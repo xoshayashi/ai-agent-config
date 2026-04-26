@@ -1,0 +1,21 @@
+# Evidence Notes
+
+Use this file when the skill depends on non-obvious research, official references, domain standards, benchmarks, or fragile workflow details.
+
+## Source Log
+
+| Claim Or Design Rule | Source | Source Type | How It Changes The Skill |
+|---|---|---|---|
+| Replace with actionable rule. | Replace with URL or citation. | official / peer-reviewed / benchmark / standard / practitioner / assumption | Replace with the instruction, check, or workflow step it justifies. |
+
+## Design Decisions
+
+- **Kept in `SKILL.md`:** Replace with the small set of rules that must always load.
+- **Kept in references:** Replace with details that should load only when needed.
+- **Excluded:** Replace with generic behavior the base LLM already handles well.
+
+## Activation Notes
+
+- Should trigger for: replace-with-realistic-user-prompts.
+- Should not trigger for: replace-with-boundary-prompts.
+- Risky ambiguous wording: replace-with-prompts-that-need-clarification.

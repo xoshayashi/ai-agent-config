@@ -2,7 +2,9 @@
 
 Use this guide to install the shared AI agent instructions and skills on any Unix-like machine.
 
-**For AI agents:** treat this file as an executable setup brief. Use Japanese as the default conversation language unless the user asks otherwise. Determine the intended target workspace first, set `AI_AGENT_TARGET_DIR` explicitly, run `scripts/setup.sh`, then verify the links. Do not assume the config repository itself is the target unless the user says so.
+**For AI agents:** treat this file as an executable setup brief. Use Japanese as the default conversation language unless the user asks otherwise. Determine the intended target workspace first, set `AI_AGENT_TARGET_DIR` explicitly, run a dry run, summarize the planned changes, then run `scripts/setup.sh` and verify the links. Do not assume the config repository itself is the target unless the user says so.
+
+**Recommended target:** propose the user's normal parent folder for LLM CLI work first. If the user is unsure, recommend `~/Documents/projects`. If the user already has a team-mandated workspace, a monorepo root, or a folder where they regularly start Claude Code, Codex, and Gemini CLI, prefer that instead.
 
 ## Prerequisites / 前提条件
 
@@ -36,6 +38,8 @@ https://github.com/xoshayashi/ai-agent-config.git
 
 取得できたら、そのリポジトリのREADME.mdとsetup.mdを読んで、このPCにAI Agent Configをセットアップして。
 Claude Code、Codex、Gemini CLIの全てがインストール済みかつログイン済みか確認して、未完了のものがあれば先に案内して。
+セットアップ先は、まず推奨として「普段LLM CLIで作業する親フォルダー」を示して。迷っている場合は `~/Documents/projects` を推奨し、既に使っている作業フォルダーや会社指定のworkspaceがあればそれを優先して。
+初回セットアップでは必ずdry runで事前確認して、作成されるリンク、バックアップされる可能性があるファイル、設定される更新頻度を日本語で要約してから本実行して。
 専門用語は日本語で説明して、更新頻度は推奨の1日1回を含めて選ばせて。
 ```
 
@@ -44,6 +48,29 @@ For AI agents executing this request:
 - Prefer a standard GitHub authentication check such as the GitHub CLI when available, but keep the user-facing interaction in plain Japanese.
 - If the repository already exists locally, update it with the latest `main`; otherwise clone `https://github.com/xoshayashi/ai-agent-config.git` into a sensible local config location such as the user's Documents folder.
 - After checkout or pull succeeds, continue with this setup guide rather than making the user issue a second command.
+- If setup, update, scheduling, or uninstall fails, use [docs/setup-error-guide.md](docs/setup-error-guide.md) to explain the error and choose the next safe step.
+
+## Recommended Target Workspace / 推奨セットアップ先
+
+`AI_AGENT_TARGET_DIR` is the folder where the entrypoint links such as `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` will be placed. It should usually be the parent folder where the user starts LLM CLI work, not this config repository.
+
+For beginners, recommend one target first instead of asking an open-ended question:
+
+| Priority | Recommended Target | Use When |
+|---|---|---|
+| **1** | Existing team workspace | The company or team already has a standard workspace folder. |
+| **2** | Existing daily work parent folder | The user already opens Claude Code, Codex, or Gemini CLI from a folder such as `~/Documents/projects`, `~/Workspace`, or a monorepo root. |
+| **3** | `~/Documents/projects` | The user is unsure. This is the default recommendation for a clean personal setup. |
+| **4** | `~/Downloads` | Temporary evaluation only. Avoid this for long-term work unless the user intentionally works there. |
+| **Avoid** | This config repository root | Only use it when the user is developing this config repository itself. |
+
+Suggested Japanese wording:
+
+```text
+セットアップ先は、普段LLM CLIで作業を始める親フォルダーにするのがおすすめです。
+迷っている場合は `~/Documents/projects` を推奨します。
+会社指定のworkspaceや、いつも使っている作業フォルダーがあればそちらを優先します。どれにしますか？
+```
 
 ## Quick Start
 
@@ -69,7 +96,7 @@ AI_AGENT_TARGET_DIR="/path/to/workspace" sh /path/to/ai-agent-config/scripts/ins
 
 After all three LLM CLIs are installed and logged in, give the Claude Code, Codex, or Gemini CLI session that will perform setup this instruction:
 
-> Read `setup.md`, explain any technical terms in plain Japanese, set `AI_AGENT_TARGET_DIR` to the project or workspace directory that should receive the instruction entrypoints, ask me what update frequency I want with daily as the recommended option, then run `scripts/setup.sh`, configure or disable updates according to my choice, and verify the resulting links.
+> Read `setup.md`, explain any technical terms in plain Japanese, recommend a target workspace before asking me to choose, set `AI_AGENT_TARGET_DIR` to that project or workspace directory, ask me what update frequency I want with daily as the recommended option, run a dry run first and summarize the planned changes in Japanese, then run `scripts/setup.sh`, configure or disable updates according to my choice, and verify the resulting links.
 
 If the user has not installed or logged in to all of Claude Code, Codex, and Gemini CLI yet, start from **Prerequisites / 前提条件** before running setup commands.
 
@@ -110,13 +137,55 @@ For non-technical users, prefer this interaction pattern:
 
 1. **GitHubログインを確認する。** 未ログインなら、ブラウザ認証など必要な操作だけを日本語で案内します。
 2. **このリポジトリを取得または更新する。** PC上に無ければ取得し、既にあれば最新版の `main` に更新します。
-3. **対象フォルダーを人間の言葉で伝える。** 例: "Downloadsフォルダーに設定します。ここで開いたAIツールが共通ルールを読めるようになります。" 対象が不明な場合だけ、平易な質問を1つして確認します。
+3. **推奨セットアップ先を示して選んでもらう。** まず `~/Documents/projects`、既存の作業フォルダー、会社指定workspaceの順で提案します。例: "`~/Documents/projects` に設定するのがおすすめです。ここで開いたAIツールが共通ルールを読めるようになります。"
 4. **実行前に短く説明する。** ユーザーが詳しい説明を求めない限り、日本語で2から3文に収めます。
-5. **セットアップを実行する。** 現在のフォルダーに依存しないよう、`AI_AGENT_TARGET_DIR` を明示して実行します。
-6. **更新頻度を選んでもらう。** 推奨は「1日1回」です。選択肢は「1日1回」「12時間ごと」「1週間ごと」「自動更新なし」「カスタム秒数」くらいに絞ります。
-7. **更新設定を反映する。** 選んだ頻度に合わせて `AI_AGENT_UPDATE_CADENCE` または `AI_AGENT_UPDATE_INTERVAL_SECONDS` を指定し、`scripts/schedule-update.sh` で自動更新を設定または停止します。
-8. **結果を確認して翻訳する。** `readlink` は「近道ファイルがどの本体ファイルを指しているか確認するコマンド」だと説明します。
-9. **最後に簡単にまとめる。** 何を設定したか、バックアップが作られたか、更新頻度は何か、急ぎの時に何を頼めばよいかを短く伝えます。
+5. **dry runで事前確認する。** `AI_AGENT_DRY_RUN=1` と `AI_AGENT_TARGET_DIR` を指定して予行演習し、作成予定のリンク、バックアップ候補、Skillリンク、状態ファイルを日本語で要約します。
+6. **要約後に本実行する。** ユーザーが明示的に止めない限り、同じ `AI_AGENT_TARGET_DIR` で本実行します。
+7. **更新頻度を選んでもらう。** 推奨は「1日1回」です。選択肢は「1日1回」「12時間ごと」「1週間ごと」「自動更新なし」「カスタム秒数」くらいに絞ります。
+8. **更新設定を反映する。** 選んだ頻度に合わせて `AI_AGENT_UPDATE_CADENCE` または `AI_AGENT_UPDATE_INTERVAL_SECONDS` を指定し、`scripts/schedule-update.sh` で自動更新を設定または停止します。
+9. **結果を確認して翻訳する。** `readlink` は「近道ファイルがどの本体ファイルを指しているか確認するコマンド」だと説明します。
+10. **最後に簡単にまとめる。** 何を設定したか、バックアップが作られたか、更新頻度は何か、急ぎの時に何を頼めばよいかを短く伝えます。
+
+## Dry-Run Approval / 事前確認
+
+First-time setup should use dry run as a standard safety step.
+
+```sh
+AI_AGENT_DRY_RUN=1 AI_AGENT_TARGET_DIR="/path/to/workspace" sh /path/to/ai-agent-config/scripts/setup.sh
+```
+
+After dry run, summarize in Japanese:
+
+- **リンク作成予定:** Which entrypoint files and skill directories would be linked.
+- **既存ファイルの扱い:** Whether any existing files would be backed up.
+- **状態ファイル:** Where setup state would be written for future updates.
+- **次の実行:** The exact target workspace and update cadence that will be used for the real run.
+
+Then proceed with the real setup unless the user stops or changes the target.
+
+## Uninstall / 元に戻す
+
+The uninstall flow removes only links and state files that this repository manages. It skips ordinary files and unmanaged links.
+
+Preview first:
+
+```sh
+AI_AGENT_DRY_RUN=1 sh /path/to/ai-agent-config/scripts/uninstall.sh
+```
+
+Then run the actual cleanup:
+
+```sh
+sh /path/to/ai-agent-config/scripts/uninstall.sh
+```
+
+For beginner-facing LLM CLI sessions, use this Japanese interaction:
+
+```text
+まずdry runで、どのリンクと設定ファイルを片付ける予定か確認します。
+通常のファイルや、別の設定が作ったリンクは触りません。
+問題なければ、実際の片付けでは対象をゴミ箱へ移します。
+```
 
 ## What The Script Installs
 
@@ -215,6 +284,21 @@ sh /path/to/ai-agent-config/scripts/update.sh
 
 Explain in Japanese that this pulls the latest shared instructions immediately and re-applies the saved setup. If the update stops because the config repository has local changes, explain that the script stopped to avoid overwriting local edits.
 
+## Contributing And Validation / みんなで育てるために
+
+When adding or changing shared instructions, setup behavior, skills, or agent workflows, keep portability and activation quality visible.
+
+- **互換性を確認する:** Use [docs/compatibility.md](docs/compatibility.md) and [compatibility/llm-cli-matrix.yml](compatibility/llm-cli-matrix.yml) when a change may affect Claude Code, Codex, or Gemini CLI differently.
+- **Skillはテンプレートから始める:** Start new skills from `skills/template/SKILL.md.template`, then fill in activation tests under `tests/`.
+- **根拠を分離する:** Keep `SKILL.md` lean and put source notes, benchmarks, official references, or academic background in `references/`.
+- **検証を実行する:** Before a pull request or distribution update, run:
+
+```sh
+sh scripts/validate-repo.sh
+```
+
+If validation fails, explain the error in Japanese, fix the smallest relevant issue, and run validation again.
+
 ## Examples
 
 Install instructions into the current project and skills into the shared directory:
@@ -226,7 +310,7 @@ AI_AGENT_TARGET_DIR="$PWD" sh /path/to/ai-agent-config/scripts/setup.sh
 Install into a specific workspace:
 
 ```sh
-AI_AGENT_TARGET_DIR="$HOME/Downloads" sh "$HOME/Documents/ai-agent-config/scripts/setup.sh"
+AI_AGENT_TARGET_DIR="$HOME/Documents/projects" sh "$HOME/Documents/ai-agent-config/scripts/setup.sh"
 ```
 
 Install skills into both the shared directory and a Codex-specific directory:
@@ -254,6 +338,20 @@ Run an urgent one-time update:
 ```sh
 sh /path/to/ai-agent-config/scripts/update.sh
 ```
+
+Preview uninstall without changing files:
+
+```sh
+AI_AGENT_DRY_RUN=1 sh /path/to/ai-agent-config/scripts/uninstall.sh
+```
+
+Undo setup by moving managed links and saved setup state to the trash:
+
+```sh
+sh /path/to/ai-agent-config/scripts/uninstall.sh
+```
+
+If the user says **"全部元に戻して"** or **"AI Agent Configを外して"**, explain what will be moved to the trash, run the dry-run uninstall first, summarize it in Japanese, then run `scripts/uninstall.sh` unless the user changes course.
 
 ## Conflict Handling
 

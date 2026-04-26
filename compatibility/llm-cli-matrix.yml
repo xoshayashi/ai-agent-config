@@ -1,0 +1,62 @@
+version: 1
+updated: "2026-04-26"
+purpose: >
+  Track which shared instruction and skill surfaces are expected to work across
+  Claude Code, Codex, and Gemini CLI. Use this file when reviewing changes that
+  may affect cross-LLM behavior.
+
+tools:
+  claude-code:
+    entrypoint: "CLAUDE.md"
+    shared_instruction: "AI_AGENT_INSTRUCTIONS.md"
+    status: "supported"
+    notes:
+      - "Reads CLAUDE.md as the thin entrypoint for this repository."
+      - "Use setup.md when onboarding users through natural language."
+  codex:
+    entrypoint: "AGENTS.md"
+    shared_instruction: "AI_AGENT_INSTRUCTIONS.md"
+    status: "supported"
+    notes:
+      - "Reads AGENTS.md as the thin entrypoint for this repository."
+      - "Skills can be linked into Codex-specific skill directories when needed."
+  gemini-cli:
+    entrypoint: "GEMINI.md"
+    shared_instruction: "AI_AGENT_INSTRUCTIONS.md"
+    status: "supported"
+    notes:
+      - "Reads GEMINI.md as the thin entrypoint for this repository."
+      - "Avoid assuming Claude-only slash commands work in Gemini CLI."
+
+shared_surfaces:
+  instruction_entrypoints:
+    files:
+      - "instructions/AGENTS.md"
+      - "instructions/CLAUDE.md"
+      - "instructions/GEMINI.md"
+      - "instructions/AI_AGENT_INSTRUCTIONS.md"
+      - "instructions/.github/copilot-instructions.md"
+    compatibility: "required"
+    review_rule: "Do not update one entrypoint without checking whether the shared instruction path still matches."
+  shared_skills:
+    source: "skills/*/SKILL.md"
+    compatibility: "conditional"
+    review_rule: "A skill must define realistic activation wording and should not rely on a single LLM vendor's private behavior unless documented."
+  natural_language_setup:
+    files:
+      - "README.md"
+      - "setup.md"
+    compatibility: "required"
+    review_rule: "A beginner should be able to paste the setup request into any supported LLM CLI and continue without command-writing expertise."
+
+review_tags:
+  portable:
+    meaning: "Expected to work across Claude Code, Codex, and Gemini CLI."
+  claude-code-only:
+    meaning: "Uses Claude Code-specific behavior. Add a fallback or document why portability is not required."
+  codex-only:
+    meaning: "Uses Codex-specific behavior. Add a fallback or document why portability is not required."
+  gemini-cli-only:
+    meaning: "Uses Gemini CLI-specific behavior. Add a fallback or document why portability is not required."
+  unknown:
+    meaning: "Compatibility has not been verified. Treat as a review blocker for shared instructions."

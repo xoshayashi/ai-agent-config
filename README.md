@@ -31,6 +31,8 @@ https://github.com/xoshayashi/ai-agent-config.git
 
 取得できたら、そのリポジトリのREADME.mdとsetup.mdを読んで、このPCにAI Agent Configをセットアップして。
 Claude Code、Codex、Gemini CLIの全てがインストール済みかつログイン済みか確認して、未完了のものがあれば先に案内して。
+セットアップ先は、まず推奨として「普段LLM CLIで作業する親フォルダー」を示して。迷っている場合は `~/Documents/projects` を推奨し、既に使っている作業フォルダーや会社指定のworkspaceがあればそれを優先して。
+初回セットアップでは必ずdry runで事前確認して、作成されるリンク、バックアップされる可能性があるファイル、設定される更新頻度を日本語で要約してから本実行して。
 専門用語は日本語で説明して、更新頻度は推奨の1日1回を含めて選ばせて。
 ```
 
@@ -41,6 +43,8 @@ Claude Code、Codex、Gemini CLIの全てがインストール済みかつログ
 ```text
 README.mdとsetup.mdを読んで、このPCにAI Agent Configをセットアップして。
 まだClaude Code、Codex、Gemini CLIの全てのインストールやログインが済んでいなければ、最初にそこから案内して。
+セットアップ先は、まず推奨として「普段LLM CLIで作業する親フォルダー」を示して。迷っている場合は `~/Documents/projects` を推奨し、既に使っている作業フォルダーや会社指定のworkspaceがあればそれを優先して。
+初回セットアップでは必ずdry runで事前確認して、作成されるリンク、バックアップされる可能性があるファイル、設定される更新頻度を日本語で要約してから本実行して。
 専門用語は日本語で説明して、更新頻度は推奨の1日1回を含めて選ばせて。
 ```
 
@@ -80,6 +84,23 @@ sh /path/to/ai-agent-config/scripts/update.sh
 ```
 
 LLMには「急ぎ対応したいんだけど」と伝えれば、この手順で進めるように案内しています。
+
+## 元に戻したい時
+
+設定を外したい場合は、LLM CLIに次のように伝えてください。
+
+```text
+AI Agent Configのセットアップを元に戻して。README.mdとsetup.mdを読んで、uninstall手順でリンクと保存済み設定を安全に片付けて。
+削除が必要なものは完全削除せず、ゴミ箱に移して。実行前に何を片付けるか日本語で説明して。
+```
+
+## みんなで育てる時
+
+このリポジトリを複数人で更新する場合は、変更前に [docs/compatibility.md](docs/compatibility.md) を確認してください。新しいSkillは `skills/template/` から作り、PR前に次を実行します。
+
+```sh
+sh scripts/validate-repo.sh
+```
 
 ## 詳細
 

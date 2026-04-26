@@ -1,0 +1,36 @@
+---
+name: replace-with-skill-name
+description: Use this skill when the user asks for replace-with-clear-trigger-intent. Include realistic user wording, the work product, and the boundary where this skill should not trigger.
+---
+
+# Replace With Skill Title
+
+Use this skill to help with replace-with-specific-job.
+
+## Use When
+
+- The user asks to replace-with-should-trigger-example.
+- The task requires replace-with-domain-specific-knowledge-or-workflow.
+- The output needs replace-with-expected-artifact.
+
+Do not use this skill for replace-with-should-not-trigger-boundary.
+
+## Workflow
+
+1. **Frame the request.** Identify the user's goal, target artifact, constraints, and completion criteria.
+2. **Load only needed references.** Use files in `references/` only when the request needs that detail.
+3. **Execute the core workflow.** Replace this with the few steps that are truly specific to the skill.
+4. **Verify the result.** Run the narrowest meaningful check or use the test prompts in `tests/`.
+5. **Report clearly.** Summarize what changed, what was verified, and any remaining risk.
+
+## References
+
+- Use `references/evidence-notes.md.template` when the skill needs research, standards, benchmarks, official references, or domain-specific evidence.
+- Use `tests/activation-prompts.md` when checking whether the skill triggers on realistic prompts.
+
+## Self-Review
+
+- Is the `description` specific enough to trigger from natural user language?
+- Is the skill avoiding behavior the base LLM already handles well?
+- Are tool-specific assumptions marked or avoided?
+- Are detailed notes kept in `references/` instead of bloating `SKILL.md`?
