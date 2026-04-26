@@ -2,6 +2,8 @@
 
 AIツール向けの共通InstructionsとSkillsを配布・更新するための設定リポジトリです。
 
+> **注意:** リポジトリ名を `ai-agent-config` から `llm-config` に改称中です。本書中のクローン URL `https://github.com/xoshayashi/llm-config.git` および `~/Documents/llm-config` 等のパスは、**GitHub 側のリポジトリ rename 完了後に有効化** されます。rename が未実施の段階では旧 URL `https://github.com/xoshayashi/ai-agent-config.git` を使ってください（rename 後は GitHub の自動リダイレクトにより旧 URL も引き続き動作します）。
+
 ## 最初に準備すること
 
 このセットアップは、**ターミナルでClaude Code、Codex、Gemini CLIの全てにログインできている状態**から進めます。まだの場合は、先に次を済ませてください。
