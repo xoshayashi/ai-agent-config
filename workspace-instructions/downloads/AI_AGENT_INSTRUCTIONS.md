@@ -37,6 +37,9 @@ This file is the single source of truth for AI coding agents working in this dir
 - Keep edits scoped to the requested behavior and avoid unrelated refactors.
 - Do not revert or overwrite changes you did not make unless the user explicitly asks.
 - Use fast, targeted search tools such as `rg` when available.
+- During specification, design, and implementation, verify any uncertain or potentially outdated technical knowledge with current official references or available documentation tools such as Context7 before relying on it.
+- If an implementation attempt causes an error, an API or CLI behaves unexpectedly, or repeated trial-and-error starts, immediately stop guessing and check the latest official documentation, upstream source, or Context7-backed references before retrying.
+- Prefer primary sources for implementation details: official docs, upstream repositories, release notes, and version-matched API references. When using Context7 or similar tools, confirm the retrieved material matches the library, framework, CLI, or service version in use.
 - Verify changes with the narrowest meaningful check for the risk involved.
 
 ## LLM Peer Review
