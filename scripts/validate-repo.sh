@@ -67,6 +67,7 @@ require_file "scripts/merge-hook-config.py"
 require_file "scripts/skill-improvement-bot.py"
 require_file "scripts/validate-repo.sh"
 require_file "tests/fixtures/skill-logs/sample.jsonl"
+require_file "tests/test_merge_hook_config.py"
 require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"
@@ -108,6 +109,9 @@ say "validate: skill-improvement automation is discoverable"
 grep -q "skill-improvement-bot.py" "$repo_root/README.md" || fail "README.md does not mention skill-improvement-bot.py"
 grep -q "schedule-skill-improvement.sh" "$repo_root/setup.md" || fail "setup.md does not mention schedule-skill-improvement.sh"
 grep -q "AI_AGENT_IMPROVEMENT_CREATE_PR" "$repo_root/docs/skill-improvement-automation.md" || fail "skill improvement automation doc missing PR opt-in variable"
+
+say "validate: merge-hook-config unit tests pass"
+python3 "$repo_root/tests/test_merge_hook_config.py"
 
 say "validate: skill-improvement fixture scan detects proposal"
 # This fixture intentionally targets skill-design-research because it is the

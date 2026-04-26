@@ -31,6 +31,22 @@ The safe-delete Hook is a runtime guardrail, not the only safety layer. The
 shared instructions still require agents to use the safer trash workflow even
 if a CLI disables hooks or a hook runtime is unavailable.
 
+## CLI Conventions
+
+Each CLI has its own hook config schema; the values in this directory follow
+the per-CLI conventions deliberately.
+
+| CLI | Tool matcher (shell tool) | `timeout` unit |
+|---|---|---|
+| Claude Code | `Bash` | seconds |
+| Codex | `^Bash$` | seconds |
+| Gemini CLI | `run_shell_command` | **milliseconds** |
+
+The timeout unit is **not** consistent: Claude/Codex use seconds (e.g. `10` =
+10 s) while Gemini uses milliseconds (e.g. `10000` = 10 s). When editing these
+files, double-check the unit before changing a `timeout` value to avoid an
+accidental 1000× off-by-error.
+
 ## Scope
 
 By default setup installs project-level hook config under `AI_AGENT_TARGET_DIR`.

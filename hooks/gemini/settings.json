@@ -16,7 +16,7 @@
     ],
     "BeforeTool": [
       {
-        "matcher": ".*",
+        "matcher": "run_shell_command",
         "hooks": [
           {
             "name": "llm-config-safe-delete-guard",
