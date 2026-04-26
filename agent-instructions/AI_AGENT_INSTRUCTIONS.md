@@ -1,12 +1,25 @@
 # AI Agent Instructions
 
-This file is the single source of truth for AI coding agents working in this directory tree. `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and `.github/copilot-instructions.md` are entrypoints that point here.
+**This file is the single source of truth** for AI coding agents working in this directory tree.
+
+`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and `.github/copilot-instructions.md` are thin entrypoints that point here.
+
+## Quick Reference
+
+| Area | Required Behavior |
+|---|---|
+| **Scope** | Apply these instructions to `/Users/sh/Downloads` and all descendants. |
+| **Before work** | Identify the goal, scope, deliverable, constraints, and completion criteria before acting. |
+| **Deletion** | **Never run or suggest `rm`; use `trash` for file or directory removal.** |
+| **Uncertainty** | When knowledge may be outdated or an error appears, check official references, upstream sources, or Context7 before retrying. |
+| **Quality gate** | Treat completion as the start of mandatory self-review; improve until the work meets a high quality bar within scope. |
+| **Writing** | Use the target medium's formatting and structure deliberately so the output is easy to scan and act on. |
 
 ## Scope
 
-- These instructions apply to `/Users/sh/Downloads` and its descendants.
+- **Applies to:** `/Users/sh/Downloads` and its descendants.
 - Follow higher-priority system, developer, tool, and explicit user instructions when they conflict with this file.
-- If an entrypoint file points here, read and follow this file before starting work.
+- If an entrypoint file points here, **read and follow this file before starting work**.
 
 ## Task Intake
 
@@ -23,13 +36,16 @@ This file is the single source of truth for AI coding agents working in this dir
 
 ## File Deletion And Safety
 
-- Do not run or suggest the `rm` command.
-- When a file or directory must be removed, use `trash` so it goes to the trash instead of being permanently deleted.
-- If `trash` is unavailable, do not guess an alias or replacement and do not use `rm`; report the blocker and continue with any non-deletion work that remains in scope.
-- If the user asks for a command that includes `rm`, replace that deletion step with `trash` and mention the substitution.
-- When adding scripts, Makefiles, package scripts, CI steps, or documentation, do not introduce `rm`; use `trash` for deletion behavior unless the user explicitly approves a tool-specific exception.
-- If deletion is explicitly requested or clearly necessary within the agreed task scope, use `trash` without asking for extra step-by-step confirmation, then report what was moved to the trash.
-- For non-trash destructive operations, version-control cleanup, broad workspace rewrites, or ambiguous deletions, proceed only when the user's request clearly covers the target and scope. Otherwise prefer reversible alternatives and continue within the clear scope.
+**Hard rule:** Do not run or suggest the `rm` command.
+
+| Situation | Required Response |
+|---|---|
+| A file or directory must be removed | Use `trash` so the item goes to the trash instead of being permanently deleted. |
+| `trash` is unavailable | Do not guess an alias or replacement and do not use `rm`; report the blocker and continue with non-deletion work in scope. |
+| The user asks for a command containing `rm` | Replace that deletion step with `trash` and mention the substitution. |
+| Adding scripts, Makefiles, package scripts, CI steps, or documentation | Do not introduce `rm`; use `trash` for deletion behavior unless the user explicitly approves a tool-specific exception. |
+| Deletion is clearly in scope | Use `trash` without extra step-by-step confirmation, then report what was moved to the trash. |
+| Non-trash destructive operations, version-control cleanup, broad workspace rewrites, or ambiguous deletions | Proceed only when the request clearly covers the target and scope. Otherwise prefer reversible alternatives and continue within the clear scope. |
 
 ## Work Practices
 
@@ -37,9 +53,9 @@ This file is the single source of truth for AI coding agents working in this dir
 - Keep edits scoped to the requested behavior and avoid unrelated refactors.
 - Do not revert or overwrite changes you did not make unless the user explicitly asks.
 - Use fast, targeted search tools such as `rg` when available.
-- During specification, design, and implementation, verify any uncertain or potentially outdated technical knowledge with current official references or available documentation tools such as Context7 before relying on it.
-- If an implementation attempt causes an error, an API or CLI behaves unexpectedly, or repeated trial-and-error starts, immediately stop guessing and check the latest official documentation, upstream source, or Context7-backed references before retrying.
-- Prefer primary sources for implementation details: official docs, upstream repositories, release notes, and version-matched API references. When using Context7 or similar tools, confirm the retrieved material matches the library, framework, CLI, or service version in use.
+- During specification, design, and implementation, **verify uncertain or potentially outdated technical knowledge** with current official references or available documentation tools such as Context7 before relying on it.
+- If an implementation attempt causes an error, an API or CLI behaves unexpectedly, or repeated trial-and-error starts, **stop guessing immediately** and check the latest official documentation, upstream source, or Context7-backed references before retrying.
+- Prefer **primary sources** for implementation details: official docs, upstream repositories, release notes, and version-matched API references. When using Context7 or similar tools, confirm the retrieved material matches the library, framework, CLI, or service version in use.
 - Verify changes with the narrowest meaningful check for the risk involved.
 
 ## Writing And Documentation Quality
@@ -69,7 +85,7 @@ This file is the single source of truth for AI coding agents working in this dir
 
 ## Completion Quality Gate
 
-- Treat completion as the start of a mandatory self-review pass, not the stopping point. After every deliverable, review the work critically and keep improving it until it meets a high quality bar within the agreed scope.
+- **Treat completion as the start of a mandatory self-review pass, not the stopping point.** After every deliverable, review the work critically and keep improving it until it meets a high quality bar within the agreed scope.
 - Do not stop at the first apparently working result. Before reporting completion, review the finished work against the initial goal, scope, deliverable, constraints, and acceptance criteria.
 - Inspect the actual output or changed files directly, and when feasible run or render the result in the form the user will experience it.
 - For non-trivial deliverables, complex tradeoffs, or high-stakes wording, include LLM peer review in this quality gate when additional reasoning would materially improve quality, and apply useful feedback before final reporting.
@@ -77,6 +93,14 @@ This file is the single source of truth for AI coding agents working in this dir
 - Check for mismatches with the original intent, missing edge cases, degraded usability, unclear wording, formatting issues, brittle implementation, and avoidable quality problems.
 - If the review finds a gap, fix it autonomously, re-verify, and repeat the review loop until the output is consistent with the specification and meets a high quality bar.
 - Keep the improvement loop in scope. Do not expand into unrelated refactors or new features unless they are necessary to satisfy the original request.
+
+| Self-Review Area | Check Before Reporting Completion |
+|---|---|
+| **Intent fit** | Does the result actually satisfy the user's latest request and acceptance criteria? |
+| **Correctness** | Are the facts, commands, APIs, file paths, links, and assumptions verified where risk warrants it? |
+| **Structure and naming** | Do names, folders, repo names, URLs, labels, and layout match the real scope? |
+| **User experience** | Is the output easy to read, scan, use, and maintain in its actual medium? |
+| **Verification** | Were the narrowest meaningful checks run, and are any remaining risks clearly reported? |
 
 ## Reporting
 
