@@ -749,7 +749,7 @@ def changed_paths(root: Path) -> list[str]:
 
 def stage_allowed_changed_paths(root: Path) -> list[str]:
     changed = changed_paths(root)
-    allowed = [path for path in changed if is_auto_pr_allowed(path, Path(""))]
+    allowed = [path for path in changed if is_auto_pr_allowed(path, None)]
     rejected = sorted(set(changed) - set(allowed))
     if rejected:
         raise SystemExit("error: refusing to stage unexpected review-feedback path(s): " + ", ".join(rejected))
@@ -758,9 +758,9 @@ def stage_allowed_changed_paths(root: Path) -> list[str]:
     return allowed
 
 
-def is_auto_pr_allowed(path: str, report_path: Path) -> bool:
+def is_auto_pr_allowed(path: str, report_path: Path | None) -> bool:
     normalized = path.replace("\\", "/")
-    if normalized == str(report_path).replace("\\", "/"):
+    if report_path is not None and normalized == str(report_path).replace("\\", "/"):
         return True
     for prefix in AUTO_PR_ALLOWED_PATHS:
         normalized_prefix = prefix.rstrip("/")
