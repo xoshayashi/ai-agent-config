@@ -2,7 +2,7 @@
 
 Use this guide to install the shared AI agent instructions and skills on any Unix-like machine.
 
-**For AI agents:** treat this file as an executable setup brief. Determine the intended target workspace first, set `AI_AGENT_TARGET_DIR` explicitly, run `scripts/setup.sh`, then verify the links. Do not assume the config repository itself is the target unless the user says so.
+**For AI agents:** treat this file as an executable setup brief. Use Japanese as the default conversation language unless the user asks otherwise. Determine the intended target workspace first, set `AI_AGENT_TARGET_DIR` explicitly, run `scripts/setup.sh`, then verify the links. Do not assume the config repository itself is the target unless the user says so.
 
 ## Quick Start
 
@@ -22,13 +22,45 @@ AI_AGENT_TARGET_DIR="/path/to/workspace" sh scripts/setup.sh
 
 Give Claude Code this instruction:
 
-> Read `setup.md`, set `AI_AGENT_TARGET_DIR` to the project or workspace directory that should receive the instruction entrypoints, then run `scripts/setup.sh` and verify the resulting links.
+> Read `setup.md`, explain any technical terms in plain Japanese, set `AI_AGENT_TARGET_DIR` to the project or workspace directory that should receive the instruction entrypoints, then run `scripts/setup.sh` and verify the resulting links.
 
 If Claude Code is opened inside this config repository, tell it the target directory explicitly:
 
 ```text
 Read setup.md and set up my workspace at /path/to/workspace.
 ```
+
+## Beginner-Friendly Interaction / 初心者にもやさしい対話
+
+This setup may be used by every employee type, including people who are new to terminals, Git, Claude Code, Codex, or AI agent configuration. When an AI agent helps with setup, it should make the process understandable without turning the session into a lecture. The default employee-facing conversation should be in Japanese.
+
+Before running commands, the agent should briefly explain in Japanese:
+
+- **何が変わるか:** 選んだ作業フォルダーに、AIツールが共通ルールを見つけるための小さな案内ファイルを置きます。
+- **どこが変わるか:** `AGENTS.md`、`CLAUDE.md`、`GEMINI.md` などが置かれるフォルダーが対象です。
+- **なぜリンクを使うか:** 共通ルールの本体は1か所で管理しつつ、各AIツールが期待する場所から読めるようにするためです。
+- **既存ファイルの扱い:** 同じ名前のファイルがある場合、標準では削除せずバックアップフォルダーへ退避します。
+- **成功状態:** 対象フォルダーに案内ファイルのリンクができ、共有Skillも設定済みのSkillフォルダーから使える状態です。
+
+Use plain Japanese explanations for technical terms the first time they appear. Keep command names, file names, and environment variable names in their original spelling, then explain what they mean.
+
+| Term | Plain Japanese Explanation |
+|---|---|
+| **Repository** | Gitで管理されているフォルダーです。多くの場合、GitHubからダウンロードします。 |
+| **Workspace** | AIツールにこの共通ルールを読ませたい作業フォルダーです。 |
+| **Symbolic link / symlink** | 実体ファイルへの近道のようなファイルです。コピーではなく、元ファイルを指し示します。 |
+| **Environment variable** | コマンドに渡す一時的な設定です。たとえば、どのフォルダーをセットアップするかを指定します。 |
+| **Skill** | AIツールに特定の作業手順を教える、再利用できる説明書パッケージです。 |
+| **Backup** | 変更前に存在していたファイルを安全に残しておく退避先です。 |
+| **Dry run** | 実際には変更せず、何が起きるかだけを確認する予行演習モードです。 |
+
+For non-technical users, prefer this interaction pattern:
+
+1. **対象フォルダーを人間の言葉で伝える。** 例: "Downloadsフォルダーに設定します。ここで開いたAIツールが共通ルールを読めるようになります。" 対象が不明な場合だけ、平易な質問を1つして確認します。
+2. **実行前に短く説明する。** ユーザーが詳しい説明を求めない限り、日本語で2から3文に収めます。
+3. **セットアップを実行する。** 現在のフォルダーに依存しないよう、`AI_AGENT_TARGET_DIR` を明示して実行します。
+4. **結果を確認して翻訳する。** `readlink` は「近道ファイルがどの本体ファイルを指しているか確認するコマンド」だと説明します。
+5. **最後に簡単にまとめる。** 何を設定したか、バックアップが作られたか、次に何ができるかを短く伝えます。
 
 ## What The Script Installs
 
