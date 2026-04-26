@@ -301,6 +301,8 @@ These phrases are intentional hooks. When the user says one of them in a setup/c
 | **「最新のルールを反映して」** | Refresh shared rules immediately. | `scripts/update.sh` |
 | **「設定が壊れていないか確認して」** | Check GitHub login, CLI paths, repository state, and links. | `scripts/health-check.sh` |
 | **「ヘルスチェックして」** | Run a read-only setup health check. | `scripts/health-check.sh` |
+| **「最近のログからSkill改善点を見て」** | Scan local LLM CLI logs and summarize redacted skill-improvement opportunities. | `scripts/skill-improvement-bot.py scan` |
+| **「Skill改善PRまで自動で作って」** | Generate a redacted improvement report and open a PR when opt-in GitHub automation is enabled. | `scripts/skill-improvement-bot.py run` |
 
 For urgent updates, run health check only when the current setup location is unclear or the update fails. Otherwise, locate the config repository from `AI_AGENT_CONFIG_HOME`, `$HOME/.ai-agent-config/config.env`, or the symlink target of `AI_AGENT_INSTRUCTIONS.md`, then run the updater.
 
@@ -322,20 +324,42 @@ sh /path/to/ai-agent-config/scripts/health-check.sh
 
 Explain `ok`, `warn`, and `fail` in Japanese. If the user or another agent needs structured output, rerun with `--json`.
 
-## Contributing And Validation / みんなで育てるために
+## Skill Improvement Automation / Skillを自動で育てる仕組み
 
-When adding or changing shared instructions, setup behavior, skills, or agent workflows, keep portability and activation quality visible.
+このリポジトリは、複数人が使った結果を **ローカルログから匿名化して改善候補へ変換する** 自動化を持ちます。手動チェックリストではなく、次の流れでSkill改善を進めます。
 
-- **互換性を確認する:** Use [docs/compatibility.md](docs/compatibility.md) and [compatibility/llm-cli-matrix.yml](compatibility/llm-cli-matrix.yml) when a change may affect Claude Code, Codex, or Gemini CLI differently.
-- **Skillはテンプレートから始める:** Start new skills from `skills/template/SKILL.md.template`, then fill in activation tests under `tests/`.
-- **根拠を分離する:** Keep `SKILL.md` lean and put source notes, benchmarks, official references, or academic background in `references/`.
-- **検証を実行する:** Before a pull request or distribution update, run:
+チームでSkill品質を育てる時は、個別の思いつきだけでSkillを増やすより、**実際の追加修正依頼から抽出した改善候補をPR化する** この流れを優先してください。
+
+1. Claude Code、Codex、Gemini CLIのローカルログを読む。
+2. Skill使用後の追加修正依頼から、Skillに吸収すべき改善ポイントだけを抽出する。
+3. 個人情報や秘密情報を伏せた改善レポートを作る。
+4. 必要に応じてLLMにSkill本文の改善パッチを作らせる。
+5. `scripts/validate-repo.sh` を自動実行する。
+6. opt-in設定がある時だけPull Requestを作る。
+7. Claudeレビュー、CI、未解決スレッド、Draft状態、競合を確認し、条件が揃った時だけ自動マージを予約する。
+
+改善候補を見るだけなら次を実行します。
 
 ```sh
-sh scripts/validate-repo.sh
+python3 scripts/skill-improvement-bot.py scan
 ```
 
-If validation fails, explain the error in Japanese, fix the smallest relevant issue, and run validation again.
+定期実行のdry-runは次です。
+
+```sh
+AI_AGENT_DRY_RUN=1 sh scripts/schedule-skill-improvement.sh
+```
+
+PR作成まで有効化する場合は、`gh auth status` が成功する状態で次を設定します。
+
+```sh
+AI_AGENT_IMPROVEMENT_CREATE_PR=1 \
+AI_AGENT_IMPROVEMENT_LLM=claude \
+AI_AGENT_IMPROVEMENT_CADENCE=daily \
+sh scripts/schedule-skill-improvement.sh
+```
+
+**重要:** 生ログはコミットしません。PR作成、Claudeレビュー対応、自動マージは、該当する環境変数を明示した場合だけ動きます。詳しくは [docs/skill-improvement-automation.md](docs/skill-improvement-automation.md) を読んでください。
 
 ## Examples
 
@@ -369,6 +393,12 @@ Schedule daily updates, the recommended cadence:
 
 ```sh
 AI_AGENT_UPDATE_CADENCE=daily sh /path/to/ai-agent-config/scripts/schedule-update.sh
+```
+
+Schedule daily skill-improvement scans:
+
+```sh
+AI_AGENT_IMPROVEMENT_CADENCE=daily sh /path/to/ai-agent-config/scripts/schedule-skill-improvement.sh
 ```
 
 Run an urgent one-time update:

@@ -28,6 +28,7 @@ gha-creds-*.json
 # Logs and temporary files
 *.log
 logs/
+reports/
 tmp/
 temp/
 .cache/
