@@ -950,7 +950,13 @@ Requirements:
     staged = stage_allowed_changed_paths(root)
     if staged:
         run_command(["git", "commit", "-m", f"Address automated review feedback for PR #{pr}"], root)
-        run_command(["git", "push", "origin", "HEAD"], root)
+        push_result = run_command(["git", "push", "origin", "HEAD"], root, check=False)
+        if push_result.returncode != 0:
+            # Avoid leaving an unpushed local-only commit that would pollute
+            # subsequent scheduler runs on this PR branch.
+            run_command(["git", "reset", "--soft", "HEAD~1"], root, check=False)
+            detail = push_result.stderr.strip() or push_result.stdout.strip() or "unknown error"
+            raise SystemExit(f"error: git push failed: {detail}")
 
 
 def maybe_auto_merge(root: Path, pr: str, data: dict[str, Any], dry_run: bool) -> None:
