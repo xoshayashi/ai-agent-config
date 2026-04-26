@@ -42,16 +42,18 @@ esac
 
 env_config_set=${AI_AGENT_CONFIG_HOME+x}
 env_config=${AI_AGENT_CONFIG_HOME-}
-env_target_set=${AI_AGENT_TARGET_DIR+x}
-env_target=${AI_AGENT_TARGET_DIR-}
+env_codex_home_set=${AI_AGENT_CODEX_HOME+x}
+env_codex_home=${AI_AGENT_CODEX_HOME-}
+env_claude_home_set=${AI_AGENT_CLAUDE_HOME+x}
+env_claude_home=${AI_AGENT_CLAUDE_HOME-}
+env_gemini_home_set=${AI_AGENT_GEMINI_HOME+x}
+env_gemini_home=${AI_AGENT_GEMINI_HOME-}
 env_skills_set=${AI_AGENT_SKILLS_DIR+x}
 env_skills=${AI_AGENT_SKILLS_DIR-}
 env_extra_skills_set=${AI_AGENT_EXTRA_SKILLS_DIRS+x}
 env_extra_skills=${AI_AGENT_EXTRA_SKILLS_DIRS-}
 env_hooks_set=${AI_AGENT_INSTALL_HOOKS+x}
 env_hooks=${AI_AGENT_INSTALL_HOOKS-}
-env_hooks_scope_set=${AI_AGENT_HOOKS_SCOPE+x}
-env_hooks_scope=${AI_AGENT_HOOKS_SCOPE-}
 env_hooks_runtime_set=${AI_AGENT_HOOKS_RUNTIME_LINK+x}
 env_hooks_runtime=${AI_AGENT_HOOKS_RUNTIME_LINK-}
 
@@ -72,11 +74,12 @@ if [ -f "$state_file" ]; then
 fi
 
 [ "${env_config_set:-}" = "x" ] && AI_AGENT_CONFIG_HOME=$env_config
-[ "${env_target_set:-}" = "x" ] && AI_AGENT_TARGET_DIR=$env_target
+[ "${env_codex_home_set:-}" = "x" ] && AI_AGENT_CODEX_HOME=$env_codex_home
+[ "${env_claude_home_set:-}" = "x" ] && AI_AGENT_CLAUDE_HOME=$env_claude_home
+[ "${env_gemini_home_set:-}" = "x" ] && AI_AGENT_GEMINI_HOME=$env_gemini_home
 [ "${env_skills_set:-}" = "x" ] && AI_AGENT_SKILLS_DIR=$env_skills
 [ "${env_extra_skills_set:-}" = "x" ] && AI_AGENT_EXTRA_SKILLS_DIRS=$env_extra_skills
 [ "${env_hooks_set:-}" = "x" ] && AI_AGENT_INSTALL_HOOKS=$env_hooks
-[ "${env_hooks_scope_set:-}" = "x" ] && AI_AGENT_HOOKS_SCOPE=$env_hooks_scope
 [ "${env_hooks_runtime_set:-}" = "x" ] && AI_AGENT_HOOKS_RUNTIME_LINK=$env_hooks_runtime
 
 default_config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
@@ -135,17 +138,17 @@ run git -C "$config_home" fetch "$remote" "$branch"
 run git -C "$config_home" merge --ff-only FETCH_HEAD
 
 if [ "$rerun_setup" = "1" ]; then
-  [ -n "${AI_AGENT_TARGET_DIR:-}" ] || fail "AI_AGENT_TARGET_DIR is not set and no saved setup state was found. Run scripts/setup.sh once, or set AI_AGENT_TARGET_DIR."
   say "re-apply setup"
   run env \
     "AI_AGENT_CONFIG_HOME=$config_home" \
-    "AI_AGENT_TARGET_DIR=$AI_AGENT_TARGET_DIR" \
+    "AI_AGENT_CODEX_HOME=${AI_AGENT_CODEX_HOME:-$HOME/.codex}" \
+    "AI_AGENT_CLAUDE_HOME=${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}" \
+    "AI_AGENT_GEMINI_HOME=${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}" \
     "AI_AGENT_SKILLS_DIR=${AI_AGENT_SKILLS_DIR:-$HOME/.agents/skills}" \
     "AI_AGENT_EXTRA_SKILLS_DIRS=${AI_AGENT_EXTRA_SKILLS_DIRS:-}" \
     "AI_AGENT_INSTALL_INSTRUCTIONS=${AI_AGENT_INSTALL_INSTRUCTIONS:-1}" \
     "AI_AGENT_INSTALL_SKILLS=${AI_AGENT_INSTALL_SKILLS:-1}" \
     "AI_AGENT_INSTALL_HOOKS=${AI_AGENT_INSTALL_HOOKS:-1}" \
-    "AI_AGENT_HOOKS_SCOPE=${AI_AGENT_HOOKS_SCOPE:-target}" \
     "AI_AGENT_HOOKS_RUNTIME_LINK=${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}" \
     "AI_AGENT_CONFLICT_MODE=${AI_AGENT_CONFLICT_MODE:-backup}" \
     "AI_AGENT_PROTECT_LINKS=${AI_AGENT_PROTECT_LINKS:-auto}" \

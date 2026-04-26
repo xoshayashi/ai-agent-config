@@ -1,152 +1,108 @@
 # AI Agent Config
 
-AIツール向けの共通InstructionsとSkillsを配布・更新するための設定リポジトリです。
+Claude Code / Codex / Gemini CLI で共通の Instructions・Skills・Hooks を配布するためのリポジトリです。  
+**現在はグローバル設定前提**で運用します。
 
-> **注意:** リポジトリ名を `ai-agent-config` から `llm-config` に改称中です。本書中のクローン URL `https://github.com/xoshayashi/llm-config.git` および `~/Documents/llm-config` 等のパスは、**GitHub 側のリポジトリ rename 完了後に有効化** されます。rename が未実施の段階では旧 URL `https://github.com/xoshayashi/ai-agent-config.git` を使ってください（rename 後は GitHub の自動リダイレクトにより旧 URL も引き続き動作します）。
+## 何が設定されるか
 
-## 最初に準備すること
+### Instructions（グローバル）
 
-このセットアップは、**ターミナルでClaude Code、Codex、Gemini CLIの全てにログインできている状態**から進めます。まだの場合は、先に次を済ませてください。
+| CLI | 配置先 |
+|---|---|
+| Codex | `~/.codex/AGENTS.md` |
+| Claude Code | `~/.claude/CLAUDE.md` |
+| Gemini CLI | `~/.gemini/GEMINI.md` |
 
-1. **ターミナルを開く。**
-   macOSなら「ターミナル」または「iTerm2」、Windowsなら「PowerShell」または「Windows Terminal」を使います。
-2. **Claude Code、Codex、Gemini CLIを全てインストールする。**
-   この設定は、3つ全てのLLM CLIで同じ共有InstructionsとSkillsを使える状態を前提にします。
-3. **3つ全てのLLM CLIにログインする。**
-   それぞれ起動して、ログイン画面やブラウザ認証が出たら画面の案内に従います。
-4. **`git` と `python3` が使えることを確認する。**
-   `git` はリポジトリ取得、`python3` はHook設定の追記・削除とHook本体の実行に使います。
+加えて各フォルダーに `AI_AGENT_INSTRUCTIONS.md` と `DESIGN.md` をリンクします。
 
-| ツール | 公式手順 | ログイン確認の目安 |
-|---|---|---|
-| **Claude Code** | [Claude Code Quickstart](https://code.claude.com/docs/en/quickstart) | `claude` を起動し、必要なら `/login` でログインします。 |
-| **Codex** | [Codex CLI](https://developers.openai.com/codex/cli) | `codex` を起動し、初回表示の案内に従ってChatGPTアカウントまたはAPI keyでログインします。 |
-| **Gemini CLI** | [Gemini CLI Get Started](https://google-gemini.github.io/gemini-cli/docs/get-started/) | `gemini` を起動し、認証方法で「Login with Google」を選びます。 |
+### Skills（共有）
 
-## LLM CLIで完結するセットアップ依頼
+- 既定: `~/.agents/skills`
 
-Claude Code、Codex、Gemini CLIのどれかを起動したら、次の文章をそのまま貼ってください。GitHubログイン確認、リポジトリ取得、セットアップまでLLM CLIとの会話で進めます。
+### Hooks（グローバル）
 
-```text
-GitHubにログインできているか確認して。未ログインなら、初心者にも分かる日本語でログイン手順を案内して。
-その後、次のリポジトリをこのPCに取得して。保存先は `~/Documents/llm-config` を基本にして。既に同じリポジトリがある場合は、最新のmainをpullして。
+| CLI | 設定先 |
+|---|---|
+| Claude Code | `~/.claude/settings.json` |
+| Codex | `~/.codex/config.toml` と `~/.codex/hooks.json` |
+| Gemini CLI | `~/.gemini/settings.json` |
 
-https://github.com/xoshayashi/llm-config.git
-
-取得できたら、そのリポジトリのREADME.mdとsetup.mdを読んで、このPCにAI Agent Configをセットアップして。
-Claude Code、Codex、Gemini CLIの全てがインストール済みかつログイン済みか確認して、未完了のものがあれば先に案内して。
-セットアップ先は、まず推奨として「普段LLM CLIで作業する親フォルダー」を示して。迷っている場合は `~/Documents/projects` を推奨し、既に使っている作業フォルダーや会社指定のworkspaceがあればそれを優先して。
-初回セットアップでは必ずdry runで事前確認して、作成されるリンク、バックアップされる可能性があるファイル、設定される更新頻度を日本語で要約してから本実行して。
-既存のClaude Code、Codex、Gemini CLIの個人設定ファイルがある場合は置き換えず、共有Hook設定だけを追記・マージして、そのことを日本語で説明して。
-専門用語は日本語で説明して、更新頻度は推奨の1日1回を含めて選ばせて。
-```
-
-## 取得済みリポジトリでセットアップする時の言葉
-
-このリポジトリが既にPC上にある場合は、実際にセットアップを進めるClaude Code、Codex、またはGemini CLIに次のように伝えてください。
+Hook 本体はこのリポジトリで管理し、実行時は安定リンクを参照します。
 
 ```text
-README.mdとsetup.mdを読んで、このPCにAI Agent Configをセットアップして。
-まだClaude Code、Codex、Gemini CLIの全てのインストールやログインが済んでいなければ、最初にそこから案内して。
-セットアップ先は、まず推奨として「普段LLM CLIで作業する親フォルダー」を示して。迷っている場合は `~/Documents/projects` を推奨し、既に使っている作業フォルダーや会社指定のworkspaceがあればそれを優先して。
-初回セットアップでは必ずdry runで事前確認して、作成されるリンク、バックアップされる可能性があるファイル、設定される更新頻度を日本語で要約してから本実行して。
-既存のClaude Code、Codex、Gemini CLIの個人設定ファイルがある場合は置き換えず、共有Hook設定だけを追記・マージして、そのことを日本語で説明して。
-専門用語は日本語で説明して、更新頻度は推奨の1日1回を含めて選ばせて。
+${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks} -> <this repo>/hooks
 ```
 
-## 自然言語での保守・運用
+## 前提条件
 
-急ぎで最新化したい時は、次のように伝えてください。これは **`scripts/update.sh` をすぐ実行するための合図** です。
+1. ターミナルを起動できること
+2. **Claude Code / Codex / Gemini CLI を全てインストール済み**であること
+3. **3つ全てでログイン済み**であること
+4. `git` と `python3` が使えること
+
+| ツール | 公式手順 |
+|---|---|
+| Claude Code | [Claude Code Quickstart](https://code.claude.com/docs/en/quickstart) |
+| Codex | [Codex CLI](https://developers.openai.com/codex/cli) |
+| Gemini CLI | [Gemini CLI Get Started](https://google-gemini.github.io/gemini-cli/docs/get-started/) |
+
+## LLM CLI に貼るセットアップ依頼（自然言語）
 
 ```text
-急ぎ対応したいんだけど、READMEの臨時更新手順で今すぐ最新にして。
+GitHubログイン状態を確認して。未ログインなら日本語で案内して。
+次に https://github.com/xoshayashi/llm-config.git を ~/Documents/llm-config に取得して。既にあれば最新mainをpullして。
+README.mdとsetup.mdを読んで、このPCにグローバル設定としてセットアップして。
+Claude Code/Codex/Gemini CLIが全てインストール・ログイン済みか確認し、未完了があれば先に案内して。
+初回はdry runして、作成リンク・追記対象・バックアップ候補を日本語で要約してから本実行して。
+既存のsettings.jsonやconfig.tomlがある場合は置換せず、共有Hookだけappend/mergeして説明して。
+更新頻度は推奨の1日1回を含めて選ばせて。
 ```
 
-Claude Code、Codex、Gemini CLIは `scripts/update.sh` を実行して、共有InstructionsとSkillsをすぐ最新化します。ここでの **LLM** は、Claude Code、Codex、Gemini CLIのように会話しながら作業を進めるAIエージェントを指します。
+## 手動コマンド
 
-状態確認だけしたい時は、次のように伝えてください。これは **`scripts/health-check.sh` を実行するための合図** です。
+### セットアップ
 
-```text
-設定が壊れていないか確認して。README.mdとsetup.mdを読んで、health-checkを実行し、結果を日本語で短く説明して。
+```sh
+sh /path/to/llm-config/scripts/setup.sh
 ```
 
-Skillの改善候補を見たい時は、次のように伝えてください。これは **`scripts/skill-improvement-bot.py scan` を実行するための合図** です。
-
-```text
-最近のLLM CLIログから、Skillで吸収できそうな改善点がないか確認して。生ログは外に出さず、匿名化された改善候補だけ日本語で説明して。
-```
-
-## 何が入るか
-
-- `AGENTS.md`、`CLAUDE.md`、`GEMINI.md` などのAIツール用入口ファイル
-- 共通ルール本体の `AI_AGENT_INSTRUCTIONS.md`
-- 再利用可能なSkill
-- Claude Code、Codex、Gemini CLI向けの共有Hook設定
-- 更新用・状態確認用・Skill改善用スクリプト
-
-## Hooksと既存個人設定の扱い
-
-Hook本体はこのリポジトリの `hooks/` でGit管理し、実行時は次の安定リンクから参照します。
-
-```text
-${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks} -> <このリポジトリ>/hooks
-```
-
-セットアップ時は、対象workspace内の公式設定フォルダーにHook設定を入れます。
-
-| CLI | 既定の設定先 | 既存設定がない場合 | 既存設定がある場合 |
-|---|---|---|---|
-| **Claude Code** | `.claude/settings.json` | リンクを作成 | `hooks` 設定を追記・マージ |
-| **Codex** | `.codex/config.toml` / `.codex/hooks.json` | リンクを作成 | `codex_hooks=true` と `hooks` 設定を追記・マージ |
-| **Gemini CLI** | `.gemini/settings.json` | リンクを作成 | `hooks` 設定を追記・マージ |
-
-つまり、既に個人設定やチーム設定がある場合でも、標準ではファイルを丸ごと置き換えません。セッション内では `append:` と表示して、どの設定ファイルに共有Hookを追加したか説明します。
-
-グローバル設定フォルダーに入れたい場合は、セットアップ時に `AI_AGENT_HOOKS_SCOPE=user` を指定します。対象workspaceとグローバルの両方に入れる場合は `AI_AGENT_HOOKS_SCOPE=both` を使います。
-
-## 更新頻度
-
-セットアップ時に、LLMはユーザーへ更新頻度を聞きます。推奨は **1日1回** です。
-
-| 選択肢 | 設定 | 向いている場面 |
-|---|---|---|
-| **1日1回（推奨）** | `AI_AGENT_UPDATE_CADENCE=daily` または `recommended` | ほとんどの従業員向け |
-| **12時間ごと** | `AI_AGENT_UPDATE_CADENCE=twice-daily` または `12h` | ルールやSkillが頻繁に変わる時期 |
-| **1週間ごと** | `AI_AGENT_UPDATE_CADENCE=weekly` または `1w` | 安定運用で更新頻度を抑えたい場合 |
-| **自動更新なし** | `AI_AGENT_UPDATE_CADENCE=manual` | 既存の自動更新を止め、必要な時だけ手動更新したい場合 |
-| **カスタム** | `AI_AGENT_UPDATE_CADENCE=custom AI_AGENT_UPDATE_INTERVAL_SECONDS=<seconds>` | 管理者や特殊な運用向け |
-
-## 臨時更新 / 手動更新
-
-自動更新を待たずに今すぐ反映したい場合は、次を実行します。
+### 更新
 
 ```sh
 sh /path/to/llm-config/scripts/update.sh
 ```
 
-LLMには「急ぎ対応したいんだけど」と伝えれば、この手順で進めるように案内しています。
-
-## 元に戻したい時
-
-設定を外したい場合は、LLM CLIに次のように伝えてください。
-
-```text
-AI Agent Configのセットアップを元に戻して。README.mdとsetup.mdを読んで、uninstall手順でリンクと保存済み設定を安全に片付けて。
-削除が必要なものは完全削除せず、ゴミ箱に移して。実行前に何を片付けるか日本語で説明して。
-```
-
-既存設定へ追記・マージされた共有Hookは、アンインストール時に managed Hook 部分だけを外します。個人設定ファイル本体は残します。
-
-## 自動で育てる仕組み
-
-このリポジトリは、手動チェックリストだけに頼らず、**利用ログからSkillの改善候補を抽出してPR化するローカル自動化** を用意しています。
+### 状態確認
 
 ```sh
-python3 scripts/skill-improvement-bot.py scan
+sh /path/to/llm-config/scripts/health-check.sh
 ```
 
-チームでSkill品質を継続改善する時は、まずこの自動化で **実際の追加修正パターンから改善候補を作る** のを推奨します。定期実行は `scripts/schedule-skill-improvement.sh` で設定します。生ログはコミットせず、PR作成や自動マージは環境変数で明示的に有効化した場合だけ動きます。詳しくは [docs/skill-improvement-automation.md](docs/skill-improvement-automation.md) を参照してください。
+### 取り外し
 
-## 詳細
+```sh
+sh /path/to/llm-config/scripts/uninstall.sh
+```
 
-詳しいセットアップ手順、環境変数、検証方法は [setup.md](setup.md) を参照してください。
+## 自然言語トリガー（運用）
+
+- 「**急ぎ対応したいんだけど**」→ `scripts/update.sh`
+- 「**設定が壊れていないか確認して**」→ `scripts/health-check.sh`
+- 「**最近のログからSkill改善点を見て**」→ `python3 scripts/skill-improvement-bot.py scan`
+
+## Hooks アーキテクチャの簡素化方針
+
+- 管理レイヤーは **ユーザーグローバル1層**に統一（`~/.claude`, `~/.codex`, `~/.gemini`）
+- プロジェクト層への自動 Hook 配布は廃止
+- デフォルト Hook は安全性重視（`safe_delete_guard.py`）のみ
+- `peer_prompt_refinement.py` は同梱するが、デフォルトでは配線しない（必要時のみ手動拡張）
+
+これにより、ローカル負荷と多層 Hook 重複による挙動競合を抑えます。
+
+## 補足
+
+- compatibility マトリクス運用は廃止済みです
+- 詳細手順は [setup.md](setup.md)
+- エラー時は [docs/setup-error-guide.md](docs/setup-error-guide.md)
+- Skill 改善自動化は [docs/skill-improvement-automation.md](docs/skill-improvement-automation.md)
+- Hooks 設計検証は [docs/hooks-architecture-review.md](docs/hooks-architecture-review.md)

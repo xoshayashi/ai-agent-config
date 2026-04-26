@@ -89,7 +89,6 @@ CATEGORY_KEYWORDS = {
 
 AUTO_PR_ALLOWED_PATHS = (
     ".github/workflows/",
-    "compatibility/",
     "docs/",
     "instructions/",
     "reports/skill-improvement/",
