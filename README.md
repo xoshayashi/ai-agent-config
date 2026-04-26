@@ -2,12 +2,30 @@
 
 AIツール向けの共通InstructionsとSkillsを配布・更新するための設定リポジトリです。
 
+## 最初に準備すること
+
+このセットアップは、**ターミナルでAI CLIにログインできている状態**から進めます。まだの場合は、先に次を済ませてください。
+
+1. **ターミナルを開く。**
+   macOSなら「ターミナル」または「iTerm2」、Windowsなら「PowerShell」または「Windows Terminal」を使います。
+2. **Claude Code、Codex、Gemini CLIのいずれかをインストールする。**
+   会社やチームで推奨ツールが決まっている場合は、それを使ってください。
+3. **AI CLIにログインする。**
+   起動してログイン画面やブラウザ認証が出たら、画面の案内に従います。
+
+| ツール | 公式手順 | ログイン確認の目安 |
+|---|---|---|
+| **Claude Code** | [Claude Code Quickstart](https://code.claude.com/docs/en/quickstart) | `claude` を起動し、必要なら `/login` でログインします。 |
+| **Codex** | [Codex CLI](https://developers.openai.com/codex/cli) | `codex` を起動し、初回表示の案内に従ってChatGPTアカウントまたはAPI keyでログインします。 |
+| **Gemini CLI** | [Gemini CLI Get Started](https://google-gemini.github.io/gemini-cli/docs/get-started/) | `gemini` を起動し、認証方法で「Login with Google」を選びます。 |
+
 ## Claude Code / Codex / Gemini CLIに渡す言葉
 
 初回セットアップでは、Claude Code、Codex、またはGemini CLIに次のように伝えてください。
 
 ```text
 README.mdとsetup.mdを読んで、このPCにAI Agent Configをセットアップして。
+まだAI CLIのインストールやログインが済んでいなければ、最初にそこから案内して。
 専門用語は日本語で説明して、更新頻度は推奨の1日1回を含めて選ばせて。
 ```
 
