@@ -70,6 +70,9 @@ state_dir=${AI_AGENT_STATE_DIR:-$HOME/.llm-config}
 
 install_instructions=${AI_AGENT_INSTALL_INSTRUCTIONS:-1}
 install_skills=${AI_AGENT_INSTALL_SKILLS:-1}
+install_hooks=${AI_AGENT_INSTALL_HOOKS:-1}
+hooks_scope=${AI_AGENT_HOOKS_SCOPE:-target}
+hooks_runtime_link=${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}
 extra_skills_dirs=${AI_AGENT_EXTRA_SKILLS_DIRS:-}
 conflict_mode=${AI_AGENT_CONFLICT_MODE:-backup}
 protect_links=${AI_AGENT_PROTECT_LINKS:-auto}
@@ -86,6 +89,18 @@ case "$persist_config" in
   0|1) ;;
   *) fail "AI_AGENT_PERSIST_CONFIG must be 0 or 1" ;;
 esac
+
+case "$install_hooks" in
+  0|1) ;;
+  *) fail "AI_AGENT_INSTALL_HOOKS must be 0 or 1" ;;
+esac
+
+case "$hooks_scope" in
+  target|user|both) ;;
+  *) fail "AI_AGENT_HOOKS_SCOPE must be target, user, or both" ;;
+esac
+
+[ -n "$hooks_runtime_link" ] || fail "AI_AGENT_HOOKS_RUNTIME_LINK must not be empty"
 
 run() {
   if [ "$dry_run" = "1" ]; then
@@ -129,6 +144,9 @@ write_state_config() {
     printf 'AI_AGENT_EXTRA_SKILLS_DIRS=%s\n' "$(quote_sh "$extra_skills_dirs")"
     printf 'AI_AGENT_INSTALL_INSTRUCTIONS=%s\n' "$(quote_sh "$install_instructions")"
     printf 'AI_AGENT_INSTALL_SKILLS=%s\n' "$(quote_sh "$install_skills")"
+    printf 'AI_AGENT_INSTALL_HOOKS=%s\n' "$(quote_sh "$install_hooks")"
+    printf 'AI_AGENT_HOOKS_SCOPE=%s\n' "$(quote_sh "$hooks_scope")"
+    printf 'AI_AGENT_HOOKS_RUNTIME_LINK=%s\n' "$(quote_sh "$hooks_runtime_link")"
     printf 'AI_AGENT_CONFLICT_MODE=%s\n' "$(quote_sh "$conflict_mode")"
     printf 'AI_AGENT_PROTECT_LINKS=%s\n' "$(quote_sh "$protect_links")"
   } > "$state_file"
@@ -230,6 +248,82 @@ install_skills_to_dir() {
   done
 }
 
+install_hook_runtime_link() {
+  dst=$(expand_home "$hooks_runtime_link")
+  src="$config_home/hooks"
+  if [ "$dst" = "$src" ]; then
+    say "ok: hook runtime path is repository hook directory: $dst"
+    return 0
+  fi
+  install_link "$src" "$dst"
+}
+
+install_hook_config() {
+  src=$1
+  dst=$2
+  kind=$3
+
+  [ -e "$src" ] || fail "source does not exist: $src"
+
+  if [ -L "$dst" ]; then
+    current=$(readlink "$dst")
+    if [ "$current" = "$src" ]; then
+      say "ok: $dst -> $src"
+      protect_link "$dst"
+      return 0
+    fi
+  fi
+
+  if [ ! -e "$dst" ] && [ ! -L "$dst" ]; then
+    install_link "$src" "$dst"
+    return 0
+  fi
+
+  [ -f "$dst" ] || fail "hook config destination is not a regular file: $dst"
+  command -v python3 >/dev/null 2>&1 || fail "python3 is required to append hook settings into existing config: $dst"
+
+  say "append: existing CLI settings preserved; merging only managed Hook entries"
+  say "append: $dst <= $src"
+  if [ "$dry_run" = "1" ]; then
+    python3 "$config_home/scripts/merge-hook-config.py" "$kind" "$src" "$dst" --dry-run
+  else
+    python3 "$config_home/scripts/merge-hook-config.py" "$kind" "$src" "$dst"
+  fi
+}
+
+install_target_hook_links() {
+  src_root="$config_home/hooks"
+  install_hook_config "$src_root/claude/settings.json" "$target_dir/.claude/settings.json" json
+  install_hook_config "$src_root/codex/config.toml" "$target_dir/.codex/config.toml" codex-config
+  install_hook_config "$src_root/codex/hooks.json" "$target_dir/.codex/hooks.json" json
+  install_hook_config "$src_root/gemini/settings.json" "$target_dir/.gemini/settings.json" json
+}
+
+install_user_hook_links() {
+  src_root="$config_home/hooks"
+  install_hook_config "$src_root/claude/settings.json" "$HOME/.claude/settings.json" json
+  install_hook_config "$src_root/codex/config.toml" "$HOME/.codex/config.toml" codex-config
+  install_hook_config "$src_root/codex/hooks.json" "$HOME/.codex/hooks.json" json
+  install_hook_config "$src_root/gemini/settings.json" "$HOME/.gemini/settings.json" json
+}
+
+install_hook_links() {
+  command -v python3 >/dev/null 2>&1 || fail "python3 is required for shared Hook scripts"
+  install_hook_runtime_link
+  case "$hooks_scope" in
+    target)
+      install_target_hook_links
+      ;;
+    user)
+      install_user_hook_links
+      ;;
+    both)
+      install_target_hook_links
+      install_user_hook_links
+      ;;
+  esac
+}
+
 say "AI agent config setup"
 say "config: $config_home"
 say "target: $target_dir"
@@ -258,6 +352,12 @@ if [ "$install_skills" = "1" ]; then
   fi
 else
   say "skip: skill links disabled"
+fi
+
+if [ "$install_hooks" = "1" ]; then
+  install_hook_links
+else
+  say "skip: hook links disabled"
 fi
 
 write_state_config
