@@ -19,6 +19,7 @@
 | **Writing** | Use the target medium's formatting and structure deliberately so the output is easy to scan and act on. |
 | **Skill/workflow design** | For non-trivial skills, agents, prompts, and reusable workflows, use evidence-backed design and verify that activation conditions are discoverable. |
 | **Config updates** | When the user asks to urgently apply the latest shared instructions or skills, run the repository updater instead of waiting for the scheduled update. |
+| **Skill improvement logs** | When the user asks to inspect recent LLM CLI usage for skill improvements, run the local skill-improvement scanner and summarize only redacted proposals. |
 
 ## Scope
 
@@ -73,6 +74,8 @@
 - Treat Japanese shortcut phrases such as **「急ぎ対応したいんだけど」**, **「今すぐ最新にして」**, and **「最新のルールを反映して」** as urgent shared-config update requests when the setup/config context is clear. If the surrounding message clearly refers to a different urgent task, handle that task instead.
 - Locate the config repository from `AI_AGENT_CONFIG_HOME`, `$HOME/.ai-agent-config/config.env`, or the symlink target of `AI_AGENT_INSTRUCTIONS.md`, then run `scripts/update.sh` from that repository and report the result in Japanese.
 - If the user asks to check whether shared config is installed, healthy, logged in, or up to date, run `scripts/health-check.sh` from the config repository first, then explain the result in Japanese before deciding whether setup or update is needed.
+- If the user asks to **find skill improvements from recent usage logs**, run `scripts/skill-improvement-bot.py scan` from the config repository. Treat phrases such as **「最近のログからSkill改善点を見て」**, **「Skillで吸収できる改善点を確認して」**, and **「Skill改善PRまで自動で作って」** as this workflow when the setup/config context is clear.
+- Do not expose, quote, or commit raw LLM CLI logs. Share only redacted summaries and improvement proposals. Creating PRs, applying review feedback, or auto-merging must be driven by the repository's explicit automation flags and safety checks.
 
 ## Research, Strategy, And Design Outputs
 

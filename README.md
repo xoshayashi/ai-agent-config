@@ -64,12 +64,18 @@ Claude Code、Codex、Gemini CLIは `scripts/update.sh` を実行して、共有
 設定が壊れていないか確認して。README.mdとsetup.mdを読んで、health-checkを実行し、結果を日本語で短く説明して。
 ```
 
+Skillの改善候補を見たい時は、次のように伝えてください。これは **`scripts/skill-improvement-bot.py scan` を実行するための合図** です。
+
+```text
+最近のLLM CLIログから、Skillで吸収できそうな改善点がないか確認して。生ログは外に出さず、匿名化された改善候補だけ日本語で説明して。
+```
+
 ## 何が入るか
 
 - `AGENTS.md`、`CLAUDE.md`、`GEMINI.md` などのAIツール用入口ファイル
 - 共通ルール本体の `AI_AGENT_INSTRUCTIONS.md`
 - 再利用可能なSkill
-- 更新用・状態確認用スクリプト
+- 更新用・状態確認用・Skill改善用スクリプト
 
 ## 更新頻度
 
@@ -102,13 +108,15 @@ AI Agent Configのセットアップを元に戻して。README.mdとsetup.mdを
 削除が必要なものは完全削除せず、ゴミ箱に移して。実行前に何を片付けるか日本語で説明して。
 ```
 
-## みんなで育てる時
+## 自動で育てる仕組み
 
-このリポジトリを複数人で更新する場合は、変更前に [docs/compatibility.md](docs/compatibility.md) を確認してください。新しいSkillは `skills/template/` から作り、PR前に次を実行します。
+このリポジトリは、手動チェックリストだけに頼らず、**利用ログからSkillの改善候補を抽出してPR化するローカル自動化** を用意しています。
 
 ```sh
-sh scripts/validate-repo.sh
+python3 scripts/skill-improvement-bot.py scan
 ```
+
+チームでSkill品質を継続改善する時は、まずこの自動化で **実際の追加修正パターンから改善候補を作る** のを推奨します。定期実行は `scripts/schedule-skill-improvement.sh` で設定します。生ログはコミットせず、PR作成や自動マージは環境変数で明示的に有効化した場合だけ動きます。詳しくは [docs/skill-improvement-automation.md](docs/skill-improvement-automation.md) を参照してください。
 
 ## 詳細
 
