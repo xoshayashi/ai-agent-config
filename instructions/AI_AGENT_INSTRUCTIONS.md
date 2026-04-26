@@ -17,6 +17,7 @@
 | **Quality gate** | Treat completion as the start of mandatory self-review; improve until the work meets a high quality bar within scope. |
 | **Writing** | Use the target medium's formatting and structure deliberately so the output is easy to scan and act on. |
 | **Skill/workflow design** | For non-trivial skills, agents, prompts, and reusable workflows, use evidence-backed design and verify that activation conditions are discoverable. |
+| **Config updates** | When the user asks to urgently apply the latest shared instructions or skills, run the repository updater instead of waiting for the scheduled update. |
 
 ## Scope
 
@@ -63,6 +64,12 @@
 - When updating persistent instructions or preferences, prioritize **repeated user directions and durable preferences** over one-off task details or generic failure patterns.
 - Keep persistent instructions and skills lean. Do not codify behavior that capable agents already handle well by default unless a durable user preference, repeated quality gap, fragile workflow, domain-specific standard, or reusable artifact justifies the added context.
 - When creating or materially updating skills, agents, prompts, or reusable workflows, explicitly decide whether the design is non-trivial. If it is, use a `skill-design-research` workflow when available, capture a brief evidence packet, and update activation metadata or trigger conditions so the workflow is discoverable from realistic user requests.
+
+## Shared Config Updates
+
+- If the user asks to **urgently update, refresh, or apply the latest shared AI agent instructions or skills**, run the config repository updater immediately instead of waiting for the scheduled update.
+- Treat Japanese shortcut phrases such as **「急ぎ対応したいんだけど」**, **「今すぐ最新にして」**, and **「最新のルールを反映して」** as urgent shared-config update requests when the setup/config context is clear. If the surrounding message clearly refers to a different urgent task, handle that task instead.
+- Locate the config repository from `AI_AGENT_CONFIG_HOME`, `$HOME/.ai-agent-config/config.env`, or the symlink target of `AI_AGENT_INSTRUCTIONS.md`, then run `scripts/update.sh` from that repository and report the result in Japanese.
 
 ## Research, Strategy, And Design Outputs
 

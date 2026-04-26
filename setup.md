@@ -28,7 +28,7 @@ AI_AGENT_TARGET_DIR="/path/to/workspace" sh /path/to/ai-agent-config/scripts/ins
 
 Give Claude Code this instruction:
 
-> Read `setup.md`, explain any technical terms in plain Japanese, set `AI_AGENT_TARGET_DIR` to the project or workspace directory that should receive the instruction entrypoints, then run `scripts/setup.sh` and verify the resulting links.
+> Read `setup.md`, explain any technical terms in plain Japanese, set `AI_AGENT_TARGET_DIR` to the project or workspace directory that should receive the instruction entrypoints, ask me what update frequency I want with daily as the recommended option, then run `scripts/setup.sh`, configure or disable updates according to my choice, and verify the resulting links.
 
 If Claude Code is opened inside this config repository, tell it the target directory explicitly:
 
@@ -65,8 +65,10 @@ For non-technical users, prefer this interaction pattern:
 1. **対象フォルダーを人間の言葉で伝える。** 例: "Downloadsフォルダーに設定します。ここで開いたAIツールが共通ルールを読めるようになります。" 対象が不明な場合だけ、平易な質問を1つして確認します。
 2. **実行前に短く説明する。** ユーザーが詳しい説明を求めない限り、日本語で2から3文に収めます。
 3. **セットアップを実行する。** 現在のフォルダーに依存しないよう、`AI_AGENT_TARGET_DIR` を明示して実行します。
-4. **結果を確認して翻訳する。** `readlink` は「近道ファイルがどの本体ファイルを指しているか確認するコマンド」だと説明します。
-5. **最後に簡単にまとめる。** 何を設定したか、バックアップが作られたか、次に何ができるかを短く伝えます。
+4. **更新頻度を選んでもらう。** 推奨は「1日1回」です。選択肢は「1日1回」「12時間ごと」「1週間ごと」「自動更新なし」「カスタム秒数」くらいに絞ります。
+5. **更新設定を反映する。** 選んだ頻度に合わせて `AI_AGENT_UPDATE_CADENCE` または `AI_AGENT_UPDATE_INTERVAL_SECONDS` を指定し、`scripts/schedule-update.sh` で自動更新を設定または停止します。
+6. **結果を確認して翻訳する。** `readlink` は「近道ファイルがどの本体ファイルを指しているか確認するコマンド」だと説明します。
+7. **最後に簡単にまとめる。** 何を設定したか、バックアップが作られたか、更新頻度は何か、急ぎの時に何を頼めばよいかを短く伝えます。
 
 ## What The Script Installs
 
@@ -126,10 +128,10 @@ sh /path/to/ai-agent-config/scripts/update.sh
 2. Reads the saved setup state from `$HOME/.ai-agent-config/config.env`.
 3. Runs `scripts/setup.sh` again so links and skills stay aligned with the latest repository contents.
 
-For automatic updates, schedule the updater:
+For automatic updates, schedule the updater with the recommended daily cadence:
 
 ```sh
-AI_AGENT_UPDATE_INTERVAL_SECONDS=86400 sh /path/to/ai-agent-config/scripts/schedule-update.sh
+AI_AGENT_UPDATE_CADENCE=daily sh /path/to/ai-agent-config/scripts/schedule-update.sh
 ```
 
 This uses `launchd` on macOS and a user `systemd` timer on Linux when available. If neither is available, the script prints the manual update command.
@@ -140,9 +142,30 @@ Update-related variables:
 |---|---|---|
 | `AI_AGENT_UPDATE_REMOTE` | `origin` | Git remote to fetch from. |
 | `AI_AGENT_UPDATE_BRANCH` | `main` | Branch to update from. |
+| `AI_AGENT_UPDATE_CADENCE` | Empty | Friendly schedule name: `recommended`, `daily`, `twice-daily`, `weekly`, `manual`, or `custom`. |
 | `AI_AGENT_UPDATE_RERUN_SETUP` | `1` | Set to `0` to pull updates without re-running setup. |
 | `AI_AGENT_UPDATE_ALLOW_DIRTY` | `0` | Set to `1` to allow updates when the config repository has local changes. |
-| `AI_AGENT_UPDATE_INTERVAL_SECONDS` | `86400` | Auto-update interval used by `schedule-update.sh`. |
+| `AI_AGENT_UPDATE_INTERVAL_SECONDS` | `86400` | Auto-update interval used by `schedule-update.sh`; required when `AI_AGENT_UPDATE_CADENCE=custom`. |
+
+Recommended choices:
+
+| User Choice | Command Setting | Meaning |
+|---|---|---|
+| **1日1回（推奨）** | `AI_AGENT_UPDATE_CADENCE=daily` | Balanced default for most employees. |
+| **12時間ごと** | `AI_AGENT_UPDATE_CADENCE=twice-daily` | Useful while instructions are changing quickly. |
+| **1週間ごと** | `AI_AGENT_UPDATE_CADENCE=weekly` | Lower-noise option for stable environments. |
+| **自動更新なし** | `AI_AGENT_UPDATE_CADENCE=manual` | Stops any existing automatic updater; the user updates manually when needed. |
+| **カスタム** | `AI_AGENT_UPDATE_CADENCE=custom AI_AGENT_UPDATE_INTERVAL_SECONDS=<seconds>` | Advanced option for admins or special cases. |
+
+## Urgent Manual Updates
+
+If the user says something like **"急ぎ対応したいんだけど"**, **"今すぐ最新にして"**, or **"最新のルールを反映して"**, the agent should run a one-time update instead of waiting for the next scheduled run:
+
+```sh
+sh /path/to/ai-agent-config/scripts/update.sh
+```
+
+Explain in Japanese that this pulls the latest shared instructions immediately and re-applies the saved setup. If the update stops because the config repository has local changes, explain that the script stopped to avoid overwriting local edits.
 
 ## Examples
 
@@ -170,6 +193,18 @@ Preview without making changes:
 
 ```sh
 AI_AGENT_DRY_RUN=1 AI_AGENT_TARGET_DIR="$PWD" sh /path/to/ai-agent-config/scripts/setup.sh
+```
+
+Schedule daily updates, the recommended cadence:
+
+```sh
+AI_AGENT_UPDATE_CADENCE=daily sh /path/to/ai-agent-config/scripts/schedule-update.sh
+```
+
+Run an urgent one-time update:
+
+```sh
+sh /path/to/ai-agent-config/scripts/update.sh
 ```
 
 ## Conflict Handling

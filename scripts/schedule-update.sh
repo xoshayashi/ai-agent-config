@@ -36,18 +36,48 @@ esac
 
 config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
 state_dir=$(expand_home "${AI_AGENT_STATE_DIR:-$HOME/.ai-agent-config}")
-interval=${AI_AGENT_UPDATE_INTERVAL_SECONDS:-86400}
+cadence=${AI_AGENT_UPDATE_CADENCE:-}
+interval=${AI_AGENT_UPDATE_INTERVAL_SECONDS:-}
+disable_updates=0
 label=${AI_AGENT_UPDATE_LABEL:-com.ai-agent-config.update}
 update_remote=${AI_AGENT_UPDATE_REMOTE:-origin}
 update_branch=${AI_AGENT_UPDATE_BRANCH:-main}
 update_script="$config_home/scripts/update.sh"
 dry_run=${AI_AGENT_DRY_RUN:-0}
 
-case "$interval" in
-  ''|*[!0-9]*)
-    fail "AI_AGENT_UPDATE_INTERVAL_SECONDS must be a positive integer"
-    ;;
-esac
+if [ -n "$cadence" ]; then
+  cadence_key=$(printf '%s' "$cadence" | tr '[:upper:]' '[:lower:]')
+  case "$cadence_key" in
+    recommended|daily|day|1d)
+      interval=86400
+      ;;
+    half-day|twice-daily|12h)
+      interval=43200
+      ;;
+    weekly|week|1w)
+      interval=604800
+      ;;
+    manual|none|off|disabled)
+      disable_updates=1
+      ;;
+    custom)
+      [ -n "$interval" ] || fail "AI_AGENT_UPDATE_CADENCE=custom requires AI_AGENT_UPDATE_INTERVAL_SECONDS"
+      ;;
+    *)
+      fail "AI_AGENT_UPDATE_CADENCE must be recommended, daily, twice-daily, weekly, manual, or custom"
+      ;;
+  esac
+fi
+
+interval=${interval:-86400}
+
+if [ "$disable_updates" = "0" ]; then
+  case "$interval" in
+    ''|*[!0-9]*)
+      fail "AI_AGENT_UPDATE_INTERVAL_SECONDS must be a positive integer"
+      ;;
+  esac
+fi
 
 case "$dry_run" in
   0|1) ;;
@@ -59,6 +89,39 @@ esac
 os=$(uname -s 2>/dev/null || printf unknown)
 say "AI agent config update scheduler"
 say "config: $config_home"
+
+if [ "$disable_updates" = "1" ]; then
+  say "automatic updates disabled by AI_AGENT_UPDATE_CADENCE=$cadence"
+  if [ "$os" = "Darwin" ]; then
+    launch_dir="$HOME/Library/LaunchAgents"
+    plist="$launch_dir/$label.plist"
+    disabled_plist="$state_dir/$label.plist.disabled.$(date +%Y%m%d-%H%M%S)"
+    if [ "$dry_run" = "1" ]; then
+      say "would unload launchd plist if present: $plist"
+      say "would move existing plist out of LaunchAgents: $disabled_plist"
+    elif [ -f "$plist" ]; then
+      mkdir -p "$state_dir"
+      launchctl unload "$plist" >/dev/null 2>&1 || true
+      mv "$plist" "$disabled_plist"
+      say "disabled launchd schedule: $disabled_plist"
+    else
+      say "no launchd schedule found: $plist"
+    fi
+  elif command -v systemctl >/dev/null 2>&1; then
+    if [ "$dry_run" = "1" ]; then
+      say "would disable systemd user timer: ai-agent-config-update.timer"
+    else
+      systemctl --user disable --now ai-agent-config-update.timer >/dev/null 2>&1 || true
+      say "disabled systemd user timer if it existed: ai-agent-config-update.timer"
+    fi
+  else
+    warn "automatic scheduling is not supported on this system"
+  fi
+  say "manual update command:"
+  say "  sh $update_script"
+  exit 0
+fi
+
 say "interval seconds: $interval"
 
 if [ "$os" = "Darwin" ]; then
