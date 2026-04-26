@@ -4,8 +4,9 @@
 
 サイト構築・スライド制作・本格的な UI 実装などは **後日別スキルで扱う**。本書ではトークン値の網羅や CSS スニペットは省き、判断軸のみを残しています。詳細仕様や実装値が必要になった場合は、必ず正本を参照すること。
 
-- **正本（Single source of truth）:**
-  `~/Library/CloudStorage/GoogleDrive-shayashi@xo-street.com/共有ドライブ/プロダクト事業部/Act/デザインガイドライン/Act_Design_Guidelines_v1.1.md`
+- **正本（Single source of truth）:** Act デザインガイドライン v1.1
+  社内 Google Drive: **共有ドライブ → プロダクト事業部 → Act → デザインガイドライン → `Act_Design_Guidelines_v1.1.md`**
+  （ローカルにマウントされた Google Drive のフルパスは利用者ごとに異なるため、ここでは Drive 上の論理パスのみを記載）
 - **代表コンポジット:** 同フォルダの `composite_light.png` / `composite_dark.png`
 
 ---
