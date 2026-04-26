@@ -22,6 +22,29 @@ For beginner-facing setup, guide the user through these steps first:
 
 If installation or login fails for any required CLI, stop setup and help the user resolve that tool-specific issue using the relevant official documentation before continuing.
 
+## Natural-Language GitHub Checkout / 自然言語での取得手順
+
+The intended beginner flow is conversational: the user should be able to start a LLM CLI, paste one natural-language request, and let the LLM CLI handle GitHub login checks, repository checkout or pull, and setup.
+
+Give the active Claude Code, Codex, or Gemini CLI session this instruction:
+
+```text
+GitHubにログインできているか確認して。未ログインなら、初心者にも分かる日本語でログイン手順を案内して。
+その後、次のリポジトリをこのPCに取得して。既に同じリポジトリがある場合は、最新のmainをpullして。
+
+https://github.com/xoshayashi/ai-agent-config.git
+
+取得できたら、そのリポジトリのREADME.mdとsetup.mdを読んで、このPCにAI Agent Configをセットアップして。
+Claude Code、Codex、Gemini CLIの全てがインストール済みかつログイン済みか確認して、未完了のものがあれば先に案内して。
+専門用語は日本語で説明して、更新頻度は推奨の1日1回を含めて選ばせて。
+```
+
+For AI agents executing this request:
+
+- Prefer a standard GitHub authentication check such as the GitHub CLI when available, but keep the user-facing interaction in plain Japanese.
+- If the repository already exists locally, update it with the latest `main`; otherwise clone `https://github.com/xoshayashi/ai-agent-config.git` into a sensible local config location such as the user's Documents folder.
+- After checkout or pull succeeds, continue with this setup guide rather than making the user issue a second command.
+
 ## Quick Start
 
 From the directory where the instruction files should appear, run:
@@ -72,7 +95,10 @@ Use plain Japanese explanations for technical terms the first time they appear. 
 
 | Term | Plain Japanese Explanation |
 |---|---|
+| **GitHub** | Gitで管理されたファイルをインターネット上で保存・共有するサービスです。 |
 | **Repository** | Gitで管理されているフォルダーです。多くの場合、GitHubからダウンロードします。 |
+| **Clone** | GitHub上のリポジトリを、このPCへ初めて取得することです。 |
+| **Pull** | 既にPCにあるリポジトリを、GitHub上の最新版に更新することです。 |
 | **Workspace** | AIツールにこの共通ルールを読ませたい作業フォルダーです。 |
 | **Symbolic link / symlink** | 実体ファイルへの近道のようなファイルです。コピーではなく、元ファイルを指し示します。 |
 | **Environment variable** | コマンドに渡す一時的な設定です。たとえば、どのフォルダーをセットアップするかを指定します。 |
@@ -82,13 +108,15 @@ Use plain Japanese explanations for technical terms the first time they appear. 
 
 For non-technical users, prefer this interaction pattern:
 
-1. **対象フォルダーを人間の言葉で伝える。** 例: "Downloadsフォルダーに設定します。ここで開いたAIツールが共通ルールを読めるようになります。" 対象が不明な場合だけ、平易な質問を1つして確認します。
-2. **実行前に短く説明する。** ユーザーが詳しい説明を求めない限り、日本語で2から3文に収めます。
-3. **セットアップを実行する。** 現在のフォルダーに依存しないよう、`AI_AGENT_TARGET_DIR` を明示して実行します。
-4. **更新頻度を選んでもらう。** 推奨は「1日1回」です。選択肢は「1日1回」「12時間ごと」「1週間ごと」「自動更新なし」「カスタム秒数」くらいに絞ります。
-5. **更新設定を反映する。** 選んだ頻度に合わせて `AI_AGENT_UPDATE_CADENCE` または `AI_AGENT_UPDATE_INTERVAL_SECONDS` を指定し、`scripts/schedule-update.sh` で自動更新を設定または停止します。
-6. **結果を確認して翻訳する。** `readlink` は「近道ファイルがどの本体ファイルを指しているか確認するコマンド」だと説明します。
-7. **最後に簡単にまとめる。** 何を設定したか、バックアップが作られたか、更新頻度は何か、急ぎの時に何を頼めばよいかを短く伝えます。
+1. **GitHubログインを確認する。** 未ログインなら、ブラウザ認証など必要な操作だけを日本語で案内します。
+2. **このリポジトリを取得または更新する。** PC上に無ければ取得し、既にあれば最新版の `main` に更新します。
+3. **対象フォルダーを人間の言葉で伝える。** 例: "Downloadsフォルダーに設定します。ここで開いたAIツールが共通ルールを読めるようになります。" 対象が不明な場合だけ、平易な質問を1つして確認します。
+4. **実行前に短く説明する。** ユーザーが詳しい説明を求めない限り、日本語で2から3文に収めます。
+5. **セットアップを実行する。** 現在のフォルダーに依存しないよう、`AI_AGENT_TARGET_DIR` を明示して実行します。
+6. **更新頻度を選んでもらう。** 推奨は「1日1回」です。選択肢は「1日1回」「12時間ごと」「1週間ごと」「自動更新なし」「カスタム秒数」くらいに絞ります。
+7. **更新設定を反映する。** 選んだ頻度に合わせて `AI_AGENT_UPDATE_CADENCE` または `AI_AGENT_UPDATE_INTERVAL_SECONDS` を指定し、`scripts/schedule-update.sh` で自動更新を設定または停止します。
+8. **結果を確認して翻訳する。** `readlink` は「近道ファイルがどの本体ファイルを指しているか確認するコマンド」だと説明します。
+9. **最後に簡単にまとめる。** 何を設定したか、バックアップが作られたか、更新頻度は何か、急ぎの時に何を頼めばよいかを短く伝えます。
 
 ## What The Script Installs
 
