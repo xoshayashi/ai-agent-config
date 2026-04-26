@@ -30,6 +30,8 @@ TEXT_SUFFIXES = {
     ".txt",
 }
 
+MAX_SKILL_CONTEXT_LINES = 80
+
 SKIP_NAME_RE = re.compile(
     r"(auth|credential|token|secret|keychain|oauth|cookie|session\.db|\.sqlite|\.png|\.jpg|\.jpeg|\.gif|\.pdf)$",
     re.IGNORECASE,
@@ -383,7 +385,6 @@ def fingerprint(source: Path, line: int, text: str) -> str:
 
 def scan_logs(args: argparse.Namespace, root: Path) -> tuple[list[Proposal], dict[str, Any]]:
     skills = load_skills(root)
-    skill_names = {skill.name for skill in skills}
     roots = configured_log_roots(args.log_root)
     files = iter_log_files(roots, args.days, args.max_files)
     signals: list[Signal] = []
@@ -403,10 +404,16 @@ def scan_logs(args: argparse.Namespace, root: Path) -> tuple[list[Proposal], dic
                     recent_skill_line = line_no
                 continue
             previous_skill = recent_skill
+            if previous_skill and line_no - recent_skill_line > MAX_SKILL_CONTEXT_LINES:
+                previous_skill = None
+                recent_skill = None
+                recent_skill_line = 0
             skill = detect_skill(text, skills)
             if skill:
                 recent_skill = skill
                 recent_skill_line = line_no
+            # Require a prior assistant anchor to reduce false positives from
+            # user-only generic correction messages.
             active_skill = previous_skill or (recent_skill if line_no > recent_skill_line else None)
             if not active_skill or not is_correction(text):
                 continue
@@ -431,8 +438,6 @@ def scan_logs(args: argparse.Namespace, root: Path) -> tuple[list[Proposal], dic
 
     grouped: dict[tuple[str, str], Proposal] = {}
     for signal in signals:
-        if signal.skill not in skill_names:
-            continue
         key = (signal.skill, signal.category)
         grouped.setdefault(key, Proposal(skill=signal.skill, category=signal.category)).signals.append(signal)
 
@@ -616,11 +621,14 @@ def apply_with_llm(root: Path, report_path: Path, provider: str, dry_run: bool) 
             "-p",
             prompt,
             "--permission-mode",
-            "acceptEdits",
+            "default",
             "--allowedTools",
             "Read,Edit,MultiEdit,Bash(git diff:*),Bash(git status:*),Bash(sh scripts/validate-repo.sh:*)",
         ]
     elif provider == "codex":
+        # Codex and Gemini do not expose the same file-edit allowlist shape as
+        # Claude here; keep the prompt narrow and rely on the post-run staging
+        # allowlist before any PR is created.
         cmd = [
             "codex",
             "exec",
@@ -633,6 +641,8 @@ def apply_with_llm(root: Path, report_path: Path, provider: str, dry_run: bool) 
             prompt,
         ]
     elif provider == "gemini":
+        # Gemini's auto_edit mode is similarly constrained after the run by
+        # stage_automation_paths(), which refuses unexpected changed paths.
         cmd = [
             "gemini",
             "--prompt",
@@ -721,27 +731,46 @@ def stage_automation_paths(root: Path, report_path: Path) -> None:
 
 
 def changed_paths(root: Path) -> list[str]:
-    status = run_command(["git", "status", "--porcelain"], root).stdout.splitlines()
+    status = run_command(["git", "status", "--porcelain=v1", "-z"], root).stdout.split("\0")
     paths: list[str] = []
-    for line in status:
-        if not line:
+    index = 0
+    while index < len(status):
+        entry = status[index]
+        index += 1
+        if not entry:
             continue
-        path = line[3:]
-        if " -> " in path:
-            paths.extend(part.strip() for part in path.split(" -> ", 1))
-        else:
-            paths.append(path.strip())
+        code = entry[:2]
+        path = entry[3:]
+        paths.append(path)
+        if "R" in code or "C" in code:
+            index += 1
     return [path for path in paths if path]
+
+
+def stage_allowed_changed_paths(root: Path) -> list[str]:
+    changed = changed_paths(root)
+    allowed = [path for path in changed if is_auto_pr_allowed(path, Path(""))]
+    rejected = sorted(set(changed) - set(allowed))
+    if rejected:
+        raise SystemExit("error: refusing to stage unexpected review-feedback path(s): " + ", ".join(rejected))
+    if allowed:
+        run_command(["git", "add", "-f", "--", *allowed], root)
+    return allowed
 
 
 def is_auto_pr_allowed(path: str, report_path: Path) -> bool:
     normalized = path.replace("\\", "/")
     if normalized == str(report_path).replace("\\", "/"):
         return True
-    return any(
-        normalized == prefix.rstrip("/") or normalized.startswith(prefix)
-        for prefix in AUTO_PR_ALLOWED_PATHS
-    )
+    for prefix in AUTO_PR_ALLOWED_PATHS:
+        normalized_prefix = prefix.rstrip("/")
+        if prefix.endswith("/"):
+            if normalized.startswith(prefix):
+                return True
+            continue
+        if normalized == normalized_prefix:
+            return True
+    return False
 
 
 def inspect_pr(root: Path, pr: str) -> dict[str, Any]:
@@ -839,22 +868,35 @@ def checks_pass(data: dict[str, Any]) -> tuple[bool, str]:
 
 def claude_ready(data: dict[str, Any]) -> tuple[bool, str]:
     events = sorted_review_events(data)
-    for item in reversed(events):
+    for item in events:
         if not trusted_review_author(item):
             continue
+        state = str(item.get("state", "")).upper()
+        if state == "CHANGES_REQUESTED":
+            return False, "Claude-related review requests changes"
         body = str(item.get("body", "")).lower()
-        if str(item.get("state", "")).upper() == "APPROVED":
+        if state == "APPROVED":
             return True, "latest Claude-related review is APPROVED"
-        if any(marker in body for marker in ["ready to merge", "merge ok", "lgtm", "approved", "no changes requested", "マージ ok", "マージok"]):
+        if any(marker in body for marker in ["ready to merge", "merge ok", "lgtm", "no changes requested", "マージ ok", "マージok"]):
             return True, "latest Claude-related review appears merge-ready"
-        if any(marker in body for marker in ["request changes", "blocking", "needs changes", "修正"]):
+        if any(marker in body for marker in ["request changes", "needs changes", "要修正", "修正をお願い"]):
             return False, "Claude-related review still asks for changes"
     return False, "no merge-ready Claude review signal found"
 
 
 def sorted_review_events(data: dict[str, Any]) -> list[dict[str, Any]]:
     events = list(data.get("comments", [])) + list(data.get("reviews", []))
-    return sorted(events, key=lambda item: item.get("createdAt") or item.get("submittedAt") or "")
+    return sorted(events, key=review_event_timestamp, reverse=True)
+
+
+def review_event_timestamp(item: dict[str, Any]) -> dt.datetime:
+    raw = str(item.get("submittedAt") or item.get("createdAt") or "")
+    if not raw:
+        return dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+    try:
+        return dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return dt.datetime.min.replace(tzinfo=dt.timezone.utc)
 
 
 def trusted_review_author(item: dict[str, Any]) -> bool:
@@ -878,10 +920,11 @@ def apply_claude_feedback(root: Path, pr: str, dry_run: bool) -> None:
 
 Requirements:
 - Read PR comments and review threads through available GitHub context or `gh`.
+- Use GitHub API access for read-only review-thread inspection only.
 - Do not broaden scope beyond review feedback.
 - Run `sh scripts/validate-repo.sh` after edits.
 - Do not use shell deletion commands; use the repository's safe deletion convention if cleanup is required.
-- Commit and push only if you made changes.
+- Do not commit or push; leave any changes in the worktree for this automation script to validate, commit, and push.
 """
     if dry_run:
         print(f"dry-run: would run Claude Code to address review feedback on PR {pr}")
@@ -892,9 +935,9 @@ Requirements:
             "-p",
             prompt,
             "--permission-mode",
-            "acceptEdits",
+            "default",
             "--allowedTools",
-            "Read,Edit,MultiEdit,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh api:*),Bash(git diff:*),Bash(git status:*),Bash(git add:*),Bash(git commit:*),Bash(git push:*),Bash(sh scripts/validate-repo.sh:*)",
+            "Read,Edit,MultiEdit,Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh api graphql:*),Bash(git diff:*),Bash(git status:*),Bash(sh scripts/validate-repo.sh:*)",
         ],
         root,
         check=False,
@@ -902,6 +945,18 @@ Requirements:
     if result.returncode != 0:
         sys.stderr.write(result.stderr)
         raise SystemExit("error: Claude review-feedback pass failed")
+    # Authoritative validation; the in-prompt instruction is best-effort only.
+    run_command(["sh", "scripts/validate-repo.sh"], root)
+    staged = stage_allowed_changed_paths(root)
+    if staged:
+        run_command(["git", "commit", "-m", f"Address automated review feedback for PR #{pr}"], root)
+        push_result = run_command(["git", "push", "origin", "HEAD"], root, check=False)
+        if push_result.returncode != 0:
+            # Avoid leaving an unpushed local-only commit that would pollute
+            # subsequent scheduler runs on this PR branch.
+            run_command(["git", "reset", "--soft", "HEAD~1"], root, check=False)
+            detail = push_result.stderr.strip() or push_result.stdout.strip() or "unknown error"
+            raise SystemExit(f"error: git push failed: {detail}")
 
 
 def maybe_auto_merge(root: Path, pr: str, data: dict[str, Any], dry_run: bool) -> None:
@@ -1009,47 +1064,63 @@ def cmd_review_open_prs(args: argparse.Namespace) -> None:
         ["gh", "pr", "list", "--state", "open", "--limit", "50", "--json", "number,title,url,headRefName"],
         root,
     )
+    open_prs = json.loads(payload.stdout)
+    if len(open_prs) == 50:
+        print("warning: PR list may be truncated; only the first 50 open PRs were inspected", file=sys.stderr)
     prs = [
         item
-        for item in json.loads(payload.stdout)
+        for item in open_prs
         if str(item.get("headRefName", "")).startswith(args.head_prefix)
     ]
     results = []
     for item in prs:
         number = str(item["number"])
         try:
-            if args.apply_claude_feedback and not args.dry_run:
-                ensure_clean(root)
-                run_command(["gh", "pr", "checkout", number], root)
-            data = inspect_pr(root, number)
-            if args.apply_claude_feedback:
-                if not has_trusted_review_activity(data):
-                    results.append(
-                        {
-                            "pr": data.get("number"),
-                            "url": data.get("url"),
-                            "skipped": "no trusted Claude review activity found",
-                        }
-                    )
-                    continue
-                apply_claude_feedback(root, number, args.dry_run)
+            try:
+                if args.apply_claude_feedback and not args.dry_run:
+                    ensure_clean(root)
+                    run_command(["gh", "pr", "checkout", number], root)
                 data = inspect_pr(root, number)
-            if args.auto_merge:
-                maybe_auto_merge(root, number, data, args.dry_run)
-            ready, ready_reason = claude_ready(data)
-            checks_ok, checks_reason = checks_pass(data)
-            results.append(
-                {
-                    "pr": data.get("number"),
-                    "url": data.get("url"),
-                    "claude_ready": ready,
-                    "claude_reason": ready_reason,
-                    "checks_ok": checks_ok,
-                    "checks_reason": checks_reason,
-                    "unresolved_threads": data.get("unresolved_threads"),
-                }
-            )
+                if args.apply_claude_feedback:
+                    if not has_trusted_review_activity(data):
+                        results.append(
+                            {
+                                "pr": data.get("number"),
+                                "url": data.get("url"),
+                                "skipped": "no trusted Claude review activity found",
+                            }
+                        )
+                        continue
+                    apply_claude_feedback(root, number, args.dry_run)
+                    data = inspect_pr(root, number)
+                if args.auto_merge:
+                    maybe_auto_merge(root, number, data, args.dry_run)
+                ready, ready_reason = claude_ready(data)
+                checks_ok, checks_reason = checks_pass(data)
+                results.append(
+                    {
+                        "pr": data.get("number"),
+                        "url": data.get("url"),
+                        "claude_ready": ready,
+                        "claude_reason": ready_reason,
+                        "checks_ok": checks_ok,
+                        "checks_reason": checks_reason,
+                        "unresolved_threads": data.get("unresolved_threads"),
+                    }
+                )
+            except SystemExit as exc:
+                results.append(
+                    {
+                        "pr": int(number) if number.isdigit() else number,
+                        "url": item.get("url"),
+                        "error": str(exc) or "command failed",
+                    }
+                )
         finally:
+            if args.apply_claude_feedback and not args.dry_run:
+                # If validation fails after Claude edits, discard local working
+                # tree changes before switching away from the PR branch.
+                run_command(["git", "restore", "--source=HEAD", "--staged", "--worktree", "."], root, check=False)
             if original_branch and not args.dry_run:
                 run_command(["git", "switch", original_branch], root, check=False)
     print(json.dumps({"checked": len(prs), "pull_requests": results}, ensure_ascii=False, indent=2))
