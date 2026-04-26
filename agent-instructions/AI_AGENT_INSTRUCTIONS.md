@@ -63,6 +63,7 @@ This file is the single source of truth for AI coding agents working in this dir
 - Do not stop at the first apparently working result. Before reporting completion, review the finished work against the initial goal, scope, deliverable, constraints, and acceptance criteria.
 - Inspect the actual output or changed files directly, and when feasible run or render the result in the form the user will experience it.
 - For non-trivial deliverables, complex tradeoffs, or high-stakes wording, include LLM peer review in this quality gate when additional reasoning would materially improve quality, and apply useful feedback before final reporting.
+- Review naming, file and folder organization, repository names, URLs, command names, user-facing labels, and other structural surfaces for whether they still match the actual scope and purpose of the work. If the implementation evolved beyond the original name or layout, improve those surfaces before reporting completion.
 - Check for mismatches with the original intent, missing edge cases, degraded usability, unclear wording, formatting issues, brittle implementation, and avoidable quality problems.
 - If the review finds a gap, fix it autonomously, re-verify, and repeat the review loop until the output is consistent with the specification and meets a high quality bar.
 - Keep the improvement loop in scope. Do not expand into unrelated refactors or new features unless they are necessary to satisfy the original request.
