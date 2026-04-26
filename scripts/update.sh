@@ -82,6 +82,13 @@ fi
 [ "${env_hooks_set:-}" = "x" ] && AI_AGENT_INSTALL_HOOKS=$env_hooks
 [ "${env_hooks_runtime_set:-}" = "x" ] && AI_AGENT_HOOKS_RUNTIME_LINK=$env_hooks_runtime
 
+if [ -n "${AI_AGENT_TARGET_DIR:-}" ]; then
+  warn "AI_AGENT_TARGET_DIR is deprecated and ignored. Instructions are now installed globally."
+fi
+if [ -n "${AI_AGENT_HOOKS_SCOPE:-}" ]; then
+  warn "AI_AGENT_HOOKS_SCOPE is deprecated and ignored. Hooks are now installed globally."
+fi
+
 default_config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
 config_home=$(abs_existing_dir "${AI_AGENT_CONFIG_HOME:-$default_config_home}")
 remote=${AI_AGENT_UPDATE_REMOTE:-origin}

@@ -4,6 +4,10 @@ set -eu
 format=${AI_AGENT_HEALTH_FORMAT:-text}
 strict=${AI_AGENT_HEALTH_STRICT:-0}
 
+warn() {
+  printf 'warning: %s\n' "$*" >&2
+}
+
 case "${1:-}" in
   --json)
     format=json
@@ -142,6 +146,13 @@ fi
 [ "${env_gemini_home_set:-}" = "x" ] && AI_AGENT_GEMINI_HOME=$env_gemini_home
 [ "${env_skills_set:-}" = "x" ] && AI_AGENT_SKILLS_DIR=$env_skills
 [ "${env_hooks_runtime_set:-}" = "x" ] && AI_AGENT_HOOKS_RUNTIME_LINK=$env_hooks_runtime
+
+if [ -n "${AI_AGENT_TARGET_DIR:-}" ]; then
+  warn "AI_AGENT_TARGET_DIR is deprecated and ignored. Instructions are now installed globally."
+fi
+if [ -n "${AI_AGENT_HOOKS_SCOPE:-}" ]; then
+  warn "AI_AGENT_HOOKS_SCOPE is deprecated and ignored. Hooks are now installed globally."
+fi
 
 default_config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
 config_home=$(expand_home "${AI_AGENT_CONFIG_HOME:-$default_config_home}")
@@ -359,13 +370,13 @@ if [ "$format" = "json" ]; then
   printf '    "gemini_GEMINI.md": "%s",\n' "$gemini_entry_status"
   printf '    "gemini_AI_AGENT_INSTRUCTIONS.md": "%s",\n' "$gemini_shared_status"
   printf '    "gemini_DESIGN.md": "%s",\n' "$gemini_design_status"
-  printf '    "skill-design-research": "%s",\n' "$skill_status"
   printf '    "hook-runtime": "%s",\n' "$hook_runtime_status"
   printf '    "claude-hooks": "%s",\n' "$claude_hook_status"
   printf '    "codex-config": "%s",\n' "$codex_config_status"
   printf '    "codex-hooks": "%s",\n' "$codex_hook_status"
   printf '    "gemini-hooks": "%s"\n' "$gemini_hook_status"
   printf '  },\n'
+  printf '  "skills": {"skill-design-research": "%s"},\n' "$skill_status"
   printf '  "automation": {"skill_improvement_schedule": "%s"}\n' "$skill_improvement_schedule"
   printf '}\n'
 else

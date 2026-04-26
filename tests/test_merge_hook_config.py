@@ -247,6 +247,20 @@ def test_remove_json_preserves_user_hook() -> None:
         assert USER_HOOK_GROUP in result["hooks"]["PreToolUse"]
 
 
+def test_remove_json_cleans_legacy_event_not_in_source() -> None:
+    """Uninstall should remove managed hooks from legacy events not in source."""
+    with in_tempdir() as tmp:
+        src = Path(tmp) / "src.json"
+        dst = Path(tmp) / "dst.json"
+        write_json(src, SAMPLE_SOURCE_JSON)
+        write_json(dst, {"hooks": {"UserPromptSubmit": [SAMPLE_GROUP]}})
+
+        changed = MHC.remove_json_file(src, dst, dry_run=False)
+        assert changed
+        result = read_json(dst)
+        assert "hooks" not in result, "legacy managed event should be removed"
+
+
 # ---------- Codex TOML tests ----------
 
 def test_merge_codex_no_features_section() -> None:
@@ -389,6 +403,7 @@ TESTS = [
     test_merge_json_dry_run_no_write,
     test_remove_json_pops_event_when_empty,
     test_remove_json_preserves_user_hook,
+    test_remove_json_cleans_legacy_event_not_in_source,
     test_merge_codex_no_features_section,
     test_merge_codex_existing_features_no_codex_hooks,
     test_merge_codex_idempotent,

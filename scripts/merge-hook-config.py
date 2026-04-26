@@ -145,9 +145,13 @@ def remove_hooks_json(source: Path, destination: Path) -> tuple[dict[str, Any], 
         return destination_data, False
 
     changed = False
-    for event_name, source_groups in source_hooks.items():
+    # Iterate destination events, not only source events. This guarantees
+    # uninstall can remove managed hooks from legacy events even after newer
+    # releases stop declaring those events in source hook config.
+    for event_name, destination_groups in list(destination_hooks.items()):
+        source_groups = source_hooks.get(event_name, [])
         if not isinstance(source_groups, list):
-            continue
+            source_groups = []
         destination_groups = destination_hooks.get(event_name)
         if not isinstance(destination_groups, list):
             continue
