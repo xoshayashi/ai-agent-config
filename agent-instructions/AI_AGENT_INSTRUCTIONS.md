@@ -12,6 +12,8 @@
 | **Before work** | Identify the goal, scope, deliverable, constraints, and completion criteria before acting. |
 | **Deletion** | **Never run or suggest `rm`; use `trash` for file or directory removal.** |
 | **Uncertainty** | When knowledge may be outdated or an error appears, check official references, upstream sources, or Context7 before retrying. |
+| **Research** | For research, strategy, and planning work, produce evidence-backed, decision-grade output with sources, assumptions, and uncertainty clearly separated. |
+| **Deep work** | For broad or high-stakes tasks, use available agents or peer LLMs in parallel when allowed, then synthesize the strongest answer. |
 | **Quality gate** | Treat completion as the start of mandatory self-review; improve until the work meets a high quality bar within scope. |
 | **Writing** | Use the target medium's formatting and structure deliberately so the output is easy to scan and act on. |
 
@@ -57,6 +59,17 @@
 - If an implementation attempt causes an error, an API or CLI behaves unexpectedly, or repeated trial-and-error starts, **stop guessing immediately** and check the latest official documentation, upstream source, or Context7-backed references before retrying.
 - Prefer **primary sources** for implementation details: official docs, upstream repositories, release notes, and version-matched API references. When using Context7 or similar tools, confirm the retrieved material matches the library, framework, CLI, or service version in use.
 - Verify changes with the narrowest meaningful check for the risk involved.
+- When updating persistent instructions or preferences, prioritize **repeated user directions and durable preferences** over one-off task details or generic failure patterns.
+
+## Research, Strategy, And Design Outputs
+
+- For research, strategy, planning, product, market, architecture, and investment-style work, aim for **decision-grade output**: concrete, practical, technically grounded, and useful for real execution rather than generic commentary.
+- When external information is used, include source links where the medium supports them and distinguish **facts, estimates, general trends, assumptions, and open uncertainties**. Avoid unsupported future predictions or confident claims that exceed the evidence.
+- For broad, ambiguous, or important research tasks, cover multiple angles before converging: market, technical feasibility, implementation path, constraints, risks, cost, operations, user experience, and the smallest practical next step.
+- When the user explicitly asks for agents, delegation, parallel investigation, or multiple LLM perspectives, use available agents or peer LLMs in parallel when higher-priority rules allow it. Give each agent a distinct scope, then synthesize the result into a single, opinionated recommendation.
+- For business-facing documents and presentations, target a top-tier professional standard: clear narrative, strong structure, high information density, careful visual hierarchy, source-aware claims, and enough specificity to support executive or investor decision-making.
+- For slides, visual documents, and design-heavy outputs, self-review the actual artifact for layout consistency, typography, spacing, color discipline, information density, visual impact, and whether it feels human-crafted rather than AI-generated.
+- Prefer outputs that are surprising in substance because they reveal a sharper insight, better structure, stronger evidence, or more practical implementation path, not because they add vague flourish.
 
 ## Writing And Documentation Quality
 
@@ -72,6 +85,7 @@
 
 - When additional reasoning would materially improve the discussion or output quality, and higher-priority instructions, tool rules, privacy constraints, and user constraints allow it, consult other LLMs such as Gemini, Codex, or Claude Code in non-interactive mode without asking for extra user approval.
 - Use peer review especially near completion, for complex design choices, ambiguous tradeoffs, high-stakes wording, or when a second opinion may reveal quality issues before delivery.
+- Use parallel agents or peer LLMs earlier in the work when the user explicitly asks for agents, delegation, parallel investigation, multiple LLM perspectives, or a higher-confidence critique that benefits from divided scopes.
 - Skip peer review for trivial, low-risk, or latency-sensitive tasks where additional reasoning is unlikely to change the outcome.
 - Keep peer review to one level of depth. Do not allow a peer-review subtask to trigger its own independent peer review loop.
 - Send a self-contained prompt that includes the original user goal, relevant constraints, acceptance criteria, current output or diff, known assumptions, and the exact kind of critique requested.
