@@ -87,7 +87,9 @@ mark_status() {
       status_rank=2
       ;;
     warn)
-      [ "$status_rank" -lt 1 ] && status_rank=1
+      if [ "$status_rank" -lt 1 ]; then
+        status_rank=1
+      fi
       ;;
   esac
 }
@@ -134,6 +136,30 @@ gh_path=$(command_path gh)
 claude_path=$(command_path claude)
 codex_path=$(command_path codex)
 gemini_path=$(command_path gemini)
+
+skill_improvement_schedule=unsupported
+os=$(uname -s 2>/dev/null || printf unknown)
+if [ "$os" = "Darwin" ]; then
+  skill_improvement_label=${AI_AGENT_IMPROVEMENT_LABEL:-com.ai-agent-config.skill-improvement}
+  skill_improvement_plist="$HOME/Library/LaunchAgents/$skill_improvement_label.plist"
+  if [ -f "$skill_improvement_plist" ]; then
+    if launchctl list "$skill_improvement_label" >/dev/null 2>&1; then
+      skill_improvement_schedule=active
+    else
+      skill_improvement_schedule=installed
+    fi
+  else
+    skill_improvement_schedule=missing
+  fi
+elif command -v systemctl >/dev/null 2>&1; then
+  if systemctl --user is-active ai-agent-config-skill-improvement.timer >/dev/null 2>&1; then
+    skill_improvement_schedule=active
+  elif systemctl --user is-enabled ai-agent-config-skill-improvement.timer >/dev/null 2>&1; then
+    skill_improvement_schedule=installed
+  else
+    skill_improvement_schedule=missing
+  fi
+fi
 
 repo_status=fail
 repo_branch=
@@ -266,7 +292,8 @@ if [ "$format" = "json" ]; then
   printf '    "CLAUDE.md": "%s",\n' "$claude_link_status"
   printf '    "GEMINI.md": "%s",\n' "$gemini_link_status"
   printf '    "skill-design-research": "%s"\n' "$skill_status"
-  printf '  }\n'
+  printf '  },\n'
+  printf '  "automation": {"skill_improvement_schedule": "%s"}\n' "$skill_improvement_schedule"
   printf '}\n'
 else
   printf 'AI Agent Config health: %s\n' "$(overall_status)"
@@ -278,6 +305,7 @@ else
   printf 'commands: git=%s gh=%s claude=%s codex=%s gemini=%s\n' "$git_status" "$gh_status" "$claude_status" "$codex_status" "$gemini_status"
   printf 'links: AGENTS.md=%s AI_AGENT_INSTRUCTIONS.md=%s CLAUDE.md=%s GEMINI.md=%s skill-design-research=%s\n' \
     "$agents_link_status" "$shared_link_status" "$claude_link_status" "$gemini_link_status" "$skill_status"
+  printf 'automation: skill-improvement-schedule=%s\n' "$skill_improvement_schedule"
 fi
 
 if [ "$strict" = "1" ] && [ "$(overall_status)" != "ok" ]; then
