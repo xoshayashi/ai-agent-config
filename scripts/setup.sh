@@ -190,6 +190,20 @@ backup_existing() {
   run mv "$dst" "$backup_path"
 }
 
+backup_copy_existing() {
+  # Like backup_existing, but COPIES the file instead of moving it. Used
+  # before in-place edits (e.g. merge-hook-config.py) so the user has a
+  # recovery path if the merge corrupts the destination, while the
+  # destination remains in place for the merge to operate on.
+  dst=$1
+  rel=$(printf '%s\n' "$dst" | sed 's#^/##')
+  backup_path="$backup_dir/$rel"
+  backup_parent=$(dirname "$backup_path")
+  say "backup: copy $dst -> $backup_path"
+  run mkdir -p "$backup_parent"
+  run cp -p "$dst" "$backup_path"
+}
+
 install_link() {
   src=$1
   dst=$2
@@ -287,6 +301,14 @@ install_hook_config() {
   if [ "$dry_run" = "1" ]; then
     python3 "$config_home/scripts/merge-hook-config.py" "$kind" "$src" "$dst" --dry-run
   else
+    # Take a recoverable copy before the in-place merge in case the merge
+    # produces unexpected output (the merge itself uses atomic write, so a
+    # crash mid-write does not corrupt $dst, but a logical bug in the merge
+    # could still leave $dst worse than before).
+    case "$conflict_mode" in
+      backup) backup_copy_existing "$dst" ;;
+      *) : ;;  # skip|fail: caller opted out of automatic recovery copy
+    esac
     python3 "$config_home/scripts/merge-hook-config.py" "$kind" "$src" "$dst"
   fi
 }

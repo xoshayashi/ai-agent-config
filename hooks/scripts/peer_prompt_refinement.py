@@ -42,6 +42,9 @@ def prompt_from_hook(data: dict[str, Any]) -> str:
 def redact(text: str) -> str:
     patterns = [
         (r"(?i)(api[_-]?key|token|secret|password)\s*[:=]\s*['\"]?[^'\"\s]+", r"\1=[REDACTED]"),
+        # Anthropic keys come before the generic `sk-` rule so their full
+        # `sk-ant-...` form is preserved in the redaction label.
+        (r"sk-ant-[A-Za-z0-9_-]{20,}", "[REDACTED_ANTHROPIC_KEY]"),
         (r"sk-[A-Za-z0-9_-]{20,}", "[REDACTED_OPENAI_KEY]"),
         (r"AIza[0-9A-Za-z_-]{20,}", "[REDACTED_GOOGLE_KEY]"),
     ]
@@ -49,6 +52,18 @@ def redact(text: str) -> str:
     for pattern, replacement in patterns:
         result = re.sub(pattern, replacement, result)
     return result
+
+
+def _read_tail_bytes(path: Path, max_bytes: int) -> bytes:
+    with path.open("rb") as handle:
+        try:
+            handle.seek(0, os.SEEK_END)
+            size = handle.tell()
+        except OSError:
+            return handle.read()
+        offset = max(0, size - max_bytes)
+        handle.seek(offset)
+        return handle.read()
 
 
 def transcript_excerpt(path_value: Any) -> str:
@@ -63,11 +78,19 @@ def transcript_excerpt(path_value: Any) -> str:
 
     max_lines = int(os.environ.get("AI_AGENT_PROMPT_REFINEMENT_TRANSCRIPT_LINES", "40"))
     max_chars = int(os.environ.get("AI_AGENT_PROMPT_REFINEMENT_TRANSCRIPT_CHARS", "12000"))
+    # Read 4x max_chars from the tail so we have headroom for partial leading
+    # lines and a safety margin for multi-byte UTF-8 boundaries; we still
+    # truncate to max_chars / max_lines below.
+    tail_budget = max(max_chars * 4, 16384)
     try:
-        lines = path.read_text(encoding="utf-8", errors="replace").splitlines()[-max_lines:]
+        chunk = _read_tail_bytes(path, tail_budget)
     except OSError:
         return "Transcript read failed."
 
+    text = chunk.decode("utf-8", errors="replace")
+    lines = text.splitlines()
+    if len(lines) > max_lines:
+        lines = lines[-max_lines:]
     excerpt = "\n".join(lines)
     if len(excerpt) > max_chars:
         excerpt = excerpt[-max_chars:]
@@ -126,9 +149,16 @@ Rules:
 """
 
 
-def peer_command(current: str, cwd: str) -> list[str] | None:
+def peer_invocation(current: str, cwd: str, packet: str) -> tuple[list[str], str] | None:
+    """Return (command, stdin_payload) for the peer call, or None when unsupported.
+
+    Each peer is invoked through exactly one channel: Gemini receives the full
+    packet via `-p` (its documented headless prompt source), while Codex reads
+    the packet from stdin via the `-` marker. Mixing `-p` and stdin makes the
+    delivery channel CLI-version-dependent, so we deliberately use only one.
+    """
     if current in {"codex", "claude"}:
-        return [
+        command = [
             "gemini",
             "--skip-trust",
             "--approval-mode",
@@ -136,10 +166,12 @@ def peer_command(current: str, cwd: str) -> list[str] | None:
             "--output-format",
             "text",
             "-p",
-            "Improve the task prompt using the Context Packet from stdin. Do not perform the task. Do not use tools; return text only.",
+            packet,
         ]
+        # Close stdin (empty payload) so Gemini does not block waiting on it.
+        return command, ""
     if current == "gemini":
-        return [
+        command = [
             "codex",
             "exec",
             "--cd",
@@ -149,13 +181,15 @@ def peer_command(current: str, cwd: str) -> list[str] | None:
             "read-only",
             "-",
         ]
+        return command, packet
     return None
 
 
 def call_peer(current: str, packet: str, cwd: str) -> str:
-    command = peer_command(current, cwd)
-    if command is None:
+    spec = peer_invocation(current, cwd, packet)
+    if spec is None:
         return ""
+    command, stdin_payload = spec
 
     timeout = int(os.environ.get("AI_AGENT_PROMPT_REFINEMENT_TIMEOUT_SECONDS", "30"))
     max_chars = int(os.environ.get("AI_AGENT_PROMPT_REFINEMENT_OUTPUT_CHARS", "8000"))
@@ -165,7 +199,7 @@ def call_peer(current: str, packet: str, cwd: str) -> str:
     try:
         completed = subprocess.run(
             command,
-            input=packet,
+            input=stdin_payload,
             text=True,
             capture_output=True,
             timeout=timeout,

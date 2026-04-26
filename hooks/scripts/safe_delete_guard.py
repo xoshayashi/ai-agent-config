@@ -10,7 +10,15 @@ import sys
 from typing import Any
 
 
-DELETE_PATTERN = re.compile(r"(^|[;&|()\s])((/bin/|/usr/bin/)?rm)(\s|$)")
+# Match `rm` invoked at the start of a command, after a separator, or after
+# whitespace, with an optional absolute path prefix (any directory ending in
+# `/`). This deliberately covers `/bin/rm`, `/usr/bin/rm`, `/usr/local/bin/rm`,
+# `/opt/homebrew/bin/rm`, and bare `rm`. It is supplementary to the shared
+# instructions, not a complete sandbox: it does not catch `\rm`, `'rm'`,
+# `command rm`, `env rm`, scripts that exec `rm`, or aliases that resolve to
+# rm. The CLI-side instructions still require agents to use the trash
+# workflow even when this hook is bypassed.
+DELETE_PATTERN = re.compile(r"(^|[;&|()\s])((?:/\S+/)?rm)(\s|$)")
 
 
 def load_input() -> dict[str, Any]:

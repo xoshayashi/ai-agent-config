@@ -5,12 +5,30 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
+import tempfile
 from pathlib import Path
 from typing import Any
 
 
 MANAGED_BEGIN = "# BEGIN llm-config managed hooks"
 MANAGED_END = "# END llm-config managed hooks"
+
+
+def atomic_write(destination: Path, payload: str) -> None:
+    parent = destination.parent
+    parent.mkdir(parents=True, exist_ok=True)
+    fd, tmp_path = tempfile.mkstemp(prefix=destination.name + ".", dir=parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(payload)
+        os.replace(tmp_path, destination)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def load_json(path: Path) -> dict[str, Any]:
@@ -54,10 +72,21 @@ def merge_hooks_json(source: Path, destination: Path) -> tuple[dict[str, Any], b
         raise ValueError(f"destination hooks must be an object: {destination}")
 
     changed = False
-    for event_name, source_groups in source_hooks.items():
+
+    # Visit every event present in either side so that stale managed hooks
+    # under events the source no longer declares are also cleaned up.
+    event_names = list(source_hooks.keys()) + [
+        name for name in destination_hooks.keys() if name not in source_hooks
+    ]
+
+    for event_name in event_names:
+        source_groups = source_hooks.get(event_name, [])
         if not isinstance(source_groups, list):
             raise ValueError(f"source hook event must be a list: {event_name}")
-        destination_groups = destination_hooks.setdefault(event_name, [])
+        if event_name in source_hooks:
+            destination_groups = destination_hooks.setdefault(event_name, [])
+        else:
+            destination_groups = destination_hooks.get(event_name, [])
         if not isinstance(destination_groups, list):
             raise ValueError(f"destination hook event must be a list: {event_name}")
 
@@ -81,6 +110,12 @@ def merge_hooks_json(source: Path, destination: Path) -> tuple[dict[str, Any], b
             destination_groups.append(group)
             existing.add(key)
             changed = True
+
+        if not destination_groups and not source_groups:
+            destination_hooks.pop(event_name, None)
+
+    if changed and not destination_hooks:
+        destination_data.pop("hooks", None)
 
     return destination_data, changed
 
@@ -121,28 +156,26 @@ def remove_hooks_json(source: Path, destination: Path) -> tuple[dict[str, Any], 
 def merge_json_file(source: Path, destination: Path, dry_run: bool) -> bool:
     merged, changed = merge_hooks_json(source, destination)
     if changed and not dry_run:
-        with destination.open("w", encoding="utf-8") as handle:
-            json.dump(merged, handle, indent=2, ensure_ascii=False)
-            handle.write("\n")
+        payload = json.dumps(merged, indent=2, ensure_ascii=False) + "\n"
+        atomic_write(destination, payload)
     return changed
 
 
 def remove_json_file(source: Path, destination: Path, dry_run: bool) -> bool:
     merged, changed = remove_hooks_json(source, destination)
     if changed and not dry_run:
-        with destination.open("w", encoding="utf-8") as handle:
-            json.dump(merged, handle, indent=2, ensure_ascii=False)
-            handle.write("\n")
+        payload = json.dumps(merged, indent=2, ensure_ascii=False) + "\n"
+        atomic_write(destination, payload)
     return changed
 
 
-def merge_codex_config(source: Path, destination: Path, dry_run: bool) -> bool:
-    del source
+def merge_codex_config(_source: Path, destination: Path, dry_run: bool) -> bool:
     if destination.exists():
         lines = destination.read_text(encoding="utf-8").splitlines()
     else:
         lines = []
 
+    changed = False
     in_features = False
     features_start = None
     insert_at = None
@@ -185,12 +218,11 @@ def merge_codex_config(source: Path, destination: Path, dry_run: bool) -> bool:
         changed = True
 
     if changed and not dry_run:
-        destination.write_text("\n".join(lines) + "\n", encoding="utf-8")
+        atomic_write(destination, "\n".join(lines) + "\n")
     return changed
 
 
-def remove_codex_config(source: Path, destination: Path, dry_run: bool) -> bool:
-    del source
+def remove_codex_config(_source: Path, destination: Path, dry_run: bool) -> bool:
     if not destination.exists():
         return False
     lines = destination.read_text(encoding="utf-8").splitlines()
@@ -200,10 +232,18 @@ def remove_codex_config(source: Path, destination: Path, dry_run: bool) -> bool:
     while index < len(lines):
         line = lines[index]
         if line.strip() == MANAGED_BEGIN:
-            while index < len(lines) and lines[index].strip() != MANAGED_END:
-                index += 1
-            if index < len(lines):
-                index += 1
+            begin_index = index
+            scan = index + 1
+            while scan < len(lines) and lines[scan].strip() != MANAGED_END:
+                scan += 1
+            if scan >= len(lines):
+                # MANAGED_END is missing — preserve the orphaned block as-is
+                # so the user can recover instead of silently losing content.
+                result.extend(lines[begin_index:])
+                index = len(lines)
+                continue
+            # Skip from MANAGED_BEGIN through MANAGED_END inclusive.
+            index = scan + 1
             changed = True
             continue
         if line.strip() == "# llm-config managed hooks":
@@ -224,7 +264,7 @@ def remove_codex_config(source: Path, destination: Path, dry_run: bool) -> bool:
         index += 1
 
     if changed and not dry_run:
-        destination.write_text("\n".join(result).rstrip() + "\n", encoding="utf-8")
+        atomic_write(destination, "\n".join(result).rstrip() + "\n")
     return changed
 
 
