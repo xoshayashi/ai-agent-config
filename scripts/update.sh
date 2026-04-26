@@ -48,9 +48,24 @@ env_skills_set=${AI_AGENT_SKILLS_DIR+x}
 env_skills=${AI_AGENT_SKILLS_DIR-}
 env_extra_skills_set=${AI_AGENT_EXTRA_SKILLS_DIRS+x}
 env_extra_skills=${AI_AGENT_EXTRA_SKILLS_DIRS-}
+env_hooks_set=${AI_AGENT_INSTALL_HOOKS+x}
+env_hooks=${AI_AGENT_INSTALL_HOOKS-}
+env_hooks_scope_set=${AI_AGENT_HOOKS_SCOPE+x}
+env_hooks_scope=${AI_AGENT_HOOKS_SCOPE-}
+env_hooks_runtime_set=${AI_AGENT_HOOKS_RUNTIME_LINK+x}
+env_hooks_runtime=${AI_AGENT_HOOKS_RUNTIME_LINK-}
 
 state_dir=${AI_AGENT_STATE_DIR:-$HOME/.llm-config}
-state_file=${AI_AGENT_STATE_FILE:-$(expand_home "$state_dir")/config.env}
+legacy_state_dir=${AI_AGENT_LEGACY_STATE_DIR:-$HOME/.ai-agent-config}
+if [ -n "${AI_AGENT_STATE_FILE:-}" ]; then
+  state_file=$(expand_home "$AI_AGENT_STATE_FILE")
+else
+  state_file=$(expand_home "$state_dir")/config.env
+  legacy_state_file=$(expand_home "$legacy_state_dir")/config.env
+  if [ ! -f "$state_file" ] && [ -f "$legacy_state_file" ]; then
+    state_file=$legacy_state_file
+  fi
+fi
 if [ -f "$state_file" ]; then
   # shellcheck source=/dev/null
   . "$state_file"
@@ -60,6 +75,9 @@ fi
 [ "${env_target_set:-}" = "x" ] && AI_AGENT_TARGET_DIR=$env_target
 [ "${env_skills_set:-}" = "x" ] && AI_AGENT_SKILLS_DIR=$env_skills
 [ "${env_extra_skills_set:-}" = "x" ] && AI_AGENT_EXTRA_SKILLS_DIRS=$env_extra_skills
+[ "${env_hooks_set:-}" = "x" ] && AI_AGENT_INSTALL_HOOKS=$env_hooks
+[ "${env_hooks_scope_set:-}" = "x" ] && AI_AGENT_HOOKS_SCOPE=$env_hooks_scope
+[ "${env_hooks_runtime_set:-}" = "x" ] && AI_AGENT_HOOKS_RUNTIME_LINK=$env_hooks_runtime
 
 default_config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
 config_home=$(abs_existing_dir "${AI_AGENT_CONFIG_HOME:-$default_config_home}")
@@ -126,6 +144,9 @@ if [ "$rerun_setup" = "1" ]; then
     "AI_AGENT_EXTRA_SKILLS_DIRS=${AI_AGENT_EXTRA_SKILLS_DIRS:-}" \
     "AI_AGENT_INSTALL_INSTRUCTIONS=${AI_AGENT_INSTALL_INSTRUCTIONS:-1}" \
     "AI_AGENT_INSTALL_SKILLS=${AI_AGENT_INSTALL_SKILLS:-1}" \
+    "AI_AGENT_INSTALL_HOOKS=${AI_AGENT_INSTALL_HOOKS:-1}" \
+    "AI_AGENT_HOOKS_SCOPE=${AI_AGENT_HOOKS_SCOPE:-target}" \
+    "AI_AGENT_HOOKS_RUNTIME_LINK=${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}" \
     "AI_AGENT_CONFLICT_MODE=${AI_AGENT_CONFLICT_MODE:-backup}" \
     "AI_AGENT_PROTECT_LINKS=${AI_AGENT_PROTECT_LINKS:-auto}" \
     "AI_AGENT_STATE_DIR=$state_dir" \

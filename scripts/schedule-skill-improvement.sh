@@ -75,6 +75,9 @@ case "$cadence_key" in
   recommended|daily|day|1d)
     interval=86400
     ;;
+  half-day|twice-daily|12h)
+    interval=43200
+    ;;
   weekly|week|1w)
     interval=604800
     ;;
@@ -85,7 +88,7 @@ case "$cadence_key" in
     [ -n "$interval" ] || fail "AI_AGENT_IMPROVEMENT_CADENCE=custom requires AI_AGENT_IMPROVEMENT_INTERVAL_SECONDS"
     ;;
   *)
-    fail "AI_AGENT_IMPROVEMENT_CADENCE must be recommended, daily, weekly, manual, or custom"
+    fail "AI_AGENT_IMPROVEMENT_CADENCE must be recommended, daily, twice-daily, weekly, manual, or custom"
     ;;
 esac
 
