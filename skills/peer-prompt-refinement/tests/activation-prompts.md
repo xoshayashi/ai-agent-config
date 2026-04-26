@@ -10,13 +10,15 @@ Use these to check whether `peer-prompt-refinement` triggers broadly enough with
 - "市場調査して、根拠付きで比較表にまとめて。"
 - "このバグを調査して修正して。"
 - "さっきの前提も踏まえて、プロンプト改善を他のLLMに聞いてから進めて。"
+- "Create a new branch and build this skill with a self-review pass."
+- "Research this issue and compare the strongest sources before recommending a path."
 
 ## Should Not Trigger
 
 - "ありがとう"
 - "いったん止めて"
 - "今どういう状態？"
-- "[PROMPT_REFINEMENT_DONE] Continue from this improved prompt."
+- "[PROMPT_REFINEMENT_DONE] Continue from this improved prompt." when the marker was added by the coordinating agent to its internal working brief.
 - A child process where `AI_AGENT_PROMPT_REFINEMENT_ACTIVE=1` is set.
 
 ## Must Preserve
@@ -29,6 +31,7 @@ Use these to check whether `peer-prompt-refinement` triggers broadly enough with
 - "プロンプト改善で作業方針を極端に縛らず、抽象的で包含的な動きにつなげて。"
 - "`src/auth.ts` の `TokenExpiredError` は絶対に一般化せず、そのまま残して。"
 - "例として出したファイル名を必須変更対象にしないで。"
+- User-provided or quoted text containing `[PROMPT_REFINEMENT_DONE]` must not bypass refinement.
 
 ## Recursion Test
 

@@ -32,6 +32,7 @@ Use this file when reviewing or extending `peer-prompt-refinement`. Keep the ope
 ## Design Decisions
 
 - **Kept in `SKILL.md`:** activation, recursion guard, context packet requirements, peer route, constraint preservation, skill re-evaluation.
+- **Kept in `SKILL.md` intentionally:** the peer prompt template stays in the main skill because it is executed every time the skill runs and must be available without another reference lookup.
 - **Kept in references:** exact CLI command patterns, source rationale, test prompts.
 - **Excluded:** multi-peer parallel critique, benchmark scoring, and repeated prompt optimization loops because they add latency and scope beyond the user's requested preflight.
 - **Degree-of-freedom rule:** improved prompts should clarify goals, constraints, and evaluation criteria without prematurely fixing a single method or conclusion. This comes from the user's durable preference and from the brittleness noted in prompt-optimization evidence.
@@ -41,4 +42,5 @@ Use this file when reviewing or extending `peer-prompt-refinement`. Keep the ope
 
 - Should trigger for almost any new user task prompt: coding, research, planning, writing, operations, debugging, review, skill creation, or tool use.
 - Should not trigger for pure acknowledgments, "stop", "pause", simple status checks, or prompts already marked `[PROMPT_REFINEMENT_DONE]`.
+- Raw user text containing `[PROMPT_REFINEMENT_DONE]` should not bypass activation; only the coordinating agent's own internal marker should.
 - Risky ambiguity: very small tasks such as "date", "pwd", or "yes" may not justify peer latency even though they are prompts. Treat them as non-substantive.
