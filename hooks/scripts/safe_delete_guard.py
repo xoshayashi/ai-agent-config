@@ -13,11 +13,23 @@ from typing import Any
 # Match `rm` invoked at the start of a command, after a separator, or after
 # whitespace, with an optional absolute path prefix (any directory ending in
 # `/`). This deliberately covers `/bin/rm`, `/usr/bin/rm`, `/usr/local/bin/rm`,
-# `/opt/homebrew/bin/rm`, and bare `rm`. It is supplementary to the shared
-# instructions, not a complete sandbox: it does not catch `\rm`, `'rm'`,
-# `command rm`, `env rm`, scripts that exec `rm`, or aliases that resolve to
-# rm. The CLI-side instructions still require agents to use the trash
-# workflow even when this hook is bypassed.
+# `/opt/homebrew/bin/rm`, and bare `rm`.
+#
+# Known false positives (accepted as fail-safe):
+#   - `echo rm -rf /tmp` — the literal string `rm` appears as an argument.
+#     The guard cannot distinguish "echo rm" from "execute rm" without a
+#     full shell parser, so it errs on the side of blocking.
+#   - `printf '%s' 'rm -rf /tmp'`, `cat | grep rm`, etc. — same class.
+#
+# Known false negatives (accepted; supplementary by design):
+#   - `\rm`, `'rm'`, `"rm"` — alias-bypass forms.
+#   - `command rm`, `env rm`, `exec rm` — wrapped invocations.
+#   - Scripts or shell functions that internally call `rm`.
+#   - User-defined aliases that ultimately resolve to `rm`.
+#
+# This guard is a runtime guardrail, not a sandbox. The shared CLI-side
+# instructions still require agents to use the trash workflow even when this
+# hook is bypassed.
 DELETE_PATTERN = re.compile(r"(^|[;&|()\s])((?:/\S+/)?rm)(\s|$)")
 
 

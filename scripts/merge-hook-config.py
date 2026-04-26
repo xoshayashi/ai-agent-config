@@ -46,6 +46,22 @@ def canonical(value: Any) -> str:
 
 
 def contains_managed_hook(value: Any) -> bool:
+    """Heuristic: does this hook group originate from llm-config?
+
+    Known limitation: this is a string-match heuristic, not a structural
+    flag. A user-authored hook whose command happens to contain one of the
+    sentinel substrings (most commonly ``llm-config/hooks`` or
+    ``AI_AGENT_HOOKS_RUNTIME_LINK`` because it wraps or extends a managed
+    hook) will be classified as managed. If such a user-authored group does
+    not match any source group exactly, the next ``setup.sh`` merge will
+    treat it as stale and remove it.
+
+    A long-term fix would be to add an explicit ``_llm-config-managed: true``
+    marker on every managed hook group and check that first. That is a
+    multi-file schema change touching every hook config, so it is left as a
+    follow-up. Until then, do NOT name personal hook commands with these
+    sentinels if you want them to survive automated merges.
+    """
     if isinstance(value, str):
         return (
             "AI_AGENT_HOOKS_RUNTIME_LINK" in value
