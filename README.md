@@ -9,8 +9,8 @@ AIツール向けの共通InstructionsとSkillsを配布・更新するための
 1. **ターミナルを開く。**
    macOSなら「ターミナル」または「iTerm2」、Windowsなら「PowerShell」または「Windows Terminal」を使います。
 2. **Claude Code、Codex、Gemini CLIを全てインストールする。**
-   この設定は、3つ全てのAI CLIで同じ共有InstructionsとSkillsを使える状態を前提にします。
-3. **3つ全てのAI CLIにログインする。**
+   この設定は、3つ全てのLLM CLIで同じ共有InstructionsとSkillsを使える状態を前提にします。
+3. **3つ全てのLLM CLIにログインする。**
    それぞれ起動して、ログイン画面やブラウザ認証が出たら画面の案内に従います。
 
 | ツール | 公式手順 | ログイン確認の目安 |
@@ -21,7 +21,7 @@ AIツール向けの共通InstructionsとSkillsを配布・更新するための
 
 ## Claude Code / Codex / Gemini CLIに渡す言葉
 
-初回セットアップでは、3つ全てのAI CLIをインストール・ログインした上で、実際にセットアップを進めるClaude Code、Codex、またはGemini CLIに次のように伝えてください。
+初回セットアップでは、3つ全てのLLM CLIをインストール・ログインした上で、実際にセットアップを進めるClaude Code、Codex、またはGemini CLIに次のように伝えてください。
 
 ```text
 README.mdとsetup.mdを読んで、このPCにAI Agent Configをセットアップして。
