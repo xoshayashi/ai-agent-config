@@ -152,7 +152,6 @@ def remove_hooks_json(source: Path, destination: Path) -> tuple[dict[str, Any], 
         source_groups = source_hooks.get(event_name, [])
         if not isinstance(source_groups, list):
             source_groups = []
-        destination_groups = destination_hooks.get(event_name)
         if not isinstance(destination_groups, list):
             continue
         source_keys = {canonical(group) for group in source_groups}
