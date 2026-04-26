@@ -114,7 +114,16 @@ env_skills_set=${AI_AGENT_SKILLS_DIR+x}
 env_skills=${AI_AGENT_SKILLS_DIR-}
 
 state_dir=${AI_AGENT_STATE_DIR:-$HOME/.llm-config}
-state_file=${AI_AGENT_STATE_FILE:-$(expand_home "$state_dir")/config.env}
+legacy_state_dir=${AI_AGENT_LEGACY_STATE_DIR:-$HOME/.ai-agent-config}
+if [ -n "${AI_AGENT_STATE_FILE:-}" ]; then
+  state_file=$(expand_home "$AI_AGENT_STATE_FILE")
+else
+  state_file=$(expand_home "$state_dir")/config.env
+  legacy_state_file=$(expand_home "$legacy_state_dir")/config.env
+  if [ ! -f "$state_file" ] && [ -f "$legacy_state_file" ]; then
+    state_file=$legacy_state_file
+  fi
+fi
 state_loaded=false
 if [ -f "$state_file" ]; then
   # shellcheck source=/dev/null
