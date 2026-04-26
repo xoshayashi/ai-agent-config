@@ -253,6 +253,22 @@ AI_AGENT_UPDATE_CADENCE=daily sh /path/to/ai-agent-config/scripts/schedule-updat
 
 This uses `launchd` on macOS and a user `systemd` timer on Linux when available. If neither is available, the script prints the manual update command.
 
+## Health Check / 状態確認
+
+Use `scripts/health-check.sh` when the user asks whether setup is healthy, installed correctly, logged in to GitHub, or ready to update.
+
+```sh
+sh /path/to/ai-agent-config/scripts/health-check.sh
+```
+
+For machine-readable output, use:
+
+```sh
+sh /path/to/ai-agent-config/scripts/health-check.sh --json
+```
+
+The health check does not change files. It reports GitHub CLI login status, command paths for `git`, `gh`, `claude`, `codex`, and `gemini`, repository branch and dirty state, saved setup state, entrypoint links, and the shared Skill link.
+
 Update-related variables:
 
 | Variable | Default | Purpose |
@@ -274,6 +290,20 @@ Recommended choices:
 | **自動更新なし** | `AI_AGENT_UPDATE_CADENCE=manual` | Stops any existing automatic updater; the user updates manually when needed. |
 | **カスタム** | `AI_AGENT_UPDATE_CADENCE=custom AI_AGENT_UPDATE_INTERVAL_SECONDS=<seconds>` | Advanced option for admins or special cases. |
 
+## Natural-Language Operations / 自然言語での保守・運用
+
+These phrases are intentional hooks. When the user says one of them in a setup/config context, the LLM CLI should map it to the corresponding script instead of waiting for the scheduled update.
+
+| User Phrase | Meaning | Script |
+|---|---|---|
+| **「急ぎ対応したいんだけど」** | Apply the latest shared instructions and skills now. | `scripts/update.sh` |
+| **「今すぐ最新にして」** | Pull the latest config and re-apply setup now. | `scripts/update.sh` |
+| **「最新のルールを反映して」** | Refresh shared rules immediately. | `scripts/update.sh` |
+| **「設定が壊れていないか確認して」** | Check GitHub login, CLI paths, repository state, and links. | `scripts/health-check.sh` |
+| **「ヘルスチェックして」** | Run a read-only setup health check. | `scripts/health-check.sh` |
+
+For urgent updates, run health check only when the current setup location is unclear or the update fails. Otherwise, locate the config repository from `AI_AGENT_CONFIG_HOME`, `$HOME/.ai-agent-config/config.env`, or the symlink target of `AI_AGENT_INSTRUCTIONS.md`, then run the updater.
+
 ## Urgent Manual Updates
 
 If the user says something like **"急ぎ対応したいんだけど"**, **"今すぐ最新にして"**, or **"最新のルールを反映して"**, the agent should run a one-time update instead of waiting for the next scheduled run:
@@ -283,6 +313,14 @@ sh /path/to/ai-agent-config/scripts/update.sh
 ```
 
 Explain in Japanese that this pulls the latest shared instructions immediately and re-applies the saved setup. If the update stops because the config repository has local changes, explain that the script stopped to avoid overwriting local edits.
+
+If the user asks **"設定が壊れていないか確認して"** or **"ヘルスチェックして"**, run:
+
+```sh
+sh /path/to/ai-agent-config/scripts/health-check.sh
+```
+
+Explain `ok`, `warn`, and `fail` in Japanese. If the user or another agent needs structured output, rerun with `--json`.
 
 ## Contributing And Validation / みんなで育てるために
 
@@ -337,6 +375,18 @@ Run an urgent one-time update:
 
 ```sh
 sh /path/to/ai-agent-config/scripts/update.sh
+```
+
+Check setup health in concise text:
+
+```sh
+sh /path/to/ai-agent-config/scripts/health-check.sh
+```
+
+Check setup health as JSON:
+
+```sh
+sh /path/to/ai-agent-config/scripts/health-check.sh --json
 ```
 
 Preview uninstall without changing files:

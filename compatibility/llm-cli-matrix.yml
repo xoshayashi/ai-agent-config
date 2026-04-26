@@ -48,6 +48,15 @@ shared_surfaces:
       - "setup.md"
     compatibility: "required"
     review_rule: "A beginner should be able to paste the setup request into any supported LLM CLI and continue without command-writing expertise."
+  natural_language_operations:
+    files:
+      - "README.md"
+      - "setup.md"
+      - "instructions/AI_AGENT_INSTRUCTIONS.md"
+      - "scripts/health-check.sh"
+      - "scripts/update.sh"
+    compatibility: "required"
+    review_rule: "Urgent update and health-check phrases must map to scripts through plain language in every supported LLM CLI."
 
 review_tags:
   portable:

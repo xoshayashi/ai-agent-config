@@ -32,12 +32,16 @@ for script in "$repo_root"/scripts/*.sh; do
   sh -n "$script"
 done
 
+say "validate: health check runs"
+AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/health-check.sh" --json >/dev/null
+
 say "validate: required docs and entrypoints"
 require_file "README.md"
 require_file "setup.md"
 require_file "docs/setup-error-guide.md"
 require_file "docs/compatibility.md"
 require_file "compatibility/llm-cli-matrix.yml"
+require_file "scripts/health-check.sh"
 require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"

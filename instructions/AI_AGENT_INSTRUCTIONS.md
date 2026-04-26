@@ -70,6 +70,7 @@
 - If the user asks to **urgently update, refresh, or apply the latest shared AI agent instructions or skills**, run the config repository updater immediately instead of waiting for the scheduled update.
 - Treat Japanese shortcut phrases such as **「急ぎ対応したいんだけど」**, **「今すぐ最新にして」**, and **「最新のルールを反映して」** as urgent shared-config update requests when the setup/config context is clear. If the surrounding message clearly refers to a different urgent task, handle that task instead.
 - Locate the config repository from `AI_AGENT_CONFIG_HOME`, `$HOME/.ai-agent-config/config.env`, or the symlink target of `AI_AGENT_INSTRUCTIONS.md`, then run `scripts/update.sh` from that repository and report the result in Japanese.
+- If the user asks to check whether shared config is installed, healthy, logged in, or up to date, run `scripts/health-check.sh` from the config repository first, then explain the result in Japanese before deciding whether setup or update is needed.
 
 ## Research, Strategy, And Design Outputs
 
