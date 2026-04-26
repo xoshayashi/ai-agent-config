@@ -46,3 +46,4 @@ This checks shell syntax, required setup documents, compatibility metadata, skil
 4. Are tool-specific commands clearly marked and paired with a fallback?
 5. Were dry-run, uninstall, or recovery paths affected?
 6. Did `scripts/validate-repo.sh` pass?
+7. If `compatibility/llm-cli-matrix.yml` changed, was its `updated` field reviewed and bumped when appropriate?

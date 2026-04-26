@@ -189,13 +189,18 @@ fi
 if [ "$uninstall_skills" = "1" ]; then
   uninstall_skills_from_dir "$skills_dir"
   if [ -n "$extra_skills_dirs" ]; then
-    old_ifs=$IFS
+    had_ifs=${IFS+x}
+    old_ifs=${IFS-}
     IFS=:
     for dir in $extra_skills_dirs; do
       [ -n "$dir" ] || continue
       uninstall_skills_from_dir "$dir"
     done
-    IFS=$old_ifs
+    if [ "$had_ifs" = "x" ]; then
+      IFS=$old_ifs
+    else
+      unset IFS
+    fi
   fi
 else
   say "skip: skill uninstall disabled"

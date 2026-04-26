@@ -69,14 +69,14 @@ if [ -n "$cadence" ]; then
   esac
 fi
 
-interval=${interval:-86400}
-
 if [ "$disable_updates" = "0" ]; then
+  interval=${interval:-86400}
   case "$interval" in
     ''|*[!0-9]*)
       fail "AI_AGENT_UPDATE_INTERVAL_SECONDS must be a positive integer"
       ;;
   esac
+  [ "$interval" -gt 0 ] || fail "AI_AGENT_UPDATE_INTERVAL_SECONDS must be a positive integer"
 fi
 
 case "$dry_run" in

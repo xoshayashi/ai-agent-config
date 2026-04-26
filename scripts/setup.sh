@@ -243,13 +243,18 @@ fi
 if [ "$install_skills" = "1" ]; then
   install_skills_to_dir "$skills_dir"
   if [ -n "$extra_skills_dirs" ]; then
-    old_ifs=$IFS
+    had_ifs=${IFS+x}
+    old_ifs=${IFS-}
     IFS=:
     for dir in $extra_skills_dirs; do
       [ -n "$dir" ] || continue
       install_skills_to_dir "$dir"
     done
-    IFS=$old_ifs
+    if [ "$had_ifs" = "x" ]; then
+      IFS=$old_ifs
+    else
+      unset IFS
+    fi
   fi
 else
   say "skip: skill links disabled"

@@ -50,7 +50,19 @@ expand_home() {
 }
 
 json_escape() {
-  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
+  printf '%s' "$1" | awk '
+    BEGIN { ORS = "" }
+    {
+      gsub(/\\/, "\\\\")
+      gsub(/"/, "\\\"")
+      gsub(/\t/, "\\t")
+      gsub(/\r/, "\\r")
+      if (NR > 1) {
+        printf "\\n"
+      }
+      printf "%s", $0
+    }
+  '
 }
 
 json_value() {
@@ -188,9 +200,10 @@ gemini_status=$(command_status gemini "$gemini_path")
 link_status_for() {
   dst=$1
   expected=$2
-  if [ -z "$target_dir" ]; then
+  target_root=$3
+  if [ -z "$target_root" ]; then
     printf 'unknown'
-  elif [ ! -d "$target_dir" ]; then
+  elif [ ! -d "$target_root" ]; then
     printf 'missing-target'
   elif [ ! -L "$dst" ]; then
     printf 'missing'
@@ -204,10 +217,10 @@ link_status_for() {
   fi
 }
 
-agents_link_status=$(link_status_for "${target_dir:-}/AGENTS.md" "$config_home/instructions/AGENTS.md")
-claude_link_status=$(link_status_for "${target_dir:-}/CLAUDE.md" "$config_home/instructions/CLAUDE.md")
-gemini_link_status=$(link_status_for "${target_dir:-}/GEMINI.md" "$config_home/instructions/GEMINI.md")
-shared_link_status=$(link_status_for "${target_dir:-}/AI_AGENT_INSTRUCTIONS.md" "$config_home/instructions/AI_AGENT_INSTRUCTIONS.md")
+agents_link_status=$(link_status_for "${target_dir:-}/AGENTS.md" "$config_home/instructions/AGENTS.md" "$target_dir")
+claude_link_status=$(link_status_for "${target_dir:-}/CLAUDE.md" "$config_home/instructions/CLAUDE.md" "$target_dir")
+gemini_link_status=$(link_status_for "${target_dir:-}/GEMINI.md" "$config_home/instructions/GEMINI.md" "$target_dir")
+shared_link_status=$(link_status_for "${target_dir:-}/AI_AGENT_INSTRUCTIONS.md" "$config_home/instructions/AI_AGENT_INSTRUCTIONS.md" "$target_dir")
 
 skill_status=missing
 skill_link="$skills_dir/skill-design-research"
