@@ -59,6 +59,7 @@ This file is the single source of truth for AI coding agents working in this dir
 
 ## Completion Quality Gate
 
+- Treat completion as the start of a mandatory self-review pass, not the stopping point. After every deliverable, review the work critically and keep improving it until it meets a high quality bar within the agreed scope.
 - Do not stop at the first apparently working result. Before reporting completion, review the finished work against the initial goal, scope, deliverable, constraints, and acceptance criteria.
 - Inspect the actual output or changed files directly, and when feasible run or render the result in the form the user will experience it.
 - For non-trivial deliverables, complex tradeoffs, or high-stakes wording, include LLM peer review in this quality gate when additional reasoning would materially improve quality, and apply useful feedback before final reporting.
