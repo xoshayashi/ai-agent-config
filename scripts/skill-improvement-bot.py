@@ -876,7 +876,7 @@ def claude_ready(data: dict[str, Any]) -> tuple[bool, str]:
             return True, "latest Claude-related review is APPROVED"
         if any(marker in body for marker in ["ready to merge", "merge ok", "lgtm", "no changes requested", "マージ ok", "マージok"]):
             return True, "latest Claude-related review appears merge-ready"
-        if any(marker in body for marker in ["request changes", "blocking", "needs changes", "要修正", "修正をお願い"]):
+        if any(marker in body for marker in ["request changes", "blocking change", "needs changes", "要修正", "修正をお願い"]):
             return False, "Claude-related review still asks for changes"
     return False, "no merge-ready Claude review signal found"
 
@@ -1107,6 +1107,10 @@ def cmd_review_open_prs(args: argparse.Namespace) -> None:
                     }
                 )
         finally:
+            if args.apply_claude_feedback and not args.dry_run:
+                # If validation fails after Claude edits, discard local working
+                # tree changes before switching away from the PR branch.
+                run_command(["git", "restore", "--source=HEAD", "--staged", "--worktree", "."], root, check=False)
             if original_branch and not args.dry_run:
                 run_command(["git", "switch", original_branch], root, check=False)
     print(json.dumps({"checked": len(prs), "pull_requests": results}, ensure_ascii=False, indent=2))
