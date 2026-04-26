@@ -24,13 +24,13 @@ If you are using the installer script from a downloaded release or checked-out c
 AI_AGENT_TARGET_DIR="/path/to/workspace" sh /path/to/ai-agent-config/scripts/install.sh
 ```
 
-## Claude Code Setup Prompt
+## Claude Code / Codex / Gemini CLI Setup Prompt
 
-Give Claude Code this instruction:
+Give Claude Code, Codex, or Gemini CLI this instruction:
 
 > Read `setup.md`, explain any technical terms in plain Japanese, set `AI_AGENT_TARGET_DIR` to the project or workspace directory that should receive the instruction entrypoints, ask me what update frequency I want with daily as the recommended option, then run `scripts/setup.sh`, configure or disable updates according to my choice, and verify the resulting links.
 
-If Claude Code is opened inside this config repository, tell it the target directory explicitly:
+If the AI CLI is opened inside this config repository, tell it the target directory explicitly:
 
 ```text
 Read setup.md and set up my workspace at /path/to/workspace.
@@ -38,7 +38,7 @@ Read setup.md and set up my workspace at /path/to/workspace.
 
 ## Beginner-Friendly Interaction / 初心者にもやさしい対話
 
-This setup may be used by every employee type, including people who are new to terminals, Git, Claude Code, Codex, or AI agent configuration. When an AI agent helps with setup, it should make the process understandable without turning the session into a lecture. The default employee-facing conversation should be in Japanese.
+This setup may be used by every employee type, including people who are new to terminals, Git, Claude Code, Codex, Gemini CLI, or AI agent configuration. When an AI agent helps with setup, it should make the process understandable without turning the session into a lecture. The default employee-facing conversation should be in Japanese.
 
 Before running commands, the agent should briefly explain in Japanese:
 
@@ -228,4 +228,4 @@ readlink "$AI_AGENT_TARGET_DIR/CLAUDE.md"
 find "${AI_AGENT_SKILLS_DIR:-$HOME/.agents/skills}" -maxdepth 2 -name SKILL.md
 ```
 
-Claude Code should be able to read `CLAUDE.md`, follow it to `AI_AGENT_INSTRUCTIONS.md`, and use linked skills from the shared skills directory.
+Claude Code, Codex, and Gemini CLI should be able to read their entrypoint files, follow them to `AI_AGENT_INSTRUCTIONS.md`, and use linked skills from the shared skills directory.
