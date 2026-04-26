@@ -6,15 +6,19 @@ Use this guide to install the shared AI agent instructions and skills on any Uni
 
 **Recommended target:** propose the user's normal parent folder for LLM CLI work first. If the user is unsure, recommend `~/Documents/projects`. If the user already has a team-mandated workspace, a monorepo root, or a folder where they regularly start Claude Code, Codex, and Gemini CLI, prefer that instead.
 
+**Existing personal settings:** when Claude Code, Codex, or Gemini CLI settings already exist, append or merge the shared Hook entries instead of replacing the user's settings. Explain this in Japanese during the setup session.
+
 ## Prerequisites / 前提条件
 
 Before running this repository's setup, make sure the user can open a terminal and use all supported LLM CLIs: Claude Code, Codex, and Gemini CLI.
+The setup scripts also require `git`, and shared Hook support requires `python3`.
 
 For beginner-facing setup, guide the user through these steps first:
 
 1. **ターミナルを起動する。** macOSなら「ターミナル」または「iTerm2」、Windowsなら「PowerShell」または「Windows Terminal」を開きます。
 2. **Claude Code、Codex、Gemini CLIを全てインストールする。** The official setup pages are the source of truth because CLI install methods can change.
 3. **3つ全てのLLM CLIにログインする。** Start each installed CLI, complete browser or account authentication, and confirm each interactive prompt opens.
+4. **`git` と `python3` が使えるか確認する。** `git` はリポジトリ取得に使い、`python3` はHook設定の追記・削除とHook本体の実行に使います。
 
 | Tool | Official Setup | Login Check |
 |---|---|---|
@@ -40,6 +44,7 @@ https://github.com/xoshayashi/llm-config.git
 Claude Code、Codex、Gemini CLIの全てがインストール済みかつログイン済みか確認して、未完了のものがあれば先に案内して。
 セットアップ先は、まず推奨として「普段LLM CLIで作業する親フォルダー」を示して。迷っている場合は `~/Documents/projects` を推奨し、既に使っている作業フォルダーや会社指定のworkspaceがあればそれを優先して。
 初回セットアップでは必ずdry runで事前確認して、作成されるリンク、バックアップされる可能性があるファイル、設定される更新頻度を日本語で要約してから本実行して。
+既存のClaude Code、Codex、Gemini CLI設定がある場合は置き換えず、共有Hook設定だけを追記・マージして、そのことを日本語で説明して。
 専門用語は日本語で説明して、更新頻度は推奨の1日1回を含めて選ばせて。
 ```
 
@@ -98,6 +103,8 @@ After all three LLM CLIs are installed and logged in, give the Claude Code, Code
 
 > Read `setup.md`, explain any technical terms in plain Japanese, recommend a target workspace before asking me to choose, set `AI_AGENT_TARGET_DIR` to that project or workspace directory, ask me what update frequency I want with daily as the recommended option, run a dry run first and summarize the planned changes in Japanese, then run `scripts/setup.sh`, configure or disable updates according to my choice, and verify the resulting links.
 
+If existing Claude Code, Codex, or Gemini CLI settings are found, explain that setup will **append or merge** the shared Hook entries instead of replacing the user's personal settings.
+
 If the user has not installed or logged in to all of Claude Code, Codex, and Gemini CLI yet, start from **Prerequisites / 前提条件** before running setup commands.
 
 If the LLM CLI is opened inside this config repository, tell it the target directory explicitly:
@@ -115,6 +122,7 @@ Before running commands, the agent should briefly explain in Japanese:
 - **何が変わるか:** 選んだ作業フォルダーに、AIツールが共通ルールを見つけるための小さな案内ファイルを置きます。
 - **どこが変わるか:** `AGENTS.md`、`CLAUDE.md`、`GEMINI.md` などが置かれるフォルダーが対象です。
 - **なぜリンクを使うか:** 共通ルールの本体は1か所で管理しつつ、各AIツールが期待する場所から読めるようにするためです。
+- **Hook設定の扱い:** Hook本体はこのリポジトリで管理し、既存の個人設定がある場合は共有Hookだけを追記・マージします。
 - **既存ファイルの扱い:** 同じ名前のファイルがある場合、標準では削除せずバックアップフォルダーへ退避します。
 - **成功状態:** 対象フォルダーに案内ファイルのリンクができ、共有Skillも設定済みのSkillフォルダーから使える状態です。
 
@@ -130,6 +138,7 @@ Use plain Japanese explanations for technical terms the first time they appear. 
 | **Symbolic link / symlink** | 実体ファイルへの近道のようなファイルです。コピーではなく、元ファイルを指し示します。 |
 | **Environment variable** | コマンドに渡す一時的な設定です。たとえば、どのフォルダーをセットアップするかを指定します。 |
 | **Skill** | AIツールに特定の作業手順を教える、再利用できる説明書パッケージです。 |
+| **Hook** | AIツールの処理前後に自動で動く小さな確認・補助プログラムです。危険な操作の防止や追加文脈の注入に使います。 |
 | **Backup** | 変更前に存在していたファイルを安全に残しておく退避先です。 |
 | **Dry run** | 実際には変更せず、何が起きるかだけを確認する予行演習モードです。 |
 
@@ -140,11 +149,12 @@ For non-technical users, prefer this interaction pattern:
 3. **推奨セットアップ先を示して選んでもらう。** まず `~/Documents/projects`、既存の作業フォルダー、会社指定workspaceの順で提案します。例: "`~/Documents/projects` に設定するのがおすすめです。ここで開いたAIツールが共通ルールを読めるようになります。"
 4. **実行前に短く説明する。** ユーザーが詳しい説明を求めない限り、日本語で2から3文に収めます。
 5. **dry runで事前確認する。** `AI_AGENT_DRY_RUN=1` と `AI_AGENT_TARGET_DIR` を指定して予行演習し、作成予定のリンク、バックアップ候補、Skillリンク、状態ファイルを日本語で要約します。
-6. **要約後に本実行する。** ユーザーが明示的に止めない限り、同じ `AI_AGENT_TARGET_DIR` で本実行します。
-7. **更新頻度を選んでもらう。** 推奨は「1日1回」です。選択肢は「1日1回」「12時間ごと」「1週間ごと」「自動更新なし」「カスタム秒数」くらいに絞ります。
-8. **更新設定を反映する。** 選んだ頻度に合わせて `AI_AGENT_UPDATE_CADENCE` または `AI_AGENT_UPDATE_INTERVAL_SECONDS` を指定し、`scripts/schedule-update.sh` で自動更新を設定または停止します。
-9. **結果を確認して翻訳する。** `readlink` は「近道ファイルがどの本体ファイルを指しているか確認するコマンド」だと説明します。
-10. **最後に簡単にまとめる。** 何を設定したか、バックアップが作られたか、更新頻度は何か、急ぎの時に何を頼めばよいかを短く伝えます。
+6. **既存設定への追記を説明する。** `append:` が出ている場合は、既存のClaude Code、Codex、Gemini CLI設定を消さずに、共有Hook部分だけを追加する意味だと説明します。
+7. **要約後に本実行する。** ユーザーが明示的に止めない限り、同じ `AI_AGENT_TARGET_DIR` で本実行します。
+8. **更新頻度を選んでもらう。** 推奨は「1日1回」です。選択肢は「1日1回」「12時間ごと」「1週間ごと」「自動更新なし」「カスタム秒数」くらいに絞ります。
+9. **更新設定を反映する。** 選んだ頻度に合わせて `AI_AGENT_UPDATE_CADENCE` または `AI_AGENT_UPDATE_INTERVAL_SECONDS` を指定し、`scripts/schedule-update.sh` で自動更新を設定または停止します。
+10. **結果を確認して翻訳する。** `readlink` は「近道ファイルがどの本体ファイルを指しているか確認するコマンド」だと説明します。
+11. **最後に簡単にまとめる。** 何を設定したか、バックアップが作られたか、既存設定へ追記したHookがあるか、更新頻度は何か、急ぎの時に何を頼めばよいかを短く伝えます。
 
 ## Dry-Run Approval / 事前確認
 
@@ -157,6 +167,7 @@ AI_AGENT_DRY_RUN=1 AI_AGENT_TARGET_DIR="/path/to/workspace" sh /path/to/llm-conf
 After dry run, summarize in Japanese:
 
 - **リンク作成予定:** Which entrypoint files and skill directories would be linked.
+- **Hook設定:** Which CLI Hook settings would be linked, or which existing settings would receive appended Hook entries.
 - **既存ファイルの扱い:** Whether any existing files would be backed up.
 - **状態ファイル:** Where setup state would be written for future updates.
 - **次の実行:** The exact target workspace and update cadence that will be used for the real run.
@@ -166,6 +177,7 @@ Then proceed with the real setup unless the user stops or changes the target.
 ## Uninstall / 元に戻す
 
 The uninstall flow removes only links and state files that this repository manages. It skips ordinary files and unmanaged links.
+If setup appended managed Hook entries into an existing CLI settings file, uninstall removes only those managed Hook entries and leaves the user's personal settings file in place.
 
 Preview first:
 
@@ -211,6 +223,34 @@ By default, that directory is:
 $HOME/.agents/skills
 ```
 
+The script also installs shared Hook support. Hook scripts stay in this repository and are exposed through a stable runtime link:
+
+| Link Location | Source |
+|---|---|
+| `$AI_AGENT_HOOKS_RUNTIME_LINK` | `hooks/` |
+
+By default, `AI_AGENT_HOOKS_RUNTIME_LINK` is:
+
+```text
+$HOME/.llm-config/hooks
+```
+
+CLI Hook settings are installed under the target workspace by default:
+
+| CLI | Hook Settings Location | Existing Settings Behavior |
+|---|---|---|
+| **Claude Code** | `$AI_AGENT_TARGET_DIR/.claude/settings.json` | Link if missing; append/merge `hooks` if present. |
+| **Codex** | `$AI_AGENT_TARGET_DIR/.codex/config.toml` and `$AI_AGENT_TARGET_DIR/.codex/hooks.json` | Link if missing; enable `codex_hooks` and append/merge hooks if present. |
+| **Gemini CLI** | `$AI_AGENT_TARGET_DIR/.gemini/settings.json` | Link if missing; append/merge `hooks` if present. |
+
+Use `AI_AGENT_HOOKS_SCOPE=user` to install Hook settings into user-level official folders such as `~/.claude`, `~/.codex`, and `~/.gemini`. Use `AI_AGENT_HOOKS_SCOPE=both` for both target and user-level settings.
+
+The peer prompt refinement Hook is installed but **off by default**. Enable it only when the user wants every substantive prompt to receive a peer LLM review:
+
+```sh
+AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT=1
+```
+
 ## Environment Variables
 
 | Variable | Default | Purpose |
@@ -223,11 +263,16 @@ $HOME/.agents/skills
 | `AI_AGENT_STATE_DIR` | `$HOME/.llm-config` | Stores setup state used by future updates. |
 | `AI_AGENT_INSTALL_INSTRUCTIONS` | `1` | Set to `0` to skip instruction entrypoint links. |
 | `AI_AGENT_INSTALL_SKILLS` | `1` | Set to `0` to skip skill links. |
+| `AI_AGENT_INSTALL_HOOKS` | `1` | Set to `0` to skip Hook runtime and CLI Hook setting installation. |
+| `AI_AGENT_HOOKS_SCOPE` | `target` | `target`, `user`, or `both`. Controls whether Hook settings are installed into the target workspace, user-level CLI folders, or both. |
+| `AI_AGENT_HOOKS_RUNTIME_LINK` | `$HOME/.llm-config/hooks` | Stable link used by CLI Hook commands to find this repository's `hooks/` directory. |
 | `AI_AGENT_CONFLICT_MODE` | `backup` | `backup`, `skip`, or `fail` when a destination path already exists. |
 | `AI_AGENT_BACKUP_DIR` | `$AI_AGENT_TARGET_DIR/.llm-config-backups/<timestamp>` | Where existing conflicting files are moved when conflict mode is `backup`. |
 | `AI_AGENT_PROTECT_LINKS` | `auto` | On macOS, applies `everyone deny delete` to created links. Set to `0` to disable. |
 | `AI_AGENT_PERSIST_CONFIG` | `1` | Set to `0` to avoid writing setup state for `scripts/update.sh`. |
 | `AI_AGENT_DRY_RUN` | `0` | Set to `1` to preview actions without changing files. |
+| `AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT` | `0` | Set to `1` in the LLM CLI environment to enable peer LLM prompt refinement. |
+| `AI_AGENT_PROMPT_REFINEMENT_TIMEOUT_SECONDS` | `30` | Timeout for the optional peer prompt refinement Hook. |
 
 ## Keeping Config Updated
 
@@ -383,6 +428,14 @@ AI_AGENT_TARGET_DIR="$PWD" \
 sh /path/to/llm-config/scripts/setup.sh
 ```
 
+Install Hook settings into user-level CLI folders instead of the target workspace:
+
+```sh
+AI_AGENT_HOOKS_SCOPE=user \
+AI_AGENT_TARGET_DIR="$PWD" \
+sh /path/to/llm-config/scripts/setup.sh
+```
+
 Preview without making changes:
 
 ```sh
@@ -438,6 +491,7 @@ If the user says **"全部元に戻して"** or **"AI Agent Configを外して"*
 The default behavior is conservative:
 
 - Existing correct links are kept.
+- Existing Claude Code, Codex, and Gemini CLI Hook settings are appended or merged so personal settings remain in place.
 - Existing conflicting files or links are moved into a timestamped backup directory.
 - No file is permanently deleted.
 - The script does not use `rm`.
@@ -451,7 +505,8 @@ After setup, verify:
 ```sh
 readlink "$AI_AGENT_TARGET_DIR/AI_AGENT_INSTRUCTIONS.md"
 readlink "$AI_AGENT_TARGET_DIR/CLAUDE.md"
+readlink "$HOME/.llm-config/hooks"
 find "${AI_AGENT_SKILLS_DIR:-$HOME/.agents/skills}" -maxdepth 2 -name SKILL.md
 ```
 
-Claude Code, Codex, and Gemini CLI should be able to read their entrypoint files, follow them to `AI_AGENT_INSTRUCTIONS.md`, and use linked skills from the shared skills directory.
+Claude Code, Codex, and Gemini CLI should be able to read their entrypoint files, follow them to `AI_AGENT_INSTRUCTIONS.md`, use linked skills from the shared skills directory, and load Hook settings from their official config folders. If a Hook settings file already existed, `scripts/setup.sh` reports `append:` and the health check reports that Hook config as `appended`.
