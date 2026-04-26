@@ -69,6 +69,7 @@ _PEER_REFINEMENT_CONTEXT_
 - If the peer CLI is missing, unauthenticated, rate-limited, or blocked by workspace trust, continue with the original prompt.
 - If the peer CLI exceeds the timeout budget or blocks on approval, stop waiting and continue with the original prompt.
 - If Gemini reports workspace trust issues for a prompt-only refinement, retry once with `--skip-trust`.
+- If peer output is present but missing one or more required sections, salvage only safe missing-consideration hints from the sections present and treat the missing sections as if the peer returned only chatter.
 - If the peer output lacks an improved prompt, misses required sections, drops important constraints, or returns only chatter/tool plans, use the original prompt plus your own missing-consideration checklist.
 - Report fallback briefly only when it affects confidence, latency, or user expectations.
 

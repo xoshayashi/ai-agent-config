@@ -1,6 +1,6 @@
 ---
 name: peer-prompt-refinement
-description: Use this skill at the start of every new user task prompt before answering, planning, researching, coding, editing, or using tools. It asks a peer LLM CLI in non-interactive mode to improve the prompt with enough relevant prior context for the peer to understand the task, then continues from the improved prompt and re-evaluates any other skills that should activate. Codex and Claude Code ask Gemini CLI; Gemini CLI asks Codex CLI. Skip only non-task chatter such as thanks/status/stop messages, prompts already marked as refined, or child peer-refinement subprocesses.
+description: Use this skill at the start of every new user task prompt to ask a configured peer LLM CLI to refine the prompt before execution. Skip non-task chatter, internally refined prompts, and child peer-refinement subprocesses.
 ---
 
 # Peer Prompt Refinement
