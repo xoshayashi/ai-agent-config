@@ -32,9 +32,9 @@ Give the active Claude Code, Codex, or Gemini CLI session this instruction:
 
 ```text
 GitHubにログインできているか確認して。未ログインなら、初心者にも分かる日本語でログイン手順を案内して。
-その後、次のリポジトリをこのPCに取得して。保存先は `~/Documents/ai-agent-config` を基本にして。既に同じリポジトリがある場合は、最新のmainをpullして。
+その後、次のリポジトリをこのPCに取得して。保存先は `~/Documents/llm-config` を基本にして。既に同じリポジトリがある場合は、最新のmainをpullして。
 
-https://github.com/xoshayashi/ai-agent-config.git
+https://github.com/xoshayashi/llm-config.git
 
 取得できたら、そのリポジトリのREADME.mdとsetup.mdを読んで、このPCにAI Agent Configをセットアップして。
 Claude Code、Codex、Gemini CLIの全てがインストール済みかつログイン済みか確認して、未完了のものがあれば先に案内して。
@@ -46,7 +46,7 @@ Claude Code、Codex、Gemini CLIの全てがインストール済みかつログ
 For AI agents executing this request:
 
 - Prefer a standard GitHub authentication check such as the GitHub CLI when available, but keep the user-facing interaction in plain Japanese.
-- If the repository already exists locally, update it with the latest `main`; otherwise clone `https://github.com/xoshayashi/ai-agent-config.git` into `~/Documents/ai-agent-config` by default.
+- If the repository already exists locally, update it with the latest `main`; otherwise clone `https://github.com/xoshayashi/llm-config.git` into `~/Documents/llm-config` by default.
 - After checkout or pull succeeds, continue with this setup guide rather than making the user issue a second command.
 - If setup, update, scheduling, or uninstall fails, use [docs/setup-error-guide.md](docs/setup-error-guide.md) to explain the error and choose the next safe step.
 
@@ -77,7 +77,7 @@ Suggested Japanese wording:
 From the directory where the instruction files should appear, run:
 
 ```sh
-AI_AGENT_TARGET_DIR="$PWD" sh /path/to/ai-agent-config/scripts/setup.sh
+AI_AGENT_TARGET_DIR="$PWD" sh /path/to/llm-config/scripts/setup.sh
 ```
 
 If you are running from the config repository root, set the target explicitly:
@@ -89,7 +89,7 @@ AI_AGENT_TARGET_DIR="/path/to/workspace" sh scripts/setup.sh
 If you are using the installer script from a downloaded release or checked-out copy, it can clone or update the config repository for you:
 
 ```sh
-AI_AGENT_TARGET_DIR="/path/to/workspace" sh /path/to/ai-agent-config/scripts/install.sh
+AI_AGENT_TARGET_DIR="/path/to/workspace" sh /path/to/llm-config/scripts/install.sh
 ```
 
 ## Claude Code / Codex / Gemini CLI Setup Prompt
@@ -151,7 +151,7 @@ For non-technical users, prefer this interaction pattern:
 First-time setup should use dry run as a standard safety step.
 
 ```sh
-AI_AGENT_DRY_RUN=1 AI_AGENT_TARGET_DIR="/path/to/workspace" sh /path/to/ai-agent-config/scripts/setup.sh
+AI_AGENT_DRY_RUN=1 AI_AGENT_TARGET_DIR="/path/to/workspace" sh /path/to/llm-config/scripts/setup.sh
 ```
 
 After dry run, summarize in Japanese:
@@ -170,13 +170,13 @@ The uninstall flow removes only links and state files that this repository manag
 Preview first:
 
 ```sh
-AI_AGENT_DRY_RUN=1 sh /path/to/ai-agent-config/scripts/uninstall.sh
+AI_AGENT_DRY_RUN=1 sh /path/to/llm-config/scripts/uninstall.sh
 ```
 
 Then run the actual cleanup:
 
 ```sh
-sh /path/to/ai-agent-config/scripts/uninstall.sh
+sh /path/to/llm-config/scripts/uninstall.sh
 ```
 
 For beginner-facing LLM CLI sessions, use this Japanese interaction:
@@ -216,15 +216,15 @@ $HOME/.agents/skills
 | Variable | Default | Purpose |
 |---|---|---|
 | `AI_AGENT_CONFIG_HOME` | Repository root inferred from `scripts/setup.sh` | Location of this config repository. |
-| `AI_AGENT_REPO_URL` | `https://github.com/xoshayashi/ai-agent-config.git` | Repository URL used by `scripts/install.sh` when cloning. |
+| `AI_AGENT_REPO_URL` | `https://github.com/xoshayashi/llm-config.git` | Repository URL used by `scripts/install.sh` when cloning. |
 | `AI_AGENT_TARGET_DIR` | Current working directory | Directory that receives `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and related entrypoints. |
 | `AI_AGENT_SKILLS_DIR` | `$HOME/.agents/skills` | Shared skill directory used as the canonical cross-LLM skill location. |
 | `AI_AGENT_EXTRA_SKILLS_DIRS` | Empty | Optional colon-separated list of additional skill directories to link into. |
-| `AI_AGENT_STATE_DIR` | `$HOME/.ai-agent-config` | Stores setup state used by future updates. |
+| `AI_AGENT_STATE_DIR` | `$HOME/.llm-config` | Stores setup state used by future updates. |
 | `AI_AGENT_INSTALL_INSTRUCTIONS` | `1` | Set to `0` to skip instruction entrypoint links. |
 | `AI_AGENT_INSTALL_SKILLS` | `1` | Set to `0` to skip skill links. |
 | `AI_AGENT_CONFLICT_MODE` | `backup` | `backup`, `skip`, or `fail` when a destination path already exists. |
-| `AI_AGENT_BACKUP_DIR` | `$AI_AGENT_TARGET_DIR/.ai-agent-config-backups/<timestamp>` | Where existing conflicting files are moved when conflict mode is `backup`. |
+| `AI_AGENT_BACKUP_DIR` | `$AI_AGENT_TARGET_DIR/.llm-config-backups/<timestamp>` | Where existing conflicting files are moved when conflict mode is `backup`. |
 | `AI_AGENT_PROTECT_LINKS` | `auto` | On macOS, applies `everyone deny delete` to created links. Set to `0` to disable. |
 | `AI_AGENT_PERSIST_CONFIG` | `1` | Set to `0` to avoid writing setup state for `scripts/update.sh`. |
 | `AI_AGENT_DRY_RUN` | `0` | Set to `1` to preview actions without changing files. |
@@ -236,19 +236,19 @@ The instruction files and skills are linked from this repository. That means upd
 After the first setup, run:
 
 ```sh
-sh /path/to/ai-agent-config/scripts/update.sh
+sh /path/to/llm-config/scripts/update.sh
 ```
 
 `scripts/update.sh` does three things:
 
 1. Pulls the latest `main` from GitHub using a fast-forward-only Git update.
-2. Reads the saved setup state from `$HOME/.ai-agent-config/config.env`.
+2. Reads the saved setup state from `$HOME/.llm-config/config.env`.
 3. Runs `scripts/setup.sh` again so links and skills stay aligned with the latest repository contents.
 
 For automatic updates, schedule the updater with the recommended daily cadence:
 
 ```sh
-AI_AGENT_UPDATE_CADENCE=daily sh /path/to/ai-agent-config/scripts/schedule-update.sh
+AI_AGENT_UPDATE_CADENCE=daily sh /path/to/llm-config/scripts/schedule-update.sh
 ```
 
 This uses `launchd` on macOS and a user `systemd` timer on Linux when available. If neither is available, the script prints the manual update command.
@@ -258,13 +258,13 @@ This uses `launchd` on macOS and a user `systemd` timer on Linux when available.
 Use `scripts/health-check.sh` when the user asks whether setup is healthy, installed correctly, logged in to GitHub, or ready to update.
 
 ```sh
-sh /path/to/ai-agent-config/scripts/health-check.sh
+sh /path/to/llm-config/scripts/health-check.sh
 ```
 
 For machine-readable output, use:
 
 ```sh
-sh /path/to/ai-agent-config/scripts/health-check.sh --json
+sh /path/to/llm-config/scripts/health-check.sh --json
 ```
 
 The health check does not change files. It reports GitHub CLI login status, command paths for `git`, `gh`, `claude`, `codex`, and `gemini`, repository branch and dirty state, saved setup state, entrypoint links, and the shared Skill link.
@@ -301,15 +301,17 @@ These phrases are intentional hooks. When the user says one of them in a setup/c
 | **「最新のルールを反映して」** | Refresh shared rules immediately. | `scripts/update.sh` |
 | **「設定が壊れていないか確認して」** | Check GitHub login, CLI paths, repository state, and links. | `scripts/health-check.sh` |
 | **「ヘルスチェックして」** | Run a read-only setup health check. | `scripts/health-check.sh` |
+| **「最近のログからSkill改善点を見て」** | Scan local LLM CLI logs and summarize redacted skill-improvement opportunities. | `scripts/skill-improvement-bot.py scan` |
+| **「Skill改善PRまで自動で作って」** | Generate a redacted improvement report and open a PR when opt-in GitHub automation is enabled. | `scripts/skill-improvement-bot.py run` |
 
-For urgent updates, run health check only when the current setup location is unclear or the update fails. Otherwise, locate the config repository from `AI_AGENT_CONFIG_HOME`, `$HOME/.ai-agent-config/config.env`, or the symlink target of `AI_AGENT_INSTRUCTIONS.md`, then run the updater.
+For urgent updates, run health check only when the current setup location is unclear or the update fails. Otherwise, locate the config repository from `AI_AGENT_CONFIG_HOME`, `$HOME/.llm-config/config.env`, or the symlink target of `AI_AGENT_INSTRUCTIONS.md`, then run the updater.
 
 ## Urgent Manual Updates
 
 If the user says something like **"急ぎ対応したいんだけど"**, **"今すぐ最新にして"**, or **"最新のルールを反映して"**, the agent should run a one-time update instead of waiting for the next scheduled run:
 
 ```sh
-sh /path/to/ai-agent-config/scripts/update.sh
+sh /path/to/llm-config/scripts/update.sh
 ```
 
 Explain in Japanese that this pulls the latest shared instructions immediately and re-applies the saved setup. If the update stops because the config repository has local changes, explain that the script stopped to avoid overwriting local edits.
@@ -317,38 +319,60 @@ Explain in Japanese that this pulls the latest shared instructions immediately a
 If the user asks **"設定が壊れていないか確認して"** or **"ヘルスチェックして"**, run:
 
 ```sh
-sh /path/to/ai-agent-config/scripts/health-check.sh
+sh /path/to/llm-config/scripts/health-check.sh
 ```
 
 Explain `ok`, `warn`, and `fail` in Japanese. If the user or another agent needs structured output, rerun with `--json`.
 
-## Contributing And Validation / みんなで育てるために
+## Skill Improvement Automation / Skillを自動で育てる仕組み
 
-When adding or changing shared instructions, setup behavior, skills, or agent workflows, keep portability and activation quality visible.
+このリポジトリは、複数人が使った結果を **ローカルログから匿名化して改善候補へ変換する** 自動化を持ちます。手動チェックリストではなく、次の流れでSkill改善を進めます。
 
-- **互換性を確認する:** Use [docs/compatibility.md](docs/compatibility.md) and [compatibility/llm-cli-matrix.yml](compatibility/llm-cli-matrix.yml) when a change may affect Claude Code, Codex, or Gemini CLI differently.
-- **Skillはテンプレートから始める:** Start new skills from `skills/template/SKILL.md.template`, then fill in activation tests under `tests/`.
-- **根拠を分離する:** Keep `SKILL.md` lean and put source notes, benchmarks, official references, or academic background in `references/`.
-- **検証を実行する:** Before a pull request or distribution update, run:
+チームでSkill品質を育てる時は、個別の思いつきだけでSkillを増やすより、**実際の追加修正依頼から抽出した改善候補をPR化する** この流れを優先してください。
+
+1. Claude Code、Codex、Gemini CLIのローカルログを読む。
+2. Skill使用後の追加修正依頼から、Skillに吸収すべき改善ポイントだけを抽出する。
+3. 個人情報や秘密情報を伏せた改善レポートを作る。
+4. 必要に応じてLLMにSkill本文の改善パッチを作らせる。
+5. `scripts/validate-repo.sh` を自動実行する。
+6. opt-in設定がある時だけPull Requestを作る。
+7. Claudeレビュー、CI、未解決スレッド、Draft状態、競合を確認し、条件が揃った時だけ自動マージを予約する。
+
+改善候補を見るだけなら次を実行します。
 
 ```sh
-sh scripts/validate-repo.sh
+python3 scripts/skill-improvement-bot.py scan
 ```
 
-If validation fails, explain the error in Japanese, fix the smallest relevant issue, and run validation again.
+定期実行のdry-runは次です。
+
+```sh
+AI_AGENT_DRY_RUN=1 sh scripts/schedule-skill-improvement.sh
+```
+
+PR作成まで有効化する場合は、`gh auth status` が成功する状態で次を設定します。
+
+```sh
+AI_AGENT_IMPROVEMENT_CREATE_PR=1 \
+AI_AGENT_IMPROVEMENT_LLM=claude \
+AI_AGENT_IMPROVEMENT_CADENCE=daily \
+sh scripts/schedule-skill-improvement.sh
+```
+
+**重要:** 生ログはコミットしません。PR作成、Claudeレビュー対応、自動マージは、該当する環境変数を明示した場合だけ動きます。詳しくは [docs/skill-improvement-automation.md](docs/skill-improvement-automation.md) を読んでください。
 
 ## Examples
 
 Install instructions into the current project and skills into the shared directory:
 
 ```sh
-AI_AGENT_TARGET_DIR="$PWD" sh /path/to/ai-agent-config/scripts/setup.sh
+AI_AGENT_TARGET_DIR="$PWD" sh /path/to/llm-config/scripts/setup.sh
 ```
 
 Install into a specific workspace:
 
 ```sh
-AI_AGENT_TARGET_DIR="$HOME/Documents/projects" sh "$HOME/Documents/ai-agent-config/scripts/setup.sh"
+AI_AGENT_TARGET_DIR="$HOME/Documents/projects" sh "$HOME/Documents/llm-config/scripts/setup.sh"
 ```
 
 Install skills into both the shared directory and a Codex-specific directory:
@@ -356,49 +380,55 @@ Install skills into both the shared directory and a Codex-specific directory:
 ```sh
 AI_AGENT_EXTRA_SKILLS_DIRS="$HOME/.codex/skills" \
 AI_AGENT_TARGET_DIR="$PWD" \
-sh /path/to/ai-agent-config/scripts/setup.sh
+sh /path/to/llm-config/scripts/setup.sh
 ```
 
 Preview without making changes:
 
 ```sh
-AI_AGENT_DRY_RUN=1 AI_AGENT_TARGET_DIR="$PWD" sh /path/to/ai-agent-config/scripts/setup.sh
+AI_AGENT_DRY_RUN=1 AI_AGENT_TARGET_DIR="$PWD" sh /path/to/llm-config/scripts/setup.sh
 ```
 
 Schedule daily updates, the recommended cadence:
 
 ```sh
-AI_AGENT_UPDATE_CADENCE=daily sh /path/to/ai-agent-config/scripts/schedule-update.sh
+AI_AGENT_UPDATE_CADENCE=daily sh /path/to/llm-config/scripts/schedule-update.sh
+```
+
+Schedule daily skill-improvement scans:
+
+```sh
+AI_AGENT_IMPROVEMENT_CADENCE=daily sh /path/to/llm-config/scripts/schedule-skill-improvement.sh
 ```
 
 Run an urgent one-time update:
 
 ```sh
-sh /path/to/ai-agent-config/scripts/update.sh
+sh /path/to/llm-config/scripts/update.sh
 ```
 
 Check setup health in concise text:
 
 ```sh
-sh /path/to/ai-agent-config/scripts/health-check.sh
+sh /path/to/llm-config/scripts/health-check.sh
 ```
 
 Check setup health as JSON:
 
 ```sh
-sh /path/to/ai-agent-config/scripts/health-check.sh --json
+sh /path/to/llm-config/scripts/health-check.sh --json
 ```
 
 Preview uninstall without changing files:
 
 ```sh
-AI_AGENT_DRY_RUN=1 sh /path/to/ai-agent-config/scripts/uninstall.sh
+AI_AGENT_DRY_RUN=1 sh /path/to/llm-config/scripts/uninstall.sh
 ```
 
 Undo setup by moving managed links and saved setup state to the trash:
 
 ```sh
-sh /path/to/ai-agent-config/scripts/uninstall.sh
+sh /path/to/llm-config/scripts/uninstall.sh
 ```
 
 If the user says **"全部元に戻して"** or **"AI Agent Configを外して"**, explain what will be moved to the trash, run the dry-run uninstall first, summarize it in Japanese, then run `scripts/uninstall.sh` unless the user changes course.

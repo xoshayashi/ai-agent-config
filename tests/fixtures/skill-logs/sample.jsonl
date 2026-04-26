@@ -1,0 +1,3 @@
+{"role":"user","content":"skill-design-research を使って新しいSkillの設計をレビューして。"}
+{"role":"assistant","content":"skill-design-research を起動して、activation と evidence を確認しました。"}
+{"role":"user","content":"起動条件がまだ弱いので修正して。Web Searchの検索ワードも多すぎて結果が絞り込まれているので改善して。"}

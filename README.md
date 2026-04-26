@@ -2,6 +2,8 @@
 
 AIツール向けの共通InstructionsとSkillsを配布・更新するための設定リポジトリです。
 
+> **注意:** リポジトリ名を `ai-agent-config` から `llm-config` に改称中です。本書中のクローン URL `https://github.com/xoshayashi/llm-config.git` および `~/Documents/llm-config` 等のパスは、**GitHub 側のリポジトリ rename 完了後に有効化** されます。rename が未実施の段階では旧 URL `https://github.com/xoshayashi/ai-agent-config.git` を使ってください（rename 後は GitHub の自動リダイレクトにより旧 URL も引き続き動作します）。
+
 ## 最初に準備すること
 
 このセットアップは、**ターミナルでClaude Code、Codex、Gemini CLIの全てにログインできている状態**から進めます。まだの場合は、先に次を済ませてください。
@@ -25,9 +27,9 @@ Claude Code、Codex、Gemini CLIのどれかを起動したら、次の文章を
 
 ```text
 GitHubにログインできているか確認して。未ログインなら、初心者にも分かる日本語でログイン手順を案内して。
-その後、次のリポジトリをこのPCに取得して。保存先は `~/Documents/ai-agent-config` を基本にして。既に同じリポジトリがある場合は、最新のmainをpullして。
+その後、次のリポジトリをこのPCに取得して。保存先は `~/Documents/llm-config` を基本にして。既に同じリポジトリがある場合は、最新のmainをpullして。
 
-https://github.com/xoshayashi/ai-agent-config.git
+https://github.com/xoshayashi/llm-config.git
 
 取得できたら、そのリポジトリのREADME.mdとsetup.mdを読んで、このPCにAI Agent Configをセットアップして。
 Claude Code、Codex、Gemini CLIの全てがインストール済みかつログイン済みか確認して、未完了のものがあれば先に案内して。
@@ -64,12 +66,18 @@ Claude Code、Codex、Gemini CLIは `scripts/update.sh` を実行して、共有
 設定が壊れていないか確認して。README.mdとsetup.mdを読んで、health-checkを実行し、結果を日本語で短く説明して。
 ```
 
+Skillの改善候補を見たい時は、次のように伝えてください。これは **`scripts/skill-improvement-bot.py scan` を実行するための合図** です。
+
+```text
+最近のLLM CLIログから、Skillで吸収できそうな改善点がないか確認して。生ログは外に出さず、匿名化された改善候補だけ日本語で説明して。
+```
+
 ## 何が入るか
 
 - `AGENTS.md`、`CLAUDE.md`、`GEMINI.md` などのAIツール用入口ファイル
 - 共通ルール本体の `AI_AGENT_INSTRUCTIONS.md`
 - 再利用可能なSkill
-- 更新用・状態確認用スクリプト
+- 更新用・状態確認用・Skill改善用スクリプト
 
 ## 更新頻度
 
@@ -88,7 +96,7 @@ Claude Code、Codex、Gemini CLIは `scripts/update.sh` を実行して、共有
 自動更新を待たずに今すぐ反映したい場合は、次を実行します。
 
 ```sh
-sh /path/to/ai-agent-config/scripts/update.sh
+sh /path/to/llm-config/scripts/update.sh
 ```
 
 LLMには「急ぎ対応したいんだけど」と伝えれば、この手順で進めるように案内しています。
@@ -102,13 +110,15 @@ AI Agent Configのセットアップを元に戻して。README.mdとsetup.mdを
 削除が必要なものは完全削除せず、ゴミ箱に移して。実行前に何を片付けるか日本語で説明して。
 ```
 
-## みんなで育てる時
+## 自動で育てる仕組み
 
-このリポジトリを複数人で更新する場合は、変更前に [docs/compatibility.md](docs/compatibility.md) を確認してください。新しいSkillは `skills/template/` から作り、PR前に次を実行します。
+このリポジトリは、手動チェックリストだけに頼らず、**利用ログからSkillの改善候補を抽出してPR化するローカル自動化** を用意しています。
 
 ```sh
-sh scripts/validate-repo.sh
+python3 scripts/skill-improvement-bot.py scan
 ```
+
+チームでSkill品質を継続改善する時は、まずこの自動化で **実際の追加修正パターンから改善候補を作る** のを推奨します。定期実行は `scripts/schedule-skill-improvement.sh` で設定します。生ログはコミットせず、PR作成や自動マージは環境変数で明示的に有効化した場合だけ動きます。詳しくは [docs/skill-improvement-automation.md](docs/skill-improvement-automation.md) を参照してください。
 
 ## 詳細
 
