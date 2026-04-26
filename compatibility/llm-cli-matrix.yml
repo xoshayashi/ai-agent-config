@@ -57,6 +57,15 @@ shared_surfaces:
       - "scripts/update.sh"
     compatibility: "required"
     review_rule: "Urgent update and health-check phrases must map to scripts through plain language in every supported LLM CLI."
+  skill_improvement_automation:
+    files:
+      - "README.md"
+      - "setup.md"
+      - "docs/skill-improvement-automation.md"
+      - "scripts/skill-improvement-bot.py"
+      - "scripts/schedule-skill-improvement.sh"
+    compatibility: "conditional"
+    review_rule: "Local log scanning must keep raw logs local, redact summaries, and require explicit opt-in for PR creation, review application, and auto-merge."
 
 review_tags:
   portable:

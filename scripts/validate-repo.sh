@@ -32,6 +32,9 @@ for script in "$repo_root"/scripts/*.sh; do
   sh -n "$script"
 done
 
+say "validate: python syntax"
+python3 -m py_compile "$repo_root/scripts/skill-improvement-bot.py"
+
 say "validate: health check runs"
 AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/health-check.sh" --json >/dev/null
 
@@ -39,20 +42,24 @@ say "validate: required docs and entrypoints"
 require_file "README.md"
 require_file "setup.md"
 require_file "docs/setup-error-guide.md"
-require_file "docs/compatibility.md"
+require_file "docs/skill-improvement-automation.md"
 require_file "compatibility/llm-cli-matrix.yml"
 require_file "scripts/install.sh"
 require_file "scripts/setup.sh"
 require_file "scripts/update.sh"
 require_file "scripts/schedule-update.sh"
+require_file "scripts/schedule-skill-improvement.sh"
 require_file "scripts/uninstall.sh"
 require_file "scripts/health-check.sh"
+require_file "scripts/skill-improvement-bot.py"
 require_file "scripts/validate-repo.sh"
+require_file "tests/fixtures/skill-logs/sample.jsonl"
 require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"
 require_file "instructions/AI_AGENT_INSTRUCTIONS.md"
 require_file "instructions/.github/copilot-instructions.md"
+require_file ".github/workflows/validate.yml"
 
 say "validate: compatibility matrix mentions supported LLM CLIs"
 grep -q "claude-code:" "$repo_root/compatibility/llm-cli-matrix.yml" || fail "compatibility matrix missing claude-code"
@@ -81,5 +88,19 @@ for doc in "$repo_root/README.md" "$repo_root/setup.md"; do
   grep -q "Codex" "$doc" || fail "$doc does not mention Codex"
   grep -q "Gemini CLI" "$doc" || fail "$doc does not mention Gemini CLI"
 done
+
+say "validate: skill-improvement automation is discoverable"
+grep -q "skill-improvement-bot.py" "$repo_root/README.md" || fail "README.md does not mention skill-improvement-bot.py"
+grep -q "schedule-skill-improvement.sh" "$repo_root/setup.md" || fail "setup.md does not mention schedule-skill-improvement.sh"
+grep -q "AI_AGENT_IMPROVEMENT_CREATE_PR" "$repo_root/docs/skill-improvement-automation.md" || fail "skill improvement automation doc missing PR opt-in variable"
+
+say "validate: skill-improvement fixture scan detects proposal"
+# This fixture intentionally targets skill-design-research because it is the
+# always-installed research/design skill in this repository.
+AI_AGENT_LOG_ROOTS_ONLY=1 \
+AI_AGENT_LOG_ROOTS="$repo_root/tests/fixtures/skill-logs" \
+python3 "$repo_root/scripts/skill-improvement-bot.py" scan --json \
+  | grep -q '"skill": "skill-design-research"' \
+  || fail "skill improvement fixture scan did not detect skill-design-research"
 
 say "validation complete"
