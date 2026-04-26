@@ -14,7 +14,7 @@ Use this guide when setup, update, scheduling, or uninstall fails. Explain error
 | `could not apply delete protection` | macOSの削除防止設定をリンクに付けられませんでした。リンク作成自体は成功している場合があります。 | まずリンクが読めるか確認します。削除防止が必須でなければ継続できます。 |
 | `trash is required for safe uninstall` | 安全に元へ戻すための `trash` コマンドが見つかりません。 | 完全削除はせず、`trash` をインストールするか、手動でゴミ箱へ移す方法を案内します。 |
 | `config repository has local changes` | 設定リポジトリに未保存の変更があり、更新すると作業を壊す可能性があります。 | 変更内容を確認し、必要ならコミットまたは退避してから更新します。 |
-| `not a git repository` | 更新対象がGitリポジトリではありません。 | 正しい `ai-agent-config` の場所を探すか、GitHubから再取得します。 |
+| `not a git repository` | 更新対象がGitリポジトリではありません。 | 正しい `llm-config` の場所を探すか、GitHubから再取得します。 |
 | `AI_AGENT_TARGET_DIR is not set` | どの作業フォルダーへリンクを置くか決まっていません。 | 推奨は `~/Documents/projects`。既存の作業フォルダーや会社指定workspaceがあればそちらを選びます。 |
 | `launchctl` or `systemctl` scheduling failed | 自動更新のスケジュール登録に失敗しました。設定本体は使える場合があります。 | まず手動更新コマンドを案内します。自動更新はOS別に再確認します。 |
 | `health: warn` | 基本動作は確認できましたが、未ログイン、未インストール、リンク未設定、リポジトリ未保存変更など確認が必要な項目があります。 | `scripts/health-check.sh` の各行を見て、最も小さい修正だけを提案します。 |

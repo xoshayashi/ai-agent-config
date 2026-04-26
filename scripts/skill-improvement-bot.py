@@ -760,10 +760,15 @@ def is_auto_pr_allowed(path: str, report_path: Path) -> bool:
     normalized = path.replace("\\", "/")
     if normalized == str(report_path).replace("\\", "/"):
         return True
-    return any(
-        normalized == prefix.rstrip("/") or normalized.startswith(prefix)
-        for prefix in AUTO_PR_ALLOWED_PATHS
-    )
+    for prefix in AUTO_PR_ALLOWED_PATHS:
+        normalized_prefix = prefix.rstrip("/")
+        if prefix.endswith("/"):
+            if normalized.startswith(prefix):
+                return True
+            continue
+        if normalized == normalized_prefix:
+            return True
+    return False
 
 
 def inspect_pr(root: Path, pr: str) -> dict[str, Any]:
@@ -861,7 +866,7 @@ def checks_pass(data: dict[str, Any]) -> tuple[bool, str]:
 
 def claude_ready(data: dict[str, Any]) -> tuple[bool, str]:
     events = sorted_review_events(data)
-    for item in reversed(events):
+    for item in events:
         if not trusted_review_author(item):
             continue
         body = str(item.get("body", "")).lower()
@@ -876,7 +881,17 @@ def claude_ready(data: dict[str, Any]) -> tuple[bool, str]:
 
 def sorted_review_events(data: dict[str, Any]) -> list[dict[str, Any]]:
     events = list(data.get("comments", [])) + list(data.get("reviews", []))
-    return sorted(events, key=lambda item: item.get("createdAt") or item.get("submittedAt") or "")
+    return sorted(events, key=review_event_timestamp, reverse=True)
+
+
+def review_event_timestamp(item: dict[str, Any]) -> dt.datetime:
+    raw = str(item.get("submittedAt") or item.get("createdAt") or "")
+    if not raw:
+        return dt.datetime.min.replace(tzinfo=dt.timezone.utc)
+    try:
+        return dt.datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except ValueError:
+        return dt.datetime.min.replace(tzinfo=dt.timezone.utc)
 
 
 def trusted_review_author(item: dict[str, Any]) -> bool:
@@ -1049,37 +1064,46 @@ def cmd_review_open_prs(args: argparse.Namespace) -> None:
     for item in prs:
         number = str(item["number"])
         try:
-            if args.apply_claude_feedback and not args.dry_run:
-                ensure_clean(root)
-                run_command(["gh", "pr", "checkout", number], root)
-            data = inspect_pr(root, number)
-            if args.apply_claude_feedback:
-                if not has_trusted_review_activity(data):
-                    results.append(
-                        {
-                            "pr": data.get("number"),
-                            "url": data.get("url"),
-                            "skipped": "no trusted Claude review activity found",
-                        }
-                    )
-                    continue
-                apply_claude_feedback(root, number, args.dry_run)
+            try:
+                if args.apply_claude_feedback and not args.dry_run:
+                    ensure_clean(root)
+                    run_command(["gh", "pr", "checkout", number], root)
                 data = inspect_pr(root, number)
-            if args.auto_merge:
-                maybe_auto_merge(root, number, data, args.dry_run)
-            ready, ready_reason = claude_ready(data)
-            checks_ok, checks_reason = checks_pass(data)
-            results.append(
-                {
-                    "pr": data.get("number"),
-                    "url": data.get("url"),
-                    "claude_ready": ready,
-                    "claude_reason": ready_reason,
-                    "checks_ok": checks_ok,
-                    "checks_reason": checks_reason,
-                    "unresolved_threads": data.get("unresolved_threads"),
-                }
-            )
+                if args.apply_claude_feedback:
+                    if not has_trusted_review_activity(data):
+                        results.append(
+                            {
+                                "pr": data.get("number"),
+                                "url": data.get("url"),
+                                "skipped": "no trusted Claude review activity found",
+                            }
+                        )
+                        continue
+                    apply_claude_feedback(root, number, args.dry_run)
+                    data = inspect_pr(root, number)
+                if args.auto_merge:
+                    maybe_auto_merge(root, number, data, args.dry_run)
+                ready, ready_reason = claude_ready(data)
+                checks_ok, checks_reason = checks_pass(data)
+                results.append(
+                    {
+                        "pr": data.get("number"),
+                        "url": data.get("url"),
+                        "claude_ready": ready,
+                        "claude_reason": ready_reason,
+                        "checks_ok": checks_ok,
+                        "checks_reason": checks_reason,
+                        "unresolved_threads": data.get("unresolved_threads"),
+                    }
+                )
+            except SystemExit as exc:
+                results.append(
+                    {
+                        "pr": int(number) if number.isdigit() else number,
+                        "url": item.get("url"),
+                        "error": str(exc) or "command failed",
+                    }
+                )
         finally:
             if original_branch and not args.dry_run:
                 run_command(["git", "switch", original_branch], root, check=False)

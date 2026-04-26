@@ -113,8 +113,17 @@ env_target=${AI_AGENT_TARGET_DIR-}
 env_skills_set=${AI_AGENT_SKILLS_DIR+x}
 env_skills=${AI_AGENT_SKILLS_DIR-}
 
-state_dir=${AI_AGENT_STATE_DIR:-$HOME/.ai-agent-config}
-state_file=${AI_AGENT_STATE_FILE:-$(expand_home "$state_dir")/config.env}
+state_dir=${AI_AGENT_STATE_DIR:-$HOME/.llm-config}
+legacy_state_dir=${AI_AGENT_LEGACY_STATE_DIR:-$HOME/.ai-agent-config}
+if [ -n "${AI_AGENT_STATE_FILE:-}" ]; then
+  state_file=$(expand_home "$AI_AGENT_STATE_FILE")
+else
+  state_file=$(expand_home "$state_dir")/config.env
+  legacy_state_file=$(expand_home "$legacy_state_dir")/config.env
+  if [ ! -f "$state_file" ] && [ -f "$legacy_state_file" ]; then
+    state_file=$legacy_state_file
+  fi
+fi
 state_loaded=false
 if [ -f "$state_file" ]; then
   # shellcheck source=/dev/null
@@ -140,7 +149,7 @@ gemini_path=$(command_path gemini)
 skill_improvement_schedule=unsupported
 os=$(uname -s 2>/dev/null || printf unknown)
 if [ "$os" = "Darwin" ]; then
-  skill_improvement_label=${AI_AGENT_IMPROVEMENT_LABEL:-com.ai-agent-config.skill-improvement}
+  skill_improvement_label=${AI_AGENT_IMPROVEMENT_LABEL:-com.llm-config.skill-improvement}
   skill_improvement_plist="$HOME/Library/LaunchAgents/$skill_improvement_label.plist"
   if [ -f "$skill_improvement_plist" ]; then
     if launchctl list "$skill_improvement_label" >/dev/null 2>&1; then
@@ -152,9 +161,9 @@ if [ "$os" = "Darwin" ]; then
     skill_improvement_schedule=missing
   fi
 elif command -v systemctl >/dev/null 2>&1; then
-  if systemctl --user is-active ai-agent-config-skill-improvement.timer >/dev/null 2>&1; then
+  if systemctl --user is-active llm-config-skill-improvement.timer >/dev/null 2>&1; then
     skill_improvement_schedule=active
-  elif systemctl --user is-enabled ai-agent-config-skill-improvement.timer >/dev/null 2>&1; then
+  elif systemctl --user is-enabled llm-config-skill-improvement.timer >/dev/null 2>&1; then
     skill_improvement_schedule=installed
   else
     skill_improvement_schedule=missing

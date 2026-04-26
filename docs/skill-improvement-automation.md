@@ -88,6 +88,7 @@ python3 scripts/skill-improvement-bot.py review-open-prs
 | 選択肢 | 設定 | 用途 |
 |---|---|---|
 | **1日1回（推奨）** | `AI_AGENT_IMPROVEMENT_CADENCE=daily` | 通常運用 |
+| **12時間ごと** | `AI_AGENT_IMPROVEMENT_CADENCE=twice-daily` または `12h` | Skill更新が多い時期 |
 | **1週間ごと** | `AI_AGENT_IMPROVEMENT_CADENCE=weekly` | 改善PRの頻度を抑えたい場合 |
 | **手動のみ** | `AI_AGENT_IMPROVEMENT_CADENCE=manual` | 自動スキャンを止める場合 |
 | **カスタム** | `AI_AGENT_IMPROVEMENT_CADENCE=custom AI_AGENT_IMPROVEMENT_INTERVAL_SECONDS=<seconds>` | 管理者向け |

@@ -2,6 +2,8 @@
 
 AIツール向けの共通InstructionsとSkillsを配布・更新するための設定リポジトリです。
 
+> **注意:** リポジトリ名を `ai-agent-config` から `llm-config` に改称中です。本書中のクローン URL `https://github.com/xoshayashi/llm-config.git` および `~/Documents/llm-config` 等のパスは、**GitHub 側のリポジトリ rename 完了後に有効化** されます。rename が未実施の段階では旧 URL `https://github.com/xoshayashi/ai-agent-config.git` を使ってください（rename 後は GitHub の自動リダイレクトにより旧 URL も引き続き動作します）。
+
 ## 最初に準備すること
 
 このセットアップは、**ターミナルでClaude Code、Codex、Gemini CLIの全てにログインできている状態**から進めます。まだの場合は、先に次を済ませてください。
@@ -25,9 +27,9 @@ Claude Code、Codex、Gemini CLIのどれかを起動したら、次の文章を
 
 ```text
 GitHubにログインできているか確認して。未ログインなら、初心者にも分かる日本語でログイン手順を案内して。
-その後、次のリポジトリをこのPCに取得して。保存先は `~/Documents/ai-agent-config` を基本にして。既に同じリポジトリがある場合は、最新のmainをpullして。
+その後、次のリポジトリをこのPCに取得して。保存先は `~/Documents/llm-config` を基本にして。既に同じリポジトリがある場合は、最新のmainをpullして。
 
-https://github.com/xoshayashi/ai-agent-config.git
+https://github.com/xoshayashi/llm-config.git
 
 取得できたら、そのリポジトリのREADME.mdとsetup.mdを読んで、このPCにAI Agent Configをセットアップして。
 Claude Code、Codex、Gemini CLIの全てがインストール済みかつログイン済みか確認して、未完了のものがあれば先に案内して。
@@ -94,7 +96,7 @@ Skillの改善候補を見たい時は、次のように伝えてください。
 自動更新を待たずに今すぐ反映したい場合は、次を実行します。
 
 ```sh
-sh /path/to/ai-agent-config/scripts/update.sh
+sh /path/to/llm-config/scripts/update.sh
 ```
 
 LLMには「急ぎ対応したいんだけど」と伝えれば、この手順で進めるように案内しています。
