@@ -18,6 +18,12 @@ If you are running from the config repository root, set the target explicitly:
 AI_AGENT_TARGET_DIR="/path/to/workspace" sh scripts/setup.sh
 ```
 
+If you are using the installer script from a downloaded release or checked-out copy, it can clone or update the config repository for you:
+
+```sh
+AI_AGENT_TARGET_DIR="/path/to/workspace" sh /path/to/ai-agent-config/scripts/install.sh
+```
+
 ## Claude Code Setup Prompt
 
 Give Claude Code this instruction:
@@ -91,15 +97,52 @@ $HOME/.agents/skills
 | Variable | Default | Purpose |
 |---|---|---|
 | `AI_AGENT_CONFIG_HOME` | Repository root inferred from `scripts/setup.sh` | Location of this config repository. |
+| `AI_AGENT_REPO_URL` | `https://github.com/xoshayashi/ai-agent-config.git` | Repository URL used by `scripts/install.sh` when cloning. |
 | `AI_AGENT_TARGET_DIR` | Current working directory | Directory that receives `AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and related entrypoints. |
 | `AI_AGENT_SKILLS_DIR` | `$HOME/.agents/skills` | Shared skill directory used as the canonical cross-LLM skill location. |
 | `AI_AGENT_EXTRA_SKILLS_DIRS` | Empty | Optional colon-separated list of additional skill directories to link into. |
+| `AI_AGENT_STATE_DIR` | `$HOME/.ai-agent-config` | Stores setup state used by future updates. |
 | `AI_AGENT_INSTALL_INSTRUCTIONS` | `1` | Set to `0` to skip instruction entrypoint links. |
 | `AI_AGENT_INSTALL_SKILLS` | `1` | Set to `0` to skip skill links. |
 | `AI_AGENT_CONFLICT_MODE` | `backup` | `backup`, `skip`, or `fail` when a destination path already exists. |
 | `AI_AGENT_BACKUP_DIR` | `$AI_AGENT_TARGET_DIR/.ai-agent-config-backups/<timestamp>` | Where existing conflicting files are moved when conflict mode is `backup`. |
 | `AI_AGENT_PROTECT_LINKS` | `auto` | On macOS, applies `everyone deny delete` to created links. Set to `0` to disable. |
+| `AI_AGENT_PERSIST_CONFIG` | `1` | Set to `0` to avoid writing setup state for `scripts/update.sh`. |
 | `AI_AGENT_DRY_RUN` | `0` | Set to `1` to preview actions without changing files. |
+
+## Keeping Config Updated
+
+The instruction files and skills are linked from this repository. That means updates become available after this repository itself is updated.
+
+After the first setup, run:
+
+```sh
+sh /path/to/ai-agent-config/scripts/update.sh
+```
+
+`scripts/update.sh` does three things:
+
+1. Pulls the latest `main` from GitHub using a fast-forward-only Git update.
+2. Reads the saved setup state from `$HOME/.ai-agent-config/config.env`.
+3. Runs `scripts/setup.sh` again so links and skills stay aligned with the latest repository contents.
+
+For automatic updates, schedule the updater:
+
+```sh
+AI_AGENT_UPDATE_INTERVAL_SECONDS=86400 sh /path/to/ai-agent-config/scripts/schedule-update.sh
+```
+
+This uses `launchd` on macOS and a user `systemd` timer on Linux when available. If neither is available, the script prints the manual update command.
+
+Update-related variables:
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `AI_AGENT_UPDATE_REMOTE` | `origin` | Git remote to fetch from. |
+| `AI_AGENT_UPDATE_BRANCH` | `main` | Branch to update from. |
+| `AI_AGENT_UPDATE_RERUN_SETUP` | `1` | Set to `0` to pull updates without re-running setup. |
+| `AI_AGENT_UPDATE_ALLOW_DIRTY` | `0` | Set to `1` to allow updates when the config repository has local changes. |
+| `AI_AGENT_UPDATE_INTERVAL_SECONDS` | `86400` | Auto-update interval used by `schedule-update.sh`. |
 
 ## Examples
 
