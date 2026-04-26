@@ -4,6 +4,24 @@ Use this guide to install the shared AI agent instructions and skills on any Uni
 
 **For AI agents:** treat this file as an executable setup brief. Use Japanese as the default conversation language unless the user asks otherwise. Determine the intended target workspace first, set `AI_AGENT_TARGET_DIR` explicitly, run `scripts/setup.sh`, then verify the links. Do not assume the config repository itself is the target unless the user says so.
 
+## Prerequisites / 前提条件
+
+Before running this repository's setup, make sure the user can open a terminal and use at least one supported AI CLI.
+
+For beginner-facing setup, guide the user through these steps first:
+
+1. **ターミナルを起動する。** macOSなら「ターミナル」または「iTerm2」、Windowsなら「PowerShell」または「Windows Terminal」を開きます。
+2. **Claude Code、Codex、Gemini CLIのいずれかをインストールする。** The official setup pages are the source of truth because CLI install methods can change.
+3. **AI CLIにログインする。** Start the installed CLI, complete browser or account authentication, and confirm the interactive prompt opens.
+
+| Tool | Official Setup | Login Check |
+|---|---|---|
+| **Claude Code** | [Claude Code Quickstart](https://code.claude.com/docs/en/quickstart) | Run `claude`; if prompted, use `/login` and follow the browser/account flow. |
+| **Codex** | [Codex CLI](https://developers.openai.com/codex/cli) | Run `codex`; on first launch, sign in with a ChatGPT account or API key. |
+| **Gemini CLI** | [Gemini CLI Get Started](https://google-gemini.github.io/gemini-cli/docs/get-started/) | Run `gemini`; choose **Login with Google** when asked how to authenticate. |
+
+If installation or login fails, stop setup and help the user resolve that tool-specific issue using the relevant official documentation before continuing.
+
 ## Quick Start
 
 From the directory where the instruction files should appear, run:
@@ -29,6 +47,8 @@ AI_AGENT_TARGET_DIR="/path/to/workspace" sh /path/to/ai-agent-config/scripts/ins
 Give Claude Code, Codex, or Gemini CLI this instruction:
 
 > Read `setup.md`, explain any technical terms in plain Japanese, set `AI_AGENT_TARGET_DIR` to the project or workspace directory that should receive the instruction entrypoints, ask me what update frequency I want with daily as the recommended option, then run `scripts/setup.sh`, configure or disable updates according to my choice, and verify the resulting links.
+
+If the user has not installed or logged in to Claude Code, Codex, or Gemini CLI yet, start from **Prerequisites / 前提条件** before running setup commands.
 
 If the AI CLI is opened inside this config repository, tell it the target directory explicitly:
 
