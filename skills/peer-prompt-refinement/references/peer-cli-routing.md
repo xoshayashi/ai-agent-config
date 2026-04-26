@@ -24,6 +24,8 @@ peer_refinement_timeout() {
 }
 ```
 
+This wrapper assumes `perl` is available. If it is not, use `timeout`, `gtimeout`, or the coordinating agent's own tool/session timeout with the same deadline.
+
 For Gemini CLI:
 
 ```sh
@@ -73,5 +75,5 @@ _PEER_REFINEMENT_CONTEXT_
 ## Notes
 
 - Gemini CLI help on this machine identifies `-p` / `--prompt` as non-interactive headless mode, supports `--output-format text|json`, accepts stdin as extra prompt context, and supports `--approval-mode plan` as read-only mode.
-- Codex CLI help on this machine identifies `codex exec` as non-interactive execution and supports stdin with `-` plus `--sandbox read-only`.
+- Codex CLI help on this machine identifies `codex exec` as non-interactive execution and supports stdin with `-` plus `--sandbox read-only`. This route also forbids tool use in the peer prompt and falls back on timeout if a local configuration ever causes an approval wait.
 - Claude Code help on this machine identifies `-p` / `--print` as non-interactive output; this skill's required route still sends Claude Code prompts to Gemini.

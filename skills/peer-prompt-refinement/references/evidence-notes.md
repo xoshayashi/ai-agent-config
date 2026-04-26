@@ -34,6 +34,8 @@ Use this file when reviewing or extending `peer-prompt-refinement`. Keep the ope
 - **Kept in `SKILL.md`:** activation, recursion guard, context packet requirements, peer route, constraint preservation, skill re-evaluation.
 - **Kept in `SKILL.md` intentionally:** the peer prompt template stays in the main skill because it is executed every time the skill runs and must be available without another reference lookup.
 - **Kept in references:** exact CLI command patterns, source rationale, test prompts.
+- **Kept as `agents/openai.yaml`:** this filename follows the Skill Creator metadata convention for OpenAI/Codex skill UI metadata. It does not mean the peer route is OpenAI-only.
+- **Repeated routing summary:** the route is summarized in `SKILL.md` frontmatter so activation metadata reflects the user's required behavior; command details remain authoritative in `references/peer-cli-routing.md`.
 - **Excluded:** multi-peer parallel critique, benchmark scoring, and repeated prompt optimization loops because they add latency and scope beyond the user's requested preflight.
 - **Degree-of-freedom rule:** improved prompts should clarify goals, constraints, and evaluation criteria without prematurely fixing a single method or conclusion. This comes from the user's durable preference and from the brittleness noted in prompt-optimization evidence.
 - **Rejected as defaults:** emotional pressure, roleplay personas, mandatory verbose chain-of-thought, broad many-shot examples, and multi-round automatic prompt search. They are either generic, brittle, costly, privacy-sensitive, or too task-dependent for an always-on preflight skill.
