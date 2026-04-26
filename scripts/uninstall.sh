@@ -42,16 +42,18 @@ esac
 
 env_config_set=${AI_AGENT_CONFIG_HOME+x}
 env_config=${AI_AGENT_CONFIG_HOME-}
-env_target_set=${AI_AGENT_TARGET_DIR+x}
-env_target=${AI_AGENT_TARGET_DIR-}
+env_codex_home_set=${AI_AGENT_CODEX_HOME+x}
+env_codex_home=${AI_AGENT_CODEX_HOME-}
+env_claude_home_set=${AI_AGENT_CLAUDE_HOME+x}
+env_claude_home=${AI_AGENT_CLAUDE_HOME-}
+env_gemini_home_set=${AI_AGENT_GEMINI_HOME+x}
+env_gemini_home=${AI_AGENT_GEMINI_HOME-}
 env_skills_set=${AI_AGENT_SKILLS_DIR+x}
 env_skills=${AI_AGENT_SKILLS_DIR-}
 env_extra_skills_set=${AI_AGENT_EXTRA_SKILLS_DIRS+x}
 env_extra_skills=${AI_AGENT_EXTRA_SKILLS_DIRS-}
 env_hooks_set=${AI_AGENT_INSTALL_HOOKS+x}
 env_hooks=${AI_AGENT_INSTALL_HOOKS-}
-env_hooks_scope_set=${AI_AGENT_HOOKS_SCOPE+x}
-env_hooks_scope=${AI_AGENT_HOOKS_SCOPE-}
 env_hooks_runtime_set=${AI_AGENT_HOOKS_RUNTIME_LINK+x}
 env_hooks_runtime=${AI_AGENT_HOOKS_RUNTIME_LINK-}
 
@@ -63,11 +65,12 @@ if [ -f "$state_file" ]; then
 fi
 
 [ "${env_config_set:-}" = "x" ] && AI_AGENT_CONFIG_HOME=$env_config
-[ "${env_target_set:-}" = "x" ] && AI_AGENT_TARGET_DIR=$env_target
+[ "${env_codex_home_set:-}" = "x" ] && AI_AGENT_CODEX_HOME=$env_codex_home
+[ "${env_claude_home_set:-}" = "x" ] && AI_AGENT_CLAUDE_HOME=$env_claude_home
+[ "${env_gemini_home_set:-}" = "x" ] && AI_AGENT_GEMINI_HOME=$env_gemini_home
 [ "${env_skills_set:-}" = "x" ] && AI_AGENT_SKILLS_DIR=$env_skills
 [ "${env_extra_skills_set:-}" = "x" ] && AI_AGENT_EXTRA_SKILLS_DIRS=$env_extra_skills
 [ "${env_hooks_set:-}" = "x" ] && AI_AGENT_INSTALL_HOOKS=$env_hooks
-[ "${env_hooks_scope_set:-}" = "x" ] && AI_AGENT_HOOKS_SCOPE=$env_hooks_scope
 [ "${env_hooks_runtime_set:-}" = "x" ] && AI_AGENT_HOOKS_RUNTIME_LINK=$env_hooks_runtime
 
 dry_run=${AI_AGENT_DRY_RUN:-0}
@@ -75,7 +78,6 @@ uninstall_instructions=${AI_AGENT_UNINSTALL_INSTRUCTIONS:-1}
 uninstall_skills=${AI_AGENT_UNINSTALL_SKILLS:-1}
 uninstall_hooks=${AI_AGENT_UNINSTALL_HOOKS:-1}
 uninstall_state=${AI_AGENT_UNINSTALL_STATE:-1}
-hooks_scope=${AI_AGENT_HOOKS_SCOPE:-target}
 hooks_runtime_link=${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}
 
 case "$dry_run" in
@@ -98,11 +100,6 @@ case "$uninstall_hooks" in
   *) fail "AI_AGENT_UNINSTALL_HOOKS must be 0 or 1" ;;
 esac
 
-case "$hooks_scope" in
-  target|user|both) ;;
-  *) fail "AI_AGENT_HOOKS_SCOPE must be target, user, or both" ;;
-esac
-
 [ -n "$hooks_runtime_link" ] || fail "AI_AGENT_HOOKS_RUNTIME_LINK must not be empty"
 
 case "$uninstall_state" in
@@ -116,16 +113,9 @@ fi
 
 default_config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
 config_home=$(abs_existing_dir "${AI_AGENT_CONFIG_HOME:-$default_config_home}")
-target_dir=${AI_AGENT_TARGET_DIR:-}
-[ -n "$target_dir" ] || fail "AI_AGENT_TARGET_DIR is not set and no saved setup state was found"
-target_dir=$(expand_home "$target_dir")
-target_missing=0
-if [ -d "$target_dir" ]; then
-  target_dir=$(CDPATH= cd "$target_dir" && pwd -P)
-else
-  target_missing=1
-  warn "target directory is missing; instruction links will be skipped: $target_dir"
-fi
+codex_home=$(expand_home "${AI_AGENT_CODEX_HOME:-$HOME/.codex}")
+claude_home=$(expand_home "${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}")
+gemini_home=$(expand_home "${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}")
 skills_dir=${AI_AGENT_SKILLS_DIR:-$HOME/.agents/skills}
 extra_skills_dirs=${AI_AGENT_EXTRA_SKILLS_DIRS:-}
 
@@ -159,7 +149,9 @@ uninstall_managed_link() {
   label=$3
 
   if [ ! -L "$dst" ]; then
-    [ -e "$dst" ] && warn "skip non-link $label: $dst"
+    if [ -e "$dst" ]; then
+      warn "skip non-link $label: $dst"
+    fi
     return 0
   fi
 
@@ -173,16 +165,18 @@ uninstall_managed_link() {
 }
 
 uninstall_instruction_links() {
-  if [ "$target_missing" = "1" ]; then
-    warn "skip instruction links because target directory is missing: $target_dir"
-    return 0
-  fi
   src_root="$config_home/instructions"
-  uninstall_managed_link "$target_dir/AGENTS.md" "$src_root/AGENTS.md" "instruction link"
-  uninstall_managed_link "$target_dir/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "instruction link"
-  uninstall_managed_link "$target_dir/CLAUDE.md" "$src_root/CLAUDE.md" "instruction link"
-  uninstall_managed_link "$target_dir/GEMINI.md" "$src_root/GEMINI.md" "instruction link"
-  uninstall_managed_link "$target_dir/.github/copilot-instructions.md" "$src_root/.github/copilot-instructions.md" "instruction link"
+  uninstall_managed_link "$codex_home/AGENTS.md" "$src_root/AGENTS.md" "instruction link"
+  uninstall_managed_link "$codex_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "instruction link"
+  uninstall_managed_link "$codex_home/DESIGN.md" "$src_root/DESIGN.md" "instruction link"
+
+  uninstall_managed_link "$claude_home/CLAUDE.md" "$src_root/CLAUDE.md" "instruction link"
+  uninstall_managed_link "$claude_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "instruction link"
+  uninstall_managed_link "$claude_home/DESIGN.md" "$src_root/DESIGN.md" "instruction link"
+
+  uninstall_managed_link "$gemini_home/GEMINI.md" "$src_root/GEMINI.md" "instruction link"
+  uninstall_managed_link "$gemini_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "instruction link"
+  uninstall_managed_link "$gemini_home/DESIGN.md" "$src_root/DESIGN.md" "instruction link"
 }
 
 uninstall_skills_from_dir() {
@@ -223,48 +217,36 @@ uninstall_hook_config() {
     return 0
   fi
 
-  [ -e "$dst" ] && warn "skip non-file hook config: $dst"
-}
-
-uninstall_target_hook_links() {
-  if [ "$target_missing" = "1" ]; then
-    warn "skip target hook links because target directory is missing: $target_dir"
-    return 0
+  if [ -e "$dst" ]; then
+    warn "skip non-file hook config: $dst"
   fi
-  src_root="$config_home/hooks"
-  uninstall_hook_config "$target_dir/.claude/settings.json" "$src_root/claude/settings.json" json
-  uninstall_hook_config "$target_dir/.codex/config.toml" "$src_root/codex/config.toml" codex-config
-  uninstall_hook_config "$target_dir/.codex/hooks.json" "$src_root/codex/hooks.json" json
-  uninstall_hook_config "$target_dir/.gemini/settings.json" "$src_root/gemini/settings.json" json
 }
 
 uninstall_user_hook_links() {
   src_root="$config_home/hooks"
-  uninstall_hook_config "$HOME/.claude/settings.json" "$src_root/claude/settings.json" json
-  uninstall_hook_config "$HOME/.codex/config.toml" "$src_root/codex/config.toml" codex-config
-  uninstall_hook_config "$HOME/.codex/hooks.json" "$src_root/codex/hooks.json" json
-  uninstall_hook_config "$HOME/.gemini/settings.json" "$src_root/gemini/settings.json" json
+  uninstall_hook_config "$claude_home/settings.json" "$src_root/claude/settings.json" json
+  uninstall_hook_config "$codex_home/config.toml" "$src_root/codex/config.toml" codex-config
+  uninstall_hook_config "$codex_home/hooks.json" "$src_root/codex/hooks.json" json
+  uninstall_hook_config "$gemini_home/settings.json" "$src_root/gemini/settings.json" json
 }
 
 uninstall_hook_links() {
   uninstall_hook_runtime_link
-  case "$hooks_scope" in
-    target)
-      uninstall_target_hook_links
-      ;;
-    user)
-      uninstall_user_hook_links
-      ;;
-    both)
-      uninstall_target_hook_links
-      uninstall_user_hook_links
-      ;;
-  esac
+  uninstall_user_hook_links
 }
 
-say "AI agent config uninstall"
+if [ -n "${AI_AGENT_TARGET_DIR:-}" ]; then
+  warn "AI_AGENT_TARGET_DIR is deprecated and ignored."
+fi
+if [ -n "${AI_AGENT_HOOKS_SCOPE:-}" ]; then
+  warn "AI_AGENT_HOOKS_SCOPE is deprecated and ignored."
+fi
+
+say "AI agent config uninstall (global mode)"
 say "config: $config_home"
-say "target: $target_dir"
+say "codex home: $codex_home"
+say "claude home: $claude_home"
+say "gemini home: $gemini_home"
 say "state: $state_file"
 
 if [ "$uninstall_instructions" = "1" ]; then

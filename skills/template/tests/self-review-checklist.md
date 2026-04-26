@@ -23,7 +23,7 @@ Use this before treating a new or updated skill as complete.
 
 ## Portability
 
-- Tool-specific behavior is labeled with a compatibility tag from `compatibility/llm-cli-matrix.yml`.
+- Tool-specific behavior is clearly labeled in the skill or evidence notes so readers can see vendor-specific assumptions.
 - The skill can still be understood as plain instructions if a specific LLM CLI ignores vendor-specific metadata.
 - Any setup, test, or verification command has a safe fallback or explanation.
 
