@@ -42,6 +42,14 @@ This file is the single source of truth for AI coding agents working in this dir
 - Prefer primary sources for implementation details: official docs, upstream repositories, release notes, and version-matched API references. When using Context7 or similar tools, confirm the retrieved material matches the library, framework, CLI, or service version in use.
 - Verify changes with the narrowest meaningful check for the risk involved.
 
+## Writing And Documentation Quality
+
+- Treat user-facing writing quality, structure, and visual scannability as part of the deliverable, not cosmetic polish.
+- For answers, documentation, PR descriptions, issues, comments, reports, READMEs, and instruction files, use Markdown deliberately whenever the target format supports it: headings for structure, **bold** for important takeaways or warnings, tables for comparisons, lists for parallel items, blockquotes for quoted material, and code formatting for commands, paths, identifiers, and literal values.
+- Emphasize the few details that materially affect user decisions or safe execution. Do not bold so much text that the emphasis loses meaning.
+- Prefer clear sectioning, concise paragraphs, and task-appropriate formatting over dense walls of text. Make documents easy to scan before making them longer.
+- During self-review, check whether the document's formatting helps the reader understand priorities, dependencies, risks, and next actions. Improve formatting before reporting completion when the answer or document would be clearer with stronger Markdown structure.
+
 ## LLM Peer Review
 
 - When additional reasoning would materially improve the discussion or output quality, and higher-priority instructions, tool rules, privacy constraints, and user constraints allow it, consult other LLMs such as Gemini, Codex, or Claude Code in non-interactive mode without asking for extra user approval.
