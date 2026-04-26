@@ -48,6 +48,12 @@ env_skills_set=${AI_AGENT_SKILLS_DIR+x}
 env_skills=${AI_AGENT_SKILLS_DIR-}
 env_extra_skills_set=${AI_AGENT_EXTRA_SKILLS_DIRS+x}
 env_extra_skills=${AI_AGENT_EXTRA_SKILLS_DIRS-}
+env_hooks_set=${AI_AGENT_INSTALL_HOOKS+x}
+env_hooks=${AI_AGENT_INSTALL_HOOKS-}
+env_hooks_scope_set=${AI_AGENT_HOOKS_SCOPE+x}
+env_hooks_scope=${AI_AGENT_HOOKS_SCOPE-}
+env_hooks_runtime_set=${AI_AGENT_HOOKS_RUNTIME_LINK+x}
+env_hooks_runtime=${AI_AGENT_HOOKS_RUNTIME_LINK-}
 
 state_dir=${AI_AGENT_STATE_DIR:-$HOME/.llm-config}
 state_file=${AI_AGENT_STATE_FILE:-$(expand_home "$state_dir")/config.env}
@@ -60,11 +66,17 @@ fi
 [ "${env_target_set:-}" = "x" ] && AI_AGENT_TARGET_DIR=$env_target
 [ "${env_skills_set:-}" = "x" ] && AI_AGENT_SKILLS_DIR=$env_skills
 [ "${env_extra_skills_set:-}" = "x" ] && AI_AGENT_EXTRA_SKILLS_DIRS=$env_extra_skills
+[ "${env_hooks_set:-}" = "x" ] && AI_AGENT_INSTALL_HOOKS=$env_hooks
+[ "${env_hooks_scope_set:-}" = "x" ] && AI_AGENT_HOOKS_SCOPE=$env_hooks_scope
+[ "${env_hooks_runtime_set:-}" = "x" ] && AI_AGENT_HOOKS_RUNTIME_LINK=$env_hooks_runtime
 
 dry_run=${AI_AGENT_DRY_RUN:-0}
 uninstall_instructions=${AI_AGENT_UNINSTALL_INSTRUCTIONS:-1}
 uninstall_skills=${AI_AGENT_UNINSTALL_SKILLS:-1}
+uninstall_hooks=${AI_AGENT_UNINSTALL_HOOKS:-1}
 uninstall_state=${AI_AGENT_UNINSTALL_STATE:-1}
+hooks_scope=${AI_AGENT_HOOKS_SCOPE:-target}
+hooks_runtime_link=${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}
 
 case "$dry_run" in
   0|1) ;;
@@ -80,6 +92,18 @@ case "$uninstall_skills" in
   0|1) ;;
   *) fail "AI_AGENT_UNINSTALL_SKILLS must be 0 or 1" ;;
 esac
+
+case "$uninstall_hooks" in
+  0|1) ;;
+  *) fail "AI_AGENT_UNINSTALL_HOOKS must be 0 or 1" ;;
+esac
+
+case "$hooks_scope" in
+  target|user|both) ;;
+  *) fail "AI_AGENT_HOOKS_SCOPE must be target, user, or both" ;;
+esac
+
+[ -n "$hooks_runtime_link" ] || fail "AI_AGENT_HOOKS_RUNTIME_LINK must not be empty"
 
 case "$uninstall_state" in
   0|1) ;;
@@ -175,6 +199,69 @@ uninstall_skills_from_dir() {
   done
 }
 
+uninstall_hook_runtime_link() {
+  uninstall_managed_link "$(expand_home "$hooks_runtime_link")" "$config_home/hooks" "hook runtime link"
+}
+
+uninstall_hook_config() {
+  dst=$1
+  expected=$2
+  kind=$3
+
+  if [ -L "$dst" ]; then
+    uninstall_managed_link "$dst" "$expected" "hook config link"
+    return 0
+  fi
+
+  if [ -f "$dst" ]; then
+    command -v python3 >/dev/null 2>&1 || fail "python3 is required to remove managed hook settings from existing config: $dst"
+    if [ "$dry_run" = "1" ]; then
+      python3 "$config_home/scripts/merge-hook-config.py" "$kind" "$expected" "$dst" --remove --dry-run
+    else
+      python3 "$config_home/scripts/merge-hook-config.py" "$kind" "$expected" "$dst" --remove
+    fi
+    return 0
+  fi
+
+  [ -e "$dst" ] && warn "skip non-file hook config: $dst"
+}
+
+uninstall_target_hook_links() {
+  if [ "$target_missing" = "1" ]; then
+    warn "skip target hook links because target directory is missing: $target_dir"
+    return 0
+  fi
+  src_root="$config_home/hooks"
+  uninstall_hook_config "$target_dir/.claude/settings.json" "$src_root/claude/settings.json" json
+  uninstall_hook_config "$target_dir/.codex/config.toml" "$src_root/codex/config.toml" codex-config
+  uninstall_hook_config "$target_dir/.codex/hooks.json" "$src_root/codex/hooks.json" json
+  uninstall_hook_config "$target_dir/.gemini/settings.json" "$src_root/gemini/settings.json" json
+}
+
+uninstall_user_hook_links() {
+  src_root="$config_home/hooks"
+  uninstall_hook_config "$HOME/.claude/settings.json" "$src_root/claude/settings.json" json
+  uninstall_hook_config "$HOME/.codex/config.toml" "$src_root/codex/config.toml" codex-config
+  uninstall_hook_config "$HOME/.codex/hooks.json" "$src_root/codex/hooks.json" json
+  uninstall_hook_config "$HOME/.gemini/settings.json" "$src_root/gemini/settings.json" json
+}
+
+uninstall_hook_links() {
+  uninstall_hook_runtime_link
+  case "$hooks_scope" in
+    target)
+      uninstall_target_hook_links
+      ;;
+    user)
+      uninstall_user_hook_links
+      ;;
+    both)
+      uninstall_target_hook_links
+      uninstall_user_hook_links
+      ;;
+  esac
+}
+
 say "AI agent config uninstall"
 say "config: $config_home"
 say "target: $target_dir"
@@ -204,6 +291,12 @@ if [ "$uninstall_skills" = "1" ]; then
   fi
 else
   say "skip: skill uninstall disabled"
+fi
+
+if [ "$uninstall_hooks" = "1" ]; then
+  uninstall_hook_links
+else
+  say "skip: hook uninstall disabled"
 fi
 
 if [ "$uninstall_state" = "1" ]; then

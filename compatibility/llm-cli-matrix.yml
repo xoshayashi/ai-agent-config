@@ -9,24 +9,32 @@ tools:
   claude-code:
     entrypoint: "CLAUDE.md"
     shared_instruction: "AI_AGENT_INSTRUCTIONS.md"
+    hook_config: ".claude/settings.json"
     status: "supported"
     notes:
       - "Reads CLAUDE.md as the thin entrypoint for this repository."
+      - "Project-level hooks are merged into or linked from .claude/settings.json."
       - "Use setup.md when onboarding users through natural language."
   codex:
     entrypoint: "AGENTS.md"
     shared_instruction: "AI_AGENT_INSTRUCTIONS.md"
+    hook_config:
+      - ".codex/config.toml"
+      - ".codex/hooks.json"
     status: "supported"
     notes:
       - "Reads AGENTS.md as the thin entrypoint for this repository."
       - "Skills can be linked into Codex-specific skill directories when needed."
+      - "Codex hooks require codex_hooks=true in an active config.toml layer."
   gemini-cli:
     entrypoint: "GEMINI.md"
     shared_instruction: "AI_AGENT_INSTRUCTIONS.md"
+    hook_config: ".gemini/settings.json"
     status: "supported"
     notes:
       - "Reads GEMINI.md as the thin entrypoint for this repository."
       - "Avoid assuming Claude-only slash commands work in Gemini CLI."
+      - "Project-level hooks are merged into or linked from .gemini/settings.json."
 
 shared_surfaces:
   instruction_entrypoints:
@@ -42,6 +50,12 @@ shared_surfaces:
     source: "skills/*/SKILL.md"
     compatibility: "conditional"
     review_rule: "A skill must define realistic activation wording and should not rely on a single LLM vendor's private behavior unless documented."
+  shared_hooks:
+    source: "hooks/"
+    compatibility: "conditional"
+    install_rule: "Keep hook scripts in this repository and expose them through AI_AGENT_HOOKS_RUNTIME_LINK plus each CLI's official config folder."
+    merge_rule: "If an existing CLI settings file is present, append or merge managed hook entries instead of replacing personal settings."
+    review_rule: "Hooks should enforce deterministic lifecycle behavior or safety gates; expensive peer-LLM behavior must be opt-in, timeout-bounded, and fail open."
   natural_language_setup:
     files:
       - "README.md"

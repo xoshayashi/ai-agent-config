@@ -34,6 +34,11 @@ done
 
 say "validate: python syntax"
 python3 -m py_compile "$repo_root/scripts/skill-improvement-bot.py"
+python3 -m py_compile "$repo_root/scripts/merge-hook-config.py"
+for hook_script in "$repo_root"/hooks/scripts/*.py; do
+  [ -f "$hook_script" ] || continue
+  python3 -m py_compile "$hook_script"
+done
 
 say "validate: health check runs"
 AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/health-check.sh" --json >/dev/null
@@ -44,6 +49,13 @@ require_file "setup.md"
 require_file "docs/setup-error-guide.md"
 require_file "docs/skill-improvement-automation.md"
 require_file "compatibility/llm-cli-matrix.yml"
+require_file "hooks/README.md"
+require_file "hooks/claude/settings.json"
+require_file "hooks/codex/config.toml"
+require_file "hooks/codex/hooks.json"
+require_file "hooks/gemini/settings.json"
+require_file "hooks/scripts/peer_prompt_refinement.py"
+require_file "hooks/scripts/safe_delete_guard.py"
 require_file "scripts/install.sh"
 require_file "scripts/setup.sh"
 require_file "scripts/update.sh"
@@ -51,9 +63,11 @@ require_file "scripts/schedule-update.sh"
 require_file "scripts/schedule-skill-improvement.sh"
 require_file "scripts/uninstall.sh"
 require_file "scripts/health-check.sh"
+require_file "scripts/merge-hook-config.py"
 require_file "scripts/skill-improvement-bot.py"
 require_file "scripts/validate-repo.sh"
 require_file "tests/fixtures/skill-logs/sample.jsonl"
+require_file "tests/test_merge_hook_config.py"
 require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"
@@ -65,6 +79,7 @@ say "validate: compatibility matrix mentions supported LLM CLIs"
 grep -q "claude-code:" "$repo_root/compatibility/llm-cli-matrix.yml" || fail "compatibility matrix missing claude-code"
 grep -q "codex:" "$repo_root/compatibility/llm-cli-matrix.yml" || fail "compatibility matrix missing codex"
 grep -q "gemini-cli:" "$repo_root/compatibility/llm-cli-matrix.yml" || fail "compatibility matrix missing gemini-cli"
+grep -q "shared_hooks:" "$repo_root/compatibility/llm-cli-matrix.yml" || fail "compatibility matrix missing shared_hooks"
 
 say "validate: skill template is a template, not an installable skill"
 require_dir "skills/template"
@@ -87,12 +102,16 @@ for doc in "$repo_root/README.md" "$repo_root/setup.md"; do
   grep -q "Claude Code" "$doc" || fail "$doc does not mention Claude Code"
   grep -q "Codex" "$doc" || fail "$doc does not mention Codex"
   grep -q "Gemini CLI" "$doc" || fail "$doc does not mention Gemini CLI"
+  grep -q "Hook" "$doc" || fail "$doc does not mention Hooks"
 done
 
 say "validate: skill-improvement automation is discoverable"
 grep -q "skill-improvement-bot.py" "$repo_root/README.md" || fail "README.md does not mention skill-improvement-bot.py"
 grep -q "schedule-skill-improvement.sh" "$repo_root/setup.md" || fail "setup.md does not mention schedule-skill-improvement.sh"
 grep -q "AI_AGENT_IMPROVEMENT_CREATE_PR" "$repo_root/docs/skill-improvement-automation.md" || fail "skill improvement automation doc missing PR opt-in variable"
+
+say "validate: merge-hook-config unit tests pass"
+python3 "$repo_root/tests/test_merge_hook_config.py"
 
 say "validate: skill-improvement fixture scan detects proposal"
 # This fixture intentionally targets skill-design-research because it is the
