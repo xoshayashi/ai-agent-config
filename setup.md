@@ -67,6 +67,9 @@ sh /path/to/llm-config/scripts/setup.sh
 | `~/.claude/DESIGN.md` | `instructions/DESIGN.md` |
 | `~/.gemini/DESIGN.md` | `instructions/DESIGN.md` |
 
+> Note: `.github/copilot-instructions.md` の自動配置は行いません。  
+> Copilot 向け設定は、利用する各リポジトリで個別に管理してください。
+
 ### Skills
 
 | Link Location | Source |

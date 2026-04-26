@@ -206,6 +206,10 @@ backup_existing() {
 }
 
 backup_copy_existing() {
+  # Like backup_existing, but COPIES the file instead of moving it. Used
+  # before in-place edits (e.g. merge-hook-config.py) so the user has a
+  # recovery path if the merge corrupts the destination, while the
+  # destination remains in place for the merge to operate on.
   dst=$1
   rel=$(printf '%s\n' "$dst" | sed 's#^/##')
   backup_path="$backup_dir/$rel"

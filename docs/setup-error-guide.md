@@ -16,6 +16,7 @@ Use this guide when setup, update, scheduling, or uninstall fails. Explain error
 | `config repository has local changes` | 設定リポジトリに未保存の変更があり、更新すると作業を壊す可能性があります。 | 変更内容を確認し、必要ならコミットまたは退避してから更新します。 |
 | `not a git repository` | 更新対象がGitリポジトリではありません。 | 正しい `llm-config` の場所を探すか、GitHubから再取得します。 |
 | `AI_AGENT_TARGET_DIR is deprecated and ignored` | 旧方式（作業フォルダー配下へのリンク作成）の変数が指定されています。 | そのまま続行できます。必要なら `AI_AGENT_CODEX_HOME` / `AI_AGENT_CLAUDE_HOME` / `AI_AGENT_GEMINI_HOME` を使ってグローバル配置先を調整します。 |
+| `copilot-instructions.md` が見つからない | グローバル移行後は `.github/copilot-instructions.md` を自動配置しません。 | Copilot を使う対象リポジトリに `.github/copilot-instructions.md` を手動配置するか、このリポジトリの `instructions/.github/copilot-instructions.md` を参照して必要内容を反映します。 |
 | `launchctl` or `systemctl` scheduling failed | 自動更新のスケジュール登録に失敗しました。設定本体は使える場合があります。 | まず手動更新コマンドを案内します。自動更新はOS別に再確認します。 |
 | `health: warn` | 基本動作は確認できましたが、未ログイン、未インストール、リンク未設定、リポジトリ未保存変更など確認が必要な項目があります。 | `scripts/health-check.sh` の各行を見て、最も小さい修正だけを提案します。 |
 | `health: fail` | Gitや設定リポジトリなど、更新や診断に必要な前提が見つかりません。 | リポジトリの場所、Gitの有無、GitHubからの再取得が必要かを確認します。 |
