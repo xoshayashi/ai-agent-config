@@ -1,0 +1,32 @@
+{
+  "hooks": {
+    "BeforeAgent": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "llm-config-peer-prompt-refinement",
+            "type": "command",
+            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/peer_prompt_refinement.py\" --current gemini",
+            "timeout": 30000,
+            "description": "Optionally add peer LLM prompt-refinement context before planning."
+          }
+        ]
+      }
+    ],
+    "BeforeTool": [
+      {
+        "matcher": ".*",
+        "hooks": [
+          {
+            "name": "llm-config-safe-delete-guard",
+            "type": "command",
+            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/safe_delete_guard.py\" --current gemini",
+            "timeout": 10000,
+            "description": "Block permanent shell deletion commands and suggest the safer trash workflow."
+          }
+        ]
+      }
+    ]
+  }
+}
