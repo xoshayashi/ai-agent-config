@@ -871,12 +871,15 @@ def claude_ready(data: dict[str, Any]) -> tuple[bool, str]:
     for item in events:
         if not trusted_review_author(item):
             continue
+        state = str(item.get("state", "")).upper()
+        if state == "CHANGES_REQUESTED":
+            return False, "Claude-related review requests changes"
         body = str(item.get("body", "")).lower()
-        if str(item.get("state", "")).upper() == "APPROVED":
+        if state == "APPROVED":
             return True, "latest Claude-related review is APPROVED"
         if any(marker in body for marker in ["ready to merge", "merge ok", "lgtm", "no changes requested", "マージ ok", "マージok"]):
             return True, "latest Claude-related review appears merge-ready"
-        if any(marker in body for marker in ["request changes", "blocking change", "needs changes", "要修正", "修正をお願い"]):
+        if any(marker in body for marker in ["request changes", "needs changes", "要修正", "修正をお願い"]):
             return False, "Claude-related review still asks for changes"
     return False, "no merge-ready Claude review signal found"
 
@@ -942,6 +945,7 @@ Requirements:
     if result.returncode != 0:
         sys.stderr.write(result.stderr)
         raise SystemExit("error: Claude review-feedback pass failed")
+    # Authoritative validation; the in-prompt instruction is best-effort only.
     run_command(["sh", "scripts/validate-repo.sh"], root)
     staged = stage_allowed_changed_paths(root)
     if staged:
