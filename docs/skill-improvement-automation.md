@@ -81,8 +81,6 @@ AI_AGENT_IMPROVEMENT_AUTO_MERGE=1 \
 python3 scripts/skill-improvement-bot.py review-open-prs
 ```
 
-`AI_AGENT_IMPROVEMENT_APPLY_REVIEW=1` を使う場合、Claude Code はレビュー対応のために `acceptEdits` 相当の権限で起動します。これは、対象Skillや関連ドキュメントへの編集をClaudeに任せる強い設定です。必ず `AI_AGENT_DRY_RUN=1` で流れを確認し、PR作成・レビュー対応・自動マージの各フラグを必要な段階だけ有効化してください。
-
 ## Scheduling / 定期実行
 
 推奨は **1日1回** です。頻度はセットアップ時の対話で決められます。
@@ -94,6 +92,8 @@ python3 scripts/skill-improvement-bot.py review-open-prs
 | **1週間ごと** | `AI_AGENT_IMPROVEMENT_CADENCE=weekly` | 改善PRの頻度を抑えたい場合 |
 | **手動のみ** | `AI_AGENT_IMPROVEMENT_CADENCE=manual` | 自動スキャンを止める場合 |
 | **カスタム** | `AI_AGENT_IMPROVEMENT_CADENCE=custom AI_AGENT_IMPROVEMENT_INTERVAL_SECONDS=<seconds>` | 管理者向け |
+
+Linuxの `systemd` タイマーは、スリープや電源OFFで実行間隔を逃したPCを追いつかせるため、起動後約10分にも1回実行します。
 
 dry-runで予定内容を確認します。
 
