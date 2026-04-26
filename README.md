@@ -19,9 +19,24 @@ AIツール向けの共通InstructionsとSkillsを配布・更新するための
 | **Codex** | [Codex CLI](https://developers.openai.com/codex/cli) | `codex` を起動し、初回表示の案内に従ってChatGPTアカウントまたはAPI keyでログインします。 |
 | **Gemini CLI** | [Gemini CLI Get Started](https://google-gemini.github.io/gemini-cli/docs/get-started/) | `gemini` を起動し、認証方法で「Login with Google」を選びます。 |
 
-## Claude Code / Codex / Gemini CLIに渡す言葉
+## LLM CLIで完結するセットアップ依頼
 
-初回セットアップでは、3つ全てのLLM CLIをインストール・ログインした上で、実際にセットアップを進めるClaude Code、Codex、またはGemini CLIに次のように伝えてください。
+Claude Code、Codex、Gemini CLIのどれかを起動したら、次の文章をそのまま貼ってください。GitHubログイン確認、リポジトリ取得、セットアップまでLLM CLIとの会話で進めます。
+
+```text
+GitHubにログインできているか確認して。未ログインなら、初心者にも分かる日本語でログイン手順を案内して。
+その後、次のリポジトリをこのPCに取得して。既に同じリポジトリがある場合は、最新のmainをpullして。
+
+https://github.com/xoshayashi/ai-agent-config.git
+
+取得できたら、そのリポジトリのREADME.mdとsetup.mdを読んで、このPCにAI Agent Configをセットアップして。
+Claude Code、Codex、Gemini CLIの全てがインストール済みかつログイン済みか確認して、未完了のものがあれば先に案内して。
+専門用語は日本語で説明して、更新頻度は推奨の1日1回を含めて選ばせて。
+```
+
+## 取得済みリポジトリでセットアップする時の言葉
+
+このリポジトリが既にPC上にある場合は、実際にセットアップを進めるClaude Code、Codex、またはGemini CLIに次のように伝えてください。
 
 ```text
 README.mdとsetup.mdを読んで、このPCにAI Agent Configをセットアップして。
