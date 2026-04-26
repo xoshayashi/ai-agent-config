@@ -27,6 +27,7 @@ Do not use this skill for replace-with-should-not-trigger-boundary.
 
 - Use `references/evidence-notes.md.template` when the skill needs research, standards, benchmarks, official references, or domain-specific evidence.
 - Use `tests/activation-prompts.md` when checking whether the skill triggers on realistic prompts.
+- Use `tests/self-review-checklist.md` before treating a new or updated skill as complete.
 
 ## Self-Review
 

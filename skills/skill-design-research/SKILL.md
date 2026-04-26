@@ -22,10 +22,11 @@ Do not use this for tiny wording edits or behavior capable agents already handle
 1. **Frame the design question.** Identify the intended user, job, triggering situations, expected outputs, failure modes, and non-obvious design choices that need evidence.
 2. **Design the activation surface.** Write or revise the `description` and any UI/routing metadata so the skill triggers on user intent, not only on internal implementation terms. Include realistic should-trigger and should-not-trigger examples when activation risk matters.
 3. **Build an evidence plan.** Prefer recent academic surveys, peer-reviewed papers, credible preprints, benchmarks, technical reports, official references, domain standards, and high-quality practitioner evidence when academic evidence is thin.
-4. **Classify source strength.** Label evidence as peer-reviewed finding, academic survey, preprint, benchmark, technical report, official reference, domain standard, vendor claim, practitioner report, or informed assumption.
-5. **Translate evidence into behavior.** Convert sources into actionable design rules, evaluation checks, workflows, templates, or reference material. Do not summarize papers for their own sake.
-6. **Keep the skill lean.** Put only the trigger, core workflow, essential decision rules, and reference-routing guidance in `SKILL.md`. Move detailed literature notes, citation lists, examples, and domain background into `references/`.
-7. **Self-review the design.** Check that every non-obvious rule has a source or explicit rationale, the activation metadata fits realistic prompts, the skill is not duplicating default agent behavior, and the workflow is practical under real context limits.
+4. **Search with bounded query breadth.** Use concise, high-signal Web Search queries that are likely to return a useful result set. Do not pack the whole research question, all constraints, and every synonym into one query; split the work into several shorter query families and adjust after seeing result quality.
+5. **Classify source strength.** Label evidence as peer-reviewed finding, academic survey, preprint, benchmark, technical report, official reference, domain standard, vendor claim, practitioner report, or informed assumption.
+6. **Translate evidence into behavior.** Convert sources into actionable design rules, evaluation checks, workflows, templates, or reference material. Do not summarize papers for their own sake.
+7. **Keep the skill lean.** Put only the trigger, core workflow, essential decision rules, and reference-routing guidance in `SKILL.md`. Move detailed literature notes, citation lists, examples, and domain background into `references/`.
+8. **Self-review the design.** Check that every non-obvious rule has a source or explicit rationale, the activation metadata fits realistic prompts, the skill is not duplicating default agent behavior, and the workflow is practical under real context limits.
 
 ## Source Quality Guide
 

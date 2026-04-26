@@ -14,6 +14,7 @@ Do not treat this as a fixed citation list. Add domain-specific sources when the
 | **Use feedback and self-review as an explicit improvement loop.** | Reflexion and Self-Refine both support test-time improvement through feedback, reflection, and iterative revision without changing model weights. | For fragile or high-quality deliverables, include a bounded review/refinement loop with concrete critique dimensions and a stop condition. |
 | **Evaluate prompts and workflows against task criteria, not vibes.** | OpenAI's evaluation guidance emphasizes evals because generative systems are variable; DSPy frames prompts and pipelines as optimizable against metrics. | Define success criteria, failure modes, test prompts, rubrics, or task-specific checks for non-trivial skills. |
 | **Prefer source-backed heuristics over generic advice.** | Surveys and official references are useful for broad patterns, while benchmarks, standards, and domain literature are needed for task-specific reliability. | A skill should encode only the heuristics that materially change behavior for that domain or workflow. Keep generic capability assumptions out. |
+| **Keep Web Search queries broad enough to find evidence.** | Search guidance from official and library sources treats result count as feedback: add terms to narrow broad results, remove or broaden terms when results are too sparse. | Start with concise, high-signal query families and iterate. Avoid packing the full research question and every constraint into one search string. |
 
 ## Source Map
 

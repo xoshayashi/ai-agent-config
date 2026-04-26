@@ -19,6 +19,7 @@ Use this before treating a new or updated skill as complete.
 - Non-obvious workflow choices cite official references, academic sources, standards, benchmarks, or clearly marked assumptions.
 - Source strength is labeled in the evidence notes.
 - Evidence changes the skill's behavior, checks, or boundaries rather than being decorative.
+- Web Search queries used for evidence gathering were concise enough to return useful results, with separate focused queries for different source types or angles.
 
 ## Portability
 

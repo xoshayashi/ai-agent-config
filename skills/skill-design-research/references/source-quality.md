@@ -19,7 +19,7 @@ Use this reference when a skill, agent, prompt, or reusable workflow needs an ev
 
 ## Search Patterns
 
-Adapt these patterns to the domain and current year:
+Adapt these patterns to the domain and current year. Treat them as **short query families**, not as one combined query.
 
 - `"[topic]" survey recent`
 - `"[topic]" benchmark evaluation`
@@ -33,6 +33,17 @@ Adapt these patterns to the domain and current year:
 - `site:ieee.org "[topic]"`
 
 Prefer current sources for fast-moving AI, agent, model, API, and tooling topics. Prefer standards, surveys, and official references when stability matters more than novelty.
+
+## Query Breadth Control
+
+Search queries should be long enough to express intent, but short enough to avoid filtering away valid results.
+
+- **Start short:** Use the core entity/topic plus one purpose qualifier when useful, such as `survey`, `benchmark`, `official docs`, `release notes`, `pricing`, `security`, or the current year.
+- **Avoid over-specified first searches:** Do not include every constraint, synonym, expected conclusion, product name, date range, and source type in the same query.
+- **Split, then compare:** Use several focused queries for distinct source types or angles instead of one overloaded query.
+- **Adjust based on results:** If results are too sparse or off-target, remove the weakest qualifier, replace overly specific terms with broader ones, or search a known source directly. If results are too broad, add one qualifier at a time.
+- **Use exact phrases sparingly:** Quote titles, error messages, unique phrases, identifiers, or exact product names. Avoid quoting generic concepts because it can hide useful sources that use nearby terminology.
+- **Keep entities intact:** Do not remove exact package names, file names, error codes, standards numbers, or paper titles when those are the thing being searched.
 
 ## Translate Evidence Into Skill Design
 
