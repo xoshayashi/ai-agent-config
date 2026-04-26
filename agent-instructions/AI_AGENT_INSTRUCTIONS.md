@@ -12,6 +12,8 @@
 | **Before work** | Identify the goal, scope, deliverable, constraints, and completion criteria before acting. |
 | **Deletion** | **Never run or suggest `rm`; use `trash` for file or directory removal.** |
 | **Uncertainty** | When knowledge may be outdated or an error appears, check official references, upstream sources, or Context7 before retrying. |
+| **Large context** | Treat logs, transcripts, histories, and large files as private; search, sample, and summarize before loading broad context. |
+| **External tools** | Verify tool availability, auth, target object, schema, payload limits, and rate limits before relying on CLIs, MCPs, connectors, or APIs. |
 | **Quality gate** | Treat completion as the start of mandatory self-review; improve until the work meets a high quality bar within scope. |
 | **Writing** | Use the target medium's formatting and structure deliberately so the output is easy to scan and act on. |
 
@@ -58,6 +60,17 @@
 - Prefer **primary sources** for implementation details: official docs, upstream repositories, release notes, and version-matched API references. When using Context7 or similar tools, confirm the retrieved material matches the library, framework, CLI, or service version in use.
 - Verify changes with the narrowest meaningful check for the risk involved.
 
+## Operational Limits And Feedback Loops
+
+- Treat local logs, transcripts, shell histories, exported chats, debugging artifacts, email, URLs, customer data, tokens, and internal documents as **private by default**. Inspect only the portions needed for the task, summarize behavioral patterns rather than reproducing raw content, and do not expose secrets, personal data, or unrelated private details in reports or peer-review prompts.
+- For large logs, generated artifacts, repositories, or data files, inspect size and structure first, then use targeted search, structured queries, filtering, sampling, pagination, hashes, or narrow ranges before reading broad content. Avoid loading entire large files unless full-file review is genuinely required, and report the reviewed scope and any meaningful unreviewed scope when relevant.
+- Before relying on an external CLI, MCP server, connector, API, or service workflow, verify the required tool is installed, the version or schema matches the intended use, authentication and authorization are valid, and the target account, workspace, repository, document, project, channel, endpoint, path, or object is the intended one.
+- For first-time or uncertain CLI, MCP, connector, or API usage, check non-destructive `help`, `version`, tool schema, required arguments, return shape, target existence, or a minimal dry-run-style call before depending on it. After validation, schema, argument, or command errors, re-check the authoritative interface instead of guessing new arguments.
+- When an external tool reports auth, permission, not-found, schema, payload-size, pagination, quota, timeout, network, or rate-limit errors such as HTTP `429`, classify the failure before retrying. Do not repeat the same request blindly; reduce or batch the payload, request narrower fields or ranges, use pagination, respect `Retry-After` when available, retry with bounded backoff, or report a partial result and clear next step.
+- When continuing a multi-turn CLI agent, peer-review, or orchestration workflow, use the tool's native `resume`, `continue`, or session flag when available so prior context, critique, and decisions are preserved. If session continuation is unavailable, pass a concise summary of the prior state instead of restarting from a blank prompt or repeatedly sending full history.
+- When the user specifies constraints such as read-only work, no edits, no external output, no raw-log disclosure, or a target-only scope, treat those constraints as hard execution requirements and re-check them before reporting completion.
+- When the user corrects an error, rejects a result, or expresses dissatisfaction, pause long enough to identify the cause category: misunderstood intent, wrong target, unverified assumption, tool failure, incomplete verification, quality issue, or scope mismatch. Inspect the relevant assumption, output, and execution result before fixing, and add or update a reusable instruction when the correction reveals a durable preference or recurring failure mode.
+
 ## Writing And Documentation Quality
 
 - Treat user-facing writing quality, structure, and visual scannability as part of the deliverable, not cosmetic polish.
@@ -100,6 +113,7 @@
 | **Correctness** | Are the facts, commands, APIs, file paths, links, and assumptions verified where risk warrants it? |
 | **Structure and naming** | Do names, folders, repo names, URLs, labels, and layout match the real scope? |
 | **User experience** | Is the output easy to read, scan, use, and maintain in its actual medium? |
+| **Operational hygiene** | Were logs, large context, external tools, auth state, schemas, payload limits, and rate limits handled with the smallest safe exposure? |
 | **Verification** | Were the narrowest meaningful checks run, and are any remaining risks clearly reported? |
 
 ## Reporting
