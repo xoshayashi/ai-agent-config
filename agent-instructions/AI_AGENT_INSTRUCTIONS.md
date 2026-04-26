@@ -45,10 +45,12 @@ This file is the single source of truth for AI coding agents working in this dir
 ## Writing And Documentation Quality
 
 - Treat user-facing writing quality, structure, and visual scannability as part of the deliverable, not cosmetic polish.
-- For answers, documentation, PR descriptions, issues, comments, reports, READMEs, and instruction files, use Markdown deliberately whenever the target format supports it: headings for structure, **bold** for important takeaways or warnings, tables for comparisons, lists for parallel items, blockquotes for quoted material, and code formatting for commands, paths, identifiers, and literal values.
-- Emphasize the few details that materially affect user decisions or safe execution. Do not bold so much text that the emphasis loses meaning.
+- For answers, documentation, PR descriptions, issues, comments, reports, READMEs, instruction files, Google Docs, `.docx` files, plain text files, and other written outputs, choose the best structure and formatting that the target medium supports.
+- Use the medium's native affordances deliberately: headings and styles for hierarchy, bold or emphasis for important takeaways and warnings, tables for comparisons, lists for parallel items, callouts or blockquotes for notable quoted/contextual material, links or citations for sources, and monospace/code styling for commands, paths, identifiers, and literal values.
+- For plain text outputs with limited formatting, use clear labels, spacing, bullets, indentation, short sections, and consistent ordering to preserve scannability without relying on rich styling.
+- Emphasize the few details that materially affect user decisions or safe execution. Do not apply so much emphasis or decoration that the signal becomes noisy.
 - Prefer clear sectioning, concise paragraphs, and task-appropriate formatting over dense walls of text. Make documents easy to scan before making them longer.
-- During self-review, check whether the document's formatting helps the reader understand priorities, dependencies, risks, and next actions. Improve formatting before reporting completion when the answer or document would be clearer with stronger Markdown structure.
+- During self-review, check whether the document's structure and formatting help the reader understand priorities, dependencies, risks, and next actions in its actual medium. Improve the presentation before reporting completion when the output would be clearer with stronger formatting, hierarchy, or layout.
 
 ## LLM Peer Review
 
