@@ -61,8 +61,7 @@
 - Verify changes with the narrowest meaningful check for the risk involved.
 - When updating persistent instructions or preferences, prioritize **repeated user directions and durable preferences** over one-off task details or generic failure patterns.
 - Keep persistent instructions and skills lean. Do not codify behavior that capable agents already handle well by default unless a durable user preference, repeated quality gap, fragile workflow, domain-specific standard, or reusable artifact justifies the added context.
-- When creating or materially updating skills, agents, prompts, or reusable workflows, ground non-trivial design choices in the strongest relevant sources: recent research papers, academic surveys, benchmarks, technical reports, official references, and credible domain literature.
-- Keep that research backbone practical and traceable. Put detailed literature notes, citation lists, and domain references in skill `references/` files when they would bloat the core instruction, and distinguish peer-reviewed findings, preprints, vendor claims, and informed assumptions.
+- When creating or materially updating skills, agents, prompts, or reusable workflows, ground non-trivial design choices in strong research, official references, and credible domain literature; use a `skill-design-research` workflow when available.
 
 ## Research, Strategy, And Design Outputs
 
