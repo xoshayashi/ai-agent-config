@@ -401,12 +401,6 @@ Schedule daily skill-improvement scans:
 AI_AGENT_IMPROVEMENT_CADENCE=daily sh /path/to/llm-config/scripts/schedule-skill-improvement.sh
 ```
 
-Schedule daily skill-improvement scans:
-
-```sh
-AI_AGENT_IMPROVEMENT_CADENCE=daily sh /path/to/ai-agent-config/scripts/schedule-skill-improvement.sh
-```
-
 Run an urgent one-time update:
 
 ```sh

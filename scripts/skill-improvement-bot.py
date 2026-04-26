@@ -412,6 +412,8 @@ def scan_logs(args: argparse.Namespace, root: Path) -> tuple[list[Proposal], dic
             if skill:
                 recent_skill = skill
                 recent_skill_line = line_no
+            # Require a prior assistant anchor to reduce false positives from
+            # user-only generic correction messages.
             active_skill = previous_skill or (recent_skill if line_no > recent_skill_line else None)
             if not active_skill or not is_correction(text):
                 continue
@@ -752,7 +754,7 @@ def stage_allowed_changed_paths(root: Path) -> list[str]:
     if rejected:
         raise SystemExit("error: refusing to stage unexpected review-feedback path(s): " + ", ".join(rejected))
     if allowed:
-        run_command(["git", "add", "--", *allowed], root)
+        run_command(["git", "add", "-f", "--", *allowed], root)
     return allowed
 
 
@@ -874,7 +876,7 @@ def claude_ready(data: dict[str, Any]) -> tuple[bool, str]:
             return True, "latest Claude-related review is APPROVED"
         if any(marker in body for marker in ["ready to merge", "merge ok", "lgtm", "no changes requested", "マージ ok", "マージok"]):
             return True, "latest Claude-related review appears merge-ready"
-        if any(marker in body for marker in ["request changes", "blocking", "needs changes", "修正"]):
+        if any(marker in body for marker in ["request changes", "blocking", "needs changes", "要修正", "修正をお願い"]):
             return False, "Claude-related review still asks for changes"
     return False, "no merge-ready Claude review signal found"
 
@@ -943,7 +945,7 @@ Requirements:
     run_command(["sh", "scripts/validate-repo.sh"], root)
     staged = stage_allowed_changed_paths(root)
     if staged:
-        run_command(["git", "commit", "-m", "Address automated review feedback"], root)
+        run_command(["git", "commit", "-m", f"Address automated review feedback for PR #{pr}"], root)
         run_command(["git", "push", "origin", "HEAD"], root)
 
 
