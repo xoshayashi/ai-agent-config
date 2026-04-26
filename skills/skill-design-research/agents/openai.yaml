@@ -1,7 +1,7 @@
 interface:
   display_name: "Skill Design Research"
-  short_description: "Ground skills in strong source evidence"
-  default_prompt: "Use $skill-design-research to design a lean, research-backed skill."
+  short_description: "Research-backed skill and agent design"
+  default_prompt: "Use $skill-design-research to create, review, or tune activation for a lean research-backed skill or agent."
 
 policy:
   allow_implicit_invocation: true

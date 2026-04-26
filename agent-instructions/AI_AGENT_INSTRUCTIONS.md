@@ -16,6 +16,7 @@
 | **Agent delegation** | When the user explicitly asks for agents, delegation, or parallel investigation, decompose independent workstreams, delegate bounded tasks, then synthesize and own the final answer. |
 | **Quality gate** | Treat completion as the start of mandatory self-review; improve until the work meets a high quality bar within scope. |
 | **Writing** | Use the target medium's formatting and structure deliberately so the output is easy to scan and act on. |
+| **Skill/workflow design** | For non-trivial skills, agents, prompts, and reusable workflows, use evidence-backed design and verify that activation conditions are discoverable. |
 
 ## Scope
 
@@ -61,7 +62,7 @@
 - Verify changes with the narrowest meaningful check for the risk involved.
 - When updating persistent instructions or preferences, prioritize **repeated user directions and durable preferences** over one-off task details or generic failure patterns.
 - Keep persistent instructions and skills lean. Do not codify behavior that capable agents already handle well by default unless a durable user preference, repeated quality gap, fragile workflow, domain-specific standard, or reusable artifact justifies the added context.
-- When creating or materially updating skills, agents, prompts, or reusable workflows, ground non-trivial design choices in strong research, official references, and credible domain literature; use a `skill-design-research` workflow when available.
+- When creating or materially updating skills, agents, prompts, or reusable workflows, explicitly decide whether the design is non-trivial. If it is, use a `skill-design-research` workflow when available, capture a brief evidence packet, and update activation metadata or trigger conditions so the workflow is discoverable from realistic user requests.
 
 ## Research, Strategy, And Design Outputs
 
@@ -108,6 +109,7 @@
 - Inspect the actual output or changed files directly, and when feasible run or render the result in the form the user will experience it.
 - For non-trivial deliverables, complex tradeoffs, or high-stakes wording, include LLM peer review in this quality gate when additional reasoning would materially improve quality, and apply useful feedback before final reporting.
 - Review naming, file and folder organization, repository names, URLs, command names, user-facing labels, and other structural surfaces for whether they still match the actual scope and purpose of the work. If the implementation evolved beyond the original name or layout, improve those surfaces before reporting completion.
+- For skills, agents, slash commands, and reusable workflows, review the activation surface: frontmatter descriptions, routing metadata, aliases, default prompts, entrypoint instructions, likely should-trigger prompts, and should-not-trigger boundaries.
 - Check for mismatches with the original intent, missing edge cases, degraded usability, unclear wording, formatting issues, brittle implementation, and avoidable quality problems.
 - If the review finds a gap, fix it autonomously, re-verify, and repeat the review loop until the output is consistent with the specification and meets a high quality bar.
 - Keep the improvement loop in scope. Do not expand into unrelated refactors or new features unless they are necessary to satisfy the original request.
@@ -117,6 +119,7 @@
 | **Intent fit** | Does the result actually satisfy the user's latest request and acceptance criteria? |
 | **Correctness** | Are the facts, commands, APIs, file paths, links, and assumptions verified where risk warrants it? |
 | **Structure and naming** | Do names, folders, repo names, URLs, labels, and layout match the real scope? |
+| **Activation fit** | Will the right skill, agent, command, or workflow be selected by realistic future requests without being over-broad? |
 | **User experience** | Is the output easy to read, scan, use, and maintain in its actual medium? |
 | **Agent synthesis** | If delegates or peer LLMs were used, were scopes distinct, contradictions reconciled, and the final judgment owned by the coordinating agent? |
 | **Verification** | Were the narrowest meaningful checks run, and are any remaining risks clearly reported? |
