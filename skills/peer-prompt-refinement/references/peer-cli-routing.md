@@ -8,7 +8,7 @@ Use these command patterns when `peer-prompt-refinement` needs another LLM to im
 |---|---|---|
 | Codex | Gemini CLI | `AI_AGENT_PROMPT_REFINEMENT_ACTIVE=1 gemini --skip-trust --approval-mode plan --output-format text -p "Improve the task prompt using the Context Packet from stdin. Do not perform the task. Do not use tools; return text only."` |
 | Claude Code | Gemini CLI | `AI_AGENT_PROMPT_REFINEMENT_ACTIVE=1 gemini --skip-trust --approval-mode plan --output-format text -p "Improve the task prompt using the Context Packet from stdin. Do not perform the task. Do not use tools; return text only."` |
-| Gemini CLI | Codex CLI | `AI_AGENT_PROMPT_REFINEMENT_ACTIVE=1 codex exec --cd "$PWD" --sandbox read-only -` |
+| Gemini CLI | Codex CLI | `AI_AGENT_PROMPT_REFINEMENT_ACTIVE=1 codex exec --cd "$PWD" --skip-git-repo-check --sandbox read-only -` |
 
 ## Safe Transfer Pattern
 
@@ -45,6 +45,7 @@ For Codex CLI:
 ```sh
 peer_refinement_timeout env AI_AGENT_PROMPT_REFINEMENT_ACTIVE=1 codex exec \
   --cd "$PWD" \
+  --skip-git-repo-check \
   --sandbox read-only \
   - <<'_PEER_REFINEMENT_CONTEXT_'
 <peer prompt with Context Packet>
@@ -76,5 +77,5 @@ _PEER_REFINEMENT_CONTEXT_
 ## Notes
 
 - Gemini CLI help on this machine identifies `-p` / `--prompt` as non-interactive headless mode, supports `--skip-trust`, `--output-format text|json|stream-json`, accepts stdin as extra prompt context, and supports `--approval-mode plan` as read-only mode.
-- Codex CLI help on this machine identifies `codex exec` as non-interactive execution and supports stdin with `-`, `--cd` / `-C`, and `--sandbox read-only`. Current `codex exec --help` does not list `--ask-for-approval`; use read-only sandboxing, the text-only peer prompt, and the timeout fallback instead.
+- Codex CLI help on this machine identifies `codex exec` as non-interactive execution and supports stdin with `-`, `--cd` / `-C`, `--skip-git-repo-check`, and `--sandbox read-only`. `--skip-git-repo-check` keeps the Gemini-to-Codex peer route usable when the caller's current directory is not inside a Git repository. Current `codex exec --help` does not list `--ask-for-approval`; use read-only sandboxing, the text-only peer prompt, and the timeout fallback instead.
 - Claude Code help on this machine identifies `-p` / `--print` as non-interactive output; this skill's required route still sends Claude Code prompts to Gemini.
