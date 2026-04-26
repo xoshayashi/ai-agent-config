@@ -32,7 +32,7 @@ reports/
 tmp/
 temp/
 .cache/
-.ai-agent-config-backups/
+.llm-config-backups/
 
 # Common dependency/build artifacts
 node_modules/

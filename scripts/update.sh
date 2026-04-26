@@ -49,7 +49,7 @@ env_skills=${AI_AGENT_SKILLS_DIR-}
 env_extra_skills_set=${AI_AGENT_EXTRA_SKILLS_DIRS+x}
 env_extra_skills=${AI_AGENT_EXTRA_SKILLS_DIRS-}
 
-state_dir=${AI_AGENT_STATE_DIR:-$HOME/.ai-agent-config}
+state_dir=${AI_AGENT_STATE_DIR:-$HOME/.llm-config}
 state_file=${AI_AGENT_STATE_FILE:-$(expand_home "$state_dir")/config.env}
 if [ -f "$state_file" ]; then
   # shellcheck source=/dev/null
