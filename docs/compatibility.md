@@ -15,7 +15,7 @@ compatibility/llm-cli-matrix.yml
 - **Portable first:** Shared instructions should be written in natural language and should avoid tool-specific commands unless the fallback is clear.
 - **Entry points stay thin:** `AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` should keep pointing to `AI_AGENT_INSTRUCTIONS.md`.
 - **Tag tool-specific behavior:** If a rule only works in one LLM CLI, label it with the relevant compatibility tag in the PR or nearby documentation.
-- **Natural-language setup must remain complete:** A beginner should be able to paste the setup request into a supported LLM CLI and continue through GitHub login, checkout or pull, dry-run preview, setup, update scheduling, and verification.
+- **Natural-language setup must remain complete:** A beginner should be able to paste the setup request into a supported LLM CLI and continue through GitHub login, checkout or pull, dry-run preview, setup, update scheduling, verification, health check, and urgent update.
 - **Skills need activation checks:** New or updated skills should include should-trigger and should-not-trigger prompts, either in the skill references or in `skills/template/tests/activation-prompts.md` when starting from the template.
 
 ## Validation

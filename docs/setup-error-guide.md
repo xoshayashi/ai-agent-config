@@ -17,6 +17,8 @@ Use this guide when setup, update, scheduling, or uninstall fails. Explain error
 | `not a git repository` | 更新対象がGitリポジトリではありません。 | 正しい `ai-agent-config` の場所を探すか、GitHubから再取得します。 |
 | `AI_AGENT_TARGET_DIR is not set` | どの作業フォルダーへリンクを置くか決まっていません。 | 推奨は `~/Documents/projects`。既存の作業フォルダーや会社指定workspaceがあればそちらを選びます。 |
 | `launchctl` or `systemctl` scheduling failed | 自動更新のスケジュール登録に失敗しました。設定本体は使える場合があります。 | まず手動更新コマンドを案内します。自動更新はOS別に再確認します。 |
+| `health: warn` | 基本動作は確認できましたが、未ログイン、未インストール、リンク未設定、リポジトリ未保存変更など確認が必要な項目があります。 | `scripts/health-check.sh` の各行を見て、最も小さい修正だけを提案します。 |
+| `health: fail` | Gitや設定リポジトリなど、更新や診断に必要な前提が見つかりません。 | リポジトリの場所、Gitの有無、GitHubからの再取得が必要かを確認します。 |
 
 ## Response Pattern
 
