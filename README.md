@@ -25,9 +25,9 @@ Claude Code、Codex、Gemini CLIのどれかを起動したら、次の文章を
 
 ```text
 GitHubにログインできているか確認して。未ログインなら、初心者にも分かる日本語でログイン手順を案内して。
-その後、次のリポジトリをこのPCに取得して。保存先は `~/Documents/ai-agent-config` を基本にして。既に同じリポジトリがある場合は、最新のmainをpullして。
+その後、次のリポジトリをこのPCに取得して。保存先は `~/Documents/llm-config` を基本にして。既に同じリポジトリがある場合は、最新のmainをpullして。
 
-https://github.com/xoshayashi/ai-agent-config.git
+https://github.com/xoshayashi/llm-config.git
 
 取得できたら、そのリポジトリのREADME.mdとsetup.mdを読んで、このPCにAI Agent Configをセットアップして。
 Claude Code、Codex、Gemini CLIの全てがインストール済みかつログイン済みか確認して、未完了のものがあれば先に案内して。
@@ -94,7 +94,7 @@ Skillの改善候補を見たい時は、次のように伝えてください。
 自動更新を待たずに今すぐ反映したい場合は、次を実行します。
 
 ```sh
-sh /path/to/ai-agent-config/scripts/update.sh
+sh /path/to/llm-config/scripts/update.sh
 ```
 
 LLMには「急ぎ対応したいんだけど」と伝えれば、この手順で進めるように案内しています。

@@ -6,6 +6,10 @@ The shared project instructions are imported below. **Follow them before startin
 
 @./AI_AGENT_INSTRUCTIONS.md
 
+**Design discipline:** Apply the Act design language to any user-facing output (tone, copy, color, typography, layout, UI suggestions). The basic action manners are imported below; defer to the source guideline noted there for full implementation values.
+
+@./DESIGN.md
+
 ## Note
 
 This file is editable, but local deletion, moving, and renaming are protected by the macOS ACL `everyone deny delete`.

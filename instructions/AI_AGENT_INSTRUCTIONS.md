@@ -20,6 +20,7 @@
 | **Skill/workflow design** | For non-trivial skills, agents, prompts, and reusable workflows, use evidence-backed design and verify that activation conditions are discoverable. |
 | **Config updates** | When the user asks to urgently apply the latest shared instructions or skills, run the repository updater instead of waiting for the scheduled update. |
 | **Skill improvement logs** | When the user asks to inspect recent LLM CLI usage for skill improvements, run the local skill-improvement scanner and summarize only redacted proposals. |
+| **Design discipline** | For any user-facing output that involves visual or verbal style — copy tone, color choices, typography hints, UI suggestions, document layout — follow `instructions/DESIGN.md` (Act design language). Defer to the source guideline noted there for full implementation values. |
 
 ## Scope
 
@@ -72,7 +73,7 @@
 
 - If the user asks to **urgently update, refresh, or apply the latest shared AI agent instructions or skills**, run the config repository updater immediately instead of waiting for the scheduled update.
 - Treat Japanese shortcut phrases such as **「急ぎ対応したいんだけど」**, **「今すぐ最新にして」**, and **「最新のルールを反映して」** as urgent shared-config update requests when the setup/config context is clear. If the surrounding message clearly refers to a different urgent task, handle that task instead.
-- Locate the config repository from `AI_AGENT_CONFIG_HOME`, `$HOME/.ai-agent-config/config.env`, or the symlink target of `AI_AGENT_INSTRUCTIONS.md`, then run `scripts/update.sh` from that repository and report the result in Japanese.
+- Locate the config repository from `AI_AGENT_CONFIG_HOME`, `$HOME/.llm-config/config.env`, or the symlink target of `AI_AGENT_INSTRUCTIONS.md`, then run `scripts/update.sh` from that repository and report the result in Japanese.
 - If the user asks to check whether shared config is installed, healthy, logged in, or up to date, run `scripts/health-check.sh` from the config repository first, then explain the result in Japanese before deciding whether setup or update is needed.
 - If the user asks to **find skill improvements from recent usage logs**, run `scripts/skill-improvement-bot.py scan` from the config repository. Treat phrases such as **「最近のログからSkill改善点を見て」**, **「Skillで吸収できる改善点を確認して」**, and **「Skill改善PRまで自動で作って」** as this workflow when the setup/config context is clear.
 - Do not expose, quote, or commit raw LLM CLI logs. Share only redacted summaries and improvement proposals. Creating PRs, applying review feedback, or auto-merging must be driven by the repository's explicit automation flags and safety checks.
@@ -88,6 +89,14 @@
 - For professional documents, presentations, and decision materials, target a top-tier standard: clear narrative, strong structure, high information density, careful visual hierarchy, source-aware claims, and enough specificity to support serious decision-making.
 - For slides, visual documents, and design-heavy outputs, self-review the actual artifact for layout consistency, typography, spacing, color discipline, information density, visual impact, and whether it feels human-crafted rather than AI-generated.
 - Prefer outputs that are surprising in substance because they reveal a sharper insight, better structure, stronger evidence, or more practical implementation path, not because they add vague flourish.
+
+## Design Discipline (Act Design Language)
+
+- For any user-facing output whose tone, copy, color, typography, layout, or UI affordance is visible to a human, follow [`instructions/DESIGN.md`](./DESIGN.md). It captures the **basic action manners** of the Act design language (Calm intelligence / Industrial-strength softness / Quiet by default).
+- Apply DESIGN.md by default to chat replies, README/docs, PR descriptions, error messages, generated copy, and incidental UI/visual suggestions. Stay quiet by default; reserve Yellow (or any equivalent loud accent) for the single most important moment per page or message.
+- Do not embed promotional or hype language ("revolutionary", "next-gen", "驚異の", "業界初" 等). Prefer short, factual statements with current-tense verbs and `tabular-nums`-style number formatting.
+- For deeper site / slide / full UI implementation work, a dedicated skill will be added later. Until then, refer to the source guideline path noted at the top of `DESIGN.md` and the corresponding `composite_light.png` / `composite_dark.png` for exact tokens and values.
+- If `DESIGN.md` and the source guideline disagree, the **source guideline wins**; update `DESIGN.md` to match instead of silently diverging.
 
 ## Writing And Documentation Quality
 
