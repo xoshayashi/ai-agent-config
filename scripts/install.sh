@@ -25,7 +25,7 @@ expand_home() {
 }
 
 repo_url=${AI_AGENT_REPO_URL:-https://github.com/xoshayashi/ai-agent-config.git}
-config_home=$(expand_home "${AI_AGENT_CONFIG_HOME:-$HOME/.ai-agent-config/repo}")
+config_home=$(expand_home "${AI_AGENT_CONFIG_HOME:-$HOME/Documents/ai-agent-config}")
 branch=${AI_AGENT_UPDATE_BRANCH:-main}
 dry_run=${AI_AGENT_DRY_RUN:-0}
 

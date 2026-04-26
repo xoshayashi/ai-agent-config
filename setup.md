@@ -32,7 +32,7 @@ Give the active Claude Code, Codex, or Gemini CLI session this instruction:
 
 ```text
 GitHubにログインできているか確認して。未ログインなら、初心者にも分かる日本語でログイン手順を案内して。
-その後、次のリポジトリをこのPCに取得して。既に同じリポジトリがある場合は、最新のmainをpullして。
+その後、次のリポジトリをこのPCに取得して。保存先は `~/Documents/ai-agent-config` を基本にして。既に同じリポジトリがある場合は、最新のmainをpullして。
 
 https://github.com/xoshayashi/ai-agent-config.git
 
@@ -46,7 +46,7 @@ Claude Code、Codex、Gemini CLIの全てがインストール済みかつログ
 For AI agents executing this request:
 
 - Prefer a standard GitHub authentication check such as the GitHub CLI when available, but keep the user-facing interaction in plain Japanese.
-- If the repository already exists locally, update it with the latest `main`; otherwise clone `https://github.com/xoshayashi/ai-agent-config.git` into a sensible local config location such as the user's Documents folder.
+- If the repository already exists locally, update it with the latest `main`; otherwise clone `https://github.com/xoshayashi/ai-agent-config.git` into `~/Documents/ai-agent-config` by default.
 - After checkout or pull succeeds, continue with this setup guide rather than making the user issue a second command.
 - If setup, update, scheduling, or uninstall fails, use [docs/setup-error-guide.md](docs/setup-error-guide.md) to explain the error and choose the next safe step.
 
@@ -275,7 +275,7 @@ Update-related variables:
 |---|---|---|
 | `AI_AGENT_UPDATE_REMOTE` | `origin` | Git remote to fetch from. |
 | `AI_AGENT_UPDATE_BRANCH` | `main` | Branch to update from. |
-| `AI_AGENT_UPDATE_CADENCE` | Empty | Friendly schedule name: `recommended`, `daily`, `twice-daily`, `weekly`, `manual`, or `custom`. |
+| `AI_AGENT_UPDATE_CADENCE` | Empty | Friendly schedule name: `recommended`, `daily`, `twice-daily`, `weekly`, `manual`, or `custom`. Short aliases such as `1d`, `12h`, and `1w` are also accepted. |
 | `AI_AGENT_UPDATE_RERUN_SETUP` | `1` | Set to `0` to pull updates without re-running setup. |
 | `AI_AGENT_UPDATE_ALLOW_DIRTY` | `0` | Set to `1` to allow updates when the config repository has local changes. |
 | `AI_AGENT_UPDATE_INTERVAL_SECONDS` | `86400` | Auto-update interval used by `schedule-update.sh`; required when `AI_AGENT_UPDATE_CADENCE=custom`. |
@@ -284,9 +284,9 @@ Recommended choices:
 
 | User Choice | Command Setting | Meaning |
 |---|---|---|
-| **1日1回（推奨）** | `AI_AGENT_UPDATE_CADENCE=daily` | Balanced default for most employees. |
-| **12時間ごと** | `AI_AGENT_UPDATE_CADENCE=twice-daily` | Useful while instructions are changing quickly. |
-| **1週間ごと** | `AI_AGENT_UPDATE_CADENCE=weekly` | Lower-noise option for stable environments. |
+| **1日1回（推奨）** | `AI_AGENT_UPDATE_CADENCE=daily` or `recommended` | Balanced default for most employees. |
+| **12時間ごと** | `AI_AGENT_UPDATE_CADENCE=twice-daily` or `12h` | Useful while instructions are changing quickly. |
+| **1週間ごと** | `AI_AGENT_UPDATE_CADENCE=weekly` or `1w` | Lower-noise option for stable environments. |
 | **自動更新なし** | `AI_AGENT_UPDATE_CADENCE=manual` | Stops any existing automatic updater; the user updates manually when needed. |
 | **カスタム** | `AI_AGENT_UPDATE_CADENCE=custom AI_AGENT_UPDATE_INTERVAL_SECONDS=<seconds>` | Advanced option for admins or special cases. |
 

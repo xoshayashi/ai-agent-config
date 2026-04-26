@@ -25,7 +25,7 @@ Claude Code、Codex、Gemini CLIのどれかを起動したら、次の文章を
 
 ```text
 GitHubにログインできているか確認して。未ログインなら、初心者にも分かる日本語でログイン手順を案内して。
-その後、次のリポジトリをこのPCに取得して。既に同じリポジトリがある場合は、最新のmainをpullして。
+その後、次のリポジトリをこのPCに取得して。保存先は `~/Documents/ai-agent-config` を基本にして。既に同じリポジトリがある場合は、最新のmainをpullして。
 
 https://github.com/xoshayashi/ai-agent-config.git
 
@@ -77,9 +77,9 @@ Claude Code、Codex、Gemini CLIは `scripts/update.sh` を実行して、共有
 
 | 選択肢 | 設定 | 向いている場面 |
 |---|---|---|
-| **1日1回（推奨）** | `AI_AGENT_UPDATE_CADENCE=daily` | ほとんどの従業員向け |
-| **12時間ごと** | `AI_AGENT_UPDATE_CADENCE=twice-daily` | ルールやSkillが頻繁に変わる時期 |
-| **1週間ごと** | `AI_AGENT_UPDATE_CADENCE=weekly` | 安定運用で更新頻度を抑えたい場合 |
+| **1日1回（推奨）** | `AI_AGENT_UPDATE_CADENCE=daily` または `recommended` | ほとんどの従業員向け |
+| **12時間ごと** | `AI_AGENT_UPDATE_CADENCE=twice-daily` または `12h` | ルールやSkillが頻繁に変わる時期 |
+| **1週間ごと** | `AI_AGENT_UPDATE_CADENCE=weekly` または `1w` | 安定運用で更新頻度を抑えたい場合 |
 | **自動更新なし** | `AI_AGENT_UPDATE_CADENCE=manual` | 既存の自動更新を止め、必要な時だけ手動更新したい場合 |
 | **カスタム** | `AI_AGENT_UPDATE_CADENCE=custom AI_AGENT_UPDATE_INTERVAL_SECONDS=<seconds>` | 管理者や特殊な運用向け |
 
