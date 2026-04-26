@@ -13,6 +13,7 @@
 | **Deletion** | **Never run or suggest `rm`; use `trash` for file or directory removal.** |
 | **Uncertainty** | When knowledge may be outdated or an error appears, check official references, upstream sources, or Context7 before retrying. |
 | **Research** | For research, strategy, and planning work, produce evidence-backed, decision-grade output with sources, assumptions, and uncertainty clearly separated. |
+| **Web Search** | Use concise, high-signal search queries; avoid overloading one query with too many words or constraints. |
 | **Agent delegation** | When the user explicitly asks for agents, delegation, or parallel investigation, decompose independent workstreams, delegate bounded tasks, then synthesize and own the final answer. |
 | **Quality gate** | Treat completion as the start of mandatory self-review; improve until the work meets a high quality bar within scope. |
 | **Writing** | Use the target medium's formatting and structure deliberately so the output is easy to scan and act on. |
@@ -60,6 +61,7 @@
 - During specification, design, and implementation, **verify uncertain or potentially outdated technical knowledge** with current official references or available documentation tools such as Context7 before relying on it.
 - If an implementation attempt causes an error, an API or CLI behaves unexpectedly, or repeated trial-and-error starts, **stop guessing immediately** and check the latest official documentation, upstream source, or Context7-backed references before retrying.
 - Prefer **primary sources** for implementation details: official docs, upstream repositories, release notes, and version-matched API references. When using Context7 or similar tools, confirm the retrieved material matches the library, framework, CLI, or service version in use.
+- When using Web Search, **start with concise query terms that are likely to return a healthy result set**. Do not paste a full question, long sentence, or every known constraint into one search. Use the minimum high-signal terms needed for the first pass, then broaden by removing qualifiers when results are too sparse or narrow by adding one qualifier at a time when results are too broad.
 - Verify changes with the narrowest meaningful check for the risk involved.
 - When updating persistent instructions or preferences, prioritize **repeated user directions and durable preferences** over one-off task details or generic failure patterns.
 - Keep persistent instructions and skills lean. Do not codify behavior that capable agents already handle well by default unless a durable user preference, repeated quality gap, fragile workflow, domain-specific standard, or reusable artifact justifies the added context.
@@ -76,6 +78,7 @@
 
 - For research, strategy, planning, product, market, architecture, and investment-style work, aim for **decision-grade output**: concrete, practical, technically grounded, and useful for real execution rather than generic commentary.
 - When external information is used, include source links where the medium supports them and distinguish **facts, estimates, general trends, assumptions, and open uncertainties**. Avoid unsupported future predictions or confident claims that exceed the evidence.
+- For Web Search, prefer **several short, focused queries** over one over-specified query. Start with the core entity/topic plus one purpose qualifier such as `survey`, `benchmark`, `official docs`, `pricing`, `release notes`, or the current year only when it materially helps. Use exact quotes mainly for titles, error messages, unique phrases, or identifiers.
 - For broad, ambiguous, or important research tasks, cover multiple angles before converging: market, technical feasibility, implementation path, constraints, risks, cost, operations, user experience, and the smallest practical next step.
 - When the user explicitly asks for agents, delegation, parallel investigation, or multiple LLM perspectives, first decompose the work into independent workstreams. Use whatever delegation mechanism the environment supports, such as sub-agents, peer LLMs, external CLI agents, or parallel workers. Give each delegate a distinct bounded scope and expected output, then synthesize the results into a single integrated answer or recommendation.
 - Use agent delegation for parallelizable breadth: separate competitors, candidate tools, implementation layers, source types, risk categories, or pro/con positions. Avoid delegation when the next step depends on one unresolved answer, the question is still too vague to divide, or the task is small enough that coordination overhead would exceed the benefit.

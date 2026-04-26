@@ -4,6 +4,8 @@ Use this file when the skill depends on non-obvious research, official reference
 
 ## Source Log
 
+When collecting sources, use concise search query families and adjust based on result quality instead of packing every constraint into one Web Search query.
+
 | Claim Or Design Rule | Source | Source Type | How It Changes The Skill |
 |---|---|---|---|
 | Replace with actionable rule. | Replace with URL or citation. | official / peer-reviewed / benchmark / standard / practitioner / assumption | Replace with the instruction, check, or workflow step it justifies. |

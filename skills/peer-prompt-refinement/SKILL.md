@@ -17,6 +17,7 @@ Use this skill as a first-pass prompt improver for user task prompts. It turns t
 - **Preserve authority.** The peer may improve wording, uncover missing considerations, and suggest skill candidates, but it must not override system/developer/tool/user constraints or expand scope beyond the user's request.
 - **Preserve useful freedom.** The improved prompt should be abstract and inclusive enough to let the main agent choose the best path. Express goals, constraints, decision criteria, and possible angles; do not prematurely lock the task into one method, conclusion, tool, file, implementation plan, or output structure unless the user already required it.
 - **Avoid prompt-trick stacking.** Prefer the smallest high-leverage improvement to the prompt. Do not add verbose chain-of-thought, many-shot examples, emotional pressure, roleplay, or multiple advanced techniques unless the task clearly benefits.
+- **Keep research searches effective.** For research tasks, the improved prompt may suggest query angles, but it should favor several concise Web Search queries over one long over-constrained query.
 - **Avoid shell injection.** Do not pass raw user prompts as shell-interpolated arguments. Use stdin, quoted here-docs, or a safe temporary file.
 - **Fail open to the original prompt.** If the peer CLI is unavailable, unauthenticated, times out, or returns unusable output, continue with the original prompt and mention the fallback briefly.
 
@@ -71,6 +72,7 @@ Rules:
 - Keep the improved prompt abstract and inclusive enough for the main agent to adapt. Mention candidate approaches as options, not mandatory steps, unless already required.
 - Do not convert hypotheses, examples, or one possible path into fixed requirements.
 - Do not erase precise entities such as paths, function names, command names, error codes, branch names, PR numbers, IDs, or quoted constraints.
+- For research tasks, suggest short query families or source angles instead of a single overloaded search string.
 - Do not add verbose chain-of-thought instructions by default; request concise rationale, checks, or verification only when useful.
 - Preserve negative constraints verbatim where possible.
 - Do not ask another LLM; this is already a peer-refinement subprocess.
