@@ -51,7 +51,7 @@ peer_refinement_timeout env AI_AGENT_PROMPT_REFINEMENT_ACTIVE=1 codex exec \
 _PEER_REFINEMENT_CONTEXT_
 ```
 
-`--approval-mode plan` is intentional for Gemini because this peer step should be read-only and text-only. Do not use `yolo` or auto-edit modes for prompt refinement. If Gemini still attempts a tool action, waits for approval, or prints a plan instead of the required sections, treat the output as unusable and fall back.
+`--approval-mode plan` is intentional for Gemini because this peer step should be read-only and text-only. Do not use `yolo` or auto-edit modes for prompt refinement. If Gemini still attempts a tool action, waits for approval, or prints a plan instead of the required sections, treat the output as unusable and fall back. `--skip-trust` is also intentionally included because local `gemini --help` identifies it as the session-level workspace trust bypass.
 
 ## Context Packet Rules
 
@@ -75,6 +75,6 @@ _PEER_REFINEMENT_CONTEXT_
 
 ## Notes
 
-- Gemini CLI help on this machine identifies `-p` / `--prompt` as non-interactive headless mode, supports `--output-format text|json`, accepts stdin as extra prompt context, and supports `--approval-mode plan` as read-only mode.
-- Codex CLI help on this machine identifies `codex exec` as non-interactive execution and supports stdin with `-` plus `--sandbox read-only`. This route also forbids tool use in the peer prompt and falls back on timeout if a local configuration ever causes an approval wait.
+- Gemini CLI help on this machine identifies `-p` / `--prompt` as non-interactive headless mode, supports `--skip-trust`, `--output-format text|json|stream-json`, accepts stdin as extra prompt context, and supports `--approval-mode plan` as read-only mode.
+- Codex CLI help on this machine identifies `codex exec` as non-interactive execution and supports stdin with `-`, `--cd` / `-C`, and `--sandbox read-only`. Current `codex exec --help` does not list `--ask-for-approval`; use read-only sandboxing, the text-only peer prompt, and the timeout fallback instead.
 - Claude Code help on this machine identifies `-p` / `--print` as non-interactive output; this skill's required route still sends Claude Code prompts to Gemini.
