@@ -51,7 +51,7 @@ SAMPLE_HOOK = {
     "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/safe_delete_guard.py\" --current claude",
     "timeout": 10,
 }
-SAMPLE_GROUP = {"matcher": "Bash", "hooks": [SAMPLE_HOOK]}
+SAMPLE_GROUP = {"_llm_config_managed": True, "matcher": "Bash", "hooks": [SAMPLE_HOOK]}
 SAMPLE_SOURCE_JSON = {"hooks": {"PreToolUse": [SAMPLE_GROUP]}}
 
 USER_HOOK_GROUP = {
@@ -159,6 +159,50 @@ def test_merge_json_replaces_stale_managed_hook() -> None:
         assert old_managed not in groups, "stale managed hook must be removed"
         assert SAMPLE_GROUP in groups, "current managed hook must be present"
         assert USER_HOOK_GROUP in groups, "user hook must survive cleanup"
+
+
+def test_merge_json_keeps_unmarked_user_hook_with_runtime_link() -> None:
+    """A user hook referencing AI_AGENT_HOOKS_RUNTIME_LINK must not be removed
+    unless it matches managed markers/patterns.
+    """
+    with in_tempdir() as tmp:
+        src = Path(tmp) / "src.json"
+        dst = Path(tmp) / "dst.json"
+        write_json(src, SAMPLE_SOURCE_JSON)
+        user_runtime_hook = {
+            "matcher": "Bash",
+            "hooks": [
+                {
+                    "type": "command",
+                    "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK}/scripts/my_custom_router.py\"",
+                    "timeout": 7,
+                }
+            ],
+        }
+        write_json(dst, {"hooks": {"PreToolUse": [user_runtime_hook]}})
+
+        MHC.merge_json_file(src, dst, dry_run=False)
+        result = read_json(dst)
+        groups = result["hooks"]["PreToolUse"]
+        assert user_runtime_hook in groups, "user runtime-link hook must survive merge"
+        assert SAMPLE_GROUP in groups, "managed hook must still be added"
+
+
+def test_merge_json_no_duplicate_when_destination_lacks_marker() -> None:
+    with in_tempdir() as tmp:
+        src = Path(tmp) / "src.json"
+        dst = Path(tmp) / "dst.json"
+        write_json(src, SAMPLE_SOURCE_JSON)
+        legacy_group = {
+            "matcher": "Bash",
+            "hooks": [SAMPLE_HOOK],
+        }
+        write_json(dst, {"hooks": {"PreToolUse": [legacy_group]}})
+
+        MHC.merge_json_file(src, dst, dry_run=False)
+        result = read_json(dst)
+        groups = result["hooks"]["PreToolUse"]
+        assert len(groups) == 1, f"legacy managed group should not duplicate: {groups}"
 
 
 def test_merge_json_pops_empty_event() -> None:
@@ -398,6 +442,8 @@ TESTS = [
     test_merge_json_idempotent,
     test_merge_json_preserves_user_hook,
     test_merge_json_replaces_stale_managed_hook,
+    test_merge_json_keeps_unmarked_user_hook_with_runtime_link,
+    test_merge_json_no_duplicate_when_destination_lacks_marker,
     test_merge_json_pops_empty_event,
     test_merge_json_atomic_write_no_temp_leftover,
     test_merge_json_dry_run_no_write,
