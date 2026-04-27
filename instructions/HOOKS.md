@@ -12,7 +12,9 @@ When `AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1`, use this sequence:
    When Codex emits `[[SPEC_DONE]]`, the `Stop` hook sends that draft to Claude for review. Claude either approves it for implementation or sends one more spec-refinement prompt back to Codex.
 3. **Implementation loop**  
    After Claude approves the spec, Codex implements step-by-step. At each `Stop`, Claude may provide the next implementation prompt.
-4. **Periodic review loop**  
+4. **Verification loop**  
+   `[[IMPLEMENTATION_DONE]]` is not a final stop signal. It means implementation is ready to move into verification. Codex must run validation, inspect the diff, and self-review before the task can finish.
+5. **Periodic review loop**  
    Gemini periodically critiques simplification opportunities and possible spec drift, and that note is fed into Claude's implementation guidance.
 
 Codex remains the execution hub and final action owner.
@@ -22,10 +24,18 @@ Codex remains the execution hub and final action owner.
 Use explicit keywords in assistant responses when a phase is complete:
 
 - `[[SPEC_DONE]]` for specification readiness
-- `[[IMPLEMENTATION_DONE]]` for implementation completion
-- `[[TASK_DONE]]` for final end-to-end completion
+- `[[IMPLEMENTATION_DONE]]` for implementation handoff into verification
+- `[[VERIFICATION_DONE]]` for completed verification and self-review
+- `[[TASK_DONE]]` for final end-to-end completion after verification
 
-The orchestrator hook treats `[[IMPLEMENTATION_DONE]]` or `[[TASK_DONE]]` as stop conditions.
+The orchestrator hook should treat these keywords as **phase transitions, not just raw stop conditions**:
+
+- `[[IMPLEMENTATION_DONE]]` moves the task into verification
+- `[[VERIFICATION_DONE]]` marks verification readiness
+- only `[[VERIFICATION_DONE]]` together with `[[TASK_DONE]]` should allow final completion
+
+Keyword detection should be strict. Treat them as valid only when they appear as standalone lines or list items, not when they are merely mentioned inside prose, examples, or documentation.
+
 If `[[SPEC_DONE]]` is absent, the orchestrator should surface that the spec is still in refinement instead of failing silently.
 
 ## Safety Limits

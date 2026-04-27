@@ -22,6 +22,7 @@
 - **入力前**: `peer-prompt-refinement` Skill が必要時のみ別 LLM でプロンプトを洗練
 - **仕様フェーズ**: `multillm_orchestrator.py` が Codex に仕様起草をさせ、`[[SPEC_DONE]]` を境に Claude がレビュー
 - **実装フェーズ**: Codex が実装し、`Stop` ごとに Claude が次ステップを提案
+- **検証フェーズ**: `[[IMPLEMENTATION_DONE]]` 後は直ちに停止せず、検証・差分確認・セルフレビューへ遷移
 - **定期批判**: Gemini が simplification / spec drift を観点に定期レビュー
 - **別モード**: `response_strategy_bridge.py` は orchestration とは別に、回答後の 1 ターン継続を補助する
 
@@ -31,7 +32,7 @@
 
 - 仕様の品質判定基準がまだテキスト中心で、テスト・差分・PR 状態との結合が弱い
 - Claude / Gemini の出力を「提案」ではなく「検証済み制御信号」にする設計が薄い
-- タスク完了判定が `[[..._DONE]]` キーワード中心で、成果物検証との二重化が不足
+- タスク完了判定が `[[..._DONE]]` キーワード中心で、特に `[[IMPLEMENTATION_DONE]]` が終了扱いに寄りすぎると早期停止を招く
 - 実装後のテスト、PR 作成、レビュー反映、マージ条件までを一気通貫で結ぶ制御面が未整備
 
 ## 3. 現状コードベース分析
@@ -51,7 +52,7 @@
 設計上の良い点:
 
 - **単一実行ハブ**: 実行責任者が Codex に固定される
-- **明示的な phase 管理**: `spec_authoring -> implementation -> done`
+- **明示的な phase 管理**: `spec_authoring -> implementation -> verification -> done`
 - **ガードあり**: 再入防止、継続回数上限、同一プロンプト繰り返し検知
 - **fail-open 基本**: peer CLI 不調で本体を壊しにくい
 
@@ -59,7 +60,7 @@
 
 - state path はセッション ID の置換ベースで、理論上衝突余地がある
 - `AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS` は現状 `maximum=60`
-- 仕様・実装の完了判定はまだキーワード依存が強い
+- 仕様・実装・検証の完了判定はまだキーワード依存が強い
 - pre-implementation lock は advisory であり、Hook が phase ベースで編集やコマンド実行を強制停止するわけではない
 - 起動条件は heuristic であり、グローバル ON でも複雑タスク寄りの prompt に絞って起動するのが実用的
 
@@ -178,7 +179,7 @@
 
 #### A. 完了判定がテキスト寄り
 
-`[[SPEC_DONE]]`, `[[IMPLEMENTATION_DONE]]`, `[[TASK_DONE]]` は分かりやすいが、  
+`[[SPEC_DONE]]`, `[[IMPLEMENTATION_DONE]]`, `[[VERIFICATION_DONE]]`, `[[TASK_DONE]]` は分かりやすいが、  
 **実際にテストが通っているか、PR が整っているか、差分が妥当か** とは独立である。
 
 #### B. reviewer 出力の契約がまだ弱い
@@ -287,6 +288,7 @@ Gemini はこの phase に常時入れない。
 - Codex が step-by-step で実装
 - `Stop` ごとに Claude が次ステップ要否を判定
 - 3 ターンごとなどで Gemini が critic として参加
+- `[[IMPLEMENTATION_DONE]]` は **終了キーワードではなく、verification への遷移キーワード** として扱う
 
 Gemini の役割:
 
@@ -294,17 +296,20 @@ Gemini の役割:
 - 仕様から逸脱していないか
 - 実装の重さが disproportionate になっていないか
 
-#### Phase 4. Verification Loop（Target Architecture）
+#### Phase 4. Verification Loop
 
-ここが今後の最重要追加対象。
+ここは最終終了前の必須フェーズとする。
 
-実装完了前に、最低でも次を自動化対象にする。
+`[[IMPLEMENTATION_DONE]]` が出たら、Codex はここへ遷移して少なくとも次を行う。
 
 1. テスト実行または既存検証コマンドの確認
 2. 失敗時の再修正
 3. 差分サマリー生成
 4. self-review
 5. peer review
+
+ここでは **`[[VERIFICATION_DONE]]`** を、検証とセルフレビューが完了した明示シグナルとして使う。  
+**最終停止は `[[VERIFICATION_DONE]]` と `[[TASK_DONE]]` の両方が揃った時だけ** 許可する。
 
 #### Phase 5. PR / Review / Merge Readiness（Target Architecture）
 
@@ -350,7 +355,7 @@ reviewer からの返却は将来的に次へ寄せる。
 
 ### 原則 4. 完了判定はキーワードと実検証の二重化
 
-`[[..._DONE]]` は維持してよいが、それだけでは足りない。  
+`[[..._DONE]]` は維持してよいが、それだけでは足りない。特に `[[IMPLEMENTATION_DONE]]` は「ここで止まってよい」ではなく「ここから verification に入れ」である。  
 次を合わせて見るべき:
 
 - test exit code
@@ -377,6 +382,7 @@ reviewer からの返却は将来的に次へ寄せる。
 - `next_step_prompt_for_codex`
 - `spec_revision_count`
 - `implementation_turn`
+- `verification_turn`
 - `continuation_count`
 - `same_prompt_count`
 
@@ -455,7 +461,7 @@ reviewer からの返却は将来的に次へ寄せる。
 6. 仕様変更が original prompt の境界を越える
 
 ただし、これらは **目標とする HITL 条件** であり、現行実装が直接 `needs_human` を受け取って停止するところまではまだ入っていない。  
-現状の stop 条件は、主に **continuation cap / same-prompt cap / completion keyword / reviewer の continue 不採用** である。
+現状の stop 条件は、主に **continuation cap / same-prompt cap / final completion keyword pair / reviewer の continue 不採用** である。
 
 ### 7.6 Verification Loop の主体
 
