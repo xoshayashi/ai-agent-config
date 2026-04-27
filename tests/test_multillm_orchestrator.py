@@ -222,6 +222,70 @@ def test_build_continue_decision_stops_on_repeated_prompt() -> None:
     with_env({"AI_AGENT_ORCHESTRATOR_MAX_SAME_PROMPT": "2"}, _run)
 
 
+def test_build_continue_decision_reports_claude_guidance_visibility() -> None:
+    state = {
+        "implementation_turn": 1,
+        "continuation_count": 0,
+        "same_prompt_count": 0,
+        "last_continuation_prompt": "",
+        "spec_markdown": "spec",
+        "gemini_review_every": 99,
+    }
+    decision_payload = {
+        "action": "continue",
+        "next_prompt_for_codex": "verify tests",
+        "reason": "One more concrete verification pass is worthwhile.",
+    }
+
+    original_transcript = patch_attr(MLO, "transcript_excerpt", lambda _: "excerpt")
+    original_claude = patch_attr(MLO, "call_claude", lambda *args: json_text(decision_payload))
+    original_gemini = patch_attr(MLO, "call_gemini", lambda _: "")
+    try:
+        decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response", set())
+    finally:
+        MLO.transcript_excerpt = original_transcript
+        MLO.call_claude = original_claude
+        MLO.call_gemini = original_gemini
+
+    assert decision["continue"] is True
+    assert "Claude implementation guidance received." in decision["note"]
+
+
+def test_build_continue_decision_reports_gemini_and_claude_visibility() -> None:
+    state = {
+        "implementation_turn": 3,
+        "continuation_count": 0,
+        "same_prompt_count": 0,
+        "last_continuation_prompt": "",
+        "spec_markdown": "spec",
+        "gemini_review_every": 3,
+    }
+    gemini_payload = {
+        "simpler_option": "narrower fix",
+        "spec_change_needed": False,
+        "rationale": "keep it lean",
+        "actionable_note_for_claude": "Ask Codex to trim the scope.",
+    }
+    claude_payload = {
+        "action": "allow_stop",
+        "next_prompt_for_codex": "",
+        "reason": "",
+    }
+
+    original_transcript = patch_attr(MLO, "transcript_excerpt", lambda _: "excerpt")
+    original_claude = patch_attr(MLO, "call_claude", lambda *args: json_text(claude_payload))
+    original_gemini = patch_attr(MLO, "call_gemini", lambda _: json_text(gemini_payload))
+    try:
+        decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response", set())
+    finally:
+        MLO.transcript_excerpt = original_transcript
+        MLO.call_claude = original_claude
+        MLO.call_gemini = original_gemini
+
+    assert decision["continue"] is False
+    assert "Claude implementation guidance received; Gemini critique also applied." in decision["note"]
+
+
 def test_handle_user_prompt_submit_bootstraps_spec_phase() -> None:
     with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
         state_path = Path(tmp) / "state.json"
@@ -365,6 +429,8 @@ def run_tests() -> int:
         test_claude_effort_level_allows_env_override,
         test_build_continue_decision_stops_at_continuation_cap,
         test_build_continue_decision_stops_on_repeated_prompt,
+        test_build_continue_decision_reports_claude_guidance_visibility,
+        test_build_continue_decision_reports_gemini_and_claude_visibility,
         test_handle_user_prompt_submit_bootstraps_spec_phase,
         test_handle_user_prompt_submit_skips_light_prompts,
         test_handle_stop_promotes_done_spec_to_implementation,

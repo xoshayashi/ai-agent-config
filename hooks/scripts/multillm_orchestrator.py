@@ -565,6 +565,7 @@ def build_continue_decision(state: dict[str, Any], data: dict[str, Any], respons
     )
 
     gemini_note = ""
+    gemini_review_used = False
     if turn > 0 and turn % review_every == 0:
         gemini_review_packet = f"""You are a reviewer tracking implementation quality.
 Return strict JSON:
@@ -584,6 +585,7 @@ Latest Codex response:
         gemini_review_raw = call_gemini(gemini_review_packet)
         gemini_review_json = parse_json_from_text(gemini_review_raw)
         if gemini_review_json:
+            gemini_review_used = True
             gemini_note = str(gemini_review_json.get("actionable_note_for_claude", "")).strip()
 
     transcript = transcript_excerpt(data.get("transcript_path"))
@@ -623,13 +625,17 @@ Recent redacted transcript excerpt:
     action = str(decision_json.get("action", "")).strip().lower()
     next_prompt = str(decision_json.get("next_prompt_for_codex", "")).strip()
     reason = str(decision_json.get("reason", "")).strip()
+    peer_prefix = "Claude implementation guidance received"
+    if gemini_review_used:
+        peer_prefix += "; Gemini critique also applied"
 
     should_continue = action == "continue" and bool(next_prompt)
     if not should_continue:
         state["continuation_count"] = 0
         state["same_prompt_count"] = 0
         state["last_continuation_prompt"] = ""
-        return {"continue": False, "prompt": "", "note": reason}
+        note = reason or "No immediate continuation suggested."
+        return {"continue": False, "prompt": "", "note": f"{peer_prefix}. {note}"}
 
     max_continuations = safe_int(
         os.environ.get("AI_AGENT_ORCHESTRATOR_MAX_CONTINUATIONS_PER_TASK", "5"),
@@ -675,7 +681,8 @@ Recent redacted transcript excerpt:
             "note": "Repeated continuation prompt detected. Stopping auto-loop for safety.",
         }
 
-    return {"continue": True, "prompt": next_prompt, "note": reason}
+    note = reason or "Continuing with the next implementation step."
+    return {"continue": True, "prompt": next_prompt, "note": f"{peer_prefix}. {note}"}
 
 
 def codex_user_prompt_output(context: str) -> dict[str, Any]:
