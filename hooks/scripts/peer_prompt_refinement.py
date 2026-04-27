@@ -20,6 +20,18 @@ SIMPLE_PROMPT_PATTERN = re.compile(
 )
 
 
+def safe_int(value: Any, default: int, minimum: int | None = None, maximum: int | None = None) -> int:
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        parsed = default
+    if minimum is not None and parsed < minimum:
+        parsed = minimum
+    if maximum is not None and parsed > maximum:
+        parsed = maximum
+    return parsed
+
+
 def load_input() -> dict[str, Any]:
     raw = sys.stdin.read()
     if not raw.strip():
@@ -33,6 +45,10 @@ def load_input() -> dict[str, Any]:
 
 def enabled() -> bool:
     return os.environ.get("AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT") == "1"
+
+
+def strict_mode() -> bool:
+    return os.environ.get("AI_AGENT_PROMPT_REFINEMENT_REQUIRED", "1") == "1"
 
 
 def prompt_from_hook(data: dict[str, Any]) -> str:
@@ -77,8 +93,18 @@ def transcript_excerpt(path_value: Any) -> str:
     if not path.is_file():
         return "Transcript path not readable."
 
-    max_lines = int(os.environ.get("AI_AGENT_PROMPT_REFINEMENT_TRANSCRIPT_LINES", "40"))
-    max_chars = int(os.environ.get("AI_AGENT_PROMPT_REFINEMENT_TRANSCRIPT_CHARS", "12000"))
+    max_lines = safe_int(
+        os.environ.get("AI_AGENT_PROMPT_REFINEMENT_TRANSCRIPT_LINES", "24"),
+        24,
+        minimum=1,
+        maximum=400,
+    )
+    max_chars = safe_int(
+        os.environ.get("AI_AGENT_PROMPT_REFINEMENT_TRANSCRIPT_CHARS", "8000"),
+        8000,
+        minimum=400,
+        maximum=64000,
+    )
     # Read 4x max_chars from the tail so we have headroom for partial leading
     # lines and a safety margin for multi-byte UTF-8 boundaries; we still
     # truncate to max_chars / max_lines below.
@@ -106,6 +132,31 @@ def should_skip(prompt: str) -> bool:
     if SIMPLE_PROMPT_PATTERN.search(prompt):
         return True
     return False
+
+
+def trim_block(text: str, limit: int) -> str:
+    if limit <= 0 or len(text) <= limit:
+        return text
+    return text[-limit:]
+
+
+def failure_message(current: str, provider: str, reason: str) -> str:
+    return (
+        "Peer prompt refinement could not complete and the turn was blocked. "
+        f"Current agent: {current}. Peer: {provider_label(provider)}. "
+        f"Cause: {reason}. Resolve the peer CLI/auth/config issue or set "
+        "AI_AGENT_PROMPT_REFINEMENT_REQUIRED=0 to allow fail-open behavior."
+    )
+
+
+def emit_block(current: str, reason: str) -> int:
+    provider = choose_provider(current)
+    message = failure_message(current, provider, reason)
+    if current == "codex":
+        print(json.dumps({"decision": "block", "reason": message}, ensure_ascii=False))
+        return 0
+    print(message, file=sys.stderr)
+    return 2
 
 
 def choose_provider(current: str) -> str:
@@ -137,7 +188,14 @@ def build_packet(current: str, data: dict[str, Any], prompt: str) -> str:
     event_name = data.get("hook_event_name", "")
     model = data.get("model", "")
     route = provider_label(choose_provider(current))
+    prompt_limit = safe_int(
+        os.environ.get("AI_AGENT_PROMPT_REFINEMENT_PROMPT_CHARS", "6000"),
+        6000,
+        minimum=400,
+        maximum=32000,
+    )
     excerpt = transcript_excerpt(data.get("transcript_path"))
+    clipped_prompt = trim_block(prompt, prompt_limit)
     return f"""You are improving a task prompt for another LLM agent. Do not perform the task.
 Return a concise improved prompt that preserves all constraints and helps the main agent execute.
 
@@ -152,7 +210,7 @@ Required output:
 
 Context Packet:
 - Original prompt:
-{prompt}
+{clipped_prompt}
 - Current agent: {current}
 - Peer route: {current} -> {route}
 - Hook event: {event_name}
@@ -174,7 +232,7 @@ Rules:
 """
 
 
-def peer_invocation(current: str, cwd: str, packet: str) -> tuple[list[str], str] | None:
+def peer_invocation(current: str, cwd: str, packet: str) -> tuple[str, list[str], str] | None:
     """Return (command, stdin_payload) for the peer call, or None when unsupported.
 
     Each peer is invoked through exactly one channel: Claude and Gemini receive
@@ -198,7 +256,7 @@ def peer_invocation(current: str, cwd: str, packet: str) -> tuple[list[str], str
             "--max-turns",
             "1",
         ]
-        return command, ""
+        return provider, command, ""
 
     if provider == "gemini":
         if shutil.which("gemini") is None:
@@ -214,7 +272,7 @@ def peer_invocation(current: str, cwd: str, packet: str) -> tuple[list[str], str
             packet,
         ]
         # Close stdin (empty payload) so Gemini does not block waiting on it.
-        return command, ""
+        return provider, command, ""
 
     if provider == "codex":
         if shutil.which("codex") is None:
@@ -229,19 +287,29 @@ def peer_invocation(current: str, cwd: str, packet: str) -> tuple[list[str], str
             "read-only",
             "-",
         ]
-        return command, packet
+        return provider, command, packet
 
     return None
 
 
-def call_peer(current: str, packet: str, cwd: str) -> str:
+def call_peer(current: str, packet: str, cwd: str) -> tuple[str, str]:
     spec = peer_invocation(current, cwd, packet)
     if spec is None:
-        return ""
-    command, stdin_payload = spec
+        return "", "peer CLI is not installed or not on PATH"
+    provider, command, stdin_payload = spec
 
-    timeout = int(os.environ.get("AI_AGENT_PROMPT_REFINEMENT_TIMEOUT_SECONDS", "30"))
-    max_chars = int(os.environ.get("AI_AGENT_PROMPT_REFINEMENT_OUTPUT_CHARS", "8000"))
+    timeout = safe_int(
+        os.environ.get("AI_AGENT_PROMPT_REFINEMENT_TIMEOUT_SECONDS", "150"),
+        150,
+        minimum=5,
+        maximum=600,
+    )
+    max_chars = safe_int(
+        os.environ.get("AI_AGENT_PROMPT_REFINEMENT_OUTPUT_CHARS", "8000"),
+        8000,
+        minimum=500,
+        maximum=64000,
+    )
     env = os.environ.copy()
     env["AI_AGENT_PROMPT_REFINEMENT_ACTIVE"] = "1"
 
@@ -256,16 +324,19 @@ def call_peer(current: str, packet: str, cwd: str) -> str:
             env=env,
             check=False,
         )
-    except (OSError, subprocess.TimeoutExpired):
-        return ""
+    except subprocess.TimeoutExpired:
+        return "", f"{provider_label(provider)} timed out after {timeout} seconds"
+    except OSError as exc:
+        return "", f"{provider_label(provider)} could not be started: {exc}"
 
     if completed.returncode != 0:
-        return ""
+        detail = completed.stderr.strip() or completed.stdout.strip() or f"exit code {completed.returncode}"
+        return "", f"{provider_label(provider)} failed: {detail[:400]}"
 
     output = completed.stdout.strip()
     if not output:
-        return ""
-    return output[:max_chars]
+        return "", f"{provider_label(provider)} returned empty output"
+    return output[:max_chars], ""
 
 
 def hook_output(current: str, event_name: str, context: str) -> dict[str, Any]:
@@ -297,8 +368,10 @@ def main() -> int:
         return 0
 
     packet = build_packet(args.current, data, prompt)
-    peer_output = call_peer(args.current, packet, str(data.get("cwd", "")))
+    peer_output, failure = call_peer(args.current, packet, str(data.get("cwd", "")))
     if not peer_output:
+        if strict_mode():
+            return emit_block(args.current, failure or "unknown peer refinement failure")
         print("{}")
         return 0
 

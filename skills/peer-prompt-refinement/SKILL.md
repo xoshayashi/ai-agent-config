@@ -19,7 +19,7 @@ Use this skill as a first-pass prompt improver for user task prompts. It turns t
 - **Avoid prompt-trick stacking.** Prefer the smallest high-leverage improvement to the prompt. Do not add verbose chain-of-thought, many-shot examples, emotional pressure, roleplay, or multiple advanced techniques unless the task clearly benefits.
 - **Keep research searches effective.** For research tasks, the improved prompt may suggest query angles, but it should favor several concise Web Search queries over one long over-constrained query.
 - **Avoid shell injection.** Do not pass raw user prompts as shell-interpolated arguments. Use stdin, quoted here-docs, or a safe temporary file.
-- **Fail open to the original prompt.** If the peer CLI is unavailable, unauthenticated, times out, blocks on approval, or returns unusable output, continue with the original prompt and mention the fallback briefly.
+- **Default to fail-closed when the hook is enabled.** If the peer CLI is unavailable, unauthenticated, times out, blocks on approval, or returns unusable output, stop the turn and surface the failure reason by default. Only allow fail-open when `AI_AGENT_PROMPT_REFINEMENT_REQUIRED=0` is explicitly set.
 
 ## Workflow
 

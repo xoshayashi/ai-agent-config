@@ -53,7 +53,7 @@
           {
             "type": "command",
             "command": "sh -lc 'if [ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-1}\" = \"1\" ]; then exec python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/multillm_orchestrator.py\" --current codex; fi; if [ \"${AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT:-0}\" = \"1\" ]; then exec python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/peer_prompt_refinement.py\" --current codex; fi; exit 0'",
-            "timeout": 60,
+            "timeout": 180,
             "statusMessage": "Preparing Codex prompt flow"
           }
         ]

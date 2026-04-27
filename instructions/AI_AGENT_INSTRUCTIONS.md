@@ -73,6 +73,7 @@
 - When updating persistent instructions or preferences, prioritize **repeated user directions and durable preferences** over one-off task details or generic failure patterns.
 - Keep persistent instructions and skills lean. Do not codify behavior that capable agents already handle well by default unless a durable user preference, repeated quality gap, fragile workflow, domain-specific standard, or reusable artifact justifies the added context.
 - When creating or materially updating skills, agents, prompts, or reusable workflows, explicitly decide whether the design is non-trivial. If it is, use a `skill-design-research` workflow when available, capture a brief evidence packet, and update activation metadata or trigger conditions so the workflow is discoverable from realistic user requests.
+- When following a skill that references local files such as `references/...`, `scripts/...`, `templates/...`, or `assets/...`, resolve those paths relative to that skill's own directory first. If a referenced file is not found at the correctly resolved skill-relative path, treat that as a blocking issue for the current workflow step: stop, report the missing reference precisely, and do not proceed as though the reference had been read.
 
 ## Shared Config Updates
 
@@ -156,6 +157,7 @@
 
 - Summarize what changed, what was verified, the result of the completion quality check, and any remaining risk or assumption.
 - If delegation, peer review, or parallel LLM investigation were used, briefly note the division of scopes, what feedback or findings were adopted, and what was rejected with reason.
+- Do not surface transient internal recovery steps as progress updates when they resolve automatically. Examples include alternate local reference-path resolution, peer-refinement timeout fallback, or switching to a narrower verification path. Report those only when they block progress, materially change confidence/latency/quality, or the user explicitly asked for debugging detail.
 - End with a question only when an unresolved initial specification issue or a higher-priority rule blocks further progress.
 
 ## Local Protection Note

@@ -63,6 +63,24 @@ unless explicitly enabled:
 export AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT=1
 ```
 
+When enabled, peer prompt refinement is **fail-closed by default**. If the
+peer CLI times out, is unauthenticated, is missing, or returns unusable output,
+the hook blocks the turn instead of silently continuing. To opt back into the
+older fail-open behavior, set:
+
+```sh
+export AI_AGENT_PROMPT_REFINEMENT_REQUIRED=0
+```
+
+The shared defaults now wait longer on purpose:
+
+- peer CLI internal timeout: `AI_AGENT_PROMPT_REFINEMENT_TIMEOUT_SECONDS=150`
+- outer hook timeout: Codex / Claude `180` seconds, Gemini `180000` milliseconds
+
+If you want even longer waits, increase the env var and keep each CLI hook
+timeout slightly above it so the wrapper script has time to classify the failure
+instead of being cut off by the host CLI first.
+
 Prompt-refinement default routing is:
 
 - Codex -> Claude Code

@@ -39,7 +39,7 @@
             "name": "llm-config-peer-prompt-refinement",
             "type": "command",
             "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT:-0}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/peer_prompt_refinement.py\" --current gemini'",
-            "timeout": 15000,
+            "timeout": 180000,
             "description": "Optionally refine prompts via peer LLM before the agent loop."
           }
         ]
