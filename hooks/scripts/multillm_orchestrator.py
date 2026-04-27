@@ -735,10 +735,29 @@ def build_verification_decision(
     verification_done_keyword: str,
     task_done_keyword: str,
 ) -> dict[str, Any]:
+    verification_turn = safe_int(state.get("verification_turn", 0), 0, minimum=0)
+    max_verification_turns = safe_int(
+        os.environ.get("AI_AGENT_ORCHESTRATOR_MAX_VERIFICATION_TURNS", "3"),
+        3,
+        minimum=1,
+        maximum=20,
+    )
+    if verification_turn > max_verification_turns:
+        state["verification_turn"] = 0
+        state["continuation_count"] = 0
+        state["same_prompt_count"] = 0
+        state["last_continuation_prompt"] = ""
+        return {
+            "continue": False,
+            "prompt": "",
+            "note": f"Verification turn cap reached ({max_verification_turns}). Waiting for user direction.",
+        }
+
     verification_done = contains_explicit_keyword(response, verification_done_keyword)
     task_done = contains_explicit_keyword(response, task_done_keyword)
     if verification_done and task_done:
         state["phase"] = "done"
+        state["verification_turn"] = 0
         return {"continue": False, "prompt": "", "note": "Verification and task completion keywords detected."}
 
     spec_markdown = str(state.get("spec_markdown", ""))
@@ -899,6 +918,7 @@ def handle_user_prompt_submit(data: dict[str, Any], state: dict[str, Any], path:
             "implementation_brief": "",
             "next_step_prompt_for_codex": "",
             "implementation_turn": 0,
+            "verification_turn": 0,
             "spec_revision_count": 0,
             "continuation_count": 0,
             "same_prompt_count": 0,
@@ -953,6 +973,7 @@ def handle_stop(data: dict[str, Any], state: dict[str, Any], path: Path) -> dict
                 "implementation_brief": spec_packet.get("implementation_brief", ""),
                 "next_step_prompt_for_codex": spec_packet.get("next_step_prompt_for_codex", ""),
                 "implementation_turn": 0,
+                "verification_turn": 0,
                 "continuation_count": 0,
                 "same_prompt_count": 0,
                 "last_continuation_prompt": "",
@@ -995,6 +1016,7 @@ def handle_stop(data: dict[str, Any], state: dict[str, Any], path: Path) -> dict
         return {"systemMessage": f"Orchestrator: Claude review complete; {note}."}
 
     if phase == "verification":
+        state["verification_turn"] = safe_int(state.get("verification_turn", 0), 0, minimum=0) + 1
         decision = build_verification_decision(
             state,
             data,
@@ -1012,11 +1034,13 @@ def handle_stop(data: dict[str, Any], state: dict[str, Any], path: Path) -> dict
     if contains_explicit_keyword(response, task_done_keyword):
         if contains_explicit_keyword(response, verification_done_keyword):
             state["phase"] = "done"
+            state["verification_turn"] = 0
             save_state(path, state)
             return codex_stop_output(
                 {"continue": False, "prompt": "", "note": "Verification and task completion keywords detected."}
             )
         state["phase"] = "verification"
+        state["verification_turn"] = 0
         save_state(path, state)
         return codex_stop_output(
             {
@@ -1032,6 +1056,7 @@ def handle_stop(data: dict[str, Any], state: dict[str, Any], path: Path) -> dict
         )
     if contains_explicit_keyword(response, implementation_done_keyword):
         state["phase"] = "verification"
+        state["verification_turn"] = 0
         save_state(path, state)
         return codex_stop_output(
             {
