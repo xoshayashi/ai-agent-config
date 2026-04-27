@@ -79,6 +79,7 @@ extra_skills_dirs=${AI_AGENT_EXTRA_SKILLS_DIRS:-}
 conflict_mode=${AI_AGENT_CONFLICT_MODE:-backup}
 protect_links=${AI_AGENT_PROTECT_LINKS:-auto}
 persist_config=${AI_AGENT_PERSIST_CONFIG:-1}
+require_llm_clis=${AI_AGENT_REQUIRE_LLM_CLIS:-1}
 timestamp=$(date +%Y%m%d-%H%M%S)
 backup_dir=$(expand_home "${AI_AGENT_BACKUP_DIR:-$state_dir/backups/$timestamp}")
 
@@ -99,6 +100,11 @@ case "$persist_config" in
   *) fail "AI_AGENT_PERSIST_CONFIG must be 0 or 1" ;;
 esac
 
+case "$require_llm_clis" in
+  0|1) ;;
+  *) fail "AI_AGENT_REQUIRE_LLM_CLIS must be 0 or 1" ;;
+esac
+
 case "$install_instructions" in
   0|1) ;;
   *) fail "AI_AGENT_INSTALL_INSTRUCTIONS must be 0 or 1" ;;
@@ -115,6 +121,18 @@ case "$install_hooks" in
 esac
 
 [ -n "$hooks_runtime_link" ] || fail "AI_AGENT_HOOKS_RUNTIME_LINK must not be empty"
+
+if [ "$require_llm_clis" = "1" ]; then
+  missing=
+  for cli in claude codex gemini; do
+    if ! command -v "$cli" >/dev/null 2>&1; then
+      missing="$missing $cli"
+    fi
+  done
+  if [ -n "$missing" ]; then
+    fail "missing required LLM CLI(s):$missing. Install and login all of them, or set AI_AGENT_REQUIRE_LLM_CLIS=0 to continue at your own risk."
+  fi
+fi
 
 run() {
   if [ "$dry_run" = "1" ]; then
@@ -164,7 +182,11 @@ write_state_config() {
     printf 'AI_AGENT_HOOKS_RUNTIME_LINK=%s\n' "$(quote_sh "$hooks_runtime_link")"
     printf 'AI_AGENT_CONFLICT_MODE=%s\n' "$(quote_sh "$conflict_mode")"
     printf 'AI_AGENT_PROTECT_LINKS=%s\n' "$(quote_sh "$protect_links")"
+    printf 'AI_AGENT_REQUIRE_LLM_CLIS=%s\n' "$(quote_sh "$require_llm_clis")"
+    printf 'AI_AGENT_STATE_DIR=%s\n' "$(quote_sh "$state_root")"
+    printf 'AI_AGENT_STATE_FILE=%s\n' "$(quote_sh "$state_file")"
   } > "$state_file"
+  chmod 600 "$state_file"
 }
 
 is_darwin() {
@@ -264,14 +286,17 @@ install_instruction_links() {
   install_link "$src_root/AGENTS.md" "$codex_home/AGENTS.md"
   install_link "$src_root/AI_AGENT_INSTRUCTIONS.md" "$codex_home/AI_AGENT_INSTRUCTIONS.md"
   install_link "$src_root/DESIGN.md" "$codex_home/DESIGN.md"
+  install_link "$src_root/HOOKS.md" "$codex_home/HOOKS.md"
 
   install_link "$src_root/CLAUDE.md" "$claude_home/CLAUDE.md"
   install_link "$src_root/AI_AGENT_INSTRUCTIONS.md" "$claude_home/AI_AGENT_INSTRUCTIONS.md"
   install_link "$src_root/DESIGN.md" "$claude_home/DESIGN.md"
+  install_link "$src_root/HOOKS.md" "$claude_home/HOOKS.md"
 
   install_link "$src_root/GEMINI.md" "$gemini_home/GEMINI.md"
   install_link "$src_root/AI_AGENT_INSTRUCTIONS.md" "$gemini_home/AI_AGENT_INSTRUCTIONS.md"
   install_link "$src_root/DESIGN.md" "$gemini_home/DESIGN.md"
+  install_link "$src_root/HOOKS.md" "$gemini_home/HOOKS.md"
 }
 
 install_skills_to_dir() {
@@ -346,6 +371,9 @@ say "config: $config_home"
 say "codex home: $codex_home"
 say "claude home: $claude_home"
 say "gemini home: $gemini_home"
+if [ "$install_hooks" = "1" ]; then
+  say "note: Codex multi-LLM orchestration Hook is installed but disabled by default. Enable it only when needed with AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1."
+fi
 
 if [ "$install_instructions" = "1" ]; then
   install_instruction_links

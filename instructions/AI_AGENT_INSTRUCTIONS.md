@@ -12,6 +12,7 @@
 | **Before work** | Identify the goal, scope, deliverable, constraints, and completion criteria before acting. |
 | **Deletion** | **Never run or suggest `rm`; use `trash` for file or directory removal.** |
 | **Uncertainty** | When knowledge may be outdated or an error appears, check official references, upstream sources, or Context7 before retrying. |
+| **Dependencies** | If a required library or tool is missing, you may install it. Prefer the latest stable version, and if an old version is found, verify whether it should be updated before continuing. |
 | **Research** | For research, strategy, and planning work, produce evidence-backed, decision-grade output with sources, assumptions, and uncertainty clearly separated. |
 | **Web Search** | Use concise, high-signal search queries; avoid overloading one query with too many words or constraints. |
 | **Agent delegation** | When the user explicitly asks for agents, delegation, or parallel investigation, decompose independent workstreams, delegate bounded tasks, then synthesize and own the final answer. |
@@ -21,6 +22,7 @@
 | **Config updates** | When the user asks to urgently apply the latest shared instructions or skills, run the repository updater instead of waiting for the scheduled update. |
 | **Skill improvement logs** | When the user asks to inspect recent LLM CLI usage for skill improvements, run the local skill-improvement scanner and summarize only redacted proposals. |
 | **Design discipline** | For any user-facing output that involves visual or verbal style — copy tone, color choices, typography hints, UI suggestions, document layout — follow `instructions/DESIGN.md` (Act design language). Defer to the source guideline noted there for full implementation values. |
+| **Hook orchestration** | For Hook-based multi-LLM workflows, follow `instructions/HOOKS.md` for lifecycle, completion keywords, and stop conditions. |
 
 ## Scope
 
@@ -60,6 +62,9 @@
 - Keep edits scoped to the requested behavior and avoid unrelated refactors.
 - Do not revert or overwrite changes you did not make unless the user explicitly asks.
 - Use fast, targeted search tools such as `rg` when available.
+- If a required library, package, CLI, or dependency is not installed and installing it is in scope for completing the task, you may install it without asking for extra approval unless a higher-priority rule requires confirmation.
+- When installing dependencies, prefer the **latest stable version** that is compatible with the project, unless the repository already pins a specific version or the user asked for a different constraint.
+- If you encounter an **old or outdated dependency version**, do not assume it should remain as-is. Check the current official version, release notes, and project compatibility, then update it when that is the most reasonable path for completing the task safely.
 - During specification, design, and implementation, **verify uncertain or potentially outdated technical knowledge** with current official references or available documentation tools such as Context7 before relying on it.
 - If an implementation attempt causes an error, an API or CLI behaves unexpectedly, or repeated trial-and-error starts, **stop guessing immediately** and check the latest official documentation, upstream source, or Context7-backed references before retrying.
 - Prefer **primary sources** for implementation details: official docs, upstream repositories, release notes, and version-matched API references. When using Context7 or similar tools, confirm the retrieved material matches the library, framework, CLI, or service version in use.
@@ -68,6 +73,7 @@
 - When updating persistent instructions or preferences, prioritize **repeated user directions and durable preferences** over one-off task details or generic failure patterns.
 - Keep persistent instructions and skills lean. Do not codify behavior that capable agents already handle well by default unless a durable user preference, repeated quality gap, fragile workflow, domain-specific standard, or reusable artifact justifies the added context.
 - When creating or materially updating skills, agents, prompts, or reusable workflows, explicitly decide whether the design is non-trivial. If it is, use a `skill-design-research` workflow when available, capture a brief evidence packet, and update activation metadata or trigger conditions so the workflow is discoverable from realistic user requests.
+- When following a skill that references local files such as `references/...`, `scripts/...`, `templates/...`, or `assets/...`, resolve those paths relative to that skill's own directory first. If a referenced file is not found at the correctly resolved skill-relative path, treat that as a blocking issue for the current workflow step: stop, report the missing reference precisely, and do not proceed as though the reference had been read.
 
 ## Shared Config Updates
 
@@ -151,6 +157,7 @@
 
 - Summarize what changed, what was verified, the result of the completion quality check, and any remaining risk or assumption.
 - If delegation, peer review, or parallel LLM investigation were used, briefly note the division of scopes, what feedback or findings were adopted, and what was rejected with reason.
+- Do not surface transient internal recovery steps as progress updates when they resolve automatically. Examples include alternate local reference-path resolution, peer-refinement timeout fallback, or switching to a narrower verification path. Report those only when they block progress, materially change confidence/latency/quality, or the user explicitly asked for debugging detail.
 - End with a question only when an unresolved initial specification issue or a higher-priority rule blocks further progress.
 
 ## Local Protection Note

@@ -34,6 +34,49 @@ abs_existing_dir() {
   (cd "$dir" && pwd -P)
 }
 
+load_state_file() {
+  path=$1
+  [ -f "$path" ] || return 1
+  command -v python3 >/dev/null 2>&1 || {
+    warn "python3 is required to read setup state safely: $path"
+    return 1
+  }
+  parser="$script_dir/read-state-config.py"
+  [ -f "$parser" ] || {
+    warn "state parser not found: $parser"
+    return 1
+  }
+  if ! parsed=$(python3 "$parser" "$path" 2>/dev/null); then
+    warn "state file could not be read safely: $path"
+    return 1
+  fi
+
+  tab=$(printf '\t')
+  while IFS="$tab" read -r key value; do
+    [ -n "$key" ] || continue
+    case "$key" in
+      AI_AGENT_CONFIG_HOME) AI_AGENT_CONFIG_HOME=$value ;;
+      AI_AGENT_CODEX_HOME) AI_AGENT_CODEX_HOME=$value ;;
+      AI_AGENT_CLAUDE_HOME) AI_AGENT_CLAUDE_HOME=$value ;;
+      AI_AGENT_GEMINI_HOME) AI_AGENT_GEMINI_HOME=$value ;;
+      AI_AGENT_SKILLS_DIR) AI_AGENT_SKILLS_DIR=$value ;;
+      AI_AGENT_EXTRA_SKILLS_DIRS) AI_AGENT_EXTRA_SKILLS_DIRS=$value ;;
+      AI_AGENT_INSTALL_INSTRUCTIONS) AI_AGENT_INSTALL_INSTRUCTIONS=$value ;;
+      AI_AGENT_INSTALL_SKILLS) AI_AGENT_INSTALL_SKILLS=$value ;;
+      AI_AGENT_INSTALL_HOOKS) AI_AGENT_INSTALL_HOOKS=$value ;;
+      AI_AGENT_HOOKS_RUNTIME_LINK) AI_AGENT_HOOKS_RUNTIME_LINK=$value ;;
+      AI_AGENT_CONFLICT_MODE) AI_AGENT_CONFLICT_MODE=$value ;;
+      AI_AGENT_PROTECT_LINKS) AI_AGENT_PROTECT_LINKS=$value ;;
+      AI_AGENT_REQUIRE_LLM_CLIS) AI_AGENT_REQUIRE_LLM_CLIS=$value ;;
+      AI_AGENT_STATE_DIR) AI_AGENT_STATE_DIR=$value ;;
+      AI_AGENT_STATE_FILE) AI_AGENT_STATE_FILE=$value ;;
+    esac
+  done <<EOF
+$parsed
+EOF
+  return 0
+}
+
 script_path=$0
 case "$script_path" in
   */*) script_dir=$(CDPATH= cd "$(dirname "$script_path")" && pwd -P) ;;
@@ -68,9 +111,9 @@ else
     state_file=$legacy_state_file
   fi
 fi
-if [ -f "$state_file" ]; then
-  # shellcheck source=/dev/null
-  . "$state_file"
+state_loaded=0
+if load_state_file "$state_file"; then
+  state_loaded=1
 fi
 
 [ "${env_config_set:-}" = "x" ] && AI_AGENT_CONFIG_HOME=$env_config
@@ -81,6 +124,10 @@ fi
 [ "${env_extra_skills_set:-}" = "x" ] && AI_AGENT_EXTRA_SKILLS_DIRS=$env_extra_skills
 [ "${env_hooks_set:-}" = "x" ] && AI_AGENT_INSTALL_HOOKS=$env_hooks
 [ "${env_hooks_runtime_set:-}" = "x" ] && AI_AGENT_HOOKS_RUNTIME_LINK=$env_hooks_runtime
+state_dir=${AI_AGENT_STATE_DIR:-$state_dir}
+if [ -n "${AI_AGENT_STATE_FILE:-}" ]; then
+  state_file=$(expand_home "$AI_AGENT_STATE_FILE")
+fi
 
 if [ -n "${AI_AGENT_TARGET_DIR:-}" ]; then
   warn "AI_AGENT_TARGET_DIR is deprecated and ignored. Instructions are now installed globally."
@@ -131,6 +178,9 @@ say "AI agent config update"
 say "config: $config_home"
 say "remote: $remote"
 say "branch: $branch"
+if [ "$state_loaded" = "0" ]; then
+  warn "state file not loaded; using environment/defaults: $state_file"
+fi
 
 current_branch=$(git -C "$config_home" rev-parse --abbrev-ref HEAD)
 if [ "$current_branch" != "$branch" ]; then
@@ -159,7 +209,9 @@ if [ "$rerun_setup" = "1" ]; then
     "AI_AGENT_HOOKS_RUNTIME_LINK=${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}" \
     "AI_AGENT_CONFLICT_MODE=${AI_AGENT_CONFLICT_MODE:-backup}" \
     "AI_AGENT_PROTECT_LINKS=${AI_AGENT_PROTECT_LINKS:-auto}" \
+    "AI_AGENT_REQUIRE_LLM_CLIS=${AI_AGENT_REQUIRE_LLM_CLIS:-1}" \
     "AI_AGENT_STATE_DIR=$state_dir" \
+    "AI_AGENT_STATE_FILE=$state_file" \
     "AI_AGENT_DRY_RUN=$dry_run" \
     sh "$config_home/scripts/setup.sh"
 else

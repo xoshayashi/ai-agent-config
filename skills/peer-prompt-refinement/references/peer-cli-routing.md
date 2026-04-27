@@ -6,9 +6,9 @@ Use these command patterns when `peer-prompt-refinement` needs another LLM to im
 
 | Current Agent | Peer LLM CLI | Non-Interactive Pattern |
 |---|---|---|
-| Codex | Gemini CLI | `AI_AGENT_PROMPT_REFINEMENT_ACTIVE=1 gemini --skip-trust --approval-mode plan --output-format text -p "Improve the task prompt using the Context Packet from stdin. Do not perform the task. Do not use tools; return text only."` |
-| Claude Code | Gemini CLI | `AI_AGENT_PROMPT_REFINEMENT_ACTIVE=1 gemini --skip-trust --approval-mode plan --output-format text -p "Improve the task prompt using the Context Packet from stdin. Do not perform the task. Do not use tools; return text only."` |
-| Gemini CLI | Codex CLI | `AI_AGENT_PROMPT_REFINEMENT_ACTIVE=1 codex exec --cd "$PWD" --skip-git-repo-check --sandbox read-only -` |
+| Codex | Claude Code | `AI_AGENT_PROMPT_REFINEMENT_ACTIVE=1 claude -p "<Context Packet>" --output-format text --permission-mode plan --max-turns 1` |
+| Claude Code | Codex CLI | `AI_AGENT_PROMPT_REFINEMENT_ACTIVE=1 codex exec --cd "$PWD" --skip-git-repo-check --sandbox read-only -` |
+| Gemini CLI | Claude Code | `AI_AGENT_PROMPT_REFINEMENT_ACTIVE=1 claude -p "<Context Packet>" --output-format text --permission-mode plan --max-turns 1` |
 
 ## Safe Transfer Pattern
 
@@ -25,6 +25,16 @@ peer_refinement_timeout() {
 ```
 
 This wrapper assumes `perl` is available. If it is not, use `timeout`, `gtimeout`, or the coordinating agent's own tool/session timeout with the same deadline.
+
+For Claude Code:
+
+```sh
+peer_refinement_timeout env AI_AGENT_PROMPT_REFINEMENT_ACTIVE=1 claude \
+  -p "<peer prompt with Context Packet>" \
+  --output-format text \
+  --permission-mode plan \
+  --max-turns 1
+```
 
 For Gemini CLI:
 
@@ -52,7 +62,7 @@ peer_refinement_timeout env AI_AGENT_PROMPT_REFINEMENT_ACTIVE=1 codex exec \
 _PEER_REFINEMENT_CONTEXT_
 ```
 
-`--approval-mode plan` is intentional for Gemini because this peer step should be read-only and text-only. Do not use `yolo` or auto-edit modes for prompt refinement. If Gemini still attempts a tool action, waits for approval, or prints a plan instead of the required sections, treat the output as unusable and fall back. `--skip-trust` is also intentionally included because local `gemini --help` identifies it as the session-level workspace trust bypass.
+`--permission-mode plan` (Claude) and `--approval-mode plan` (Gemini) are intentional because this peer step should be read-only and text-only. Do not use auto-edit or bypass modes for prompt refinement. If the peer CLI still waits for approval or returns non-conforming output, treat it as unusable and fall back.
 
 ## Context Packet Rules
 
@@ -76,6 +86,6 @@ _PEER_REFINEMENT_CONTEXT_
 
 ## Notes
 
-- Gemini CLI help on this machine identifies `-p` / `--prompt` as non-interactive headless mode, supports `--skip-trust`, `--output-format text|json|stream-json`, accepts stdin as extra prompt context, and supports `--approval-mode plan` as read-only mode.
-- Codex CLI help on this machine identifies `codex exec` as non-interactive execution and supports stdin with `-`, `--cd` / `-C`, `--skip-git-repo-check`, and `--sandbox read-only`. `--skip-git-repo-check` keeps the Gemini-to-Codex peer route usable when the caller's current directory is not inside a Git repository. Current `codex exec --help` does not list `--ask-for-approval`; use read-only sandboxing, the text-only peer prompt, and the timeout fallback instead.
-- Claude Code help on this machine identifies `-p` / `--print` as non-interactive output; this skill's required route still sends Claude Code prompts to Gemini.
+- Claude Code docs identify `-p` / `--print` as non-interactive mode, and support `--output-format`, `--permission-mode`, and `--max-turns` for controlled headless runs.
+- Codex CLI help on this machine identifies `codex exec` as non-interactive execution and supports stdin with `-`, `--cd` / `-C`, `--skip-git-repo-check`, and `--sandbox read-only`.
+- Gemini CLI help on this machine identifies `-p` / `--prompt` as non-interactive mode and supports `--approval-mode plan` and `--output-format`.

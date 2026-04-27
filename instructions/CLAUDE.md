@@ -1,17 +1,21 @@
 # Claude Code Project Instructions
 
-**Shared source of truth:** `AI_AGENT_INSTRUCTIONS.md`
+**Shared source of truth:** `/Users/sh/Documents/ai-agent-config/instructions/AI_AGENT_INSTRUCTIONS.md`
 
 The shared project instructions are imported below. **Follow them before starting work.**
 
-@./AI_AGENT_INSTRUCTIONS.md
+@/Users/sh/Documents/ai-agent-config/instructions/AI_AGENT_INSTRUCTIONS.md
 
 **Design discipline:** Apply the Act design language to any user-facing output (tone, copy, color, typography, layout, UI suggestions). The basic action manners are imported below; defer to the source guideline noted there for full implementation values.
 
-@./DESIGN.md
+@/Users/sh/Documents/ai-agent-config/instructions/DESIGN.md
+
+**Hook orchestration rules:** Follow shared lifecycle and completion-keyword rules in:
+
+@/Users/sh/Documents/ai-agent-config/instructions/HOOKS.md
 
 ## Note
 
 This file is editable, but local deletion, moving, and renaming are protected by the macOS ACL `everyone deny delete`.
 
-See `AI_AGENT_INSTRUCTIONS.md` for details.
+See `/Users/sh/Documents/ai-agent-config/instructions/AI_AGENT_INSTRUCTIONS.md` for details.
