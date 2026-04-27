@@ -449,10 +449,10 @@ def spec_is_review_candidate(spec_markdown: str) -> bool:
         if re.search(pattern, text, flags=re.IGNORECASE):
             keyword_hits += 1
     # These thresholds are tuned for "likely implementation-ready" drafts:
-    # require real markdown section structure, while allowing numbered lists only
-    # as a secondary signal rather than counting them as headings outright.
+    # require real markdown section structure, while keeping numbered lists as
+    # auxiliary content rather than counting them as headings outright.
     return (len(text) >= 900 and markdown_heading_count >= 4 and keyword_hits >= 3) or (
-        len(text) >= 1400 and markdown_heading_count >= 3 and keyword_hits >= 2 and numbered_item_count >= 2
+        len(text) >= 1400 and markdown_heading_count >= 3 and keyword_hits >= 2
     )
 
 
