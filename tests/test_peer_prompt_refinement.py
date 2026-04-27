@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import importlib.util
+import json
 import os
 import sys
 import traceback
@@ -76,7 +77,7 @@ def test_peer_invocation_claude_channel() -> None:
     def _run() -> None:
         original = patch_which(lambda name: "/usr/bin/claude" if name == "claude" else None)
         try:
-            command, stdin_payload = PPR.peer_invocation("codex", "/tmp", "packet") or ([], "")
+            _, command, stdin_payload = PPR.peer_invocation("codex", "/tmp", "packet") or ("", [], "")
         finally:
             PPR.shutil.which = original
         assert command and command[0] == "claude"
@@ -89,13 +90,38 @@ def test_peer_invocation_codex_channel() -> None:
     def _run() -> None:
         original = patch_which(lambda name: "/usr/bin/codex" if name == "codex" else None)
         try:
-            command, stdin_payload = PPR.peer_invocation("claude", "/tmp", "packet") or ([], "")
+            _, command, stdin_payload = PPR.peer_invocation("claude", "/tmp", "packet") or ("", [], "")
         finally:
             PPR.shutil.which = original
         assert command and command[0] == "codex"
         assert_eq(stdin_payload, "packet", "codex invocation should use stdin channel")
 
     with_env({"AI_AGENT_PROMPT_REFINEMENT_PROVIDER": "codex"}, _run)
+
+
+def test_strict_mode_defaults_on() -> None:
+    def _run() -> None:
+        os.environ.pop("AI_AGENT_PROMPT_REFINEMENT_REQUIRED", None)
+        assert_eq(PPR.strict_mode(), True, "strict mode should default on")
+
+    _run()
+
+
+def test_emit_block_for_codex_returns_json() -> None:
+    import io
+
+    original_stdout = sys.stdout
+    capture = io.StringIO()
+    sys.stdout = capture
+    try:
+        code = PPR.emit_block("codex", "timeout")
+    finally:
+        sys.stdout = original_stdout
+
+    assert_eq(code, 0, "codex block should return zero with block payload")
+    payload = json.loads(capture.getvalue())
+    assert_eq(payload.get("decision"), "block", "codex block decision")
+    assert "timeout" in str(payload.get("reason", ""))
 
 
 def run_tests() -> int:
@@ -105,6 +131,8 @@ def run_tests() -> int:
         test_explicit_provider_override,
         test_peer_invocation_claude_channel,
         test_peer_invocation_codex_channel,
+        test_strict_mode_defaults_on,
+        test_emit_block_for_codex_returns_json,
     ]
 
     failures = 0

@@ -105,6 +105,8 @@ sh /path/to/llm-config/scripts/uninstall.sh
 - 安全性重視 Hook（`safe_delete_guard.py`）は既定ON
 - Codex中心マルチLLM Hook（`multillm_orchestrator.py`）は **登録済みで既定ON**（`AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=0` で無効化）
 - 入力前プロンプト改善 Hook（`peer_prompt_refinement.py`）は **登録済みだが既定OFF**（`AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT=1` で有効）
+- `peer_prompt_refinement.py` を有効化した場合、peer CLI の失敗時は **既定で停止**（`AI_AGENT_PROMPT_REFINEMENT_REQUIRED=0` で fail-open に変更可能）
+- peer prompt refinement の共有既定待機時間は **150秒**。必要なら `AI_AGENT_PROMPT_REFINEMENT_TIMEOUT_SECONDS` で延長可能
 - 回答後の自律継続 Hook（`response_strategy_bridge.py`）は **登録済みだが既定OFF**（`AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY=1` で有効）
 
 これにより、ローカル負荷と多層 Hook 重複による挙動競合を抑えます。
@@ -113,6 +115,7 @@ sh /path/to/llm-config/scripts/uninstall.sh
 
 - compatibility マトリクス運用は廃止済みです
 - 詳細手順は [setup.md](setup.md)
+- `CLAUDE.md` / `GEMINI.md` の `@` import は、CLIの解決仕様に合わせて絶対パスで管理しています。別のPCや別パスに clone した場合は、その clone 先から `scripts/setup.sh` を再実行して各CLI設定を作り直してください
 - エラー時は [docs/setup-error-guide.md](docs/setup-error-guide.md)
 - Skill 改善自動化は [docs/skill-improvement-automation.md](docs/skill-improvement-automation.md)
 - Hooks 設計検証は [docs/hooks-architecture-review.md](docs/hooks-architecture-review.md)

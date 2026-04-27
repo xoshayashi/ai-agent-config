@@ -151,6 +151,8 @@ export AI_AGENT_ORCHESTRATOR_GEMINI_REVIEW_EVERY=3
 
 ```sh
 export AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT=1
+export AI_AGENT_PROMPT_REFINEMENT_REQUIRED=1
+export AI_AGENT_PROMPT_REFINEMENT_TIMEOUT_SECONDS=150
 ```
 
 provider を固定する場合:
@@ -189,6 +191,8 @@ export AI_AGENT_PROMPT_REFINEMENT_PROVIDER=claude   # claude / gemini / codex
 | `AI_AGENT_ORCHESTRATOR_GEMINI_REVIEW_EVERY` | `3` | 実装何ターンごとにGeminiレビューを挟むか |
 | `AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT` | `0` | `1` で入力前の peer prompt refinement Hook を有効化 |
 | `AI_AGENT_PROMPT_REFINEMENT_PROVIDER` | `auto` | `auto` / `claude` / `gemini` / `codex` |
+| `AI_AGENT_PROMPT_REFINEMENT_REQUIRED` | `1` | `1` で peer prompt refinement が失敗したら停止、`0` で fail-open |
+| `AI_AGENT_PROMPT_REFINEMENT_TIMEOUT_SECONDS` | `150` | peer prompt refinement の内部待機秒数 |
 | `AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY` | `0` | `1` で回答後の peer レビュー継続 Hook を有効化 |
 | `AI_AGENT_RESPONSE_STRATEGY_PROVIDER` | `auto` | `auto` / `gemini` / `codex` / `ollama` |
 | `AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL` | Empty | `provider=ollama` 時に使うモデル名 |
@@ -201,6 +205,12 @@ export AI_AGENT_PROMPT_REFINEMENT_PROVIDER=claude   # claude / gemini / codex
 | `AI_AGENT_DRY_RUN` | `0` | `1` で予行演習 |
 
 ## 更新
+
+## 絶対パス import について
+
+- `instructions/CLAUDE.md` と `instructions/GEMINI.md` の `@...` import は、各CLIの実際の読み込み挙動に合わせて **絶対パス** で管理しています。
+- このリポジトリを別のPCや別パスに clone した場合は、`scripts/setup.sh` をその clone 先から実行して、各CLIのグローバル設定に張られるエントリーポイントをその環境向けに作り直してください。
+- 手で `instructions/*.md` を別の場所へコピーした場合は、`@/absolute/path/...` の参照先もその環境に合わせて更新が必要です。
 
 ### 手動更新
 
