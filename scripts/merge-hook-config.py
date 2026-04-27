@@ -13,6 +13,13 @@ from typing import Any
 
 MANAGED_BEGIN = "# BEGIN llm-config managed hooks"
 MANAGED_END = "# END llm-config managed hooks"
+MANAGED_FLAG = "_llm_config_managed"
+LEGACY_MANAGED_SCRIPT_HINTS = {
+    "safe_delete_guard.py",
+    "peer_prompt_refinement.py",
+    "response_strategy_bridge.py",
+    "multillm_orchestrator.py",
+}
 
 
 def atomic_write(destination: Path, payload: str) -> None:
@@ -45,33 +52,47 @@ def canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
+def strip_managed_flag(value: Any) -> Any:
+    if isinstance(value, dict):
+        return {key: strip_managed_flag(item) for key, item in value.items() if key != MANAGED_FLAG}
+    if isinstance(value, list):
+        return [strip_managed_flag(item) for item in value]
+    return value
+
+
+def _has_legacy_managed_command(group: dict[str, Any]) -> bool:
+    hooks = group.get("hooks")
+    if not isinstance(hooks, list) or not hooks:
+        return False
+    for hook in hooks:
+        if not isinstance(hook, dict):
+            continue
+        command = hook.get("command")
+        if not isinstance(command, str):
+            continue
+        if "AI_AGENT_HOOKS_RUNTIME_LINK" not in command:
+            continue
+        if any(hint in command for hint in LEGACY_MANAGED_SCRIPT_HINTS):
+            return True
+    return False
+
+
 def contains_managed_hook(value: Any) -> bool:
-    """Heuristic: does this hook group originate from llm-config?
+    """Return whether a hook group is managed by llm-config.
 
-    Known limitation: this is a string-match heuristic, not a structural
-    flag. A user-authored hook whose command happens to contain one of the
-    sentinel substrings (most commonly ``llm-config/hooks`` or
-    ``AI_AGENT_HOOKS_RUNTIME_LINK`` because it wraps or extends a managed
-    hook) will be classified as managed. If such a user-authored group does
-    not match any source group exactly, the next ``setup.sh`` merge will
-    treat it as stale and remove it.
-
-    A long-term fix would be to add an explicit ``_llm-config-managed: true``
-    marker on every managed hook group and check that first. That is a
-    multi-file schema change touching every hook config, so it is left as a
-    follow-up. Until then, do NOT name personal hook commands with these
-    sentinels if you want them to survive automated merges.
+    Preferred path: explicit marker ``_llm_config_managed: true``.
+    Backward compatibility: legacy groups are recognized only when their hook
+    command explicitly uses ``AI_AGENT_HOOKS_RUNTIME_LINK`` and known managed
+    script names. This avoids broad substring matches that can misclassify
+    user-authored hooks.
     """
-    if isinstance(value, str):
-        return (
-            "AI_AGENT_HOOKS_RUNTIME_LINK" in value
-            or "llm-config/hooks" in value
-            or "peer_prompt_refinement.py" in value
-            or "safe_delete_guard.py" in value
-        )
     if isinstance(value, list):
         return any(contains_managed_hook(item) for item in value)
     if isinstance(value, dict):
+        if value.get(MANAGED_FLAG) is True:
+            return True
+        if _has_legacy_managed_command(value):
+            return True
         return any(contains_managed_hook(item) for item in value.values())
     return False
 
@@ -107,10 +128,12 @@ def merge_hooks_json(source: Path, destination: Path) -> tuple[dict[str, Any], b
             raise ValueError(f"destination hook event must be a list: {event_name}")
 
         source_keys = {canonical(group) for group in source_groups}
+        source_keys_without_marker = {canonical(strip_managed_flag(group)) for group in source_groups}
         cleaned_groups = []
         for group in destination_groups:
             key = canonical(group)
-            if contains_managed_hook(group) and key not in source_keys:
+            key_without_marker = canonical(strip_managed_flag(group))
+            if contains_managed_hook(group) and key not in source_keys and key_without_marker not in source_keys_without_marker:
                 changed = True
                 continue
             cleaned_groups.append(group)
@@ -119,12 +142,15 @@ def merge_hooks_json(source: Path, destination: Path) -> tuple[dict[str, Any], b
             destination_groups = cleaned_groups
 
         existing = {canonical(group) for group in destination_groups}
+        existing_without_marker = {canonical(strip_managed_flag(group)) for group in destination_groups}
         for group in source_groups:
             key = canonical(group)
-            if key in existing:
+            key_without_marker = canonical(strip_managed_flag(group))
+            if key in existing or key_without_marker in existing_without_marker:
                 continue
             destination_groups.append(group)
             existing.add(key)
+            existing_without_marker.add(key_without_marker)
             changed = True
 
         if not destination_groups and not source_groups:
@@ -155,10 +181,13 @@ def remove_hooks_json(source: Path, destination: Path) -> tuple[dict[str, Any], 
         if not isinstance(destination_groups, list):
             continue
         source_keys = {canonical(group) for group in source_groups}
+        source_keys_without_marker = {canonical(strip_managed_flag(group)) for group in source_groups}
         kept = [
             group
             for group in destination_groups
-            if canonical(group) not in source_keys and not contains_managed_hook(group)
+            if canonical(group) not in source_keys
+            and canonical(strip_managed_flag(group)) not in source_keys_without_marker
+            and not contains_managed_hook(group)
         ]
         if len(kept) != len(destination_groups):
             changed = True

@@ -5,7 +5,7 @@
 旧構成（project + user の二重配布）は、重複実行と設定競合を起こしやすいため、次の単純構成に変更しました。
 
 - **配布先はグローバルのみ**（`~/.claude`, `~/.codex`, `~/.gemini`）
-- **デフォルト Hook は安全ガードのみ**（`safe_delete_guard.py`）
+- **デフォルト有効 Hook は安全ガードのみ**（`safe_delete_guard.py`）
 - Hook ロジック本体はリポジトリ管理し、`$AI_AGENT_HOOKS_RUNTIME_LINK` から参照
 
 ## 旧構成の主なリスク
@@ -29,3 +29,15 @@
 
 - プロジェクト固有 Hook を別途運用する場合、手動で役割分担（global は安全系、project は業務固有）を明確化する必要がある
 - 完全な一元統制が必要な組織では、OS 管理ポリシーや managed settings との併用設計が必要
+
+## 追補（2026-04 Response Strategy）
+
+入力時の peer prompt refinement と、回答完了タイミングの自律継続検証として、以下を追加しました。
+
+- `peer_prompt_refinement.py`（`UserPromptSubmit` / `BeforeAgent`）
+- `multillm_orchestrator.py`（Codex `SessionStart` / `UserPromptSubmit` / `Stop`）
+- Claude/Codex: `Stop` イベントで発火
+- Gemini: `AfterAgent` イベントで発火
+- 既定は `AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1`（有効）、`AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT=0` / `AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY=0`（無効）
+
+設計詳細は [docs/response-strategy-autonomy.md](./response-strategy-autonomy.md) を参照してください。

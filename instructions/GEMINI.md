@@ -10,6 +10,10 @@ The shared project instructions are imported below. **Follow them before startin
 
 @./DESIGN.md
 
+**Hook orchestration rules:** Follow shared lifecycle and completion-keyword rules in:
+
+@./HOOKS.md
+
 ## Note
 
 This file is editable, but local deletion, moving, and renaming are protected by the macOS ACL `everyone deny delete`.

@@ -66,6 +66,9 @@ sh /path/to/llm-config/scripts/setup.sh
 | `~/.codex/DESIGN.md` | `instructions/DESIGN.md` |
 | `~/.claude/DESIGN.md` | `instructions/DESIGN.md` |
 | `~/.gemini/DESIGN.md` | `instructions/DESIGN.md` |
+| `~/.codex/HOOKS.md` | `instructions/HOOKS.md` |
+| `~/.claude/HOOKS.md` | `instructions/HOOKS.md` |
+| `~/.gemini/HOOKS.md` | `instructions/HOOKS.md` |
 
 > Note: `.github/copilot-instructions.md` の自動配置は行いません。  
 > Copilot 向け設定は、利用する各リポジトリで個別に管理してください。
@@ -96,6 +99,72 @@ CLI 側設定先:
 | Codex | `~/.codex/config.toml` と `~/.codex/hooks.json` |
 | Gemini CLI | `~/.gemini/settings.json` |
 
+### 回答後自律継続 Hook（任意）
+
+`response_strategy_bridge.py` は設定に登録済みですが、既定では無効です。  
+有効化する場合のみ、シェル設定に次を追加します。
+
+```sh
+export AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY=1
+```
+
+追加で provider を固定する場合:
+
+```sh
+export AI_AGENT_RESPONSE_STRATEGY_PROVIDER=gemini   # gemini / codex / ollama
+```
+
+`ollama` を使う場合はモデル指定が必須です。
+
+```sh
+export AI_AGENT_RESPONSE_STRATEGY_PROVIDER=ollama
+export AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL=qwen2.5:latest
+```
+
+### Codex中心マルチLLMオーケストレーション Hook（任意）
+
+`multillm_orchestrator.py` は Codex Hook 設定に登録済みで、既定では有効です。  
+有効化すると、Codexをハブとして次を実行します。
+
+1. `UserPromptSubmit`: Claude -> Gemini -> Claude で仕様整理
+2. `Stop`: ClaudeからCodexへの次ステップ提案
+3. 定期的に Gemini が簡素化・仕様修正観点を再レビュー
+
+無効化したい場合:
+
+```sh
+export AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=0
+```
+
+Geminiレビュー頻度（実装ターン数ベース）:
+
+```sh
+export AI_AGENT_ORCHESTRATOR_GEMINI_REVIEW_EVERY=3
+```
+
+完了キーワードと終了条件は `instructions/HOOKS.md` を参照します。
+
+### 入力前プロンプト改善 Hook（任意）
+
+`peer_prompt_refinement.py` は設定に登録済みですが、既定では無効です。  
+有効化する場合のみ、シェル設定に次を追加します。
+
+```sh
+export AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT=1
+```
+
+provider を固定する場合:
+
+```sh
+export AI_AGENT_PROMPT_REFINEMENT_PROVIDER=claude   # claude / gemini / codex
+```
+
+`auto` の既定ルートは次です。
+
+- Codex -> Claude Code
+- Claude Code -> Codex
+- Gemini CLI -> Claude Code
+
 ## 既存個人設定の扱い
 
 - 既存設定ファイルがある場合、`scripts/setup.sh` は **append/merge** を実行します
@@ -116,11 +185,19 @@ CLI 側設定先:
 | `AI_AGENT_INSTALL_SKILLS` | `1` | `0` で Skills のリンク作成をスキップ |
 | `AI_AGENT_INSTALL_HOOKS` | `1` | `0` で Hook 設定導入をスキップ |
 | `AI_AGENT_HOOKS_RUNTIME_LINK` | `~/.llm-config/hooks` | Hook スクリプト参照用の安定リンク |
+| `AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION` | `1` | `0` でCodex中心マルチLLMオーケストレーションHookを無効化 |
+| `AI_AGENT_ORCHESTRATOR_GEMINI_REVIEW_EVERY` | `3` | 実装何ターンごとにGeminiレビューを挟むか |
+| `AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT` | `0` | `1` で入力前の peer prompt refinement Hook を有効化 |
+| `AI_AGENT_PROMPT_REFINEMENT_PROVIDER` | `auto` | `auto` / `claude` / `gemini` / `codex` |
+| `AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY` | `0` | `1` で回答後の peer レビュー継続 Hook を有効化 |
+| `AI_AGENT_RESPONSE_STRATEGY_PROVIDER` | `auto` | `auto` / `gemini` / `codex` / `ollama` |
+| `AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL` | Empty | `provider=ollama` 時に使うモデル名 |
 | `AI_AGENT_CONFLICT_MODE` | `backup` | `backup` / `skip` / `fail` |
 | `AI_AGENT_BACKUP_DIR` | `$AI_AGENT_STATE_DIR/backups/<timestamp>` | 競合時の退避先 |
 | `AI_AGENT_PROTECT_LINKS` | `auto` | macOS で `everyone deny delete` を付与 |
 | `AI_AGENT_STATE_DIR` | `~/.llm-config` | `config.env` などの状態ファイル保存先 |
 | `AI_AGENT_PERSIST_CONFIG` | `1` | `0` で状態ファイルを書かない |
+| `AI_AGENT_REQUIRE_LLM_CLIS` | `1` | `1` で `claude` / `codex` / `gemini` の存在を事前チェック（不足時は失敗） |
 | `AI_AGENT_DRY_RUN` | `0` | `1` で予行演習 |
 
 ## 更新
@@ -155,6 +232,12 @@ JSON 出力:
 
 ```sh
 sh /path/to/llm-config/scripts/health-check.sh --json
+```
+
+既定ではパス/remote情報はマスク表示です。フル表示が必要な時のみ:
+
+```sh
+AI_AGENT_HEALTH_REDACT=0 sh /path/to/llm-config/scripts/health-check.sh --json
 ```
 
 ## Skill 改善自動化

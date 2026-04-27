@@ -2,6 +2,7 @@
   "hooks": {
     "BeforeTool": [
       {
+        "_llm_config_managed": true,
         "matcher": "run_shell_command",
         "hooks": [
           {
@@ -10,6 +11,36 @@
             "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/safe_delete_guard.py\" --current gemini",
             "timeout": 10000,
             "description": "Block permanent shell deletion commands and suggest the safer trash workflow."
+          }
+        ]
+      }
+    ],
+    "AfterAgent": [
+      {
+        "_llm_config_managed": true,
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "llm-config-response-strategy-bridge",
+            "type": "command",
+            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY:-0}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/response_strategy_bridge.py\" --current gemini'",
+            "timeout": 25000,
+            "description": "Optionally request one more turn using an external reviewer strategy."
+          }
+        ]
+      }
+    ],
+    "BeforeAgent": [
+      {
+        "_llm_config_managed": true,
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "llm-config-peer-prompt-refinement",
+            "type": "command",
+            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT:-0}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/peer_prompt_refinement.py\" --current gemini'",
+            "timeout": 15000,
+            "description": "Optionally refine prompts via peer LLM before the agent loop."
           }
         ]
       }
