@@ -115,6 +115,8 @@ def test_should_activate_orchestration_prefers_complex_or_explicit_prompts() -> 
     assert MLO.should_activate_orchestration("Hook の仕様と実装計画を確認して修正して")
     assert not MLO.should_activate_orchestration("ありがとう")
     assert not MLO.should_activate_orchestration("status")
+    assert not MLO.should_activate_orchestration("improve the docstring")
+    assert not MLO.should_activate_orchestration("fix the error in https://example.com/api")
 
 
 def test_spec_status_from_keyword() -> None:

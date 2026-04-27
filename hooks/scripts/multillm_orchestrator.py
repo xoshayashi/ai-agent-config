@@ -43,7 +43,7 @@ TRIVIAL_PROMPT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 ORCHESTRATION_EXPLICIT_TRIGGER_PATTERN = re.compile(
-    r"(orchestrat|spec|design doc|architecture|review|verification|pull request|pr|"
+    r"(orchestrat|spec|design doc|architecture|review|verification|pull request|\bpr\b|"
     r"仕様|設計|設計書|アーキテクチャ|実装計画|検証|レビュー|調査|分析|ブランチ|フック|"
     r"hook|skill|agent|automation|自動化|リファクタ|テスト|不具合|バグ)",
     re.IGNORECASE,
@@ -387,12 +387,16 @@ def should_activate_orchestration(prompt: str) -> bool:
     if not stripped:
         return False
     if TRIVIAL_PROMPT_PATTERN.search(stripped):
+        # Keep lightweight acknowledgements as plain user turns even when a task
+        # is already in progress; the session state remains available at Stop.
         return False
     if ORCHESTRATION_EXPLICIT_TRIGGER_PATTERN.search(stripped):
         return True
 
     line_count = len([line for line in stripped.splitlines() if line.strip()])
-    has_path_like = "/" in stripped or ".py" in stripped or ".md" in stripped or ".json" in stripped
+    stripped_without_urls = re.sub(r"https?://\S+", " ", stripped)
+    has_local_path_like = re.search(r"\b[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\b", stripped_without_urls)
+    has_path_like = bool(has_local_path_like or re.search(r"\.(?:py|md|json)\b", stripped))
     has_action = ORCHESTRATION_ACTION_PATTERN.search(stripped) is not None
     long_enough = len(stripped) >= 140 or line_count >= 3
     return bool(has_action and (long_enough or has_path_like))
@@ -413,6 +417,8 @@ def spec_is_review_candidate(spec_markdown: str) -> bool:
     ):
         if re.search(pattern, text, flags=re.IGNORECASE):
             keyword_hits += 1
+    # These thresholds are tuned for "likely implementation-ready" drafts:
+    # roughly multi-section specs with enough substance to justify fallback review.
     return (len(text) >= 900 and heading_count >= 4 and keyword_hits >= 3) or (
         len(text) >= 1400 and heading_count >= 3 and keyword_hits >= 2
     )
@@ -776,13 +782,14 @@ def handle_stop(data: dict[str, Any], state: dict[str, Any], path: Path) -> dict
     phase = str(state.get("phase", ""))
     spec_done_keyword, impl_done_keywords = completion_keywords()
     if phase == "spec_authoring":
-        state["spec_revision_count"] = safe_int(state.get("spec_revision_count", 0), 0, minimum=0) + 1
+        spec_revision_count = safe_int(state.get("spec_revision_count", 0), 0, minimum=0) + 1
+        state["spec_revision_count"] = spec_revision_count
         state["spec_markdown"] = response
         save_state(path, state)
         spec_ready = spec_done_keyword in response
         spec_review_fallback = (
             not spec_ready
-            and safe_int(state.get("spec_revision_count", 0), 0, minimum=0) >= 2
+            and spec_revision_count >= 2
             and spec_is_review_candidate(response)
         )
         if not spec_ready and not spec_review_fallback:
