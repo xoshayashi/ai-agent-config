@@ -1,7 +1,21 @@
 {
   "hooks": {
+    "SessionStart": [
+      {
+        "_llm_config_managed": true,
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-1}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/multillm_orchestrator.py\" --current codex'",
+            "timeout": 25,
+            "statusMessage": "Loading orchestration state"
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
+        "_llm_config_managed": true,
         "matcher": "^Bash$",
         "hooks": [
           {
@@ -9,6 +23,44 @@
             "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/safe_delete_guard.py\" --current codex",
             "timeout": 10,
             "statusMessage": "Checking shell command safety"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "_llm_config_managed": true,
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-1}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/multillm_orchestrator.py\" --current codex'",
+            "timeout": 60,
+            "statusMessage": "Running multi-LLM orchestration"
+          },
+          {
+            "type": "command",
+            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-1}\" = \"1\" ] && exit 0; [ \"${AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY:-0}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/response_strategy_bridge.py\" --current codex'",
+            "timeout": 25,
+            "statusMessage": "Evaluating response strategy"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "_llm_config_managed": true,
+        "hooks": [
+          {
+            "type": "command",
+            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-1}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/multillm_orchestrator.py\" --current codex'",
+            "timeout": 60,
+            "statusMessage": "Building orchestration specification"
+          },
+          {
+            "type": "command",
+            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-1}\" = \"1\" ] && exit 0; [ \"${AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT:-0}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/peer_prompt_refinement.py\" --current codex'",
+            "timeout": 15,
+            "statusMessage": "Running peer prompt refinement"
           }
         ]
       }

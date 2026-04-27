@@ -21,6 +21,7 @@
 | **Config updates** | When the user asks to urgently apply the latest shared instructions or skills, run the repository updater instead of waiting for the scheduled update. |
 | **Skill improvement logs** | When the user asks to inspect recent LLM CLI usage for skill improvements, run the local skill-improvement scanner and summarize only redacted proposals. |
 | **Design discipline** | For any user-facing output that involves visual or verbal style — copy tone, color choices, typography hints, UI suggestions, document layout — follow `instructions/DESIGN.md` (Act design language). Defer to the source guideline noted there for full implementation values. |
+| **Hook orchestration** | For Hook-based multi-LLM workflows, follow `instructions/HOOKS.md` for lifecycle, completion keywords, and stop conditions. |
 
 ## Scope
 

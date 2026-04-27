@@ -7,6 +7,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -107,11 +108,35 @@ def should_skip(prompt: str) -> bool:
     return False
 
 
+def choose_provider(current: str) -> str:
+    requested = os.environ.get("AI_AGENT_PROMPT_REFINEMENT_PROVIDER", "auto").strip().lower()
+    if requested in {"claude", "gemini", "codex"}:
+        return requested
+
+    # Auto route:
+    # - Codex -> Claude
+    # - Claude -> Codex
+    # - Gemini -> Claude
+    if current == "codex":
+        return "claude"
+    if current == "claude":
+        return "codex"
+    return "claude"
+
+
+def provider_label(provider: str) -> str:
+    if provider == "claude":
+        return "Claude Code CLI"
+    if provider == "gemini":
+        return "Gemini CLI"
+    return "Codex CLI"
+
+
 def build_packet(current: str, data: dict[str, Any], prompt: str) -> str:
     cwd = data.get("cwd", "")
     event_name = data.get("hook_event_name", "")
     model = data.get("model", "")
-    route = "Gemini CLI" if current in {"codex", "claude"} else "Codex CLI"
+    route = provider_label(choose_provider(current))
     excerpt = transcript_excerpt(data.get("transcript_path"))
     return f"""You are improving a task prompt for another LLM agent. Do not perform the task.
 Return a concise improved prompt that preserves all constraints and helps the main agent execute.
@@ -152,12 +177,32 @@ Rules:
 def peer_invocation(current: str, cwd: str, packet: str) -> tuple[list[str], str] | None:
     """Return (command, stdin_payload) for the peer call, or None when unsupported.
 
-    Each peer is invoked through exactly one channel: Gemini receives the full
-    packet via `-p` (its documented headless prompt source), while Codex reads
-    the packet from stdin via the `-` marker. Mixing `-p` and stdin makes the
-    delivery channel CLI-version-dependent, so we deliberately use only one.
+    Each peer is invoked through exactly one channel: Claude and Gemini receive
+    the full packet via `-p`, while Codex reads the packet from stdin via the
+    `-` marker. Mixing `-p` and stdin makes the delivery channel
+    CLI-version-dependent, so we deliberately use only one.
     """
-    if current in {"codex", "claude"}:
+    provider = choose_provider(current)
+
+    if provider == "claude":
+        if shutil.which("claude") is None:
+            return None
+        command = [
+            "claude",
+            "-p",
+            packet,
+            "--output-format",
+            "text",
+            "--permission-mode",
+            "plan",
+            "--max-turns",
+            "1",
+        ]
+        return command, ""
+
+    if provider == "gemini":
+        if shutil.which("gemini") is None:
+            return None
         command = [
             "gemini",
             "--skip-trust",
@@ -170,7 +215,10 @@ def peer_invocation(current: str, cwd: str, packet: str) -> tuple[list[str], str
         ]
         # Close stdin (empty payload) so Gemini does not block waiting on it.
         return command, ""
-    if current == "gemini":
+
+    if provider == "codex":
+        if shutil.which("codex") is None:
+            return None
         command = [
             "codex",
             "exec",
@@ -182,6 +230,7 @@ def peer_invocation(current: str, cwd: str, packet: str) -> tuple[list[str], str
             "-",
         ]
         return command, packet
+
     return None
 
 
@@ -264,4 +313,3 @@ def main() -> int:
 
 if __name__ == "__main__":
     raise SystemExit(main())
-
