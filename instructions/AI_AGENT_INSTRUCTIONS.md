@@ -12,6 +12,7 @@
 | **Before work** | Identify the goal, scope, deliverable, constraints, and completion criteria before acting. |
 | **Deletion** | **Never run or suggest `rm`; use `trash` for file or directory removal.** |
 | **Uncertainty** | When knowledge may be outdated or an error appears, check official references, upstream sources, or Context7 before retrying. |
+| **Dependencies** | If a required library or tool is missing, you may install it. Prefer the latest stable version, and if an old version is found, verify whether it should be updated before continuing. |
 | **Research** | For research, strategy, and planning work, produce evidence-backed, decision-grade output with sources, assumptions, and uncertainty clearly separated. |
 | **Web Search** | Use concise, high-signal search queries; avoid overloading one query with too many words or constraints. |
 | **Agent delegation** | When the user explicitly asks for agents, delegation, or parallel investigation, decompose independent workstreams, delegate bounded tasks, then synthesize and own the final answer. |
@@ -61,6 +62,9 @@
 - Keep edits scoped to the requested behavior and avoid unrelated refactors.
 - Do not revert or overwrite changes you did not make unless the user explicitly asks.
 - Use fast, targeted search tools such as `rg` when available.
+- If a required library, package, CLI, or dependency is not installed and installing it is in scope for completing the task, you may install it without asking for extra approval unless a higher-priority rule requires confirmation.
+- When installing dependencies, prefer the **latest stable version** that is compatible with the project, unless the repository already pins a specific version or the user asked for a different constraint.
+- If you encounter an **old or outdated dependency version**, do not assume it should remain as-is. Check the current official version, release notes, and project compatibility, then update it when that is the most reasonable path for completing the task safely.
 - During specification, design, and implementation, **verify uncertain or potentially outdated technical knowledge** with current official references or available documentation tools such as Context7 before relying on it.
 - If an implementation attempt causes an error, an API or CLI behaves unexpectedly, or repeated trial-and-error starts, **stop guessing immediately** and check the latest official documentation, upstream source, or Context7-backed references before retrying.
 - Prefer **primary sources** for implementation details: official docs, upstream repositories, release notes, and version-matched API references. When using Context7 or similar tools, confirm the retrieved material matches the library, framework, CLI, or service version in use.

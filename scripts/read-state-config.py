@@ -23,6 +23,7 @@ ALLOWED_KEYS = {
     "AI_AGENT_HOOKS_RUNTIME_LINK",
     "AI_AGENT_CONFLICT_MODE",
     "AI_AGENT_PROTECT_LINKS",
+    "AI_AGENT_REQUIRE_LLM_CLIS",
     "AI_AGENT_STATE_DIR",
     "AI_AGENT_STATE_FILE",
 }
@@ -73,9 +74,13 @@ def parse_value(raw: str) -> str:
         return parse_single_quoted(value)
 
     if value.startswith('"') and value.endswith('"') and len(value) >= 2:
-        # Keep this intentionally simple and safe: only support plain quoted
-        # values with escaped \" and \\.
+        # setup.sh always writes single-quoted values via quote_sh, so this
+        # branch only exists for forward-compatible reading of simple files.
+        # Keep it intentionally strict: support plain double-quoted strings
+        # with only \" and \\ escapes, and reject any other raw quote usage.
         inner = value[1:-1]
+        if re.search(r'(?<!\\)"', inner):
+            raise ValueError("unescaped double quote in double-quoted value")
         inner = inner.replace(r"\\", "\\").replace(r"\"", '"')
         return inner
 

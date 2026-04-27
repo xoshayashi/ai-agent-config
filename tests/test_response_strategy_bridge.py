@@ -112,6 +112,30 @@ def test_should_skip_reentry_guard() -> None:
     with_env({"AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY": "1"}, _run)
 
 
+def test_safe_int_falls_back_on_invalid_env_values() -> None:
+    def _run() -> None:
+        should_skip = RSB.should_skip(
+            current="codex",
+            data={"hook_event_name": "Stop", "stop_hook_active": False},
+            prompt="この件を直して",
+            response="x" * 200,
+        )
+        assert should_skip is False
+
+        excerpt = RSB.transcript_excerpt("")
+        assert excerpt == "No transcript path supplied."
+
+    with_env(
+        {
+            "AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY": "1",
+            "AI_AGENT_RESPONSE_STRATEGY_MIN_RESPONSE_CHARS": "not-a-number",
+            "AI_AGENT_RESPONSE_STRATEGY_TRANSCRIPT_LINES": "bad",
+            "AI_AGENT_RESPONSE_STRATEGY_TRANSCRIPT_CHARS": "bad",
+        },
+        _run,
+    )
+
+
 def run_tests() -> int:
     tests = [
         test_parse_peer_json_direct,
@@ -120,6 +144,7 @@ def run_tests() -> int:
         test_review_to_decision_human_gate,
         test_build_hook_output,
         test_should_skip_reentry_guard,
+        test_safe_int_falls_back_on_invalid_env_values,
     ]
 
     failures = 0
