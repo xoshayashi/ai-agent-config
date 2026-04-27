@@ -105,7 +105,16 @@ def test_codex_stop_output_continue() -> None:
 def test_should_keep_current_task_followup_prompt() -> None:
     assert MLO.should_keep_current_task("続けて"), "follow-up prompt should keep current task"
     assert MLO.should_keep_current_task("続けて。テストも追加して、最後に差分確認して"), "detailed follow-up should keep current task"
+    assert MLO.should_keep_current_task("この仕様で実装して"), "implementation handoff should keep current task"
+    assert MLO.should_keep_current_task("fix it"), "common English follow-up should keep current task"
     assert not MLO.should_keep_current_task("新しい機能を追加したい"), "new detailed prompt should start a new task"
+
+
+def test_should_activate_orchestration_prefers_complex_or_explicit_prompts() -> None:
+    assert MLO.should_activate_orchestration("このコードベースを分析して詳細な設計書を書いて")
+    assert MLO.should_activate_orchestration("Hook の仕様と実装計画を確認して修正して")
+    assert not MLO.should_activate_orchestration("ありがとう")
+    assert not MLO.should_activate_orchestration("status")
 
 
 def test_spec_status_from_keyword() -> None:
@@ -216,7 +225,7 @@ def test_handle_user_prompt_submit_bootstraps_spec_phase() -> None:
         state_path = Path(tmp) / "state.json"
         original_keywords = patch_attr(MLO, "completion_keywords", lambda: ("[[SPEC_DONE]]", {"[[TASK_DONE]]"}))
         try:
-            payload = MLO.handle_user_prompt_submit({"prompt": "task"}, {}, state_path)
+            payload = MLO.handle_user_prompt_submit({"prompt": "このコードベースを分析して設計書を書いて"}, {}, state_path)
         finally:
             MLO.completion_keywords = original_keywords
         output = payload.get("hookSpecificOutput", {})
@@ -224,6 +233,15 @@ def test_handle_user_prompt_submit_bootstraps_spec_phase() -> None:
         assert "[[SPEC_DONE]]" in str(output.get("additionalContext", ""))
         saved = MLO.load_state(state_path)
         assert_eq(saved.get("phase"), "spec_authoring", "spec phase initialized")
+        assert_eq(saved.get("spec_revision_count"), 0, "spec revision count initialized")
+
+
+def test_handle_user_prompt_submit_skips_light_prompts() -> None:
+    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
+        state_path = Path(tmp) / "state.json"
+        payload = MLO.handle_user_prompt_submit({"prompt": "ありがとう"}, {}, state_path)
+        assert_eq(payload, {}, "light prompt should not trigger orchestration")
+        assert not state_path.exists()
 
 
 def test_handle_stop_promotes_done_spec_to_implementation() -> None:
@@ -278,6 +296,50 @@ def test_handle_stop_generates_default_start_prompt_when_review_omits_one() -> N
         assert "approved spec [[SPEC_DONE]]" in str(payload.get("reason", ""))
 
 
+def test_handle_stop_spec_authoring_returns_wait_message_before_keyword() -> None:
+    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
+        state_path = Path(tmp) / "state.json"
+        state = {"phase": "spec_authoring", "original_prompt": "build feature", "spec_revision_count": 0}
+        payload = MLO.handle_stop({"response": "短い仕様ドラフト"}, state, state_path)
+        assert "specification draft saved" in str(payload.get("systemMessage", ""))
+
+
+def test_handle_stop_spec_authoring_can_use_structured_fallback_review() -> None:
+    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
+        state_path = Path(tmp) / "state.json"
+        state = {"phase": "spec_authoring", "original_prompt": "build feature", "spec_revision_count": 1}
+        structured_spec = "\n".join(
+            [
+                "1. 目的",
+                "説明" * 500,
+                "2. scope / non-goals",
+                "3. acceptance criteria",
+                "4. constraints",
+                "5. risks",
+                "6. implementation plan",
+            ]
+        )
+        review_payload = {
+            "spec_markdown": structured_spec + "\n[[SPEC_DONE]]",
+            "status": "done",
+            "implementation_brief": "brief",
+            "next_step_prompt_for_codex": "start coding",
+        }
+        original_review = patch_attr(MLO, "review_spec_with_claude", lambda data, prompt, draft, keyword: review_payload)
+        original_keywords = patch_attr(
+            MLO,
+            "completion_keywords",
+            lambda: ("[[SPEC_DONE]]", {"[[IMPLEMENTATION_DONE]]", "[[TASK_DONE]]"}),
+        )
+        try:
+            payload = MLO.handle_stop({"response": structured_spec}, state, state_path)
+        finally:
+            MLO.review_spec_with_claude = original_review
+            MLO.completion_keywords = original_keywords
+        assert_eq(payload.get("decision"), "block", "fallback review should continue into implementation")
+        assert_eq(payload.get("reason"), "start coding", "fallback review next prompt")
+
+
 def json_text(payload: dict[str, object]) -> str:
     import json
 
@@ -292,6 +354,7 @@ def run_tests() -> int:
         test_should_skip_when_enabled_and_event_matches,
         test_codex_stop_output_continue,
         test_should_keep_current_task_followup_prompt,
+        test_should_activate_orchestration_prefers_complex_or_explicit_prompts,
         test_spec_status_from_keyword,
         test_build_spec_authoring_context_mentions_keyword,
         test_default_implementation_start_prompt_uses_spec,
@@ -301,8 +364,11 @@ def run_tests() -> int:
         test_build_continue_decision_stops_at_continuation_cap,
         test_build_continue_decision_stops_on_repeated_prompt,
         test_handle_user_prompt_submit_bootstraps_spec_phase,
+        test_handle_user_prompt_submit_skips_light_prompts,
         test_handle_stop_promotes_done_spec_to_implementation,
         test_handle_stop_generates_default_start_prompt_when_review_omits_one,
+        test_handle_stop_spec_authoring_returns_wait_message_before_keyword,
+        test_handle_stop_spec_authoring_can_use_structured_fallback_review,
     ]
 
     failures = 0

@@ -251,8 +251,6 @@ ollama_path=$(command_path ollama)
 response_strategy_enabled=${AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY:-0}
 response_strategy_provider=${AI_AGENT_RESPONSE_STRATEGY_PROVIDER:-auto}
 response_strategy_ollama_model=${AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL:-}
-prompt_refinement_enabled=${AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT:-0}
-prompt_refinement_provider=${AI_AGENT_PROMPT_REFINEMENT_PROVIDER:-auto}
 orchestration_enabled=${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-0}
 
 skill_improvement_schedule=unsupported
@@ -504,64 +502,6 @@ else
   skills_text_summary="total=$skills_total warn=$skills_warn"
 fi
 
-prompt_refinement_status=disabled
-prompt_refinement_effective_provider=$prompt_refinement_provider
-case "$prompt_refinement_enabled" in
-  0|1) ;;
-  *)
-    prompt_refinement_status=invalid-enable-flag
-    mark_status warn
-    ;;
-esac
-
-if [ "$prompt_refinement_enabled" = "1" ]; then
-  case "$prompt_refinement_provider" in
-    auto)
-      if [ -n "$claude_path" ]; then
-        prompt_refinement_effective_provider=claude
-        prompt_refinement_status=ready
-      elif [ -n "$codex_path" ]; then
-        prompt_refinement_effective_provider=codex
-        prompt_refinement_status=ready
-      elif [ -n "$gemini_path" ]; then
-        prompt_refinement_effective_provider=gemini
-        prompt_refinement_status=ready
-      else
-        prompt_refinement_status=missing-peer-cli
-        mark_status warn
-      fi
-      ;;
-    claude)
-      if [ -n "$claude_path" ]; then
-        prompt_refinement_status=ready
-      else
-        prompt_refinement_status=missing-claude
-        mark_status warn
-      fi
-      ;;
-    codex)
-      if [ -n "$codex_path" ]; then
-        prompt_refinement_status=ready
-      else
-        prompt_refinement_status=missing-codex
-        mark_status warn
-      fi
-      ;;
-    gemini)
-      if [ -n "$gemini_path" ]; then
-        prompt_refinement_status=ready
-      else
-        prompt_refinement_status=missing-gemini
-        mark_status warn
-      fi
-      ;;
-    *)
-      prompt_refinement_status=invalid-provider
-      mark_status warn
-      ;;
-  esac
-fi
-
 orchestration_status=disabled
 case "$orchestration_enabled" in
   0|1) ;;
@@ -699,7 +639,7 @@ if [ "$format" = "json" ]; then
   printf '    "gemini-hooks": "%s"\n' "$gemini_hook_status"
   printf '  },\n'
   printf '  "skills": {\n%b\n  },\n' "$skills_json_body"
-  printf '  "hooks": {"orchestration": {"enabled": %s, "status": "%s"}, "prompt_refinement": {"enabled": %s, "provider": "%s", "effective_provider": "%s", "status": "%s"}, "response_strategy": {"enabled": %s, "provider": "%s", "effective_provider": "%s", "status": "%s", "ollama_model": "%s"}},\n' "$(json_value "$orchestration_enabled")" "$orchestration_status" "$(json_value "$prompt_refinement_enabled")" "$(json_escape "$prompt_refinement_provider")" "$(json_escape "$prompt_refinement_effective_provider")" "$prompt_refinement_status" "$(json_value "$response_strategy_enabled")" "$(json_escape "$response_strategy_provider")" "$(json_escape "$response_strategy_effective_provider")" "$response_strategy_status" "$(json_escape "$response_strategy_ollama_model")"
+  printf '  "hooks": {"orchestration": {"enabled": %s, "status": "%s"}, "response_strategy": {"enabled": %s, "provider": "%s", "effective_provider": "%s", "status": "%s", "ollama_model": "%s"}},\n' "$(json_value "$orchestration_enabled")" "$orchestration_status" "$(json_value "$response_strategy_enabled")" "$(json_escape "$response_strategy_provider")" "$(json_escape "$response_strategy_effective_provider")" "$response_strategy_status" "$(json_escape "$response_strategy_ollama_model")"
   printf '  "automation": {"skill_improvement_schedule": "%s"}\n' "$skill_improvement_schedule"
   printf '}\n'
 else
@@ -718,8 +658,6 @@ else
     "$hook_runtime_status" "$claude_hook_status" "$codex_config_status" "$codex_hook_status" "$gemini_hook_status"
   printf 'hooks-orchestration: enabled=%s status=%s\n' \
     "$orchestration_enabled" "$orchestration_status"
-  printf 'hooks-prompt-refinement: enabled=%s provider=%s effective=%s status=%s\n' \
-    "$prompt_refinement_enabled" "$prompt_refinement_provider" "$prompt_refinement_effective_provider" "$prompt_refinement_status"
   printf 'hooks-response-strategy: enabled=%s provider=%s effective=%s status=%s\n' \
     "$response_strategy_enabled" "$response_strategy_provider" "$response_strategy_effective_provider" "$response_strategy_status"
   printf 'skills: %s\n' "$skills_text_summary"
