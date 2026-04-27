@@ -123,7 +123,27 @@ def test_emit_block_for_codex_returns_json() -> None:
     assert_eq(code, 0, "codex block should return zero with block payload")
     payload = json.loads(capture.getvalue())
     assert_eq(payload.get("decision"), "block", "codex block decision")
-    assert "timeout" in str(payload.get("reason", ""))
+    reason = str(payload.get("reason", ""))
+    assert "Peer prompt refinement failed and blocked the turn" in reason
+    assert "timeout" in reason
+
+
+def test_emit_notice_returns_simple_system_message() -> None:
+    import io
+
+    original_stdout = sys.stdout
+    capture = io.StringIO()
+    sys.stdout = capture
+    try:
+        code = PPR.emit_notice("codex", "Claude Code CLI returned empty output")
+    finally:
+        sys.stdout = original_stdout
+
+    assert_eq(code, 0, "notice should return zero")
+    payload = json.loads(capture.getvalue())
+    message = str(payload.get("systemMessage", ""))
+    assert "Peer prompt refinement failed; continuing without it" in message
+    assert "empty output" in message
 
 
 def test_hook_output_adds_visible_success_message() -> None:
@@ -143,6 +163,7 @@ def run_tests() -> int:
         test_peer_invocation_codex_channel,
         test_strict_mode_defaults_on,
         test_emit_block_for_codex_returns_json,
+        test_emit_notice_returns_simple_system_message,
         test_hook_output_adds_visible_success_message,
     ]
 

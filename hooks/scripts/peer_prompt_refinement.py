@@ -140,23 +140,46 @@ def trim_block(text: str, limit: int) -> str:
     return text[-limit:]
 
 
-def failure_message(current: str, provider: str, reason: str) -> str:
+def simplified_failure_reason(reason: str) -> str:
+    text = str(reason).strip()
+    lower = text.lower()
+    if "timed out" in lower:
+        return "timeout"
+    if "not installed" in lower or "not on path" in lower or "could not be started" in lower:
+        return "peer CLI unavailable"
+    if "empty output" in lower:
+        return "empty output"
+    if "failed:" in lower:
+        return "peer CLI error"
+    if text:
+        return text
+    return "unknown error"
+
+
+def failure_message(current: str, provider: str, reason: str, *, blocked: bool) -> str:
+    del current  # The current agent is not needed in the user-facing notice.
+    state = "failed and blocked the turn" if blocked else "failed; continuing without it"
     return (
-        "Peer prompt refinement could not complete and the turn was blocked. "
-        f"Current agent: {current}. Peer: {provider_label(provider)}. "
-        f"Cause: {reason}. Resolve the peer CLI/auth/config issue or set "
-        "AI_AGENT_PROMPT_REFINEMENT_REQUIRED=0 to allow fail-open behavior."
+        f"Peer prompt refinement {state} via {provider_label(provider)} "
+        f"({simplified_failure_reason(reason)})."
     )
 
 
 def emit_block(current: str, reason: str) -> int:
     provider = choose_provider(current)
-    message = failure_message(current, provider, reason)
+    message = failure_message(current, provider, reason, blocked=True)
     if current == "codex":
         print(json.dumps({"decision": "block", "reason": message}, ensure_ascii=False))
         return 0
     print(message, file=sys.stderr)
     return 2
+
+
+def emit_notice(current: str, reason: str) -> int:
+    provider = choose_provider(current)
+    message = failure_message(current, provider, reason, blocked=False)
+    print(json.dumps({"systemMessage": message}, ensure_ascii=False))
+    return 0
 
 
 def choose_provider(current: str) -> str:
@@ -375,8 +398,7 @@ def main() -> int:
     if not peer_output:
         if strict_mode():
             return emit_block(args.current, failure or "unknown peer refinement failure")
-        print("{}")
-        return 0
+        return emit_notice(args.current, failure or "unknown peer refinement failure")
 
     provider = choose_provider(args.current)
     context = (
