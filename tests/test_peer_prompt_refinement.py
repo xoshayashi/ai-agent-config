@@ -126,6 +126,14 @@ def test_emit_block_for_codex_returns_json() -> None:
     assert "timeout" in str(payload.get("reason", ""))
 
 
+def test_hook_output_adds_visible_success_message() -> None:
+    payload = PPR.hook_output("codex", "UserPromptSubmit", "context", "claude")
+    assert "Peer prompt refinement applied via Claude Code CLI." in str(payload.get("systemMessage", ""))
+    hook_output = payload.get("hookSpecificOutput", {})
+    assert_eq(hook_output.get("hookEventName"), "UserPromptSubmit", "hook event")
+    assert_eq(hook_output.get("additionalContext"), "context", "additional context")
+
+
 def run_tests() -> int:
     tests = [
         test_auto_route_codex_to_claude,
@@ -135,6 +143,7 @@ def run_tests() -> int:
         test_peer_invocation_codex_channel,
         test_strict_mode_defaults_on,
         test_emit_block_for_codex_returns_json,
+        test_hook_output_adds_visible_success_message,
     ]
 
     failures = 0

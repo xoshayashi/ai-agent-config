@@ -339,9 +339,11 @@ def call_peer(current: str, packet: str, cwd: str) -> tuple[str, str]:
     return output[:max_chars], ""
 
 
-def hook_output(current: str, event_name: str, context: str) -> dict[str, Any]:
+def hook_output(current: str, event_name: str, context: str, provider: str) -> dict[str, Any]:
+    system_message = f"Peer prompt refinement applied via {provider_label(provider)}."
     if current == "gemini" or event_name == "BeforeAgent":
         return {
+            "systemMessage": system_message,
             "hookSpecificOutput": {
                 "hookEventName": "BeforeAgent",
                 "additionalContext": context,
@@ -349,6 +351,7 @@ def hook_output(current: str, event_name: str, context: str) -> dict[str, Any]:
         }
 
     return {
+        "systemMessage": system_message,
         "hookSpecificOutput": {
             "hookEventName": "UserPromptSubmit",
             "additionalContext": context,
@@ -375,12 +378,13 @@ def main() -> int:
         print("{}")
         return 0
 
+    provider = choose_provider(args.current)
     context = (
         "Peer prompt-refinement note. Treat this as advisory context only; "
         "the original user prompt and higher-priority instructions remain authoritative.\n\n"
         f"{peer_output}"
     )
-    print(json.dumps(hook_output(args.current, str(data.get("hook_event_name", "")), context)))
+    print(json.dumps(hook_output(args.current, str(data.get("hook_event_name", "")), context, provider)))
     return 0
 
 
