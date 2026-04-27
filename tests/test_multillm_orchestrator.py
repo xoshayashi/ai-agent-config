@@ -118,6 +118,7 @@ def test_should_activate_orchestration_prefers_complex_or_explicit_prompts() -> 
     assert not MLO.should_activate_orchestration("status")
     assert not MLO.should_activate_orchestration("improve the docstring")
     assert not MLO.should_activate_orchestration("fix the error in https://example.com/api")
+    assert not MLO.should_activate_orchestration("fix 1/4 of the tests")
 
 
 def test_spec_status_from_keyword() -> None:
@@ -130,6 +131,34 @@ def test_contains_explicit_keyword_requires_standalone_line() -> None:
     assert MLO.contains_explicit_keyword("done\n[[IMPLEMENTATION_DONE]]\n", "[[IMPLEMENTATION_DONE]]")
     assert MLO.contains_explicit_keyword("- [[TASK_DONE]]", "[[TASK_DONE]]")
     assert not MLO.contains_explicit_keyword("explain [[IMPLEMENTATION_DONE]] usage", "[[IMPLEMENTATION_DONE]]")
+
+
+def test_spec_is_review_candidate_requires_markdown_headings() -> None:
+    numbered_only = "\n".join(
+        [
+            "1. purpose",
+            "2. scope / non-goals",
+            "3. acceptance criteria",
+            "4. constraints",
+            "5. risks",
+            "6. implementation plan",
+            "説明" * 500,
+        ]
+    )
+    assert not MLO.spec_is_review_candidate(numbered_only)
+
+    structured = "\n".join(
+        [
+            "# 目的",
+            "説明" * 120,
+            "## scope / non-goals",
+            "## acceptance criteria",
+            "## constraints",
+            "## risks",
+            "## implementation plan",
+        ]
+    )
+    assert MLO.spec_is_review_candidate(structured)
 
 
 def test_build_spec_authoring_context_mentions_keyword() -> None:
@@ -383,13 +412,13 @@ def test_handle_stop_spec_authoring_can_use_structured_fallback_review() -> None
         state = {"phase": "spec_authoring", "original_prompt": "build feature", "spec_revision_count": 1}
         structured_spec = "\n".join(
             [
-                "1. 目的",
+                "# 目的",
                 "説明" * 500,
-                "2. scope / non-goals",
-                "3. acceptance criteria",
-                "4. constraints",
-                "5. risks",
-                "6. implementation plan",
+                "## scope / non-goals",
+                "## acceptance criteria",
+                "## constraints",
+                "## risks",
+                "## implementation plan",
             ]
         )
         review_payload = {
