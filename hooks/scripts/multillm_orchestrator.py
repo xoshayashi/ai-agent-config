@@ -843,7 +843,7 @@ def codex_stop_output(decision: dict[str, Any]) -> dict[str, Any]:
         }
         note = str(decision.get("note", "")).strip()
         if note:
-            payload["systemMessage"] = f"Orchestrator continuation: {note}"
+            payload["systemMessage"] = f"Auto-continuing via orchestration: {note}"
         return payload
     note = str(decision.get("note", "")).strip()
     if note:
