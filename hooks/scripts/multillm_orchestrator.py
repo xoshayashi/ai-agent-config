@@ -30,7 +30,9 @@ SUPPORTED_EVENTS: dict[str, set[str]] = {
 }
 
 DEFAULT_SPEC_DONE_KEYWORD = "[[SPEC_DONE]]"
-DEFAULT_IMPL_DONE_KEYWORDS = {"[[IMPLEMENTATION_DONE]]", "[[TASK_DONE]]"}
+DEFAULT_IMPLEMENTATION_DONE_KEYWORD = "[[IMPLEMENTATION_DONE]]"
+DEFAULT_VERIFICATION_DONE_KEYWORD = "[[VERIFICATION_DONE]]"
+DEFAULT_TASK_DONE_KEYWORD = "[[TASK_DONE]]"
 FOLLOWUP_PROMPT_PATTERN = re.compile(
     r"^\s*(continue|go on|keep going|proceed|next|ok|yes|please continue|implement|apply|fix it|"
     r"続けて(?:ください)?|続行(?:してください)?|進めて(?:ください)?|次(?:へ)?|そのまま|"
@@ -242,18 +244,30 @@ def hooks_md_path() -> Path:
     return repo_root_from_script() / "instructions" / "HOOKS.md"
 
 
-def completion_keywords() -> tuple[str, set[str]]:
+def completion_keywords() -> tuple[str, str, str, str]:
     path = hooks_md_path()
     if not path.is_file():
-        return DEFAULT_SPEC_DONE_KEYWORD, set(DEFAULT_IMPL_DONE_KEYWORDS)
+        return (
+            DEFAULT_SPEC_DONE_KEYWORD,
+            DEFAULT_IMPLEMENTATION_DONE_KEYWORD,
+            DEFAULT_VERIFICATION_DONE_KEYWORD,
+            DEFAULT_TASK_DONE_KEYWORD,
+        )
 
     try:
         text = path.read_text(encoding="utf-8")
     except OSError:
-        return DEFAULT_SPEC_DONE_KEYWORD, set(DEFAULT_IMPL_DONE_KEYWORDS)
+        return (
+            DEFAULT_SPEC_DONE_KEYWORD,
+            DEFAULT_IMPLEMENTATION_DONE_KEYWORD,
+            DEFAULT_VERIFICATION_DONE_KEYWORD,
+            DEFAULT_TASK_DONE_KEYWORD,
+        )
     tokens = sorted(set(re.findall(r"\[\[[A-Z0-9_:-]+\]\]", text)))
     spec_done = DEFAULT_SPEC_DONE_KEYWORD
-    impl_done = set(DEFAULT_IMPL_DONE_KEYWORDS)
+    implementation_done = DEFAULT_IMPLEMENTATION_DONE_KEYWORD
+    verification_done = DEFAULT_VERIFICATION_DONE_KEYWORD
+    task_done = DEFAULT_TASK_DONE_KEYWORD
 
     for token in tokens:
         if "SPEC_DONE" in token:
@@ -261,9 +275,22 @@ def completion_keywords() -> tuple[str, set[str]]:
             break
 
     for token in tokens:
-        if "IMPLEMENTATION_DONE" in token or "TASK_DONE" in token:
-            impl_done.add(token)
-    return spec_done, impl_done
+        if "IMPLEMENTATION_DONE" in token:
+            implementation_done = token
+        elif "VERIFICATION_DONE" in token:
+            verification_done = token
+        elif "TASK_DONE" in token:
+            task_done = token
+    return spec_done, implementation_done, verification_done, task_done
+
+
+def contains_explicit_keyword(text: str, keyword: str) -> bool:
+    if not text or not keyword:
+        return False
+    pattern = re.compile(
+        rf"(?m)^\s*(?:[-*+]\s+|[0-9]+[.)]\s+)?{re.escape(keyword)}\s*$"
+    )
+    return pattern.search(text) is not None
 
 
 def command_available(name: str) -> bool:
@@ -429,7 +456,7 @@ def spec_status_from(packet: dict[str, Any], spec_done_keyword: str) -> str:
     spec_markdown = str(packet.get("spec_markdown", ""))
     if raw_status in {"draft", "done"}:
         return raw_status
-    return "done" if spec_done_keyword in spec_markdown else "draft"
+    return "done" if contains_explicit_keyword(spec_markdown, spec_done_keyword) else "draft"
 
 
 def build_spec_authoring_context(prompt: str, spec_done_keyword: str) -> str:
@@ -469,6 +496,23 @@ def default_implementation_start_prompt(spec_markdown: str, implementation_brief
         lines.extend(["", "Implementation brief:", implementation_brief])
     lines.extend(["", "Approved specification:", spec_markdown])
     return "\n".join(lines)
+
+
+def default_verification_start_prompt(
+    spec_markdown: str,
+    implementation_response: str,
+    verification_done_keyword: str,
+    task_done_keyword: str,
+) -> str:
+    return (
+        "Implementation appears complete enough to begin verification.\n"
+        "Do not stop yet. Run the most relevant tests or verification checks, inspect the diff, "
+        "and perform a focused self-review against the approved specification.\n"
+        f"Use {verification_done_keyword} only when verification and self-review are complete. "
+        f"Use {task_done_keyword} only when the task is truly complete end-to-end.\n\n"
+        f"Approved specification:\n{spec_markdown}\n\n"
+        f"Latest implementation summary:\n{implementation_response}"
+    )
 
 
 def review_spec_with_claude(
@@ -542,6 +586,8 @@ def orchestration_prompt_context(phase: str, spec_markdown: str, implementation_
         lines.extend(["", "Current phase: specification authoring and refinement."])
     elif phase == "implementation":
         lines.extend(["", "Current phase: implementation."])
+    elif phase == "verification":
+        lines.extend(["", "Current phase: verification and self-review."])
     lines.extend(["", "Specification:", spec_markdown])
     if implementation_brief:
         lines.extend(["", "Implementation brief:", implementation_brief])
@@ -550,10 +596,7 @@ def orchestration_prompt_context(phase: str, spec_markdown: str, implementation_
     return "\n".join(lines).strip()
 
 
-def build_continue_decision(state: dict[str, Any], data: dict[str, Any], response: str, impl_done_keywords: set[str]) -> dict[str, Any]:
-    if any(keyword in response for keyword in impl_done_keywords):
-        state["phase"] = "done"
-        return {"continue": False, "prompt": "", "note": "Implementation completion keyword detected."}
+def build_continue_decision(state: dict[str, Any], data: dict[str, Any], response: str) -> dict[str, Any]:
 
     spec_markdown = str(state.get("spec_markdown", ""))
     turn = safe_int(state.get("implementation_turn", 0), 0, minimum=0)
@@ -685,6 +728,81 @@ Recent redacted transcript excerpt:
     return {"continue": True, "prompt": next_prompt, "note": f"{peer_prefix}. {note}"}
 
 
+def build_verification_decision(
+    state: dict[str, Any],
+    data: dict[str, Any],
+    response: str,
+    verification_done_keyword: str,
+    task_done_keyword: str,
+) -> dict[str, Any]:
+    verification_done = contains_explicit_keyword(response, verification_done_keyword)
+    task_done = contains_explicit_keyword(response, task_done_keyword)
+    if verification_done and task_done:
+        state["phase"] = "done"
+        return {"continue": False, "prompt": "", "note": "Verification and task completion keywords detected."}
+
+    spec_markdown = str(state.get("spec_markdown", ""))
+    transcript = transcript_excerpt(data.get("transcript_path"))
+    claude_decision_packet = f"""You are reviewing Codex output during the verification phase.
+Return strict JSON:
+{{
+  "action": "continue|allow_stop",
+  "next_prompt_for_codex": "string",
+  "reason": "string"
+}}
+
+Rules:
+- The task is not complete unless both `{verification_done_keyword}` and `{task_done_keyword}` are explicitly present as standalone lines.
+- If they are missing, prefer "continue" and tell Codex the smallest next verification or self-review step.
+- Keep next_prompt_for_codex concise, concrete, and scope-safe.
+
+Specification:
+{spec_markdown}
+
+Latest Codex verification response:
+{response}
+
+Recent redacted transcript excerpt:
+{transcript}
+"""
+    claude_decision_raw = call_claude(
+        claude_decision_packet,
+        "implementation_guidance",
+        spec_markdown,
+        response,
+    )
+    decision_json = parse_json_from_text(claude_decision_raw)
+    action = str(decision_json.get("action", "")).strip().lower()
+    next_prompt = str(decision_json.get("next_prompt_for_codex", "")).strip()
+    reason = str(decision_json.get("reason", "")).strip()
+
+    if action == "allow_stop":
+        note = reason or "Verification review did not confirm final completion keywords."
+        return {
+            "continue": False,
+            "prompt": "",
+            "note": f"Claude verification guidance received. {note}",
+        }
+
+    if next_prompt:
+        note = reason or "Continue verification and self-review."
+        return {
+            "continue": True,
+            "prompt": next_prompt,
+            "note": f"Claude verification guidance received. {note}",
+        }
+
+    fallback_prompt = (
+        "Continue verification. Run or summarize the most relevant checks, inspect changed files, "
+        f"and only emit {verification_done_keyword} plus {task_done_keyword} when the task is truly complete."
+    )
+    return {
+        "continue": True,
+        "prompt": fallback_prompt,
+        "note": "Claude verification guidance received. Verification is still incomplete.",
+    }
+
+
 def codex_user_prompt_output(context: str) -> dict[str, Any]:
     return {
         "hookSpecificOutput": {
@@ -712,12 +830,14 @@ def codex_stop_output(decision: dict[str, Any]) -> dict[str, Any]:
 
 def codex_session_start_output(state: dict[str, Any]) -> dict[str, Any]:
     phase = str(state.get("phase", "idle"))
-    if phase in {"implementation", "spec_authoring"}:
+    if phase in {"implementation", "spec_authoring", "verification"}:
         spec = str(state.get("spec_markdown", ""))
         if spec:
             label = "Current specification"
             if phase == "spec_authoring":
                 label = "Current draft specification (needs refinement)"
+            elif phase == "verification":
+                label = "Current approved specification (verification in progress)"
             return {
                 "hookSpecificOutput": {
                     "hookEventName": "SessionStart",
@@ -748,6 +868,14 @@ def handle_user_prompt_submit(data: dict[str, Any], state: dict[str, Any], path:
             "",
         )
         return codex_user_prompt_output(context)
+    if phase == "verification" and state.get("spec_markdown") and should_keep_current_task(prompt):
+        context = orchestration_prompt_context(
+            "verification",
+            str(state.get("spec_markdown", "")),
+            str(state.get("implementation_brief", "")),
+            "",
+        )
+        return codex_user_prompt_output(context)
     if phase == "spec_authoring" and state.get("spec_markdown") and should_keep_current_task(prompt):
         context = orchestration_prompt_context(
             "spec_authoring",
@@ -760,7 +888,7 @@ def handle_user_prompt_submit(data: dict[str, Any], state: dict[str, Any], path:
     if not should_activate_orchestration(prompt):
         return {}
 
-    spec_done_keyword, _ = completion_keywords()
+    spec_done_keyword, _, _, _ = completion_keywords()
     if phase in {"implementation", "spec_authoring"} and not should_keep_current_task(prompt):
         state.clear()
     state.update(
@@ -787,13 +915,13 @@ def handle_stop(data: dict[str, Any], state: dict[str, Any], path: Path) -> dict
         return {}
 
     phase = str(state.get("phase", ""))
-    spec_done_keyword, impl_done_keywords = completion_keywords()
+    spec_done_keyword, implementation_done_keyword, verification_done_keyword, task_done_keyword = completion_keywords()
     if phase == "spec_authoring":
         spec_revision_count = safe_int(state.get("spec_revision_count", 0), 0, minimum=0) + 1
         state["spec_revision_count"] = spec_revision_count
         state["spec_markdown"] = response
         save_state(path, state)
-        spec_ready = spec_done_keyword in response
+        spec_ready = contains_explicit_keyword(response, spec_done_keyword)
         spec_review_fallback = (
             not spec_ready
             and spec_revision_count >= 2
@@ -866,11 +994,59 @@ def handle_stop(data: dict[str, Any], state: dict[str, Any], path: Path) -> dict
         note = "specification approved" if spec_status == "done" else "specification still needs refinement"
         return {"systemMessage": f"Orchestrator: Claude review complete; {note}."}
 
+    if phase == "verification":
+        decision = build_verification_decision(
+            state,
+            data,
+            response,
+            verification_done_keyword,
+            task_done_keyword,
+        )
+        save_state(path, state)
+        return codex_stop_output(decision)
+
     if phase != "implementation":
         return {}
 
     state["implementation_turn"] = safe_int(state.get("implementation_turn", 0), 0, minimum=0) + 1
-    decision = build_continue_decision(state, data, response, impl_done_keywords)
+    if contains_explicit_keyword(response, task_done_keyword):
+        if contains_explicit_keyword(response, verification_done_keyword):
+            state["phase"] = "done"
+            save_state(path, state)
+            return codex_stop_output(
+                {"continue": False, "prompt": "", "note": "Verification and task completion keywords detected."}
+            )
+        state["phase"] = "verification"
+        save_state(path, state)
+        return codex_stop_output(
+            {
+                "continue": True,
+                "prompt": default_verification_start_prompt(
+                    str(state.get("spec_markdown", "")),
+                    response,
+                    verification_done_keyword,
+                    task_done_keyword,
+                ),
+                "note": "Task completion keyword appeared before verification completion; continuing into verification.",
+            }
+        )
+    if contains_explicit_keyword(response, implementation_done_keyword):
+        state["phase"] = "verification"
+        save_state(path, state)
+        return codex_stop_output(
+            {
+                "continue": True,
+                "prompt": default_verification_start_prompt(
+                    str(state.get("spec_markdown", "")),
+                    response,
+                    verification_done_keyword,
+                    task_done_keyword,
+                ),
+                "note": "Implementation completion keyword detected; switching to verification phase.",
+            }
+        )
+
+    decision = build_continue_decision(state, data, response)
     save_state(path, state)
     return codex_stop_output(decision)
 

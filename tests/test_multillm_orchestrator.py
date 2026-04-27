@@ -76,10 +76,11 @@ def test_completion_keywords_from_hooks_md() -> None:
         )
 
         def _run() -> None:
-            spec_done, impl_done = MLO.completion_keywords()
+            spec_done, implementation_done, verification_done, task_done = MLO.completion_keywords()
             assert_eq(spec_done, "[[SPEC_DONE]]", "spec keyword")
-            assert "[[IMPLEMENTATION_DONE]]" in impl_done
-            assert "[[TASK_DONE]]" in impl_done
+            assert_eq(implementation_done, "[[IMPLEMENTATION_DONE]]", "implementation keyword")
+            assert_eq(verification_done, "[[VERIFICATION_DONE]]", "verification keyword default")
+            assert_eq(task_done, "[[TASK_DONE]]", "task keyword")
 
         with_env({"AI_AGENT_HOOKS_RULES_DOC": str(hooks_md)}, _run)
 
@@ -120,9 +121,15 @@ def test_should_activate_orchestration_prefers_complex_or_explicit_prompts() -> 
 
 
 def test_spec_status_from_keyword() -> None:
-    packet = {"status": "unknown", "spec_markdown": "ready [[SPEC_DONE]]"}
+    packet = {"status": "unknown", "spec_markdown": "ready\n[[SPEC_DONE]]"}
     status = MLO.spec_status_from(packet, "[[SPEC_DONE]]")
     assert_eq(status, "done", "spec status inferred from keyword")
+
+
+def test_contains_explicit_keyword_requires_standalone_line() -> None:
+    assert MLO.contains_explicit_keyword("done\n[[IMPLEMENTATION_DONE]]\n", "[[IMPLEMENTATION_DONE]]")
+    assert MLO.contains_explicit_keyword("- [[TASK_DONE]]", "[[TASK_DONE]]")
+    assert not MLO.contains_explicit_keyword("explain [[IMPLEMENTATION_DONE]] usage", "[[IMPLEMENTATION_DONE]]")
 
 
 def test_build_spec_authoring_context_mentions_keyword() -> None:
@@ -180,7 +187,7 @@ def test_build_continue_decision_stops_at_continuation_cap() -> None:
         original_claude = patch_attr(MLO, "call_claude", lambda *args: json_text(decision_payload))
         original_gemini = patch_attr(MLO, "call_gemini", lambda _: "")
         try:
-            decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response", set())
+            decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response")
         finally:
             MLO.transcript_excerpt = original_transcript
             MLO.call_claude = original_claude
@@ -211,7 +218,7 @@ def test_build_continue_decision_stops_on_repeated_prompt() -> None:
         original_claude = patch_attr(MLO, "call_claude", lambda *args: json_text(decision_payload))
         original_gemini = patch_attr(MLO, "call_gemini", lambda _: "")
         try:
-            decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response", set())
+            decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response")
         finally:
             MLO.transcript_excerpt = original_transcript
             MLO.call_claude = original_claude
@@ -241,7 +248,7 @@ def test_build_continue_decision_reports_claude_guidance_visibility() -> None:
     original_claude = patch_attr(MLO, "call_claude", lambda *args: json_text(decision_payload))
     original_gemini = patch_attr(MLO, "call_gemini", lambda _: "")
     try:
-        decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response", set())
+        decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response")
     finally:
         MLO.transcript_excerpt = original_transcript
         MLO.call_claude = original_claude
@@ -276,7 +283,7 @@ def test_build_continue_decision_reports_gemini_and_claude_visibility() -> None:
     original_claude = patch_attr(MLO, "call_claude", lambda *args: json_text(claude_payload))
     original_gemini = patch_attr(MLO, "call_gemini", lambda _: json_text(gemini_payload))
     try:
-        decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response", set())
+        decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response")
     finally:
         MLO.transcript_excerpt = original_transcript
         MLO.call_claude = original_claude
@@ -289,7 +296,7 @@ def test_build_continue_decision_reports_gemini_and_claude_visibility() -> None:
 def test_handle_user_prompt_submit_bootstraps_spec_phase() -> None:
     with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
         state_path = Path(tmp) / "state.json"
-        original_keywords = patch_attr(MLO, "completion_keywords", lambda: ("[[SPEC_DONE]]", {"[[TASK_DONE]]"}))
+        original_keywords = patch_attr(MLO, "completion_keywords", lambda: ("[[SPEC_DONE]]", "[[IMPLEMENTATION_DONE]]", "[[VERIFICATION_DONE]]", "[[TASK_DONE]]"))
         try:
             payload = MLO.handle_user_prompt_submit({"prompt": "このコードベースを分析して設計書を書いて"}, {}, state_path)
         finally:
@@ -315,7 +322,7 @@ def test_handle_stop_promotes_done_spec_to_implementation() -> None:
         state_path = Path(tmp) / "state.json"
         state = {"phase": "spec_authoring", "original_prompt": "build feature"}
         review_payload = {
-            "spec_markdown": "approved spec [[SPEC_DONE]]",
+            "spec_markdown": "approved spec\n[[SPEC_DONE]]",
             "status": "done",
             "implementation_brief": "brief",
             "next_step_prompt_for_codex": "start coding",
@@ -324,10 +331,10 @@ def test_handle_stop_promotes_done_spec_to_implementation() -> None:
         original_keywords = patch_attr(
             MLO,
             "completion_keywords",
-            lambda: ("[[SPEC_DONE]]", {"[[IMPLEMENTATION_DONE]]", "[[TASK_DONE]]"}),
+            lambda: ("[[SPEC_DONE]]", "[[IMPLEMENTATION_DONE]]", "[[VERIFICATION_DONE]]", "[[TASK_DONE]]"),
         )
         try:
-            payload = MLO.handle_stop({"response": "draft [[SPEC_DONE]]"}, state, state_path)
+            payload = MLO.handle_stop({"response": "draft\n[[SPEC_DONE]]"}, state, state_path)
         finally:
             MLO.review_spec_with_claude = original_review
             MLO.completion_keywords = original_keywords
@@ -342,7 +349,7 @@ def test_handle_stop_generates_default_start_prompt_when_review_omits_one() -> N
         state_path = Path(tmp) / "state.json"
         state = {"phase": "spec_authoring", "original_prompt": "build feature"}
         review_payload = {
-            "spec_markdown": "approved spec [[SPEC_DONE]]",
+            "spec_markdown": "approved spec\n[[SPEC_DONE]]",
             "status": "done",
             "implementation_brief": "brief",
             "next_step_prompt_for_codex": "",
@@ -351,15 +358,15 @@ def test_handle_stop_generates_default_start_prompt_when_review_omits_one() -> N
         original_keywords = patch_attr(
             MLO,
             "completion_keywords",
-            lambda: ("[[SPEC_DONE]]", {"[[IMPLEMENTATION_DONE]]", "[[TASK_DONE]]"}),
+            lambda: ("[[SPEC_DONE]]", "[[IMPLEMENTATION_DONE]]", "[[VERIFICATION_DONE]]", "[[TASK_DONE]]"),
         )
         try:
-            payload = MLO.handle_stop({"response": "draft [[SPEC_DONE]]"}, state, state_path)
+            payload = MLO.handle_stop({"response": "draft\n[[SPEC_DONE]]"}, state, state_path)
         finally:
             MLO.review_spec_with_claude = original_review
             MLO.completion_keywords = original_keywords
         assert_eq(payload.get("decision"), "block", "fallback prompt should continue into implementation")
-        assert "approved spec [[SPEC_DONE]]" in str(payload.get("reason", ""))
+        assert "approved spec\n[[SPEC_DONE]]" in str(payload.get("reason", ""))
 
 
 def test_handle_stop_spec_authoring_returns_wait_message_before_keyword() -> None:
@@ -395,7 +402,7 @@ def test_handle_stop_spec_authoring_can_use_structured_fallback_review() -> None
         original_keywords = patch_attr(
             MLO,
             "completion_keywords",
-            lambda: ("[[SPEC_DONE]]", {"[[IMPLEMENTATION_DONE]]", "[[TASK_DONE]]"}),
+            lambda: ("[[SPEC_DONE]]", "[[IMPLEMENTATION_DONE]]", "[[VERIFICATION_DONE]]", "[[TASK_DONE]]"),
         )
         try:
             payload = MLO.handle_stop({"response": structured_spec}, state, state_path)
@@ -404,6 +411,77 @@ def test_handle_stop_spec_authoring_can_use_structured_fallback_review() -> None
             MLO.completion_keywords = original_keywords
         assert_eq(payload.get("decision"), "block", "fallback review should continue into implementation")
         assert_eq(payload.get("reason"), "start coding", "fallback review next prompt")
+
+
+def test_handle_stop_implementation_done_moves_to_verification() -> None:
+    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
+        state_path = Path(tmp) / "state.json"
+        state = {
+            "phase": "implementation",
+            "spec_markdown": "approved spec [[SPEC_DONE]]",
+            "implementation_turn": 0,
+        }
+        original_keywords = patch_attr(
+            MLO,
+            "completion_keywords",
+            lambda: ("[[SPEC_DONE]]", "[[IMPLEMENTATION_DONE]]", "[[VERIFICATION_DONE]]", "[[TASK_DONE]]"),
+        )
+        try:
+            payload = MLO.handle_stop({"response": "work finished\n[[IMPLEMENTATION_DONE]]"}, state, state_path)
+        finally:
+            MLO.completion_keywords = original_keywords
+        assert_eq(payload.get("decision"), "block", "should continue into verification")
+        assert "[[VERIFICATION_DONE]]" in str(payload.get("reason", ""))
+        saved = MLO.load_state(state_path)
+        assert_eq(saved.get("phase"), "verification", "state promoted to verification")
+
+
+def test_handle_stop_task_done_without_verification_keeps_verifying() -> None:
+    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
+        state_path = Path(tmp) / "state.json"
+        state = {
+            "phase": "implementation",
+            "spec_markdown": "approved spec [[SPEC_DONE]]",
+            "implementation_turn": 0,
+        }
+        original_keywords = patch_attr(
+            MLO,
+            "completion_keywords",
+            lambda: ("[[SPEC_DONE]]", "[[IMPLEMENTATION_DONE]]", "[[VERIFICATION_DONE]]", "[[TASK_DONE]]"),
+        )
+        try:
+            payload = MLO.handle_stop({"response": "all done\n[[TASK_DONE]]"}, state, state_path)
+        finally:
+            MLO.completion_keywords = original_keywords
+        assert_eq(payload.get("decision"), "block", "should force verification before stop")
+        assert "[[VERIFICATION_DONE]]" in str(payload.get("reason", ""))
+        saved = MLO.load_state(state_path)
+        assert_eq(saved.get("phase"), "verification", "task done alone should not finish")
+
+
+def test_handle_stop_verification_done_and_task_done_finishes() -> None:
+    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
+        state_path = Path(tmp) / "state.json"
+        state = {
+            "phase": "verification",
+            "spec_markdown": "approved spec [[SPEC_DONE]]",
+        }
+        original_keywords = patch_attr(
+            MLO,
+            "completion_keywords",
+            lambda: ("[[SPEC_DONE]]", "[[IMPLEMENTATION_DONE]]", "[[VERIFICATION_DONE]]", "[[TASK_DONE]]"),
+        )
+        try:
+            payload = MLO.handle_stop(
+                {"response": "checks passed\n[[VERIFICATION_DONE]]\n[[TASK_DONE]]"},
+                state,
+                state_path,
+            )
+        finally:
+            MLO.completion_keywords = original_keywords
+        assert "Verification and task completion keywords detected." in str(payload.get("systemMessage", ""))
+        saved = MLO.load_state(state_path)
+        assert_eq(saved.get("phase"), "done", "verification plus task done should finish")
 
 
 def json_text(payload: dict[str, object]) -> str:
