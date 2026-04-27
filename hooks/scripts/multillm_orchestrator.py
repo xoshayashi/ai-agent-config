@@ -308,7 +308,29 @@ def peer_env() -> dict[str, str]:
     return env
 
 
-def run_cli(command: list[str]) -> str:
+def simplify_cli_failure(reason: str) -> str:
+    text = str(reason).strip()
+    lower = text.lower()
+    if "timed out" in lower:
+        return "timeout"
+    if "not installed" in lower or "not on path" in lower or "could not be started" in lower:
+        return "CLI unavailable"
+    if "empty output" in lower:
+        return "empty output"
+    if "invalid output" in lower:
+        return "invalid output"
+    if "failed:" in lower:
+        return "CLI error"
+    if text:
+        return text
+    return "unknown error"
+
+
+def orchestration_failure_note(label: str, reason: str) -> str:
+    return f"{label} unavailable ({simplify_cli_failure(reason)})."
+
+
+def run_cli_result(command: list[str]) -> tuple[str, str]:
     timeout = safe_int(os.environ.get("AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS", "45"), 45, minimum=3, maximum=60)
     output_limit = safe_int(os.environ.get("AI_AGENT_ORCHESTRATOR_OUTPUT_CHARS", "20000"), 20000, minimum=1000, maximum=200000)
     try:
@@ -320,14 +342,17 @@ def run_cli(command: list[str]) -> str:
             env=peer_env(),
             check=False,
         )
-    except (OSError, subprocess.TimeoutExpired):
-        return ""
+    except subprocess.TimeoutExpired:
+        return "", f"timed out after {timeout} seconds"
+    except OSError as exc:
+        return "", f"could not be started: {exc}"
     if completed.returncode != 0:
-        return ""
+        detail = completed.stderr.strip() or completed.stdout.strip() or f"exit code {completed.returncode}"
+        return "", f"failed: {detail[:400]}"
     output = completed.stdout.strip()
     if not output:
-        return ""
-    return output[:output_limit]
+        return "", "returned empty output"
+    return output[:output_limit], ""
 
 
 def claude_effort_level(kind: str, *signals: str) -> str:
@@ -351,9 +376,9 @@ def claude_effort_level(kind: str, *signals: str) -> str:
     return simple
 
 
-def call_claude(packet: str, kind: str = "simple", *signals: str) -> str:
+def call_claude_result(packet: str, kind: str = "simple", *signals: str) -> tuple[str, str]:
     if not command_available("claude"):
-        return ""
+        return "", "CLI unavailable"
     effort = claude_effort_level(kind, packet, *signals)
     command = [
         "claude",
@@ -368,12 +393,16 @@ def call_claude(packet: str, kind: str = "simple", *signals: str) -> str:
         "--max-turns",
         "1",
     ]
-    return run_cli(command)
+    return run_cli_result(command)
 
 
-def call_gemini(packet: str) -> str:
+def call_claude(packet: str, kind: str = "simple", *signals: str) -> str:
+    return call_claude_result(packet, kind, *signals)[0]
+
+
+def call_gemini_result(packet: str) -> tuple[str, str]:
     if not command_available("gemini"):
-        return ""
+        return "", "CLI unavailable"
     command = [
         "gemini",
         "--skip-trust",
@@ -384,7 +413,11 @@ def call_gemini(packet: str) -> str:
         "-p",
         packet,
     ]
-    return run_cli(command)
+    return run_cli_result(command)
+
+
+def call_gemini(packet: str) -> str:
+    return call_gemini_result(packet)[0]
 
 
 def prompt_from(data: dict[str, Any]) -> str:
@@ -557,7 +590,7 @@ Context:
 - Recent redacted transcript excerpt:
 {excerpt}
 """
-    claude_review_raw = call_claude(
+    claude_review_raw, review_failure = call_claude_result(
         claude_review_packet,
         "spec_review",
         original_prompt,
@@ -569,6 +602,8 @@ Context:
     status = str(review_json.get("status", "")).strip().lower()
     implementation_brief = str(review_json.get("implementation_brief", "")).strip()
     next_step_prompt = str(review_json.get("next_step_prompt_for_codex", "")).strip()
+    if claude_review_raw and not review_json:
+        review_failure = "invalid output"
 
     if status not in {"draft", "done"}:
         status = "done" if spec_done_keyword in spec_markdown else "draft"
@@ -578,6 +613,7 @@ Context:
         "status": status,
         "implementation_brief": implementation_brief,
         "next_step_prompt_for_codex": next_step_prompt,
+        "review_failure": review_failure,
     }
 
 
@@ -613,6 +649,7 @@ def build_continue_decision(state: dict[str, Any], data: dict[str, Any], respons
 
     gemini_note = ""
     gemini_review_used = False
+    gemini_failure = ""
     if turn > 0 and turn % review_every == 0:
         gemini_review_packet = f"""You are a reviewer tracking implementation quality.
 Return strict JSON:
@@ -629,11 +666,13 @@ Specification:
 Latest Codex response:
 {response}
 """
-        gemini_review_raw = call_gemini(gemini_review_packet)
+        gemini_review_raw, gemini_failure = call_gemini_result(gemini_review_packet)
         gemini_review_json = parse_json_from_text(gemini_review_raw)
         if gemini_review_json:
             gemini_review_used = True
             gemini_note = str(gemini_review_json.get("actionable_note_for_claude", "")).strip()
+        elif gemini_review_raw:
+            gemini_failure = "invalid output"
 
     transcript = transcript_excerpt(data.get("transcript_path"))
     claude_decision_packet = f"""You are guiding Codex implementation under a fixed specification.
@@ -661,7 +700,7 @@ Gemini reviewer note (optional):
 Recent redacted transcript excerpt:
 {transcript}
 """
-    claude_decision_raw = call_claude(
+    claude_decision_raw, claude_failure = call_claude_result(
         claude_decision_packet,
         "implementation_guidance",
         spec_markdown,
@@ -669,12 +708,24 @@ Recent redacted transcript excerpt:
         gemini_note,
     )
     decision_json = parse_json_from_text(claude_decision_raw)
+    if claude_decision_raw and not decision_json:
+        claude_failure = "invalid output"
+    if claude_failure:
+        note = orchestration_failure_note("Claude implementation guidance", claude_failure)
+        if gemini_failure:
+            note += f" {orchestration_failure_note('Gemini critique', gemini_failure)}"
+        state["continuation_count"] = 0
+        state["same_prompt_count"] = 0
+        state["last_continuation_prompt"] = ""
+        return {"continue": False, "prompt": "", "note": note}
     action = str(decision_json.get("action", "")).strip().lower()
     next_prompt = str(decision_json.get("next_prompt_for_codex", "")).strip()
     reason = str(decision_json.get("reason", "")).strip()
     peer_prefix = "Claude implementation guidance received"
     if gemini_review_used:
         peer_prefix += "; Gemini critique also applied"
+    elif gemini_failure:
+        peer_prefix += f"; {orchestration_failure_note('Gemini critique', gemini_failure).lower()}"
 
     should_continue = action == "continue" and bool(next_prompt)
     if not should_continue:
@@ -788,13 +839,28 @@ Latest Codex verification response:
 Recent redacted transcript excerpt:
 {transcript}
 """
-    claude_decision_raw = call_claude(
+    claude_decision_raw, claude_failure = call_claude_result(
         claude_decision_packet,
         "implementation_guidance",
         spec_markdown,
         response,
     )
     decision_json = parse_json_from_text(claude_decision_raw)
+    if claude_decision_raw and not decision_json:
+        claude_failure = "invalid output"
+    if claude_failure:
+        fallback_prompt = (
+            "Continue verification. Run or summarize the most relevant checks, inspect changed files, "
+            f"and only emit {verification_done_keyword} plus {task_done_keyword} when the task is truly complete."
+        )
+        return {
+            "continue": True,
+            "prompt": fallback_prompt,
+            "note": (
+                f"{orchestration_failure_note('Claude verification guidance', claude_failure)} "
+                "Continuing with a generic verification prompt."
+            ),
+        }
     action = str(decision_json.get("action", "")).strip().lower()
     next_prompt = str(decision_json.get("next_prompt_for_codex", "")).strip()
     reason = str(decision_json.get("reason", "")).strip()
@@ -965,6 +1031,25 @@ def handle_stop(data: dict[str, Any], state: dict[str, Any], path: Path) -> dict
             response,
             spec_done_keyword,
         )
+        review_failure = str(spec_packet.get("review_failure", "")).strip()
+        if review_failure:
+            state.update(
+                {
+                    "phase": "spec_authoring",
+                    "spec_markdown": response,
+                    "implementation_brief": "",
+                    "next_step_prompt_for_codex": "",
+                    "implementation_turn": 0,
+                    "verification_turn": 0,
+                    "continuation_count": 0,
+                    "same_prompt_count": 0,
+                    "last_continuation_prompt": "",
+                }
+            )
+            save_state(path, state)
+            return {
+                "systemMessage": f"Orchestrator: {orchestration_failure_note('Claude spec review', review_failure)}"
+            }
         if not str(spec_packet.get("spec_markdown", "")).strip():
             return {"systemMessage": "Orchestrator: specification review returned no usable output."}
 

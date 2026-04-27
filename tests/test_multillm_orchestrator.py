@@ -213,14 +213,14 @@ def test_build_continue_decision_stops_at_continuation_cap() -> None:
 
     def _run() -> None:
         original_transcript = patch_attr(MLO, "transcript_excerpt", lambda _: "excerpt")
-        original_claude = patch_attr(MLO, "call_claude", lambda *args: json_text(decision_payload))
-        original_gemini = patch_attr(MLO, "call_gemini", lambda _: "")
+        original_claude = patch_attr(MLO, "call_claude_result", lambda *args: (json_text(decision_payload), ""))
+        original_gemini = patch_attr(MLO, "call_gemini_result", lambda _: ("", ""))
         try:
             decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response")
         finally:
             MLO.transcript_excerpt = original_transcript
-            MLO.call_claude = original_claude
-            MLO.call_gemini = original_gemini
+            MLO.call_claude_result = original_claude
+            MLO.call_gemini_result = original_gemini
         assert decision["continue"] is False
         assert "Continuation cap reached" in decision["note"]
 
@@ -244,14 +244,14 @@ def test_build_continue_decision_stops_on_repeated_prompt() -> None:
 
     def _run() -> None:
         original_transcript = patch_attr(MLO, "transcript_excerpt", lambda _: "excerpt")
-        original_claude = patch_attr(MLO, "call_claude", lambda *args: json_text(decision_payload))
-        original_gemini = patch_attr(MLO, "call_gemini", lambda _: "")
+        original_claude = patch_attr(MLO, "call_claude_result", lambda *args: (json_text(decision_payload), ""))
+        original_gemini = patch_attr(MLO, "call_gemini_result", lambda _: ("", ""))
         try:
             decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response")
         finally:
             MLO.transcript_excerpt = original_transcript
-            MLO.call_claude = original_claude
-            MLO.call_gemini = original_gemini
+            MLO.call_claude_result = original_claude
+            MLO.call_gemini_result = original_gemini
         assert decision["continue"] is False
         assert "Repeated continuation prompt detected" in decision["note"]
 
@@ -274,14 +274,14 @@ def test_build_continue_decision_reports_claude_guidance_visibility() -> None:
     }
 
     original_transcript = patch_attr(MLO, "transcript_excerpt", lambda _: "excerpt")
-    original_claude = patch_attr(MLO, "call_claude", lambda *args: json_text(decision_payload))
-    original_gemini = patch_attr(MLO, "call_gemini", lambda _: "")
+    original_claude = patch_attr(MLO, "call_claude_result", lambda *args: (json_text(decision_payload), ""))
+    original_gemini = patch_attr(MLO, "call_gemini_result", lambda _: ("", ""))
     try:
         decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response")
     finally:
         MLO.transcript_excerpt = original_transcript
-        MLO.call_claude = original_claude
-        MLO.call_gemini = original_gemini
+        MLO.call_claude_result = original_claude
+        MLO.call_gemini_result = original_gemini
 
     assert decision["continue"] is True
     assert "Claude implementation guidance received." in decision["note"]
@@ -309,17 +309,41 @@ def test_build_continue_decision_reports_gemini_and_claude_visibility() -> None:
     }
 
     original_transcript = patch_attr(MLO, "transcript_excerpt", lambda _: "excerpt")
-    original_claude = patch_attr(MLO, "call_claude", lambda *args: json_text(claude_payload))
-    original_gemini = patch_attr(MLO, "call_gemini", lambda _: json_text(gemini_payload))
+    original_claude = patch_attr(MLO, "call_claude_result", lambda *args: (json_text(claude_payload), ""))
+    original_gemini = patch_attr(MLO, "call_gemini_result", lambda _: (json_text(gemini_payload), ""))
     try:
         decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response")
     finally:
         MLO.transcript_excerpt = original_transcript
-        MLO.call_claude = original_claude
-        MLO.call_gemini = original_gemini
+        MLO.call_claude_result = original_claude
+        MLO.call_gemini_result = original_gemini
 
     assert decision["continue"] is False
     assert "Claude implementation guidance received; Gemini critique also applied." in decision["note"]
+
+
+def test_build_continue_decision_reports_simple_claude_failure() -> None:
+    state = {
+        "implementation_turn": 1,
+        "continuation_count": 0,
+        "same_prompt_count": 0,
+        "last_continuation_prompt": "",
+        "spec_markdown": "spec",
+        "gemini_review_every": 99,
+    }
+
+    original_transcript = patch_attr(MLO, "transcript_excerpt", lambda _: "excerpt")
+    original_claude = patch_attr(MLO, "call_claude_result", lambda *args: ("", "timed out after 45 seconds"))
+    original_gemini = patch_attr(MLO, "call_gemini_result", lambda _: ("", ""))
+    try:
+        decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response")
+    finally:
+        MLO.transcript_excerpt = original_transcript
+        MLO.call_claude_result = original_claude
+        MLO.call_gemini_result = original_gemini
+
+    assert decision["continue"] is False
+    assert "Claude implementation guidance unavailable (timeout)." in decision["note"]
 
 
 def test_handle_user_prompt_submit_bootstraps_spec_phase() -> None:
@@ -404,6 +428,42 @@ def test_handle_stop_spec_authoring_returns_wait_message_before_keyword() -> Non
         state = {"phase": "spec_authoring", "original_prompt": "build feature", "spec_revision_count": 0}
         payload = MLO.handle_stop({"response": "短い仕様ドラフト"}, state, state_path)
         assert "specification draft saved" in str(payload.get("systemMessage", ""))
+
+
+def test_handle_stop_spec_authoring_reports_simple_review_failure() -> None:
+    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
+        state_path = Path(tmp) / "state.json"
+        state = {"phase": "spec_authoring", "original_prompt": "build feature", "spec_revision_count": 1}
+        structured_spec = "\n".join(
+            [
+                "# 目的",
+                "説明" * 500,
+                "## scope / non-goals",
+                "## acceptance criteria",
+                "## constraints",
+                "## risks",
+                "## implementation plan",
+            ]
+        )
+        review_payload = {
+            "spec_markdown": structured_spec,
+            "status": "draft",
+            "implementation_brief": "",
+            "next_step_prompt_for_codex": "",
+            "review_failure": "timed out after 45 seconds",
+        }
+        original_review = patch_attr(MLO, "review_spec_with_claude", lambda data, prompt, draft, keyword: review_payload)
+        original_keywords = patch_attr(
+            MLO,
+            "completion_keywords",
+            lambda: ("[[SPEC_DONE]]", "[[IMPLEMENTATION_DONE]]", "[[VERIFICATION_DONE]]", "[[TASK_DONE]]"),
+        )
+        try:
+            payload = MLO.handle_stop({"response": structured_spec}, state, state_path)
+        finally:
+            MLO.review_spec_with_claude = original_review
+            MLO.completion_keywords = original_keywords
+        assert "Claude spec review unavailable (timeout)." in str(payload.get("systemMessage", ""))
 
 
 def test_handle_stop_spec_authoring_can_use_structured_fallback_review() -> None:
@@ -548,7 +608,7 @@ def test_build_verification_decision_allow_stop_without_keywords() -> None:
         "reason": "Need user confirmation before further verification.",
     }
     original_transcript = patch_attr(MLO, "transcript_excerpt", lambda _: "excerpt")
-    original_claude = patch_attr(MLO, "call_claude", lambda *args: json_text(claude_payload))
+    original_claude = patch_attr(MLO, "call_claude_result", lambda *args: (json_text(claude_payload), ""))
     try:
         decision = MLO.build_verification_decision(
             state,
@@ -559,7 +619,7 @@ def test_build_verification_decision_allow_stop_without_keywords() -> None:
         )
     finally:
         MLO.transcript_excerpt = original_transcript
-        MLO.call_claude = original_claude
+        MLO.call_claude_result = original_claude
     assert decision["continue"] is False
     assert "Need user confirmation" in decision["note"]
 
@@ -571,7 +631,7 @@ def test_build_verification_decision_invalid_json_falls_back_to_continue() -> No
         "verification_turn": 1,
     }
     original_transcript = patch_attr(MLO, "transcript_excerpt", lambda _: "excerpt")
-    original_claude = patch_attr(MLO, "call_claude", lambda *args: "not json")
+    original_claude = patch_attr(MLO, "call_claude_result", lambda *args: ("not json", ""))
     try:
         decision = MLO.build_verification_decision(
             state,
@@ -582,9 +642,10 @@ def test_build_verification_decision_invalid_json_falls_back_to_continue() -> No
         )
     finally:
         MLO.transcript_excerpt = original_transcript
-        MLO.call_claude = original_claude
+        MLO.call_claude_result = original_claude
     assert decision["continue"] is True
     assert "[[VERIFICATION_DONE]]" in decision["prompt"]
+    assert "Claude verification guidance unavailable (invalid output)." in decision["note"]
 
 
 def json_text(payload: dict[str, object]) -> str:
@@ -612,12 +673,20 @@ def run_tests() -> int:
         test_build_continue_decision_stops_on_repeated_prompt,
         test_build_continue_decision_reports_claude_guidance_visibility,
         test_build_continue_decision_reports_gemini_and_claude_visibility,
+        test_build_continue_decision_reports_simple_claude_failure,
         test_handle_user_prompt_submit_bootstraps_spec_phase,
         test_handle_user_prompt_submit_skips_light_prompts,
         test_handle_stop_promotes_done_spec_to_implementation,
         test_handle_stop_generates_default_start_prompt_when_review_omits_one,
         test_handle_stop_spec_authoring_returns_wait_message_before_keyword,
+        test_handle_stop_spec_authoring_reports_simple_review_failure,
         test_handle_stop_spec_authoring_can_use_structured_fallback_review,
+        test_handle_stop_implementation_done_moves_to_verification,
+        test_handle_stop_task_done_without_verification_keeps_verifying,
+        test_handle_stop_verification_done_and_task_done_finishes,
+        test_build_verification_decision_stops_at_verification_cap,
+        test_build_verification_decision_allow_stop_without_keywords,
+        test_build_verification_decision_invalid_json_falls_back_to_continue,
     ]
 
     failures = 0
