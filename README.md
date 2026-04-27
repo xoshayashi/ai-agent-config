@@ -103,7 +103,9 @@ sh /path/to/llm-config/scripts/uninstall.sh
 - 管理レイヤーは **ユーザーグローバル1層**に統一（`~/.claude`, `~/.codex`, `~/.gemini`）
 - プロジェクト層への自動 Hook 配布は廃止
 - 安全性重視 Hook（`safe_delete_guard.py`）は既定ON
-- Codex中心マルチLLM Hook（`multillm_orchestrator.py`）は **登録済みで既定ON**（`AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=0` で無効化）
+- Codex中心マルチLLM Hook（`multillm_orchestrator.py`）は **登録済みだが既定OFF**（`AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1` で有効化）
+- orchestration の共有既定待機時間は **45秒**。必要なら `AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS` で延長可能
+- Claude 非対話レビューの effort は **簡単な判断で `low`、難しい判断で `high`** を既定使用。必要なら `AI_AGENT_ORCHESTRATOR_CLAUDE_SIMPLE_EFFORT` / `AI_AGENT_ORCHESTRATOR_CLAUDE_COMPLEX_EFFORT` で調整可能
 - 入力前プロンプト改善 Hook（`peer_prompt_refinement.py`）は **登録済みだが既定OFF**（`AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT=1` で有効）
 - `peer_prompt_refinement.py` を有効化した場合、peer CLI の失敗時は **既定で停止**（`AI_AGENT_PROMPT_REFINEMENT_REQUIRED=0` で fail-open に変更可能）
 - peer prompt refinement の共有既定待機時間は **150秒**。必要なら `AI_AGENT_PROMPT_REFINEMENT_TIMEOUT_SECONDS` で延長可能

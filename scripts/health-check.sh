@@ -253,7 +253,7 @@ response_strategy_provider=${AI_AGENT_RESPONSE_STRATEGY_PROVIDER:-auto}
 response_strategy_ollama_model=${AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL:-}
 prompt_refinement_enabled=${AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT:-0}
 prompt_refinement_provider=${AI_AGENT_PROMPT_REFINEMENT_PROVIDER:-auto}
-orchestration_enabled=${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-1}
+orchestration_enabled=${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-0}
 
 skill_improvement_schedule=unsupported
 os=$(uname -s 2>/dev/null || printf unknown)

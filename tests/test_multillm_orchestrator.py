@@ -104,6 +104,7 @@ def test_codex_stop_output_continue() -> None:
 
 def test_should_keep_current_task_followup_prompt() -> None:
     assert MLO.should_keep_current_task("続けて"), "follow-up prompt should keep current task"
+    assert MLO.should_keep_current_task("続けて。テストも追加して、最後に差分確認して"), "detailed follow-up should keep current task"
     assert not MLO.should_keep_current_task("新しい機能を追加したい"), "new detailed prompt should start a new task"
 
 
@@ -111,6 +112,41 @@ def test_spec_status_from_keyword() -> None:
     packet = {"status": "unknown", "spec_markdown": "ready [[SPEC_DONE]]"}
     status = MLO.spec_status_from(packet, "[[SPEC_DONE]]")
     assert_eq(status, "done", "spec status inferred from keyword")
+
+
+def test_build_spec_authoring_context_mentions_keyword() -> None:
+    text = MLO.build_spec_authoring_context("task", "[[SPEC_DONE]]")
+    assert "[[SPEC_DONE]]" in text
+    assert "Draft the specification yourself in Codex first" in text
+
+
+def test_default_implementation_start_prompt_uses_spec() -> None:
+    text = MLO.default_implementation_start_prompt("spec body", "brief")
+    assert "spec body" in text
+    assert "brief" in text
+
+
+def test_claude_effort_level_defaults_low_for_simple_calls() -> None:
+    assert_eq(MLO.claude_effort_level("simple", "tiny prompt"), "low", "simple effort default")
+
+
+def test_claude_effort_level_raises_for_complex_spec_review() -> None:
+    text = "仕様レビューです。複雑な設計とリスクを確認してください。"
+    assert_eq(MLO.claude_effort_level("spec_review", text), "high", "complex review effort")
+
+
+def test_claude_effort_level_allows_env_override() -> None:
+    def _run() -> None:
+        assert_eq(MLO.claude_effort_level("spec_review", "simple"), "medium", "simple override")
+        assert_eq(MLO.claude_effort_level("implementation_guidance", "complex design risk"), "max", "complex override")
+
+    with_env(
+        {
+            "AI_AGENT_ORCHESTRATOR_CLAUDE_SIMPLE_EFFORT": "medium",
+            "AI_AGENT_ORCHESTRATOR_CLAUDE_COMPLEX_EFFORT": "max",
+        },
+        _run,
+    )
 
 
 def test_build_continue_decision_stops_at_continuation_cap() -> None:
@@ -130,7 +166,7 @@ def test_build_continue_decision_stops_at_continuation_cap() -> None:
 
     def _run() -> None:
         original_transcript = patch_attr(MLO, "transcript_excerpt", lambda _: "excerpt")
-        original_claude = patch_attr(MLO, "call_claude", lambda _: json_text(decision_payload))
+        original_claude = patch_attr(MLO, "call_claude", lambda *args: json_text(decision_payload))
         original_gemini = patch_attr(MLO, "call_gemini", lambda _: "")
         try:
             decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response", set())
@@ -161,7 +197,7 @@ def test_build_continue_decision_stops_on_repeated_prompt() -> None:
 
     def _run() -> None:
         original_transcript = patch_attr(MLO, "transcript_excerpt", lambda _: "excerpt")
-        original_claude = patch_attr(MLO, "call_claude", lambda _: json_text(decision_payload))
+        original_claude = patch_attr(MLO, "call_claude", lambda *args: json_text(decision_payload))
         original_gemini = patch_attr(MLO, "call_gemini", lambda _: "")
         try:
             decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response", set())
@@ -175,22 +211,71 @@ def test_build_continue_decision_stops_on_repeated_prompt() -> None:
     with_env({"AI_AGENT_ORCHESTRATOR_MAX_SAME_PROMPT": "2"}, _run)
 
 
-def test_handle_user_prompt_submit_fail_open_on_empty_spec() -> None:
+def test_handle_user_prompt_submit_bootstraps_spec_phase() -> None:
     with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
         state_path = Path(tmp) / "state.json"
-        original_builder = patch_attr(
-            MLO,
-            "build_spec_by_claude_and_gemini",
-            lambda data, prompt, keyword: {"spec_markdown": "", "status": "draft"},
-        )
         original_keywords = patch_attr(MLO, "completion_keywords", lambda: ("[[SPEC_DONE]]", {"[[TASK_DONE]]"}))
         try:
             payload = MLO.handle_user_prompt_submit({"prompt": "task"}, {}, state_path)
         finally:
-            MLO.build_spec_by_claude_and_gemini = original_builder
             MLO.completion_keywords = original_keywords
-        assert_eq(payload, {}, "empty spec should fail open")
-        assert not state_path.exists()
+        output = payload.get("hookSpecificOutput", {})
+        assert_eq(output.get("hookEventName"), "UserPromptSubmit", "bootstrap event")
+        assert "[[SPEC_DONE]]" in str(output.get("additionalContext", ""))
+        saved = MLO.load_state(state_path)
+        assert_eq(saved.get("phase"), "spec_authoring", "spec phase initialized")
+
+
+def test_handle_stop_promotes_done_spec_to_implementation() -> None:
+    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
+        state_path = Path(tmp) / "state.json"
+        state = {"phase": "spec_authoring", "original_prompt": "build feature"}
+        review_payload = {
+            "spec_markdown": "approved spec [[SPEC_DONE]]",
+            "status": "done",
+            "implementation_brief": "brief",
+            "next_step_prompt_for_codex": "start coding",
+        }
+        original_review = patch_attr(MLO, "review_spec_with_claude", lambda data, prompt, draft, keyword: review_payload)
+        original_keywords = patch_attr(
+            MLO,
+            "completion_keywords",
+            lambda: ("[[SPEC_DONE]]", {"[[IMPLEMENTATION_DONE]]", "[[TASK_DONE]]"}),
+        )
+        try:
+            payload = MLO.handle_stop({"response": "draft [[SPEC_DONE]]"}, state, state_path)
+        finally:
+            MLO.review_spec_with_claude = original_review
+            MLO.completion_keywords = original_keywords
+        assert_eq(payload.get("decision"), "block", "implementation should auto-continue")
+        assert_eq(payload.get("reason"), "start coding", "next step prompt")
+        saved = MLO.load_state(state_path)
+        assert_eq(saved.get("phase"), "implementation", "state promoted to implementation")
+
+
+def test_handle_stop_generates_default_start_prompt_when_review_omits_one() -> None:
+    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
+        state_path = Path(tmp) / "state.json"
+        state = {"phase": "spec_authoring", "original_prompt": "build feature"}
+        review_payload = {
+            "spec_markdown": "approved spec [[SPEC_DONE]]",
+            "status": "done",
+            "implementation_brief": "brief",
+            "next_step_prompt_for_codex": "",
+        }
+        original_review = patch_attr(MLO, "review_spec_with_claude", lambda data, prompt, draft, keyword: review_payload)
+        original_keywords = patch_attr(
+            MLO,
+            "completion_keywords",
+            lambda: ("[[SPEC_DONE]]", {"[[IMPLEMENTATION_DONE]]", "[[TASK_DONE]]"}),
+        )
+        try:
+            payload = MLO.handle_stop({"response": "draft [[SPEC_DONE]]"}, state, state_path)
+        finally:
+            MLO.review_spec_with_claude = original_review
+            MLO.completion_keywords = original_keywords
+        assert_eq(payload.get("decision"), "block", "fallback prompt should continue into implementation")
+        assert "approved spec [[SPEC_DONE]]" in str(payload.get("reason", ""))
 
 
 def json_text(payload: dict[str, object]) -> str:
@@ -208,9 +293,16 @@ def run_tests() -> int:
         test_codex_stop_output_continue,
         test_should_keep_current_task_followup_prompt,
         test_spec_status_from_keyword,
+        test_build_spec_authoring_context_mentions_keyword,
+        test_default_implementation_start_prompt_uses_spec,
+        test_claude_effort_level_defaults_low_for_simple_calls,
+        test_claude_effort_level_raises_for_complex_spec_review,
+        test_claude_effort_level_allows_env_override,
         test_build_continue_decision_stops_at_continuation_cap,
         test_build_continue_decision_stops_on_repeated_prompt,
-        test_handle_user_prompt_submit_fail_open_on_empty_spec,
+        test_handle_user_prompt_submit_bootstraps_spec_phase,
+        test_handle_stop_promotes_done_spec_to_implementation,
+        test_handle_stop_generates_default_start_prompt_when_review_omits_one,
     ]
 
     failures = 0

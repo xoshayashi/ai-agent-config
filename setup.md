@@ -123,23 +123,38 @@ export AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL=qwen2.5:latest
 
 ### Codex中心マルチLLMオーケストレーション Hook（任意）
 
-`multillm_orchestrator.py` は Codex Hook 設定に登録済みで、既定では有効です。  
+`multillm_orchestrator.py` は Codex Hook 設定に登録済みで、既定では無効です。  
 有効化すると、Codexをハブとして次を実行します。
 
-1. `UserPromptSubmit`: Claude -> Gemini -> Claude で仕様整理
-2. `Stop`: ClaudeからCodexへの次ステップ提案
-3. 定期的に Gemini が簡素化・仕様修正観点を再レビュー
+1. `UserPromptSubmit`: Codexに仕様起草ブリーフを注入
+2. `Stop` で `[[SPEC_DONE]]` が出たら Claude が仕様レビュー
+3. Claude が未完成と判断したら、Codexへ仕様修正プロンプトを返す
+4. Claude が確定と判断したら、そのまま実装に進める
+5. 実装中は Claude が次ステップ提案、Gemini が定期レビュー
 
-無効化したい場合:
+有効化したい場合:
 
 ```sh
-export AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=0
+export AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1
 ```
 
 Geminiレビュー頻度（実装ターン数ベース）:
 
 ```sh
 export AI_AGENT_ORCHESTRATOR_GEMINI_REVIEW_EVERY=3
+```
+
+peer CLI 内部待機時間を延ばしたい場合:
+
+```sh
+export AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS=45
+```
+
+Claude spec review / implementation guidance の thinking 深さを調整したい場合:
+
+```sh
+export AI_AGENT_ORCHESTRATOR_CLAUDE_SIMPLE_EFFORT=low
+export AI_AGENT_ORCHESTRATOR_CLAUDE_COMPLEX_EFFORT=high
 ```
 
 完了キーワードと終了条件は `instructions/HOOKS.md` を参照します。
@@ -187,7 +202,10 @@ export AI_AGENT_PROMPT_REFINEMENT_PROVIDER=claude   # claude / gemini / codex
 | `AI_AGENT_INSTALL_SKILLS` | `1` | `0` で Skills のリンク作成をスキップ |
 | `AI_AGENT_INSTALL_HOOKS` | `1` | `0` で Hook 設定導入をスキップ |
 | `AI_AGENT_HOOKS_RUNTIME_LINK` | `~/.llm-config/hooks` | Hook スクリプト参照用の安定リンク |
-| `AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION` | `1` | `0` でCodex中心マルチLLMオーケストレーションHookを無効化 |
+| `AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION` | `0` | `1` でCodex中心マルチLLMオーケストレーションHookを有効化 |
+| `AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS` | `45` | orchestration 内の Claude/Gemini 呼び出しの内部待機秒数 |
+| `AI_AGENT_ORCHESTRATOR_CLAUDE_SIMPLE_EFFORT` | `low` | 簡単な Claude 非対話レビュー時の effort |
+| `AI_AGENT_ORCHESTRATOR_CLAUDE_COMPLEX_EFFORT` | `high` | 複雑な Claude 非対話レビュー時の effort |
 | `AI_AGENT_ORCHESTRATOR_GEMINI_REVIEW_EVERY` | `3` | 実装何ターンごとにGeminiレビューを挟むか |
 | `AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT` | `0` | `1` で入力前の peer prompt refinement Hook を有効化 |
 | `AI_AGENT_PROMPT_REFINEMENT_PROVIDER` | `auto` | `auto` / `claude` / `gemini` / `codex` |

@@ -23,7 +23,7 @@
 
 - 管理対象をユーザーグローバル設定に限定して、管理レイヤーを1つに固定
 - 既存 `settings.json` / `config.toml` は置換せず managed 部分のみ append/merge
-- 高負荷になりやすい peer prompt refinement はデフォルト配線しない
+- 高負荷になりやすい peer prompt refinement は登録済みでも既定OFFにして、明示有効化までは実行させない
 
 ## 残るトレードオフ
 
@@ -38,6 +38,8 @@
 - `multillm_orchestrator.py`（Codex `SessionStart` / `UserPromptSubmit` / `Stop`）
 - Claude/Codex: `Stop` イベントで発火
 - Gemini: `AfterAgent` イベントで発火
-- 既定は `AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1`（有効）、`AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT=0` / `AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY=0`（無効）
+- 既定は `AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=0`（無効）、`AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT=0` / `AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY=0`（無効）
 
-設計詳細は [docs/response-strategy-autonomy.md](./response-strategy-autonomy.md) を参照してください。
+現行の `multillm_orchestrator.py` は、旧来の `Claude -> Gemini -> Claude` 仕様ループではなく、**Codex が先に仕様を書き、Claude が stop 境界でレビューし、Gemini は実装中の periodic critic に回る** 形へ簡略化しています。
+
+設計詳細は [docs/codex-hub-orchestration.md](./codex-hub-orchestration.md) と [docs/response-strategy-autonomy.md](./response-strategy-autonomy.md) を参照してください。
