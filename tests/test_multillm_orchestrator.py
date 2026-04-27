@@ -150,7 +150,7 @@ def test_spec_is_review_candidate_requires_markdown_headings() -> None:
     structured = "\n".join(
         [
             "# 目的",
-            "説明" * 120,
+            "説明" * 500,
             "## scope / non-goals",
             "## acceptance criteria",
             "## constraints",
