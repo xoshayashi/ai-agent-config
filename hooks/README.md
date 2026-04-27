@@ -69,6 +69,12 @@ With this enabled, Codex hooks use this flow:
 Completion keywords and stop conditions are defined in `instructions/HOOKS.md`.
 When orchestration mode is enabled, the Codex `Stop` hook suppresses
 `response_strategy_bridge.py` to avoid conflicting continuation decisions.
+The Codex `Stop` configuration is routed through a single managed hook so the
+UI shows one post-response hook status line instead of separate orchestration
+and response-strategy entries.
+When the orchestrator auto-continues from a Codex `Stop` hook, Codex's UI may
+still label that event as `blocked`; this is Codex's current official
+continuation mechanism rather than an orchestration error.
 
 Prompt refinement is now handled by the shared `peer-prompt-refinement` **Skill**
 rather than by global hooks. The script remains in this repository as a reusable
