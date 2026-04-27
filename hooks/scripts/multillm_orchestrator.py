@@ -422,7 +422,10 @@ def should_activate_orchestration(prompt: str) -> bool:
 
     line_count = len([line for line in stripped.splitlines() if line.strip()])
     stripped_without_urls = re.sub(r"https?://\S+", " ", stripped)
-    has_local_path_like = re.search(r"\b[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+\b", stripped_without_urls)
+    has_local_path_like = re.search(
+        r"\b[A-Za-z][A-Za-z0-9_-]*/[A-Za-z][A-Za-z0-9_.-]+\b",
+        stripped_without_urls,
+    )
     has_path_like = bool(has_local_path_like or re.search(r"\.(?:py|md|json)\b", stripped))
     has_action = ORCHESTRATION_ACTION_PATTERN.search(stripped) is not None
     long_enough = len(stripped) >= 140 or line_count >= 3
@@ -433,7 +436,8 @@ def spec_is_review_candidate(spec_markdown: str) -> bool:
     text = spec_markdown.strip()
     if not text:
         return False
-    heading_count = len(re.findall(r"^(#{1,6}\s+.+|[0-9]+\.\s+.+)$", text, flags=re.MULTILINE))
+    markdown_heading_count = len(re.findall(r"^#{1,6}\s+.+$", text, flags=re.MULTILINE))
+    numbered_item_count = len(re.findall(r"^[0-9]+\.\s+.+$", text, flags=re.MULTILINE))
     keyword_hits = 0
     for pattern in (
         r"(scope|non-goals?|対象|非対象)",
@@ -445,9 +449,10 @@ def spec_is_review_candidate(spec_markdown: str) -> bool:
         if re.search(pattern, text, flags=re.IGNORECASE):
             keyword_hits += 1
     # These thresholds are tuned for "likely implementation-ready" drafts:
-    # roughly multi-section specs with enough substance to justify fallback review.
-    return (len(text) >= 900 and heading_count >= 4 and keyword_hits >= 3) or (
-        len(text) >= 1400 and heading_count >= 3 and keyword_hits >= 2
+    # require real markdown section structure, while allowing numbered lists only
+    # as a secondary signal rather than counting them as headings outright.
+    return (len(text) >= 900 and markdown_heading_count >= 4 and keyword_hits >= 3) or (
+        len(text) >= 1400 and markdown_heading_count >= 3 and keyword_hits >= 2 and numbered_item_count >= 2
     )
 
 
