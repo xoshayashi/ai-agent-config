@@ -36,13 +36,23 @@ Default is disabled. Enable only when needed:
 export AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1
 ```
 
+Even when enabled, orchestration should not claim every prompt. The practical
+activation surface is:
+
+- explicit design / specification / review / automation asks
+- long or multi-part implementation requests
+- prompts with repository/file-context plus action verbs
+
+Light chat, thanks, and simple status prompts should pass through without
+starting the orchestration loop.
+
 ## Lifecycle
 
 With orchestration enabled, the default flow is:
 
 1. `UserPromptSubmit`: inject a spec-authoring brief into Codex
-2. `Stop` while spec is incomplete: do nothing special
-3. `Stop` when Codex emits `[[SPEC_DONE]]`: ask Claude to review the spec
+2. `Stop` while spec is incomplete: save the draft and ask Codex to keep refining
+3. `Stop` when Codex emits `[[SPEC_DONE]]`, or when a later draft is structured enough to qualify for fallback review: ask Claude to review the spec
 4. If Claude says the spec is still draft, continue Codex with one more refinement prompt
 5. If Claude approves the spec, continue Codex into implementation
 6. During implementation, Claude suggests the next step and Gemini periodically critiques simplification or spec drift
@@ -63,9 +73,10 @@ The orchestrator treats `[[IMPLEMENTATION_DONE]]` or `[[TASK_DONE]]` as stop con
 - Fail-open when peer CLI unavailable or output invalid
 - Recursion guards (`AI_AGENT_ORCHESTRATOR_ACTIVE`)
 - Bounded timeout/output size for peer calls
+- Outer Codex `Stop` timeout must exceed the worst sequential peer-review budget
 - Continuation loop caps (`AI_AGENT_ORCHESTRATOR_MAX_CONTINUATIONS_PER_TASK`, `AI_AGENT_ORCHESTRATOR_MAX_SAME_PROMPT`)
 - Session-scoped local state (`~/.llm-config/orchestration`)
-- Draft spec phase keeps implementation blocked until Claude review marks it done
+- Draft spec phase keeps implementation blocked by policy and injected guidance, not by a hard phase lock on tools
 
 ## References
 
