@@ -182,6 +182,7 @@ write_state_config() {
     printf 'AI_AGENT_HOOKS_RUNTIME_LINK=%s\n' "$(quote_sh "$hooks_runtime_link")"
     printf 'AI_AGENT_CONFLICT_MODE=%s\n' "$(quote_sh "$conflict_mode")"
     printf 'AI_AGENT_PROTECT_LINKS=%s\n' "$(quote_sh "$protect_links")"
+    printf 'AI_AGENT_REQUIRE_LLM_CLIS=%s\n' "$(quote_sh "$require_llm_clis")"
     printf 'AI_AGENT_STATE_DIR=%s\n' "$(quote_sh "$state_root")"
     printf 'AI_AGENT_STATE_FILE=%s\n' "$(quote_sh "$state_file")"
   } > "$state_file"
@@ -370,6 +371,9 @@ say "config: $config_home"
 say "codex home: $codex_home"
 say "claude home: $claude_home"
 say "gemini home: $gemini_home"
+if [ "$install_hooks" = "1" ]; then
+  say "note: Codex multi-LLM orchestration Hook is enabled by default and may trigger peer CLI/API calls unless AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=0 is set."
+fi
 
 if [ "$install_instructions" = "1" ]; then
   install_instruction_links

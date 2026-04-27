@@ -31,6 +31,18 @@ SUPPORTED_EVENTS: dict[str, set[str]] = {
 }
 
 
+def safe_int(value: Any, default: int, minimum: int | None = None, maximum: int | None = None) -> int:
+    try:
+        parsed = int(str(value).strip())
+    except (TypeError, ValueError):
+        parsed = default
+    if minimum is not None and parsed < minimum:
+        parsed = minimum
+    if maximum is not None and parsed > maximum:
+        parsed = maximum
+    return parsed
+
+
 def load_input() -> dict[str, Any]:
     raw = sys.stdin.read()
     if not raw.strip():
@@ -72,6 +84,13 @@ def _read_tail_bytes(path: Path, max_bytes: int) -> bytes:
 
 
 def transcript_excerpt(path_value: Any) -> str:
+    """Return a redacted transcript tail for reviewer context.
+
+    Redaction here removes credential-like secrets only. It does not sanitize
+    adversarial instruction content inside the transcript, so peer prompts must
+    continue to frame excerpts as untrusted context rather than authoritative
+    instructions.
+    """
     if os.environ.get("AI_AGENT_RESPONSE_STRATEGY_INCLUDE_TRANSCRIPT", "1") != "1":
         return "Transcript excerpt disabled."
     if not isinstance(path_value, str) or not path_value:
@@ -80,8 +99,8 @@ def transcript_excerpt(path_value: Any) -> str:
     if not path.is_file():
         return "Transcript path not readable."
 
-    max_lines = int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_TRANSCRIPT_LINES", "60"))
-    max_chars = int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_TRANSCRIPT_CHARS", "16000"))
+    max_lines = safe_int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_TRANSCRIPT_LINES", "60"), 60, minimum=1, maximum=2000)
+    max_chars = safe_int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_TRANSCRIPT_CHARS", "16000"), 16000, minimum=200, maximum=200000)
     tail_budget = max(max_chars * 4, 20000)
     try:
         chunk = _read_tail_bytes(path, tail_budget)
@@ -125,7 +144,7 @@ def should_skip(current: str, data: dict[str, Any], prompt: str, response: str) 
     if data.get("stop_hook_active") is True and os.environ.get("AI_AGENT_RESPONSE_STRATEGY_ALLOW_REENTRY") != "1":
         return True
 
-    min_response_chars = int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_MIN_RESPONSE_CHARS", "120"))
+    min_response_chars = safe_int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_MIN_RESPONSE_CHARS", "120"), 120, minimum=0, maximum=100000)
     if len(response.strip()) < min_response_chars:
         return True
 
@@ -205,7 +224,7 @@ def build_packet(current: str, data: dict[str, Any], prompt: str, response: str)
 
     peer = choose_provider(current)
     route = f"{current} -> {peer}"
-    max_strategy_chars = int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_MAX_PROMPT_CHARS", "1800"))
+    max_strategy_chars = safe_int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_MAX_PROMPT_CHARS", "1800"), 1800, minimum=100, maximum=20000)
 
     return f"""You are an external response reviewer in a multi-LLM autonomous loop.
 Your job is to decide whether the main agent should continue one more turn, and if so, provide one high-quality continuation prompt.
@@ -252,8 +271,8 @@ def call_peer(current: str, packet: str, cwd: str) -> str:
         return ""
     command, stdin_payload = spec
 
-    timeout = int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_TIMEOUT_SECONDS", "35"))
-    max_chars = int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_OUTPUT_CHARS", "12000"))
+    timeout = safe_int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_TIMEOUT_SECONDS", "35"), 35, minimum=3, maximum=120)
+    max_chars = safe_int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_OUTPUT_CHARS", "12000"), 12000, minimum=500, maximum=200000)
 
     env = os.environ.copy()
     env["AI_AGENT_RESPONSE_STRATEGY_ACTIVE"] = "1"
@@ -331,7 +350,7 @@ def review_to_decision(review: dict[str, Any]) -> dict[str, Any]:
     human_question = review.get("human_question")
     human_question_text = human_question.strip() if isinstance(human_question, str) else ""
 
-    max_strategy_chars = int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_MAX_PROMPT_CHARS", "1800"))
+    max_strategy_chars = safe_int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_MAX_PROMPT_CHARS", "1800"), 1800, minimum=100, maximum=20000)
     if len(strategy) > max_strategy_chars:
         strategy = strategy[:max_strategy_chars]
 

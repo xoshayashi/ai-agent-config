@@ -20,6 +20,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Any
 
@@ -104,7 +105,19 @@ def load_state(path: Path) -> dict[str, Any]:
 def save_state(path: Path, state: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = json.dumps(state, ensure_ascii=False, indent=2) + "\n"
-    path.write_text(payload, encoding="utf-8")
+    fd, tmp_path = tempfile.mkstemp(prefix=path.name + ".", dir=path.parent)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(payload)
+        os.chmod(tmp_path, 0o600)
+        Path(tmp_path).replace(path)
+        os.chmod(path, 0o600)
+    except Exception:
+        try:
+            os.unlink(tmp_path)
+        except OSError:
+            pass
+        raise
 
 
 def _read_tail_bytes(path: Path, max_bytes: int) -> bytes:
@@ -133,6 +146,12 @@ def redact(text: str) -> str:
 
 
 def transcript_excerpt(path_value: Any) -> str:
+    """Return a redacted transcript tail for peer-review context.
+
+    Redaction here removes credential-like secrets only. It does not sanitize
+    adversarial instruction content inside the transcript, so downstream peer
+    prompts must continue to treat excerpts as untrusted context.
+    """
     if os.environ.get("AI_AGENT_ORCHESTRATOR_INCLUDE_TRANSCRIPT", "1") != "1":
         return "Transcript excerpt disabled."
     if not isinstance(path_value, str) or not path_value:
@@ -635,6 +654,8 @@ def handle_user_prompt_submit(data: dict[str, Any], state: dict[str, Any], path:
         state.clear()
 
     spec_packet = build_spec_by_claude_and_gemini(data, prompt, spec_done_keyword)
+    if not str(spec_packet.get("spec_markdown", "")).strip():
+        return {}
     spec_status = spec_status_from(spec_packet, spec_done_keyword)
     next_phase = "implementation" if spec_status == "done" else "spec_draft"
     state.update(

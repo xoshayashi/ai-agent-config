@@ -40,6 +40,11 @@ default. Disable only when needed:
 export AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=0
 ```
 
+This default-on mode has a real cost/latency footprint. On each Codex
+`UserPromptSubmit`, it can make up to 3 peer CLI/API calls
+(`Claude -> Gemini -> Claude`), and on each `Stop` it can make an additional
+continuation-decision call. Keep it enabled only when you want that behavior.
+
 With this enabled, Codex hooks use this flow:
 
 1. `UserPromptSubmit`: Claude -> Gemini -> Claude specification loop

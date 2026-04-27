@@ -46,6 +46,12 @@ def with_env(updates: dict[str, str], fn):
                 os.environ[key] = value
 
 
+def patch_attr(obj, name: str, value):
+    original = getattr(obj, name)
+    setattr(obj, name, value)
+    return original
+
+
 def test_parse_json_from_text() -> None:
     parsed = MLO.parse_json_from_text('{"action":"continue","next_prompt_for_codex":"x"}')
     assert_eq(parsed.get("action"), "continue", "direct JSON parse")
@@ -107,6 +113,92 @@ def test_spec_status_from_keyword() -> None:
     assert_eq(status, "done", "spec status inferred from keyword")
 
 
+def test_build_continue_decision_stops_at_continuation_cap() -> None:
+    state = {
+        "implementation_turn": 1,
+        "continuation_count": 1,
+        "same_prompt_count": 1,
+        "last_continuation_prompt": "verify tests",
+        "spec_markdown": "spec",
+        "gemini_review_every": 99,
+    }
+    decision_payload = {
+        "action": "continue",
+        "next_prompt_for_codex": "verify tests",
+        "reason": "one more pass",
+    }
+
+    def _run() -> None:
+        original_transcript = patch_attr(MLO, "transcript_excerpt", lambda _: "excerpt")
+        original_claude = patch_attr(MLO, "call_claude", lambda _: json_text(decision_payload))
+        original_gemini = patch_attr(MLO, "call_gemini", lambda _: "")
+        try:
+            decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response", set())
+        finally:
+            MLO.transcript_excerpt = original_transcript
+            MLO.call_claude = original_claude
+            MLO.call_gemini = original_gemini
+        assert decision["continue"] is False
+        assert "Continuation cap reached" in decision["note"]
+
+    with_env({"AI_AGENT_ORCHESTRATOR_MAX_CONTINUATIONS_PER_TASK": "1"}, _run)
+
+
+def test_build_continue_decision_stops_on_repeated_prompt() -> None:
+    state = {
+        "implementation_turn": 1,
+        "continuation_count": 0,
+        "same_prompt_count": 2,
+        "last_continuation_prompt": "verify tests",
+        "spec_markdown": "spec",
+        "gemini_review_every": 99,
+    }
+    decision_payload = {
+        "action": "continue",
+        "next_prompt_for_codex": "verify tests",
+        "reason": "repeat",
+    }
+
+    def _run() -> None:
+        original_transcript = patch_attr(MLO, "transcript_excerpt", lambda _: "excerpt")
+        original_claude = patch_attr(MLO, "call_claude", lambda _: json_text(decision_payload))
+        original_gemini = patch_attr(MLO, "call_gemini", lambda _: "")
+        try:
+            decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response", set())
+        finally:
+            MLO.transcript_excerpt = original_transcript
+            MLO.call_claude = original_claude
+            MLO.call_gemini = original_gemini
+        assert decision["continue"] is False
+        assert "Repeated continuation prompt detected" in decision["note"]
+
+    with_env({"AI_AGENT_ORCHESTRATOR_MAX_SAME_PROMPT": "2"}, _run)
+
+
+def test_handle_user_prompt_submit_fail_open_on_empty_spec() -> None:
+    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
+        state_path = Path(tmp) / "state.json"
+        original_builder = patch_attr(
+            MLO,
+            "build_spec_by_claude_and_gemini",
+            lambda data, prompt, keyword: {"spec_markdown": "", "status": "draft"},
+        )
+        original_keywords = patch_attr(MLO, "completion_keywords", lambda: ("[[SPEC_DONE]]", {"[[TASK_DONE]]"}))
+        try:
+            payload = MLO.handle_user_prompt_submit({"prompt": "task"}, {}, state_path)
+        finally:
+            MLO.build_spec_by_claude_and_gemini = original_builder
+            MLO.completion_keywords = original_keywords
+        assert_eq(payload, {}, "empty spec should fail open")
+        assert not state_path.exists()
+
+
+def json_text(payload: dict[str, object]) -> str:
+    import json
+
+    return json.dumps(payload, ensure_ascii=False)
+
+
 def run_tests() -> int:
     tests = [
         test_parse_json_from_text,
@@ -116,6 +208,9 @@ def run_tests() -> int:
         test_codex_stop_output_continue,
         test_should_keep_current_task_followup_prompt,
         test_spec_status_from_keyword,
+        test_build_continue_decision_stops_at_continuation_cap,
+        test_build_continue_decision_stops_on_repeated_prompt,
+        test_handle_user_prompt_submit_fail_open_on_empty_spec,
     ]
 
     failures = 0
