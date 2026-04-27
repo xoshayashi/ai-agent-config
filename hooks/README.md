@@ -25,7 +25,7 @@ CLI load hooks from the locations it already expects.
 | Hook | Default | Purpose |
 |---|---|---|
 | `safe_delete_guard.py` | On | Blocks permanent shell deletion commands and tells the agent to use the safer trash workflow. |
-| `multillm_orchestrator.py` | Registered / **On by default (Codex)** | Codex-centered orchestration: Claude+Gemini spec loop on prompt submit, then Claude-guided implementation continuation on stop. |
+| `multillm_orchestrator.py` | Registered / **Off by default (Codex)** | Codex-centered orchestration: Codex drafts the spec, Claude reviews/finalizes it at the stop boundary, then Claude-guided implementation continuation with periodic Gemini critique. |
 | `peer_prompt_refinement.py` | Registered / **Off by default** | At prompt-submission events (`UserPromptSubmit` / `BeforeAgent`), optionally asks a peer LLM to refine the incoming prompt context before work begins. |
 | `response_strategy_bridge.py` | Registered / **Off by default** | At response-finalization events (`Stop` / `AfterAgent`), optionally asks a peer LLM for one more-turn strategy and can trigger an automatic continuation. |
 
@@ -33,23 +33,35 @@ The safe-delete hook is a runtime guardrail, not the only safety layer. The
 shared instructions still require agents to use the safer trash workflow even
 if hooks are disabled or unavailable.
 
-`multillm_orchestrator.py` is wired in Codex hook settings and is enabled by
-default. Disable only when needed:
+`multillm_orchestrator.py` is wired in Codex hook settings but is disabled by
+default. Enable it only when you want a multi-LLM implementation loop:
 
 ```sh
-export AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=0
+export AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1
 ```
 
-This default-on mode has a real cost/latency footprint. On each Codex
-`UserPromptSubmit`, it can make up to 3 peer CLI/API calls
-(`Claude -> Gemini -> Claude`), and on each `Stop` it can make an additional
-continuation-decision call. Keep it enabled only when you want that behavior.
+This orchestration mode still has a real latency footprint, but it is lighter
+than the earlier design because it does not launch a multi-step peer review on
+every raw prompt submission. Peer calls are concentrated at review boundaries.
+
+Its internal peer-call timeout defaults to `45` seconds. Increase it with
+`AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS` when Claude/Gemini review needs more
+time, while keeping the outer CLI hook timeout above that value.
+
+Claude peer review also adapts effort by default:
+
+- simple review/guidance -> `--effort low`
+- complex review/guidance -> `--effort high`
+
+Tune those defaults with `AI_AGENT_ORCHESTRATOR_CLAUDE_SIMPLE_EFFORT` and
+`AI_AGENT_ORCHESTRATOR_CLAUDE_COMPLEX_EFFORT`.
 
 With this enabled, Codex hooks use this flow:
 
-1. `UserPromptSubmit`: Claude -> Gemini -> Claude specification loop
-2. `Stop`: Claude continuation guidance for Codex implementation
-3. Every N implementation turns, Gemini critique is injected into the Claude guidance step
+1. `UserPromptSubmit`: inject a Codex-first specification brief
+2. `Stop` after Codex emits `[[SPEC_DONE]]`: Claude reviews the spec and either approves it or requests one more refinement pass
+3. `Stop` during implementation: Claude continuation guidance for Codex implementation
+4. Every N implementation turns, Gemini critique is injected into the Claude guidance step
 
 Completion keywords and stop conditions are defined in `instructions/HOOKS.md`.
 When orchestration mode is enabled, prompt-refinement and response-strategy hooks

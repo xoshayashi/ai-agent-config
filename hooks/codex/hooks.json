@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-1}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/multillm_orchestrator.py\" --current codex'",
+            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-0}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/multillm_orchestrator.py\" --current codex'",
             "timeout": 25,
             "statusMessage": "Loading orchestration state"
           }
@@ -33,13 +33,13 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-1}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/multillm_orchestrator.py\" --current codex'",
+            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-0}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/multillm_orchestrator.py\" --current codex'",
             "timeout": 60,
             "statusMessage": "Running multi-LLM orchestration"
           },
           {
             "type": "command",
-            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-1}\" = \"1\" ] && exit 0; [ \"${AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY:-0}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/response_strategy_bridge.py\" --current codex'",
+            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-0}\" = \"1\" ] && exit 0; [ \"${AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY:-0}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/response_strategy_bridge.py\" --current codex'",
             "timeout": 25,
             "statusMessage": "Evaluating response strategy"
           }
@@ -52,7 +52,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -lc 'if [ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-1}\" = \"1\" ]; then exec python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/multillm_orchestrator.py\" --current codex; fi; if [ \"${AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT:-0}\" = \"1\" ]; then exec python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/peer_prompt_refinement.py\" --current codex; fi; exit 0'",
+            "command": "sh -lc 'if [ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-0}\" = \"1\" ]; then exec python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/multillm_orchestrator.py\" --current codex; fi; if [ \"${AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT:-0}\" = \"1\" ]; then exec python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/peer_prompt_refinement.py\" --current codex; fi; exit 0'",
             "timeout": 180,
             "statusMessage": "Preparing Codex prompt flow"
           }

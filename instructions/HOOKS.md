@@ -7,11 +7,13 @@ This document defines shared orchestration behavior for Hook-based workflows.
 When `AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1`, use this sequence:
 
 1. **Specification loop (pre-implementation)**  
-   Codex hook triggers a Claude -> Gemini -> Claude spec flow at `UserPromptSubmit`.
-2. **Implementation loop**  
-   Codex implements step-by-step. At each `Stop`, Claude may provide the next implementation prompt.
-3. **Periodic review loop**  
-   Gemini periodically critiques simplification opportunities and possible spec drift.
+   Codex stays in charge and drafts the specification first. The initial `UserPromptSubmit` hook only injects a spec-authoring brief and waits for Codex to produce a spec containing `[[SPEC_DONE]]`.
+2. **Specification review gate**  
+   When Codex emits `[[SPEC_DONE]]`, the `Stop` hook sends that draft to Claude for review. Claude either approves it for implementation or sends one more spec-refinement prompt back to Codex.
+3. **Implementation loop**  
+   After Claude approves the spec, Codex implements step-by-step. At each `Stop`, Claude may provide the next implementation prompt.
+4. **Periodic review loop**  
+   Gemini periodically critiques simplification opportunities and possible spec drift, and that note is fed into Claude's implementation guidance.
 
 Codex remains the execution hub and final action owner.
 

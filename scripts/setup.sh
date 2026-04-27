@@ -372,7 +372,7 @@ say "codex home: $codex_home"
 say "claude home: $claude_home"
 say "gemini home: $gemini_home"
 if [ "$install_hooks" = "1" ]; then
-  say "note: Codex multi-LLM orchestration Hook is enabled by default and may trigger peer CLI/API calls unless AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=0 is set."
+  say "note: Codex multi-LLM orchestration Hook is installed but disabled by default. Enable it only when needed with AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1."
 fi
 
 if [ "$install_instructions" = "1" ]; then

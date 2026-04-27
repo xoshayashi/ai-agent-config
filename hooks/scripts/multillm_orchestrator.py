@@ -2,8 +2,8 @@
 """Codex-centered multi-LLM orchestration hook.
 
 This hook keeps Codex as the execution hub while using:
-- Claude for spec drafting/finalization and implementation guidance
-- Gemini for independent spec/progress critique
+- Claude for spec review/finalization and implementation guidance
+- Gemini for periodic implementation critique
 
 Design goals:
 - Fail-open by default (never brick the session if a peer CLI is unavailable)
@@ -32,7 +32,12 @@ SUPPORTED_EVENTS: dict[str, set[str]] = {
 DEFAULT_SPEC_DONE_KEYWORD = "[[SPEC_DONE]]"
 DEFAULT_IMPL_DONE_KEYWORDS = {"[[IMPLEMENTATION_DONE]]", "[[TASK_DONE]]"}
 FOLLOWUP_PROMPT_PATTERN = re.compile(
-    r"^\s*(continue|go on|next|ok|yes|続けて|続行|進めて|次|そのまま|お願いします|お願い)\b",
+    r"^\s*(continue|go on|next|ok|yes|続けて|続行|進めて|次|そのまま|お願いします|お願い)(?:\b|[、。\s])",
+    re.IGNORECASE,
+)
+COMPLEXITY_SIGNAL_PATTERN = re.compile(
+    r"(architecture|orchestrat|migration|trade[- ]?off|risk|security|performance|complex|ambiguous|"
+    r"設計|仕様|移行|互換|安全|性能|複雑|曖昧|リスク)",
     re.IGNORECASE,
 )
 
@@ -61,7 +66,7 @@ def load_input() -> dict[str, Any]:
 
 
 def enabled() -> bool:
-    return os.environ.get("AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION", "1") == "1"
+    return os.environ.get("AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION", "0") == "1"
 
 
 def should_skip(current: str, data: dict[str, Any]) -> bool:
@@ -258,17 +263,15 @@ def peer_env() -> dict[str, str]:
     return env
 
 
-def run_cli(command: list[str], stdin_payload: str, cwd: str) -> str:
-    timeout = safe_int(os.environ.get("AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS", "10"), 10, minimum=3, maximum=60)
+def run_cli(command: list[str]) -> str:
+    timeout = safe_int(os.environ.get("AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS", "45"), 45, minimum=3, maximum=60)
     output_limit = safe_int(os.environ.get("AI_AGENT_ORCHESTRATOR_OUTPUT_CHARS", "20000"), 20000, minimum=1000, maximum=200000)
     try:
         completed = subprocess.run(
             command,
-            input=stdin_payload,
             text=True,
             capture_output=True,
             timeout=timeout,
-            cwd=cwd or None,
             env=peer_env(),
             check=False,
         )
@@ -282,9 +285,31 @@ def run_cli(command: list[str], stdin_payload: str, cwd: str) -> str:
     return output[:output_limit]
 
 
-def call_claude(packet: str) -> str:
+def claude_effort_level(kind: str, *signals: str) -> str:
+    simple = os.environ.get("AI_AGENT_ORCHESTRATOR_CLAUDE_SIMPLE_EFFORT", "low").strip().lower() or "low"
+    complex_level = os.environ.get("AI_AGENT_ORCHESTRATOR_CLAUDE_COMPLEX_EFFORT", "high").strip().lower() or "high"
+    allowed = {"low", "medium", "high", "xhigh", "max"}
+    if simple not in allowed:
+        simple = "low"
+    if complex_level not in allowed:
+        complex_level = "high"
+
+    text = "\n".join(signal for signal in signals if signal).strip()
+    if kind == "spec_review":
+        if len(text) >= 4000 or COMPLEXITY_SIGNAL_PATTERN.search(text):
+            return complex_level
+        return simple
+    if kind == "implementation_guidance":
+        if len(text) >= 6000 or COMPLEXITY_SIGNAL_PATTERN.search(text):
+            return complex_level
+        return simple
+    return simple
+
+
+def call_claude(packet: str, kind: str = "simple", *signals: str) -> str:
     if not command_available("claude"):
         return ""
+    effort = claude_effort_level(kind, packet, *signals)
     command = [
         "claude",
         "-p",
@@ -293,10 +318,12 @@ def call_claude(packet: str) -> str:
         "text",
         "--permission-mode",
         "plan",
+        "--effort",
+        effort,
         "--max-turns",
         "1",
     ]
-    return run_cli(command, "", "")
+    return run_cli(command)
 
 
 def call_gemini(packet: str) -> str:
@@ -312,7 +339,7 @@ def call_gemini(packet: str) -> str:
         "-p",
         packet,
     ]
-    return run_cli(command, "", "")
+    return run_cli(command)
 
 
 def prompt_from(data: dict[str, Any]) -> str:
@@ -332,7 +359,7 @@ def should_keep_current_task(prompt: str) -> bool:
     stripped = prompt.strip()
     if not stripped:
         return True
-    if len(stripped) <= 48 and FOLLOWUP_PROMPT_PATTERN.search(stripped):
+    if FOLLOWUP_PROMPT_PATTERN.search(stripped):
         return True
     return False
 
@@ -345,56 +372,57 @@ def spec_status_from(packet: dict[str, Any], spec_done_keyword: str) -> str:
     return "done" if spec_done_keyword in spec_markdown else "draft"
 
 
-def build_spec_by_claude_and_gemini(data: dict[str, Any], prompt: str, spec_done_keyword: str) -> dict[str, Any]:
+def build_spec_authoring_context(prompt: str, spec_done_keyword: str) -> str:
+    return f"""Multi-LLM orchestration context (Codex hub mode).
+Use this as advisory context. User/system/developer instructions remain authoritative.
+
+Current phase: specification authoring.
+
+Before implementation:
+- Use the applicable shared instructions and skills.
+- Draft the specification yourself in Codex first instead of delegating the first draft to another CLI.
+- Keep the specification concrete enough to implement, but do not over-constrain methods when the user did not require that.
+- Cover scope, constraints, acceptance criteria, key risks, and a step-by-step implementation brief.
+- When the specification is implementation-ready, include `{spec_done_keyword}` in the response.
+- Do not start code changes until the specification is ready for Claude review.
+
+Original task prompt:
+{prompt}
+""".strip()
+
+
+def default_spec_refinement_prompt(spec_markdown: str) -> str:
+    return (
+        "Refine the specification using the reviewed draft below. Tighten missing requirements, "
+        "acceptance criteria, edge cases, and implementation steps. Keep scope aligned with the "
+        "original task, and include [[SPEC_DONE]] only when the specification is truly implementation-ready.\n\n"
+        f"Reviewed specification draft:\n{spec_markdown}"
+    )
+
+
+def default_implementation_start_prompt(spec_markdown: str, implementation_brief: str) -> str:
+    lines = [
+        "Start implementation from the approved specification below.",
+        "Work step by step, keep the implementation aligned to the spec, and report concrete progress.",
+    ]
+    if implementation_brief:
+        lines.extend(["", "Implementation brief:", implementation_brief])
+    lines.extend(["", "Approved specification:", spec_markdown])
+    return "\n".join(lines)
+
+
+def review_spec_with_claude(
+    data: dict[str, Any],
+    original_prompt: str,
+    draft_spec: str,
+    spec_done_keyword: str,
+) -> dict[str, Any]:
     cwd = str(data.get("cwd", ""))
     model = str(data.get("model", ""))
     excerpt = transcript_excerpt(data.get("transcript_path"))
     hooks_doc = hooks_md_path()
 
-    claude_seed_packet = f"""You are the specification lead for a Codex-centered implementation workflow.
-Return strict JSON:
-{{
-  "spec_markdown": "string",
-  "status": "draft|done",
-  "implementation_brief": "string"
-}}
-
-Requirements:
-- Preserve user constraints and scope.
-- Keep the spec concrete enough for implementation but avoid over-constraining methods.
-- If the spec is implementation-ready, include `{spec_done_keyword}` inside spec_markdown.
-
-Context:
-- User prompt:
-{prompt}
-- CWD: {cwd}
-- Active model: {model}
-- Hook rules document path: {hooks_doc}
-- Recent redacted transcript excerpt:
-{excerpt}
-"""
-    claude_seed_raw = call_claude(claude_seed_packet)
-    claude_seed_json = parse_json_from_text(claude_seed_raw)
-    seed_spec = str(claude_seed_json.get("spec_markdown", "")).strip() or claude_seed_raw
-
-    gemini_review_packet = f"""You are an independent reviewer.
-Given this specification draft, return strict JSON:
-{{
-  "critical_gaps": ["..."],
-  "simplifications": ["..."],
-  "risk_checks": ["..."]
-}}
-
-Do not re-write the full spec. Focus on missing requirements, simplification opportunities, and risk checks.
-
-Spec draft:
-{seed_spec}
-"""
-    gemini_review_raw = call_gemini(gemini_review_packet)
-    gemini_review_json = parse_json_from_text(gemini_review_raw)
-    gemini_review = gemini_review_json if gemini_review_json else {"critical_gaps": [], "simplifications": [], "risk_checks": []}
-
-    claude_finalize_packet = f"""You are the specification lead finalizing a build-ready spec for Codex.
+    claude_review_packet = f"""You are reviewing a Codex-authored specification before implementation starts.
 Return strict JSON:
 {{
   "spec_markdown": "string",
@@ -403,28 +431,36 @@ Return strict JSON:
   "next_step_prompt_for_codex": "string"
 }}
 
-Rules:
-- Keep scope aligned with the user request.
-- Integrate useful reviewer feedback.
-- If build-ready, include `{spec_done_keyword}` in spec_markdown.
-- Keep implementation brief short and actionable.
+Requirements:
+- Preserve user constraints, intent, and scope.
+- Improve clarity, missing checks, and implementation readiness without rewriting the task into a different plan.
+- If the specification is implementation-ready, include `{spec_done_keyword}` inside spec_markdown and set status to "done".
+- If the specification is not ready, set status to "draft" and make `next_step_prompt_for_codex` a concise prompt that tells Codex exactly how to refine the spec next.
+- If the specification is ready, make `next_step_prompt_for_codex` the best first implementation step for Codex.
 
-User prompt:
-{prompt}
-
-Seed spec:
-{seed_spec}
-
-Gemini review:
-{json.dumps(gemini_review, ensure_ascii=False)}
+Context:
+- Original user prompt:
+{original_prompt}
+- Codex-authored spec draft:
+{draft_spec}
+- CWD: {cwd}
+- Active model: {model}
+- Hook rules document path: {hooks_doc}
+- Recent redacted transcript excerpt:
+{excerpt}
 """
-    claude_final_raw = call_claude(claude_finalize_packet)
-    final_json = parse_json_from_text(claude_final_raw)
+    claude_review_raw = call_claude(
+        claude_review_packet,
+        "spec_review",
+        original_prompt,
+        draft_spec,
+    )
+    review_json = parse_json_from_text(claude_review_raw)
 
-    spec_markdown = str(final_json.get("spec_markdown", "")).strip() or seed_spec
-    status = str(final_json.get("status", "")).strip().lower()
-    implementation_brief = str(final_json.get("implementation_brief", "")).strip()
-    next_step_prompt = str(final_json.get("next_step_prompt_for_codex", "")).strip()
+    spec_markdown = str(review_json.get("spec_markdown", "")).strip() or draft_spec
+    status = str(review_json.get("status", "")).strip().lower()
+    implementation_brief = str(review_json.get("implementation_brief", "")).strip()
+    next_step_prompt = str(review_json.get("next_step_prompt_for_codex", "")).strip()
 
     if status not in {"draft", "done"}:
         status = "done" if spec_done_keyword in spec_markdown else "draft"
@@ -434,7 +470,6 @@ Gemini review:
         "status": status,
         "implementation_brief": implementation_brief,
         "next_step_prompt_for_codex": next_step_prompt,
-        "gemini_review": gemini_review,
     }
 
 
@@ -443,8 +478,8 @@ def orchestration_prompt_context(phase: str, spec_markdown: str, implementation_
         "Multi-LLM orchestration context (Codex hub mode).",
         "Use this as advisory context. User/system/developer instructions remain authoritative.",
     ]
-    if phase == "spec_draft":
-        lines.extend(["", "Current phase: specification refinement."])
+    if phase == "spec_authoring":
+        lines.extend(["", "Current phase: specification authoring and refinement."])
     elif phase == "implementation":
         lines.extend(["", "Current phase: implementation."])
     lines.extend(["", "Specification:", spec_markdown])
@@ -517,7 +552,13 @@ Gemini reviewer note (optional):
 Recent redacted transcript excerpt:
 {transcript}
 """
-    claude_decision_raw = call_claude(claude_decision_packet)
+    claude_decision_raw = call_claude(
+        claude_decision_packet,
+        "implementation_guidance",
+        spec_markdown,
+        response,
+        gemini_note,
+    )
     decision_json = parse_json_from_text(claude_decision_raw)
     action = str(decision_json.get("action", "")).strip().lower()
     next_prompt = str(decision_json.get("next_prompt_for_codex", "")).strip()
@@ -604,11 +645,11 @@ def codex_stop_output(decision: dict[str, Any]) -> dict[str, Any]:
 
 def codex_session_start_output(state: dict[str, Any]) -> dict[str, Any]:
     phase = str(state.get("phase", "idle"))
-    if phase in {"implementation", "spec_draft"}:
+    if phase in {"implementation", "spec_authoring"}:
         spec = str(state.get("spec_markdown", ""))
         if spec:
             label = "Current specification"
-            if phase == "spec_draft":
+            if phase == "spec_authoring":
                 label = "Current draft specification (needs refinement)"
             return {
                 "hookSpecificOutput": {
@@ -640,9 +681,9 @@ def handle_user_prompt_submit(data: dict[str, Any], state: dict[str, Any], path:
             "",
         )
         return codex_user_prompt_output(context)
-    if phase == "spec_draft" and state.get("spec_markdown") and should_keep_current_task(prompt):
+    if phase == "spec_authoring" and state.get("spec_markdown") and should_keep_current_task(prompt):
         context = orchestration_prompt_context(
-            "spec_draft",
+            "spec_authoring",
             str(state.get("spec_markdown", "")),
             str(state.get("implementation_brief", "")),
             str(state.get("next_step_prompt_for_codex", "")),
@@ -650,49 +691,93 @@ def handle_user_prompt_submit(data: dict[str, Any], state: dict[str, Any], path:
         return codex_user_prompt_output(context)
 
     spec_done_keyword, _ = completion_keywords()
-    if phase in {"implementation", "spec_draft"} and not should_keep_current_task(prompt):
+    if phase in {"implementation", "spec_authoring"} and not should_keep_current_task(prompt):
         state.clear()
-
-    spec_packet = build_spec_by_claude_and_gemini(data, prompt, spec_done_keyword)
-    if not str(spec_packet.get("spec_markdown", "")).strip():
-        return {}
-    spec_status = spec_status_from(spec_packet, spec_done_keyword)
-    next_phase = "implementation" if spec_status == "done" else "spec_draft"
     state.update(
         {
-            "phase": next_phase,
-            "spec_markdown": spec_packet["spec_markdown"],
-            "implementation_brief": spec_packet.get("implementation_brief", ""),
-            "next_step_prompt_for_codex": spec_packet.get("next_step_prompt_for_codex", ""),
-            "gemini_review": spec_packet.get("gemini_review", {}),
-            "spec_status": spec_status,
+            "phase": "spec_authoring",
+            "original_prompt": prompt,
+            "spec_markdown": "",
+            "implementation_brief": "",
+            "next_step_prompt_for_codex": "",
             "implementation_turn": 0,
-            "gemini_review_every": safe_int(os.environ.get("AI_AGENT_ORCHESTRATOR_GEMINI_REVIEW_EVERY", "3"), 3, minimum=1, maximum=20),
             "continuation_count": 0,
             "same_prompt_count": 0,
             "last_continuation_prompt": "",
         }
     )
     save_state(path, state)
-    context = orchestration_prompt_context(
-        next_phase,
-        str(state.get("spec_markdown", "")),
-        str(state.get("implementation_brief", "")),
-        str(state.get("next_step_prompt_for_codex", "")),
-    )
-    return codex_user_prompt_output(context)
+    return codex_user_prompt_output(build_spec_authoring_context(prompt, spec_done_keyword))
 
 
 def handle_stop(data: dict[str, Any], state: dict[str, Any], path: Path) -> dict[str, Any]:
-    if str(state.get("phase", "")) != "implementation":
-        return {}
-
     response = response_from(data)
     if not response:
         return {}
 
+    phase = str(state.get("phase", ""))
+    spec_done_keyword, impl_done_keywords = completion_keywords()
+    if phase == "spec_authoring":
+        state["spec_markdown"] = response
+        save_state(path, state)
+        if spec_done_keyword not in response:
+            return {}
+
+        spec_packet = review_spec_with_claude(
+            data,
+            str(state.get("original_prompt", "")),
+            response,
+            spec_done_keyword,
+        )
+        if not str(spec_packet.get("spec_markdown", "")).strip():
+            return {"systemMessage": "Orchestrator: specification review returned no usable output."}
+
+        spec_status = spec_status_from(spec_packet, spec_done_keyword)
+        next_phase = "implementation" if spec_status == "done" else "spec_authoring"
+        state.update(
+            {
+                "phase": next_phase,
+                "spec_markdown": spec_packet["spec_markdown"],
+                "implementation_brief": spec_packet.get("implementation_brief", ""),
+                "next_step_prompt_for_codex": spec_packet.get("next_step_prompt_for_codex", ""),
+                "implementation_turn": 0,
+                "continuation_count": 0,
+                "same_prompt_count": 0,
+                "last_continuation_prompt": "",
+            }
+        )
+        save_state(path, state)
+        next_prompt = str(spec_packet.get("next_step_prompt_for_codex", "")).strip()
+        if spec_status == "done" and not next_prompt:
+            next_prompt = default_implementation_start_prompt(
+                str(spec_packet.get("spec_markdown", "")),
+                str(spec_packet.get("implementation_brief", "")),
+            )
+        if spec_status == "draft" and not next_prompt:
+            next_prompt = default_spec_refinement_prompt(str(spec_packet.get("spec_markdown", "")))
+        if spec_status == "done" and next_prompt:
+            return codex_stop_output(
+                {
+                    "continue": True,
+                    "prompt": next_prompt,
+                    "note": "Claude reviewed the specification and approved implementation.",
+                }
+            )
+        if spec_status == "draft" and next_prompt:
+            return codex_stop_output(
+                {
+                    "continue": True,
+                    "prompt": next_prompt,
+                    "note": "Claude requested one more specification refinement pass.",
+                }
+            )
+        note = "specification approved" if spec_status == "done" else "specification still needs refinement"
+        return {"systemMessage": f"Orchestrator: Claude review complete; {note}."}
+
+    if phase != "implementation":
+        return {}
+
     state["implementation_turn"] = safe_int(state.get("implementation_turn", 0), 0, minimum=0) + 1
-    _, impl_done_keywords = completion_keywords()
     decision = build_continue_decision(state, data, response, impl_done_keywords)
     save_state(path, state)
     return codex_stop_output(decision)
