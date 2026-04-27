@@ -434,6 +434,7 @@ def test_handle_stop_implementation_done_moves_to_verification() -> None:
         assert "[[VERIFICATION_DONE]]" in str(payload.get("reason", ""))
         saved = MLO.load_state(state_path)
         assert_eq(saved.get("phase"), "verification", "state promoted to verification")
+        assert_eq(saved.get("verification_turn"), 0, "verification turn initialized")
 
 
 def test_handle_stop_task_done_without_verification_keeps_verifying() -> None:
@@ -457,6 +458,7 @@ def test_handle_stop_task_done_without_verification_keeps_verifying() -> None:
         assert "[[VERIFICATION_DONE]]" in str(payload.get("reason", ""))
         saved = MLO.load_state(state_path)
         assert_eq(saved.get("phase"), "verification", "task done alone should not finish")
+        assert_eq(saved.get("verification_turn"), 0, "verification turn initialized")
 
 
 def test_handle_stop_verification_done_and_task_done_finishes() -> None:
@@ -482,6 +484,78 @@ def test_handle_stop_verification_done_and_task_done_finishes() -> None:
         assert "Verification and task completion keywords detected." in str(payload.get("systemMessage", ""))
         saved = MLO.load_state(state_path)
         assert_eq(saved.get("phase"), "done", "verification plus task done should finish")
+
+
+def test_build_verification_decision_stops_at_verification_cap() -> None:
+    state = {
+        "phase": "verification",
+        "spec_markdown": "approved spec [[SPEC_DONE]]",
+        "verification_turn": 4,
+        "continuation_count": 2,
+        "same_prompt_count": 1,
+        "last_continuation_prompt": "continue verification",
+    }
+    decision = MLO.build_verification_decision(
+        state,
+        {"transcript_path": ""},
+        "verification still running",
+        "[[VERIFICATION_DONE]]",
+        "[[TASK_DONE]]",
+    )
+    assert decision["continue"] is False
+    assert "Verification turn cap reached" in decision["note"]
+    assert_eq(state.get("verification_turn"), 0, "verification turn reset")
+
+
+def test_build_verification_decision_allow_stop_without_keywords() -> None:
+    state = {
+        "phase": "verification",
+        "spec_markdown": "approved spec [[SPEC_DONE]]",
+        "verification_turn": 1,
+    }
+    claude_payload = {
+        "action": "allow_stop",
+        "next_prompt_for_codex": "",
+        "reason": "Need user confirmation before further verification.",
+    }
+    original_transcript = patch_attr(MLO, "transcript_excerpt", lambda _: "excerpt")
+    original_claude = patch_attr(MLO, "call_claude", lambda *args: json_text(claude_payload))
+    try:
+        decision = MLO.build_verification_decision(
+            state,
+            {"transcript_path": ""},
+            "verification status update",
+            "[[VERIFICATION_DONE]]",
+            "[[TASK_DONE]]",
+        )
+    finally:
+        MLO.transcript_excerpt = original_transcript
+        MLO.call_claude = original_claude
+    assert decision["continue"] is False
+    assert "Need user confirmation" in decision["note"]
+
+
+def test_build_verification_decision_invalid_json_falls_back_to_continue() -> None:
+    state = {
+        "phase": "verification",
+        "spec_markdown": "approved spec [[SPEC_DONE]]",
+        "verification_turn": 1,
+    }
+    original_transcript = patch_attr(MLO, "transcript_excerpt", lambda _: "excerpt")
+    original_claude = patch_attr(MLO, "call_claude", lambda *args: "not json")
+    try:
+        decision = MLO.build_verification_decision(
+            state,
+            {"transcript_path": ""},
+            "verification status update",
+            "[[VERIFICATION_DONE]]",
+            "[[TASK_DONE]]",
+        )
+    finally:
+        MLO.transcript_excerpt = original_transcript
+        MLO.call_claude = original_claude
+    assert decision["continue"] is True
+    assert "[[VERIFICATION_DONE]]" in decision["prompt"]
 
 
 def json_text(payload: dict[str, object]) -> str:

@@ -33,6 +33,7 @@ The orchestrator hook should treat these keywords as **phase transitions, not ju
 - `[[IMPLEMENTATION_DONE]]` moves the task into verification
 - `[[VERIFICATION_DONE]]` marks verification readiness
 - only `[[VERIFICATION_DONE]]` together with `[[TASK_DONE]]` should allow final completion
+- verification should also have its own bounded turn cap so it cannot continue forever on repeated reviewer guidance
 
 Keyword detection should be strict. Treat them as valid only when they appear as standalone lines or list items, not when they are merely mentioned inside prose, examples, or documentation.
 

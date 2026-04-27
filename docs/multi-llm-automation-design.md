@@ -462,6 +462,7 @@ reviewer からの返却は将来的に次へ寄せる。
 
 ただし、これらは **目標とする HITL 条件** であり、現行実装が直接 `needs_human` を受け取って停止するところまではまだ入っていない。  
 現状の stop 条件は、主に **continuation cap / same-prompt cap / final completion keyword pair / reviewer の continue 不採用** である。
+verification phase にも独立した turn cap を持たせ、検証フェーズだけが無限継続しないようにする。
 
 ### 7.6 Verification Loop の主体
 
