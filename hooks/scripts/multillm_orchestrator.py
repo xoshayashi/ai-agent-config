@@ -32,7 +32,25 @@ SUPPORTED_EVENTS: dict[str, set[str]] = {
 DEFAULT_SPEC_DONE_KEYWORD = "[[SPEC_DONE]]"
 DEFAULT_IMPL_DONE_KEYWORDS = {"[[IMPLEMENTATION_DONE]]", "[[TASK_DONE]]"}
 FOLLOWUP_PROMPT_PATTERN = re.compile(
-    r"^\s*(continue|go on|next|ok|yes|続けて|続行|進めて|次|そのまま|お願いします|お願い)(?:\b|[、。\s])",
+    r"^\s*(continue|go on|keep going|proceed|next|ok|yes|please continue|implement|apply|fix it|"
+    r"続けて(?:ください)?|続行(?:してください)?|進めて(?:ください)?|次(?:へ)?|そのまま|"
+    r"お願いします|お願い|じゃあ|では|この仕様で実装して|これで進めて|それで進めて)"
+    r"(?:\b|[、。,.\s])",
+    re.IGNORECASE,
+)
+TRIVIAL_PROMPT_PATTERN = re.compile(
+    r"^\s*(ありがとう|thanks|thank you|ok|了解|はい|いいえ|stop|pause|status|進捗|止めて)[。.!?\s]*$",
+    re.IGNORECASE,
+)
+ORCHESTRATION_EXPLICIT_TRIGGER_PATTERN = re.compile(
+    r"(orchestrat|spec|design doc|architecture|review|verification|pull request|pr|"
+    r"仕様|設計|設計書|アーキテクチャ|実装計画|検証|レビュー|調査|分析|ブランチ|フック|"
+    r"hook|skill|agent|automation|自動化|リファクタ|テスト|不具合|バグ)",
+    re.IGNORECASE,
+)
+ORCHESTRATION_ACTION_PATTERN = re.compile(
+    r"(implement|build|fix|refactor|analy[sz]e|research|review|debug|write|create|update|"
+    r"作成|修正|実装|調査|分析|確認|検証|改善|更新|整理)",
     re.IGNORECASE,
 )
 COMPLEXITY_SIGNAL_PATTERN = re.compile(
@@ -364,6 +382,42 @@ def should_keep_current_task(prompt: str) -> bool:
     return False
 
 
+def should_activate_orchestration(prompt: str) -> bool:
+    stripped = prompt.strip()
+    if not stripped:
+        return False
+    if TRIVIAL_PROMPT_PATTERN.search(stripped):
+        return False
+    if ORCHESTRATION_EXPLICIT_TRIGGER_PATTERN.search(stripped):
+        return True
+
+    line_count = len([line for line in stripped.splitlines() if line.strip()])
+    has_path_like = "/" in stripped or ".py" in stripped or ".md" in stripped or ".json" in stripped
+    has_action = ORCHESTRATION_ACTION_PATTERN.search(stripped) is not None
+    long_enough = len(stripped) >= 140 or line_count >= 3
+    return bool(has_action and (long_enough or has_path_like))
+
+
+def spec_is_review_candidate(spec_markdown: str) -> bool:
+    text = spec_markdown.strip()
+    if not text:
+        return False
+    heading_count = len(re.findall(r"^(#{1,6}\s+.+|[0-9]+\.\s+.+)$", text, flags=re.MULTILINE))
+    keyword_hits = 0
+    for pattern in (
+        r"(scope|non-goals?|対象|非対象)",
+        r"(acceptance|criteria|受け入れ|完了条件)",
+        r"(constraint|制約)",
+        r"(risk|リスク)",
+        r"(implementation|実装)",
+    ):
+        if re.search(pattern, text, flags=re.IGNORECASE):
+            keyword_hits += 1
+    return (len(text) >= 900 and heading_count >= 4 and keyword_hits >= 3) or (
+        len(text) >= 1400 and heading_count >= 3 and keyword_hits >= 2
+    )
+
+
 def spec_status_from(packet: dict[str, Any], spec_done_keyword: str) -> str:
     raw_status = str(packet.get("status", "")).strip().lower()
     spec_markdown = str(packet.get("spec_markdown", ""))
@@ -690,6 +744,9 @@ def handle_user_prompt_submit(data: dict[str, Any], state: dict[str, Any], path:
         )
         return codex_user_prompt_output(context)
 
+    if not should_activate_orchestration(prompt):
+        return {}
+
     spec_done_keyword, _ = completion_keywords()
     if phase in {"implementation", "spec_authoring"} and not should_keep_current_task(prompt):
         state.clear()
@@ -701,6 +758,7 @@ def handle_user_prompt_submit(data: dict[str, Any], state: dict[str, Any], path:
             "implementation_brief": "",
             "next_step_prompt_for_codex": "",
             "implementation_turn": 0,
+            "spec_revision_count": 0,
             "continuation_count": 0,
             "same_prompt_count": 0,
             "last_continuation_prompt": "",
@@ -718,10 +776,22 @@ def handle_stop(data: dict[str, Any], state: dict[str, Any], path: Path) -> dict
     phase = str(state.get("phase", ""))
     spec_done_keyword, impl_done_keywords = completion_keywords()
     if phase == "spec_authoring":
+        state["spec_revision_count"] = safe_int(state.get("spec_revision_count", 0), 0, minimum=0) + 1
         state["spec_markdown"] = response
         save_state(path, state)
-        if spec_done_keyword not in response:
-            return {}
+        spec_ready = spec_done_keyword in response
+        spec_review_fallback = (
+            not spec_ready
+            and safe_int(state.get("spec_revision_count", 0), 0, minimum=0) >= 2
+            and spec_is_review_candidate(response)
+        )
+        if not spec_ready and not spec_review_fallback:
+            return {
+                "systemMessage": (
+                    f"Orchestrator: specification draft saved. Continue refining and include "
+                    f"{spec_done_keyword} when it is ready for Claude review."
+                )
+            }
 
         spec_packet = review_spec_with_claude(
             data,
@@ -760,7 +830,11 @@ def handle_stop(data: dict[str, Any], state: dict[str, Any], path: Path) -> dict
                 {
                     "continue": True,
                     "prompt": next_prompt,
-                    "note": "Claude reviewed the specification and approved implementation.",
+                    "note": (
+                        "Claude reviewed the specification and approved implementation."
+                        if spec_ready
+                        else "Claude reviewed a structured spec draft via fallback and approved implementation."
+                    ),
                 }
             )
         if spec_status == "draft" and next_prompt:
@@ -768,7 +842,11 @@ def handle_stop(data: dict[str, Any], state: dict[str, Any], path: Path) -> dict
                 {
                     "continue": True,
                     "prompt": next_prompt,
-                    "note": "Claude requested one more specification refinement pass.",
+                    "note": (
+                        "Claude requested one more specification refinement pass."
+                        if spec_ready
+                        else "Claude reviewed a structured spec draft via fallback and requested one more refinement pass."
+                    ),
                 }
             )
         note = "specification approved" if spec_status == "done" else "specification still needs refinement"

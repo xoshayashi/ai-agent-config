@@ -106,9 +106,7 @@ sh /path/to/llm-config/scripts/uninstall.sh
 - Codex中心マルチLLM Hook（`multillm_orchestrator.py`）は **登録済みだが既定OFF**（`AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1` で有効化）
 - orchestration の共有既定待機時間は **45秒**。必要なら `AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS` で延長可能
 - Claude 非対話レビューの effort は **簡単な判断で `low`、難しい判断で `high`** を既定使用。必要なら `AI_AGENT_ORCHESTRATOR_CLAUDE_SIMPLE_EFFORT` / `AI_AGENT_ORCHESTRATOR_CLAUDE_COMPLEX_EFFORT` で調整可能
-- 入力前プロンプト改善 Hook（`peer_prompt_refinement.py`）は **登録済みだが既定OFF**（`AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT=1` で有効）
-- `peer_prompt_refinement.py` を有効化した場合、peer CLI の失敗時は **既定で停止**（`AI_AGENT_PROMPT_REFINEMENT_REQUIRED=0` で fail-open に変更可能）
-- peer prompt refinement の共有既定待機時間は **150秒**。必要なら `AI_AGENT_PROMPT_REFINEMENT_TIMEOUT_SECONDS` で延長可能
+- 入力前プロンプト改善は Hook ではなく **Skill（`peer-prompt-refinement`）で運用**
 - 回答後の自律継続 Hook（`response_strategy_bridge.py`）は **登録済みだが既定OFF**（`AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY=1` で有効）
 
 これにより、ローカル負荷と多層 Hook 重複による挙動競合を抑えます。

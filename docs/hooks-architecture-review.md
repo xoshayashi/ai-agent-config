@@ -23,7 +23,7 @@
 
 - 管理対象をユーザーグローバル設定に限定して、管理レイヤーを1つに固定
 - 既存 `settings.json` / `config.toml` は置換せず managed 部分のみ append/merge
-- 高負荷になりやすい peer prompt refinement は登録済みでも既定OFFにして、明示有効化までは実行させない
+- 高負荷になりやすい prompt refinement は Hook ではなく Skill 側に寄せ、グローバル Hook 競合を避ける
 
 ## 残るトレードオフ
 
@@ -32,13 +32,12 @@
 
 ## 追補（2026-04 Response Strategy）
 
-入力時の peer prompt refinement と、回答完了タイミングの自律継続検証として、以下を追加しました。
+回答完了タイミングの自律継続検証として、以下を追加しました。
 
-- `peer_prompt_refinement.py`（`UserPromptSubmit` / `BeforeAgent`）
 - `multillm_orchestrator.py`（Codex `SessionStart` / `UserPromptSubmit` / `Stop`）
 - Claude/Codex: `Stop` イベントで発火
 - Gemini: `AfterAgent` イベントで発火
-- 既定は `AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=0`（無効）、`AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT=0` / `AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY=0`（無効）
+- 既定は `AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=0`（無効）、`AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY=0`（無効）
 
 現行の `multillm_orchestrator.py` は、旧来の `Claude -> Gemini -> Claude` 仕様ループではなく、**Codex が先に仕様を書き、Claude が stop 境界でレビューし、Gemini は実装中の periodic critic に回る** 形へ簡略化しています。
 

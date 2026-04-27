@@ -271,7 +271,7 @@ def call_peer(current: str, packet: str, cwd: str) -> str:
         return ""
     command, stdin_payload = spec
 
-    timeout = safe_int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_TIMEOUT_SECONDS", "35"), 35, minimum=3, maximum=120)
+    timeout = safe_int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_TIMEOUT_SECONDS", "35"), 35, minimum=3, maximum=45)
     max_chars = safe_int(os.environ.get("AI_AGENT_RESPONSE_STRATEGY_OUTPUT_CHARS", "12000"), 12000, minimum=500, maximum=200000)
 
     env = os.environ.copy()
