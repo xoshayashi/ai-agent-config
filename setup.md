@@ -150,6 +150,11 @@ peer CLI 内部待機時間を延ばしたい場合:
 export AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS=45
 ```
 
+注記:
+
+- orchestration を有効化しても、実際には **重い設計 / 実装 / レビュー系 prompt を中心に起動** させる前提です
+- Codex の `Stop` では、Gemini critique と Claude guidance が同じターンで順に走ることがあるため、**外側 Hook timeout は内部 timeout の 2 倍弱を見込む** のが安全です
+
 Claude spec review / implementation guidance の thinking 深さを調整したい場合:
 
 ```sh
@@ -159,28 +164,11 @@ export AI_AGENT_ORCHESTRATOR_CLAUDE_COMPLEX_EFFORT=high
 
 完了キーワードと終了条件は `instructions/HOOKS.md` を参照します。
 
-### 入力前プロンプト改善 Hook（任意）
+### 入力前プロンプト改善
 
-`peer_prompt_refinement.py` は設定に登録済みですが、既定では無効です。  
-有効化する場合のみ、シェル設定に次を追加します。
-
-```sh
-export AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT=1
-export AI_AGENT_PROMPT_REFINEMENT_REQUIRED=1
-export AI_AGENT_PROMPT_REFINEMENT_TIMEOUT_SECONDS=150
-```
-
-provider を固定する場合:
-
-```sh
-export AI_AGENT_PROMPT_REFINEMENT_PROVIDER=claude   # claude / gemini / codex
-```
-
-`auto` の既定ルートは次です。
-
-- Codex -> Claude Code
-- Claude Code -> Codex
-- Gemini CLI -> Claude Code
+入力前のプロンプト改善は、グローバル Hook ではなく **Skill
+`peer-prompt-refinement`** で運用します。  
+そのため、`scripts/setup.sh` は prompt refinement 用 Hook を各 CLI 設定に登録しません。
 
 ## 既存個人設定の扱い
 
@@ -207,10 +195,6 @@ export AI_AGENT_PROMPT_REFINEMENT_PROVIDER=claude   # claude / gemini / codex
 | `AI_AGENT_ORCHESTRATOR_CLAUDE_SIMPLE_EFFORT` | `low` | 簡単な Claude 非対話レビュー時の effort |
 | `AI_AGENT_ORCHESTRATOR_CLAUDE_COMPLEX_EFFORT` | `high` | 複雑な Claude 非対話レビュー時の effort |
 | `AI_AGENT_ORCHESTRATOR_GEMINI_REVIEW_EVERY` | `3` | 実装何ターンごとにGeminiレビューを挟むか |
-| `AI_AGENT_HOOKS_ENABLE_PROMPT_REFINEMENT` | `0` | `1` で入力前の peer prompt refinement Hook を有効化 |
-| `AI_AGENT_PROMPT_REFINEMENT_PROVIDER` | `auto` | `auto` / `claude` / `gemini` / `codex` |
-| `AI_AGENT_PROMPT_REFINEMENT_REQUIRED` | `1` | `1` で peer prompt refinement が失敗したら停止、`0` で fail-open |
-| `AI_AGENT_PROMPT_REFINEMENT_TIMEOUT_SECONDS` | `150` | peer prompt refinement の内部待機秒数 |
 | `AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY` | `0` | `1` で回答後の peer レビュー継続 Hook を有効化 |
 | `AI_AGENT_RESPONSE_STRATEGY_PROVIDER` | `auto` | `auto` / `gemini` / `codex` / `ollama` |
 | `AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL` | Empty | `provider=ollama` 時に使うモデル名 |
