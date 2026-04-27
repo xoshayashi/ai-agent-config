@@ -437,7 +437,6 @@ def spec_is_review_candidate(spec_markdown: str) -> bool:
     if not text:
         return False
     markdown_heading_count = len(re.findall(r"^#{1,6}\s+.+$", text, flags=re.MULTILINE))
-    numbered_item_count = len(re.findall(r"^[0-9]+\.\s+.+$", text, flags=re.MULTILINE))
     keyword_hits = 0
     for pattern in (
         r"(scope|non-goals?|対象|非対象)",
@@ -449,8 +448,8 @@ def spec_is_review_candidate(spec_markdown: str) -> bool:
         if re.search(pattern, text, flags=re.IGNORECASE):
             keyword_hits += 1
     # These thresholds are tuned for "likely implementation-ready" drafts:
-    # require real markdown section structure, while keeping numbered lists as
-    # auxiliary content rather than counting them as headings outright.
+    # require real markdown heading structure; numbered list items alone do not
+    # count toward the heading threshold.
     return (len(text) >= 900 and markdown_heading_count >= 4 and keyword_hits >= 3) or (
         len(text) >= 1400 and markdown_heading_count >= 3 and keyword_hits >= 2
     )
