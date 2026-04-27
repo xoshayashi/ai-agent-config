@@ -32,11 +32,14 @@ def assert_eq(actual, expected, message: str = "") -> None:
         raise AssertionError(f"{message}: expected {expected!r}, got {actual!r}")
 
 
-def with_env(updates: dict[str, str], fn):
+def with_env(updates: dict[str, str | None], fn):
     old = {key: os.environ.get(key) for key in updates}
     try:
         for key, value in updates.items():
-            os.environ[key] = value
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
         fn()
     finally:
         for key, value in old.items():
@@ -101,10 +104,9 @@ def test_peer_invocation_codex_channel() -> None:
 
 def test_strict_mode_defaults_on() -> None:
     def _run() -> None:
-        os.environ.pop("AI_AGENT_PROMPT_REFINEMENT_REQUIRED", None)
         assert_eq(PPR.strict_mode(), True, "strict mode should default on")
 
-    _run()
+    with_env({"AI_AGENT_PROMPT_REFINEMENT_REQUIRED": None}, _run)
 
 
 def test_emit_block_for_codex_returns_json() -> None:
