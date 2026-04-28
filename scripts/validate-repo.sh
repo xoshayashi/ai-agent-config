@@ -106,6 +106,7 @@ for doc in "$repo_root/README.md" "$repo_root/setup.md"; do
   grep -q "Claude Code" "$doc" || fail "$doc does not mention Claude Code"
   grep -q "Codex" "$doc" || fail "$doc does not mention Codex"
   grep -q "Gemini CLI" "$doc" || fail "$doc does not mention Gemini CLI"
+  grep -q "Copilot" "$doc" || fail "$doc does not mention Copilot scope"
   grep -q "Hook" "$doc" || fail "$doc does not mention Hooks"
   grep -q "~/.codex" "$doc" || fail "$doc does not mention global Codex config directory"
   grep -q "~/.claude" "$doc" || fail "$doc does not mention global Claude config directory"
