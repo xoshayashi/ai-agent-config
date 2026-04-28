@@ -21,7 +21,7 @@ alias gemini='gemini --yolo'
 # subcommands and flag-only invocations through unchanged so they can still
 # manage installation, auth, MCP, plugins, and explicit permission overrides.
 claude() {
-  case "$1" in
+  case "${1-}" in
     agents|auth|auto-mode|doctor|install|mcp|plugin|plugins|setup-token|ultrareview|update|upgrade|--help|-h|--version|-v|--permission-mode|--dangerously-skip-permissions|--allow-dangerously-skip-permissions)
       command claude "$@"
       ;;
