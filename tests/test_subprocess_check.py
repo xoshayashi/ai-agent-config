@@ -267,6 +267,53 @@ def test_parse_claude_json_extracts_result() -> None:
     assert "Edit hooks/scripts/foo.py" in text
 
 
+def test_parse_claude_json_handles_array_of_stream_events() -> None:
+    """Recent Claude Code releases emit `--output-format json` as an array of stream events."""
+    events = [
+        {"type": "system", "subtype": "init", "session_id": "abc"},
+        {
+            "type": "assistant",
+            "message": {
+                "role": "assistant",
+                "content": [{"type": "text", "text": "STATUS: complete"}],
+            },
+        },
+        {"type": "result", "subtype": "success", "result": "STATUS: complete"},
+    ]
+    kind, text = SC.parse_subprocess_output("claude", json.dumps(events))
+    assert kind == "complete"
+    assert text.strip().startswith("STATUS: complete")
+
+
+def test_parse_claude_json_array_falls_back_to_assistant_text_when_no_result_event() -> None:
+    events = [
+        {"type": "system", "subtype": "init", "session_id": "abc"},
+        {
+            "type": "assistant",
+            "message": {
+                "role": "assistant",
+                "content": [{"type": "text", "text": "Run the tests next."}],
+            },
+        },
+    ]
+    kind, text = SC.parse_subprocess_output("claude", json.dumps(events))
+    assert kind == "instruction"
+    assert "Run the tests next" in text
+
+
+def test_parse_subprocess_output_returns_empty_when_parser_fails_to_avoid_raw_leak() -> None:
+    """Guard: if claude/codex output cannot be parsed, do NOT leak raw JSON as continuation."""
+    raw = '{"unexpected_envelope": [1, 2, 3], "no_text_anywhere": true}'
+    kind, text = SC.parse_subprocess_output("claude", raw)
+    assert kind == "empty"
+    assert text == ""
+
+    raw_codex = '{"type":"thread.started","id":"t-1"}\n{"type":"some_other_event"}'
+    kind, text = SC.parse_subprocess_output("codex", raw_codex)
+    assert kind == "empty"
+    assert text == ""
+
+
 # ── Output adapters ──────────────────────────────────────────────────────────
 
 def test_stop_continuation_output_for_claude_blocks() -> None:
@@ -508,6 +555,9 @@ def run_tests() -> int:
         test_parse_output_empty,
         test_parse_codex_jsonl_extracts_text,
         test_parse_claude_json_extracts_result,
+        test_parse_claude_json_handles_array_of_stream_events,
+        test_parse_claude_json_array_falls_back_to_assistant_text_when_no_result_event,
+        test_parse_subprocess_output_returns_empty_when_parser_fails_to_avoid_raw_leak,
         test_stop_continuation_output_for_claude_blocks,
         test_stop_continuation_output_for_gemini_denies,
         test_context_output_uses_correct_shape_per_cli,

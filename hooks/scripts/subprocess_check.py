@@ -349,14 +349,28 @@ def parse_subprocess_output(current: str, raw: str | None) -> tuple[str, str]:
     if not raw or not raw.strip():
         return "empty", ""
 
-    text = raw
+    stripped = raw.strip()
+    looks_like_json = stripped.startswith("{") or stripped.startswith("[")
 
-    # Codex returns newline-delimited JSON events; pick assistant text when possible.
+    text: str | None = None
+
+    # CLIs that emit machine-readable output: try to parse. If the input *looks*
+    # like JSON but parsing fails to find assistant text, treat as 'empty'
+    # rather than leaking raw JSON into the continuation. Plain text passes
+    # through as-is (some CLIs/configurations may emit plain text).
     if current == "codex":
-        text = extract_text_from_codex_jsonl(raw) or raw
-    # Claude Code returns a JSON envelope with a result field when --output-format json is used.
+        text = extract_text_from_codex_jsonl(raw)
+        if text is None and not looks_like_json:
+            text = stripped
     elif current == "claude":
-        text = extract_text_from_claude_json(raw) or raw
+        text = extract_text_from_claude_json(raw)
+        if text is None and not looks_like_json:
+            text = stripped
+    else:
+        text = stripped
+
+    if not text:
+        return "empty", ""
 
     text = text.strip()
     if not text:
@@ -397,16 +411,54 @@ def extract_text_from_codex_jsonl(raw: str) -> str | None:
 
 
 def extract_text_from_claude_json(raw: str) -> str | None:
-    """Best-effort extraction from `claude -p --output-format json` output."""
+    """Best-effort extraction from `claude -p --output-format json` output.
+
+    Handles both formats produced by recent Claude Code releases:
+      - Single-object: {"result": "...", "session_id": "...", ...}
+      - Array of stream events: [{"type":"system",...}, {"type":"assistant",...},
+                                  {"type":"result","result":"..."}]
+    """
     try:
         parsed = json.loads(raw)
     except json.JSONDecodeError:
         return None
+
+    # Single-object envelope
     if isinstance(parsed, dict):
         for key in ("result", "response", "message", "text"):
             value = parsed.get(key)
             if isinstance(value, str) and value.strip():
                 return value
+        return None
+
+    # Array of stream events: prefer the final `result` event, then assistant text.
+    if isinstance(parsed, list):
+        for entry in reversed(parsed):
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("type") == "result":
+                value = entry.get("result")
+                if isinstance(value, str) and value.strip():
+                    return value
+        chunks: list[str] = []
+        for entry in parsed:
+            if not isinstance(entry, dict):
+                continue
+            if entry.get("type") != "assistant":
+                continue
+            message = entry.get("message")
+            if not isinstance(message, dict):
+                continue
+            content = message.get("content")
+            if isinstance(content, list):
+                for item in content:
+                    if isinstance(item, dict) and item.get("type") == "text":
+                        text_value = item.get("text")
+                        if isinstance(text_value, str):
+                            chunks.append(text_value)
+        joined = "\n".join(chunk for chunk in chunks if chunk.strip()).strip()
+        return joined or None
+
     return None
 
 
