@@ -1,13 +1,19 @@
 # Skill Improvement Automation
 
-この自動化は、Claude Code、Codex、Gemini CLIの利用ログから **Skillで吸収すべき改善点** を見つけ、改善提案、PR作成、Claudeレビュー対応、条件付き自動マージまでをつなぐためのローカル運用です。GitHub Copilot は現行実装では canonical instructions の共有対象ではありますが、同じログ収集・Hook・self-workflow 基盤には入っていません。
+## このドキュメントの位置付け
+
+- **読者:** 自分が日々使っている AI エージェント CLI のログから「Skill（再利用可能な手順書）にどんな改善が要りそうか」を自動で拾わせたい人。プログラミング経験は問いません。
+- **前提:** Claude Code / Codex / Gemini CLI のいずれかを日常的に使っており、このリポジトリの `scripts/setup.sh` で初期設定が済んでいる。
+- **読み終えて分かること:** 何が自動化できるか／できないか、どこまで自動で進めるかを切り替える環境変数（CLI に渡す設定値）の名前、PR 作成や自動マージを有効化する具体的なコマンド。
+
+この自動化は、Claude Code、Codex、Gemini CLIの利用ログから **Skillで吸収すべき改善点** を見つけ、改善提案、PR作成（GitHub 上の変更提案）、Claudeレビュー対応、条件付き自動マージ（条件を満たした PR を自動で取り込む処理）までをつなぐためのローカル運用です。GitHub Copilot は現行実装では canonical instructions の共有対象ではありますが、同じログ収集・Hook・self-workflow 基盤には入っていません。
 
 ## Feasibility / 実現可能性
 
 | 領域 | 判定 | 理由 |
 |---|---:|---|
-| **CLIログの定期チェック** | 可能 | ログは各ユーザーPCのローカル領域にあるため、`launchd` または `systemd` のユーザータイマーで定期実行できます。 |
-| **GitHub Actionsだけでのログ収集** | 不可 | GitHub-hosted runnerはユーザーPC上のClaude Code、Codex、Gemini CLIログへアクセスできません。GitHub Actionsの `schedule` は既定ブランチ上で定時実行できますが、対象はGitHub側の環境です。 |
+| **CLIログの定期チェック** | 可能 | ログは各ユーザーPCのローカル領域にあるため、`launchd`（macOS の標準スケジューラ）または `systemd`（Linux の標準スケジューラ）のユーザータイマーで定期実行できます。 |
+| **GitHub Actionsだけでのログ収集** | 不可 | GitHub-hosted runner（GitHub が用意するクラウド上の実行環境）はユーザーPC上のClaude Code、Codex、Gemini CLIログへアクセスできません。GitHub Actionsの `schedule` は既定ブランチ上で定時実行できますが、対象はGitHub側の環境です。 |
 | **改善提案PRの作成** | 可能 | `gh pr create` はタイトル、本文、base/head指定に対応しており、非対話のPR作成に使えます。 |
 | **Claudeレビュー後の自動改善** | 条件付きで可能 | ローカルの `claude -p` と `gh` が使え、対象PRブランチをチェックアウトできる場合に実行できます。 |
 | **自動マージ** | 条件付きで可能 | `gh pr merge --auto --match-head-commit <SHA>` により、要件が満たされた時だけマージ予約できます。未解決レビュー、失敗チェック、Draft、競合がある場合は止めます。 |
@@ -31,8 +37,8 @@ Local LLM CLI logs
 
 ## Safety Defaults / 安全設計
 
-- **生ログはコミットしない:** PRに入るのは `reports/skill-improvement/*.md` の匿名化済み要約だけです。
-- **秘密情報は伏せる:** API key、GitHub token、メールアドレス、長いハッシュ、ユーザーホームパスは redaction の対象です。
+- **生ログはコミットしない:** PRに入るのは `reports/skill-improvement/*.md` の匿名化済み要約だけです（生のログ本文は GitHub に上げません）。
+- **秘密情報は伏せる:** API key（外部サービスへのアクセスキー）、GitHub token、メールアドレス、長いハッシュ、ユーザーホームパスは redaction（自動で伏せ字にする処理）の対象です。
 - **スニペットは高プライバシーモードでPR化しない:** `AI_AGENT_IMPROVEMENT_INCLUDE_SNIPPETS=1` はローカル確認向けです。既定の `AI_AGENT_IMPROVEMENT_PRIVACY_MODE=high` では、スニペット入りレポートをPR化しようとすると停止します。
 - **外部LLMへの送信は任意:** Skill本文を自動修正する処理は `AI_AGENT_IMPROVEMENT_LLM` を指定した時だけ動きます。
 - **PR作成も任意:** `AI_AGENT_IMPROVEMENT_CREATE_PR=1` を設定しない限り、定期実行はローカルレポート生成に留まります。

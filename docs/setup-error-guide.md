@@ -1,5 +1,11 @@
 # Setup Error Guide
 
+## このドキュメントの位置付け
+
+- **読者:** `scripts/setup.sh`（PC への初期設定）、`scripts/update.sh`（最新の設定を取り込む）、`scripts/uninstall.sh`（取り外し）、自動更新スケジュール登録、のいずれかで失敗した人。プログラミング経験は問いません。
+- **前提:** ターミナル（黒い画面のコマンド入力ツール）でこのリポジトリのスクリプトを動かしている。
+- **読み終えて分かること:** よく出るエラーが何を意味するか、どの順番で確認すれば自分のファイルを壊さずに進められるか。
+
 Use this guide when setup, update, scheduling, or uninstall fails. Explain errors in plain Japanese first, then suggest the smallest safe next step.
 
 ## Common Errors
@@ -18,7 +24,7 @@ Use this guide when setup, update, scheduling, or uninstall fails. Explain error
 | `not a git repository` | 更新対象がGitリポジトリではありません。 | 正しい `llm-config` の場所を探すか、GitHubから再取得します。 |
 | `AI_AGENT_TARGET_DIR is deprecated and ignored` | 旧方式（作業フォルダー配下へのリンク作成）の変数が指定されています。 | そのまま続行できます。必要なら `AI_AGENT_CODEX_HOME` / `AI_AGENT_CLAUDE_HOME` / `AI_AGENT_GEMINI_HOME` を使ってグローバル配置先を調整します。 |
 | `copilot-instructions.md` が見つからない | 現行実装では `.github/copilot-instructions.md` は repo-local 管理で、`scripts/setup.sh` や `scripts/health-check.sh` の対象外です。 | Copilot を使う対象リポジトリに `.github/copilot-instructions.md` を手動配置するか、このリポジトリの `instructions/.github/copilot-instructions.md` を正本として必要内容を反映します。 |
-| `launchctl` or `systemctl` scheduling failed | 自動更新のスケジュール登録に失敗しました。設定本体は使える場合があります。 | まず手動更新コマンドを案内します。自動更新はOS別に再確認します。 |
+| `launchctl` or `systemctl` scheduling failed | 自動更新のスケジュール登録（macOS の `launchctl`、Linux の `systemctl` という OS 標準のスケジューラ機構を使った定期実行登録）に失敗しました。設定本体は使える場合があります。 | まず手動更新コマンドを案内します。自動更新はOS別に再確認します。 |
 | Hookが起動しない (`statusMessage` が出ない) | `hooks.json` が未反映か、managed hook link や installable skill link が壊れている可能性があります。 | `~/.codex/config.toml` の `codex_hooks = true`、`~/.codex/hooks.json` の存在、`scripts/health-check.sh` の `hooks-self-workflow` 行、`~/.agents/skills/refinment` のリンクを確認し、`scripts/setup.sh` を再実行します。 |
 | `health: warn` | 基本動作は確認できましたが、未ログイン、未インストール、リンク未設定、リポジトリ未保存変更など確認が必要な項目があります。 | `scripts/health-check.sh` の各行を見て、最も小さい修正だけを提案します。 |
 | `health: fail` | Gitや設定リポジトリなど、更新や診断に必要な前提が見つかりません。 | リポジトリの場所、Gitの有無、GitHubからの再取得が必要かを確認します。 |
@@ -28,11 +34,11 @@ Use this guide when setup, update, scheduling, or uninstall fails. Explain error
 1. **何が起きたか**を1から2文で説明する。
 2. **ユーザーのファイルが失われていないか**を確認する。
 3. **安全な次の一手**を1つ提示する。
-4. 迷う場合は `AI_AGENT_DRY_RUN=1` で再確認する。
+4. 迷う場合は `AI_AGENT_DRY_RUN=1`（実際には変更せず、何が起きるかだけを表示する確認モード）で再確認する。
 
 ## Safety Rules
 
-- Do not suggest permanent deletion.
+- Do not suggest permanent deletion.（**永続削除は提案しない。** 元に戻せない `rm` ではなく、ゴミ箱に送る `trash` を使う）
 - Use `trash` for cleanup and uninstall.
 - Prefer user-owned directories (`~/.codex`, `~/.claude`, `~/.gemini`, `~/.llm-config`) over system-wide protected locations.
 - If a command failed because knowledge may be outdated, check the official CLI or GitHub documentation before retrying.

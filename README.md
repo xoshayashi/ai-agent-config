@@ -3,6 +3,8 @@
 Claude Code / Codex / Gemini CLI で共通の Instructions・Skills・Hooks を配布し、GitHub Copilot には同じ source of truth を repo-local instructions として供給するためのリポジトリです。  
 **現在は 3 CLI のグローバル設定 + Copilot の repo-local instructions** という形で運用します。
 
+> はじめて読む方・非エンジニアの方は、まず [docs/overview.md](docs/overview.md)（このリポジトリは何か・何が起きるか・誰のためのものか）を参照してください。
+
 ## 何が設定されるか
 
 ### Instructions（グローバル）
