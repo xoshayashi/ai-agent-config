@@ -46,7 +46,7 @@ def test_should_not_block_safe_command() -> None:
 
 
 def test_should_not_block_non_shell_tool() -> None:
-    payload = {"tool_name": "Read", "tool_input": {"command": "rm -rf build"}}
+    payload = {"tool_name": "Read", "tool_input": {"file_path": "build/output.txt"}}
     assert SDG.should_block(payload) is False
 
 

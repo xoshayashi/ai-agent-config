@@ -121,7 +121,8 @@ grep -q "test_safe_delete_guard.py" "$repo_root/CLAUDE.md" || fail "CLAUDE.md do
 ! grep -q "test_self_workflow.py" "$repo_root/AGENTS.md" "$repo_root/CLAUDE.md" || fail "root entrypoints still reference deleted self-workflow tests"
 ! grep -q "self_workflow.py" "$repo_root/AGENTS.md" "$repo_root/CLAUDE.md" || fail "root entrypoints still reference deleted self_workflow.py"
 ! grep -q "~/.llm-config" "$repo_root/AGENTS.md" "$repo_root/CLAUDE.md" || fail "root entrypoints still reference the retired .llm-config path"
-! rg -q "enable-auto-permission|disable-auto-permission|shell/auto-permission|AI_AGENT_SHELL_ALIAS_LINK|auto-permission" \
+auto_permission_pattern='enable-auto-permission|disable-auto-permission|shell/auto-permission|AI_AGENT_SHELL_ALIAS_LINK|auto-permission'
+! grep -REq "$auto_permission_pattern" \
   "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/AGENTS.md" "$repo_root/CLAUDE.md" "$repo_root/instructions" \
   || fail "auto-permission references remain in the minimal architecture docs"
 

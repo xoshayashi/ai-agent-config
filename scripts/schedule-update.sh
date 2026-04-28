@@ -28,6 +28,26 @@ expand_home() {
   esac
 }
 
+xml_escape() {
+  printf '%s' "$1" | sed \
+    -e 's/&/\&amp;/g' \
+    -e 's/</\&lt;/g' \
+    -e 's/>/\&gt;/g' \
+    -e 's/"/\&quot;/g' \
+    -e "s/'/\&apos;/g"
+}
+
+systemd_require_safe_value() {
+  label=$1
+  value=$2
+  case "$value" in
+    *[\"\\\\]*|*" "*|*"	"*|*'
+'*)
+      fail "$label contains spaces, quotes, backslashes, or newlines; systemd scheduling cannot safely write this value"
+      ;;
+  esac
+}
+
 script_path=$0
 case "$script_path" in
   */*) script_dir=$(CDPATH= cd "$(dirname "$script_path")" && pwd -P) ;;
@@ -174,42 +194,50 @@ if [ "$os" = "Darwin" ]; then
     exit 0
   fi
   mkdir -p "$launch_dir" "$state_dir"
+  label_xml=$(xml_escape "$label")
+  runtime_update_entrypoint_xml=$(xml_escape "$runtime_update_entrypoint")
+  state_dir_xml=$(xml_escape "$state_dir")
+  config_home_xml=$(xml_escape "$config_home")
+  update_remote_xml=$(xml_escape "$update_remote")
+  update_branch_xml=$(xml_escape "$update_branch")
+  skip_when_dirty_xml=$(xml_escape "$skip_when_dirty")
+  skip_when_branch_mismatch_xml=$(xml_escape "$skip_when_branch_mismatch")
   cat > "$plist" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
   <key>Label</key>
-  <string>$label</string>
+  <string>$label_xml</string>
   <key>ProgramArguments</key>
   <array>
-    <string>$runtime_update_entrypoint</string>
+    <string>$runtime_update_entrypoint_xml</string>
   </array>
   <key>StartInterval</key>
   <integer>$interval</integer>
   <key>RunAtLoad</key>
   <true/>
   <key>WorkingDirectory</key>
-  <string>$state_dir</string>
+  <string>$state_dir_xml</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>AI_AGENT_STATE_DIR</key>
-    <string>$state_dir</string>
+    <string>$state_dir_xml</string>
     <key>AI_AGENT_CONFIG_HOME</key>
-    <string>$config_home</string>
+    <string>$config_home_xml</string>
     <key>AI_AGENT_UPDATE_REMOTE</key>
-    <string>$update_remote</string>
+    <string>$update_remote_xml</string>
     <key>AI_AGENT_UPDATE_BRANCH</key>
-    <string>$update_branch</string>
+    <string>$update_branch_xml</string>
     <key>AI_AGENT_UPDATE_SKIP_WHEN_DIRTY</key>
-    <string>$skip_when_dirty</string>
+    <string>$skip_when_dirty_xml</string>
     <key>AI_AGENT_UPDATE_SKIP_WHEN_BRANCH_MISMATCH</key>
-    <string>$skip_when_branch_mismatch</string>
+    <string>$skip_when_branch_mismatch_xml</string>
   </dict>
   <key>StandardOutPath</key>
-  <string>$state_dir/update.log</string>
+  <string>$state_dir_xml/update.log</string>
   <key>StandardErrorPath</key>
-  <string>$state_dir/update.err.log</string>
+  <string>$state_dir_xml/update.err.log</string>
 </dict>
 </plist>
 EOF
@@ -227,6 +255,11 @@ elif command -v systemctl >/dev/null 2>&1; then
     say "would enable timer with systemctl --user enable --now ai-agent-config-update.timer"
     exit 0
   fi
+  systemd_require_safe_value "AI_AGENT_STATE_DIR" "$state_dir"
+  systemd_require_safe_value "AI_AGENT_CONFIG_HOME" "$config_home"
+  systemd_require_safe_value "AI_AGENT_UPDATE_REMOTE" "$update_remote"
+  systemd_require_safe_value "AI_AGENT_UPDATE_BRANCH" "$update_branch"
+  systemd_require_safe_value "update runtime entrypoint path" "$runtime_update_entrypoint"
   cat > "$service" <<EOF
 [Unit]
 Description=Update AI agent config

@@ -168,7 +168,8 @@ def main() -> int:
         capture_output=True,
         dry_run=False,
     )
-    assert current_branch_proc is not None
+    if current_branch_proc is None:
+        return fail("internal error: git branch check returned no result")
     if current_branch_proc.returncode != 0:
         detail = completed_stderr(current_branch_proc) or "unable to read current branch"
         return fail(detail)
@@ -190,7 +191,8 @@ def main() -> int:
         capture_output=True,
         dry_run=False,
     )
-    assert dirty_proc is not None
+    if dirty_proc is None:
+        return fail("internal error: git status check returned no result")
     if dirty_proc.returncode != 0:
         detail = completed_stderr(dirty_proc) or "unable to inspect repository status"
         return fail(detail)
@@ -218,6 +220,8 @@ def main() -> int:
     if rerun_setup:
         say("re-apply setup")
         home = Path.home()
+        # Keep scheduler registration enabled here so setup refreshes the
+        # runtime wrappers and launchd/systemd definitions after an update.
         setup_env = os.environ.copy()
         setup_env.update(
             {
