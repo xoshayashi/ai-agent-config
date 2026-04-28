@@ -129,26 +129,23 @@ CLI 側設定先:
 | Gemini CLI | `~/.gemini/settings.json` |
 | GitHub Copilot CLI | `~/.copilot/settings.json` |
 
-### Same-LLM Self-Workflow Hook
+### Same-LLM Subprocess Check Hook
 
-`self_workflow.py` は Claude Code / Codex / Gemini CLI / GitHub Copilot CLI の Hook 設定に登録済みで、**常時 routed** です。
-ただし実際の loop は、qualifying-task 判定に通ったときだけ動きます。現在の CLI がそのまま次を実行します。
+`subprocess_check.py` は Claude Code / Codex / Gemini CLI / GitHub Copilot CLI の Hook 設定に登録済みで、**managed event で常時 routed** です。
+Hook 境界で同じ CLI を非対話サブプロセスとして 1 回呼び、次の具体的な 1 手か `STATUS: complete` を返させます。
+旧 `self_workflow.py` は、既存のローカル設定が残っている環境向けの互換 shim として同梱しています。
 
-1. startup event (`UserPromptSubmit` / `SessionStart` または `BeforeAgent`) で仕様起草ブリーフを注入
-2. 必要時だけ現在の CLI 自身が `refinment` で startup brief を整え、`Refined prompt:` を表示してから開始
-3. completion event で `[[SPEC_DONE]]` が出たら、同じ CLI が `refinment` で仕様をもう一段締める
-4. 仕様が整ったらそのまま実装に進める
-5. 実装中と verification 中も、同じ CLI が必要時だけ `refinment` で next-step / completion brief を締めながら進行
+1. startup event (`UserPromptSubmit` / `SessionStart` または `BeforeAgent`) で、最初の具体的な 1 手を相談する
+2. Stop 系 event では、短い返答や answer-only の返答を軽量 gate で弾く
+3. 実質的な作業が続いているときだけ、同じ CLI に「次に何をするか」を聞く
+4. サブプロセスが `STATUS: complete` を返したら、そのタスクの継続を止める
 
 注記:
 
-- self-workflow Hook は常時 routed ですが、実際に loop を起動するのは **重い設計 / 実装 / レビュー系 prompt** が中心です
-- 入力前の brief 改善と phase boundary の引き締めは **Skill `refinment`** が担当します
-- `refinment` は self-contained で、外部 reviewer CLI を呼ばずに現在の CLI 自身が brief を整えます
-- 新規タスクで `refinment` を使った場合、その CLI は `Refined prompt:` を表示してから作業を始めます
+- subprocess-check Hook は常時 routed ですが、軽量 gate が no-op 判定を返すこともあります
+- 入力前の brief 改善は **Skill `refinment`** 側の判断に委ねます
+- 完了シグナルと停止条件の正本は `instructions/HOOKS.md` です
 - 外部 reviewer を呼ぶ `response strategy` / `multi-LLM orchestration` は現行 main path では使いません
-
-完了キーワードと終了条件は `instructions/HOOKS.md` を参照します。
 
 ### 入力前プロンプト改善
 

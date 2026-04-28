@@ -34,48 +34,31 @@ repo-level Copilot instructions.
 | Hook | Default | Purpose |
 |---|---|---|
 | `safe_delete_guard.py` | On | Blocks permanent shell deletion commands and tells the agent to use the safer trash workflow. |
-| `self_workflow.py` | Registered / **Always routed on managed events, selectively active on qualifying tasks** | Same-LLM self-workflow: the current CLI drafts the spec, uses Skill-driven refinment at task start and phase boundaries, and boundedly auto-continues through implementation and verification. |
+| `subprocess_check.py` | Registered / **Always routed on managed events** | Same-CLI advisor: asks the current CLI in non-interactive mode for the next concrete step or `STATUS: complete`. |
+| `self_workflow.py` | Compatibility only | Thin shim that forwards old managed hook configs to `subprocess_check.py` until local settings are refreshed. |
 
 The safe-delete hook is a runtime guardrail, not the only safety layer. The
 shared instructions still require agents to use the safer trash workflow even
 if hooks are disabled or unavailable.
 
-`self_workflow.py` is called directly from the managed hook configs for Claude
-Code, Codex, Gemini CLI, and GitHub Copilot CLI. There is no routine enable flag for the main
-self-workflow path now; the managed hook is always present, and
-qualifying-task detection decides when the loop actually activates.
+`subprocess_check.py` is called directly from the managed hook configs for Claude
+Code, Codex, Gemini CLI, and GitHub Copilot CLI. The managed hook is always
+present, but the Python gate may immediately no-op on unsupported events,
+recursive subprocesses, short answer-only turns, or after the per-task cap.
 
-This self-workflow mode still has a real latency footprint, but it is lighter
-than the earlier design because it does not launch external LLM subprocesses from
-the main path.
-Even with the managed hook always installed, the runtime should activate only
-for heavier design / implementation / review prompts rather than every trivial
-turn.
-The runtime should make a generic intent split: answer-only turns stay outside
-the loop, while artifact/execution turns can enter it when they need bounded
-multi-step work.
-When a loop is already active, a non-follow-up turn that falls outside that
-managed path should clear the active workflow state instead of letting stale
-continuation prompts survive into the next stop event.
+The active Skill path is self-contained. `skills/refinment` may still refine
+the working brief inside the current CLI, but the hook itself does not force
+any specific Skill.
 
-The active Skill path is self-contained. `skills/refinment` refines the working
-brief inside the current CLI instead of shelling out to another model. Keep that Skill
-focused on selective use, minimal edits, and visible `Refined prompt:` output
-when it changes startup behavior.
+In same-CLI mode, managed hooks use this flow:
 
-`refinment` is invoked through the CLI's native skill-routing path, not as a
-separately registered Hook script.
+1. Startup event (`UserPromptSubmit`, `SessionStart`, or `BeforeAgent`): ask the same CLI for the smallest first concrete step
+2. Stop-style event: skip trivial / answer-only turns, otherwise ask for the next concrete step
+3. If the subprocess returns `STATUS: complete` on the first line, mark the task complete and stop continuing
+4. Otherwise surface the returned instruction as the continuation prompt
 
-In same-LLM mode, managed hooks use this flow:
-
-1. Startup event (`UserPromptSubmit` or `BeforeAgent`): inject a specification brief and let the current CLI decide whether to use `refinment`
-2. If `refinment` is used on the original task prompt, the CLI shows the refined prompt to the user before continuing
-3. Completion event after a spec draft is ready enough for review: auto-continue the same CLI with a prompt that tells it to use `refinment`
-4. Completion event during implementation: auto-continue the same CLI with a prompt that tells it to use `refinment` for the next-step or verification-ready decision
-5. Completion event during verification: auto-continue the same CLI with a prompt that tells it to use `refinment` before declaring completion, and prefer delta-only corrections only when the latest response actually reads like a correction/supplement
-
-Completion keywords and stop conditions are defined in `instructions/HOOKS.md`.
-When `self_workflow.py` auto-continues from a Claude/Codex/Gemini completion
+Completion signals and stop conditions are defined in `instructions/HOOKS.md`.
+When `subprocess_check.py` auto-continues from a Claude/Codex/Gemini completion
 hook, the UI may still label that event as `blocked` or `denied`; this is the
 current official continuation mechanism rather than an error.
 
@@ -84,7 +67,7 @@ Key guardrails:
 - Re-entry guard via `AI_AGENT_SELF_WORKFLOW_ACTIVE=1`
 - Bounded continuation count and repeated-prompt caps
 - Verification turn caps
-- Session-scoped local state under `~/.ai-agent-config/self-workflow`
+- Session-scoped local state under `~/.ai-agent-config/subprocess-check`
 - Fail-open behavior for non-qualifying or unsupported events
 
 ## CLI Conventions

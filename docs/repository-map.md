@@ -27,10 +27,10 @@ flowchart TD
 |---|---|---|---|
 | `instructions/` | AI の共通ルール | AI の振る舞い方針を直したい | `AI_AGENT_INSTRUCTIONS.md`, `DESIGN.md`, `HOOKS.md` |
 | `skills/` | 再利用できる手順書 | 繰り返し使う作業フローを追加・改善したい | `refinment/`, `skill-design-research/` |
-| `hooks/` | Hook 設定と本体 | 自動で起動する処理を見直したい | `safe_delete_guard.py`, `self_workflow.py` |
+| `hooks/` | Hook 設定と本体 | 自動で起動する処理を見直したい | `safe_delete_guard.py`, `subprocess_check.py` |
 | `scripts/` | 導入・更新・診断用スクリプト | セットアップ、更新、健康診断、スケジュール登録をしたい | `setup.sh`, `update.sh`, `health-check.sh` |
 | `docs/` | 人間向けの説明 | 初見者向け説明や運用ガイドを読みたい | このフォルダ一式 |
-| `tests/` | テストとフィクスチャ | 変更が壊れていないか確認したい | `test_self_workflow.py`, `test_merge_hook_config.py` |
+| `tests/` | テストとフィクスチャ | 変更が壊れていないか確認したい | `test_subprocess_check.py`, `test_merge_hook_config.py` |
 
 ## 「何を変えたいか」から逆引きする
 

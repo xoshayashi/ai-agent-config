@@ -169,9 +169,9 @@ shell rc から marker block を削除し、シンボリックリンクを `tras
 - 管理レイヤーは **ユーザーグローバル1層**に統一（`~/.claude`, `~/.codex`, `~/.gemini`, `~/.copilot`）
 - プロジェクト層への自動 Hook 配布は廃止
 - 安全性重視 Hook（`safe_delete_guard.py`）は既定ON
-- 共通 Hook（`self_workflow.py`）は **Codex / Claude Code / Gemini CLI / GitHub Copilot CLI の managed event に登録済み**
+- 共通 Hook（`subprocess_check.py`、旧 `self_workflow.py` 互換 shim あり）は **Codex / Claude Code / Gemini CLI / GitHub Copilot CLI の managed event に登録済み**
 - GitHub Copilot CLI も同じ canonical instructions / managed Hook / self-workflow / global setup の対象です
-- `self_workflow.py` は qualifying-task 判定に通ったときだけ spec -> implementation -> verification の自己継続 loop を起動し、answer-only と artifact/execution を分けて前者は通常 loop 外に残す
+- `subprocess_check.py` は Hook 境界で同じ CLI を非対話サブプロセスとして呼び、次の具体的な 1 手か `STATUS: complete` を返させます
 - 入力前プロンプト改善と phase boundary の brief 引き締めは **Skill（`refinment`）で運用**
 - `refinment` は self-contained。現在の CLI が必要と判断したときだけ brief を整え、必要なら `Refined prompt:` を表示してから作業を始める
 - 外部 reviewer を使う multi-LLM orchestration / response-strategy の main path は廃止

@@ -482,11 +482,11 @@ else
 fi
 
 self_workflow_mode=generic-same-llm
-if [ ! -f "$config_home/hooks/scripts/self_workflow.py" ]; then
+if [ -f "$config_home/hooks/scripts/subprocess_check.py" ] || [ -f "$config_home/hooks/scripts/self_workflow.py" ]; then
+  self_workflow_status=ready
+else
   self_workflow_status=missing-script
   mark_status warn
-else
-  self_workflow_status=ready
 fi
 
 for status in \
