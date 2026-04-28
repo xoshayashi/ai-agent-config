@@ -20,6 +20,12 @@ ${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks} -> <this repository>/hoo
 This keeps hook logic version-controlled in this repository while letting each
 CLI load hooks from the locations it already expects.
 
+GitHub Copilot is not part of this hook installation path. In the current
+implementation, Copilot only shares the canonical instructions file under
+`instructions/.github/copilot-instructions.md`; it does not receive managed
+Hook config, global setup, or self-workflow runtime integration from this
+repository.
+
 ## Installed Hooks
 
 | Hook | Default | Purpose |

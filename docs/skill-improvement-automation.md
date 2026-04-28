@@ -1,6 +1,6 @@
 # Skill Improvement Automation
 
-この自動化は、Claude Code、Codex、Gemini CLIの利用ログから **Skillで吸収すべき改善点** を見つけ、改善提案、PR作成、Claudeレビュー対応、条件付き自動マージまでをつなぐためのローカル運用です。
+この自動化は、Claude Code、Codex、Gemini CLIの利用ログから **Skillで吸収すべき改善点** を見つけ、改善提案、PR作成、Claudeレビュー対応、条件付き自動マージまでをつなぐためのローカル運用です。GitHub Copilot は現行実装では canonical instructions の共有対象ではありますが、同じログ収集・Hook・self-workflow 基盤には入っていません。
 
 ## Feasibility / 実現可能性
 
