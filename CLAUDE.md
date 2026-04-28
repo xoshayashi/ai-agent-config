@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this repo is
 
-A distribution repository that installs **Instructions / Skills / Hooks** as **global** configuration for three LLM CLIs: Claude Code, Codex, and Gemini CLI, and also keeps the canonical repo-local instructions file for GitHub Copilot. Everything is opt-in via `scripts/setup.sh`; the repo never modifies a target machine until that script runs.
+A distribution repository that installs **Instructions / Skills / Hooks** as **global** configuration for three LLM CLIs: Claude Code, Codex, and Gemini CLI. Everything is opt-in via `scripts/setup.sh`; the repo never modifies a target machine until that script runs.
 
 ## Common commands
 
@@ -32,7 +32,7 @@ There is no test runner, no linter, and no package manager. `validate-repo.sh` d
 
 ### Single source of truth pattern
 
-`instructions/AI_AGENT_INSTRUCTIONS.md` is the canonical instruction set. The per-CLI files (`instructions/CLAUDE.md`, `instructions/AGENTS.md` for Codex, `instructions/GEMINI.md`, and `instructions/.github/copilot-instructions.md`) are **thin entrypoints** that import or point to `AI_AGENT_INSTRUCTIONS.md`, plus `DESIGN.md` (Act design language) and `HOOKS.md` (self-workflow lifecycle) where supported. When updating shared behavior, edit `AI_AGENT_INSTRUCTIONS.md`; only touch entrypoint files when the entrypoint mechanism itself changes.
+`instructions/AI_AGENT_INSTRUCTIONS.md` is the canonical instruction set. The per-CLI files (`instructions/CLAUDE.md`, `instructions/AGENTS.md` for Codex, and `instructions/GEMINI.md`) are **thin entrypoints** that import or point to `AI_AGENT_INSTRUCTIONS.md`, plus `DESIGN.md` (Act design language) and `HOOKS.md` (self-workflow lifecycle) where supported. When updating shared behavior, edit `AI_AGENT_INSTRUCTIONS.md`; only touch entrypoint files when the entrypoint mechanism itself changes.
 
 ### Stable-link installation model
 
@@ -45,8 +45,6 @@ There is no test runner, no linter, and no package manager. `validate-repo.sh` d
 | Gemini CLI | `~/.gemini/GEMINI.md` → `instructions/GEMINI.md` | `~/.gemini/settings.json` (merged) |
 
 Hook scripts in `hooks/scripts/*.py` are referenced through one indirection — the stable link `${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}` → `<repo>/hooks`. This means CLI hook config can keep an absolute path like `~/.llm-config/hooks/scripts/safe_delete_guard.py` while the underlying repo can move.
-
-GitHub Copilot is intentionally different: the canonical file lives at `instructions/.github/copilot-instructions.md`, but `setup.sh` does not install it globally or manage a repo's `/.github/copilot-instructions.md` for you.
 
 ### Existing-config policy
 
@@ -69,13 +67,13 @@ Each subdirectory of `skills/` is a self-contained skill that gets symlinked int
 
 ### Editable entrypoints
 
-`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `AI_AGENT_INSTRUCTIONS.md`, and `.github/copilot-instructions.md` are now ordinary editable files. They may be changed, moved, or renamed as needed; keep the shared-source-of-truth pattern intact when doing so.
+`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and `AI_AGENT_INSTRUCTIONS.md` are now ordinary editable files. They may be changed, moved, or renamed as needed; keep the shared-source-of-truth pattern intact when doing so.
 
 ## Conventions enforced by validation
 
 `scripts/validate-repo.sh` will fail the build if:
 
-- `README.md` or `setup.md` stop mentioning all three CLI names, Copilot scope, the three global config dirs (`~/.codex`, `~/.claude`, `~/.gemini`), or "Hook"
+- `README.md` or `setup.md` stop mentioning all three CLI names, the three global config dirs (`~/.codex`, `~/.claude`, `~/.gemini`), or "Hook"
 - `README.md` stops referencing `skill-improvement-bot.py`, or `setup.md` stops referencing `schedule-skill-improvement.sh`
 - `docs/skill-improvement-automation.md` stops naming the `AI_AGENT_IMPROVEMENT_CREATE_PR` opt-in variable
 - The skill-improvement fixture scan no longer detects `skill-design-research` in `tests/fixtures/skill-logs/`
