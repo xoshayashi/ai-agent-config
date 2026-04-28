@@ -27,6 +27,9 @@ gha-creds-*.json
 
 # Local Claude Code orientation file at repo root (not the global entrypoint at instructions/CLAUDE.md)
 /CLAUDE.md
+/AGENTS.md
+/GEMINI.md
+/.github/copilot-instructions.md
 
 # Logs and temporary files
 *.log
