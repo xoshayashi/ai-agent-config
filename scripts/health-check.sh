@@ -171,6 +171,7 @@ load_state_file() {
       AI_AGENT_CODEX_HOME) AI_AGENT_CODEX_HOME=$value ;;
       AI_AGENT_CLAUDE_HOME) AI_AGENT_CLAUDE_HOME=$value ;;
       AI_AGENT_GEMINI_HOME) AI_AGENT_GEMINI_HOME=$value ;;
+      AI_AGENT_COPILOT_HOME) AI_AGENT_COPILOT_HOME=$value ;;
       AI_AGENT_SKILLS_DIR) AI_AGENT_SKILLS_DIR=$value ;;
       AI_AGENT_HOOKS_RUNTIME_LINK) AI_AGENT_HOOKS_RUNTIME_LINK=$value ;;
       AI_AGENT_REQUIRE_LLM_CLIS) AI_AGENT_REQUIRE_LLM_CLIS=$value ;;
@@ -191,13 +192,13 @@ env_claude_home_set=${AI_AGENT_CLAUDE_HOME+x}
 env_claude_home=${AI_AGENT_CLAUDE_HOME-}
 env_gemini_home_set=${AI_AGENT_GEMINI_HOME+x}
 env_gemini_home=${AI_AGENT_GEMINI_HOME-}
+env_copilot_home_set=${AI_AGENT_COPILOT_HOME+x}
+env_copilot_home=${AI_AGENT_COPILOT_HOME-}
 env_skills_set=${AI_AGENT_SKILLS_DIR+x}
 env_skills=${AI_AGENT_SKILLS_DIR-}
-env_hooks_runtime_set=${AI_AGENT_HOOKS_RUNTIME_LINK+x}
-env_hooks_runtime=${AI_AGENT_HOOKS_RUNTIME_LINK-}
 
-state_dir=${AI_AGENT_STATE_DIR:-$HOME/.llm-config}
-legacy_state_dir=${AI_AGENT_LEGACY_STATE_DIR:-$HOME/.ai-agent-config}
+state_dir=${AI_AGENT_STATE_DIR:-$HOME/.ai-agent-config}
+legacy_state_dir=${AI_AGENT_LEGACY_STATE_DIR:-$HOME/.llm-config}
 if [ -n "${AI_AGENT_STATE_FILE:-}" ]; then
   state_file=$(expand_home "$AI_AGENT_STATE_FILE")
 else
@@ -218,8 +219,8 @@ fi
 [ "${env_codex_home_set:-}" = "x" ] && AI_AGENT_CODEX_HOME=$env_codex_home
 [ "${env_claude_home_set:-}" = "x" ] && AI_AGENT_CLAUDE_HOME=$env_claude_home
 [ "${env_gemini_home_set:-}" = "x" ] && AI_AGENT_GEMINI_HOME=$env_gemini_home
+[ "${env_copilot_home_set:-}" = "x" ] && AI_AGENT_COPILOT_HOME=$env_copilot_home
 [ "${env_skills_set:-}" = "x" ] && AI_AGENT_SKILLS_DIR=$env_skills
-[ "${env_hooks_runtime_set:-}" = "x" ] && AI_AGENT_HOOKS_RUNTIME_LINK=$env_hooks_runtime
 state_dir=${AI_AGENT_STATE_DIR:-$state_dir}
 if [ -n "${AI_AGENT_STATE_FILE:-}" ]; then
   state_file=$(expand_home "$AI_AGENT_STATE_FILE")
@@ -231,42 +232,57 @@ fi
 if [ -n "${AI_AGENT_HOOKS_SCOPE:-}" ]; then
   warn "AI_AGENT_HOOKS_SCOPE is deprecated and ignored. Hooks are now installed globally."
 fi
+if [ -n "${AI_AGENT_HOOKS_RUNTIME_LINK:-}" ]; then
+  warn "AI_AGENT_HOOKS_RUNTIME_LINK is deprecated and ignored. Hook runtime is now linked inside each CLI home."
+fi
 
 default_config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
 config_home=$(expand_home "${AI_AGENT_CONFIG_HOME:-$default_config_home}")
 codex_home=$(expand_home "${AI_AGENT_CODEX_HOME:-$HOME/.codex}")
 claude_home=$(expand_home "${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}")
 gemini_home=$(expand_home "${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}")
+copilot_home=$(expand_home "${AI_AGENT_COPILOT_HOME:-$HOME/.copilot}")
 skills_dir=${AI_AGENT_SKILLS_DIR:-$HOME/.agents/skills}
-hooks_runtime_link=${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}
-hooks_runtime_path=$(expand_home "$hooks_runtime_link")
 
 git_path=$(command_path git)
 gh_path=$(command_path gh)
 claude_path=$(command_path claude)
 codex_path=$(command_path codex)
 gemini_path=$(command_path gemini)
+copilot_path=$(command_path copilot)
 ollama_path=$(command_path ollama)
 
 skill_improvement_schedule=unsupported
 os=$(uname -s 2>/dev/null || printf unknown)
 if [ "$os" = "Darwin" ]; then
-  skill_improvement_label=${AI_AGENT_IMPROVEMENT_LABEL:-com.llm-config.skill-improvement}
+  skill_improvement_label=${AI_AGENT_IMPROVEMENT_LABEL:-com.ai-agent-config.skill-improvement}
+  legacy_skill_improvement_label=${AI_AGENT_LEGACY_IMPROVEMENT_LABEL:-com.llm-config.skill-improvement}
   skill_improvement_plist="$HOME/Library/LaunchAgents/$skill_improvement_label.plist"
+  legacy_skill_improvement_plist="$HOME/Library/LaunchAgents/$legacy_skill_improvement_label.plist"
   if [ -f "$skill_improvement_plist" ]; then
     if launchctl list "$skill_improvement_label" >/dev/null 2>&1; then
       skill_improvement_schedule=active
     else
       skill_improvement_schedule=installed
     fi
+  elif [ -f "$legacy_skill_improvement_plist" ]; then
+    if launchctl list "$legacy_skill_improvement_label" >/dev/null 2>&1; then
+      skill_improvement_schedule=active-legacy
+    else
+      skill_improvement_schedule=installed-legacy
+    fi
   else
     skill_improvement_schedule=missing
   fi
 elif command -v systemctl >/dev/null 2>&1; then
-  if systemctl --user is-active llm-config-skill-improvement.timer >/dev/null 2>&1; then
+  if systemctl --user is-active ai-agent-config-skill-improvement.timer >/dev/null 2>&1; then
     skill_improvement_schedule=active
-  elif systemctl --user is-enabled llm-config-skill-improvement.timer >/dev/null 2>&1; then
+  elif systemctl --user is-enabled ai-agent-config-skill-improvement.timer >/dev/null 2>&1; then
     skill_improvement_schedule=installed
+  elif systemctl --user is-active llm-config-skill-improvement.timer >/dev/null 2>&1; then
+    skill_improvement_schedule=active-legacy
+  elif systemctl --user is-enabled llm-config-skill-improvement.timer >/dev/null 2>&1; then
+    skill_improvement_schedule=installed-legacy
   else
     skill_improvement_schedule=missing
   fi
@@ -333,6 +349,7 @@ gh_status=$(command_status gh "$gh_path")
 claude_status=$(command_status claude "$claude_path")
 codex_status=$(command_status codex "$codex_path")
 gemini_status=$(command_status gemini "$gemini_path")
+copilot_status=$(command_status copilot "$copilot_path")
 ollama_status=$(command_status ollama "$ollama_path")
 
 link_status_for() {
@@ -449,12 +466,20 @@ gemini_entry_status=$(link_status_for "$gemini_home/GEMINI.md" "$config_home/ins
 gemini_shared_status=$(link_status_for "$gemini_home/AI_AGENT_INSTRUCTIONS.md" "$config_home/instructions/AI_AGENT_INSTRUCTIONS.md")
 gemini_design_status=$(link_status_for "$gemini_home/DESIGN.md" "$config_home/instructions/DESIGN.md")
 gemini_hooks_doc_status=$(link_status_for "$gemini_home/HOOKS.md" "$config_home/instructions/HOOKS.md")
-hook_runtime_status=$(link_status_for "$hooks_runtime_path" "$config_home/hooks")
+copilot_entry_status=$(link_status_for "$copilot_home/copilot-instructions.md" "$config_home/instructions/COPILOT.md")
+copilot_shared_status=$(link_status_for "$copilot_home/AI_AGENT_INSTRUCTIONS.md" "$config_home/instructions/AI_AGENT_INSTRUCTIONS.md")
+copilot_design_status=$(link_status_for "$copilot_home/DESIGN.md" "$config_home/instructions/DESIGN.md")
+copilot_hooks_doc_status=$(link_status_for "$copilot_home/HOOKS.md" "$config_home/instructions/HOOKS.md")
+claude_hook_dir_status=$(link_status_for "$claude_home/hooks" "$config_home/hooks")
+codex_hook_dir_status=$(link_status_for "$codex_home/hooks" "$config_home/hooks")
+gemini_hook_dir_status=$(link_status_for "$gemini_home/hooks" "$config_home/hooks")
+copilot_hook_dir_status=$(link_status_for "$copilot_home/hooks" "$config_home/hooks")
 
 claude_hook_status=$(hook_config_status_for "$claude_home/settings.json" "$config_home/hooks/claude/settings.json" json)
 codex_config_status=$(hook_config_status_for "$codex_home/config.toml" "$config_home/hooks/codex/config.toml" codex-config)
 codex_hook_status=$(hook_config_status_for "$codex_home/hooks.json" "$config_home/hooks/codex/hooks.json" json)
 gemini_hook_status=$(hook_config_status_for "$gemini_home/settings.json" "$config_home/hooks/gemini/settings.json" json)
+copilot_hook_status=$(hook_config_status_for "$copilot_home/settings.json" "$config_home/hooks/copilot/settings.json" json)
 
 skills_json_body=
 skills_text_summary=
@@ -508,12 +533,13 @@ else
 fi
 
 for status in \
-  "$gh_status" "$claude_status" "$codex_status" "$gemini_status" \
+  "$gh_status" "$claude_status" "$codex_status" "$gemini_status" "$copilot_status" \
   "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_hooks_doc_status" \
   "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_hooks_doc_status" \
   "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_hooks_doc_status" \
-  "$hook_runtime_status" \
-  "$claude_hook_status" "$codex_config_status" "$codex_hook_status" "$gemini_hook_status"; do
+  "$copilot_entry_status" "$copilot_shared_status" "$copilot_design_status" "$copilot_hooks_doc_status" \
+  "$claude_hook_dir_status" "$codex_hook_dir_status" "$gemini_hook_dir_status" "$copilot_hook_dir_status" \
+  "$claude_hook_status" "$codex_config_status" "$codex_hook_status" "$gemini_hook_status" "$copilot_hook_status"; do
   [ "$status" = "ok" ] || [ "$status" = "appended" ] || [ "$status" = "appended-legacy" ] || mark_status warn
 done
 
@@ -527,14 +553,15 @@ if [ "$format" = "json" ]; then
   printf '  "codex_home": "%s",\n' "$(json_escape "$(display_path "$codex_home")")"
   printf '  "claude_home": "%s",\n' "$(json_escape "$(display_path "$claude_home")")"
   printf '  "gemini_home": "%s",\n' "$(json_escape "$(display_path "$gemini_home")")"
+  printf '  "copilot_home": "%s",\n' "$(json_escape "$(display_path "$copilot_home")")"
   printf '  "skills_dir": "%s",\n' "$(json_escape "$(display_path "$skills_dir")")"
-  printf '  "hooks_runtime_link": "%s",\n' "$(json_escape "$(display_path "$hooks_runtime_path")")"
   printf '  "commands": {\n'
   printf '    "git": {"status": "%s", "path": "%s"},\n' "$git_status" "$(json_escape "$(display_path "$git_path")")"
   printf '    "gh": {"status": "%s", "path": "%s"},\n' "$gh_status" "$(json_escape "$(display_path "$gh_path")")"
   printf '    "claude": {"status": "%s", "path": "%s"},\n' "$claude_status" "$(json_escape "$(display_path "$claude_path")")"
   printf '    "codex": {"status": "%s", "path": "%s"},\n' "$codex_status" "$(json_escape "$(display_path "$codex_path")")"
   printf '    "gemini": {"status": "%s", "path": "%s"},\n' "$gemini_status" "$(json_escape "$(display_path "$gemini_path")")"
+  printf '    "copilot": {"status": "%s", "path": "%s"},\n' "$copilot_status" "$(json_escape "$(display_path "$copilot_path")")"
   printf '    "ollama": {"status": "%s", "path": "%s"}\n' "$ollama_status" "$(json_escape "$(display_path "$ollama_path")")"
   printf '  },\n'
   printf '  "github": {"status": "%s"},\n' "$github_status"
@@ -552,11 +579,19 @@ if [ "$format" = "json" ]; then
   printf '    "gemini_AI_AGENT_INSTRUCTIONS.md": "%s",\n' "$gemini_shared_status"
   printf '    "gemini_DESIGN.md": "%s",\n' "$gemini_design_status"
   printf '    "gemini_HOOKS.md": "%s",\n' "$gemini_hooks_doc_status"
-  printf '    "hook-runtime": "%s",\n' "$hook_runtime_status"
+  printf '    "copilot_copilot-instructions.md": "%s",\n' "$copilot_entry_status"
+  printf '    "copilot_AI_AGENT_INSTRUCTIONS.md": "%s",\n' "$copilot_shared_status"
+  printf '    "copilot_DESIGN.md": "%s",\n' "$copilot_design_status"
+  printf '    "copilot_HOOKS.md": "%s",\n' "$copilot_hooks_doc_status"
+  printf '    "claude-hook-dir": "%s",\n' "$claude_hook_dir_status"
+  printf '    "codex-hook-dir": "%s",\n' "$codex_hook_dir_status"
+  printf '    "gemini-hook-dir": "%s",\n' "$gemini_hook_dir_status"
+  printf '    "copilot-hook-dir": "%s",\n' "$copilot_hook_dir_status"
   printf '    "claude-hooks": "%s",\n' "$claude_hook_status"
   printf '    "codex-config": "%s",\n' "$codex_config_status"
   printf '    "codex-hooks": "%s",\n' "$codex_hook_status"
-  printf '    "gemini-hooks": "%s"\n' "$gemini_hook_status"
+  printf '    "gemini-hooks": "%s",\n' "$gemini_hook_status"
+  printf '    "copilot-hooks": "%s"\n' "$copilot_hook_status"
   printf '  },\n'
   printf '  "skills": {\n%b\n  },\n' "$skills_json_body"
   printf '  "hooks": {"self_workflow": {"mode": "%s", "status": "%s"}},\n' "$(json_escape "$self_workflow_mode")" "$self_workflow_status"
@@ -567,15 +602,16 @@ else
   printf 'redacted: %s\n' "$([ "$redact_output" = "1" ] && printf yes || printf no)"
   printf 'config: %s\n' "$(display_path "$config_home")"
   printf 'state: %s (%s)\n' "$(display_path "$state_file")" "$(if [ "$state_loaded" = "true" ]; then printf loaded; else printf missing; fi)"
-  printf 'homes: codex=%s claude=%s gemini=%s\n' "$(display_path "$codex_home")" "$(display_path "$claude_home")" "$(display_path "$gemini_home")"
-  printf 'hooks-runtime-link: %s\n' "$(display_path "$hooks_runtime_path")"
+  printf 'homes: codex=%s claude=%s gemini=%s copilot=%s\n' "$(display_path "$codex_home")" "$(display_path "$claude_home")" "$(display_path "$gemini_home")" "$(display_path "$copilot_home")"
   printf 'repository: %s branch=%s head=%s dirty=%s upstream=%s ahead=%s behind=%s\n' "$repo_status" "${repo_branch:-unknown}" "${repo_head:-unknown}" "$repo_dirty" "$(display_remote "${repo_upstream:-none}")" "$repo_ahead" "$repo_behind"
   printf 'github: %s\n' "$github_status"
-  printf 'commands: git=%s gh=%s claude=%s codex=%s gemini=%s ollama=%s\n' "$git_status" "$gh_status" "$claude_status" "$codex_status" "$gemini_status" "$ollama_status"
-  printf 'links: codex(AGENTS=%s shared=%s design=%s hooks=%s) claude(CLAUDE=%s shared=%s design=%s hooks=%s) gemini(GEMINI=%s shared=%s design=%s hooks=%s)\n' \
-    "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_hooks_doc_status" "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_hooks_doc_status" "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_hooks_doc_status"
-  printf 'hooks: runtime=%s claude=%s codex-config=%s codex-hooks=%s gemini=%s\n' \
-    "$hook_runtime_status" "$claude_hook_status" "$codex_config_status" "$codex_hook_status" "$gemini_hook_status"
+  printf 'commands: git=%s gh=%s claude=%s codex=%s gemini=%s copilot=%s ollama=%s\n' "$git_status" "$gh_status" "$claude_status" "$codex_status" "$gemini_status" "$copilot_status" "$ollama_status"
+  printf 'links: codex(AGENTS=%s shared=%s design=%s hooks=%s) claude(CLAUDE=%s shared=%s design=%s hooks=%s) gemini(GEMINI=%s shared=%s design=%s hooks=%s) copilot(entry=%s shared=%s design=%s hooks=%s)\n' \
+    "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_hooks_doc_status" "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_hooks_doc_status" "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_hooks_doc_status" "$copilot_entry_status" "$copilot_shared_status" "$copilot_design_status" "$copilot_hooks_doc_status"
+  printf 'hook-dirs: claude=%s codex=%s gemini=%s copilot=%s\n' \
+    "$claude_hook_dir_status" "$codex_hook_dir_status" "$gemini_hook_dir_status" "$copilot_hook_dir_status"
+  printf 'hooks: claude=%s codex-config=%s codex-hooks=%s gemini=%s copilot=%s\n' \
+    "$claude_hook_status" "$codex_config_status" "$codex_hook_status" "$gemini_hook_status" "$copilot_hook_status"
   printf 'hooks-self-workflow: mode=%s status=%s\n' \
     "$self_workflow_mode" "$self_workflow_status"
   printf 'skills: %s\n' "$skills_text_summary"

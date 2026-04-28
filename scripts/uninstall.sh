@@ -68,10 +68,10 @@ load_state_file() {
       AI_AGENT_CODEX_HOME) AI_AGENT_CODEX_HOME=$value ;;
       AI_AGENT_CLAUDE_HOME) AI_AGENT_CLAUDE_HOME=$value ;;
       AI_AGENT_GEMINI_HOME) AI_AGENT_GEMINI_HOME=$value ;;
+      AI_AGENT_COPILOT_HOME) AI_AGENT_COPILOT_HOME=$value ;;
       AI_AGENT_SKILLS_DIR) AI_AGENT_SKILLS_DIR=$value ;;
       AI_AGENT_EXTRA_SKILLS_DIRS) AI_AGENT_EXTRA_SKILLS_DIRS=$value ;;
       AI_AGENT_INSTALL_HOOKS) AI_AGENT_INSTALL_HOOKS=$value ;;
-      AI_AGENT_HOOKS_RUNTIME_LINK) AI_AGENT_HOOKS_RUNTIME_LINK=$value ;;
       AI_AGENT_REQUIRE_LLM_CLIS) AI_AGENT_REQUIRE_LLM_CLIS=$value ;;
       AI_AGENT_STATE_DIR) AI_AGENT_STATE_DIR=$value ;;
       AI_AGENT_STATE_FILE) AI_AGENT_STATE_FILE=$value ;;
@@ -96,17 +96,22 @@ env_claude_home_set=${AI_AGENT_CLAUDE_HOME+x}
 env_claude_home=${AI_AGENT_CLAUDE_HOME-}
 env_gemini_home_set=${AI_AGENT_GEMINI_HOME+x}
 env_gemini_home=${AI_AGENT_GEMINI_HOME-}
+env_copilot_home_set=${AI_AGENT_COPILOT_HOME+x}
+env_copilot_home=${AI_AGENT_COPILOT_HOME-}
 env_skills_set=${AI_AGENT_SKILLS_DIR+x}
 env_skills=${AI_AGENT_SKILLS_DIR-}
 env_extra_skills_set=${AI_AGENT_EXTRA_SKILLS_DIRS+x}
 env_extra_skills=${AI_AGENT_EXTRA_SKILLS_DIRS-}
 env_hooks_set=${AI_AGENT_INSTALL_HOOKS+x}
 env_hooks=${AI_AGENT_INSTALL_HOOKS-}
-env_hooks_runtime_set=${AI_AGENT_HOOKS_RUNTIME_LINK+x}
-env_hooks_runtime=${AI_AGENT_HOOKS_RUNTIME_LINK-}
 
-state_dir=${AI_AGENT_STATE_DIR:-$HOME/.llm-config}
+state_dir=${AI_AGENT_STATE_DIR:-$HOME/.ai-agent-config}
 state_file=${AI_AGENT_STATE_FILE:-$(expand_home "$state_dir")/config.env}
+legacy_state_dir=${AI_AGENT_LEGACY_STATE_DIR:-$HOME/.llm-config}
+legacy_state_file=$(expand_home "$legacy_state_dir")/config.env
+if [ ! -f "$state_file" ] && [ -f "$legacy_state_file" ]; then
+  state_file=$legacy_state_file
+fi
 state_loaded=0
 if load_state_file "$state_file"; then
   state_loaded=1
@@ -116,10 +121,10 @@ fi
 [ "${env_codex_home_set:-}" = "x" ] && AI_AGENT_CODEX_HOME=$env_codex_home
 [ "${env_claude_home_set:-}" = "x" ] && AI_AGENT_CLAUDE_HOME=$env_claude_home
 [ "${env_gemini_home_set:-}" = "x" ] && AI_AGENT_GEMINI_HOME=$env_gemini_home
+[ "${env_copilot_home_set:-}" = "x" ] && AI_AGENT_COPILOT_HOME=$env_copilot_home
 [ "${env_skills_set:-}" = "x" ] && AI_AGENT_SKILLS_DIR=$env_skills
 [ "${env_extra_skills_set:-}" = "x" ] && AI_AGENT_EXTRA_SKILLS_DIRS=$env_extra_skills
 [ "${env_hooks_set:-}" = "x" ] && AI_AGENT_INSTALL_HOOKS=$env_hooks
-[ "${env_hooks_runtime_set:-}" = "x" ] && AI_AGENT_HOOKS_RUNTIME_LINK=$env_hooks_runtime
 state_dir=${AI_AGENT_STATE_DIR:-$state_dir}
 if [ -n "${AI_AGENT_STATE_FILE:-}" ]; then
   state_file=$(expand_home "$AI_AGENT_STATE_FILE")
@@ -130,7 +135,6 @@ uninstall_instructions=${AI_AGENT_UNINSTALL_INSTRUCTIONS:-1}
 uninstall_skills=${AI_AGENT_UNINSTALL_SKILLS:-1}
 uninstall_hooks=${AI_AGENT_UNINSTALL_HOOKS:-1}
 uninstall_state=${AI_AGENT_UNINSTALL_STATE:-1}
-hooks_runtime_link=${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}
 
 case "$dry_run" in
   0|1) ;;
@@ -152,8 +156,6 @@ case "$uninstall_hooks" in
   *) fail "AI_AGENT_UNINSTALL_HOOKS must be 0 or 1" ;;
 esac
 
-[ -n "$hooks_runtime_link" ] || fail "AI_AGENT_HOOKS_RUNTIME_LINK must not be empty"
-
 case "$uninstall_state" in
   0|1) ;;
   *) fail "AI_AGENT_UNINSTALL_STATE must be 0 or 1" ;;
@@ -167,6 +169,7 @@ default_config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
 codex_home=$(expand_home "${AI_AGENT_CODEX_HOME:-$HOME/.codex}")
 claude_home=$(expand_home "${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}")
 gemini_home=$(expand_home "${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}")
+copilot_home=$(expand_home "${AI_AGENT_COPILOT_HOME:-$HOME/.copilot}")
 skills_dir=${AI_AGENT_SKILLS_DIR:-$HOME/.agents/skills}
 extra_skills_dirs=${AI_AGENT_EXTRA_SKILLS_DIRS:-}
 
@@ -175,7 +178,12 @@ infer_config_home_from_links() {
     "$codex_home/AI_AGENT_INSTRUCTIONS.md" \
     "$claude_home/AI_AGENT_INSTRUCTIONS.md" \
     "$gemini_home/AI_AGENT_INSTRUCTIONS.md" \
-    "$(expand_home "$hooks_runtime_link")"; do
+    "$copilot_home/AI_AGENT_INSTRUCTIONS.md" \
+    "$copilot_home/copilot-instructions.md" \
+    "$claude_home/hooks" \
+    "$codex_home/hooks" \
+    "$gemini_home/hooks" \
+    "$copilot_home/hooks"; do
     [ -L "$path" ] || continue
     target=$(readlink "$path" 2>/dev/null || true)
     [ -n "$target" ] || continue
@@ -279,6 +287,11 @@ uninstall_instruction_links() {
   uninstall_managed_link "$gemini_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "instruction link"
   uninstall_managed_link "$gemini_home/DESIGN.md" "$src_root/DESIGN.md" "instruction link"
   uninstall_managed_link "$gemini_home/HOOKS.md" "$src_root/HOOKS.md" "instruction link"
+
+  uninstall_managed_link "$copilot_home/copilot-instructions.md" "$src_root/COPILOT.md" "instruction link"
+  uninstall_managed_link "$copilot_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "instruction link"
+  uninstall_managed_link "$copilot_home/DESIGN.md" "$src_root/DESIGN.md" "instruction link"
+  uninstall_managed_link "$copilot_home/HOOKS.md" "$src_root/HOOKS.md" "instruction link"
 }
 
 uninstall_skills_from_dir() {
@@ -295,8 +308,11 @@ uninstall_skills_from_dir() {
   done
 }
 
-uninstall_hook_runtime_link() {
-  uninstall_managed_link "$(expand_home "$hooks_runtime_link")" "$config_home/hooks" "hook runtime link"
+uninstall_hook_dir_links() {
+  uninstall_managed_link "$claude_home/hooks" "$config_home/hooks" "hook runtime link"
+  uninstall_managed_link "$codex_home/hooks" "$config_home/hooks" "hook runtime link"
+  uninstall_managed_link "$gemini_home/hooks" "$config_home/hooks" "hook runtime link"
+  uninstall_managed_link "$copilot_home/hooks" "$config_home/hooks" "hook runtime link"
 }
 
 uninstall_hook_config() {
@@ -332,10 +348,11 @@ uninstall_user_hook_links() {
   uninstall_hook_config "$codex_home/config.toml" "$src_root/codex/config.toml" codex-config
   uninstall_hook_config "$codex_home/hooks.json" "$src_root/codex/hooks.json" json
   uninstall_hook_config "$gemini_home/settings.json" "$src_root/gemini/settings.json" json
+  uninstall_hook_config "$copilot_home/settings.json" "$src_root/copilot/settings.json" json
 }
 
 uninstall_hook_links() {
-  uninstall_hook_runtime_link
+  uninstall_hook_dir_links
   uninstall_user_hook_links
 }
 
@@ -345,12 +362,16 @@ fi
 if [ -n "${AI_AGENT_HOOKS_SCOPE:-}" ]; then
   warn "AI_AGENT_HOOKS_SCOPE is deprecated and ignored."
 fi
+if [ -n "${AI_AGENT_HOOKS_RUNTIME_LINK:-}" ]; then
+  warn "AI_AGENT_HOOKS_RUNTIME_LINK is deprecated and ignored."
+fi
 
 say "AI agent config uninstall (global mode)"
 say "config: $config_home"
 say "codex home: $codex_home"
 say "claude home: $claude_home"
 say "gemini home: $gemini_home"
+say "copilot home: $copilot_home"
 say "state: $state_file"
 if [ "$state_loaded" = "0" ]; then
   warn "state file not loaded safely; using environment/defaults where needed"
@@ -364,6 +385,7 @@ fi
 
 if [ "$uninstall_skills" = "1" ]; then
   uninstall_skills_from_dir "$skills_dir"
+  uninstall_skills_from_dir "$copilot_home/skills"
   if [ -n "$extra_skills_dirs" ]; then
     had_ifs=${IFS+x}
     old_ifs=${IFS-}

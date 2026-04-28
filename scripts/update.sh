@@ -59,12 +59,12 @@ load_state_file() {
       AI_AGENT_CODEX_HOME) AI_AGENT_CODEX_HOME=$value ;;
       AI_AGENT_CLAUDE_HOME) AI_AGENT_CLAUDE_HOME=$value ;;
       AI_AGENT_GEMINI_HOME) AI_AGENT_GEMINI_HOME=$value ;;
+      AI_AGENT_COPILOT_HOME) AI_AGENT_COPILOT_HOME=$value ;;
       AI_AGENT_SKILLS_DIR) AI_AGENT_SKILLS_DIR=$value ;;
       AI_AGENT_EXTRA_SKILLS_DIRS) AI_AGENT_EXTRA_SKILLS_DIRS=$value ;;
       AI_AGENT_INSTALL_INSTRUCTIONS) AI_AGENT_INSTALL_INSTRUCTIONS=$value ;;
       AI_AGENT_INSTALL_SKILLS) AI_AGENT_INSTALL_SKILLS=$value ;;
       AI_AGENT_INSTALL_HOOKS) AI_AGENT_INSTALL_HOOKS=$value ;;
-      AI_AGENT_HOOKS_RUNTIME_LINK) AI_AGENT_HOOKS_RUNTIME_LINK=$value ;;
       AI_AGENT_CONFLICT_MODE) AI_AGENT_CONFLICT_MODE=$value ;;
       AI_AGENT_REQUIRE_LLM_CLIS) AI_AGENT_REQUIRE_LLM_CLIS=$value ;;
       AI_AGENT_STATE_DIR) AI_AGENT_STATE_DIR=$value ;;
@@ -90,17 +90,17 @@ env_claude_home_set=${AI_AGENT_CLAUDE_HOME+x}
 env_claude_home=${AI_AGENT_CLAUDE_HOME-}
 env_gemini_home_set=${AI_AGENT_GEMINI_HOME+x}
 env_gemini_home=${AI_AGENT_GEMINI_HOME-}
+env_copilot_home_set=${AI_AGENT_COPILOT_HOME+x}
+env_copilot_home=${AI_AGENT_COPILOT_HOME-}
 env_skills_set=${AI_AGENT_SKILLS_DIR+x}
 env_skills=${AI_AGENT_SKILLS_DIR-}
 env_extra_skills_set=${AI_AGENT_EXTRA_SKILLS_DIRS+x}
 env_extra_skills=${AI_AGENT_EXTRA_SKILLS_DIRS-}
 env_hooks_set=${AI_AGENT_INSTALL_HOOKS+x}
 env_hooks=${AI_AGENT_INSTALL_HOOKS-}
-env_hooks_runtime_set=${AI_AGENT_HOOKS_RUNTIME_LINK+x}
-env_hooks_runtime=${AI_AGENT_HOOKS_RUNTIME_LINK-}
 
-state_dir=${AI_AGENT_STATE_DIR:-$HOME/.llm-config}
-legacy_state_dir=${AI_AGENT_LEGACY_STATE_DIR:-$HOME/.ai-agent-config}
+state_dir=${AI_AGENT_STATE_DIR:-$HOME/.ai-agent-config}
+legacy_state_dir=${AI_AGENT_LEGACY_STATE_DIR:-$HOME/.llm-config}
 if [ -n "${AI_AGENT_STATE_FILE:-}" ]; then
   state_file=$(expand_home "$AI_AGENT_STATE_FILE")
 else
@@ -119,10 +119,10 @@ fi
 [ "${env_codex_home_set:-}" = "x" ] && AI_AGENT_CODEX_HOME=$env_codex_home
 [ "${env_claude_home_set:-}" = "x" ] && AI_AGENT_CLAUDE_HOME=$env_claude_home
 [ "${env_gemini_home_set:-}" = "x" ] && AI_AGENT_GEMINI_HOME=$env_gemini_home
+[ "${env_copilot_home_set:-}" = "x" ] && AI_AGENT_COPILOT_HOME=$env_copilot_home
 [ "${env_skills_set:-}" = "x" ] && AI_AGENT_SKILLS_DIR=$env_skills
 [ "${env_extra_skills_set:-}" = "x" ] && AI_AGENT_EXTRA_SKILLS_DIRS=$env_extra_skills
 [ "${env_hooks_set:-}" = "x" ] && AI_AGENT_INSTALL_HOOKS=$env_hooks
-[ "${env_hooks_runtime_set:-}" = "x" ] && AI_AGENT_HOOKS_RUNTIME_LINK=$env_hooks_runtime
 state_dir=${AI_AGENT_STATE_DIR:-$state_dir}
 if [ -n "${AI_AGENT_STATE_FILE:-}" ]; then
   state_file=$(expand_home "$AI_AGENT_STATE_FILE")
@@ -133,6 +133,9 @@ if [ -n "${AI_AGENT_TARGET_DIR:-}" ]; then
 fi
 if [ -n "${AI_AGENT_HOOKS_SCOPE:-}" ]; then
   warn "AI_AGENT_HOOKS_SCOPE is deprecated and ignored. Hooks are now installed globally."
+fi
+if [ -n "${AI_AGENT_HOOKS_RUNTIME_LINK:-}" ]; then
+  warn "AI_AGENT_HOOKS_RUNTIME_LINK is deprecated and ignored. Hook runtime is now linked inside each CLI home."
 fi
 
 default_config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
@@ -200,12 +203,12 @@ if [ "$rerun_setup" = "1" ]; then
     "AI_AGENT_CODEX_HOME=${AI_AGENT_CODEX_HOME:-$HOME/.codex}" \
     "AI_AGENT_CLAUDE_HOME=${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}" \
     "AI_AGENT_GEMINI_HOME=${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}" \
+    "AI_AGENT_COPILOT_HOME=${AI_AGENT_COPILOT_HOME:-$HOME/.copilot}" \
     "AI_AGENT_SKILLS_DIR=${AI_AGENT_SKILLS_DIR:-$HOME/.agents/skills}" \
     "AI_AGENT_EXTRA_SKILLS_DIRS=${AI_AGENT_EXTRA_SKILLS_DIRS:-}" \
     "AI_AGENT_INSTALL_INSTRUCTIONS=${AI_AGENT_INSTALL_INSTRUCTIONS:-1}" \
     "AI_AGENT_INSTALL_SKILLS=${AI_AGENT_INSTALL_SKILLS:-1}" \
     "AI_AGENT_INSTALL_HOOKS=${AI_AGENT_INSTALL_HOOKS:-1}" \
-    "AI_AGENT_HOOKS_RUNTIME_LINK=${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}" \
     "AI_AGENT_CONFLICT_MODE=${AI_AGENT_CONFLICT_MODE:-backup}" \
     "AI_AGENT_REQUIRE_LLM_CLIS=${AI_AGENT_REQUIRE_LLM_CLIS:-1}" \
     "AI_AGENT_STATE_DIR=$state_dir" \

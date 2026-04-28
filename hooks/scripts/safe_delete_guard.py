@@ -53,11 +53,31 @@ def command_from_hook(data: dict[str, Any]) -> str:
         command = tool_input.get("cmd")
         if isinstance(command, str):
             return command
+    tool_args = data.get("toolArgs")
+    if isinstance(tool_args, dict):
+        command = tool_args.get("command")
+        if isinstance(command, str):
+            return command
+        command = tool_args.get("cmd")
+        if isinstance(command, str):
+            return command
+    if isinstance(tool_args, str):
+        try:
+            parsed = json.loads(tool_args)
+        except json.JSONDecodeError:
+            parsed = None
+        if isinstance(parsed, dict):
+            command = parsed.get("command")
+            if isinstance(command, str):
+                return command
+            command = parsed.get("cmd")
+            if isinstance(command, str):
+                return command
     return ""
 
 
 def tool_name(data: dict[str, Any]) -> str:
-    value = data.get("tool_name") or data.get("original_request_name") or ""
+    value = data.get("tool_name") or data.get("toolName") or data.get("original_request_name") or ""
     return value if isinstance(value, str) else ""
 
 
@@ -76,6 +96,12 @@ def should_block(data: dict[str, Any]) -> bool:
 
 
 def block_output(current: str, event_name: str, reason: str) -> dict[str, Any]:
+    if current == "copilot":
+        return {
+            "permissionDecision": "deny",
+            "permissionDecisionReason": reason,
+        }
+
     if current == "gemini" or event_name == "BeforeTool":
         return {
             "decision": "deny",
@@ -94,7 +120,7 @@ def block_output(current: str, event_name: str, reason: str) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--current", choices=["claude", "codex", "gemini"], required=True)
+    parser.add_argument("--current", choices=["claude", "codex", "gemini", "copilot"], required=True)
     args = parser.parse_args()
 
     data = load_input()

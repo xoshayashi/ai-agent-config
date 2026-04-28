@@ -35,7 +35,7 @@ flowchart TD
 | エラーや症状 | 何が起きているか | 最初にやる安全な一手 |
 |---|---|---|
 | `command not found: git` | Git が入っていない | Git を入れてから再実行する |
-| `missing required LLM CLI(s): ...` | `claude` / `codex` / `gemini` のいずれかが未導入 | 不足分をインストール・ログインする |
+| `missing required LLM CLI(s): ...` | `claude` / `codex` / `gemini` / `copilot` のいずれかが未導入 | 不足分をインストール・ログインする |
 | GitHub authentication failed | GitHub 認証が未完了、または権限不足 | GitHub へログインできているか確認する |
 | `target exists but is not a git repository` | 置きたい場所に別フォルダがある | 中身を確認し、必要なら安全に退避する |
 | `path already exists` | リンク先に同名のファイルやフォルダがある | 何がぶつかっているか確認する |
@@ -43,7 +43,7 @@ flowchart TD
 | `trash is required for safe uninstall` | 安全な削除用コマンドがない | `trash` を導入してから再試行する |
 | `config repository has local changes` | 更新対象 repo に未保存の変更がある | 変更内容を確認し、退避かコミットを決める |
 | `not a git repository` | `update.sh` の対象が Git repo ではない | 正しい clone 先を確認する |
-| `copilot-instructions.md` が見つからない | Copilot は手動配置対象で自動 setup 対象外 | 対象 repo 側で `.github/copilot-instructions.md` を管理する |
+| `copilot-instructions.md` が見つからない | `~/.copilot` 側の global link か、この repo の tracked file が欠けている | `sh scripts/setup.sh` を再実行し、`.github/copilot-instructions.md` も確認する |
 | `launchctl` / `systemctl` scheduling failed | 定期実行登録だけ失敗した | まずは手動コマンドで運用を継続する |
 | Hook が効かない | Hook 設定や Skill リンクが壊れている可能性 | `health-check.sh` で Hook 行を確認する |
 | `health: warn` | 動くが、確認すべき弱点がある | 警告行を1つずつ解消する |
@@ -53,7 +53,7 @@ flowchart TD
 
 ### 1. CLI が足りない
 
-`setup.sh` は既定で Claude Code / Codex / Gemini CLI の3つを前提確認します。
+`setup.sh` は既定で Claude Code / Codex / Gemini CLI / Copilot CLI の4つを前提確認します。
 まだ全部は入れない方針なら、意図を持って次のように進めます。
 
 ```sh
@@ -65,7 +65,7 @@ AI_AGENT_REQUIRE_LLM_CLIS=0 sh scripts/setup.sh
 確認ポイントは次の順です。
 
 1. `sh scripts/health-check.sh`
-2. `~/.codex/hooks.json` や `~/.claude/settings.json` に managed Hook が入っているか
+2. `~/.codex/hooks.json`、`~/.claude/settings.json`、`~/.gemini/settings.json`、`~/.copilot/settings.json` に managed Hook が入っているか
 3. `~/.agents/skills/refinment` のリンクがあるか
 4. 必要なら `AI_AGENT_DRY_RUN=1 sh scripts/setup.sh` で予定を再確認してから再実行
 

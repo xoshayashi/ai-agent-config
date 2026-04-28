@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Generic self-workflow hook for Codex, Claude Code, and Gemini CLI.
+"""Generic self-workflow hook for Codex, Claude Code, Gemini CLI, and Copilot CLI.
 
 This hook keeps each CLI responsible for finishing its own work by using:
 - A self-contained refinment skill for startup prompt tightening
@@ -8,7 +8,7 @@ This hook keeps each CLI responsible for finishing its own work by using:
 
 Design goals:
 - No external LLM reviewer subprocess in the main path
-- One reusable workflow across Codex, Claude Code, and Gemini CLI
+- One reusable workflow across Codex, Claude Code, Gemini CLI, and Copilot CLI
 - Explicit recursion guards
 - Deterministic, session-scoped state on local disk
 """
@@ -28,6 +28,7 @@ SUPPORTED_EVENTS: dict[str, set[str]] = {
     "codex": {"SessionStart", "UserPromptSubmit", "Stop"},
     "claude": {"UserPromptSubmit", "Stop", "SubagentStop"},
     "gemini": {"BeforeAgent", "AfterAgent"},
+    "copilot": {"SessionStart", "UserPromptSubmit", "Stop"},
 }
 ACTIVE_PHASES = {"implementation", "spec_authoring", "spec_review", "verification"}
 
@@ -141,7 +142,7 @@ def state_root() -> Path:
     root = env_value(
         "AI_AGENT_SELF_WORKFLOW_STATE_DIR",
         "AI_AGENT_ORCHESTRATOR_STATE_DIR",
-        "~/.llm-config/self-workflow",
+        "~/.ai-agent-config/self-workflow",
     )
     return Path(os.path.expanduser(root)).resolve()
 
@@ -362,7 +363,12 @@ def response_from(data: dict[str, Any]) -> str:
             return value
     for key in ("transcript_path", "transcriptPath"):
         transcript = transcript_excerpt(data.get(key))
-        if transcript and not transcript.startswith(("No transcript", "Transcript path not readable", "Transcript read failed")):
+        if transcript and transcript not in {
+            "Transcript excerpt disabled.",
+            "No transcript path supplied.",
+            "Transcript path not readable.",
+            "Transcript read failed.",
+        }:
             return transcript
     return ""
 
@@ -793,6 +799,10 @@ def turn_context_output(current: str, event_name: str, context: str, system_mess
                 "additionalContext": context,
             }
         }
+    elif current == "copilot":
+        payload = {
+            "additionalContext": context,
+        }
     else:
         payload = {
             "hookSpecificOutput": {
@@ -1088,7 +1098,7 @@ def handle_session_start(current: str, state: dict[str, Any]) -> dict[str, Any]:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--current", choices=["claude", "codex", "gemini"], required=True)
+    parser.add_argument("--current", choices=["claude", "codex", "gemini", "copilot"], required=True)
     args = parser.parse_args()
 
     data = load_input()

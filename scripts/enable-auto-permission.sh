@@ -40,7 +40,7 @@ config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
 src="$config_home/shell/auto-permission.sh"
 [ -f "$src" ] || fail "shell wrapper source missing: $src"
 
-shell_alias_link=${AI_AGENT_SHELL_ALIAS_LINK:-$HOME/.llm-config/auto-permission.sh}
+shell_alias_link=${AI_AGENT_SHELL_ALIAS_LINK:-$HOME/.ai-agent-config/auto-permission.sh}
 dst=$(expand_home "$shell_alias_link")
 
 dry_run=${AI_AGENT_DRY_RUN:-0}

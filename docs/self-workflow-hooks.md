@@ -43,6 +43,7 @@ sequenceDiagram
 | Codex | `UserPromptSubmit` / `SessionStart` | `Stop` |
 | Claude Code | `UserPromptSubmit` | `Stop`, `SubagentStop` |
 | Gemini CLI | `BeforeAgent` | `AfterAgent` |
+| GitHub Copilot CLI | `UserPromptSubmit` / `SessionStart` | `Stop` |
 
 ## フェーズの意味
 
@@ -94,21 +95,22 @@ self-workflow は、answer-only のやり取りまで全部を自動継続させ
 | Hook 本体 | `hooks/scripts/self_workflow.py` |
 | 補助 Skill | `skills/refinment/` |
 | 共有ルール | `instructions/HOOKS.md` |
-| セッション state | `~/.llm-config/self-workflow` |
+| セッション state | `~/.ai-agent-config/self-workflow` |
 
-## Copilot との違い
+## Copilot での扱い
 
-GitHub Copilot は同じ instructions の思想を共有しますが、この self-workflow runtime には入りません。
+GitHub Copilot CLI もこの self-workflow runtime に入ります。
 
-- 入るもの: Claude Code / Codex / Gemini CLI
-- 入らないもの: GitHub Copilot
+- `UserPromptSubmit` / `SessionStart` で brief を注入します
+- `Stop` では `transcript_path` を読んで phase 判定します
+- この repo では global runtime に加えて `.github/copilot-instructions.md` も tracked file として持ちます
 
 ## この設計の狙い
 
 - 作業の責任を今の CLI に持たせる
 - prompt 改善を必要時だけ、しかもユーザーに見える形で行う
 - routine reviewer latency を常時発生させない
-- 3つの CLI でほぼ同じライフサイクルを使う
+- 4つの CLI でほぼ同じライフサイクルを使う
 
 ## 関連ページ
 

@@ -55,11 +55,11 @@ case "$script_path" in
 esac
 
 config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
-state_dir=$(expand_home "${AI_AGENT_STATE_DIR:-$HOME/.llm-config}")
+state_dir=$(expand_home "${AI_AGENT_STATE_DIR:-$HOME/.ai-agent-config}")
 cadence=${AI_AGENT_IMPROVEMENT_CADENCE:-${AI_AGENT_UPDATE_CADENCE:-daily}}
 interval=${AI_AGENT_IMPROVEMENT_INTERVAL_SECONDS:-}
 disable_schedule=0
-label=${AI_AGENT_IMPROVEMENT_LABEL:-com.llm-config.skill-improvement}
+label=${AI_AGENT_IMPROVEMENT_LABEL:-com.ai-agent-config.skill-improvement}
 bot_script="$config_home/scripts/skill-improvement-bot.py"
 dry_run=${AI_AGENT_DRY_RUN:-0}
 create_pr=${AI_AGENT_IMPROVEMENT_CREATE_PR:-0}
@@ -133,10 +133,10 @@ if [ "$disable_schedule" = "1" ]; then
     fi
   elif command -v systemctl >/dev/null 2>&1; then
     if [ "$dry_run" = "1" ]; then
-      say "would disable systemd user timer: llm-config-skill-improvement.timer"
+      say "would disable systemd user timer: ai-agent-config-skill-improvement.timer"
     else
-      systemctl --user disable --now llm-config-skill-improvement.timer >/dev/null 2>&1 || true
-      say "disabled systemd user timer if it existed: llm-config-skill-improvement.timer"
+      systemctl --user disable --now ai-agent-config-skill-improvement.timer >/dev/null 2>&1 || true
+      say "disabled systemd user timer if it existed: ai-agent-config-skill-improvement.timer"
     fi
   else
     warn "automatic scheduling is not supported on this system"
@@ -222,12 +222,12 @@ EOF
   say "scheduled with launchd: $plist"
 elif command -v systemctl >/dev/null 2>&1; then
   systemd_dir="$HOME/.config/systemd/user"
-  service="$systemd_dir/llm-config-skill-improvement.service"
-  timer="$systemd_dir/llm-config-skill-improvement.timer"
+  service="$systemd_dir/ai-agent-config-skill-improvement.service"
+  timer="$systemd_dir/ai-agent-config-skill-improvement.timer"
   if [ "$dry_run" = "1" ]; then
     say "would write systemd service: $service"
     say "would write systemd timer: $timer"
-    say "would enable timer with systemctl --user enable --now llm-config-skill-improvement.timer"
+    say "would enable timer with systemctl --user enable --now ai-agent-config-skill-improvement.timer"
     exit 0
   fi
   systemd_require_safe_value "AI_AGENT_STATE_DIR" "$state_dir"
@@ -262,13 +262,13 @@ Description=Run AI Agent Config skill improvement scan periodically
 # Run once after boot so machines that were asleep during the interval still catch up.
 OnBootSec=10m
 OnUnitActiveSec=${interval}s
-Unit=llm-config-skill-improvement.service
+Unit=ai-agent-config-skill-improvement.service
 
 [Install]
 WantedBy=timers.target
 EOF
   systemctl --user daemon-reload
-  systemctl --user enable --now llm-config-skill-improvement.timer
+  systemctl --user enable --now ai-agent-config-skill-improvement.timer
   say "scheduled with systemd user timer: $timer"
 else
   warn "automatic scheduling is not supported on this system"

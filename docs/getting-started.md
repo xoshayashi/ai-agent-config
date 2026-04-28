@@ -26,7 +26,7 @@ flowchart LR
 |---|---|
 | `git` | このリポジトリを取得・更新するため |
 | `python3` | 一部スクリプトとテストのため |
-| Claude Code / Codex / Gemini CLI | 共通設定の配布先として想定しているため |
+| Claude Code / Codex / Gemini CLI / Copilot CLI | 共通設定の配布先として想定しているため |
 | 各 CLI でのログイン完了 | 導入後すぐ使える状態にするため |
 | `trash` | 安全な削除・取り外しのため |
 
@@ -40,9 +40,11 @@ flowchart LR
 | `~/.codex/` | Codex のグローバル instructions / hooks 設定 |
 | `~/.claude/` | Claude Code のグローバル instructions / hooks 設定 |
 | `~/.gemini/` | Gemini CLI のグローバル instructions / hooks 設定 |
+| `~/.copilot/` | Copilot CLI のグローバル instructions / hooks / skills 設定 |
 | `~/.agents/skills/` | 共有 Skill のリンク配置先 |
-| `~/.llm-config/hooks` | Hook 本体への安定リンク |
-| `<repo>/.github/copilot-instructions.md` | Copilot 用。これは **手動管理** |
+| `~/.ai-agent-config/` | state、backup、scheduler log の保存先 |
+| `~/.claude/hooks` ほか各CLIの `hooks/` | Hook 本体へのリンク |
+| `.github/copilot-instructions.md` | この repo で Copilot を使うための tracked instructions |
 
 ## 安全設計
 
@@ -52,7 +54,7 @@ flowchart LR
 | **追記/マージが基本** | 既存の `settings.json` や `config.toml` を丸ごと置換しない |
 | **バックアップ前提** | 競合時は退避を優先する |
 | **`rm` を使わない** | 削除は `trash` に寄せる |
-| **Copilot は別扱い** | グローバル Hook の自動配布対象ではない |
+| **Copilot も同じ global 管理** | `~/.copilot` に instructions / hooks / skills を入れる |
 
 ## 初回セットアップ
 

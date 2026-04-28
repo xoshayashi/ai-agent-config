@@ -14,22 +14,26 @@
 この repo の Hook 設計は、次の4つに整理されています。
 
 1. **配布先はグローバルのみ**
-   `~/.claude`、`~/.codex`、`~/.gemini` のユーザー設定に入れる
+   `~/.claude`、`~/.codex`、`~/.gemini`、`~/.copilot` のユーザー設定に入れる
 2. **安全系 Hook を最優先**
    `safe_delete_guard.py` で危険な削除を防ぐ
 3. **作業は同じ CLI が最後まで持つ**
    `self_workflow.py` により、仕様作成から検証まで同じ CLI が継続する
-4. **Hook 本体は repo に残し、各 CLI からは安定リンクで呼ぶ**
-   `~/.llm-config/hooks` を経由して参照する
+4. **Hook 本体は repo に残し、各 CLI の `hooks/` から呼ぶ**
+   `~/.claude/hooks`、`~/.codex/hooks`、`~/.gemini/hooks`、`~/.copilot/hooks` を経由して参照する
 
 ## まずは配置イメージ
 
 ```mermaid
 flowchart LR
-    Repo["この repo の hooks/"] --> Stable["~/.llm-config/hooks<br/>安定リンク"]
-    Stable --> Claude["~/.claude/settings.json"]
-    Stable --> Codex["~/.codex/config.toml / hooks.json"]
-    Stable --> Gemini["~/.gemini/settings.json"]
+    Repo["この repo の hooks/"] --> ClaudeHooks["~/.claude/hooks"]
+    Repo --> CodexHooks["~/.codex/hooks"]
+    Repo --> GeminiHooks["~/.gemini/hooks"]
+    Repo --> CopilotHooks["~/.copilot/hooks"]
+    ClaudeHooks --> Claude["~/.claude/settings.json"]
+    CodexHooks --> Codex["~/.codex/config.toml / hooks.json"]
+    GeminiHooks --> Gemini["~/.gemini/settings.json"]
+    CopilotHooks --> Copilot["~/.copilot/settings.json"]
 ```
 
 ## なぜ「グローバルだけ」にしたのか
@@ -61,18 +65,18 @@ flowchart LR
 | 優先していること | 具体的な意味 |
 |---|---|
 | 安全性 | `rm` を避ける、過剰な自動化を避ける |
-| 一貫性 | Claude Code / Codex / Gemini CLI で同じ考え方を使う |
+| 一貫性 | Claude Code / Codex / Gemini CLI / GitHub Copilot CLI で同じ考え方を使う |
 | 責任の明確さ | 作業を始めた CLI が最後まで仕上げる |
 | 軽さ | 外部 reviewer を常時 main path に入れない |
 
 ## Copilot はどこまで同じか
 
-GitHub Copilot も同じ「共通 instructions の思想」は共有しますが、扱いは別です。
+GitHub Copilot CLI も同じ「共通 instructions / skills / hooks の思想」で扱います。
 
-- 共有するもの: `instructions/.github/copilot-instructions.md`
-- 共有しないもの: グローバル Hook 配布、self-workflow runtime、`setup.sh` による自動導入
+- 共有するもの: global instructions、shared skills、managed hooks、self-workflow runtime
+- この repo 固有で別に持つもの: tracked な `.github/copilot-instructions.md`
 
-つまり、**Copilot は仲間だが、同じ Hook 基盤の上にはいない** という理解が近いです。
+つまり、**Copilot も同じ Hook 基盤に入るが、この repo では repo-level instructions も追加で持つ** という理解が近いです。
 
 ## まだ残るトレードオフ
 

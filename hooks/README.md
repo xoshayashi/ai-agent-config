@@ -10,21 +10,24 @@ official **global** config directory:
 | Claude Code | `~/.claude/settings.json` |
 | Codex | `~/.codex/config.toml` and `~/.codex/hooks.json` |
 | Gemini CLI | `~/.gemini/settings.json` |
+| GitHub Copilot CLI | `~/.copilot/settings.json` |
 
-The hook commands call scripts through the stable link:
+The hook commands call scripts through each CLI's own `hooks/` link:
 
 ```text
-${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks} -> <this repository>/hooks
+~/.claude/hooks   -> <this repository>/hooks
+~/.codex/hooks    -> <this repository>/hooks
+~/.gemini/hooks   -> <this repository>/hooks
+~/.copilot/hooks  -> <this repository>/hooks
 ```
 
 This keeps hook logic version-controlled in this repository while letting each
 CLI load hooks from the locations it already expects.
 
-GitHub Copilot is not part of this hook installation path. In the current
-implementation, Copilot only shares the canonical instructions file under
-`instructions/.github/copilot-instructions.md`; it does not receive managed
-Hook config, global setup, or self-workflow runtime integration from this
-repository.
+GitHub Copilot CLI is part of this global hook installation path. This
+repository manages Copilot's user-level hooks through `~/.copilot/settings.json`
+and also tracks `.github/copilot-instructions.md` for this repository's own
+repo-level Copilot instructions.
 
 ## Installed Hooks
 
@@ -38,7 +41,7 @@ shared instructions still require agents to use the safer trash workflow even
 if hooks are disabled or unavailable.
 
 `self_workflow.py` is called directly from the managed hook configs for Claude
-Code, Codex, and Gemini CLI. There is no routine enable flag for the main
+Code, Codex, Gemini CLI, and GitHub Copilot CLI. There is no routine enable flag for the main
 self-workflow path now; the managed hook is always present, and
 qualifying-task detection decides when the loop actually activates.
 
@@ -81,7 +84,7 @@ Key guardrails:
 - Re-entry guard via `AI_AGENT_SELF_WORKFLOW_ACTIVE=1`
 - Bounded continuation count and repeated-prompt caps
 - Verification turn caps
-- Session-scoped local state under `~/.llm-config/self-workflow`
+- Session-scoped local state under `~/.ai-agent-config/self-workflow`
 - Fail-open behavior for non-qualifying or unsupported events
 
 ## CLI Conventions

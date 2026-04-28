@@ -35,11 +35,11 @@ case "$script_path" in
 esac
 
 config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
-state_dir=$(expand_home "${AI_AGENT_STATE_DIR:-$HOME/.llm-config}")
+state_dir=$(expand_home "${AI_AGENT_STATE_DIR:-$HOME/.ai-agent-config}")
 cadence=${AI_AGENT_UPDATE_CADENCE:-}
 interval=${AI_AGENT_UPDATE_INTERVAL_SECONDS:-}
 disable_updates=0
-label=${AI_AGENT_UPDATE_LABEL:-com.llm-config.update}
+label=${AI_AGENT_UPDATE_LABEL:-com.ai-agent-config.update}
 update_remote=${AI_AGENT_UPDATE_REMOTE:-origin}
 update_branch=${AI_AGENT_UPDATE_BRANCH:-main}
 update_script="$config_home/scripts/update.sh"
@@ -109,10 +109,10 @@ if [ "$disable_updates" = "1" ]; then
     fi
   elif command -v systemctl >/dev/null 2>&1; then
     if [ "$dry_run" = "1" ]; then
-      say "would disable systemd user timer: llm-config-update.timer"
+      say "would disable systemd user timer: ai-agent-config-update.timer"
     else
-      systemctl --user disable --now llm-config-update.timer >/dev/null 2>&1 || true
-      say "disabled systemd user timer if it existed: llm-config-update.timer"
+      systemctl --user disable --now ai-agent-config-update.timer >/dev/null 2>&1 || true
+      say "disabled systemd user timer if it existed: ai-agent-config-update.timer"
     fi
   else
     warn "automatic scheduling is not supported on this system"
@@ -171,12 +171,12 @@ EOF
 elif command -v systemctl >/dev/null 2>&1; then
   systemd_dir="$HOME/.config/systemd/user"
   mkdir -p "$systemd_dir" "$state_dir"
-  service="$systemd_dir/llm-config-update.service"
-  timer="$systemd_dir/llm-config-update.timer"
+  service="$systemd_dir/ai-agent-config-update.service"
+  timer="$systemd_dir/ai-agent-config-update.timer"
   if [ "$dry_run" = "1" ]; then
     say "would write systemd service: $service"
     say "would write systemd timer: $timer"
-    say "would enable timer with systemctl --user enable --now llm-config-update.timer"
+    say "would enable timer with systemctl --user enable --now ai-agent-config-update.timer"
     exit 0
   fi
   cat > "$service" <<EOF
@@ -197,13 +197,13 @@ Description=Run AI agent config update periodically
 [Timer]
 OnBootSec=5m
 OnUnitActiveSec=${interval}s
-Unit=llm-config-update.service
+Unit=ai-agent-config-update.service
 
 [Install]
 WantedBy=timers.target
 EOF
   systemctl --user daemon-reload
-  systemctl --user enable --now llm-config-update.timer
+  systemctl --user enable --now ai-agent-config-update.timer
   say "scheduled with systemd user timer: $timer"
 else
   warn "automatic scheduling is not supported on this system"

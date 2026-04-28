@@ -2,13 +2,13 @@
 
 **This file is the single source of truth** for AI coding agents working in this directory tree.
 
-`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and `.github/copilot-instructions.md` are thin entrypoints that point here.
+`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `COPILOT.md`, and `.github/copilot-instructions.md` are thin entrypoints that point here.
 
 ## Quick Reference
 
 | Area | Required Behavior |
 |---|---|
-| **Scope** | Apply these instructions wherever an entrypoint file (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`) imports or points to this file, including the global CLI config directories (`~/.codex`, `~/.claude`, `~/.gemini`). |
+| **Scope** | Apply these instructions wherever an entrypoint file (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, or `~/.copilot/copilot-instructions.md`) imports or points to this file, including the global CLI config directories (`~/.codex`, `~/.claude`, `~/.gemini`, `~/.copilot`). |
 | **Before work** | Identify the goal, scope, deliverable, constraints, and completion criteria before acting. |
 | **Deletion** | **Never run or suggest `rm`; use `trash` for file or directory removal.** |
 | **Uncertainty** | When knowledge may be outdated or an error appears, check official references, upstream sources, or Context7 before retrying. |
@@ -27,7 +27,7 @@
 
 ## Scope
 
-- **Applies to:** Any directory whose entrypoint file (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, or `.github/copilot-instructions.md`) imports or points to this file. This includes the global CLI config directories (`~/.codex`, `~/.claude`, `~/.gemini`) installed by `scripts/setup.sh`, and therefore covers all sessions of those CLIs unless a project-local entrypoint overrides specific rules.
+- **Applies to:** Any directory whose entrypoint file (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`, or `~/.copilot/copilot-instructions.md`) imports or points to this file. This includes the global CLI config directories (`~/.codex`, `~/.claude`, `~/.gemini`, `~/.copilot`) installed by `scripts/setup.sh`, and therefore covers all sessions of those CLIs unless a project-local entrypoint overrides specific rules.
 - Follow higher-priority system, developer, tool, and explicit user instructions when they conflict with this file.
 - If an entrypoint file points here, **read and follow this file before starting work**.
 
@@ -80,7 +80,7 @@
 
 - If the user asks to **urgently update, refresh, or apply the latest shared AI agent instructions or skills**, run the config repository updater immediately instead of waiting for the scheduled update.
 - Treat Japanese shortcut phrases such as **「急ぎ対応したいんだけど」**, **「今すぐ最新にして」**, and **「最新のルールを反映して」** as urgent shared-config update requests when the setup/config context is clear. If the surrounding message clearly refers to a different urgent task, handle that task instead.
-- Locate the config repository from `AI_AGENT_CONFIG_HOME`, `$HOME/.llm-config/config.env`, or the symlink target of `AI_AGENT_INSTRUCTIONS.md`, then run `scripts/update.sh` from that repository and report the result in Japanese.
+- Locate the config repository from `AI_AGENT_CONFIG_HOME`, `$HOME/.ai-agent-config/config.env`, legacy `$HOME/.llm-config/config.env`, or the symlink target of `AI_AGENT_INSTRUCTIONS.md`, then run `scripts/update.sh` from that repository and report the result in Japanese.
 - If the user asks to check whether shared config is installed, healthy, logged in, or up to date, run `scripts/health-check.sh` from the config repository first, then explain the result in Japanese before deciding whether setup or update is needed.
 - If the user asks to **find skill improvements from recent usage logs**, run `scripts/skill-improvement-bot.py scan` from the config repository. Treat phrases such as **「最近のログからSkill改善点を見て」**, **「Skillで吸収できる改善点を確認して」**, and **「Skill改善PRまで自動で作って」** as this workflow when the setup/config context is clear.
 - Do not expose, quote, or commit raw LLM CLI logs. Share only redacted summaries and improvement proposals. Creating PRs, applying review feedback, or auto-merging must be driven by the repository's explicit automation flags and safety checks.

@@ -8,7 +8,7 @@
           {
             "name": "llm-config-safe-delete-guard",
             "type": "command",
-            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/safe_delete_guard.py\" --current gemini",
+            "command": "python3 \"${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}/hooks/scripts/safe_delete_guard.py\" --current gemini",
             "timeout": 10000,
             "description": "Block permanent shell deletion commands and suggest the safer trash workflow."
           }
@@ -23,7 +23,7 @@
           {
             "name": "llm-config-self-workflow",
             "type": "command",
-            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current gemini",
+            "command": "python3 \"${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}/hooks/scripts/self_workflow.py\" --current gemini",
             "timeout": 50000,
             "description": "Continue the same LLM's self-workflow when one more turn is needed."
           }
@@ -38,7 +38,7 @@
           {
             "name": "llm-config-self-workflow-brief",
             "type": "command",
-            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current gemini",
+            "command": "python3 \"${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}/hooks/scripts/self_workflow.py\" --current gemini",
             "timeout": 40000,
             "description": "Inject self-workflow context before the turn starts."
           }

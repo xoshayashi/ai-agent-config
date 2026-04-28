@@ -2,9 +2,9 @@
 
 > [!NOTE]
 > 3行で言うと:
-> - このリポジトリは、**Claude Code / Codex / Gemini CLI に同じ働き方を配る設定の母艦**です。
+> - このリポジトリは、**Claude Code / Codex / Gemini CLI / GitHub Copilot CLI に同じ働き方を配る設定の母艦**です。
 > - 配るものは主に **Instructions（指示書）**、**Skills（再利用できる手順）**、**Hooks（自動で走る番人）** の3つです。
-> - GitHub Copilot にも同じ思想を共有しますが、Copilot は **repo-local instructions のみ** で、グローバル Hook 配布の対象ではありません。
+> - GitHub Copilot CLI にも global config を配り、この repo 自体には `.github/copilot-instructions.md` も持ちます。
 
 ## このページの役割
 
@@ -34,16 +34,17 @@ flowchart LR
     Inst --> Codex["Codex"]
     Inst --> Claude["Claude Code"]
     Inst --> Gemini["Gemini CLI"]
+    Inst --> Copilot["GitHub Copilot CLI"]
 
     Skill --> Codex
     Skill --> Claude
     Skill --> Gemini
+    Skill --> Copilot
 
     Hook --> Codex
     Hook --> Claude
     Hook --> Gemini
-
-    Repo -. 手動配置 .-> Copilot["GitHub Copilot<br/>repo-local instructions のみ"]
+    Hook --> Copilot
 ```
 
 ## 配っているものは何か
@@ -67,10 +68,10 @@ flowchart LR
 
 ### 向いている人
 
-- Claude Code / Codex / Gemini CLI のうち、少なくとも1つを日常的に使う人
+- Claude Code / Codex / Gemini CLI / Copilot CLI のうち、少なくとも1つを日常的に使う人
 - 1人で複数 CLI を併用し、動き方をそろえたい人
 - 小さなチームで AI エージェントの運用ルールを共有したい人
-- GitHub Copilot の repo-local instructions も同じ思想で管理したい人
+- GitHub Copilot CLI も含めて global config をそろえたい人
 
 ### まだ不要な人
 
@@ -84,7 +85,8 @@ flowchart LR
 
 - Claude Code / Codex / Gemini CLI そのものをインストールするわけではありません
 - ブラウザ版 ChatGPT や Claude の設定まで自動で変えるわけではありません
-- GitHub Copilot を他の3 CLI とまったく同じ Hook 基盤に乗せるわけではありません
+- GitHub Copilot CLI も global Hook 配布の対象です
+- ただし、この repo の `.github/copilot-instructions.md` は repo 固有の tracked file として別に持ちます
 - ユーザーの既存設定を「全部こちらの形に置き換える」ことを目的にはしていません
 
 ## セットアップすると、自分の PC で何が起きるか
@@ -92,9 +94,11 @@ flowchart LR
 まず大枠だけ押さえると、`scripts/setup.sh` は次のことをします。
 
 1. `~/.codex`、`~/.claude`、`~/.gemini` に共通設定を入れる
-2. `~/.agents/skills` に共有 Skill へのリンクを置く
-3. `~/.llm-config/hooks` に Hook 本体への安定リンクを置く
-4. 既存設定がある場合は、置き換えではなく **追記/マージ** で扱う
+2. `~/.copilot` に Copilot 用の共通設定を入れる
+3. `~/.agents/skills` と `~/.copilot/skills` に共有 Skill へのリンクを置く
+4. 各 CLI の公式設定フォルダーに `hooks/` リンクを置く
+5. `~/.ai-agent-config` に state や backup を保存する
+6. 既存設定がある場合は、置き換えではなく **追記/マージ** で扱う
 
 > [!TIP]
 > 最初から本実行する必要はありません。`AI_AGENT_DRY_RUN=1 sh scripts/setup.sh` で、

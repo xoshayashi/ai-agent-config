@@ -48,7 +48,7 @@ MHC = load_module()
 
 SAMPLE_HOOK = {
     "type": "command",
-    "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/safe_delete_guard.py\" --current claude",
+    "command": "python3 \"${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}/hooks/scripts/safe_delete_guard.py\" --current claude",
     "timeout": 10,
 }
 SAMPLE_GROUP = {"_llm_config_managed": True, "matcher": "Bash", "hooks": [SAMPLE_HOOK]}

@@ -1,0 +1,53 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "_llm_config_managed": true,
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${AI_AGENT_COPILOT_HOME:-$HOME/.copilot}/hooks/scripts/self_workflow.py\" --current copilot",
+            "timeout": 25
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "_llm_config_managed": true,
+        "matcher": "^bash$",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${AI_AGENT_COPILOT_HOME:-$HOME/.copilot}/hooks/scripts/safe_delete_guard.py\" --current copilot",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "_llm_config_managed": true,
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${AI_AGENT_COPILOT_HOME:-$HOME/.copilot}/hooks/scripts/self_workflow.py\" --current copilot",
+            "timeout": 50
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "_llm_config_managed": true,
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${AI_AGENT_COPILOT_HOME:-$HOME/.copilot}/hooks/scripts/self_workflow.py\" --current copilot",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

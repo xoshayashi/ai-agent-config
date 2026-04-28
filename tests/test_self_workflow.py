@@ -123,7 +123,7 @@ def test_should_skip_only_on_recursion_or_wrong_event() -> None:
     with_env({"AI_AGENT_SELF_WORKFLOW_ACTIVE": "1"}, _run)
 
 
-def test_stop_output_formats_for_codex_and_gemini() -> None:
+def test_stop_output_formats_for_codex_gemini_and_copilot() -> None:
     payload = SWF.stop_output(
         "codex",
         {"continue": True, "prompt": "次のステップを実行", "note": "missing verification"},
@@ -132,17 +132,32 @@ def test_stop_output_formats_for_codex_and_gemini() -> None:
         "gemini",
         {"continue": True, "prompt": "次のステップを実行", "note": "missing verification"}
     )
+    copilot_payload = SWF.stop_output(
+        "copilot",
+        {"continue": True, "prompt": "次のステップを実行", "note": "missing verification"},
+    )
     assert_eq(payload.get("decision"), "block", "stop continuation decision")
     assert_eq(gemini_payload.get("decision"), "deny", "gemini continuation decision")
+    assert_eq(copilot_payload.get("decision"), "block", "copilot continuation decision")
     assert payload.get("reason")
 
 
-def test_turn_context_output_formats_for_claude_and_gemini() -> None:
+def test_turn_context_output_formats_for_claude_gemini_and_copilot() -> None:
     claude_payload = SWF.turn_context_output("claude", "UserPromptSubmit", "context")
     gemini_payload = SWF.turn_context_output("gemini", "BeforeAgent", "context")
+    copilot_payload = SWF.turn_context_output("copilot", "UserPromptSubmit", "context")
     assert_eq(claude_payload.get("hookSpecificOutput", {}).get("hookEventName"), "UserPromptSubmit", "claude hook event")
     assert_eq(claude_payload.get("hookSpecificOutput", {}).get("additionalContext"), "context", "claude context")
     assert_eq(gemini_payload.get("hookSpecificOutput", {}).get("additionalContext"), "context", "gemini context")
+    assert_eq(copilot_payload.get("additionalContext"), "context", "copilot context")
+
+
+def test_response_from_transcript_path_fallback() -> None:
+    with tempfile.TemporaryDirectory(prefix="swf-transcript-") as tmp:
+        transcript = Path(tmp) / "transcript.txt"
+        transcript.write_text("assistant response\n[[IMPLEMENTATION_DONE]]\n", encoding="utf-8")
+        response = SWF.response_from({"transcript_path": str(transcript)})
+        assert "[[IMPLEMENTATION_DONE]]" in response
 
 
 def test_should_keep_current_task_followup_prompt() -> None:
@@ -481,6 +496,22 @@ def test_handle_stop_implementation_done_moves_to_verification() -> None:
         assert_eq(saved.get("verification_turn"), 0, "verification turn initialized")
 
 
+def test_handle_stop_copilot_uses_transcript_path_for_verification_handoff() -> None:
+    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
+        state_path = Path(tmp) / "state.json"
+        transcript = Path(tmp) / "transcript.txt"
+        transcript.write_text("work finished\n[[IMPLEMENTATION_DONE]]\n", encoding="utf-8")
+        state = {
+            "phase": "implementation",
+            "spec_markdown": "approved spec [[SPEC_DONE]]",
+            "implementation_turn": 0,
+        }
+        payload = SWF.handle_stop("copilot", {"transcript_path": str(transcript)}, state, state_path)
+        assert_eq(payload.get("decision"), "block", "copilot should continue into verification")
+        saved = SWF.load_state(state_path)
+        assert_eq(saved.get("phase"), "verification", "copilot transcript fallback should promote phase")
+
+
 def test_handle_stop_structured_verification_ready_moves_to_verification() -> None:
     with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
         state_path = Path(tmp) / "state.json"
@@ -665,8 +696,9 @@ def run_tests() -> int:
         test_completion_keywords_from_hooks_md,
         test_completion_keywords_prefer_first_match_per_category,
         test_should_skip_only_on_recursion_or_wrong_event,
-        test_stop_output_formats_for_codex_and_gemini,
-        test_turn_context_output_formats_for_claude_and_gemini,
+        test_stop_output_formats_for_codex_gemini_and_copilot,
+        test_turn_context_output_formats_for_claude_gemini_and_copilot,
+        test_response_from_transcript_path_fallback,
         test_should_keep_current_task_followup_prompt,
         test_should_activate_self_workflow_prefers_complex_or_explicit_prompts,
         test_is_answer_only_request_distinguishes_explanation_from_execution,
@@ -693,6 +725,7 @@ def run_tests() -> int:
         test_handle_stop_spec_review_done_moves_to_implementation,
         test_handle_stop_spec_review_without_keyword_requests_refinement,
         test_handle_stop_implementation_done_moves_to_verification,
+        test_handle_stop_copilot_uses_transcript_path_for_verification_handoff,
         test_handle_stop_structured_verification_ready_moves_to_verification,
         test_handle_stop_task_done_without_verification_keeps_verifying,
         test_handle_stop_structured_task_complete_without_verification_keeps_verifying,

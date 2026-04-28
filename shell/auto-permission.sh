@@ -6,7 +6,7 @@
 #
 # Installed by scripts/enable-auto-permission.sh (NOT scripts/setup.sh) as a
 # stable symlink at:
-#   ${AI_AGENT_SHELL_ALIAS_LINK:-$HOME/.llm-config/auto-permission.sh}
+#   ${AI_AGENT_SHELL_ALIAS_LINK:-$HOME/.ai-agent-config/auto-permission.sh}
 # and sourced from the user's shell rc through a managed marker block.
 #
 # Removed cleanly by scripts/disable-auto-permission.sh.

@@ -52,7 +52,7 @@ flowchart TD
 - このリポジトリは、AI 本体を配るものではなく、**AI の働き方をそろえる設定の母艦**です。
 - 中心にあるのは `instructions/AI_AGENT_INSTRUCTIONS.md` で、そこを各 CLI が参照します。
 - `scripts/setup.sh` は既存設定を壊しに行く設計ではなく、**dry run・追記/マージ・バックアップ**を前提にしています。
-- GitHub Copilot は対象外ではありませんが、**グローバル Hook の自動配布対象ではない**ので扱いが少し別です。
+- GitHub Copilot CLI も global setup / Hook 配布の対象です。加えて、この repo では `.github/copilot-instructions.md` も tracked file として持ちます。
 
 ## 実務での使い分け
 
