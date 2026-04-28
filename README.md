@@ -43,8 +43,20 @@ ${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks} -> <this repo>/hooks
 2. **Claude Code / Codex / Gemini CLI を全てインストール済み**であること
 3. **3つ全てでログイン済み**であること
 4. `git` と `python3` が使えること
+5. `trash` コマンド（macOS は `brew install trash`、Linux は `trash-cli` パッケージ）
 
 `scripts/setup.sh` は既定で 3 CLI の存在チェックを行います（`AI_AGENT_REQUIRE_LLM_CLIS=0` で無効化可能）。
+
+`trash` がインストールされていない場合、`scripts/setup.sh` は対応するパッケージマネージャ（macOS: `brew`、Linux: `apt-get` / `dnf` / `pacman`）を検出して **インストールコマンドを提示し、y/N で確認**します（**Enter は「いいえ」**）。`AI_AGENT_ASSUME_YES=1` を付けると確認をスキップして即実行します。
+
+| OS | 自動提案されるコマンド |
+|---|---|
+| macOS | `brew install trash` |
+| Debian/Ubuntu | `sudo apt-get install -y trash-cli` |
+| Fedora/RHEL | `sudo dnf install -y trash-cli` |
+| Arch | `sudo pacman -S --noconfirm trash-cli` |
+
+これらの環境以外では、`trash` を手動で導入してから setup を再実行してください。
 
 | ツール | 公式手順 |
 |---|---|
