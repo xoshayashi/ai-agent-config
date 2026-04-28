@@ -77,7 +77,6 @@ install_hooks=${AI_AGENT_INSTALL_HOOKS:-1}
 hooks_runtime_link=${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}
 extra_skills_dirs=${AI_AGENT_EXTRA_SKILLS_DIRS:-}
 conflict_mode=${AI_AGENT_CONFLICT_MODE:-backup}
-protect_links=${AI_AGENT_PROTECT_LINKS:-auto}
 persist_config=${AI_AGENT_PERSIST_CONFIG:-1}
 require_llm_clis=${AI_AGENT_REQUIRE_LLM_CLIS:-1}
 timestamp=$(date +%Y%m%d-%H%M%S)
@@ -181,7 +180,6 @@ write_state_config() {
     printf 'AI_AGENT_INSTALL_HOOKS=%s\n' "$(quote_sh "$install_hooks")"
     printf 'AI_AGENT_HOOKS_RUNTIME_LINK=%s\n' "$(quote_sh "$hooks_runtime_link")"
     printf 'AI_AGENT_CONFLICT_MODE=%s\n' "$(quote_sh "$conflict_mode")"
-    printf 'AI_AGENT_PROTECT_LINKS=%s\n' "$(quote_sh "$protect_links")"
     printf 'AI_AGENT_REQUIRE_LLM_CLIS=%s\n' "$(quote_sh "$require_llm_clis")"
     printf 'AI_AGENT_STATE_DIR=%s\n' "$(quote_sh "$state_root")"
     printf 'AI_AGENT_STATE_FILE=%s\n' "$(quote_sh "$state_file")"
@@ -198,21 +196,6 @@ clear_link_protection() {
   [ -L "$path" ] || return 0
   if is_darwin; then
     chmod -h -N "$path" 2>/dev/null || true
-  fi
-}
-
-protect_link() {
-  path=$1
-  case "$protect_links" in
-    0|false|no)
-      return 0
-      ;;
-    auto)
-      is_darwin || return 0
-      ;;
-  esac
-  if is_darwin; then
-    chmod -h +a "everyone deny delete" "$path" 2>/dev/null || warn "could not apply delete protection to $path"
   fi
 }
 
@@ -253,7 +236,7 @@ install_link() {
     current=$(readlink "$dst")
     if [ "$current" = "$src" ]; then
       say "ok: $dst -> $src"
-      protect_link "$dst"
+      clear_link_protection "$dst"
       return 0
     fi
   fi
@@ -275,9 +258,6 @@ install_link() {
 
   say "link: $dst -> $src"
   run ln -s "$src" "$dst"
-  if [ "$dry_run" != "1" ]; then
-    protect_link "$dst"
-  fi
 }
 
 install_instruction_links() {
@@ -330,7 +310,7 @@ install_hook_config() {
     current=$(readlink "$dst")
     if [ "$current" = "$src" ]; then
       say "ok: $dst -> $src"
-      protect_link "$dst"
+      clear_link_protection "$dst"
       return 0
     fi
   fi
