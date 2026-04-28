@@ -12,6 +12,16 @@ capable of starting its own work, and adding a hook on every keystroke
 boundary only adds overhead. Phase transitions (`[[SPEC_DONE]]` etc.) are
 detected at the post-work boundary instead.
 
+### Idle-phase bootstrap
+
+For brand-new sessions there is no `phase` recorded on disk, so the LLM
+explicitly opts into the auto-continuation loop by emitting `[[SPEC_DONE]]`
+on a standalone line. When the post-work hook sees that signal on an idle
+phase, it records the response as the spec draft, promotes the phase to
+`spec_review`, and dispatches the standard refinment gate. Without that
+keyword on an idle phase, the hook stays silent — the LLM is free to
+answer simple turns without engaging the workflow.
+
 ## Same-LLM Self-Workflow
 
 When a managed Hook receives a qualifying non-trivial task, the current CLI
