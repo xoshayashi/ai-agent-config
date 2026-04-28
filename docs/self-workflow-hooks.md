@@ -71,5 +71,3 @@ completion when more work is needed.
 ## Related Docs
 
 - Current architecture summary: [hooks-architecture-review.md](./hooks-architecture-review.md)
-- Historical Codex-hub note: [codex-hub-orchestration.md](./codex-hub-orchestration.md)
-- Historical response-strategy note: [response-strategy-autonomy.md](./response-strategy-autonomy.md)

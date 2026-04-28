@@ -34,7 +34,7 @@
           {
             "type": "command",
             "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current codex",
-            "timeout": 150,
+            "timeout": 50,
             "statusMessage": "Evaluating self-workflow continuation"
           }
         ]

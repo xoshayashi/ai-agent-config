@@ -59,16 +59,15 @@ SELF_WORKFLOW_ACTION_PATTERN = re.compile(
     re.IGNORECASE,
 )
 PHASE_SIGNAL_PATTERN = re.compile(
-    r"^(verification_ready|task_complete|verification_incomplete|implementation_in_progress)$",
-    re.IGNORECASE,
+    r"^(verification_ready|task_complete|verification_incomplete|implementation_in_progress)$"
 )
 
 
 def env_value(name: str, legacy_name: str, default: str) -> str:
     if name in os.environ:
-        return os.environ.get(name, default)
+        return os.environ[name]
     if legacy_name in os.environ:
-        return os.environ.get(legacy_name, default)
+        return os.environ[legacy_name]
     return default
 
 
@@ -93,10 +92,6 @@ def load_input() -> dict[str, Any]:
     except json.JSONDecodeError:
         return {}
     return parsed if isinstance(parsed, dict) else {}
-
-
-def enabled() -> bool:
-    return True
 
 
 def should_skip(current: str, data: dict[str, Any]) -> bool:
@@ -150,7 +145,6 @@ def save_state(path: Path, state: dict[str, Any]) -> None:
             handle.write(payload)
         os.chmod(tmp_path, 0o600)
         Path(tmp_path).replace(path)
-        os.chmod(path, 0o600)
     except Exception:
         try:
             os.unlink(tmp_path)
@@ -288,24 +282,21 @@ def completion_keywords() -> tuple[str, str, str, str]:
             DEFAULT_TASK_DONE_KEYWORD,
         )
     tokens = sorted(set(re.findall(r"\[\[[A-Z0-9_:-]+\]\]", text)))
-    spec_done = DEFAULT_SPEC_DONE_KEYWORD
-    implementation_done = DEFAULT_IMPLEMENTATION_DONE_KEYWORD
-    verification_done = DEFAULT_VERIFICATION_DONE_KEYWORD
-    task_done = DEFAULT_TASK_DONE_KEYWORD
+    return (
+        choose_completion_keyword(tokens, DEFAULT_SPEC_DONE_KEYWORD, "SPEC_DONE"),
+        choose_completion_keyword(tokens, DEFAULT_IMPLEMENTATION_DONE_KEYWORD, "IMPLEMENTATION_DONE"),
+        choose_completion_keyword(tokens, DEFAULT_VERIFICATION_DONE_KEYWORD, "VERIFICATION_DONE"),
+        choose_completion_keyword(tokens, DEFAULT_TASK_DONE_KEYWORD, "TASK_DONE"),
+    )
 
-    for token in tokens:
-        if "SPEC_DONE" in token:
-            spec_done = token
-            break
 
+def choose_completion_keyword(tokens: list[str], default: str, marker: str) -> str:
+    if default in tokens:
+        return default
     for token in tokens:
-        if "IMPLEMENTATION_DONE" in token:
-            implementation_done = token
-        elif "VERIFICATION_DONE" in token:
-            verification_done = token
-        elif "TASK_DONE" in token:
-            task_done = token
-    return spec_done, implementation_done, verification_done, task_done
+        if marker in token:
+            return token
+    return default
 
 
 def contains_explicit_keyword(text: str, keyword: str) -> bool:
@@ -674,8 +665,7 @@ def apply_continuation_safety(state: dict[str, Any], next_prompt: str, note: str
     return {"continue": True, "prompt": next_prompt, "note": note}
 
 
-def build_continue_decision(state: dict[str, Any], data: dict[str, Any], response: str) -> dict[str, Any]:
-    del data
+def build_continue_decision(state: dict[str, Any], _data: dict[str, Any], response: str) -> dict[str, Any]:
     spec_markdown = str(state.get("spec_markdown", ""))
     _, implementation_done_keyword, _, _ = completion_keywords()
     next_prompt = default_implementation_continue_prompt(
@@ -689,12 +679,11 @@ def build_continue_decision(state: dict[str, Any], data: dict[str, Any], respons
 
 def build_verification_decision(
     state: dict[str, Any],
-    data: dict[str, Any],
+    _data: dict[str, Any],
     response: str,
     verification_done_keyword: str,
     task_done_keyword: str,
 ) -> dict[str, Any]:
-    del data
     verification_turn = safe_int(state.get("verification_turn", 0), 0, minimum=0)
     max_verification_turns = safe_int(
         env_value(

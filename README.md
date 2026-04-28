@@ -171,4 +171,3 @@ shell rc から marker block を削除し、シンボリックリンクを `tras
 - Skill 改善自動化は [docs/skill-improvement-automation.md](docs/skill-improvement-automation.md)
 - Hooks 設計検証は [docs/hooks-architecture-review.md](docs/hooks-architecture-review.md)
 - 現行の共通自己完結フローは [docs/self-workflow-hooks.md](docs/self-workflow-hooks.md)
-- 旧 `codex-hub-orchestration` / `response-strategy` 設計は移行メモとして `docs/` に残しています
