@@ -69,6 +69,22 @@ prefer a delta-only follow-up instead of repeating the whole earlier answer.
 Use correction-like signals for that branch; do not treat generic "updated"
 status text as delta-only by itself.
 
+## Minimal Completion Signal
+
+Emit completion signals minimally. The hook needs only one valid signal per
+phase transition; redundant signals add visual noise without changing detection.
+
+- Prefer a single completion keyword on its own line at the end of the response.
+- Use a structured JSON packet **only** when the hook needs the structured
+  evidence — for example, the final `task_complete` packet that carries
+  `checks_run`, `diff_reviewed`, and `self_review_complete`.
+- Do not emit both a keyword and an equivalent JSON packet for the same
+  transition. Pick the one form the moment actually requires.
+- Keep the user-facing report and the completion signal visually separated:
+  put the report first, then a blank line, then the signal as the final line.
+- Do not wrap the signal inside emphasis, headings, or other formatting that
+  could break the standalone-line / fenced-JSON detection rule above.
+
 ## Safety Limits
 
 Apply these guardrails in hook implementations:
