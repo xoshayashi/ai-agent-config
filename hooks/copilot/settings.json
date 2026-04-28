@@ -2,19 +2,19 @@
   "hooks": {
     "SessionStart": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${AI_AGENT_COPILOT_HOME:-$HOME/.copilot}/hooks/scripts/self_workflow.py\" --current copilot",
-            "timeout": 25
+            "command": "python3 \"${AI_AGENT_COPILOT_HOME:-$HOME/.copilot}/hooks/scripts/subprocess_check.py\" --current copilot",
+            "timeout": 200
           }
         ]
       }
     ],
     "PreToolUse": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "matcher": "^bash$",
         "hooks": [
           {
@@ -27,24 +27,24 @@
     ],
     "Stop": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${AI_AGENT_COPILOT_HOME:-$HOME/.copilot}/hooks/scripts/self_workflow.py\" --current copilot",
-            "timeout": 50
+            "command": "python3 \"${AI_AGENT_COPILOT_HOME:-$HOME/.copilot}/hooks/scripts/subprocess_check.py\" --current copilot",
+            "timeout": 200
           }
         ]
       }
     ],
     "UserPromptSubmit": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${AI_AGENT_COPILOT_HOME:-$HOME/.copilot}/hooks/scripts/self_workflow.py\" --current copilot",
-            "timeout": 60
+            "command": "python3 \"${AI_AGENT_COPILOT_HOME:-$HOME/.copilot}/hooks/scripts/subprocess_check.py\" --current copilot",
+            "timeout": 200
           }
         ]
       }

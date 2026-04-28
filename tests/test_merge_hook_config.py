@@ -51,7 +51,7 @@ SAMPLE_HOOK = {
     "command": "python3 \"${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}/hooks/scripts/safe_delete_guard.py\" --current claude",
     "timeout": 10,
 }
-SAMPLE_GROUP = {"_llm_config_managed": True, "matcher": "Bash", "hooks": [SAMPLE_HOOK]}
+SAMPLE_GROUP = {"_ai_agent_config_managed": True, "matcher": "Bash", "hooks": [SAMPLE_HOOK]}
 SAMPLE_SOURCE_JSON = {"hooks": {"PreToolUse": [SAMPLE_GROUP]}}
 
 USER_HOOK_GROUP = {
@@ -139,11 +139,12 @@ def test_merge_json_replaces_stale_managed_hook() -> None:
         write_json(src, SAMPLE_SOURCE_JSON)
 
         old_managed = {
+            "_ai_agent_config_managed": True,
             "matcher": "*",  # old matcher
             "hooks": [
                 {
                     "type": "command",
-                    "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK}/scripts/safe_delete_guard.py\" --current claude",
+                    "command": "python3 \"$HOME/.claude/hooks/scripts/safe_delete_guard.py\" --current claude",
                     "timeout": 10,
                 }
             ],
@@ -161,30 +162,28 @@ def test_merge_json_replaces_stale_managed_hook() -> None:
         assert USER_HOOK_GROUP in groups, "user hook must survive cleanup"
 
 
-def test_merge_json_keeps_unmarked_user_hook_with_runtime_link() -> None:
-    """A user hook referencing AI_AGENT_HOOKS_RUNTIME_LINK must not be removed
-    unless it matches managed markers/patterns.
-    """
+def test_merge_json_keeps_unmarked_user_hook_with_custom_script_path() -> None:
+    """An unmarked user hook must survive merge even when it calls a custom script."""
     with in_tempdir() as tmp:
         src = Path(tmp) / "src.json"
         dst = Path(tmp) / "dst.json"
         write_json(src, SAMPLE_SOURCE_JSON)
-        user_runtime_hook = {
+        user_custom_hook = {
             "matcher": "Bash",
             "hooks": [
                 {
                     "type": "command",
-                    "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK}/scripts/my_custom_router.py\"",
+                    "command": "python3 \"$HOME/.custom-hooks/scripts/my_custom_router.py\"",
                     "timeout": 7,
                 }
             ],
         }
-        write_json(dst, {"hooks": {"PreToolUse": [user_runtime_hook]}})
+        write_json(dst, {"hooks": {"PreToolUse": [user_custom_hook]}})
 
         MHC.merge_json_file(src, dst, dry_run=False)
         result = read_json(dst)
         groups = result["hooks"]["PreToolUse"]
-        assert user_runtime_hook in groups, "user runtime-link hook must survive merge"
+        assert user_custom_hook in groups, "user custom hook must survive merge"
         assert SAMPLE_GROUP in groups, "managed hook must still be added"
 
 
@@ -203,7 +202,7 @@ def test_merge_json_no_duplicate_when_destination_lacks_marker() -> None:
         result = read_json(dst)
         groups = result["hooks"]["PreToolUse"]
         assert len(groups) == 1, f"legacy managed group should not duplicate: {groups}"
-        assert groups[0].get("_llm_config_managed") is True, "legacy group should be upgraded to explicit marker"
+        assert groups[0].get("_ai_agent_config_managed") is True, "legacy group should be upgraded to explicit marker"
 
 
 def test_merge_json_pops_empty_event() -> None:
@@ -217,11 +216,12 @@ def test_merge_json_pops_empty_event() -> None:
         write_json(src, {"hooks": {"PreToolUse": [SAMPLE_GROUP]}})
 
         old_managed = {
+            "_ai_agent_config_managed": True,
             "matcher": "*",
             "hooks": [
                 {
                     "type": "command",
-                    "command": "python3 ${AI_AGENT_HOOKS_RUNTIME_LINK}/scripts/peer_prompt_refinement.py --current claude",
+                    "command": "python3 \"$HOME/.claude/hooks/scripts/peer_prompt_refinement.py\" --current claude",
                     "timeout": 30,
                 }
             ],
@@ -400,7 +400,7 @@ def test_remove_codex_orphan_managed_begin_preserved() -> None:
 
 
 def test_remove_codex_marker_only_pair() -> None:
-    """The non-fenced marker pair (`# llm-config managed hooks` + codex_hooks=true)
+    """The non-fenced marker pair (`# ai-agent-config managed hooks` + codex_hooks=true)
     is removed cleanly without touching surrounding content.
     """
     with in_tempdir() as tmp:
@@ -408,7 +408,7 @@ def test_remove_codex_marker_only_pair() -> None:
         dst.write_text(
             "[features]\n"
             "foo = true\n"
-            "# llm-config managed hooks\n"
+            "# ai-agent-config managed hooks\n"
             "codex_hooks = true\n"
             "[other]\n"
             "value = 1\n",
@@ -426,7 +426,7 @@ def test_remove_codex_restores_previous_marker() -> None:
         dst = Path(tmp) / "config.toml"
         dst.write_text(
             "[features]\n"
-            "# llm-config managed hooks previous: codex_hooks = false\n"
+            "# ai-agent-config managed hooks previous: codex_hooks = false\n"
             "codex_hooks = true\n",
             encoding="utf-8",
         )
@@ -443,7 +443,7 @@ TESTS = [
     test_merge_json_idempotent,
     test_merge_json_preserves_user_hook,
     test_merge_json_replaces_stale_managed_hook,
-    test_merge_json_keeps_unmarked_user_hook_with_runtime_link,
+    test_merge_json_keeps_unmarked_user_hook_with_custom_script_path,
     test_merge_json_no_duplicate_when_destination_lacks_marker,
     test_merge_json_pops_empty_event,
     test_merge_json_atomic_write_no_temp_leftover,

@@ -1,27 +1,23 @@
 #!/usr/bin/env python3
-"""Merge llm-config hook registrations into existing CLI settings."""
+"""Merge ai-agent-config hook registrations into existing CLI settings."""
 
 from __future__ import annotations
 
 import argparse
 import json
 import os
+import re
 import tempfile
 from pathlib import Path
 from typing import Any
 
 
-MANAGED_BEGIN = "# BEGIN llm-config managed hooks"
-MANAGED_END = "# END llm-config managed hooks"
-MANAGED_FLAG = "_llm_config_managed"
-LEGACY_MANAGED_SCRIPT_HINTS = {
-    "safe_delete_guard.py",
-    "peer_prompt_refinement.py",  # pre-refinment legacy hook name
-    "refinment.py",
-    "self_workflow.py",
-    "response_strategy_bridge.py",
-    "multillm_orchestrator.py",
-}
+MANAGED_BEGIN = "# BEGIN ai-agent-config managed hooks"
+MANAGED_END = "# END ai-agent-config managed hooks"
+MANAGED_INLINE_MARKER = "# ai-agent-config managed hooks"
+MANAGED_PREVIOUS_PREFIX = "# ai-agent-config managed hooks previous:"
+MANAGED_FLAG = "_ai_agent_config_managed"
+MANAGED_PREVIOUS_PATTERN = re.compile(r"^# .*managed hooks previous:\s*(.+)$")
 
 
 def atomic_write(destination: Path, payload: str) -> None:
@@ -54,49 +50,56 @@ def canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), ensure_ascii=False)
 
 
+def is_managed_flag_key(key: str) -> bool:
+    return key.endswith("_managed")
+
+
 def strip_managed_flag(value: Any) -> Any:
     if isinstance(value, dict):
-        return {key: strip_managed_flag(item) for key, item in value.items() if key != MANAGED_FLAG}
+        return {
+            key: strip_managed_flag(item)
+            for key, item in value.items()
+            if not is_managed_flag_key(str(key))
+        }
     if isinstance(value, list):
         return [strip_managed_flag(item) for item in value]
     return value
 
 
-def _has_legacy_managed_command(group: dict[str, Any]) -> bool:
-    hooks = group.get("hooks")
-    if not isinstance(hooks, list) or not hooks:
-        return False
-    for hook in hooks:
-        if not isinstance(hook, dict):
-            continue
-        command = hook.get("command")
-        if not isinstance(command, str):
-            continue
-        if "AI_AGENT_HOOKS_RUNTIME_LINK" not in command:
-            continue
-        if any(hint in command for hint in LEGACY_MANAGED_SCRIPT_HINTS):
-            return True
-    return False
-
-
 def contains_managed_hook(value: Any) -> bool:
-    """Return whether a hook group is managed by llm-config.
+    """Return whether a hook group is managed by ai-agent-config.
 
-    Preferred path: explicit marker ``_llm_config_managed: true``.
-    Backward compatibility: legacy groups are recognized only when their hook
-    command explicitly uses ``AI_AGENT_HOOKS_RUNTIME_LINK`` and known managed
-    script names. This avoids broad substring matches that can misclassify
-    user-authored hooks.
+    Preferred path: explicit marker ``_ai_agent_config_managed: true``.
     """
     if isinstance(value, list):
         return any(contains_managed_hook(item) for item in value)
     if isinstance(value, dict):
-        if value.get(MANAGED_FLAG) is True:
-            return True
-        if _has_legacy_managed_command(value):
+        if any(is_managed_flag_key(str(key)) and item is True for key, item in value.items()):
             return True
         return any(contains_managed_hook(item) for item in value.values())
     return False
+
+
+def is_managed_begin_marker(line: str) -> bool:
+    stripped = line.strip()
+    return stripped.startswith("# BEGIN ") and stripped.endswith("managed hooks")
+
+
+def is_managed_end_marker(line: str) -> bool:
+    stripped = line.strip()
+    return stripped.startswith("# END ") and stripped.endswith("managed hooks")
+
+
+def is_managed_inline_marker(line: str) -> bool:
+    stripped = line.strip()
+    return stripped.startswith("# ") and stripped.endswith("managed hooks") and "previous:" not in stripped
+
+
+def managed_previous_value(line: str) -> str | None:
+    match = MANAGED_PREVIOUS_PATTERN.match(line.strip())
+    if match:
+        return match.group(1).strip()
+    return None
 
 
 def merge_hooks_json(source: Path, destination: Path) -> tuple[dict[str, Any], bool]:
@@ -259,19 +262,38 @@ def merge_codex_config(_source: Path, destination: Path, dry_run: bool) -> bool:
             insert_at = index + 1
 
     if codex_line is not None:
+        previous_line = lines[codex_line - 1].strip() if codex_line > 0 else ""
         if lines[codex_line].strip() == "codex_hooks = true":
-            return False
+            previous_value = managed_previous_value(previous_line)
+            if previous_value is not None and previous_line != f"{MANAGED_PREVIOUS_PREFIX} {previous_value}":
+                lines[codex_line - 1] = f"{MANAGED_PREVIOUS_PREFIX} {previous_value}"
+                changed = True
+            elif is_managed_inline_marker(previous_line) and previous_line != MANAGED_INLINE_MARKER:
+                lines[codex_line - 1] = MANAGED_INLINE_MARKER
+                changed = True
+            if changed and not dry_run:
+                atomic_write(destination, "\n".join(lines) + "\n")
+            return changed
         previous = lines[codex_line].strip()
-        previous_marker = f"# llm-config managed hooks previous: {previous}"
-        if codex_line == 0 or not lines[codex_line - 1].strip().startswith("# llm-config managed hooks previous:"):
+        previous_marker = f"{MANAGED_PREVIOUS_PREFIX} {previous}"
+        previous_value = managed_previous_value(previous_line)
+        if previous_value is not None:
+            if previous_line != previous_marker:
+                lines[codex_line - 1] = previous_marker
+                changed = True
+        elif is_managed_inline_marker(previous_line):
+            lines[codex_line - 1] = previous_marker
+            changed = True
+        else:
             lines.insert(codex_line, previous_marker)
             codex_line += 1
+            changed = True
         lines[codex_line] = "codex_hooks = true"
         changed = True
     elif features_start is not None:
         if insert_at is None:
             insert_at = features_start + 1
-        lines.insert(insert_at, "# llm-config managed hooks")
+        lines.insert(insert_at, MANAGED_INLINE_MARKER)
         lines.insert(insert_at + 1, "codex_hooks = true")
         changed = True
     else:
@@ -294,10 +316,10 @@ def remove_codex_config(_source: Path, destination: Path, dry_run: bool) -> bool
     index = 0
     while index < len(lines):
         line = lines[index]
-        if line.strip() == MANAGED_BEGIN:
+        if is_managed_begin_marker(line):
             begin_index = index
             scan = index + 1
-            while scan < len(lines) and lines[scan].strip() != MANAGED_END:
+            while scan < len(lines) and not is_managed_end_marker(lines[scan]):
                 scan += 1
             if scan >= len(lines):
                 # MANAGED_END is missing — preserve the orphaned block as-is
@@ -309,14 +331,14 @@ def remove_codex_config(_source: Path, destination: Path, dry_run: bool) -> bool
             index = scan + 1
             changed = True
             continue
-        if line.strip() == "# llm-config managed hooks":
+        if is_managed_inline_marker(line):
             next_line = lines[index + 1].strip() if index + 1 < len(lines) else ""
             if next_line.startswith("codex_hooks"):
                 index += 2
                 changed = True
                 continue
-        if line.strip().startswith("# llm-config managed hooks previous:"):
-            previous = line.split("previous:", 1)[1].strip()
+        previous = managed_previous_value(line)
+        if previous is not None:
             next_line = lines[index + 1].strip() if index + 1 < len(lines) else ""
             if next_line.startswith("codex_hooks"):
                 result.append(previous)

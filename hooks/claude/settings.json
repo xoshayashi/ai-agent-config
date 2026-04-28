@@ -2,7 +2,7 @@
   "hooks": {
     "PreToolUse": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "matcher": "Bash",
         "hooks": [
           {
@@ -15,36 +15,36 @@
     ],
     "Stop": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}/hooks/scripts/self_workflow.py\" --current claude",
-            "timeout": 50
+            "command": "python3 \"${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}/hooks/scripts/subprocess_check.py\" --current claude",
+            "timeout": 200
           }
         ]
       }
     ],
     "UserPromptSubmit": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}/hooks/scripts/self_workflow.py\" --current claude",
-            "timeout": 40
+            "command": "python3 \"${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}/hooks/scripts/subprocess_check.py\" --current claude",
+            "timeout": 200
           }
         ]
       }
     ],
     "SubagentStop": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}/hooks/scripts/self_workflow.py\" --current claude",
-            "timeout": 50
+            "command": "python3 \"${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}/hooks/scripts/subprocess_check.py\" --current claude",
+            "timeout": 200
           }
         ]
       }

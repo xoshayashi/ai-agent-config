@@ -173,7 +173,6 @@ load_state_file() {
       AI_AGENT_GEMINI_HOME) AI_AGENT_GEMINI_HOME=$value ;;
       AI_AGENT_COPILOT_HOME) AI_AGENT_COPILOT_HOME=$value ;;
       AI_AGENT_SKILLS_DIR) AI_AGENT_SKILLS_DIR=$value ;;
-      AI_AGENT_HOOKS_RUNTIME_LINK) AI_AGENT_HOOKS_RUNTIME_LINK=$value ;;
       AI_AGENT_REQUIRE_LLM_CLIS) AI_AGENT_REQUIRE_LLM_CLIS=$value ;;
       AI_AGENT_STATE_DIR) AI_AGENT_STATE_DIR=$value ;;
       AI_AGENT_STATE_FILE) AI_AGENT_STATE_FILE=$value ;;
@@ -198,15 +197,10 @@ env_skills_set=${AI_AGENT_SKILLS_DIR+x}
 env_skills=${AI_AGENT_SKILLS_DIR-}
 
 state_dir=${AI_AGENT_STATE_DIR:-$HOME/.ai-agent-config}
-legacy_state_dir=${AI_AGENT_LEGACY_STATE_DIR:-$HOME/.llm-config}
 if [ -n "${AI_AGENT_STATE_FILE:-}" ]; then
   state_file=$(expand_home "$AI_AGENT_STATE_FILE")
 else
   state_file=$(expand_home "$state_dir")/config.env
-  legacy_state_file=$(expand_home "$legacy_state_dir")/config.env
-  if [ ! -f "$state_file" ] && [ -f "$legacy_state_file" ]; then
-    state_file=$legacy_state_file
-  fi
 fi
 state_loaded=false
 if load_state_file "$state_file"; then
@@ -232,10 +226,6 @@ fi
 if [ -n "${AI_AGENT_HOOKS_SCOPE:-}" ]; then
   warn "AI_AGENT_HOOKS_SCOPE is deprecated and ignored. Hooks are now installed globally."
 fi
-if [ -n "${AI_AGENT_HOOKS_RUNTIME_LINK:-}" ]; then
-  warn "AI_AGENT_HOOKS_RUNTIME_LINK is deprecated and ignored. Hook runtime is now linked inside each CLI home."
-fi
-
 default_config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
 config_home=$(expand_home "${AI_AGENT_CONFIG_HOME:-$default_config_home}")
 codex_home=$(expand_home "${AI_AGENT_CODEX_HOME:-$HOME/.codex}")
@@ -256,20 +246,12 @@ skill_improvement_schedule=unsupported
 os=$(uname -s 2>/dev/null || printf unknown)
 if [ "$os" = "Darwin" ]; then
   skill_improvement_label=${AI_AGENT_IMPROVEMENT_LABEL:-com.ai-agent-config.skill-improvement}
-  legacy_skill_improvement_label=${AI_AGENT_LEGACY_IMPROVEMENT_LABEL:-com.llm-config.skill-improvement}
   skill_improvement_plist="$HOME/Library/LaunchAgents/$skill_improvement_label.plist"
-  legacy_skill_improvement_plist="$HOME/Library/LaunchAgents/$legacy_skill_improvement_label.plist"
   if [ -f "$skill_improvement_plist" ]; then
     if launchctl list "$skill_improvement_label" >/dev/null 2>&1; then
       skill_improvement_schedule=active
     else
       skill_improvement_schedule=installed
-    fi
-  elif [ -f "$legacy_skill_improvement_plist" ]; then
-    if launchctl list "$legacy_skill_improvement_label" >/dev/null 2>&1; then
-      skill_improvement_schedule=active-legacy
-    else
-      skill_improvement_schedule=installed-legacy
     fi
   else
     skill_improvement_schedule=missing
@@ -279,10 +261,6 @@ elif command -v systemctl >/dev/null 2>&1; then
     skill_improvement_schedule=active
   elif systemctl --user is-enabled ai-agent-config-skill-improvement.timer >/dev/null 2>&1; then
     skill_improvement_schedule=installed
-  elif systemctl --user is-active llm-config-skill-improvement.timer >/dev/null 2>&1; then
-    skill_improvement_schedule=active-legacy
-  elif systemctl --user is-enabled llm-config-skill-improvement.timer >/dev/null 2>&1; then
-    skill_improvement_schedule=installed-legacy
   else
     skill_improvement_schedule=missing
   fi
@@ -414,36 +392,15 @@ if not isinstance(hooks, dict):
     print("present-unmanaged")
     raise SystemExit(0)
 
-legacy_hints = {
-    "safe_delete_guard.py",
-    "peer_prompt_refinement.py",
-    "refinment.py",
-    "self_workflow.py",
-    "response_strategy_bridge.py",
-    "multillm_orchestrator.py",
-}
-
 for groups in hooks.values():
     if not isinstance(groups, list):
         continue
     for group in groups:
         if not isinstance(group, dict):
             continue
-        if group.get("_llm_config_managed") is True:
+        if any(str(key).endswith("_managed") and value is True for key, value in group.items()):
             print("appended")
             raise SystemExit(0)
-        hook_items = group.get("hooks")
-        if not isinstance(hook_items, list):
-            continue
-        for hook in hook_items:
-            if not isinstance(hook, dict):
-                continue
-            command = hook.get("command")
-            if not isinstance(command, str):
-                continue
-            if "AI_AGENT_HOOKS_RUNTIME_LINK" in command and any(hint in command for hint in legacy_hints):
-                print("appended-legacy")
-                raise SystemExit(0)
 
 print("present-unmanaged")
 PY
@@ -540,7 +497,7 @@ for status in \
   "$copilot_entry_status" "$copilot_shared_status" "$copilot_design_status" "$copilot_hooks_doc_status" \
   "$claude_hook_dir_status" "$codex_hook_dir_status" "$gemini_hook_dir_status" "$copilot_hook_dir_status" \
   "$claude_hook_status" "$codex_config_status" "$codex_hook_status" "$gemini_hook_status" "$copilot_hook_status"; do
-  [ "$status" = "ok" ] || [ "$status" = "appended" ] || [ "$status" = "appended-legacy" ] || mark_status warn
+  [ "$status" = "ok" ] || [ "$status" = "appended" ] || mark_status warn
 done
 
 if [ "$format" = "json" ]; then

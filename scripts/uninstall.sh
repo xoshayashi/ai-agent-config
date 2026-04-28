@@ -107,11 +107,6 @@ env_hooks=${AI_AGENT_INSTALL_HOOKS-}
 
 state_dir=${AI_AGENT_STATE_DIR:-$HOME/.ai-agent-config}
 state_file=${AI_AGENT_STATE_FILE:-$(expand_home "$state_dir")/config.env}
-legacy_state_dir=${AI_AGENT_LEGACY_STATE_DIR:-$HOME/.llm-config}
-legacy_state_file=$(expand_home "$legacy_state_dir")/config.env
-if [ ! -f "$state_file" ] && [ -f "$legacy_state_file" ]; then
-  state_file=$legacy_state_file
-fi
 state_loaded=0
 if load_state_file "$state_file"; then
   state_loaded=1
@@ -362,10 +357,6 @@ fi
 if [ -n "${AI_AGENT_HOOKS_SCOPE:-}" ]; then
   warn "AI_AGENT_HOOKS_SCOPE is deprecated and ignored."
 fi
-if [ -n "${AI_AGENT_HOOKS_RUNTIME_LINK:-}" ]; then
-  warn "AI_AGENT_HOOKS_RUNTIME_LINK is deprecated and ignored."
-fi
-
 say "AI agent config uninstall (global mode)"
 say "config: $config_home"
 say "codex home: $codex_home"

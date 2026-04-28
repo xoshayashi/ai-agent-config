@@ -2,11 +2,11 @@
   "hooks": {
     "BeforeTool": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "matcher": "run_shell_command",
         "hooks": [
           {
-            "name": "llm-config-safe-delete-guard",
+            "name": "ai-agent-config-safe-delete-guard",
             "type": "command",
             "command": "python3 \"${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}/hooks/scripts/safe_delete_guard.py\" --current gemini",
             "timeout": 10000,
@@ -17,30 +17,30 @@
     ],
     "AfterAgent": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "matcher": "*",
         "hooks": [
           {
-            "name": "llm-config-self-workflow",
+            "name": "ai-agent-config-subprocess-check",
             "type": "command",
-            "command": "python3 \"${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}/hooks/scripts/self_workflow.py\" --current gemini",
-            "timeout": 50000,
-            "description": "Continue the same LLM's self-workflow when one more turn is needed."
+            "command": "python3 \"${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}/hooks/scripts/subprocess_check.py\" --current gemini",
+            "timeout": 200000,
+            "description": "Ask the same-CLI subprocess advisor for the next step or completion signal."
           }
         ]
       }
     ],
     "BeforeAgent": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "matcher": "*",
         "hooks": [
           {
-            "name": "llm-config-self-workflow-brief",
+            "name": "ai-agent-config-subprocess-check-brief",
             "type": "command",
-            "command": "python3 \"${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}/hooks/scripts/self_workflow.py\" --current gemini",
-            "timeout": 40000,
-            "description": "Inject self-workflow context before the turn starts."
+            "command": "python3 \"${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}/hooks/scripts/subprocess_check.py\" --current gemini",
+            "timeout": 200000,
+            "description": "Ask the same-CLI subprocess advisor to plan the first concrete step."
           }
         ]
       }

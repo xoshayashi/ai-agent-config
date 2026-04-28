@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Safely parse llm-config state env files without shell evaluation."""
+"""Safely parse ai-agent-config state env files without shell evaluation."""
 
 from __future__ import annotations
 
@@ -21,7 +21,6 @@ ALLOWED_KEYS = {
     "AI_AGENT_INSTALL_INSTRUCTIONS",
     "AI_AGENT_INSTALL_SKILLS",
     "AI_AGENT_INSTALL_HOOKS",
-    "AI_AGENT_HOOKS_RUNTIME_LINK",
     "AI_AGENT_CONFLICT_MODE",
     "AI_AGENT_REQUIRE_LLM_CLIS",
     "AI_AGENT_STATE_DIR",

@@ -88,10 +88,6 @@ fi
 if [ -n "${AI_AGENT_HOOKS_SCOPE:-}" ]; then
   warn "AI_AGENT_HOOKS_SCOPE is deprecated and ignored. Hooks are now installed globally."
 fi
-if [ -n "${AI_AGENT_HOOKS_RUNTIME_LINK:-}" ]; then
-  warn "AI_AGENT_HOOKS_RUNTIME_LINK is deprecated and ignored. Hook runtime is now linked inside each CLI home."
-fi
-
 case "$conflict_mode" in
   backup|skip|fail) ;;
   *) fail "AI_AGENT_CONFLICT_MODE must be backup, skip, or fail" ;;

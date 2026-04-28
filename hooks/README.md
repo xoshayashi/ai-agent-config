@@ -114,6 +114,6 @@ or merges the managed Hook entries and prints `append:` so the user can see
 which settings file was updated. If the destination is missing, setup uses a
 symlink to the managed config file in this repository.
 
-Managed JSON hook groups include `_llm_config_managed: true`.  
-`scripts/merge-hook-config.py` uses this explicit marker first, with a narrow
-legacy fallback, so user-authored hooks are less likely to be misclassified.
+Managed JSON hook groups include `_ai_agent_config_managed: true`.  
+`scripts/merge-hook-config.py` uses this explicit marker so user-authored hooks
+are less likely to be misclassified.

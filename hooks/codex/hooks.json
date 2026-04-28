@@ -2,20 +2,20 @@
   "hooks": {
     "SessionStart": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${AI_AGENT_CODEX_HOME:-$HOME/.codex}/hooks/scripts/self_workflow.py\" --current codex",
-            "timeout": 25,
-            "statusMessage": "Loading self-workflow state"
+            "command": "python3 \"${AI_AGENT_CODEX_HOME:-$HOME/.codex}/hooks/scripts/subprocess_check.py\" --current codex",
+            "timeout": 200,
+            "statusMessage": "Resuming subprocess-check state"
           }
         ]
       }
     ],
     "PreToolUse": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "matcher": "^Bash$",
         "hooks": [
           {
@@ -29,26 +29,26 @@
     ],
     "Stop": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${AI_AGENT_CODEX_HOME:-$HOME/.codex}/hooks/scripts/self_workflow.py\" --current codex",
-            "timeout": 50,
-            "statusMessage": "Evaluating self-workflow continuation"
+            "command": "python3 \"${AI_AGENT_CODEX_HOME:-$HOME/.codex}/hooks/scripts/subprocess_check.py\" --current codex",
+            "timeout": 200,
+            "statusMessage": "Asking subprocess advisor for next step"
           }
         ]
       }
     ],
     "UserPromptSubmit": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${AI_AGENT_CODEX_HOME:-$HOME/.codex}/hooks/scripts/self_workflow.py\" --current codex",
-            "timeout": 60,
-            "statusMessage": "Preparing self-workflow brief"
+            "command": "python3 \"${AI_AGENT_CODEX_HOME:-$HOME/.codex}/hooks/scripts/subprocess_check.py\" --current codex",
+            "timeout": 200,
+            "statusMessage": "Asking subprocess advisor to plan first step"
           }
         ]
       }

@@ -100,15 +100,10 @@ env_hooks_set=${AI_AGENT_INSTALL_HOOKS+x}
 env_hooks=${AI_AGENT_INSTALL_HOOKS-}
 
 state_dir=${AI_AGENT_STATE_DIR:-$HOME/.ai-agent-config}
-legacy_state_dir=${AI_AGENT_LEGACY_STATE_DIR:-$HOME/.llm-config}
 if [ -n "${AI_AGENT_STATE_FILE:-}" ]; then
   state_file=$(expand_home "$AI_AGENT_STATE_FILE")
 else
   state_file=$(expand_home "$state_dir")/config.env
-  legacy_state_file=$(expand_home "$legacy_state_dir")/config.env
-  if [ ! -f "$state_file" ] && [ -f "$legacy_state_file" ]; then
-    state_file=$legacy_state_file
-  fi
 fi
 state_loaded=0
 if load_state_file "$state_file"; then
@@ -134,10 +129,6 @@ fi
 if [ -n "${AI_AGENT_HOOKS_SCOPE:-}" ]; then
   warn "AI_AGENT_HOOKS_SCOPE is deprecated and ignored. Hooks are now installed globally."
 fi
-if [ -n "${AI_AGENT_HOOKS_RUNTIME_LINK:-}" ]; then
-  warn "AI_AGENT_HOOKS_RUNTIME_LINK is deprecated and ignored. Hook runtime is now linked inside each CLI home."
-fi
-
 default_config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
 config_home=$(abs_existing_dir "${AI_AGENT_CONFIG_HOME:-$default_config_home}")
 remote=${AI_AGENT_UPDATE_REMOTE:-origin}

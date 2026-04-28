@@ -118,7 +118,7 @@ Hook スクリプト本体はリポジトリ管理し、各 CLI 側の `hooks/` 
 | `~/.copilot/hooks` | `hooks/` |
 
 共有 state や backup の保存先は既定で `~/.ai-agent-config` です。
-旧 `~/.llm-config` は移行互換の読み取り先としてだけ扱います。
+shared state や backup の正本は `~/.ai-agent-config` です。
 
 CLI 側設定先:
 
@@ -229,9 +229,6 @@ shell rc から marker block を削除し、シンボリックリンクを `tras
 | `AI_AGENT_SELF_WORKFLOW_MAX_SAME_PROMPT` | `2` | 同じ継続プロンプトを繰り返せる上限 |
 | `AI_AGENT_SELF_WORKFLOW_MAX_VERIFICATION_TURNS` | `3` | verification 自動継続の上限回数 |
 | `AI_AGENT_DRY_RUN` | `0` | `1` で予行演習 |
-
-> [!NOTE]
-> `AI_AGENT_HOOKS_RUNTIME_LINK` は旧構成向けの互換変数です。現行 setup では無視され、Hook runtime は各 CLI 配下の `hooks/` リンクに統一されます。
 
 ## 更新
 
