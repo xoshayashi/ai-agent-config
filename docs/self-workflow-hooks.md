@@ -17,6 +17,9 @@ The shared pattern is:
 The runtime uses a generic intent split: answer-only turns usually stay
 outside this loop, while artifact/execution turns can enter it when they need
 bounded multi-step work.
+If a loop is already active, non-follow-up turns outside that path should end
+the active loop state so stale continuations do not fire on the next stop
+event.
 
 ## Active Runtime
 
@@ -53,7 +56,8 @@ completion when more work is needed.
 4. **Verification**  
    `[[IMPLEMENTATION_DONE]]` is only a handoff into verification, not final
    completion. If verification finds only a narrow omission, respond with the
-   correction delta instead of restating the full earlier answer.
+   correction delta instead of restating the full earlier answer. Plain
+   "updated files" status text should not trigger that stricter delta mode.
 5. **Done**  
    Completion requires `[[VERIFICATION_DONE]]` plus `[[TASK_DONE]]`, or a
    structured `phase_signal="task_complete"` packet with real evidence.

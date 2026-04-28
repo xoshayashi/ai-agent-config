@@ -29,6 +29,7 @@ SUPPORTED_EVENTS: dict[str, set[str]] = {
     "claude": {"UserPromptSubmit", "Stop", "SubagentStop"},
     "gemini": {"BeforeAgent", "AfterAgent"},
 }
+ACTIVE_PHASES = {"implementation", "spec_authoring", "spec_review", "verification"}
 
 REFINMENT_SKILL = "$refinment"
 
@@ -52,6 +53,12 @@ INFORMATIONAL_PROMPT_PATTERN = re.compile(
     r"教えて|説明して|解説して|違い|どう(?:違う|使う|動く)?|なぜ|何が|可能ですか|できますか|比較して)",
     re.IGNORECASE,
 )
+EXPLANATION_OUTPUT_PATTERN = re.compile(
+    r"((?:write|draft|create)\s+(?:a|an|the)?\s*(?:short\s+|brief\s+)?"
+    r"(?:summary|explanation|description|overview|clarification|comparison|answer|note)\b|"
+    r"(?:説明|解説|概要|要約|比較|回答)(?:を|の)?(?:短く|簡潔に)?(?:書いて|作って))",
+    re.IGNORECASE,
+)
 SELF_WORKFLOW_EXPLICIT_TRIGGER_PATTERN = re.compile(
     r"(orchestrat|spec|design doc|architecture|review|verification|pull request|\bpr\b|"
     r"仕様|設計|設計書|アーキテクチャ|実装計画|検証|レビュー|調査|分析|ブランチ|フック|"
@@ -60,7 +67,8 @@ SELF_WORKFLOW_EXPLICIT_TRIGGER_PATTERN = re.compile(
 )
 EXECUTION_REQUEST_PATTERN = re.compile(
     r"(implement|build|fix|refactor|debug|write|create|update|edit|draft|generate|"
-    r"作成|修正|実装|改善|更新|整理|追加|編集|書いて|作って|直して)",
+    r"add|analy[sz]e|research|investigate|audit|"
+    r"作成|修正|実装|改善|更新|整理|追加|編集|書いて|作って|直して|調査|分析)",
     re.IGNORECASE,
 )
 ARTIFACT_CONTEXT_PATTERN = re.compile(
@@ -71,8 +79,8 @@ ARTIFACT_CONTEXT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 DELTA_ONLY_RESPONSE_PATTERN = re.compile(
-    r"(\bdelta\b|\bcorrection\b|\berrata\b|\bclarification\b|\bupdate\b|"
-    r"補足|追記|訂正|修正|差分|更新|追加確認)",
+    r"(\bdelta\b|\bcorrection\b|\berrata\b|\bclarification\b|"
+    r"補足|追記|訂正|修正|差分|追加確認)",
     re.IGNORECASE,
 )
 PHASE_SIGNAL_PATTERN = re.compile(
@@ -376,12 +384,14 @@ def prompt_features(prompt: str) -> dict[str, bool | int]:
     has_artifact_context = bool(has_path_like or ARTIFACT_CONTEXT_PATTERN.search(stripped_without_urls))
     has_execution_request = EXECUTION_REQUEST_PATTERN.search(stripped) is not None
     looks_informational = INFORMATIONAL_PROMPT_PATTERN.search(stripped) is not None
+    has_explanation_output_request = EXPLANATION_OUTPUT_PATTERN.search(stripped) is not None
     long_enough = len(stripped) >= 140 or line_count >= 3
     has_explicit_trigger = SELF_WORKFLOW_EXPLICIT_TRIGGER_PATTERN.search(stripped) is not None
     return {
         "has_artifact_context": has_artifact_context,
         "has_execution_request": has_execution_request,
         "looks_informational": looks_informational,
+        "has_explanation_output_request": has_explanation_output_request,
         "long_enough": long_enough,
         "has_explicit_trigger": has_explicit_trigger,
     }
@@ -389,7 +399,14 @@ def prompt_features(prompt: str) -> dict[str, bool | int]:
 
 def is_answer_only_request(prompt: str) -> bool:
     features = prompt_features(prompt)
-    return bool(features["looks_informational"] and not features["has_execution_request"])
+    looks_informational = bool(features["looks_informational"])
+    has_execution_request = bool(features["has_execution_request"])
+    has_artifact_context = bool(features["has_artifact_context"])
+    has_explanation_output_request = bool(features["has_explanation_output_request"])
+    return bool(
+        (looks_informational and not has_execution_request)
+        or (has_explanation_output_request and not has_artifact_context)
+    )
 
 
 def should_activate_self_workflow(prompt: str) -> bool:
@@ -397,8 +414,8 @@ def should_activate_self_workflow(prompt: str) -> bool:
     if not stripped:
         return False
     if TRIVIAL_PROMPT_PATTERN.search(stripped):
-        # Keep lightweight acknowledgements as plain user turns even when a task
-        # is already in progress; the session state remains available at Stop.
+        # Keep lightweight acknowledgements and interruptions outside the managed
+        # loop. Active state reset is handled by the caller when needed.
         return False
 
     features = prompt_features(stripped)
@@ -894,10 +911,13 @@ def handle_user_prompt_submit(
         return turn_context_output(current, event_name, context)
 
     if not should_activate_self_workflow(prompt):
+        if phase in ACTIVE_PHASES and not should_keep_current_task(prompt):
+            state.clear()
+            save_state(path, state)
         return {}
 
     spec_done_keyword, _, _, _ = completion_keywords()
-    if phase in {"implementation", "spec_authoring", "spec_review", "verification"} and not should_keep_current_task(prompt):
+    if phase in ACTIVE_PHASES and not should_keep_current_task(prompt):
         state.clear()
     state.update(
         {

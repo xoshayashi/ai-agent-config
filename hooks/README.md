@@ -45,6 +45,9 @@ turn.
 The runtime should make a generic intent split: answer-only turns stay outside
 the loop, while artifact/execution turns can enter it when they need bounded
 multi-step work.
+When a loop is already active, a non-follow-up turn that falls outside that
+managed path should clear the active workflow state instead of letting stale
+continuation prompts survive into the next stop event.
 
 The active Skill path is self-contained. `skills/refinment` refines the working
 brief inside the current CLI instead of shelling out to another model. Keep that Skill
@@ -60,7 +63,7 @@ In same-LLM mode, managed hooks use this flow:
 2. If `refinment` is used on the original task prompt, the CLI shows the refined prompt to the user before continuing
 3. Completion event after a spec draft is ready enough for review: auto-continue the same CLI with a prompt that tells it to use `refinment`
 4. Completion event during implementation: auto-continue the same CLI with a prompt that tells it to use `refinment` for the next-step or verification-ready decision
-5. Completion event during verification: auto-continue the same CLI with a prompt that tells it to use `refinment` before declaring completion, and prefer delta-only corrections when only a narrow omission was found
+5. Completion event during verification: auto-continue the same CLI with a prompt that tells it to use `refinment` before declaring completion, and prefer delta-only corrections only when the latest response actually reads like a correction/supplement
 
 Completion keywords and stop conditions are defined in `instructions/HOOKS.md`.
 When `self_workflow.py` auto-continues from a Claude/Codex/Gemini completion
