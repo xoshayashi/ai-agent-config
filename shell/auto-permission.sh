@@ -4,11 +4,12 @@
 # sessions in their permissive / auto-approval mode by default, while leaving
 # maintenance subcommands (auth, install, mcp, plugin, doctor, etc.) untouched.
 #
-# Installed by scripts/setup.sh as a stable symlink at:
-#   ${AI_AGENT_SHELL_LINK:-$HOME/.llm-config/auto-permission.sh}
+# Installed by scripts/enable-auto-permission.sh (NOT scripts/setup.sh) as a
+# stable symlink at:
+#   ${AI_AGENT_SHELL_ALIAS_LINK:-$HOME/.llm-config/auto-permission.sh}
 # and sourced from the user's shell rc through a managed marker block.
 #
-# Removed cleanly by scripts/uninstall.sh.
+# Removed cleanly by scripts/disable-auto-permission.sh.
 
 # Codex: bypass approvals and sandbox for interactive sessions.
 alias codex='codex --dangerously-bypass-approvals-and-sandbox'
@@ -21,7 +22,7 @@ alias gemini='gemini --yolo'
 # manage installation, auth, MCP, plugins, and explicit permission overrides.
 claude() {
   case "$1" in
-    agents|auth|auto-mode|doctor|install|mcp|plugin|plugins|setup-token|update|upgrade|--help|-h|--version|-v|--permission-mode|--dangerously-skip-permissions|--allow-dangerously-skip-permissions)
+    agents|auth|auto-mode|doctor|install|mcp|plugin|plugins|setup-token|ultrareview|update|upgrade|--help|-h|--version|-v|--permission-mode|--dangerously-skip-permissions|--allow-dangerously-skip-permissions)
       command claude "$@"
       ;;
     *)
