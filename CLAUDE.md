@@ -14,9 +14,8 @@ sh scripts/validate-repo.sh
 
 # Individual unit test files
 python3 tests/test_merge_hook_config.py
-python3 tests/test_response_strategy_bridge.py
 python3 tests/test_refinment.py
-python3 tests/test_multillm_orchestrator.py
+python3 tests/test_self_workflow.py
 
 # Setup / update / health-check / uninstall, dry-run first
 AI_AGENT_DRY_RUN=1 sh scripts/setup.sh
@@ -28,13 +27,13 @@ sh scripts/health-check.sh --json   # masked by default; set AI_AGENT_HEALTH_RED
 python3 scripts/skill-improvement-bot.py scan
 ```
 
-There is no test runner, no linter, and no package manager. `validate-repo.sh` does: `sh -n` syntax checks for shell scripts, `python3 -m py_compile` for Python, doc-grep assertions on README/setup, the four unit tests above, and a fixture scan for the skill-improvement bot.
+There is no test runner, no linter, and no package manager. `validate-repo.sh` does: `sh -n` syntax checks for shell scripts, `python3 -m py_compile` for Python, doc-grep assertions on README/setup, the three unit tests above, and a fixture scan for the skill-improvement bot.
 
 ## Architecture
 
 ### Single source of truth pattern
 
-`instructions/AI_AGENT_INSTRUCTIONS.md` is the canonical instruction set. The per-CLI files (`instructions/CLAUDE.md`, `instructions/AGENTS.md` for Codex, `instructions/GEMINI.md`) are **thin entrypoints** that `@`-import or point to `AI_AGENT_INSTRUCTIONS.md`, plus `DESIGN.md` (Act design language) and `HOOKS.md` (orchestration lifecycle). When updating shared behavior, edit `AI_AGENT_INSTRUCTIONS.md`; only touch entrypoint files when the entrypoint mechanism itself changes.
+`instructions/AI_AGENT_INSTRUCTIONS.md` is the canonical instruction set. The per-CLI files (`instructions/CLAUDE.md`, `instructions/AGENTS.md` for Codex, `instructions/GEMINI.md`) are **thin entrypoints** that `@`-import or point to `AI_AGENT_INSTRUCTIONS.md`, plus `DESIGN.md` (Act design language) and `HOOKS.md` (self-workflow lifecycle). When updating shared behavior, edit `AI_AGENT_INSTRUCTIONS.md`; only touch entrypoint files when the entrypoint mechanism itself changes.
 
 ### Stable-link installation model
 
@@ -54,15 +53,14 @@ Hook scripts in `hooks/scripts/*.py` are referenced through one indirection — 
 
 ### Hook layers
 
-Three hook scripts in `hooks/scripts/`, each with a different default:
+Two active hook scripts in `hooks/scripts/`, each with a different default:
 
 | Hook | Default | Trigger |
 |---|---|---|
 | `safe_delete_guard.py` | **On** | Blocks `rm`-style commands and redirects to `trash` |
-| `multillm_orchestrator.py` | Registered, **always routed for Codex** | Selectively activates on qualifying tasks |
-| `response_strategy_bridge.py` | Registered, **off** | `AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY=1` |
+| `self_workflow.py` | Registered for Claude/Codex/Gemini managed events | Selectively activates on qualifying tasks |
 
-The orchestrator implements a Codex-as-hub loop driven by completion keywords (`[[SPEC_DONE]]` → spec refinment gate → `[[IMPLEMENTATION_DONE]]` → verification → `[[VERIFICATION_DONE]]` → `[[TASK_DONE]]`) plus structured phase packets. Startup and phase-boundary brief tightening live in the self-contained `refinment` Skill. The lifecycle and stop conditions live in `instructions/HOOKS.md`; do not duplicate them elsewhere.
+`self_workflow.py` implements a same-LLM loop driven by completion keywords (`[[SPEC_DONE]]` → spec refinment gate → `[[IMPLEMENTATION_DONE]]` → verification → `[[VERIFICATION_DONE]]` → `[[TASK_DONE]]`) plus structured phase packets. Startup and phase-boundary brief tightening live in the self-contained `refinment` Skill. The lifecycle and stop conditions live in `instructions/HOOKS.md`; do not duplicate them elsewhere.
 
 ### Skills
 

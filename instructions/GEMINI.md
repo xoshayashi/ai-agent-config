@@ -10,7 +10,7 @@ The shared project instructions are imported below. **Follow them before startin
 
 @/Users/sh/Documents/ai-agent-config/instructions/DESIGN.md
 
-**Hook orchestration rules:** Follow shared lifecycle and completion-keyword rules in:
+**Hook self-workflow rules:** Follow shared lifecycle and completion-keyword rules in:
 
 @/Users/sh/Documents/ai-agent-config/instructions/HOOKS.md
 

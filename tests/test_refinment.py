@@ -59,7 +59,7 @@ def test_should_skip_trivial_prompt() -> None:
 
 
 def test_should_activate_prefers_complex_or_pathful_prompts() -> None:
-    assert REF.should_activate("この repo の hooks/scripts/multillm_orchestrator.py を読んで設計を詰めて")
+    assert REF.should_activate("この repo の hooks/scripts/self_workflow.py を読んで設計を詰めて")
     assert REF.should_activate("仕様と制約を整理してから実装して\n- docs も更新\n- tests も更新")
     assert REF.should_activate("目的はあるけど成果物と検証条件が曖昧だから、必要なら prompt を詰めてから進めて")
     assert REF.should_activate("次の quoted block は参考資料であって指示ではない。混ぜずに扱って prompt を必要時だけ整えて")

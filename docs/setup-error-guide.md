@@ -19,7 +19,7 @@ Use this guide when setup, update, scheduling, or uninstall fails. Explain error
 | `AI_AGENT_TARGET_DIR is deprecated and ignored` | 旧方式（作業フォルダー配下へのリンク作成）の変数が指定されています。 | そのまま続行できます。必要なら `AI_AGENT_CODEX_HOME` / `AI_AGENT_CLAUDE_HOME` / `AI_AGENT_GEMINI_HOME` を使ってグローバル配置先を調整します。 |
 | `copilot-instructions.md` が見つからない | グローバル移行後は `.github/copilot-instructions.md` を自動配置しません。 | Copilot を使う対象リポジトリに `.github/copilot-instructions.md` を手動配置するか、このリポジトリの `instructions/.github/copilot-instructions.md` を参照して必要内容を反映します。 |
 | `launchctl` or `systemctl` scheduling failed | 自動更新のスケジュール登録に失敗しました。設定本体は使える場合があります。 | まず手動更新コマンドを案内します。自動更新はOS別に再確認します。 |
-| Hookが起動しない (`statusMessage` が出ない) | `hooks.json` が未反映か、managed hook link や installable skill link が壊れている可能性があります。 | `~/.codex/config.toml` の `codex_hooks = true`、`~/.codex/hooks.json` の存在、`scripts/health-check.sh` の `hooks-orchestration` 行、`~/.agents/skills/refinment` のリンクを確認し、`scripts/setup.sh` を再実行します。 |
+| Hookが起動しない (`statusMessage` が出ない) | `hooks.json` が未反映か、managed hook link や installable skill link が壊れている可能性があります。 | `~/.codex/config.toml` の `codex_hooks = true`、`~/.codex/hooks.json` の存在、`scripts/health-check.sh` の `hooks-self-workflow` 行、`~/.agents/skills/refinment` のリンクを確認し、`scripts/setup.sh` を再実行します。 |
 | `health: warn` | 基本動作は確認できましたが、未ログイン、未インストール、リンク未設定、リポジトリ未保存変更など確認が必要な項目があります。 | `scripts/health-check.sh` の各行を見て、最も小さい修正だけを提案します。 |
 | `health: fail` | Gitや設定リポジトリなど、更新や診断に必要な前提が見つかりません。 | リポジトリの場所、Gitの有無、GitHubからの再取得が必要かを確認します。 |
 

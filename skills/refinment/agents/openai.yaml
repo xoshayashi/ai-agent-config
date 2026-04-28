@@ -4,5 +4,5 @@ metadata:
   tags:
     - prompts
     - workflow
-    - orchestration
+    - self-workflow
   allow_implicit_invocation: true

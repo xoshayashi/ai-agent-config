@@ -19,8 +19,20 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY:-0}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/response_strategy_bridge.py\" --current claude'",
+            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current claude",
             "timeout": 50
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "_llm_config_managed": true,
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current claude",
+            "timeout": 40
           }
         ]
       }
@@ -31,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY:-0}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/response_strategy_bridge.py\" --current claude'",
+            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current claude",
             "timeout": 50
           }
         ]

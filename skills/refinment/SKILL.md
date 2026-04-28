@@ -9,7 +9,7 @@ Use this skill to tighten a working prompt or phase brief before acting, while k
 
 ## Core Rules
 
-- **Run only when it materially helps.** Use refinment for non-trivial new tasks or material orchestration boundaries, not as decoration on every turn.
+- **Run only when it materially helps.** Use refinment for non-trivial new tasks or material self-workflow boundaries, not as decoration on every turn.
 - **Stay self-contained.** Do not call another LLM, subprocess reviewer, or external prompt improver from this skill.
 - **Refine sparingly.** Default to the original prompt unless there is a real contract gap, conflict, or instruction/data ambiguity worth fixing.
 - **Show the refined prompt when you use it on a new task.** Put a short `Refined prompt:` block in the next visible user update before continuing the work.
@@ -35,7 +35,7 @@ Use this skill to tighten a working prompt or phase brief before acting, while k
 - A spec draft needs one internal readiness pass before implementation starts.
 - An implementation stop boundary needs a sharper next-step brief or a clearer verification-ready decision.
 - A verification stop boundary needs a tighter completion brief before deciding whether the task is done.
-- The orchestration context explicitly suggests using `$refinment` now.
+- The self-workflow context explicitly suggests using `$refinment` now.
 
 ## Do Not Use When
 
