@@ -25,6 +25,9 @@ gha-creds-*.json
 .codex/
 .gemini/
 
+# Local Claude Code orientation file at repo root (not the global entrypoint at instructions/CLAUDE.md)
+/CLAUDE.md
+
 # Logs and temporary files
 *.log
 logs/
