@@ -200,7 +200,6 @@ export AI_AGENT_ORCHESTRATOR_CLAUDE_COMPLEX_EFFORT=high
 | `AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL` | Empty | `provider=ollama` 時に使うモデル名 |
 | `AI_AGENT_CONFLICT_MODE` | `backup` | `backup` / `skip` / `fail` |
 | `AI_AGENT_BACKUP_DIR` | `$AI_AGENT_STATE_DIR/backups/<timestamp>` | 競合時の退避先 |
-| `AI_AGENT_PROTECT_LINKS` | `auto` | macOS で `everyone deny delete` を付与 |
 | `AI_AGENT_STATE_DIR` | `~/.llm-config` | `config.env` などの状態ファイル保存先 |
 | `AI_AGENT_PERSIST_CONFIG` | `1` | `0` で状態ファイルを書かない |
 | `AI_AGENT_REQUIRE_LLM_CLIS` | `1` | `1` で `claude` / `codex` / `gemini` の存在を事前チェック（不足時は失敗） |
