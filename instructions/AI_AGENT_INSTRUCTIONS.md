@@ -2,13 +2,13 @@
 
 **This file is the single source of truth** for AI coding agents working in this directory tree.
 
-`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and `.github/copilot-instructions.md` are thin entrypoints that point here.
+`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md` are thin entrypoints that point here.
 
 ## Quick Reference
 
 | Area | Required Behavior |
 |---|---|
-| **Scope** | Apply these instructions wherever an entrypoint file (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `.github/copilot-instructions.md`) imports or points to this file, including the global CLI config directories (`~/.codex`, `~/.claude`, `~/.gemini`). |
+| **Scope** | Apply these instructions wherever an entrypoint file (`AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`) imports or points to this file, including the global CLI config directories (`~/.codex`, `~/.claude`, `~/.gemini`). |
 | **Before work** | Identify the goal, scope, deliverable, constraints, and completion criteria before acting. |
 | **Deletion** | **Never run or suggest `rm`; use `trash` for file or directory removal.** |
 | **Uncertainty** | When knowledge may be outdated or an error appears, check official references, upstream sources, or Context7 before retrying. |
@@ -27,7 +27,7 @@
 
 ## Scope
 
-- **Applies to:** Any directory whose entrypoint file (`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, or `.github/copilot-instructions.md`) imports or points to this file. This includes the global CLI config directories (`~/.codex`, `~/.claude`, `~/.gemini`) installed by `scripts/setup.sh`, and therefore covers all sessions of those CLIs unless a project-local entrypoint overrides specific rules.
+- **Applies to:** Any directory whose entrypoint file (`AGENTS.md`, `CLAUDE.md`, or `GEMINI.md`) imports or points to this file. This includes the global CLI config directories (`~/.codex`, `~/.claude`, `~/.gemini`) installed by `scripts/setup.sh`, and therefore covers all sessions of those CLIs unless a project-local entrypoint overrides specific rules.
 - Follow higher-priority system, developer, tool, and explicit user instructions when they conflict with this file.
 - If an entrypoint file points here, **read and follow this file before starting work**.
 

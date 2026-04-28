@@ -5,9 +5,7 @@
 Use Hooks so the current LLM CLI can finish its own work without handing the
 main path to another model.
 
-This runtime currently covers Codex, Claude Code, and Gemini CLI. GitHub
-Copilot shares the same canonical instructions source, but it is not part of
-the managed Hook or self-workflow runtime path.
+This runtime currently covers Codex, Claude Code, and Gemini CLI.
 
 The shared pattern is:
 
