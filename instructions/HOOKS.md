@@ -2,13 +2,33 @@
 
 This document defines shared self-workflow behavior for Hook-based workflows.
 
+## Hook Event Scope
+
+The shared `self_workflow.py` runs only at *post-work* hook events
+(`Stop` / `SubagentStop` / `AfterAgent`). Pre-work events
+(`UserPromptSubmit` / `SessionStart` / `BeforeAgent`) are intentionally
+unwired so the hook never fires on every prompt — the main session is
+capable of starting its own work, and adding a hook on every keystroke
+boundary only adds overhead. Phase transitions (`[[SPEC_DONE]]` etc.) are
+detected at the post-work boundary instead.
+
+### Idle-phase bootstrap
+
+For brand-new sessions there is no `phase` recorded on disk, so the LLM
+explicitly opts into the auto-continuation loop by emitting `[[SPEC_DONE]]`
+on a standalone line. When the post-work hook sees that signal on an idle
+phase, it records the response as the spec draft, promotes the phase to
+`spec_review`, and dispatches the standard refinment gate. Without that
+keyword on an idle phase, the hook stays silent — the LLM is free to
+answer simple turns without engaging the workflow.
+
 ## Same-LLM Self-Workflow
 
 When a managed Hook receives a qualifying non-trivial task, the current CLI
 should stay responsible for finishing its own work. The default sequence is:
 
 1. **Specification loop (pre-implementation)**  
-   The current CLI drafts the specification itself first. On qualifying tasks, it may use the `refinment` Skill once before drafting. When it does, it should show the refined prompt to the user in the next visible update, then continue from that refined brief. The startup hook injects a spec-authoring brief and waits for a reviewable spec. `[[SPEC_DONE]]` is the primary readiness signal, but structured fallback review may also be used for later drafts when the keyword is missing.
+   The current CLI drafts the specification itself first. On qualifying tasks, it may use the `refinment` Skill once before drafting. When it does, it should show the refined prompt to the user in the next visible update, then continue from that refined brief. The CLI initializes the spec phase on its own (no startup hook fires); `[[SPEC_DONE]]` on the standalone line of the response is the primary readiness signal, and the post-work hook picks up that signal at the next `Stop` boundary. Structured fallback review may also be used for later drafts when the keyword is missing.
 2. **Specification review gate**  
    When the current CLI emits `[[SPEC_DONE]]`, or when a later draft is reviewable enough for fallback review, the completion hook auto-continues that same CLI with a prompt that tells it to use the `refinment` Skill. The CLI refines the spec itself and either keeps refining or proceeds toward implementation.
 3. **Implementation loop**  

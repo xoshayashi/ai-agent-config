@@ -114,13 +114,38 @@ def test_completion_keywords_prefer_first_match_per_category() -> None:
 
 
 def test_should_skip_only_on_recursion_or_wrong_event() -> None:
-    data = {"hook_event_name": "UserPromptSubmit", "stop_hook_active": False}
-    assert SWF.should_skip("codex", data) is False
+    # Each CLI's canonical post-work event must pass the gate, and the recursion
+    # guard must take precedence over event matching.
+    cli_to_event = (
+        ("codex", "Stop"),
+        ("claude", "Stop"),
+        ("claude", "SubagentStop"),
+        ("gemini", "AfterAgent"),
+    )
+    for cli, event in cli_to_event:
+        data = {"hook_event_name": event, "stop_hook_active": False}
+        assert SWF.should_skip(cli, data) is False, f"{cli}/{event} should pass the gate"
 
     def _run() -> None:
-        assert SWF.should_skip("codex", data) is True
+        for cli, event in cli_to_event:
+            data = {"hook_event_name": event, "stop_hook_active": False}
+            assert SWF.should_skip(cli, data) is True, f"{cli}/{event} must skip on recursion guard"
 
     with_env({"AI_AGENT_SELF_WORKFLOW_ACTIVE": "1"}, _run)
+
+
+def test_should_skip_filters_pre_work_events() -> None:
+    """Pre-work events (UserPromptSubmit / SessionStart / BeforeAgent) are
+    intentionally not in SUPPORTED_EVENTS — should_skip must filter them out
+    even when the recursion guard is unset."""
+    for cli, event in (
+        ("codex", "UserPromptSubmit"),
+        ("codex", "SessionStart"),
+        ("claude", "UserPromptSubmit"),
+        ("gemini", "BeforeAgent"),
+    ):
+        data = {"hook_event_name": event, "stop_hook_active": False}
+        assert SWF.should_skip(cli, data) is True, f"{cli}/{event} should skip"
 
 
 def test_stop_output_formats_for_codex_and_gemini() -> None:
@@ -395,6 +420,43 @@ def test_handle_session_start_done_returns_new_task_message() -> None:
     assert "Start a new task prompt" in str(output.get("additionalContext", ""))
 
 
+def test_handle_stop_idle_phase_returns_empty() -> None:
+    """Without a phase and without `[[SPEC_DONE]]`, a stop event must remain
+    silent — the auto-continuation loop should never engage on its own."""
+    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
+        state_path = Path(tmp) / "state.json"
+        payload = SWF.handle_stop(
+            "codex",
+            {"response": "Done. Renamed the function. No further action needed."},
+            {},
+            state_path,
+        )
+        assert_eq(payload, {}, "idle phase without SPEC_DONE should yield empty output")
+        # Empty/initial state should not be persisted as an active phase.
+        saved = SWF.load_state(state_path)
+        assert_eq(saved.get("phase", ""), "", "no phase should be saved")
+
+
+def test_handle_stop_idle_phase_bootstraps_into_spec_review_on_spec_done() -> None:
+    """With the pre-work hook removed, the LLM opts into the auto-continuation
+    loop by emitting `[[SPEC_DONE]]`. On an idle phase, that signal must
+    bootstrap into `spec_review` so the refinment gate fires."""
+    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
+        state_path = Path(tmp) / "state.json"
+        response = "## scope\nbuild it\n\n## acceptance\n- works\n\n[[SPEC_DONE]]"
+        payload = SWF.handle_stop(
+            "codex",
+            {"response": response},
+            {},
+            state_path,
+        )
+        assert_eq(payload.get("decision"), "block", "bootstrap should auto-continue into spec review")
+        assert "$refinment" in str(payload.get("reason", "")), "refinment gate prompt expected"
+        saved = SWF.load_state(state_path)
+        assert_eq(saved.get("phase"), "spec_review", "state promoted to spec_review after bootstrap")
+        assert_eq(saved.get("spec_markdown"), response, "draft saved as spec_markdown")
+
+
 def test_handle_stop_spec_authoring_requests_skill_review_when_ready() -> None:
     with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
         state_path = Path(tmp) / "state.json"
@@ -649,6 +711,7 @@ def run_tests() -> int:
         test_completion_keywords_from_hooks_md,
         test_completion_keywords_prefer_first_match_per_category,
         test_should_skip_only_on_recursion_or_wrong_event,
+        test_should_skip_filters_pre_work_events,
         test_stop_output_formats_for_codex_and_gemini,
         test_turn_context_output_formats_for_claude_and_gemini,
         test_should_keep_current_task_followup_prompt,
@@ -672,6 +735,8 @@ def run_tests() -> int:
         test_handle_session_start_resumes_context_for_implementation,
         test_handle_session_start_idle_returns_empty,
         test_handle_session_start_done_returns_new_task_message,
+        test_handle_stop_idle_phase_returns_empty,
+        test_handle_stop_idle_phase_bootstraps_into_spec_review_on_spec_done,
         test_handle_stop_spec_authoring_requests_skill_review_when_ready,
         test_handle_stop_spec_authoring_can_use_structured_fallback_review,
         test_handle_stop_spec_review_done_moves_to_implementation,
