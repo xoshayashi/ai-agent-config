@@ -1,5 +1,7 @@
 # 設計書: マルチLLMによる開発タスク自動化
 
+> 2026-04 現行注記: この文書には外部 review を使っていた旧案の検討メモが含まれます。現行の実装本流は、Codex を実行ハブに据えつつ、外部 review を main path から外し、必要時だけ self-contained な `refinment` で brief を締める構成です。以下で Claude / Gemini reviewer と書いてある箇所は、現行 main path ではなく履歴的な検討文脈として読んでください。
+
 ## 1. 目的
 
 本設計は、`ai-agent-config` の現在の Hook / Skill / Instructions 基盤を前提に、**複数 LLM を役割分担させながら、開発タスクをより自律的かつ安全に前進させる仕組み**を定義する。
@@ -19,14 +21,14 @@
 
 このコードベースの現状は、すでに **Codex を実行ハブに据えたマルチLLMオーケストレーションの最小実用形** になっている。
 
-- **入力前**: `peer-prompt-refinement` Skill が必要時のみ別 LLM でプロンプトを洗練
-- **仕様フェーズ**: `multillm_orchestrator.py` が Codex に仕様起草をさせ、`[[SPEC_DONE]]` を境に Claude がレビュー
-- **実装フェーズ**: Codex が実装し、`Stop` ごとに Claude が次ステップを提案
+- **入力前**: `refinment` Skill が必要時だけ Codex 内で working brief を洗練
+- **仕様フェーズ**: `multillm_orchestrator.py` が Codex に仕様起草をさせ、`[[SPEC_DONE]]` を境に `refinment` でもう一段締める
+- **実装フェーズ**: Codex が実装し、`Stop` ごとに必要時だけ `refinment` で次ステップ brief を締める
 - **検証フェーズ**: `[[IMPLEMENTATION_DONE]]` 後は直ちに停止せず、検証・差分確認・セルフレビューへ遷移
-- **定期批判**: Gemini が simplification / spec drift を観点に定期レビュー
+- **定期批判**: main path では外部 reviewer を前提にしない
 - **別モード**: `response_strategy_bridge.py` は orchestration とは別に、回答後の 1 ターン継続を補助する
 
-この方向性は妥当である。特に、**「Codex-first / boundary review / periodic critique」** という現在の分離は、毎ターン多モデルを回す方式よりも、実装責任・状態遷移・コストの面で優れている。
+この方向性は妥当である。特に、**「Codex-first / boundary refinment / bounded continuation」** という現在の分離は、毎ターン多モデルを回す方式よりも、実装責任・状態遷移・コストの面で優れている。
 
 一方で、今の実装はまだ **開発タスク自動化の基盤** にとどまる。今後は次の不足を埋めるとよい。
 
@@ -64,7 +66,7 @@
 - pre-implementation lock は advisory であり、Hook が phase ベースで編集やコマンド実行を強制停止するわけではない
 - 起動条件は heuristic であり、グローバル ON でも複雑タスク寄りの prompt に絞って起動するのが実用的
 
-#### B. `skills/peer-prompt-refinement`
+#### B. `skills/refinment`
 
 入力前に他 LLM を使ってプロンプトを洗練する Skill。
 
@@ -121,7 +123,7 @@
 
 - **Codex のみ orchestration を持つ**
 - response strategy は各 CLI に対して登録される
-- prompt refinement は Hook ではなく Skill として扱う
+- prompt refinement は独立グローバル Hook にはせず、standalone Skill を残しつつ、Codex orchestration では必要時だけ `UserPromptSubmit` で内部実行する
 - `safe_delete_guard.py` は既定 ON で共通安全策として機能
 
 #### E. 運用・配布レイヤー
@@ -169,7 +171,7 @@
 - **phase separation が明確**  
   仕様と実装を同一ループに混ぜていない
 - **review boundary が自然**  
-  `[[SPEC_DONE]]` という明示イベントを Claude review gate に使える
+  `[[SPEC_DONE]]` という明示イベントを spec refinment gate に使える
 - **latency-aware**  
   毎プロンプトで Claude -> Gemini -> Claude を回す旧案より軽い
 - **ops-friendly**  
@@ -245,7 +247,7 @@ Claude / Gemini には JSON 返却を求めているが、
 #### Phase 0. Intake
 
 - User prompt 受領
-- 必要時のみ `peer-prompt-refinement` Skill
+- 必要時のみ `refinment` Skill
 - simple prompt は skip
 - orchestration は常時すべての prompt に発火させず、明示ワード・複雑タスク・長文実装依頼などの heuristic で起動
 
@@ -306,7 +308,7 @@ Gemini の役割:
 2. 失敗時の再修正
 3. 差分サマリー生成
 4. self-review
-5. peer review
+5. additional completion review
 
 ここでは **`[[VERIFICATION_DONE]]`** を、検証とセルフレビューが完了した明示シグナルとして使う。  
 **最終停止は `[[VERIFICATION_DONE]]` と `[[TASK_DONE]]` の両方が揃った時だけ** 許可する。
@@ -366,7 +368,7 @@ reviewer からの返却は将来的に次へ寄せる。
 ### 原則 5. fail-open / fail-closed を phase ごとに分ける
 
 - **Skillベースの prompt refinement** は fail-closed 寄りでもよい
-- **orchestration peer review** は基本 fail-open
+- **orchestration completion review** は基本 fail-open
 - **destructive or merge-boundary operations** は fail-closed 寄り
 
 ## 7. 詳細設計

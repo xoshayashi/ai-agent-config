@@ -128,52 +128,29 @@ export AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL=qwen2.5:latest
 
 ### Codex中心マルチLLMオーケストレーション Hook（任意）
 
-`multillm_orchestrator.py` は Codex Hook 設定に登録済みで、既定では無効です。  
-有効化すると、Codexをハブとして次を実行します。
+`multillm_orchestrator.py` は Codex Hook 設定に登録済みで、**常時 routed** です。  
+ただし実際の loop は、qualifying-task 判定に通ったときだけ動きます。Codexをハブとして次を実行します。
 
 1. `UserPromptSubmit`: Codexに仕様起草ブリーフを注入
-2. `Stop` で `[[SPEC_DONE]]` が出たら Claude が仕様レビュー
-3. Claude が未完成と判断したら、Codexへ仕様修正プロンプトを返す
-4. Claude が確定と判断したら、そのまま実装に進める
-5. 実装中は Claude が次ステップ提案、Gemini が定期レビュー
-
-有効化したい場合:
-
-```sh
-export AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1
-```
-
-Geminiレビュー頻度（実装ターン数ベース）:
-
-```sh
-export AI_AGENT_ORCHESTRATOR_GEMINI_REVIEW_EVERY=3
-```
-
-peer CLI 内部待機時間を延ばしたい場合:
-
-```sh
-export AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS=45
-```
+2. 必要時だけ Codex 自身が `refinment` で startup brief を整え、`Refined prompt:` を表示してから開始
+3. `Stop` で `[[SPEC_DONE]]` が出たら、Codex が `refinment` で仕様をもう一段締める
+4. 仕様が整ったらそのまま実装に進める
+5. 実装中と verification 中も、Codex が必要時だけ `refinment` で next-step / completion brief を締めながら進行
 
 注記:
 
-- orchestration を有効化しても、実際には **重い設計 / 実装 / レビュー系 prompt を中心に起動** させる前提です
-- Codex の `Stop` では、Gemini critique と Claude guidance が同じターンで順に走ることがあるため、**外側 Hook timeout は内部 timeout の 2 倍弱を見込む** のが安全です
-
-Claude spec review / implementation guidance の thinking 深さを調整したい場合:
-
-```sh
-export AI_AGENT_ORCHESTRATOR_CLAUDE_SIMPLE_EFFORT=low
-export AI_AGENT_ORCHESTRATOR_CLAUDE_COMPLEX_EFFORT=high
-```
+- Codex の orchestration Hook は常時 routed ですが、実際に loop を起動するのは **重い設計 / 実装 / レビュー系 prompt** が中心です
+- 入力前の brief 改善と phase boundary の引き締めは **Skill `refinment`** が担当します
+- `refinment` は self-contained で、外部 reviewer CLI を呼ばずに Codex 自身が brief を整えます
+- 新規タスクで `refinment` を使った場合、Codex は `Refined prompt:` を表示してから作業を始めます
 
 完了キーワードと終了条件は `instructions/HOOKS.md` を参照します。
 
 ### 入力前プロンプト改善
 
 入力前のプロンプト改善は、グローバル Hook ではなく **Skill
-`peer-prompt-refinement`** で運用します。  
-そのため、`scripts/setup.sh` は prompt refinement 用 Hook を各 CLI 設定に登録しません。
+`refinment`** で運用します。  
+そのため、`scripts/setup.sh` は refinment 専用 Hook を各 CLI 設定に登録しません。
 
 ### 3 CLI の auto-permission モード（任意・別コマンド）
 
@@ -237,11 +214,6 @@ shell rc から marker block を削除し、シンボリックリンクを `tras
 | `AI_AGENT_INSTALL_SKILLS` | `1` | `0` で Skills のリンク作成をスキップ |
 | `AI_AGENT_INSTALL_HOOKS` | `1` | `0` で Hook 設定導入をスキップ |
 | `AI_AGENT_HOOKS_RUNTIME_LINK` | `~/.llm-config/hooks` | Hook スクリプト参照用の安定リンク |
-| `AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION` | `0` | `1` でCodex中心マルチLLMオーケストレーションHookを有効化 |
-| `AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS` | `45` | orchestration 内の Claude/Gemini 呼び出しの内部待機秒数 |
-| `AI_AGENT_ORCHESTRATOR_CLAUDE_SIMPLE_EFFORT` | `low` | 簡単な Claude 非対話レビュー時の effort |
-| `AI_AGENT_ORCHESTRATOR_CLAUDE_COMPLEX_EFFORT` | `high` | 複雑な Claude 非対話レビュー時の effort |
-| `AI_AGENT_ORCHESTRATOR_GEMINI_REVIEW_EVERY` | `3` | 実装何ターンごとにGeminiレビューを挟むか |
 | `AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY` | `0` | `1` で回答後の peer レビュー継続 Hook を有効化 |
 | `AI_AGENT_RESPONSE_STRATEGY_PROVIDER` | `auto` | `auto` / `gemini` / `codex` / `ollama` |
 | `AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL` | Empty | `provider=ollama` 時に使うモデル名 |

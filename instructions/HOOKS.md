@@ -4,18 +4,17 @@ This document defines shared orchestration behavior for Hook-based workflows.
 
 ## Multi-LLM Orchestration (Codex Hub)
 
-When `AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1`, use this sequence:
+When Codex receives a qualifying non-trivial task through the managed hook layer,
+use this sequence:
 
 1. **Specification loop (pre-implementation)**  
-   Codex stays in charge and drafts the specification first. The initial `UserPromptSubmit` hook only injects a spec-authoring brief and waits for Codex to produce a reviewable spec. `[[SPEC_DONE]]` is the primary readiness signal, but structured fallback review may also be used for later drafts when the keyword is missing.
+   Codex stays in charge and drafts the specification first. On qualifying tasks, Codex may use the `refinment` Skill once before drafting. When it does, Codex should show the refined prompt to the user in the next visible update, then continue from that refined brief. The initial `UserPromptSubmit` hook injects a spec-authoring brief and waits for Codex to produce a reviewable spec. `[[SPEC_DONE]]` is the primary readiness signal, but structured fallback review may also be used for later drafts when the keyword is missing.
 2. **Specification review gate**  
-   When Codex emits `[[SPEC_DONE]]`, the `Stop` hook sends that draft to Claude for review. Claude either approves it for implementation or sends one more spec-refinement prompt back to Codex.
+   When Codex emits `[[SPEC_DONE]]`, or when a later draft is reviewable enough for fallback review, the `Stop` hook auto-continues Codex with a prompt that tells it to use the `refinment` Skill. Codex refines the spec itself and either keeps refining or proceeds toward implementation.
 3. **Implementation loop**  
-   After Claude approves the spec, Codex implements step-by-step. At each `Stop`, Claude may provide the next implementation prompt.
+   After the refined spec is ready, Codex implements step-by-step. At each material `Stop`, the hook may auto-continue Codex with a prompt that tells it to use `refinment` for a tighter next-step or verification-readiness brief.
 4. **Verification loop**  
-   `[[IMPLEMENTATION_DONE]]` is not a final stop signal. It means implementation is ready to move into verification. Codex must run validation, inspect the diff, and self-review before the task can finish.
-5. **Periodic review loop**  
-   Gemini periodically critiques simplification opportunities and possible spec drift, and that note is fed into Claude's implementation guidance.
+   `[[IMPLEMENTATION_DONE]]` is not a final stop signal. It means implementation is ready to move into verification. Codex may also use a structured packet with `phase_signal="verification_ready"`. During verification, Codex should use `refinment` when it needs a tighter completion brief before declaring the task done.
 
 Codex remains the execution hub and final action owner.
 
@@ -35,6 +34,15 @@ The orchestrator hook should treat these keywords as **phase transitions, not ju
 - only `[[VERIFICATION_DONE]]` together with `[[TASK_DONE]]` should allow final completion
 - verification should also have its own bounded turn cap so it cannot continue forever on repeated reviewer guidance
 
+Structured phase packets are also valid when they appear as fenced JSON:
+
+- `{"phase_signal":"verification_ready","summary":"..."}`
+- `{"phase_signal":"task_complete","summary":"...","checks_run":["..."],"diff_reviewed":true,"self_review_complete":true}`
+
+The second packet is valid for final completion only when it includes concrete
+verification evidence (`checks_run`, `diff_reviewed=true`, and
+`self_review_complete=true`).
+
 Keyword detection should be strict. Treat them as valid only when they appear as standalone lines or list items, not when they are merely mentioned inside prose, examples, or documentation.
 
 If `[[SPEC_DONE]]` is absent, the orchestrator should surface that the spec is still in refinement instead of failing silently.
@@ -44,8 +52,7 @@ If `[[SPEC_DONE]]` is absent, the orchestrator should surface that the spec is s
 Apply these guardrails in hook implementations:
 
 - recursion guard environment flags
-- bounded timeout per peer CLI call
-- fail-open behavior when peer CLIs are unavailable or outputs are invalid
+- bounded auto-continuation loops and repeated-prompt caps
 - local state persistence keyed by session id
 
 ## Human-in-the-loop

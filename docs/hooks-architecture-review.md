@@ -5,7 +5,7 @@
 旧構成（project + user の二重配布）は、重複実行と設定競合を起こしやすいため、次の単純構成に変更しました。
 
 - **配布先はグローバルのみ**（`~/.claude`, `~/.codex`, `~/.gemini`）
-- **デフォルト有効 Hook は安全ガードのみ**（`safe_delete_guard.py`）
+- **常時ガードは安全系を優先し、Codex orchestration は qualifying-task 判定で制御**（`safe_delete_guard.py`, `multillm_orchestrator.py`）
 - Hook ロジック本体はリポジトリ管理し、`$AI_AGENT_HOOKS_RUNTIME_LINK` から参照
 
 ## 旧構成の主なリスク
@@ -23,7 +23,7 @@
 
 - 管理対象をユーザーグローバル設定に限定して、管理レイヤーを1つに固定
 - 既存 `settings.json` / `config.toml` は置換せず managed 部分のみ append/merge
-- 高負荷になりやすい prompt refinement は Hook ではなく Skill 側に寄せ、グローバル Hook 競合を避ける
+- 重い外部 reviewer call は main path から外しつつ、Codex の `UserPromptSubmit` では必要時だけ self-contained な `refinment` を使う
 
 ## 残るトレードオフ
 
@@ -35,10 +35,12 @@
 回答完了タイミングの自律継続検証として、以下を追加しました。
 
 - `multillm_orchestrator.py`（Codex `SessionStart` / `UserPromptSubmit` / `Stop`）
+- `codex_hook_gate.py`（Codex Hook の単一ルーター）
 - Claude/Codex: `Stop` イベントで発火
 - Gemini: `AfterAgent` イベントで発火
-- 既定は `AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=0`（無効）、`AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY=0`（無効）
+- `AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY=0` は既定維持
+- Codex orchestration 自体は常時 routed だが、実際の loop 起動は qualifying-task 判定と phase state によって決まる
 
-現行の `multillm_orchestrator.py` は、旧来の `Claude -> Gemini -> Claude` 仕様ループではなく、**Codex が先に仕様を書き、Claude が stop 境界でレビューし、Gemini は実装中の periodic critic に回る** 形へ簡略化しています。
+現行の `multillm_orchestrator.py` は、旧来の `Claude -> Gemini -> Claude` 仕様ループではなく、**Codex が先に仕様を書き、必要時だけ self-contained な `refinment` で brief を締め、Hook 本体は state machine に専念する** 形へ寄せています。
 
 設計詳細は [docs/codex-hub-orchestration.md](./codex-hub-orchestration.md) と [docs/response-strategy-autonomy.md](./response-strategy-autonomy.md) を参照してください。

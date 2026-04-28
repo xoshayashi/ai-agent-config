@@ -25,50 +25,42 @@ CLI load hooks from the locations it already expects.
 | Hook | Default | Purpose |
 |---|---|---|
 | `safe_delete_guard.py` | On | Blocks permanent shell deletion commands and tells the agent to use the safer trash workflow. |
-| `multillm_orchestrator.py` | Registered / **Off by default (Codex)** | Codex-centered orchestration: Codex drafts the spec, Claude reviews/finalizes it at the stop boundary, then Claude-guided implementation continuation with periodic Gemini critique. |
-| `response_strategy_bridge.py` | Registered / **Off by default** | At response-finalization events (`Stop` / `AfterAgent`), optionally asks a peer LLM for one more-turn strategy and can trigger an automatic continuation. |
+| `multillm_orchestrator.py` | Registered / **Always routed for Codex, selectively active on qualifying tasks** | Codex-centered orchestration: Codex-first spec authoring, Skill-driven refinment at task start and phase boundaries, and bounded auto-continuation through implementation and verification. |
+| `response_strategy_bridge.py` | Registered / **Legacy opt-in** | At response-finalization events (`Stop` / `AfterAgent`), optionally asks a peer LLM for one more-turn strategy. This is no longer part of the main Codex hub flow. |
 
 The safe-delete hook is a runtime guardrail, not the only safety layer. The
 shared instructions still require agents to use the safer trash workflow even
 if hooks are disabled or unavailable.
 
-`multillm_orchestrator.py` is wired in Codex hook settings but is disabled by
-default. Enable it only when you want a multi-LLM implementation loop:
-
-```sh
-export AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1
-```
+`multillm_orchestrator.py` is routed through
+`hooks/scripts/codex_hook_gate.py`. There is no routine enable flag for Codex
+hub orchestration now; the managed hook is always present, and
+qualifying-task detection decides when the orchestration loop actually
+activates.
 
 This orchestration mode still has a real latency footprint, but it is lighter
-than the earlier design because it does not launch a multi-step peer review on
-every raw prompt submission. Peer calls are concentrated at review boundaries.
-Even with orchestration enabled globally, the runtime should activate only for
-heavier design / implementation / review prompts rather than every trivial turn.
+than the earlier design because it does not launch external LLM subprocesses from
+the main Codex path.
+Even with the managed hook always installed, the runtime should activate only
+for heavier design / implementation / review prompts rather than every trivial
+turn.
 
-Its internal peer-call timeout defaults to `45` seconds. Increase it with
-`AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS` when Claude/Gemini review needs more
-time, while keeping the outer CLI hook timeout above the worst sequential peer
-budget. In practice, Codex implementation turns that include Gemini critique
-and Claude guidance can consume roughly **2x** the internal timeout.
+The active Skill path is self-contained. `skills/refinment` refines the working
+brief inside Codex instead of shelling out to Claude or Gemini. Keep that Skill
+focused on selective use, minimal edits, and visible `Refined prompt:` output
+when it changes startup behavior.
 
-Claude peer review also adapts effort by default:
+In skill-driven mode, Codex hooks use this flow:
 
-- simple review/guidance -> `--effort low`
-- complex review/guidance -> `--effort high`
-
-Tune those defaults with `AI_AGENT_ORCHESTRATOR_CLAUDE_SIMPLE_EFFORT` and
-`AI_AGENT_ORCHESTRATOR_CLAUDE_COMPLEX_EFFORT`.
-
-With this enabled, Codex hooks use this flow:
-
-1. `UserPromptSubmit`: inject a Codex-first specification brief
-2. `Stop` after Codex emits `[[SPEC_DONE]]`, or after a later structured draft qualifies for fallback review: Claude reviews the spec and either approves it or requests one more refinement pass
-3. `Stop` during implementation: Claude continuation guidance for Codex implementation
-4. Every N implementation turns, Gemini critique is injected into the Claude guidance step
+1. `UserPromptSubmit`: inject a Codex-first specification brief and let Codex decide whether to use `refinment`
+2. If `refinment` is used on the original task prompt, Codex shows the refined prompt to the user before continuing
+3. `Stop` after a spec draft is ready enough for review: auto-continue Codex with a prompt that tells it to use `refinment`
+4. `Stop` during implementation: auto-continue Codex with a prompt that tells it to use `refinment` for the next-step or verification-ready decision
+5. `Stop` during verification: auto-continue Codex with a prompt that tells it to use `refinment` before declaring completion
 
 Completion keywords and stop conditions are defined in `instructions/HOOKS.md`.
-When orchestration mode is enabled, the Codex `Stop` hook suppresses
-`response_strategy_bridge.py` to avoid conflicting continuation decisions.
+The Codex `Stop` hook now stays entirely on the orchestrator path, so
+`response_strategy_bridge.py` no longer competes with the main Codex hub flow.
 The Codex `Stop` configuration is routed through a single managed hook so the
 UI shows one post-response hook status line instead of separate orchestration
 and response-strategy entries.
@@ -76,12 +68,12 @@ When the orchestrator auto-continues from a Codex `Stop` hook, Codex's UI may
 still label that event as `blocked`; this is Codex's current official
 continuation mechanism rather than an orchestration error.
 
-Prompt refinement is now handled by the shared `peer-prompt-refinement` **Skill**
-rather than by global hooks. The script remains in this repository as a reusable
-implementation artifact, but setup no longer registers it as a managed hook.
+The reusable `refinment.py` script remains in this repository as a
+hook-compatible helper, but the active Codex hub path relies on the
+installable `refinment` Skill rather than on hook-level external LLM calls.
 
-`response_strategy_bridge.py` is wired into hook settings but remains inert
-unless explicitly enabled:
+`response_strategy_bridge.py` is still available for legacy non-Codex flows and
+remains inert unless explicitly enabled:
 
 ```sh
 export AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY=1
@@ -101,7 +93,7 @@ export AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL=qwen2.5:latest
 ```
 
 For `ollama`, set `AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL`; otherwise the
-hook fail-opens and skips peer review.
+hook fail-opens and skips external review.
 
 Key guardrails:
 

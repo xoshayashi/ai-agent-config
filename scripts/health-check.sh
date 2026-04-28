@@ -251,7 +251,6 @@ ollama_path=$(command_path ollama)
 response_strategy_enabled=${AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY:-0}
 response_strategy_provider=${AI_AGENT_RESPONSE_STRATEGY_PROVIDER:-auto}
 response_strategy_ollama_model=${AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL:-}
-orchestration_enabled=${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-0}
 
 skill_improvement_schedule=unsupported
 os=$(uname -s 2>/dev/null || printf unknown)
@@ -405,6 +404,7 @@ if not isinstance(hooks, dict):
 legacy_hints = {
     "safe_delete_guard.py",
     "peer_prompt_refinement.py",
+    "refinment.py",
     "response_strategy_bridge.py",
     "multillm_orchestrator.py",
 }
@@ -502,28 +502,18 @@ else
   skills_text_summary="total=$skills_total warn=$skills_warn"
 fi
 
-orchestration_status=disabled
-case "$orchestration_enabled" in
-  0|1) ;;
-  *)
-    orchestration_status=invalid-enable-flag
-    mark_status warn
-    ;;
-esac
-
-if [ "$orchestration_enabled" = "1" ]; then
-  if [ -z "$claude_path" ] && [ -z "$gemini_path" ]; then
-    orchestration_status=missing-claude-and-gemini
-    mark_status warn
-  elif [ -z "$claude_path" ]; then
-    orchestration_status=missing-claude
-    mark_status warn
-  elif [ -z "$gemini_path" ]; then
-    orchestration_status=missing-gemini
-    mark_status warn
-  else
-    orchestration_status=ready
-  fi
+orchestration_mode=skill-driven
+if [ -z "$claude_path" ] && [ -z "$gemini_path" ]; then
+  orchestration_status=missing-claude-and-gemini
+  mark_status warn
+elif [ -z "$claude_path" ]; then
+  orchestration_status=missing-claude
+  mark_status warn
+elif [ -z "$gemini_path" ]; then
+  orchestration_status=missing-gemini
+  mark_status warn
+else
+  orchestration_status=ready
 fi
 
 response_strategy_status=disabled
@@ -639,7 +629,7 @@ if [ "$format" = "json" ]; then
   printf '    "gemini-hooks": "%s"\n' "$gemini_hook_status"
   printf '  },\n'
   printf '  "skills": {\n%b\n  },\n' "$skills_json_body"
-  printf '  "hooks": {"orchestration": {"enabled": %s, "status": "%s"}, "response_strategy": {"enabled": %s, "provider": "%s", "effective_provider": "%s", "status": "%s", "ollama_model": "%s"}},\n' "$(json_value "$orchestration_enabled")" "$orchestration_status" "$(json_value "$response_strategy_enabled")" "$(json_escape "$response_strategy_provider")" "$(json_escape "$response_strategy_effective_provider")" "$response_strategy_status" "$(json_escape "$response_strategy_ollama_model")"
+  printf '  "hooks": {"orchestration": {"mode": "%s", "status": "%s"}, "response_strategy": {"enabled": %s, "provider": "%s", "effective_provider": "%s", "status": "%s", "ollama_model": "%s"}},\n' "$(json_escape "$orchestration_mode")" "$orchestration_status" "$(json_value "$response_strategy_enabled")" "$(json_escape "$response_strategy_provider")" "$(json_escape "$response_strategy_effective_provider")" "$response_strategy_status" "$(json_escape "$response_strategy_ollama_model")"
   printf '  "automation": {"skill_improvement_schedule": "%s"}\n' "$skill_improvement_schedule"
   printf '}\n'
 else
@@ -656,8 +646,8 @@ else
     "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_hooks_doc_status" "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_hooks_doc_status" "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_hooks_doc_status"
   printf 'hooks: runtime=%s claude=%s codex-config=%s codex-hooks=%s gemini=%s\n' \
     "$hook_runtime_status" "$claude_hook_status" "$codex_config_status" "$codex_hook_status" "$gemini_hook_status"
-  printf 'hooks-orchestration: enabled=%s status=%s\n' \
-    "$orchestration_enabled" "$orchestration_status"
+  printf 'hooks-orchestration: mode=%s status=%s\n' \
+    "$orchestration_mode" "$orchestration_status"
   printf 'hooks-response-strategy: enabled=%s provider=%s effective=%s status=%s\n' \
     "$response_strategy_enabled" "$response_strategy_provider" "$response_strategy_effective_provider" "$response_strategy_status"
   printf 'skills: %s\n' "$skills_text_summary"
