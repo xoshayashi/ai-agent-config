@@ -158,9 +158,18 @@ def test_should_activate_self_workflow_prefers_complex_or_explicit_prompts() -> 
     assert SWF.should_activate_self_workflow("Hook の仕様と実装計画を確認して修正して")
     assert not SWF.should_activate_self_workflow("ありがとう")
     assert not SWF.should_activate_self_workflow("status")
+    assert not SWF.should_activate_self_workflow("sandbox と approval の違いを教えて")
+    assert not SWF.should_activate_self_workflow("Codex の sandbox 設計について説明して")
+    assert not SWF.should_activate_self_workflow("hooks/scripts/self_workflow.py の構成を説明して")
     assert not SWF.should_activate_self_workflow("improve the docstring")
     assert not SWF.should_activate_self_workflow("fix the error in https://example.com/api")
     assert not SWF.should_activate_self_workflow("fix 1/4 of the tests")
+
+
+def test_is_answer_only_request_distinguishes_explanation_from_execution() -> None:
+    assert SWF.is_answer_only_request("sandbox と approval の違いを教えて")
+    assert SWF.is_answer_only_request("hooks/scripts/self_workflow.py の構成を説明して")
+    assert not SWF.is_answer_only_request("hooks/scripts/self_workflow.py を修正して")
 
 
 def test_spec_status_from_keyword() -> None:
@@ -230,6 +239,7 @@ def test_default_verification_start_prompt_mentions_structured_completion() -> N
     assert "$refinment" in text
     assert "phase_signal" in text
     assert "[[VERIFICATION_DONE]]" in text
+    assert "delta only" in text
 
 
 def test_default_spec_refinement_prompt_uses_supplied_keyword() -> None:
@@ -543,6 +553,18 @@ def test_build_verification_decision_continues_with_skill_prompt() -> None:
     assert decision["continue"] is True
     assert "$refinment" in decision["prompt"]
     assert "Skill-driven verification refinment requested" in decision["note"]
+    assert "delta only" in decision["prompt"]
+
+
+def test_default_verification_continue_prompt_prefers_delta_after_correction_style_response() -> None:
+    text = SWF.default_verification_continue_prompt(
+        "spec body",
+        "補足: macOS では network_access = true が効かない",
+        "[[VERIFICATION_DONE]]",
+        "[[TASK_DONE]]",
+    )
+    assert "delta-only" in text
+    assert "Do not restate unchanged background." in text
 
 
 def test_build_verification_decision_stops_at_verification_cap() -> None:
@@ -583,6 +605,7 @@ def run_tests() -> int:
         test_turn_context_output_formats_for_claude_and_gemini,
         test_should_keep_current_task_followup_prompt,
         test_should_activate_self_workflow_prefers_complex_or_explicit_prompts,
+        test_is_answer_only_request_distinguishes_explanation_from_execution,
         test_spec_status_from_keyword,
         test_contains_explicit_keyword_requires_standalone_line,
         test_spec_is_review_candidate_requires_markdown_headings,
@@ -610,6 +633,7 @@ def run_tests() -> int:
         test_handle_stop_verification_done_and_task_done_finishes,
         test_build_verification_decision_accepts_structured_completion_evidence,
         test_build_verification_decision_continues_with_skill_prompt,
+        test_default_verification_continue_prompt_prefers_delta_after_correction_style_response,
         test_build_verification_decision_stops_at_verification_cap,
     ]
 

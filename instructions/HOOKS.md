@@ -16,6 +16,16 @@ should stay responsible for finishing its own work. The default sequence is:
 4. **Verification loop**  
    `[[IMPLEMENTATION_DONE]]` is not a final stop signal. It means implementation is ready to move into verification. The CLI may also use a structured packet with `phase_signal="verification_ready"`. During verification, it should use `refinment` when it needs a tighter completion brief before declaring the task done.
 
+The managed loop should use a generic intent split:
+
+- **answer-only turns** stay outside the loop by default
+- **artifact / execution turns** can enter the loop when they need bounded
+  multi-step work
+
+Do not promote simple "what is the difference" or "explain this" prompts into
+spec -> implementation -> verification work unless they also ask for a concrete
+change or deliverable.
+
 This workflow is generic across Codex, Claude Code, and Gemini CLI. No
 external peer reviewer is part of the main path.
 
@@ -47,6 +57,9 @@ verification evidence (`checks_run`, `diff_reviewed=true`, and
 Keyword detection should be strict. Treat them as valid only when they appear as standalone lines or list items, not when they are merely mentioned inside prose, examples, or documentation.
 
 If `[[SPEC_DONE]]` is absent, the hook should surface that the spec is still in refinement instead of failing silently.
+
+When verification discovers only a narrow omission or factual correction,
+prefer a delta-only follow-up instead of repeating the whole earlier answer.
 
 ## Safety Limits
 
