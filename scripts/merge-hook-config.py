@@ -16,7 +16,9 @@ MANAGED_END = "# END llm-config managed hooks"
 MANAGED_FLAG = "_llm_config_managed"
 LEGACY_MANAGED_SCRIPT_HINTS = {
     "safe_delete_guard.py",
-    "peer_prompt_refinement.py",
+    "peer_prompt_refinement.py",  # pre-refinment legacy hook name
+    "refinment.py",
+    "self_workflow.py",
     "response_strategy_bridge.py",
     "multillm_orchestrator.py",
 }
@@ -146,7 +148,20 @@ def merge_hooks_json(source: Path, destination: Path) -> tuple[dict[str, Any], b
         for group in source_groups:
             key = canonical(group)
             key_without_marker = canonical(strip_managed_flag(group))
-            if key in existing or key_without_marker in existing_without_marker:
+            if key in existing:
+                continue
+            if key_without_marker in existing_without_marker:
+                for index, existing_group in enumerate(destination_groups):
+                    if canonical(strip_managed_flag(existing_group)) != key_without_marker:
+                        continue
+                    if canonical(existing_group) != key:
+                        destination_groups[index] = group
+                        changed = True
+                    break
+                existing = {canonical(item) for item in destination_groups}
+                existing_without_marker = {
+                    canonical(strip_managed_flag(item)) for item in destination_groups
+                }
                 continue
             destination_groups.append(group)
             existing.add(key)

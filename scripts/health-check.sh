@@ -248,11 +248,6 @@ codex_path=$(command_path codex)
 gemini_path=$(command_path gemini)
 ollama_path=$(command_path ollama)
 
-response_strategy_enabled=${AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY:-0}
-response_strategy_provider=${AI_AGENT_RESPONSE_STRATEGY_PROVIDER:-auto}
-response_strategy_ollama_model=${AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL:-}
-orchestration_enabled=${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-0}
-
 skill_improvement_schedule=unsupported
 os=$(uname -s 2>/dev/null || printf unknown)
 if [ "$os" = "Darwin" ]; then
@@ -405,6 +400,8 @@ if not isinstance(hooks, dict):
 legacy_hints = {
     "safe_delete_guard.py",
     "peer_prompt_refinement.py",
+    "refinment.py",
+    "self_workflow.py",
     "response_strategy_bridge.py",
     "multillm_orchestrator.py",
 }
@@ -502,89 +499,12 @@ else
   skills_text_summary="total=$skills_total warn=$skills_warn"
 fi
 
-orchestration_status=disabled
-case "$orchestration_enabled" in
-  0|1) ;;
-  *)
-    orchestration_status=invalid-enable-flag
-    mark_status warn
-    ;;
-esac
-
-if [ "$orchestration_enabled" = "1" ]; then
-  if [ -z "$claude_path" ] && [ -z "$gemini_path" ]; then
-    orchestration_status=missing-claude-and-gemini
-    mark_status warn
-  elif [ -z "$claude_path" ]; then
-    orchestration_status=missing-claude
-    mark_status warn
-  elif [ -z "$gemini_path" ]; then
-    orchestration_status=missing-gemini
-    mark_status warn
-  else
-    orchestration_status=ready
-  fi
-fi
-
-response_strategy_status=disabled
-response_strategy_effective_provider=$response_strategy_provider
-case "$response_strategy_enabled" in
-  0|1) ;;
-  *)
-    response_strategy_status=invalid-enable-flag
-    mark_status warn
-    ;;
-esac
-
-if [ "$response_strategy_enabled" = "1" ]; then
-  case "$response_strategy_provider" in
-    auto)
-      if [ -n "$gemini_path" ]; then
-        response_strategy_effective_provider=gemini
-        response_strategy_status=ready
-      elif [ -n "$codex_path" ]; then
-        response_strategy_effective_provider=codex
-        response_strategy_status=ready
-      elif [ -n "$ollama_path" ] && [ -n "$response_strategy_ollama_model" ]; then
-        response_strategy_effective_provider=ollama
-        response_strategy_status=ready
-      else
-        response_strategy_status=missing-peer-cli
-        mark_status warn
-      fi
-      ;;
-    gemini)
-      if [ -n "$gemini_path" ]; then
-        response_strategy_status=ready
-      else
-        response_strategy_status=missing-gemini
-        mark_status warn
-      fi
-      ;;
-    codex)
-      if [ -n "$codex_path" ]; then
-        response_strategy_status=ready
-      else
-        response_strategy_status=missing-codex
-        mark_status warn
-      fi
-      ;;
-    ollama)
-      if [ -z "$ollama_path" ]; then
-        response_strategy_status=missing-ollama
-        mark_status warn
-      elif [ -z "$response_strategy_ollama_model" ]; then
-        response_strategy_status=missing-ollama-model
-        mark_status warn
-      else
-        response_strategy_status=ready
-      fi
-      ;;
-    *)
-      response_strategy_status=invalid-provider
-      mark_status warn
-      ;;
-  esac
+self_workflow_mode=generic-same-llm
+if [ ! -f "$config_home/hooks/scripts/self_workflow.py" ]; then
+  self_workflow_status=missing-script
+  mark_status warn
+else
+  self_workflow_status=ready
 fi
 
 for status in \
@@ -639,7 +559,7 @@ if [ "$format" = "json" ]; then
   printf '    "gemini-hooks": "%s"\n' "$gemini_hook_status"
   printf '  },\n'
   printf '  "skills": {\n%b\n  },\n' "$skills_json_body"
-  printf '  "hooks": {"orchestration": {"enabled": %s, "status": "%s"}, "response_strategy": {"enabled": %s, "provider": "%s", "effective_provider": "%s", "status": "%s", "ollama_model": "%s"}},\n' "$(json_value "$orchestration_enabled")" "$orchestration_status" "$(json_value "$response_strategy_enabled")" "$(json_escape "$response_strategy_provider")" "$(json_escape "$response_strategy_effective_provider")" "$response_strategy_status" "$(json_escape "$response_strategy_ollama_model")"
+  printf '  "hooks": {"self_workflow": {"mode": "%s", "status": "%s"}},\n' "$(json_escape "$self_workflow_mode")" "$self_workflow_status"
   printf '  "automation": {"skill_improvement_schedule": "%s"}\n' "$skill_improvement_schedule"
   printf '}\n'
 else
@@ -656,10 +576,8 @@ else
     "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_hooks_doc_status" "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_hooks_doc_status" "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_hooks_doc_status"
   printf 'hooks: runtime=%s claude=%s codex-config=%s codex-hooks=%s gemini=%s\n' \
     "$hook_runtime_status" "$claude_hook_status" "$codex_config_status" "$codex_hook_status" "$gemini_hook_status"
-  printf 'hooks-orchestration: enabled=%s status=%s\n' \
-    "$orchestration_enabled" "$orchestration_status"
-  printf 'hooks-response-strategy: enabled=%s provider=%s effective=%s status=%s\n' \
-    "$response_strategy_enabled" "$response_strategy_provider" "$response_strategy_effective_provider" "$response_strategy_status"
+  printf 'hooks-self-workflow: mode=%s status=%s\n' \
+    "$self_workflow_mode" "$self_workflow_status"
   printf 'skills: %s\n' "$skills_text_summary"
   printf 'automation: skill-improvement-schedule=%s\n' "$skill_improvement_schedule"
 fi

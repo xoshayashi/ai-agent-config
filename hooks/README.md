@@ -25,85 +25,58 @@ CLI load hooks from the locations it already expects.
 | Hook | Default | Purpose |
 |---|---|---|
 | `safe_delete_guard.py` | On | Blocks permanent shell deletion commands and tells the agent to use the safer trash workflow. |
-| `multillm_orchestrator.py` | Registered / **Off by default (Codex)** | Codex-centered orchestration: Codex drafts the spec, Claude reviews/finalizes it at the stop boundary, then Claude-guided implementation continuation with periodic Gemini critique. |
-| `response_strategy_bridge.py` | Registered / **Off by default** | At response-finalization events (`Stop` / `AfterAgent`), optionally asks a peer LLM for one more-turn strategy and can trigger an automatic continuation. |
+| `self_workflow.py` | Registered / **Always routed on managed events, selectively active on qualifying tasks** | Same-LLM self-workflow: the current CLI drafts the spec, uses Skill-driven refinment at task start and phase boundaries, and boundedly auto-continues through implementation and verification. |
 
 The safe-delete hook is a runtime guardrail, not the only safety layer. The
 shared instructions still require agents to use the safer trash workflow even
 if hooks are disabled or unavailable.
 
-`multillm_orchestrator.py` is wired in Codex hook settings but is disabled by
-default. Enable it only when you want a multi-LLM implementation loop:
+`self_workflow.py` is called directly from the managed hook configs for Claude
+Code, Codex, and Gemini CLI. There is no routine enable flag for the main
+self-workflow path now; the managed hook is always present, and
+qualifying-task detection decides when the loop actually activates.
 
-```sh
-export AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1
-```
+This self-workflow mode still has a real latency footprint, but it is lighter
+than the earlier design because it does not launch external LLM subprocesses from
+the main path.
+Even with the managed hook always installed, the runtime should activate only
+for heavier design / implementation / review prompts rather than every trivial
+turn.
+The runtime should make a generic intent split: answer-only turns stay outside
+the loop, while artifact/execution turns can enter it when they need bounded
+multi-step work.
+When a loop is already active, a non-follow-up turn that falls outside that
+managed path should clear the active workflow state instead of letting stale
+continuation prompts survive into the next stop event.
 
-This orchestration mode still has a real latency footprint, but it is lighter
-than the earlier design because it does not launch a multi-step peer review on
-every raw prompt submission. Peer calls are concentrated at review boundaries.
-Even with orchestration enabled globally, the runtime should activate only for
-heavier design / implementation / review prompts rather than every trivial turn.
+The active Skill path is self-contained. `skills/refinment` refines the working
+brief inside the current CLI instead of shelling out to another model. Keep that Skill
+focused on selective use, minimal edits, and visible `Refined prompt:` output
+when it changes startup behavior.
 
-Its internal peer-call timeout defaults to `45` seconds. Increase it with
-`AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS` when Claude/Gemini review needs more
-time, while keeping the outer CLI hook timeout above the worst sequential peer
-budget. In practice, Codex implementation turns that include Gemini critique
-and Claude guidance can consume roughly **2x** the internal timeout.
+`refinment` is invoked through the CLI's native skill-routing path, not as a
+separately registered Hook script.
 
-Claude peer review also adapts effort by default:
+In same-LLM mode, managed hooks use this flow:
 
-- simple review/guidance -> `--effort low`
-- complex review/guidance -> `--effort high`
-
-Tune those defaults with `AI_AGENT_ORCHESTRATOR_CLAUDE_SIMPLE_EFFORT` and
-`AI_AGENT_ORCHESTRATOR_CLAUDE_COMPLEX_EFFORT`.
-
-With this enabled, Codex hooks use this flow:
-
-1. `UserPromptSubmit`: inject a Codex-first specification brief
-2. `Stop` after Codex emits `[[SPEC_DONE]]`, or after a later structured draft qualifies for fallback review: Claude reviews the spec and either approves it or requests one more refinement pass
-3. `Stop` during implementation: Claude continuation guidance for Codex implementation
-4. Every N implementation turns, Gemini critique is injected into the Claude guidance step
+1. Startup event (`UserPromptSubmit` or `BeforeAgent`): inject a specification brief and let the current CLI decide whether to use `refinment`
+2. If `refinment` is used on the original task prompt, the CLI shows the refined prompt to the user before continuing
+3. Completion event after a spec draft is ready enough for review: auto-continue the same CLI with a prompt that tells it to use `refinment`
+4. Completion event during implementation: auto-continue the same CLI with a prompt that tells it to use `refinment` for the next-step or verification-ready decision
+5. Completion event during verification: auto-continue the same CLI with a prompt that tells it to use `refinment` before declaring completion, and prefer delta-only corrections only when the latest response actually reads like a correction/supplement
 
 Completion keywords and stop conditions are defined in `instructions/HOOKS.md`.
-When orchestration mode is enabled, the Codex `Stop` hook suppresses
-`response_strategy_bridge.py` to avoid conflicting continuation decisions.
-
-Prompt refinement is now handled by the shared `peer-prompt-refinement` **Skill**
-rather than by global hooks. The script remains in this repository as a reusable
-implementation artifact, but setup no longer registers it as a managed hook.
-
-`response_strategy_bridge.py` is wired into hook settings but remains inert
-unless explicitly enabled:
-
-```sh
-export AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY=1
-```
-
-When disabled, it returns `{}` immediately and does not alter turn flow.
-When enabled, the default routing is:
-
-- Claude Code / Codex -> Gemini CLI reviewer
-- Gemini CLI -> Codex reviewer
-
-You can override with:
-
-```sh
-export AI_AGENT_RESPONSE_STRATEGY_PROVIDER=gemini   # or codex / ollama
-export AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL=qwen2.5:latest
-```
-
-For `ollama`, set `AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL`; otherwise the
-hook fail-opens and skips peer review.
+When `self_workflow.py` auto-continues from a Claude/Codex/Gemini completion
+hook, the UI may still label that event as `blocked` or `denied`; this is the
+current official continuation mechanism rather than an error.
 
 Key guardrails:
 
-- Re-entry guard via `AI_AGENT_RESPONSE_STRATEGY_ACTIVE=1` in subprocess calls
-- Skip when `stop_hook_active=true` unless `AI_AGENT_RESPONSE_STRATEGY_ALLOW_REENTRY=1`
-- Minimum response-length threshold (`AI_AGENT_RESPONSE_STRATEGY_MIN_RESPONSE_CHARS`, default `120`)
-- Timeout and output caps (`AI_AGENT_RESPONSE_STRATEGY_TIMEOUT_SECONDS`, `AI_AGENT_RESPONSE_STRATEGY_OUTPUT_CHARS`)
-- Optional redacted transcript context window for better review quality
+- Re-entry guard via `AI_AGENT_SELF_WORKFLOW_ACTIVE=1`
+- Bounded continuation count and repeated-prompt caps
+- Verification turn caps
+- Session-scoped local state under `~/.llm-config/self-workflow`
+- Fail-open behavior for non-qualifying or unsupported events
 
 ## CLI Conventions
 

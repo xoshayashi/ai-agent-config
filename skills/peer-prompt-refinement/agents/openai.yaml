@@ -1,7 +1,0 @@
-interface:
-  display_name: "Peer Prompt Refinement"
-  short_description: "Improve task prompts with a peer LLM first"
-  default_prompt: "Use $peer-prompt-refinement to improve this task prompt with the configured peer LLM before executing it."
-
-policy:
-  allow_implicit_invocation: true
