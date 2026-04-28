@@ -952,6 +952,18 @@ def handle_stop(current: str, data: dict[str, Any], state: dict[str, Any], path:
 
     phase = str(state.get("phase", ""))
     spec_done_keyword, implementation_done_keyword, verification_done_keyword, task_done_keyword = completion_keywords()
+
+    # Bootstrap path for idle sessions: with the pre-work hook gone, a brand-new
+    # session has no `phase` set when its first response arrives. The LLM signals
+    # opt-in to the auto-continuation loop by emitting `[[SPEC_DONE]]`. When we
+    # see that on an idle phase, treat the response as a freshly authored spec
+    # so the existing `spec_authoring` branch can transition into `spec_review`.
+    if not phase and contains_explicit_keyword(response, spec_done_keyword):
+        phase = "spec_authoring"
+        state["phase"] = phase
+        state.setdefault("spec_revision_count", 0)
+        state.setdefault("original_prompt", "")
+
     if phase == "spec_authoring":
         spec_revision_count = safe_int(state.get("spec_revision_count", 0), 0, minimum=0) + 1
         state["spec_revision_count"] = spec_revision_count
