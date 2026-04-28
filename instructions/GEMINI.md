@@ -14,12 +14,6 @@ The shared project instructions are imported below. **Follow them before startin
 
 @/Users/sh/Documents/ai-agent-config/instructions/HOOKS.md
 
-## Note
-
-This file is editable, but local deletion, moving, and renaming are protected by the macOS ACL `everyone deny delete`.
-
-See `/Users/sh/Documents/ai-agent-config/instructions/AI_AGENT_INSTRUCTIONS.md` for details.
-
 ## Personalization
 
 Call me Shunsuke.
