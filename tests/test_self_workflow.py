@@ -218,21 +218,25 @@ def test_spec_is_review_candidate_requires_markdown_headings() -> None:
     assert SWF.spec_is_review_candidate(structured)
 
 
-def test_build_spec_authoring_context_mentions_keyword_and_skill() -> None:
+def test_build_spec_authoring_context_is_advisory_and_skill_neutral() -> None:
     text = SWF.build_spec_authoring_context("task", "[[SPEC_DONE]]")
     assert "[[SPEC_DONE]]" in text
-    assert "$refinment" in text
-    assert "show the refined prompt to the user" in text.lower()
-    assert "Draft the specification yourself in this CLI first" in text
+    assert "task" in text
+    assert "advisory" in text.lower()
+    assert "opt-in" in text.lower()
+    # The context must not push any specific skill.
+    assert "$refinment" not in text
+    assert "use $" not in text.lower()
 
 
-def test_default_implementation_start_prompt_uses_spec_and_skill() -> None:
+def test_default_implementation_start_prompt_uses_spec_and_keyword() -> None:
     text = SWF.default_implementation_start_prompt("spec body", "brief", "[[BUILD_DONE]]")
     assert "spec body" in text
     assert "brief" in text
-    assert "$refinment" in text
     assert "[[BUILD_DONE]]" in text
     assert "verification_ready" in text
+    # The implementation start prompt must not push any specific skill.
+    assert "$refinment" not in text
 
 
 def test_default_verification_start_prompt_mentions_structured_completion() -> None:
@@ -242,10 +246,11 @@ def test_default_verification_start_prompt_mentions_structured_completion() -> N
         "[[VERIFICATION_DONE]]",
         "[[TASK_DONE]]",
     )
-    assert "$refinment" in text
     assert "phase_signal" in text
     assert "[[VERIFICATION_DONE]]" in text
     assert "delta only" in text
+    # The verification start prompt must not push any specific skill.
+    assert "$refinment" not in text
 
 
 def test_default_spec_refinement_prompt_uses_supplied_keyword() -> None:
@@ -254,7 +259,7 @@ def test_default_spec_refinement_prompt_uses_supplied_keyword() -> None:
     assert "[[READY_FOR_BUILD]]" in text
 
 
-def test_build_continue_decision_requests_skill_driven_review() -> None:
+def test_build_continue_decision_returns_skill_neutral_continuation() -> None:
     state = {
         "implementation_turn": 1,
         "continuation_count": 0,
@@ -264,8 +269,9 @@ def test_build_continue_decision_requests_skill_driven_review() -> None:
     }
     decision = SWF.build_continue_decision(state, {"transcript_path": ""}, "latest response")
     assert decision["continue"] is True
-    assert "$refinment" in decision["prompt"]
-    assert "Skill-driven implementation refinment requested" in decision["note"]
+    # The continuation prompt must not push any specific skill.
+    assert "$refinment" not in decision["prompt"]
+    assert "Implementation continuation" in decision["note"]
 
 
 def test_build_continue_decision_avoids_external_reviewer_language() -> None:
@@ -324,8 +330,11 @@ def test_handle_user_prompt_submit_bootstraps_spec_phase() -> None:
         payload = SWF.handle_user_prompt_submit("codex", "UserPromptSubmit", {"prompt": "このコードベースを分析して設計書を書いて"}, {}, state_path)
         output = payload.get("hookSpecificOutput", {})
         assert_eq(output.get("hookEventName"), "UserPromptSubmit", "bootstrap event")
-        assert "[[SPEC_DONE]]" in str(output.get("additionalContext", ""))
-        assert "$refinment" in str(output.get("additionalContext", ""))
+        additional_context = str(output.get("additionalContext", ""))
+        assert "[[SPEC_DONE]]" in additional_context
+        # The bootstrap context must be skill-neutral.
+        assert "$refinment" not in additional_context
+        assert "opt-in" in additional_context.lower()
         saved = SWF.load_state(state_path)
         assert_eq(saved.get("phase"), "spec_authoring", "spec phase initialized")
         assert_eq(saved.get("spec_revision_count"), 0, "spec revision count initialized")
@@ -395,13 +404,16 @@ def test_handle_session_start_done_returns_new_task_message() -> None:
     assert "Start a new task prompt" in str(output.get("additionalContext", ""))
 
 
-def test_handle_stop_spec_authoring_requests_skill_review_when_ready() -> None:
+def test_handle_stop_spec_authoring_requests_review_when_ready() -> None:
     with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
         state_path = Path(tmp) / "state.json"
         state = {"phase": "spec_authoring", "original_prompt": "build feature", "spec_revision_count": 0}
         payload = SWF.handle_stop("codex", {"response": "draft\n[[SPEC_DONE]]"}, state, state_path)
         assert_eq(payload.get("decision"), "block", "should auto-continue into spec review")
-        assert "$refinment" in str(payload.get("reason", ""))
+        reason = str(payload.get("reason", ""))
+        assert "Decide whether the specification draft" in reason
+        # The continuation prompt must not push any specific skill.
+        assert "$refinment" not in reason
         saved = SWF.load_state(state_path)
         assert_eq(saved.get("phase"), "spec_review", "state promoted to spec_review")
 
@@ -423,7 +435,10 @@ def test_handle_stop_spec_authoring_can_use_structured_fallback_review() -> None
         )
         payload = SWF.handle_stop("codex", {"response": structured_spec}, state, state_path)
         assert_eq(payload.get("decision"), "block", "fallback review should continue")
-        assert "$refinment" in str(payload.get("reason", ""))
+        reason = str(payload.get("reason", ""))
+        assert "Decide whether the specification draft" in reason
+        # The fallback continuation must not push any specific skill.
+        assert "$refinment" not in reason
         saved = SWF.load_state(state_path)
         assert_eq(saved.get("phase"), "spec_review", "fallback review enters spec_review")
 
@@ -571,7 +586,7 @@ def test_build_verification_decision_accepts_structured_completion_evidence() ->
     assert_eq(state.get("same_prompt_count"), 0, "same prompt count reset")
 
 
-def test_build_verification_decision_continues_with_skill_prompt() -> None:
+def test_build_verification_decision_continues_with_skill_neutral_prompt() -> None:
     state = {
         "phase": "verification",
         "spec_markdown": "approved spec [[SPEC_DONE]]",
@@ -588,8 +603,9 @@ def test_build_verification_decision_continues_with_skill_prompt() -> None:
         "[[TASK_DONE]]",
     )
     assert decision["continue"] is True
-    assert "$refinment" in decision["prompt"]
-    assert "Skill-driven verification refinment requested" in decision["note"]
+    # The verification continuation must not push any specific skill.
+    assert "$refinment" not in decision["prompt"]
+    assert "Verification continuation" in decision["note"]
     assert "delta only" in decision["prompt"]
 
 
@@ -657,11 +673,11 @@ def run_tests() -> int:
         test_spec_status_from_keyword,
         test_contains_explicit_keyword_requires_standalone_line,
         test_spec_is_review_candidate_requires_markdown_headings,
-        test_build_spec_authoring_context_mentions_keyword_and_skill,
-        test_default_implementation_start_prompt_uses_spec_and_skill,
+        test_build_spec_authoring_context_is_advisory_and_skill_neutral,
+        test_default_implementation_start_prompt_uses_spec_and_keyword,
         test_default_verification_start_prompt_mentions_structured_completion,
         test_default_spec_refinement_prompt_uses_supplied_keyword,
-        test_build_continue_decision_requests_skill_driven_review,
+        test_build_continue_decision_returns_skill_neutral_continuation,
         test_build_continue_decision_avoids_external_reviewer_language,
         test_build_continue_decision_stops_at_continuation_cap,
         test_build_continue_decision_stops_on_repeated_prompt,
@@ -672,7 +688,7 @@ def run_tests() -> int:
         test_handle_session_start_resumes_context_for_implementation,
         test_handle_session_start_idle_returns_empty,
         test_handle_session_start_done_returns_new_task_message,
-        test_handle_stop_spec_authoring_requests_skill_review_when_ready,
+        test_handle_stop_spec_authoring_requests_review_when_ready,
         test_handle_stop_spec_authoring_can_use_structured_fallback_review,
         test_handle_stop_spec_review_done_moves_to_implementation,
         test_handle_stop_spec_review_without_keyword_requests_refinement,
@@ -682,7 +698,7 @@ def run_tests() -> int:
         test_handle_stop_structured_task_complete_without_verification_keeps_verifying,
         test_handle_stop_verification_done_and_task_done_finishes,
         test_build_verification_decision_accepts_structured_completion_evidence,
-        test_build_verification_decision_continues_with_skill_prompt,
+        test_build_verification_decision_continues_with_skill_neutral_prompt,
         test_default_verification_continue_prompt_prefers_delta_after_correction_style_response,
         test_default_verification_continue_prompt_does_not_treat_normal_updates_as_delta_only,
         test_build_verification_decision_stops_at_verification_cap,

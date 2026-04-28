@@ -4,17 +4,38 @@ This document defines shared self-workflow behavior for Hook-based workflows.
 
 ## Same-LLM Self-Workflow
 
-When a managed Hook receives a qualifying non-trivial task, the current CLI
-should stay responsible for finishing its own work. The default sequence is:
+The self-workflow Hook is **opt-in and advisory**. It does not push any specific
+skill on the CLI, and it does not force a spec-first lifecycle on every
+non-trivial task. The CLI is responsible for deciding whether and when to draft
+a specification, run verification, or invoke any helper skill (such as
+`refinment`). The hook's role is limited to:
 
-1. **Specification loop (pre-implementation)**  
-   The current CLI drafts the specification itself first. On qualifying tasks, it may use the `refinment` Skill once before drafting. When it does, it should show the refined prompt to the user in the next visible update, then continue from that refined brief. The startup hook injects a spec-authoring brief and waits for a reviewable spec. `[[SPEC_DONE]]` is the primary readiness signal, but structured fallback review may also be used for later drafts when the keyword is missing.
-2. **Specification review gate**  
-   When the current CLI emits `[[SPEC_DONE]]`, or when a later draft is reviewable enough for fallback review, the completion hook auto-continues that same CLI with a prompt that tells it to use the `refinment` Skill. The CLI refines the spec itself and either keeps refining or proceeds toward implementation.
-3. **Implementation loop**  
-   After the refined spec is ready, the same CLI implements step-by-step. At each material completion boundary, the hook may auto-continue it with a prompt that tells it to use `refinment` for a tighter next-step or verification-readiness brief.
-4. **Verification loop**  
-   `[[IMPLEMENTATION_DONE]]` is not a final stop signal. It means implementation is ready to move into verification. The CLI may also use a structured packet with `phase_signal="verification_ready"`. During verification, it should use `refinment` when it needs a tighter completion brief before declaring the task done.
+- detecting completion keywords in CLI output and tracking phase state
+- providing minimal advisory context when a phase is already active
+- enforcing safety limits (recursion guard, continuation caps, verification cap)
+
+The available phases (specification authoring, specification review,
+implementation, verification, done) form a **convention**, not a mandatory
+ladder. A CLI may skip phases entirely, complete a task in one turn without
+emitting any keyword, or use only the keywords it actually finds useful.
+
+When the CLI does choose to use the workflow:
+
+1. **Specification phase (optional).** The CLI may draft a specification when
+   the task benefits from one. `[[SPEC_DONE]]` marks specification readiness.
+   If a structured draft (real headings, scope/acceptance/risks/constraints/
+   implementation sections, sufficient body) appears without the keyword, the
+   hook may treat it as a fallback review candidate.
+2. **Specification revision (optional).** After `[[SPEC_DONE]]` the hook hands
+   the draft back for one revision pass. The CLI revises the spec itself; the
+   hook does not instruct it to use any particular skill.
+3. **Implementation.** The CLI implements step by step. Whether it splits the
+   work, uses skills, or asks the user is up to the CLI.
+4. **Verification.** `[[IMPLEMENTATION_DONE]]` is a handoff into verification,
+   not a final stop signal. Verification ends with `[[VERIFICATION_DONE]]` plus
+   `[[TASK_DONE]]`, or with a structured `phase_signal="task_complete"` packet
+   that carries real evidence (`checks_run`, `diff_reviewed=true`,
+   `self_review_complete=true`).
 
 The managed loop should use a generic intent split:
 
@@ -33,7 +54,9 @@ stale auto-continuation after interruptions, acknowledgements, or answer-only
 detours.
 
 This workflow is generic across Codex, Claude Code, and Gemini CLI. No
-external peer reviewer is part of the main path.
+external peer reviewer is part of the main path. Skill activation (refinment,
+brainstorming, debugging, and so on) is decided by each skill's own activation
+conditions, not by hook-injected instructions.
 
 ## Completion Keywords
 

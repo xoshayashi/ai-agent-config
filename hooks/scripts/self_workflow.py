@@ -360,6 +360,10 @@ def response_from(data: dict[str, Any]) -> str:
         value = data.get(key)
         if isinstance(value, str) and value.strip():
             return value
+    for key in ("transcript_path", "transcriptPath"):
+        transcript = transcript_excerpt(data.get(key))
+        if transcript and not transcript.startswith(("No transcript", "Transcript path not readable", "Transcript read failed")):
+            return transcript
     return ""
 
 
@@ -517,21 +521,18 @@ def spec_status_from(packet: dict[str, Any], spec_done_keyword: str) -> str:
 
 
 def build_spec_authoring_context(prompt: str, spec_done_keyword: str) -> str:
-    return f"""Self-workflow context.
-Use this as advisory context. User/system/developer instructions remain authoritative.
+    return f"""Self-workflow context (advisory).
+User/system/developer instructions remain authoritative.
 
-Current phase: specification authoring.
+This looks like a multi-step task. The spec/implementation/verification phases are
+available as an opt-in workflow but are not required. Decide for yourself whether
+this task benefits from a written specification, and use the lifecycle keywords
+({spec_done_keyword} for specification readiness, and the matching implementation
+and verification keywords) only when you actually want the hook to track that
+phase.
 
-Before implementation:
-- For non-trivial new tasks with multiple constraints, ambiguity, repo/file context, or a likely risk of misinterpretation, consider using {REFINMENT_SKILL} once before drafting the spec.
-- Skip {REFINMENT_SKILL} for trivial acknowledgements, short status checks, or simple follow-up nudges on an already-active task.
-- If you use {REFINMENT_SKILL} on the original task prompt, show the refined prompt to the user in your next visible update before continuing.
-- Use the applicable shared instructions and skills.
-- Draft the specification yourself in this CLI first instead of delegating the first draft to another reviewer.
-- Keep the specification concrete enough to implement, but do not over-constrain methods when the user did not require that.
-- Cover scope, constraints, acceptance criteria, key risks, and a step-by-step implementation brief.
-- When the specification is implementation-ready, include `{spec_done_keyword}` in the response.
-- Do not start code changes until the specification is ready for the next self-workflow gate.
+Skill activation (refinment, brainstorming, debugging, etc.) is also up to you and
+the skills' own activation conditions. The hook does not push any specific skill.
 
 Original task prompt:
 {prompt}
@@ -549,9 +550,9 @@ def default_spec_refinement_prompt(spec_markdown: str, spec_done_keyword: str) -
 
 def default_spec_refinment_gate_prompt(spec_markdown: str, spec_done_keyword: str) -> str:
     return (
-        f"Use {REFINMENT_SKILL} to tighten the specification draft yourself. "
-        "Decide whether the draft is implementation-ready, then revise it in place. "
-        "Preserve scope, constraints, acceptance criteria, and concrete implementation steps. "
+        "Decide whether the specification draft below is implementation-ready, "
+        "then revise it in place. Preserve scope, constraints, acceptance criteria, "
+        "and concrete implementation steps. "
         f"If the spec is ready, return the revised spec with {spec_done_keyword} on its own line. "
         f"If it is not ready, return a tighter draft without {spec_done_keyword}. "
         "Do not start code changes in this response.\n\n"
@@ -567,7 +568,6 @@ def default_implementation_start_prompt(
     lines = [
         "Start implementation from the approved specification below.",
         "Work step by step, keep the implementation aligned to the spec, and report concrete progress.",
-        f"At material stop boundaries, use {REFINMENT_SKILL} when you need a tighter next-step brief or a clearer decision on whether verification should begin.",
         f"When implementation is ready for verification, emit {implementation_done_keyword} on its own line or include a fenced JSON object with phase_signal set to verification_ready and a short summary.",
     ]
     if implementation_brief:
@@ -584,8 +584,7 @@ def default_verification_start_prompt(
 ) -> str:
     return (
         "Implementation appears complete enough to begin verification.\n"
-        f"Do not stop yet. Before deciding completion, use {REFINMENT_SKILL} to tighten the verification brief. "
-        "Then run the most relevant tests or verification checks, inspect the diff, "
+        "Do not stop yet. Run the most relevant tests or verification checks, inspect the diff, "
         "and perform a focused self-review against the approved specification.\n"
         "If verification finds only a narrow factual omission or recommendation change, do not restate the whole earlier answer. "
         "Respond with the delta only: the corrected point, why it matters, and the revised conclusion.\n"
@@ -606,26 +605,13 @@ def self_workflow_prompt_context(phase: str, spec_markdown: str, implementation_
     ]
     if phase == "spec_authoring":
         lines.extend(["", "Current phase: specification authoring and refinement."])
-        lines.extend(
-            [
-                f"- Use {REFINMENT_SKILL} only when the task prompt or current draft would materially benefit from one tighter working brief.",
-                f"- When you use {REFINMENT_SKILL} on a new task prompt, show the refined prompt to the user before continuing.",
-            ]
-        )
     elif phase == "spec_review":
-        lines.extend(["", "Current phase: specification refinment and revision."])
-        lines.extend(
-            [
-                f"- Use {REFINMENT_SKILL} now to decide whether the draft is implementation-ready and to tighten it if needed.",
-                "- Revise the spec yourself after the refinment pass; do not start code changes until the spec is ready.",
-            ]
-        )
+        lines.extend(["", "Current phase: specification revision."])
+        lines.append("- Revise the spec yourself; do not start code changes until the spec is ready.")
     elif phase == "implementation":
         lines.extend(["", "Current phase: implementation."])
-        lines.append(f"- At material stop boundaries, use {REFINMENT_SKILL} to decide the next concrete implementation step or whether verification should begin.")
     elif phase == "verification":
         lines.extend(["", "Current phase: verification and self-review."])
-        lines.append(f"- Use {REFINMENT_SKILL} to tighten the completion brief before deciding whether verification is truly complete.")
     lines.extend(["", "Specification:", spec_markdown])
     if implementation_brief:
         lines.extend(["", "Implementation brief:", implementation_brief])
@@ -640,22 +626,17 @@ def default_implementation_continue_prompt(
     implementation_done_keyword: str,
 ) -> str:
     lines = [
-        f"Use {REFINMENT_SKILL} on the latest implementation state.",
         "Decide whether one more concrete implementation step is needed or whether the task is ready for verification.",
-        "After the refinment pass, act on it yourself in the same turn.",
+        "Act on that decision yourself in the same turn.",
+        f"If implementation is ready for verification, emit {implementation_done_keyword} on its own line or include a fenced JSON object with `phase_signal` set to `verification_ready`.",
+        "If more work remains, do the next concrete implementation step now instead of only summarizing it.",
+        "",
+        "Approved specification:",
+        spec_markdown,
+        "",
+        "Latest implementation response:",
+        clip_text(response),
     ]
-    lines.extend(
-        [
-            f"If implementation is ready for verification, emit {implementation_done_keyword} on its own line or include a fenced JSON object with `phase_signal` set to `verification_ready`.",
-            "If more work remains, do the next concrete implementation step now instead of only summarizing it.",
-            "",
-            "Approved specification:",
-            spec_markdown,
-            "",
-            "Latest implementation response:",
-            clip_text(response),
-        ]
-    )
     return "\n".join(lines)
 
 
@@ -674,7 +655,6 @@ def default_verification_continue_prompt(
             "Do not restate unchanged background.\n"
         )
     return (
-        f"Use {REFINMENT_SKILL} on the verification state. "
         "Decide whether any meaningful verification, diff inspection, or self-review work is still missing. "
         "Then perform the smallest missing verification or fix yourself in the same turn.\n"
         f"{delta_guidance}"
@@ -749,7 +729,7 @@ def build_continue_decision(state: dict[str, Any], _data: dict[str, Any], respon
         response,
         implementation_done_keyword,
     )
-    note = f"Skill-driven implementation refinment requested via {REFINMENT_SKILL}."
+    note = "Implementation continuation requested by the self-workflow state."
     return apply_continuation_safety(state, next_prompt, note)
 
 
@@ -802,7 +782,7 @@ def build_verification_decision(
     return apply_continuation_safety(
         state,
         next_prompt,
-        f"Skill-driven verification refinment requested via {REFINMENT_SKILL}.",
+        "Verification continuation requested by the self-workflow state.",
     )
 
 
@@ -978,9 +958,9 @@ def handle_stop(current: str, data: dict[str, Any], state: dict[str, Any], path:
                 "continue": True,
                 "prompt": default_spec_refinment_gate_prompt(response, spec_done_keyword),
                 "note": (
-                    f"Skill-driven specification refinment requested via {REFINMENT_SKILL}."
+                    "Specification draft ready; continuing into refinement."
                     if spec_ready
-                    else f"Structured specification draft qualified for refinment via {REFINMENT_SKILL}."
+                    else "Specification draft qualified for fallback review."
                 ),
             }
         )
@@ -1021,7 +1001,7 @@ def handle_stop(current: str, data: dict[str, Any], state: dict[str, Any], path:
             {
                 "continue": True,
                 "prompt": default_spec_refinement_prompt(response, spec_done_keyword),
-                "note": f"Specification still needs refinment. Continuing specification work after {REFINMENT_SKILL}.",
+                "note": "Specification still needs refinement. Continuing specification work.",
             }
         )
 

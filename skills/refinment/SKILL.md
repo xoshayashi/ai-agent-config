@@ -35,7 +35,6 @@ Use this skill to tighten a working prompt or phase brief before acting, while k
 - A spec draft needs one internal readiness pass before implementation starts.
 - An implementation stop boundary needs a sharper next-step brief or a clearer verification-ready decision.
 - A verification stop boundary needs a tighter completion brief before deciding whether the task is done.
-- The self-workflow context explicitly suggests using `$refinment` now.
 
 ## Do Not Use When
 
