@@ -1,17 +1,5 @@
 {
   "hooks": {
-    "SessionStart": [
-      {
-        "_ai_agent_config_managed": true,
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${AI_AGENT_COPILOT_HOME:-$HOME/.copilot}/hooks/scripts/subprocess_check.py\" --current copilot",
-            "timeout": 200
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "_ai_agent_config_managed": true,
@@ -26,18 +14,6 @@
       }
     ],
     "Stop": [
-      {
-        "_ai_agent_config_managed": true,
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${AI_AGENT_COPILOT_HOME:-$HOME/.copilot}/hooks/scripts/subprocess_check.py\" --current copilot",
-            "timeout": 200
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
       {
         "_ai_agent_config_managed": true,
         "hooks": [

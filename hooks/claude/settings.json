@@ -25,18 +25,6 @@
         ]
       }
     ],
-    "UserPromptSubmit": [
-      {
-        "_ai_agent_config_managed": true,
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}/hooks/scripts/subprocess_check.py\" --current claude",
-            "timeout": 200
-          }
-        ]
-      }
-    ],
     "SubagentStop": [
       {
         "_ai_agent_config_managed": true,

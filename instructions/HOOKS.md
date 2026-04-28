@@ -4,18 +4,23 @@ This document defines the shared self-check Hook behavior for this repository.
 
 ## Same-CLI Subprocess Check
 
-The Hook installed by this repository is **opt-in and advisory**. It does not
-push any specific skill on the CLI, and it does not enforce a spec-first
-lifecycle. Its only job is to ask the **same CLI in non-interactive
-subprocess mode** for the next concrete step (or a completion signal) at hook
-boundaries, and surface that subprocess output to the main session.
+The Hook installed by this repository is **opt-in and advisory**. It runs only
+at *post-work* hook events — never at prompt-submit / session-start time — and
+asks the **same CLI in non-interactive subprocess mode** to review the main
+session's latest response and decide whether more work is needed.
+
+This scope was deliberately narrowed: pre-work advisor calls
+(UserPromptSubmit / SessionStart / BeforeAgent) imposed visible latency on
+every prompt while returning no usable output ~85% of the time. The main
+session is fully capable of deciding the first step on its own, so the
+advisor adds value only as a post-execution review.
 
 The hook script is `hooks/scripts/subprocess_check.py`. It is shared across:
 
-- Codex (uses `codex exec --json -`)
-- Claude Code (uses `claude -p --output-format json`)
-- Gemini CLI (uses `gemini -p`)
-- GitHub Copilot CLI (uses `copilot -p -s --no-ask-user`)
+- Codex (uses `codex exec --json -`, fires on `Stop`)
+- Claude Code (uses `claude -p --output-format json`, fires on `Stop` and `SubagentStop`)
+- Gemini CLI (uses `gemini -p`, fires on `AfterAgent`)
+- GitHub Copilot CLI (uses `copilot -p -s --no-ask-user`, fires on `Stop`)
 
 The subprocess inherits the user's environment, so any installed skills
 (refinment, brainstorming, debugging, and others) activate via each skill's own
@@ -26,13 +31,12 @@ name.
 
 ```
 [main CLI]
-    ↓ Hook event (UserPromptSubmit / Stop / ...)
+    ↓ Post-work hook event (Stop / SubagentStop / AfterAgent)
 [hook: subprocess_check.py]
     ↓ lightweight Python gate
-       - skip if disabled, completed, hard cap reached
-       - skip Stop-style events whose response is short / answer-only / contains
-         `[[TASK_DONE]]`
-    ↓ build small advisor prompt (event + original task + last response)
+       - skip if disabled, already completed, hard cap reached
+       - skip if response is short, answer-only, or contains `[[TASK_DONE]]`
+    ↓ build small advisor prompt (event + last response)
 [same-CLI subprocess]
     ↓ runs as a one-shot, non-interactive turn with
       AI_AGENT_SELF_WORKFLOW_ACTIVE=1 set so its own hook is suppressed
@@ -42,6 +46,7 @@ name.
 [hook]
     ↓ if `STATUS: complete`: stop, mark task complete in state
     ↓ if instruction: return it as a continuation prompt to the main session
+    ↓ if empty: silently log and yield control back to the main session
 ```
 
 The subprocess's reply is passed back as the continuation prompt verbatim. It
@@ -67,7 +72,7 @@ There are no other completion keywords. The previous `[[SPEC_DONE]]`,
 |---|---|---|
 | Per-task subprocess call cap | 8 | `AI_AGENT_SUBPROCESS_CHECK_MAX` |
 | Subprocess timeout (seconds) | 180 | `AI_AGENT_SUBPROCESS_CHECK_TIMEOUT` |
-| Min response length to consider a Stop event substantive | 200 chars | `AI_AGENT_SUBPROCESS_CHECK_MIN_OUTPUT` |
+| Min response length to consider a post-work event substantive | 200 chars | `AI_AGENT_SUBPROCESS_CHECK_MIN_OUTPUT` |
 | Recursion guard for nested subprocess calls | always on | `AI_AGENT_SELF_WORKFLOW_ACTIVE=1` (set automatically) |
 | Off switch | enabled | `AI_AGENT_SUBPROCESS_CHECK=0` disables the hook entirely |
 
@@ -78,8 +83,7 @@ returns no continuation. The main session keeps control.
 
 State and audit log live under `${AI_AGENT_STATE_DIR:-$HOME/.ai-agent-config}/subprocess-check/`:
 
-- `<session_id>.json` — per-session counters (`calls_used`, `completed`,
-  `original_prompt`).
+- `<session_id>.json` — per-session counters (`calls_used`, `completed`).
 - `decisions.jsonl` — newline-delimited JSON of every hook decision (skip /
   instruction / complete / empty), useful for debugging or auditing the
   advisor's behavior after the fact.
@@ -89,6 +93,9 @@ is no phase machine to keep in sync.
 
 ## What the Hook Does Not Do
 
+- It does not run on prompt-submit or session-start events. Pre-work advisor
+  calls were removed because the main session is already capable of choosing
+  the first step, and those calls returned no usable output ~85% of the time.
 - It does not push the use of any skill (refinment, brainstorming, etc.). The
   subprocess decides what skills, if any, to invoke based on each skill's own
   activation conditions.
@@ -98,6 +105,8 @@ is no phase machine to keep in sync.
   longer part of this design.
 - It does not call other LLMs or external reviewer subprocesses. The
   subprocess is the **same CLI** running in non-interactive mode.
+- It does not surface a warning when the subprocess returns empty output. The
+  empty result is logged for audit and the main session continues silently.
 
 ## Human-in-the-loop
 

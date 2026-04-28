@@ -54,7 +54,7 @@ def with_env(updates: dict[str, str | None], fn):
 # ── Recursion guard / event filtering ────────────────────────────────────────
 
 def test_should_skip_event_on_recursion_guard() -> None:
-    data = {"hook_event_name": "UserPromptSubmit"}
+    data = {"hook_event_name": "Stop"}
     assert SC.should_skip_event("codex", data) is False
 
     def _run() -> None:
@@ -64,7 +64,10 @@ def test_should_skip_event_on_recursion_guard() -> None:
 
 
 def test_should_skip_event_on_unsupported_event() -> None:
+    # Pre-work events are not supported; only post-work events fire the advisor.
+    assert SC.should_skip_event("claude", {"hook_event_name": "UserPromptSubmit"}) is True
     assert SC.should_skip_event("claude", {"hook_event_name": "BeforeAgent"}) is True
+    assert SC.should_skip_event("codex", {"hook_event_name": "SessionStart"}) is True
     assert SC.should_skip_event("claude", {"hook_event_name": "Stop"}) is False
 
 
@@ -74,7 +77,15 @@ def test_supported_events_cover_all_four_clis() -> None:
     assert "gemini" in SC.SUPPORTED_EVENTS
     assert "copilot" in SC.SUPPORTED_EVENTS
     assert "Stop" in SC.SUPPORTED_EVENTS["copilot"]
+    assert "Stop" in SC.SUPPORTED_EVENTS["codex"]
+    assert "Stop" in SC.SUPPORTED_EVENTS["claude"]
+    assert "SubagentStop" in SC.SUPPORTED_EVENTS["claude"]
     assert "AfterAgent" in SC.SUPPORTED_EVENTS["gemini"]
+    # Pre-work events are intentionally absent
+    for cli in ("codex", "claude", "gemini", "copilot"):
+        assert "UserPromptSubmit" not in SC.SUPPORTED_EVENTS[cli]
+        assert "SessionStart" not in SC.SUPPORTED_EVENTS[cli]
+        assert "BeforeAgent" not in SC.SUPPORTED_EVENTS[cli]
 
 
 # ── Lightweight gate ─────────────────────────────────────────────────────────
@@ -140,9 +151,12 @@ def test_gate_allows_substantive_execution_response() -> None:
     assert skip is False, f"unexpected skip: {reason}"
 
 
-def test_gate_does_not_filter_on_user_prompt_submit() -> None:
-    skip, _ = SC.should_skip_subprocess({}, "UserPromptSubmit", "fix the bug")
-    assert skip is False
+def test_gate_filters_short_responses_on_all_post_work_events() -> None:
+    # All supported events are post-work; the same response gate applies.
+    for event in ("Stop", "SubagentStop", "AfterAgent"):
+        skip, reason = SC.should_skip_subprocess({}, event, "ok")
+        assert skip is True, f"{event} should skip on short response"
+        assert "min_output" in reason
 
 
 # ── Subprocess command builder ───────────────────────────────────────────────
@@ -328,31 +342,27 @@ def test_stop_continuation_output_for_gemini_denies() -> None:
     assert_eq(payload["decision"], "deny", "gemini continuation decision")
 
 
-def test_context_output_uses_correct_shape_per_cli() -> None:
-    claude_payload = SC.context_output("claude", "UserPromptSubmit", "ctx")
-    gemini_payload = SC.context_output("gemini", "BeforeAgent", "ctx")
-    copilot_payload = SC.context_output("copilot", "UserPromptSubmit", "ctx")
-    assert_eq(claude_payload["hookSpecificOutput"]["hookEventName"], "UserPromptSubmit", "claude wraps with event")
-    assert_eq(gemini_payload["hookSpecificOutput"]["additionalContext"], "ctx", "gemini context")
-    assert_eq(copilot_payload["additionalContext"], "ctx", "copilot context flat")
-
-
 # ── Build subprocess prompt ──────────────────────────────────────────────────
 
 def test_build_subprocess_prompt_is_skill_neutral() -> None:
-    text = SC.build_subprocess_prompt("Stop", "do X", "main session output")
+    text = SC.build_subprocess_prompt("Stop", "main session output describing the work")
     assert "STATUS: complete" in text
-    assert "main session output" in text
-    assert "do X" in text
+    assert "main session output describing the work" in text
     # Skill-neutral: must not push any specific skill
     assert "$refinment" not in text
     assert "Use $refinment" not in text
 
 
 def test_build_subprocess_prompt_preserves_event_context() -> None:
-    text = SC.build_subprocess_prompt("UserPromptSubmit", "build feature", "")
-    assert "UserPromptSubmit" in text
-    assert "build feature" in text
+    text = SC.build_subprocess_prompt("SubagentStop", "subagent finished editing files")
+    assert "SubagentStop" in text
+    assert "subagent finished" in text
+
+
+def test_build_subprocess_prompt_handles_empty_response() -> None:
+    text = SC.build_subprocess_prompt("Stop", "")
+    assert "Stop" in text
+    assert "(empty)" in text
 
 
 # ── handle_event integration ─────────────────────────────────────────────────
@@ -474,23 +484,28 @@ def test_handle_event_increments_calls_used_until_cap() -> None:
     with_env({"AI_AGENT_SUBPROCESS_CHECK_MAX": "2"}, lambda: with_state_dir(_run))
 
 
-def test_handle_event_bootstraps_state_on_user_prompt_submit() -> None:
+def test_handle_event_returns_empty_silently_on_unusable_subprocess_output() -> None:
+    """If the subprocess returns nothing usable, the hook must not surface a
+    warning to the main session — only audit log records the event."""
+
     def fake_call(current, prompt):
-        return "Run the tests next."
+        return ""
 
     def _run() -> None:
+        substantive = (
+            "I edited hooks/scripts/x.py and ran the tests. "
+            "Created tests/test_x.py with extra coverage."
+        ) * 5
         with mock.patch.object(SC, "call_subprocess", side_effect=fake_call):
             result = SC.handle_event(
-                "codex",
+                "claude",
                 {
-                    "hook_event_name": "UserPromptSubmit",
-                    "session_id": "fresh",
-                    "prompt": "Implement feature X",
+                    "hook_event_name": "Stop",
+                    "session_id": "empty-out",
+                    "response": substantive,
                 },
             )
-        assert "Run the tests next." in str(
-            result.get("hookSpecificOutput", {}).get("additionalContext", "")
-        )
+        assert_eq(result, {}, "empty subprocess output must yield silent return")
 
     with_state_dir(_run)
 
@@ -542,7 +557,7 @@ def run_tests() -> int:
         test_gate_blocks_task_done_shortcut,
         test_gate_blocks_answer_only_response,
         test_gate_allows_substantive_execution_response,
-        test_gate_does_not_filter_on_user_prompt_submit,
+        test_gate_filters_short_responses_on_all_post_work_events,
         test_subprocess_commands_present_for_all_clis,
         test_subprocess_commands_match_expected_invocations,
         test_call_subprocess_returns_none_when_binary_missing,
@@ -560,15 +575,15 @@ def run_tests() -> int:
         test_parse_subprocess_output_returns_empty_when_parser_fails_to_avoid_raw_leak,
         test_stop_continuation_output_for_claude_blocks,
         test_stop_continuation_output_for_gemini_denies,
-        test_context_output_uses_correct_shape_per_cli,
         test_build_subprocess_prompt_is_skill_neutral,
         test_build_subprocess_prompt_preserves_event_context,
+        test_build_subprocess_prompt_handles_empty_response,
         test_handle_event_skips_when_disabled,
         test_handle_event_skips_short_stop_response_without_calling_subprocess,
         test_handle_event_invokes_subprocess_and_returns_continuation,
         test_handle_event_marks_complete_on_status_marker,
         test_handle_event_increments_calls_used_until_cap,
-        test_handle_event_bootstraps_state_on_user_prompt_submit,
+        test_handle_event_returns_empty_silently_on_unusable_subprocess_output,
         test_state_round_trip,
         test_state_root_uses_ai_agent_state_dir,
         test_decision_log_appends_jsonl,

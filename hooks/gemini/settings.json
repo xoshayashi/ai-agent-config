@@ -29,21 +29,6 @@
           }
         ]
       }
-    ],
-    "BeforeAgent": [
-      {
-        "_ai_agent_config_managed": true,
-        "matcher": "*",
-        "hooks": [
-          {
-            "name": "ai-agent-config-subprocess-check-brief",
-            "type": "command",
-            "command": "python3 \"${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}/hooks/scripts/subprocess_check.py\" --current gemini",
-            "timeout": 200000,
-            "description": "Ask the same-CLI subprocess advisor to plan the first concrete step."
-          }
-        ]
-      }
     ]
   }
 }

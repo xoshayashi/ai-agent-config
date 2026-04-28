@@ -1,18 +1,5 @@
 {
   "hooks": {
-    "SessionStart": [
-      {
-        "_ai_agent_config_managed": true,
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${AI_AGENT_CODEX_HOME:-$HOME/.codex}/hooks/scripts/subprocess_check.py\" --current codex",
-            "timeout": 200,
-            "statusMessage": "Resuming subprocess-check state"
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "_ai_agent_config_managed": true,
@@ -36,19 +23,6 @@
             "command": "python3 \"${AI_AGENT_CODEX_HOME:-$HOME/.codex}/hooks/scripts/subprocess_check.py\" --current codex",
             "timeout": 200,
             "statusMessage": "Asking subprocess advisor for next step"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "_ai_agent_config_managed": true,
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${AI_AGENT_CODEX_HOME:-$HOME/.codex}/hooks/scripts/subprocess_check.py\" --current codex",
-            "timeout": 200,
-            "statusMessage": "Asking subprocess advisor to plan first step"
           }
         ]
       }

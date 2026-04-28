@@ -1,14 +1,19 @@
 #!/usr/bin/env python3
 """Subprocess-based self-check hook for Codex, Claude Code, Gemini CLI, and Copilot CLI.
 
-Each Hook event spawns the same CLI in non-interactive mode. The subprocess
-reads a small context packet on its stdin (or as a flag argument) and returns
-either the next instruction or `STATUS: complete` to stop. The main session
-applies the returned text as a continuation prompt.
+The advisor runs only at *post-work* hook events (Stop / SubagentStop /
+AfterAgent). It reviews the main session's latest response and either returns
+a concrete next-step instruction or `STATUS: complete` to stop.
+
+Pre-work hook events (UserPromptSubmit / SessionStart / BeforeAgent) are
+intentionally NOT supported: empirically those calls returned no usable output
+~85% of the time while still imposing visible latency on every prompt
+submission. The main session is fully capable of deciding the first step on
+its own; the advisor adds value only as a post-execution review.
 
 Design:
-- No phase state machine. The main session decides shape; the subprocess decides
-  the next concrete step.
+- No phase state machine. The main session decides shape; the subprocess
+  decides whether more work is needed after it stops.
 - Skill activation (refinment, brainstorming, etc.) happens inside the
   subprocess via each skill's own activation conditions.
 - Python keeps only: a lightweight gate, a per-task call counter, a recursion
@@ -32,10 +37,10 @@ from typing import Any
 # ── Supported events per CLI ─────────────────────────────────────────────────
 
 SUPPORTED_EVENTS: dict[str, set[str]] = {
-    "codex":   {"SessionStart", "UserPromptSubmit", "Stop"},
-    "claude":  {"UserPromptSubmit", "Stop", "SubagentStop"},
-    "gemini":  {"BeforeAgent", "AfterAgent"},
-    "copilot": {"SessionStart", "UserPromptSubmit", "Stop"},
+    "codex":   {"Stop"},
+    "claude":  {"Stop", "SubagentStop"},
+    "gemini":  {"AfterAgent"},
+    "copilot": {"Stop"},
 }
 
 # ── Subprocess command per CLI ───────────────────────────────────────────────
@@ -57,7 +62,6 @@ DEFAULT_MAX_CALLS = 8
 DEFAULT_TIMEOUT_SEC = 180
 DEFAULT_MIN_OUTPUT_CHARS = 200
 DEFAULT_PROMPT_BODY_CHARS = 8000
-DEFAULT_ORIGINAL_PROMPT_CHARS = 4000
 
 COMPLETE_MARKER = "STATUS: complete"
 EARLY_EXIT_PATTERN = re.compile(r"(?m)^\s*\[\[TASK_DONE\]\]\s*$")
@@ -178,11 +182,6 @@ def session_id_from(data: dict[str, Any]) -> str:
     return "default"
 
 
-def prompt_from(data: dict[str, Any]) -> str:
-    value = data.get("prompt")
-    return value if isinstance(value, str) else ""
-
-
 def response_from(data: dict[str, Any]) -> str:
     for key in ("prompt_response", "last_assistant_message", "response"):
         value = data.get(key)
@@ -223,7 +222,11 @@ def looks_like_answer_only(text: str) -> bool:
 
 
 def should_skip_subprocess(state: dict[str, Any], event: str, response: str) -> tuple[bool, str]:
-    """Return (skip, reason)."""
+    """Return (skip, reason).
+
+    All supported events are post-work (Stop / SubagentStop / AfterAgent),
+    so the gate always applies the response-based filters.
+    """
     if is_disabled():
         return True, "AI_AGENT_SUBPROCESS_CHECK=0"
 
@@ -234,37 +237,20 @@ def should_skip_subprocess(state: dict[str, Any], event: str, response: str) -> 
     if used >= max_calls():
         return True, f"hard cap {max_calls()} reached"
 
-    # Stop-style events: filter trivial / no-action responses
-    stop_events = {"Stop", "SubagentStop", "AfterAgent"}
-    if event in stop_events:
-        if EARLY_EXIT_PATTERN.search(response):
-            return True, "[[TASK_DONE]] shortcut from main session"
-        if len(response.strip()) < min_output_chars():
-            return True, "response shorter than min_output threshold"
-        if looks_like_answer_only(response):
-            return True, "looks like an answer-only turn"
+    if EARLY_EXIT_PATTERN.search(response):
+        return True, "[[TASK_DONE]] shortcut from main session"
+    if len(response.strip()) < min_output_chars():
+        return True, "response shorter than min_output threshold"
+    if looks_like_answer_only(response):
+        return True, "looks like an answer-only turn"
 
     return False, ""
 
 
 # ── Subprocess invocation ────────────────────────────────────────────────────
 
-def build_subprocess_prompt(event: str, original_prompt: str, response: str) -> str:
+def build_subprocess_prompt(event: str, response: str) -> str:
     intent = {
-        "UserPromptSubmit": (
-            "Decide the smallest first concrete step the main session should take "
-            "for the user's task. If the task is trivially complete, reply with "
-            f"`{COMPLETE_MARKER}` on the first line."
-        ),
-        "BeforeAgent": (
-            "Decide the smallest first concrete step the main session should take "
-            "for the user's task. If the task is trivially complete, reply with "
-            f"`{COMPLETE_MARKER}` on the first line."
-        ),
-        "SessionStart": (
-            "Resume context. Do not invent new work; only suggest the smallest next "
-            f"concrete step that fits the prior session. If nothing remains, reply with `{COMPLETE_MARKER}`."
-        ),
         "Stop": (
             "Read the main session's latest response and decide the smallest next "
             "concrete step. If the task is fully complete, reply with "
@@ -292,17 +278,9 @@ def build_subprocess_prompt(event: str, original_prompt: str, response: str) -> 
         f"Event: {event}",
         f"Intent: {intent}",
         "",
-        "Original user task:",
-        clip(original_prompt or "(unknown)", DEFAULT_ORIGINAL_PROMPT_CHARS),
+        "Most recent main-session response:",
+        clip(response or "(empty)", DEFAULT_PROMPT_BODY_CHARS),
     ]
-    if response.strip():
-        body.extend(
-            [
-                "",
-                "Most recent main-session response:",
-                clip(response, DEFAULT_PROMPT_BODY_CHARS),
-            ]
-        )
     return "\n".join(body)
 
 
@@ -474,14 +452,6 @@ def stop_continuation_output(current: str, instruction: str, note: str) -> dict[
     return payload
 
 
-def context_output(current: str, event: str, context: str) -> dict[str, Any]:
-    if current == "gemini":
-        return {"hookSpecificOutput": {"additionalContext": context}}
-    if current == "copilot":
-        return {"additionalContext": context}
-    return {"hookSpecificOutput": {"hookEventName": event, "additionalContext": context}}
-
-
 # ── Event dispatch ───────────────────────────────────────────────────────────
 
 def handle_event(current: str, data: dict[str, Any]) -> dict[str, Any]:
@@ -491,14 +461,6 @@ def handle_event(current: str, data: dict[str, Any]) -> dict[str, Any]:
     state = load_state(path)
 
     response = response_from(data)
-    user_prompt = prompt_from(data)
-    original_prompt = state.get("original_prompt") or user_prompt
-
-    # Track the original user prompt the first time we see it.
-    if event in {"UserPromptSubmit", "BeforeAgent"} and user_prompt and not state.get("original_prompt"):
-        state["original_prompt"] = user_prompt
-        state.setdefault("calls_used", 0)
-        state.setdefault("completed", False)
 
     skip, reason = should_skip_subprocess(state, event, response)
     if skip:
@@ -507,16 +469,20 @@ def handle_event(current: str, data: dict[str, Any]) -> dict[str, Any]:
             save_state(path, state)
         return {}
 
-    advisor_prompt = build_subprocess_prompt(event, original_prompt, response)
+    advisor_prompt = build_subprocess_prompt(event, response)
     raw = call_subprocess(current, advisor_prompt)
     state["calls_used"] = int(state.get("calls_used", 0) or 0) + 1
+    state.setdefault("completed", False)
 
     kind, text = parse_subprocess_output(current, raw)
 
     if kind == "empty":
         save_state(path, state)
         log_decision(session_id, event, "empty", "")
-        return {"systemMessage": "subprocess-check: subprocess returned no usable output. Waiting for user."}
+        # Silent on empty: surfacing a warning here only adds noise to the
+        # main session after a wasted advisor call. The audit log keeps the
+        # record for debugging.
+        return {}
 
     if kind == "complete":
         state["completed"] = True
@@ -526,9 +492,6 @@ def handle_event(current: str, data: dict[str, Any]) -> dict[str, Any]:
 
     save_state(path, state)
     log_decision(session_id, event, "instruction", text[:200])
-
-    if event in {"UserPromptSubmit", "BeforeAgent", "SessionStart"}:
-        return context_output(current, event, text)
 
     return stop_continuation_output(current, text, f"continuation #{state['calls_used']}")
 
