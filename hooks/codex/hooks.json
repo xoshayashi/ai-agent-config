@@ -6,9 +6,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-0}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/multillm_orchestrator.py\" --current codex'",
+            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current codex",
             "timeout": 25,
-            "statusMessage": "Loading orchestration state"
+            "statusMessage": "Loading self-workflow state"
           }
         ]
       }
@@ -33,15 +33,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-0}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/multillm_orchestrator.py\" --current codex'",
-            "timeout": 150,
-            "statusMessage": "Running multi-LLM orchestration"
-          },
-          {
-            "type": "command",
-            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-0}\" = \"1\" ] && exit 0; [ \"${AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY:-0}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/response_strategy_bridge.py\" --current codex'",
+            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current codex",
             "timeout": 50,
-            "statusMessage": "Evaluating response strategy"
+            "statusMessage": "Evaluating self-workflow continuation"
           }
         ]
       }
@@ -52,9 +46,9 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-0}\" = \"1\" ] || exit 0; exec python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/multillm_orchestrator.py\" --current codex'",
+            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current codex",
             "timeout": 60,
-            "statusMessage": "Preparing Codex orchestration"
+            "statusMessage": "Preparing self-workflow brief"
           }
         ]
       }

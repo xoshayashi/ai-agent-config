@@ -203,6 +203,7 @@ def test_merge_json_no_duplicate_when_destination_lacks_marker() -> None:
         result = read_json(dst)
         groups = result["hooks"]["PreToolUse"]
         assert len(groups) == 1, f"legacy managed group should not duplicate: {groups}"
+        assert groups[0].get("_llm_config_managed") is True, "legacy group should be upgraded to explicit marker"
 
 
 def test_merge_json_pops_empty_event() -> None:

@@ -2,43 +2,41 @@
 
 ## 結論
 
-旧構成（project + user の二重配布）は、重複実行と設定競合を起こしやすいため、次の単純構成に変更しました。
+旧構成（project + user の二重配布）と旧 multi-LLM continuation 案は、
+重複実行・責務分散・待ち時間増加を起こしやすいため、次の単純構成に
+整理しました。
 
 - **配布先はグローバルのみ**（`~/.claude`, `~/.codex`, `~/.gemini`）
-- **デフォルト有効 Hook は安全ガードのみ**（`safe_delete_guard.py`）
-- Hook ロジック本体はリポジトリ管理し、`$AI_AGENT_HOOKS_RUNTIME_LINK` から参照
+- **常時ガードは安全系を優先**（`safe_delete_guard.py`）
+- **自己完結フローは `self_workflow.py` に一本化**
+- **Hook ロジック本体はリポジトリ管理し、`$AI_AGENT_HOOKS_RUNTIME_LINK` から参照**
 
-## 旧構成の主なリスク
+## なぜこの形にしたか
 
-1. **重複実行リスク（Codex）**  
-   Codex は複数ソースの Hook を併用するため、project と user の両方に同種 Hook があると二重実行される。
+1. **重複実行を減らすため**
+   Hook の管理レイヤーを 1 つに固定し、project/user の多重登録を避ける。
+2. **責任の所在を明確にするため**
+   作業を始めた CLI 自身が仕様、実装、検証まで継続する。
+3. **待ち時間を抑えるため**
+   外部 reviewer subprocess を main path から外し、必要時だけ
+   `refinment` で brief を締める。
 
-2. **遅延リスク（Gemini CLI）**  
-   Hook は同期実行で、マッチした Hook の完了待ちが発生するため、頻繁イベントへの重い Hook は対話速度を落とす。
+## 現行構成
 
-3. **運用競合リスク（全 CLI）**  
-   プロジェクト配下の設定ファイルはチーム差分・ブランチ差分の影響を受けやすく、PRコンフリクト要因になる。
+- `safe_delete_guard.py`: 永続削除の防止
+- `self_workflow.py`: spec -> implementation -> verification の phase loop
+- `skills/refinment`: startup / phase boundary の brief tightening
 
-## 新構成での回避策
-
-- 管理対象をユーザーグローバル設定に限定して、管理レイヤーを1つに固定
-- 既存 `settings.json` / `config.toml` は置換せず managed 部分のみ append/merge
-- 高負荷になりやすい prompt refinement は Hook ではなく Skill 側に寄せ、グローバル Hook 競合を避ける
+この構成は Codex, Claude Code, Gemini CLI で共通です。違いは Hook event
+名だけで、ライフサイクル自体は `instructions/HOOKS.md` に揃えています。
 
 ## 残るトレードオフ
 
-- プロジェクト固有 Hook を別途運用する場合、手動で役割分担（global は安全系、project は業務固有）を明確化する必要がある
-- 完全な一元統制が必要な組織では、OS 管理ポリシーや managed settings との併用設計が必要
+- project 固有 Hook を別途運用するなら、global は安全系・共通系、
+  project は業務固有、という役割分担を明示する必要がある
+- 完全な一元統制が必要な環境では、OS 管理ポリシーや managed settings
+  との併用設計が必要
 
-## 追補（2026-04 Response Strategy）
+## 参照
 
-回答完了タイミングの自律継続検証として、以下を追加しました。
-
-- `multillm_orchestrator.py`（Codex `SessionStart` / `UserPromptSubmit` / `Stop`）
-- Claude/Codex: `Stop` イベントで発火
-- Gemini: `AfterAgent` イベントで発火
-- 既定は `AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=0`（無効）、`AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY=0`（無効）
-
-現行の `multillm_orchestrator.py` は、旧来の `Claude -> Gemini -> Claude` 仕様ループではなく、**Codex が先に仕様を書き、Claude が stop 境界でレビューし、Gemini は実装中の periodic critic に回る** 形へ簡略化しています。
-
-設計詳細は [docs/codex-hub-orchestration.md](./codex-hub-orchestration.md) と [docs/response-strategy-autonomy.md](./response-strategy-autonomy.md) を参照してください。
+- 現行設計: [self-workflow-hooks.md](./self-workflow-hooks.md)

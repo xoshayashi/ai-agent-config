@@ -342,11 +342,31 @@ install_instruction_links() {
 
 install_skills_to_dir() {
   dst_root=$(abs_dir "$1")
+  retire_legacy_skill_links_in_dir "$dst_root"
   for skill in "$config_home"/skills/*; do
     [ -d "$skill" ] || continue
     [ -f "$skill/SKILL.md" ] || continue
     name=$(basename "$skill")
     install_link "$skill" "$dst_root/$name"
+  done
+}
+
+retire_legacy_skill_links_in_dir() {
+  dst_root=$1
+  for legacy_name in peer-prompt-refinement peer-orchestration-review; do
+    legacy_path="$dst_root/$legacy_name"
+    [ -L "$legacy_path" ] || continue
+    current=$(readlink "$legacy_path" || printf '')
+    case "$current" in
+      "$config_home"/skills/*|"$config_home"/skills)
+        say "retire: $legacy_path"
+        if [ "$dry_run" = "1" ]; then
+          warn "would retire legacy skill link: $legacy_path"
+        else
+          backup_existing "$legacy_path"
+        fi
+        ;;
+    esac
   done
 }
 
@@ -413,7 +433,7 @@ say "codex home: $codex_home"
 say "claude home: $claude_home"
 say "gemini home: $gemini_home"
 if [ "$install_hooks" = "1" ]; then
-  say "note: Codex multi-LLM orchestration Hook is installed but disabled by default. Enable it only when needed with AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1."
+  say "note: Self-workflow Hooks are installed in same-LLM mode. Qualifying tasks activate automatically without a feature flag."
 fi
 
 if [ "$install_instructions" = "1" ]; then

@@ -154,13 +154,13 @@ shell rc から marker block を削除し、シンボリックリンクを `tras
 - 管理レイヤーは **ユーザーグローバル1層**に統一（`~/.claude`, `~/.codex`, `~/.gemini`）
 - プロジェクト層への自動 Hook 配布は廃止
 - 安全性重視 Hook（`safe_delete_guard.py`）は既定ON
-- Codex中心マルチLLM Hook（`multillm_orchestrator.py`）は **登録済みだが既定OFF**（`AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION=1` で有効化）
-- orchestration の共有既定待機時間は **45秒**。必要なら `AI_AGENT_ORCHESTRATOR_TIMEOUT_SECONDS` で延長可能
-- Claude 非対話レビューの effort は **簡単な判断で `low`、難しい判断で `high`** を既定使用。必要なら `AI_AGENT_ORCHESTRATOR_CLAUDE_SIMPLE_EFFORT` / `AI_AGENT_ORCHESTRATOR_CLAUDE_COMPLEX_EFFORT` で調整可能
-- 入力前プロンプト改善は Hook ではなく **Skill（`peer-prompt-refinement`）で運用**
-- 回答後の自律継続 Hook（`response_strategy_bridge.py`）は **登録済みだが既定OFF**（`AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY=1` で有効）
+- 共通 Hook（`self_workflow.py`）は **Codex / Claude Code / Gemini CLI の managed event に登録済み**
+- `self_workflow.py` は qualifying-task 判定に通ったときだけ spec -> implementation -> verification の自己継続 loop を起動し、answer-only と artifact/execution を分けて前者は通常 loop 外に残す
+- 入力前プロンプト改善と phase boundary の brief 引き締めは **Skill（`refinment`）で運用**
+- `refinment` は self-contained。現在の CLI が必要と判断したときだけ brief を整え、必要なら `Refined prompt:` を表示してから作業を始める
+- 外部 reviewer を使う multi-LLM orchestration / response-strategy の main path は廃止
 
-これにより、ローカル負荷と多層 Hook 重複による挙動競合を抑えます。
+これにより、ローカル負荷と多層 Hook 重複による挙動競合を抑えつつ、同じ CLI が自分のタスクを最後まで完了しやすくします。
 
 ## 補足
 
@@ -170,5 +170,4 @@ shell rc から marker block を削除し、シンボリックリンクを `tras
 - エラー時は [docs/setup-error-guide.md](docs/setup-error-guide.md)
 - Skill 改善自動化は [docs/skill-improvement-automation.md](docs/skill-improvement-automation.md)
 - Hooks 設計検証は [docs/hooks-architecture-review.md](docs/hooks-architecture-review.md)
-- 回答後フック連携設計は [docs/response-strategy-autonomy.md](docs/response-strategy-autonomy.md)
-- Codex中心オーケストレーションは [docs/codex-hub-orchestration.md](docs/codex-hub-orchestration.md)
+- 現行の共通自己完結フローは [docs/self-workflow-hooks.md](docs/self-workflow-hooks.md)
