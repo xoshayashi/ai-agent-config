@@ -29,21 +29,6 @@
           }
         ]
       }
-    ],
-    "BeforeAgent": [
-      {
-        "_llm_config_managed": true,
-        "matcher": "*",
-        "hooks": [
-          {
-            "name": "llm-config-self-workflow-brief",
-            "type": "command",
-            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current gemini",
-            "timeout": 40000,
-            "description": "Inject self-workflow context before the turn starts."
-          }
-        ]
-      }
     ]
   }
 }

@@ -114,13 +114,29 @@ def test_completion_keywords_prefer_first_match_per_category() -> None:
 
 
 def test_should_skip_only_on_recursion_or_wrong_event() -> None:
-    data = {"hook_event_name": "UserPromptSubmit", "stop_hook_active": False}
+    # Stop is the canonical post-work event; pre-work events are no longer
+    # supported and must always be skipped at the gate.
+    data = {"hook_event_name": "Stop", "stop_hook_active": False}
     assert SWF.should_skip("codex", data) is False
 
     def _run() -> None:
         assert SWF.should_skip("codex", data) is True
 
     with_env({"AI_AGENT_SELF_WORKFLOW_ACTIVE": "1"}, _run)
+
+
+def test_should_skip_filters_pre_work_events() -> None:
+    """Pre-work events (UserPromptSubmit / SessionStart / BeforeAgent) are
+    intentionally not in SUPPORTED_EVENTS — should_skip must filter them out
+    even when the recursion guard is unset."""
+    for cli, event in (
+        ("codex", "UserPromptSubmit"),
+        ("codex", "SessionStart"),
+        ("claude", "UserPromptSubmit"),
+        ("gemini", "BeforeAgent"),
+    ):
+        data = {"hook_event_name": event, "stop_hook_active": False}
+        assert SWF.should_skip(cli, data) is True, f"{cli}/{event} should skip"
 
 
 def test_stop_output_formats_for_codex_and_gemini() -> None:
@@ -649,6 +665,7 @@ def run_tests() -> int:
         test_completion_keywords_from_hooks_md,
         test_completion_keywords_prefer_first_match_per_category,
         test_should_skip_only_on_recursion_or_wrong_event,
+        test_should_skip_filters_pre_work_events,
         test_stop_output_formats_for_codex_and_gemini,
         test_turn_context_output_formats_for_claude_and_gemini,
         test_should_keep_current_task_followup_prompt,

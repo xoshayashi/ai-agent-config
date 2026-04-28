@@ -25,9 +25,9 @@ from pathlib import Path
 from typing import Any
 
 SUPPORTED_EVENTS: dict[str, set[str]] = {
-    "codex": {"SessionStart", "UserPromptSubmit", "Stop"},
-    "claude": {"UserPromptSubmit", "Stop", "SubagentStop"},
-    "gemini": {"BeforeAgent", "AfterAgent"},
+    "codex": {"Stop"},
+    "claude": {"Stop", "SubagentStop"},
+    "gemini": {"AfterAgent"},
 }
 ACTIVE_PHASES = {"implementation", "spec_authoring", "spec_review", "verification"}
 
@@ -1121,11 +1121,7 @@ def main() -> int:
     state = load_state(path)
     event_name = str(data.get("hook_event_name", ""))
 
-    if event_name == "SessionStart":
-        output = handle_session_start(args.current, state)
-    elif event_name in {"UserPromptSubmit", "BeforeAgent"}:
-        output = handle_user_prompt_submit(args.current, event_name, data, state, path)
-    elif event_name in {"Stop", "SubagentStop", "AfterAgent"}:
+    if event_name in {"Stop", "SubagentStop", "AfterAgent"}:
         output = handle_stop(args.current, data, state, path)
     else:
         output = {}

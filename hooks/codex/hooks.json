@@ -1,18 +1,5 @@
 {
   "hooks": {
-    "SessionStart": [
-      {
-        "_llm_config_managed": true,
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current codex",
-            "timeout": 25,
-            "statusMessage": "Loading self-workflow state"
-          }
-        ]
-      }
-    ],
     "PreToolUse": [
       {
         "_llm_config_managed": true,
@@ -36,19 +23,6 @@
             "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current codex",
             "timeout": 50,
             "statusMessage": "Evaluating self-workflow continuation"
-          }
-        ]
-      }
-    ],
-    "UserPromptSubmit": [
-      {
-        "_llm_config_managed": true,
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current codex",
-            "timeout": 60,
-            "statusMessage": "Preparing self-workflow brief"
           }
         ]
       }
