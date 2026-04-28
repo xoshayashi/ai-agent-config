@@ -17,7 +17,6 @@ Use this guide when setup, update, scheduling, or uninstall fails. Explain error
 | `config repository has local changes` | 設定リポジトリに未保存の変更があり、更新すると作業を壊す可能性があります。 | 変更内容を確認し、必要ならコミットまたは退避してから更新します。 |
 | `not a git repository` | 更新対象がGitリポジトリではありません。 | 正しい `llm-config` の場所を探すか、GitHubから再取得します。 |
 | `AI_AGENT_TARGET_DIR is deprecated and ignored` | 旧方式（作業フォルダー配下へのリンク作成）の変数が指定されています。 | そのまま続行できます。必要なら `AI_AGENT_CODEX_HOME` / `AI_AGENT_CLAUDE_HOME` / `AI_AGENT_GEMINI_HOME` を使ってグローバル配置先を調整します。 |
-| `copilot-instructions.md` が見つからない | 現行実装では `.github/copilot-instructions.md` は repo-local 管理で、`scripts/setup.sh` や `scripts/health-check.sh` の対象外です。 | Copilot を使う対象リポジトリに `.github/copilot-instructions.md` を手動配置するか、このリポジトリの `instructions/.github/copilot-instructions.md` を正本として必要内容を反映します。 |
 | `launchctl` or `systemctl` scheduling failed | 自動更新のスケジュール登録に失敗しました。設定本体は使える場合があります。 | まず手動更新コマンドを案内します。自動更新はOS別に再確認します。 |
 | Hookが起動しない (`statusMessage` が出ない) | `hooks.json` が未反映か、managed hook link や installable skill link が壊れている可能性があります。 | `~/.codex/config.toml` の `codex_hooks = true`、`~/.codex/hooks.json` の存在、`scripts/health-check.sh` の `hooks-self-workflow` 行、`~/.agents/skills/refinment` のリンクを確認し、`scripts/setup.sh` を再実行します。 |
 | `health: warn` | 基本動作は確認できましたが、未ログイン、未インストール、リンク未設定、リポジトリ未保存変更など確認が必要な項目があります。 | `scripts/health-check.sh` の各行を見て、最も小さい修正だけを提案します。 |
