@@ -25,7 +25,7 @@ gha-creds-*.json
 .codex/
 .gemini/
 
-# Local Claude Code orientation file at repo root (not the global entrypoint at instructions/CLAUDE.md)
+# Local CLI-generated instruction entrypoints at repo root (canonical files live under instructions/)
 /CLAUDE.md
 /AGENTS.md
 /GEMINI.md
