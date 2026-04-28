@@ -16,12 +16,17 @@
 2. Claude Code / Codex / Gemini CLI が全てインストール済み  
 3. 3つ全てでログイン済み  
 4. `git` と `python3` が利用可能
+5. `trash` コマンド（無い場合は `scripts/setup.sh` 実行時に確認の上で自動インストール）
 
 | Tool | Official Setup |
 |---|---|
 | Claude Code | [Claude Code Quickstart](https://code.claude.com/docs/en/quickstart) |
 | Codex | [Codex CLI](https://developers.openai.com/codex/cli) |
 | Gemini CLI | [Gemini CLI Get Started](https://google-gemini.github.io/gemini-cli/docs/get-started/) |
+| trash (macOS) | `brew install trash` |
+| trash-cli (Linux) | `sudo apt-get install -y trash-cli` 等 |
+
+`trash` はこのリポジトリの `scripts/uninstall.sh` と `scripts/disable-auto-permission.sh` が安全に削除を行うために必須です（`rm` は使いません）。`scripts/setup.sh` は `trash` が無ければインストールコマンドを提示して y/N 確認します（**Enter は「いいえ」**、`AI_AGENT_ASSUME_YES=1` で確認スキップ）。
 
 ## 自然言語での取得とセットアップ
 
