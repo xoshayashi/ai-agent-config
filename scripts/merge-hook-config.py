@@ -16,7 +16,8 @@ MANAGED_END = "# END llm-config managed hooks"
 MANAGED_FLAG = "_llm_config_managed"
 LEGACY_MANAGED_SCRIPT_HINTS = {
     "safe_delete_guard.py",
-    "peer_prompt_refinement.py",
+    "peer_prompt_refinement.py",  # pre-refinment legacy hook name
+    "refinment.py",
     "response_strategy_bridge.py",
     "multillm_orchestrator.py",
 }

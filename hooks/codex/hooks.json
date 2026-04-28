@@ -6,7 +6,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-0}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/multillm_orchestrator.py\" --current codex'",
+            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/codex_hook_gate.py\" --current codex",
             "timeout": 25,
             "statusMessage": "Loading orchestration state"
           }
@@ -33,7 +33,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -lc 'if [ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-0}\" = \"1\" ]; then exec python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/multillm_orchestrator.py\" --current codex; elif [ \"${AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY:-0}\" = \"1\" ]; then exec python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/response_strategy_bridge.py\" --current codex; else exit 0; fi'",
+            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/codex_hook_gate.py\" --current codex",
             "timeout": 150,
             "statusMessage": "Evaluating Codex post-response flow"
           }
@@ -46,7 +46,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_MULTILLM_ORCHESTRATION:-0}\" = \"1\" ] || exit 0; exec python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/multillm_orchestrator.py\" --current codex'",
+            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/codex_hook_gate.py\" --current codex",
             "timeout": 60,
             "statusMessage": "Preparing Codex orchestration"
           }

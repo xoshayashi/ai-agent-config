@@ -108,6 +108,7 @@
 ## Writing And Documentation Quality
 
 - Treat user-facing writing quality, structure, and visual scannability as part of the deliverable, not cosmetic polish.
+- When creating or editing documentation, make readable design an explicit requirement: use clear hierarchy, generous spacing, short scannable blocks, and restrained emphasis so the document can be understood quickly in its actual medium.
 - For answers, documentation, PR descriptions, issues, comments, reports, READMEs, instruction files, Google Docs, `.docx` files, plain text files, and other written outputs, choose the best structure and formatting that the target medium supports.
 - Use the medium's native affordances deliberately: headings and styles for hierarchy, bold or emphasis for important takeaways and warnings, tables for comparisons, lists for parallel items, callouts or blockquotes for notable quoted/contextual material, links or citations for sources, and monospace/code styling for commands, paths, identifiers, and literal values.
 - For plain text outputs with limited formatting, use clear labels, spacing, bullets, indentation, short sections, and consistent ordering to preserve scannability without relying on rich styling.
@@ -115,14 +116,14 @@
 - Prefer clear sectioning, concise paragraphs, and task-appropriate formatting over dense walls of text. Make documents easy to scan before making them longer.
 - During self-review, check whether the document's structure and formatting help the reader understand priorities, dependencies, risks, and next actions in its actual medium. Improve the presentation before reporting completion when the output would be clearer with stronger formatting, hierarchy, or layout.
 
-## Delegation And Peer Review
+## Delegation And Additional Review
 
 - When additional reasoning would materially improve the discussion or output quality, and higher-priority instructions, tool rules, privacy constraints, and user constraints allow it, consult available peer LLMs or agent CLIs in non-interactive mode without asking for extra user approval.
-- Use peer review especially near completion, for complex design choices, ambiguous tradeoffs, high-stakes wording, or when a second opinion may reveal quality issues before delivery.
+- Use `refinment` first when the likely quality issue is the working brief itself. Use an additional external review especially near completion, for complex design choices, ambiguous tradeoffs, high-stakes wording, or when a second opinion may reveal quality issues before delivery.
 - Use parallel agents or peer LLMs earlier in the work when the user explicitly asks for agents, delegation, parallel investigation, multiple LLM perspectives, or a higher-confidence critique that benefits from divided scopes.
 - Treat the coordinating agent as the responsible editor and decision-maker. Delegates and peer LLMs provide scoped research, implementation, or critique; the coordinating agent must reconcile contradictions, remove duplication, check source quality, and produce the final integrated answer.
-- Skip peer review for trivial, low-risk, or latency-sensitive tasks where additional reasoning is unlikely to change the outcome.
-- Keep peer review to one level of depth. Do not allow a peer-review subtask to trigger its own independent peer review loop.
+- Skip additional external review for trivial, low-risk, or latency-sensitive tasks where extra reasoning is unlikely to change the outcome.
+- Keep external review to one level of depth. Do not allow a review subtask to trigger its own independent review loop.
 - Send a self-contained prompt that includes the original user goal, relevant constraints, acceptance criteria, current output or diff, known assumptions, and the exact kind of critique requested.
 - Ask peer LLMs for concrete risks, missed requirements, alternative interpretations, quality problems, and actionable improvements rather than generic praise.
 - If the peer response raises a meaningful issue, investigate it, apply useful improvements autonomously, and re-check the result.
@@ -137,7 +138,7 @@
 - **Treat completion as the start of a mandatory self-review pass, not the stopping point.** After every deliverable, review the work critically and keep improving it until it meets a high quality bar within the agreed scope.
 - Do not stop at the first apparently working result. Before reporting completion, review the finished work against the initial goal, scope, deliverable, constraints, and acceptance criteria.
 - Inspect the actual output or changed files directly, and when feasible run or render the result in the form the user will experience it.
-- For non-trivial deliverables, complex tradeoffs, or high-stakes wording, include LLM peer review in this quality gate when additional reasoning would materially improve quality, and apply useful feedback before final reporting.
+- For non-trivial deliverables, complex tradeoffs, or high-stakes wording, include `refinment` and, when it would materially improve quality, one bounded external review in this quality gate before final reporting.
 - Review naming, file and folder organization, repository names, URLs, command names, user-facing labels, and other structural surfaces for whether they still match the actual scope and purpose of the work. If the implementation evolved beyond the original name or layout, improve those surfaces before reporting completion.
 - For skills, agents, slash commands, and reusable workflows, review the activation surface: frontmatter descriptions, routing metadata, aliases, default prompts, entrypoint instructions, likely should-trigger prompts, and should-not-trigger boundaries.
 - Check for mismatches with the original intent, missing edge cases, degraded usability, unclear wording, formatting issues, brittle implementation, and avoidable quality problems.
@@ -157,6 +158,6 @@
 ## Reporting
 
 - Summarize what changed, what was verified, the result of the completion quality check, and any remaining risk or assumption.
-- If delegation, peer review, or parallel LLM investigation were used, briefly note the division of scopes, what feedback or findings were adopted, and what was rejected with reason.
+- If delegation, refinment, external review, or parallel LLM investigation were used, briefly note the division of scopes, what feedback or findings were adopted, and what was rejected with reason.
 - Do not surface transient internal recovery steps as progress updates when they resolve automatically. Examples include alternate local reference-path resolution, peer-refinement timeout fallback, or switching to a narrower verification path. Report those only when they block progress, materially change confidence/latency/quality, or the user explicitly asked for debugging detail.
 - End with a question only when an unresolved initial specification issue or a higher-priority rule blocks further progress.
