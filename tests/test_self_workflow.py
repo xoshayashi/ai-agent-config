@@ -150,6 +150,8 @@ def test_should_keep_current_task_followup_prompt() -> None:
     assert SWF.should_keep_current_task("続けて。テストも追加して、最後に差分確認して")
     assert SWF.should_keep_current_task("この仕様で実装して")
     assert SWF.should_keep_current_task("fix it")
+    assert SWF.should_keep_current_task("はい")
+    assert SWF.should_keep_current_task("了解")
     assert not SWF.should_keep_current_task("新しい機能を追加したい")
 
 
@@ -350,6 +352,22 @@ def test_handle_user_prompt_submit_nonactivating_prompt_clears_active_state() ->
         assert_eq(payload, {}, "interrupt prompt should stay outside self-workflow")
         assert_eq(state, {}, "active state should be cleared")
         assert_eq(SWF.load_state(state_path), {}, "cleared state should be persisted")
+
+
+def test_handle_user_prompt_submit_japanese_followup_preserves_active_state() -> None:
+    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
+        state_path = Path(tmp) / "state.json"
+        state = {
+            "phase": "implementation",
+            "spec_markdown": "approved spec [[SPEC_DONE]]",
+            "implementation_brief": "keep going",
+            "implementation_turn": 2,
+        }
+        payload = SWF.handle_user_prompt_submit("codex", "UserPromptSubmit", {"prompt": "はい"}, state, state_path)
+        output = payload.get("hookSpecificOutput", {})
+        assert_eq(output.get("hookEventName"), "UserPromptSubmit", "followup event")
+        assert "Current phase: implementation." in str(output.get("additionalContext", ""))
+        assert_eq(state.get("phase"), "implementation", "active state should be preserved")
 
 
 def test_handle_session_start_resumes_context_for_implementation() -> None:
@@ -650,6 +668,7 @@ def run_tests() -> int:
         test_handle_user_prompt_submit_bootstraps_spec_phase,
         test_handle_user_prompt_submit_skips_light_prompts,
         test_handle_user_prompt_submit_nonactivating_prompt_clears_active_state,
+        test_handle_user_prompt_submit_japanese_followup_preserves_active_state,
         test_handle_session_start_resumes_context_for_implementation,
         test_handle_session_start_idle_returns_empty,
         test_handle_session_start_done_returns_new_task_message,
