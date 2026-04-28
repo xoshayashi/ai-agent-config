@@ -28,6 +28,14 @@ expand_home() {
   esac
 }
 
+script_path=$0
+case "$script_path" in
+  */*) script_dir=$(CDPATH= cd "$(dirname "$script_path")" && pwd -P) ;;
+  *) script_dir=$(CDPATH= cd "$(dirname "$(command -v "$script_path")")" && pwd -P) ;;
+esac
+config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
+src="$config_home/shell/auto-permission.sh"
+
 shell_alias_link=${AI_AGENT_SHELL_ALIAS_LINK:-$HOME/.llm-config/auto-permission.sh}
 dst=$(expand_home "$shell_alias_link")
 
@@ -82,6 +90,11 @@ remove_marker_block() {
 remove_managed_link() {
   if [ ! -L "$dst" ]; then
     [ -e "$dst" ] && warn "skip non-symlink at $dst"
+    return 0
+  fi
+  current=$(readlink "$dst")
+  if [ "$current" != "$src" ]; then
+    warn "skip unmanaged symlink: $dst -> $current (expected $src)"
     return 0
   fi
   if [ "$dry_run" = "1" ]; then

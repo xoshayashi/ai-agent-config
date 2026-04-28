@@ -134,8 +134,10 @@ if [ "$dry_run" = "1" ]; then
 fi
 
 mkdir -p "$(dirname "$dst")"
-if [ -L "$dst" ] || [ -e "$dst" ]; then
-  warn "destination already exists; leaving as-is: $dst"
+if [ -L "$dst" ] && [ "$(readlink "$dst")" = "$src" ]; then
+  say "ok: symlink already correct: $dst -> $src"
+elif [ -L "$dst" ] || [ -e "$dst" ]; then
+  fail "destination already exists and is not the managed symlink: $dst -- remove it first or set AI_AGENT_SHELL_ALIAS_LINK to a different path"
 else
   ln -s "$src" "$dst"
   say "linked: $dst -> $src"
