@@ -46,6 +46,11 @@ flowchart LR
 | `~/.claude/hooks` ほか各CLIの `hooks/` | Hook 本体へのリンク |
 | `.github/copilot-instructions.md` | この repo で Copilot を使うための tracked instructions |
 
+> [!TIP]
+> Copilot だけ別方式ではありません。
+> `~/.copilot/copilot-instructions.md` は GitHub 公式の local instructions の置き場で、
+> `.github/copilot-instructions.md` は repository-wide instructions の置き場です。
+
 ## 安全設計
 
 | 約束 | 意味 |

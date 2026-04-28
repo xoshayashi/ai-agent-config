@@ -54,6 +54,13 @@ flowchart TD
 - `scripts/setup.sh` は既存設定を壊しに行く設計ではなく、**dry run・追記/マージ・バックアップ**を前提にしています。
 - GitHub Copilot CLI も global setup / Hook 配布の対象です。加えて、この repo では `.github/copilot-instructions.md` も tracked file として持ちます。
 
+> [!NOTE]
+> Copilot はこの repo 独自の裏技で対応しているわけではありません。
+> GitHub 公式が案内している **`$HOME/.copilot/copilot-instructions.md` の local instructions** と
+> **`.github/copilot-instructions.md` の repository-wide instructions** に沿って構成しています。
+> 参考: [Copilot CLI custom instructions](https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-custom-instructions),
+> [Copilot repository instructions](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/add-custom-instructions/add-repository-instructions)
+
 ## 実務での使い分け
 
 - 手早く操作だけ知りたい: ルートの [README.md](../README.md) と [setup.md](../setup.md)
