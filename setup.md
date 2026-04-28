@@ -16,12 +16,17 @@
 2. Claude Code / Codex / Gemini CLI が全てインストール済み  
 3. 3つ全てでログイン済み  
 4. `git` と `python3` が利用可能
+5. `trash` コマンド（無い場合は `scripts/setup.sh` 実行時に確認の上で自動インストール）
 
 | Tool | Official Setup |
 |---|---|
 | Claude Code | [Claude Code Quickstart](https://code.claude.com/docs/en/quickstart) |
 | Codex | [Codex CLI](https://developers.openai.com/codex/cli) |
 | Gemini CLI | [Gemini CLI Get Started](https://google-gemini.github.io/gemini-cli/docs/get-started/) |
+| trash (macOS) | `brew install trash` |
+| trash-cli (Linux) | `sudo apt-get install -y trash-cli` 等 |
+
+`trash` はこのリポジトリの `scripts/uninstall.sh` と `scripts/disable-auto-permission.sh` が安全に削除を行うために必須です（`rm` は使いません）。`scripts/setup.sh` は `trash` が無ければインストールコマンドを提示して y/N 確認します（**Enter は「いいえ」**、`AI_AGENT_ASSUME_YES=1` で確認スキップ）。
 
 ## 自然言語での取得とセットアップ
 
@@ -169,6 +174,48 @@ export AI_AGENT_ORCHESTRATOR_CLAUDE_COMPLEX_EFFORT=high
 入力前のプロンプト改善は、グローバル Hook ではなく **Skill
 `peer-prompt-refinement`** で運用します。  
 そのため、`scripts/setup.sh` は prompt refinement 用 Hook を各 CLI 設定に登録しません。
+
+### 3 CLI の auto-permission モード（任意・別コマンド）
+
+> ⚠️ **既定の安全側を下げる opt-in です。** 内容を理解した上で実行してください。
+
+`shell/auto-permission.sh` には Codex / Gemini CLI / Claude Code を承認スキップ・auto モードで起動する shell ラッパーが定義されています。`scripts/setup.sh` には**意図的に組み込まれていません**。明示 opt-in したい場合のみ、専用スクリプトを実行します。
+
+| CLI | 適用される flag |
+|---|---|
+| `codex` | `--dangerously-bypass-approvals-and-sandbox` |
+| `gemini` | `--yolo` |
+| `claude` | `--permission-mode auto`（通常セッション時のみ。`auth` / `mcp` / `plugin` / `doctor` 等は素の挙動） |
+
+#### 有効化
+
+```sh
+sh /path/to/llm-config/scripts/enable-auto-permission.sh
+```
+
+実行内容（追加されるシンボリックリンクと shell rc に追記される marker block）を表示してから `y/N` で確認します。**Enter キーは「いいえ」** が既定です。CI 等で確認をスキップしたい場合は `AI_AGENT_ASSUME_YES=1` を併用します。
+
+shell rc は次の marker block に挟まれて 1 行 source されるだけです。
+
+```sh
+# >>> ai-agent-config managed shell wrappers >>>
+# Managed by scripts/enable-auto-permission.sh in ai-agent-config.
+# Reverse with scripts/disable-auto-permission.sh.
+[ -r "$HOME/.llm-config/auto-permission.sh" ] && . "$HOME/.llm-config/auto-permission.sh"
+# <<< ai-agent-config managed shell wrappers <<<
+```
+
+#### 無効化
+
+```sh
+sh /path/to/llm-config/scripts/disable-auto-permission.sh
+```
+
+shell rc から marker block を削除し、シンボリックリンクを `trash` に送ります。冪等。
+
+#### サポートされる shell
+
+`SHELL` 環境変数を見て、`zsh` なら `~/.zshrc`、`bash` なら `~/.bash_profile`（macOS 想定）または `~/.bashrc` を対象にします。それ以外の shell の場合は `enable` が中断します（必要に応じて手動でスニペットを source してください）。
 
 ## 既存個人設定の扱い
 

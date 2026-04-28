@@ -43,8 +43,20 @@ ${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks} -> <this repo>/hooks
 2. **Claude Code / Codex / Gemini CLI を全てインストール済み**であること
 3. **3つ全てでログイン済み**であること
 4. `git` と `python3` が使えること
+5. `trash` コマンド（macOS は `brew install trash`、Linux は `trash-cli` パッケージ）
 
 `scripts/setup.sh` は既定で 3 CLI の存在チェックを行います（`AI_AGENT_REQUIRE_LLM_CLIS=0` で無効化可能）。
+
+`trash` がインストールされていない場合、`scripts/setup.sh` は対応するパッケージマネージャ（macOS: `brew`、Linux: `apt-get` / `dnf` / `pacman`）を検出して **インストールコマンドを提示し、y/N で確認**します（**Enter は「いいえ」**）。`AI_AGENT_ASSUME_YES=1` を付けると確認をスキップして即実行します。
+
+| OS | 自動提案されるコマンド |
+|---|---|
+| macOS | `brew install trash` |
+| Debian/Ubuntu | `sudo apt-get install -y trash-cli` |
+| Fedora/RHEL | `sudo dnf install -y trash-cli` |
+| Arch | `sudo pacman -S --noconfirm trash-cli` |
+
+これらの環境以外では、`trash` を手動で導入してから setup を再実行してください。
 
 | ツール | 公式手順 |
 |---|---|
@@ -91,6 +103,45 @@ sh /path/to/llm-config/scripts/health-check.sh
 ```sh
 sh /path/to/llm-config/scripts/uninstall.sh
 ```
+
+## オプション: 3 CLI の auto-permission モードを既定化
+
+> ⚠️ **これは安全側を下げる opt-in です。** 内容を理解した上で、自己責任で実行してください。
+> 非エンジニアの方や、AI エージェントが自分のマシンで何をしうるか把握していない場合は **使わないでください**。
+
+`shell/auto-permission.sh` には、Codex / Gemini CLI / Claude Code を **承認スキップ・auto モード**で起動する shell 用ラッパーが入っています。
+
+| CLI | 適用される flag |
+|---|---|
+| `codex` | `--dangerously-bypass-approvals-and-sandbox` |
+| `gemini` | `--yolo` |
+| `claude` | `--permission-mode auto`（通常セッション時のみ。`auth` / `mcp` / `plugin` / `doctor` 等は素の挙動） |
+
+これを有効化すると、これら 3 CLI から起動した AI エージェントは **ファイル削除・コマンド実行・shell 操作などをユーザに毎回確認せずに行えます**。
+
+### 有効化
+
+`scripts/setup.sh` には**意図的に組み込まれていません**。明示的に opt-in する場合のみ、専用スクリプトを実行してください。
+
+```sh
+sh /path/to/llm-config/scripts/enable-auto-permission.sh
+```
+
+実行すると、変更内容（追加されるシンボリックリンクと shell rc に追記される marker block）を表示してから、`y/N` で確認します。**Enter キーは「いいえ」**。
+
+非インタラクティブな環境で確認をスキップしたい場合（CI 等）：
+
+```sh
+AI_AGENT_ASSUME_YES=1 sh /path/to/llm-config/scripts/enable-auto-permission.sh
+```
+
+### 無効化
+
+```sh
+sh /path/to/llm-config/scripts/disable-auto-permission.sh
+```
+
+shell rc から marker block を削除し、シンボリックリンクを `trash` に送ります。冪等です。
 
 ## 自然言語トリガー（運用）
 

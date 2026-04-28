@@ -133,6 +133,67 @@ if [ "$require_llm_clis" = "1" ]; then
   fi
 fi
 
+ensure_trash_installed() {
+  if command -v trash >/dev/null 2>&1; then
+    return 0
+  fi
+
+  os=$(uname -s 2>/dev/null || printf unknown)
+  pkg_cmd=""
+  case "$os" in
+    Darwin)
+      command -v brew >/dev/null 2>&1 && pkg_cmd="brew install trash"
+      ;;
+    Linux)
+      if command -v apt-get >/dev/null 2>&1; then
+        pkg_cmd="sudo apt-get install -y trash-cli"
+      elif command -v dnf >/dev/null 2>&1; then
+        pkg_cmd="sudo dnf install -y trash-cli"
+      elif command -v pacman >/dev/null 2>&1; then
+        pkg_cmd="sudo pacman -S --noconfirm trash-cli"
+      fi
+      ;;
+  esac
+
+  if [ -z "$pkg_cmd" ]; then
+    fail "trash is required for safe removal but not installed, and no supported package manager was found on $os. Install trash (macOS) or trash-cli (Linux) manually, then re-run."
+  fi
+
+  say ""
+  say "trash command not found on this system."
+  say "  Proposed install: $pkg_cmd"
+
+  if [ "$dry_run" = "1" ]; then
+    say "  would run the proposed command and continue"
+    return 0
+  fi
+
+  if [ "${AI_AGENT_ASSUME_YES:-0}" = "1" ]; then
+    say "  AI_AGENT_ASSUME_YES=1 set; running install without prompt"
+  elif [ ! -t 0 ]; then
+    fail "stdin is not a TTY; cannot prompt. Run '$pkg_cmd' manually then re-run, or set AI_AGENT_ASSUME_YES=1."
+  else
+    printf '  Run this install command now? [y/N]: ' >&2
+    IFS= read -r answer || answer=""
+    case "$answer" in
+      Y|y|YES|yes|Yes) ;;
+      *) fail "declined; run '$pkg_cmd' yourself, then re-run setup" ;;
+    esac
+  fi
+
+  # shellcheck disable=SC2086
+  if ! eval "$pkg_cmd"; then
+    fail "trash install failed: $pkg_cmd"
+  fi
+
+  if ! command -v trash >/dev/null 2>&1; then
+    fail "trash still not on PATH after install; check your PATH and try again"
+  fi
+  say "trash installed successfully."
+}
+
+ensure_trash_installed
+
 run() {
   if [ "$dry_run" = "1" ]; then
     printf 'would run:'
