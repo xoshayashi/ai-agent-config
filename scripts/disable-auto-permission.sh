@@ -61,11 +61,21 @@ remove_marker_block() {
     return 0
   fi
   tmp="${rc_file}.disable.$$"
-  awk '
+  if ! awk '
     /^# >>> ai-agent-config managed shell wrappers >>>/ { skip=1; next }
     /^# <<< ai-agent-config managed shell wrappers <<</ { if (skip) { skip=0; next } }
     !skip { print }
-  ' "$rc_file" > "$tmp" && mv "$tmp" "$rc_file"
+    END {
+      if (skip) {
+        print "error: open marker found but matching close marker missing; rc file not modified" > "/dev/stderr"
+        exit 1
+      }
+    }
+  ' "$rc_file" > "$tmp"; then
+    [ -e "$tmp" ] && trash "$tmp" 2>/dev/null || true
+    fail "refusing to overwrite $rc_file: managed marker block appears truncated"
+  fi
+  mv "$tmp" "$rc_file"
   say "removed managed marker block from $rc_file"
 }
 
