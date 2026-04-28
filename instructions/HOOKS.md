@@ -26,6 +26,12 @@ Do not promote simple "what is the difference" or "explain this" prompts into
 spec -> implementation -> verification work unless they also ask for a concrete
 change or deliverable.
 
+If a self-workflow phase is already active, any non-follow-up user turn that
+does not continue the current loop and does not start a new qualifying task
+should clear the active loop state before the next stop boundary. This prevents
+stale auto-continuation after interruptions, acknowledgements, or answer-only
+detours.
+
 This workflow is generic across Codex, Claude Code, and Gemini CLI. No
 external peer reviewer is part of the main path.
 
@@ -60,6 +66,8 @@ If `[[SPEC_DONE]]` is absent, the hook should surface that the spec is still in 
 
 When verification discovers only a narrow omission or factual correction,
 prefer a delta-only follow-up instead of repeating the whole earlier answer.
+Use correction-like signals for that branch; do not treat generic "updated"
+status text as delta-only by itself.
 
 ## Safety Limits
 

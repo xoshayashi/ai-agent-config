@@ -156,11 +156,14 @@ def test_should_keep_current_task_followup_prompt() -> None:
 def test_should_activate_self_workflow_prefers_complex_or_explicit_prompts() -> None:
     assert SWF.should_activate_self_workflow("このコードベースを分析して詳細な設計書を書いて")
     assert SWF.should_activate_self_workflow("Hook の仕様と実装計画を確認して修正して")
+    assert SWF.should_activate_self_workflow("Analyze hooks/scripts/self_workflow.py and propose the next fix")
+    assert SWF.should_activate_self_workflow("add retry handling to hooks/scripts/self_workflow.py")
     assert not SWF.should_activate_self_workflow("ありがとう")
     assert not SWF.should_activate_self_workflow("status")
     assert not SWF.should_activate_self_workflow("sandbox と approval の違いを教えて")
     assert not SWF.should_activate_self_workflow("Codex の sandbox 設計について説明して")
     assert not SWF.should_activate_self_workflow("hooks/scripts/self_workflow.py の構成を説明して")
+    assert not SWF.should_activate_self_workflow("write an explanation of the hooks architecture")
     assert not SWF.should_activate_self_workflow("improve the docstring")
     assert not SWF.should_activate_self_workflow("fix the error in https://example.com/api")
     assert not SWF.should_activate_self_workflow("fix 1/4 of the tests")
@@ -169,6 +172,7 @@ def test_should_activate_self_workflow_prefers_complex_or_explicit_prompts() -> 
 def test_is_answer_only_request_distinguishes_explanation_from_execution() -> None:
     assert SWF.is_answer_only_request("sandbox と approval の違いを教えて")
     assert SWF.is_answer_only_request("hooks/scripts/self_workflow.py の構成を説明して")
+    assert SWF.is_answer_only_request("write an explanation of the hooks architecture")
     assert not SWF.is_answer_only_request("hooks/scripts/self_workflow.py を修正して")
 
 
@@ -331,6 +335,21 @@ def test_handle_user_prompt_submit_skips_light_prompts() -> None:
         payload = SWF.handle_user_prompt_submit("codex", "UserPromptSubmit", {"prompt": "ありがとう"}, {}, state_path)
         assert_eq(payload, {}, "light prompt should not trigger self-workflow")
         assert not state_path.exists()
+
+
+def test_handle_user_prompt_submit_nonactivating_prompt_clears_active_state() -> None:
+    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
+        state_path = Path(tmp) / "state.json"
+        state = {
+            "phase": "implementation",
+            "spec_markdown": "approved spec [[SPEC_DONE]]",
+            "implementation_brief": "keep going",
+            "implementation_turn": 2,
+        }
+        payload = SWF.handle_user_prompt_submit("codex", "UserPromptSubmit", {"prompt": "stop"}, state, state_path)
+        assert_eq(payload, {}, "interrupt prompt should stay outside self-workflow")
+        assert_eq(state, {}, "active state should be cleared")
+        assert_eq(SWF.load_state(state_path), {}, "cleared state should be persisted")
 
 
 def test_handle_session_start_resumes_context_for_implementation() -> None:
@@ -567,6 +586,17 @@ def test_default_verification_continue_prompt_prefers_delta_after_correction_sty
     assert "Do not restate unchanged background." in text
 
 
+def test_default_verification_continue_prompt_does_not_treat_normal_updates_as_delta_only() -> None:
+    text = SWF.default_verification_continue_prompt(
+        "spec body",
+        "I updated the files and reran the tests.",
+        "[[VERIFICATION_DONE]]",
+        "[[TASK_DONE]]",
+    )
+    assert "Do not restate unchanged background." not in text
+    assert "When only a small correction or supplement is needed" in text
+
+
 def test_build_verification_decision_stops_at_verification_cap() -> None:
     state = {
         "phase": "verification",
@@ -619,6 +649,7 @@ def run_tests() -> int:
         test_build_continue_decision_stops_on_repeated_prompt,
         test_handle_user_prompt_submit_bootstraps_spec_phase,
         test_handle_user_prompt_submit_skips_light_prompts,
+        test_handle_user_prompt_submit_nonactivating_prompt_clears_active_state,
         test_handle_session_start_resumes_context_for_implementation,
         test_handle_session_start_idle_returns_empty,
         test_handle_session_start_done_returns_new_task_message,
@@ -634,6 +665,7 @@ def run_tests() -> int:
         test_build_verification_decision_accepts_structured_completion_evidence,
         test_build_verification_decision_continues_with_skill_prompt,
         test_default_verification_continue_prompt_prefers_delta_after_correction_style_response,
+        test_default_verification_continue_prompt_does_not_treat_normal_updates_as_delta_only,
         test_build_verification_decision_stops_at_verification_cap,
     ]
 
