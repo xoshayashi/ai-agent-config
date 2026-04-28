@@ -25,9 +25,9 @@ from pathlib import Path
 from typing import Any
 
 SUPPORTED_EVENTS: dict[str, set[str]] = {
-    "codex": {"SessionStart", "UserPromptSubmit", "Stop"},
-    "claude": {"UserPromptSubmit", "Stop", "SubagentStop"},
-    "gemini": {"BeforeAgent", "AfterAgent"},
+    "codex": {"Stop"},
+    "claude": {"Stop", "SubagentStop"},
+    "gemini": {"AfterAgent"},
 }
 ACTIVE_PHASES = {"implementation", "spec_authoring", "spec_review", "verification"}
 
@@ -952,11 +952,22 @@ def handle_stop(current: str, data: dict[str, Any], state: dict[str, Any], path:
 
     phase = str(state.get("phase", ""))
     spec_done_keyword, implementation_done_keyword, verification_done_keyword, task_done_keyword = completion_keywords()
+
+    # Bootstrap path for idle sessions: with the pre-work hook gone, a brand-new
+    # session has no `phase` set when its first response arrives. The LLM signals
+    # opt-in to the auto-continuation loop by emitting `[[SPEC_DONE]]`. When we
+    # see that on an idle phase, treat the response as a freshly authored spec
+    # so the existing `spec_authoring` branch can transition into `spec_review`.
+    if not phase and contains_explicit_keyword(response, spec_done_keyword):
+        phase = "spec_authoring"
+        state["phase"] = phase
+        state.setdefault("spec_revision_count", 0)
+        state.setdefault("original_prompt", "")
+
     if phase == "spec_authoring":
         spec_revision_count = safe_int(state.get("spec_revision_count", 0), 0, minimum=0) + 1
         state["spec_revision_count"] = spec_revision_count
         state["spec_markdown"] = response
-        save_state(path, state)
         spec_ready = contains_explicit_keyword(response, spec_done_keyword)
         spec_review_fallback = (
             not spec_ready
@@ -964,12 +975,18 @@ def handle_stop(current: str, data: dict[str, Any], state: dict[str, Any], path:
             and spec_is_review_candidate(response)
         )
         if not spec_ready and not spec_review_fallback:
+            # Persist the draft (and incremented revision count) so the next
+            # Stop sees the latest progress.
+            save_state(path, state)
             return {
                 "systemMessage": (
                     f"Self-workflow: specification draft saved. Continue refining and include "
                     f"{spec_done_keyword} when it is ready for the next refinment gate."
                 )
             }
+        # Single write at the final phase. This avoids a window where a crash
+        # between the draft-save and the spec_review-save would leave disk state
+        # in spec_authoring with revision count incremented.
         state["phase"] = "spec_review"
         save_state(path, state)
         return stop_output(
@@ -1121,11 +1138,7 @@ def main() -> int:
     state = load_state(path)
     event_name = str(data.get("hook_event_name", ""))
 
-    if event_name == "SessionStart":
-        output = handle_session_start(args.current, state)
-    elif event_name in {"UserPromptSubmit", "BeforeAgent"}:
-        output = handle_user_prompt_submit(args.current, event_name, data, state, path)
-    elif event_name in {"Stop", "SubagentStop", "AfterAgent"}:
+    if event_name in {"Stop", "SubagentStop", "AfterAgent"}:
         output = handle_stop(args.current, data, state, path)
     else:
         output = {}
