@@ -25,18 +25,6 @@
         ]
       }
     ],
-    "UserPromptSubmit": [
-      {
-        "_llm_config_managed": true,
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current claude",
-            "timeout": 40
-          }
-        ]
-      }
-    ],
     "SubagentStop": [
       {
         "_llm_config_managed": true,
