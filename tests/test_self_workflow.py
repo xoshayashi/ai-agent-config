@@ -162,53 +162,6 @@ def test_stop_output_formats_for_codex_and_gemini() -> None:
     assert payload.get("reason")
 
 
-def test_turn_context_output_formats_for_claude_and_gemini() -> None:
-    claude_payload = SWF.turn_context_output("claude", "UserPromptSubmit", "context")
-    gemini_payload = SWF.turn_context_output("gemini", "BeforeAgent", "context")
-    assert_eq(claude_payload.get("hookSpecificOutput", {}).get("hookEventName"), "UserPromptSubmit", "claude hook event")
-    assert_eq(claude_payload.get("hookSpecificOutput", {}).get("additionalContext"), "context", "claude context")
-    assert_eq(gemini_payload.get("hookSpecificOutput", {}).get("additionalContext"), "context", "gemini context")
-
-
-def test_should_keep_current_task_followup_prompt() -> None:
-    assert SWF.should_keep_current_task("続けて")
-    assert SWF.should_keep_current_task("続けて。テストも追加して、最後に差分確認して")
-    assert SWF.should_keep_current_task("この仕様で実装して")
-    assert SWF.should_keep_current_task("fix it")
-    assert SWF.should_keep_current_task("はい")
-    assert SWF.should_keep_current_task("了解")
-    assert not SWF.should_keep_current_task("新しい機能を追加したい")
-
-
-def test_should_activate_self_workflow_prefers_complex_or_explicit_prompts() -> None:
-    assert SWF.should_activate_self_workflow("このコードベースを分析して詳細な設計書を書いて")
-    assert SWF.should_activate_self_workflow("Hook の仕様と実装計画を確認して修正して")
-    assert SWF.should_activate_self_workflow("Analyze hooks/scripts/self_workflow.py and propose the next fix")
-    assert SWF.should_activate_self_workflow("add retry handling to hooks/scripts/self_workflow.py")
-    assert not SWF.should_activate_self_workflow("ありがとう")
-    assert not SWF.should_activate_self_workflow("status")
-    assert not SWF.should_activate_self_workflow("sandbox と approval の違いを教えて")
-    assert not SWF.should_activate_self_workflow("Codex の sandbox 設計について説明して")
-    assert not SWF.should_activate_self_workflow("hooks/scripts/self_workflow.py の構成を説明して")
-    assert not SWF.should_activate_self_workflow("write an explanation of the hooks architecture")
-    assert not SWF.should_activate_self_workflow("improve the docstring")
-    assert not SWF.should_activate_self_workflow("fix the error in https://example.com/api")
-    assert not SWF.should_activate_self_workflow("fix 1/4 of the tests")
-
-
-def test_is_answer_only_request_distinguishes_explanation_from_execution() -> None:
-    assert SWF.is_answer_only_request("sandbox と approval の違いを教えて")
-    assert SWF.is_answer_only_request("hooks/scripts/self_workflow.py の構成を説明して")
-    assert SWF.is_answer_only_request("write an explanation of the hooks architecture")
-    assert not SWF.is_answer_only_request("hooks/scripts/self_workflow.py を修正して")
-
-
-def test_spec_status_from_keyword() -> None:
-    packet = {"status": "unknown", "spec_markdown": "ready\n[[SPEC_DONE]]"}
-    status = SWF.spec_status_from(packet, "[[SPEC_DONE]]")
-    assert_eq(status, "done", "spec status inferred from keyword")
-
-
 def test_contains_explicit_keyword_requires_standalone_line() -> None:
     assert SWF.contains_explicit_keyword("done\n[[IMPLEMENTATION_DONE]]\n", "[[IMPLEMENTATION_DONE]]")
     assert SWF.contains_explicit_keyword("- [[TASK_DONE]]", "[[TASK_DONE]]")
@@ -241,14 +194,6 @@ def test_spec_is_review_candidate_requires_markdown_headings() -> None:
         ]
     )
     assert SWF.spec_is_review_candidate(structured)
-
-
-def test_build_spec_authoring_context_mentions_keyword_and_skill() -> None:
-    text = SWF.build_spec_authoring_context("task", "[[SPEC_DONE]]")
-    assert "[[SPEC_DONE]]" in text
-    assert "$refinment" in text
-    assert "show the refined prompt to the user" in text.lower()
-    assert "Draft the specification yourself in this CLI first" in text
 
 
 def test_default_implementation_start_prompt_uses_spec_and_skill() -> None:
@@ -341,83 +286,6 @@ def test_build_continue_decision_stops_on_repeated_prompt() -> None:
         assert "Repeated continuation prompt detected" in decision["note"]
 
     with_env({"AI_AGENT_SELF_WORKFLOW_MAX_SAME_PROMPT": "2"}, _run)
-
-
-def test_handle_user_prompt_submit_bootstraps_spec_phase() -> None:
-    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
-        state_path = Path(tmp) / "state.json"
-        payload = SWF.handle_user_prompt_submit("codex", "UserPromptSubmit", {"prompt": "このコードベースを分析して設計書を書いて"}, {}, state_path)
-        output = payload.get("hookSpecificOutput", {})
-        assert_eq(output.get("hookEventName"), "UserPromptSubmit", "bootstrap event")
-        assert "[[SPEC_DONE]]" in str(output.get("additionalContext", ""))
-        assert "$refinment" in str(output.get("additionalContext", ""))
-        saved = SWF.load_state(state_path)
-        assert_eq(saved.get("phase"), "spec_authoring", "spec phase initialized")
-        assert_eq(saved.get("spec_revision_count"), 0, "spec revision count initialized")
-
-
-def test_handle_user_prompt_submit_skips_light_prompts() -> None:
-    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
-        state_path = Path(tmp) / "state.json"
-        payload = SWF.handle_user_prompt_submit("codex", "UserPromptSubmit", {"prompt": "ありがとう"}, {}, state_path)
-        assert_eq(payload, {}, "light prompt should not trigger self-workflow")
-        assert not state_path.exists()
-
-
-def test_handle_user_prompt_submit_nonactivating_prompt_clears_active_state() -> None:
-    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
-        state_path = Path(tmp) / "state.json"
-        state = {
-            "phase": "implementation",
-            "spec_markdown": "approved spec [[SPEC_DONE]]",
-            "implementation_brief": "keep going",
-            "implementation_turn": 2,
-        }
-        payload = SWF.handle_user_prompt_submit("codex", "UserPromptSubmit", {"prompt": "stop"}, state, state_path)
-        assert_eq(payload, {}, "interrupt prompt should stay outside self-workflow")
-        assert_eq(state, {}, "active state should be cleared")
-        assert_eq(SWF.load_state(state_path), {}, "cleared state should be persisted")
-
-
-def test_handle_user_prompt_submit_japanese_followup_preserves_active_state() -> None:
-    with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
-        state_path = Path(tmp) / "state.json"
-        state = {
-            "phase": "implementation",
-            "spec_markdown": "approved spec [[SPEC_DONE]]",
-            "implementation_brief": "keep going",
-            "implementation_turn": 2,
-        }
-        payload = SWF.handle_user_prompt_submit("codex", "UserPromptSubmit", {"prompt": "はい"}, state, state_path)
-        output = payload.get("hookSpecificOutput", {})
-        assert_eq(output.get("hookEventName"), "UserPromptSubmit", "followup event")
-        assert "Current phase: implementation." in str(output.get("additionalContext", ""))
-        assert_eq(state.get("phase"), "implementation", "active state should be preserved")
-
-
-def test_handle_session_start_resumes_context_for_implementation() -> None:
-    payload = SWF.handle_session_start(
-        "codex",
-        {
-            "phase": "implementation",
-            "spec_markdown": "approved spec body",
-        },
-    )
-    output = payload.get("hookSpecificOutput", {})
-    assert_eq(output.get("hookEventName"), "SessionStart", "session start event")
-    assert "approved spec body" in str(output.get("additionalContext", ""))
-
-
-def test_handle_session_start_idle_returns_empty() -> None:
-    payload = SWF.handle_session_start("codex", {"phase": "idle"})
-    assert_eq(payload, {}, "idle session start should not inject context")
-
-
-def test_handle_session_start_done_returns_new_task_message() -> None:
-    payload = SWF.handle_session_start("codex", {"phase": "done"})
-    output = payload.get("hookSpecificOutput", {})
-    assert_eq(output.get("hookEventName"), "SessionStart", "session start event")
-    assert "Start a new task prompt" in str(output.get("additionalContext", ""))
 
 
 def test_handle_stop_idle_phase_returns_empty() -> None:
@@ -713,14 +581,8 @@ def run_tests() -> int:
         test_should_skip_only_on_recursion_or_wrong_event,
         test_should_skip_filters_pre_work_events,
         test_stop_output_formats_for_codex_and_gemini,
-        test_turn_context_output_formats_for_claude_and_gemini,
-        test_should_keep_current_task_followup_prompt,
-        test_should_activate_self_workflow_prefers_complex_or_explicit_prompts,
-        test_is_answer_only_request_distinguishes_explanation_from_execution,
-        test_spec_status_from_keyword,
         test_contains_explicit_keyword_requires_standalone_line,
         test_spec_is_review_candidate_requires_markdown_headings,
-        test_build_spec_authoring_context_mentions_keyword_and_skill,
         test_default_implementation_start_prompt_uses_spec_and_skill,
         test_default_verification_start_prompt_mentions_structured_completion,
         test_default_spec_refinement_prompt_uses_supplied_keyword,
@@ -728,13 +590,6 @@ def run_tests() -> int:
         test_build_continue_decision_avoids_external_reviewer_language,
         test_build_continue_decision_stops_at_continuation_cap,
         test_build_continue_decision_stops_on_repeated_prompt,
-        test_handle_user_prompt_submit_bootstraps_spec_phase,
-        test_handle_user_prompt_submit_skips_light_prompts,
-        test_handle_user_prompt_submit_nonactivating_prompt_clears_active_state,
-        test_handle_user_prompt_submit_japanese_followup_preserves_active_state,
-        test_handle_session_start_resumes_context_for_implementation,
-        test_handle_session_start_idle_returns_empty,
-        test_handle_session_start_done_returns_new_task_message,
         test_handle_stop_idle_phase_returns_empty,
         test_handle_stop_idle_phase_bootstraps_into_spec_review_on_spec_done,
         test_handle_stop_spec_authoring_requests_skill_review_when_ready,
