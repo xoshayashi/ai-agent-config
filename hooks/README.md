@@ -48,6 +48,9 @@ brief inside the current CLI instead of shelling out to another model. Keep that
 focused on selective use, minimal edits, and visible `Refined prompt:` output
 when it changes startup behavior.
 
+`refinment` is invoked through the CLI's native skill-routing path, not as a
+separately registered Hook script.
+
 In same-LLM mode, managed hooks use this flow:
 
 1. Startup event (`UserPromptSubmit` or `BeforeAgent`): inject a specification brief and let the current CLI decide whether to use `refinment`
@@ -60,10 +63,6 @@ Completion keywords and stop conditions are defined in `instructions/HOOKS.md`.
 When `self_workflow.py` auto-continues from a Claude/Codex/Gemini completion
 hook, the UI may still label that event as `blocked` or `denied`; this is the
 current official continuation mechanism rather than an error.
-
-The reusable `refinment.py` script remains in this repository as a
-hook-compatible helper, but the active path relies on the installable
-`refinment` Skill rather than on hook-level external LLM calls.
 
 Key guardrails:
 

@@ -14,7 +14,6 @@ sh scripts/validate-repo.sh
 
 # Individual unit test files
 python3 tests/test_merge_hook_config.py
-python3 tests/test_refinment.py
 python3 tests/test_self_workflow.py
 
 # Setup / update / health-check / uninstall, dry-run first
@@ -27,7 +26,7 @@ sh scripts/health-check.sh --json   # masked by default; set AI_AGENT_HEALTH_RED
 python3 scripts/skill-improvement-bot.py scan
 ```
 
-There is no test runner, no linter, and no package manager. `validate-repo.sh` does: `sh -n` syntax checks for shell scripts, `python3 -m py_compile` for Python, doc-grep assertions on README/setup, the three unit tests above, and a fixture scan for the skill-improvement bot.
+There is no test runner, no linter, and no package manager. `validate-repo.sh` does: `sh -n` syntax checks for shell scripts, `python3 -m py_compile` for Python, doc-grep assertions on README/setup, the two unit tests above, and a fixture scan for the skill-improvement bot.
 
 ## Architecture
 

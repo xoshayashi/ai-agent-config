@@ -82,6 +82,37 @@ def test_completion_keywords_from_hooks_md() -> None:
         with_env({"AI_AGENT_HOOKS_RULES_DOC": str(hooks_md)}, _run)
 
 
+def test_completion_keywords_prefer_first_match_per_category() -> None:
+    with tempfile.TemporaryDirectory(prefix="hooks-md-test-") as tmp:
+        hooks_md = Path(tmp) / "HOOKS.md"
+        hooks_md.write_text(
+            "\n".join(
+                [
+                    "# test",
+                    "",
+                    "- [[SPEC_DONE]]",
+                    "- [[IMPLEMENTATION_DONE]]",
+                    "- [[IMPLEMENTATION_DONE:V2]]",
+                    "- [[VERIFICATION_DONE]]",
+                    "- [[VERIFICATION_DONE:V2]]",
+                    "- [[TASK_DONE]]",
+                    "- [[TASK_DONE:V2]]",
+                ]
+            )
+            + "\n",
+            encoding="utf-8",
+        )
+
+        def _run() -> None:
+            spec_done, implementation_done, verification_done, task_done = SWF.completion_keywords()
+            assert_eq(spec_done, "[[SPEC_DONE]]", "spec keyword")
+            assert_eq(implementation_done, "[[IMPLEMENTATION_DONE]]", "implementation keyword prefers first")
+            assert_eq(verification_done, "[[VERIFICATION_DONE]]", "verification keyword prefers first")
+            assert_eq(task_done, "[[TASK_DONE]]", "task keyword prefers first")
+
+        with_env({"AI_AGENT_HOOKS_RULES_DOC": str(hooks_md)}, _run)
+
+
 def test_should_skip_only_on_recursion_or_wrong_event() -> None:
     data = {"hook_event_name": "UserPromptSubmit", "stop_hook_active": False}
     assert SWF.should_skip("codex", data) is False
@@ -290,6 +321,31 @@ def test_handle_user_prompt_submit_skips_light_prompts() -> None:
         payload = SWF.handle_user_prompt_submit("codex", "UserPromptSubmit", {"prompt": "ありがとう"}, {}, state_path)
         assert_eq(payload, {}, "light prompt should not trigger self-workflow")
         assert not state_path.exists()
+
+
+def test_handle_session_start_resumes_context_for_implementation() -> None:
+    payload = SWF.handle_session_start(
+        "codex",
+        {
+            "phase": "implementation",
+            "spec_markdown": "approved spec body",
+        },
+    )
+    output = payload.get("hookSpecificOutput", {})
+    assert_eq(output.get("hookEventName"), "SessionStart", "session start event")
+    assert "approved spec body" in str(output.get("additionalContext", ""))
+
+
+def test_handle_session_start_idle_returns_empty() -> None:
+    payload = SWF.handle_session_start("codex", {"phase": "idle"})
+    assert_eq(payload, {}, "idle session start should not inject context")
+
+
+def test_handle_session_start_done_returns_new_task_message() -> None:
+    payload = SWF.handle_session_start("codex", {"phase": "done"})
+    output = payload.get("hookSpecificOutput", {})
+    assert_eq(output.get("hookEventName"), "SessionStart", "session start event")
+    assert "Start a new task prompt" in str(output.get("additionalContext", ""))
 
 
 def test_handle_stop_spec_authoring_requests_skill_review_when_ready() -> None:
@@ -521,6 +577,7 @@ def run_tests() -> int:
         test_parse_json_from_text,
         test_parse_json_from_fenced_text,
         test_completion_keywords_from_hooks_md,
+        test_completion_keywords_prefer_first_match_per_category,
         test_should_skip_only_on_recursion_or_wrong_event,
         test_stop_output_formats_for_codex_and_gemini,
         test_turn_context_output_formats_for_claude_and_gemini,
@@ -539,6 +596,9 @@ def run_tests() -> int:
         test_build_continue_decision_stops_on_repeated_prompt,
         test_handle_user_prompt_submit_bootstraps_spec_phase,
         test_handle_user_prompt_submit_skips_light_prompts,
+        test_handle_session_start_resumes_context_for_implementation,
+        test_handle_session_start_idle_returns_empty,
+        test_handle_session_start_done_returns_new_task_message,
         test_handle_stop_spec_authoring_requests_skill_review_when_ready,
         test_handle_stop_spec_authoring_can_use_structured_fallback_review,
         test_handle_stop_spec_review_done_moves_to_implementation,

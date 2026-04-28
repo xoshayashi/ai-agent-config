@@ -40,5 +40,3 @@
 ## 参照
 
 - 現行設計: [self-workflow-hooks.md](./self-workflow-hooks.md)
-- 旧 Codex-hub 案: [codex-hub-orchestration.md](./codex-hub-orchestration.md)
-- 旧 response-strategy 案: [response-strategy-autonomy.md](./response-strategy-autonomy.md)
