@@ -92,6 +92,45 @@ sh /path/to/llm-config/scripts/health-check.sh
 sh /path/to/llm-config/scripts/uninstall.sh
 ```
 
+## オプション: 3 CLI の auto-permission モードを既定化
+
+> ⚠️ **これは安全側を下げる opt-in です。** 内容を理解した上で、自己責任で実行してください。
+> 非エンジニアの方や、AI エージェントが自分のマシンで何をしうるか把握していない場合は **使わないでください**。
+
+`shell/auto-permission.sh` には、Codex / Gemini CLI / Claude Code を **承認スキップ・auto モード**で起動する shell 用ラッパーが入っています。
+
+| CLI | 適用される flag |
+|---|---|
+| `codex` | `--dangerously-bypass-approvals-and-sandbox` |
+| `gemini` | `--yolo` |
+| `claude` | `--permission-mode auto`（通常セッション時のみ。`auth` / `mcp` / `plugin` / `doctor` 等は素の挙動） |
+
+これを有効化すると、これら 3 CLI から起動した AI エージェントは **ファイル削除・コマンド実行・shell 操作などをユーザに毎回確認せずに行えます**。
+
+### 有効化
+
+`scripts/setup.sh` には**意図的に組み込まれていません**。明示的に opt-in する場合のみ、専用スクリプトを実行してください。
+
+```sh
+sh /path/to/llm-config/scripts/enable-auto-permission.sh
+```
+
+実行すると、変更内容（追加されるシンボリックリンクと shell rc に追記される marker block）を表示してから、`y/N` で確認します。**Enter キーは「いいえ」**。
+
+非インタラクティブな環境で確認をスキップしたい場合（CI 等）：
+
+```sh
+AI_AGENT_ASSUME_YES=1 sh /path/to/llm-config/scripts/enable-auto-permission.sh
+```
+
+### 無効化
+
+```sh
+sh /path/to/llm-config/scripts/disable-auto-permission.sh
+```
+
+shell rc から marker block を削除し、シンボリックリンクを `trash` に送ります。冪等です。
+
 ## 自然言語トリガー（運用）
 
 - 「**急ぎ対応したいんだけど**」→ `scripts/update.sh`
