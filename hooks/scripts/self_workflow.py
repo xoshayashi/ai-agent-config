@@ -47,15 +47,32 @@ TRIVIAL_PROMPT_PATTERN = re.compile(
     r"^\s*(ありがとう|thanks|thank you|ok|了解|はい|いいえ|stop|pause|status|進捗|止めて)[。.!?\s]*$",
     re.IGNORECASE,
 )
+INFORMATIONAL_PROMPT_PATTERN = re.compile(
+    r"(\?|？|\bwhat\b|\bhow\b|\bwhy\b|\bcan\b|\bdifference\b|\bcompare\b|\bexplain\b|"
+    r"教えて|説明して|解説して|違い|どう(?:違う|使う|動く)?|なぜ|何が|可能ですか|できますか|比較して)",
+    re.IGNORECASE,
+)
 SELF_WORKFLOW_EXPLICIT_TRIGGER_PATTERN = re.compile(
     r"(orchestrat|spec|design doc|architecture|review|verification|pull request|\bpr\b|"
     r"仕様|設計|設計書|アーキテクチャ|実装計画|検証|レビュー|調査|分析|ブランチ|フック|"
     r"hook|skill|agent|automation|自動化|リファクタ|テスト|不具合|バグ)",
     re.IGNORECASE,
 )
-SELF_WORKFLOW_ACTION_PATTERN = re.compile(
-    r"(implement|build|fix|refactor|analy[sz]e|research|review|debug|write|create|update|"
-    r"作成|修正|実装|調査|分析|確認|検証|改善|更新|整理)",
+EXECUTION_REQUEST_PATTERN = re.compile(
+    r"(implement|build|fix|refactor|debug|write|create|update|edit|draft|generate|"
+    r"作成|修正|実装|改善|更新|整理|追加|編集|書いて|作って|直して)",
+    re.IGNORECASE,
+)
+ARTIFACT_CONTEXT_PATTERN = re.compile(
+    r"(\brepo\b|\brepository\b|\bcodebase\b|\bbranch\b|\bcommit\b|\bdiff\b|"
+    r"\bfile\b|\bpath\b|\bdocument\b|\breport\b|\bspec\b|"
+    r"\bissue\b|\bprd\b|README|instructions/|hooks/|skills/|scripts/|"
+    r"リポジトリ|コードベース|ブランチ|コミット|差分|ファイル|パス|設計書|仕様書|報告書|資料)",
+    re.IGNORECASE,
+)
+DELTA_ONLY_RESPONSE_PATTERN = re.compile(
+    r"(\bdelta\b|\bcorrection\b|\berrata\b|\bclarification\b|\bupdate\b|"
+    r"補足|追記|訂正|修正|差分|更新|追加確認)",
     re.IGNORECASE,
 )
 PHASE_SIGNAL_PATTERN = re.compile(
@@ -347,6 +364,34 @@ def should_keep_current_task(prompt: str) -> bool:
     return False
 
 
+def prompt_features(prompt: str) -> dict[str, bool | int]:
+    stripped = prompt.strip()
+    line_count = len([line for line in stripped.splitlines() if line.strip()])
+    stripped_without_urls = re.sub(r"https?://\S+", " ", stripped)
+    has_local_path_like = re.search(
+        r"\b[A-Za-z][A-Za-z0-9_-]*/[A-Za-z][A-Za-z0-9_.-]+\b",
+        stripped_without_urls,
+    )
+    has_path_like = bool(has_local_path_like or re.search(r"\.(?:py|md|json)\b", stripped))
+    has_artifact_context = bool(has_path_like or ARTIFACT_CONTEXT_PATTERN.search(stripped_without_urls))
+    has_execution_request = EXECUTION_REQUEST_PATTERN.search(stripped) is not None
+    looks_informational = INFORMATIONAL_PROMPT_PATTERN.search(stripped) is not None
+    long_enough = len(stripped) >= 140 or line_count >= 3
+    has_explicit_trigger = SELF_WORKFLOW_EXPLICIT_TRIGGER_PATTERN.search(stripped) is not None
+    return {
+        "has_artifact_context": has_artifact_context,
+        "has_execution_request": has_execution_request,
+        "looks_informational": looks_informational,
+        "long_enough": long_enough,
+        "has_explicit_trigger": has_explicit_trigger,
+    }
+
+
+def is_answer_only_request(prompt: str) -> bool:
+    features = prompt_features(prompt)
+    return bool(features["looks_informational"] and not features["has_execution_request"])
+
+
 def should_activate_self_workflow(prompt: str) -> bool:
     stripped = prompt.strip()
     if not stripped:
@@ -355,19 +400,21 @@ def should_activate_self_workflow(prompt: str) -> bool:
         # Keep lightweight acknowledgements as plain user turns even when a task
         # is already in progress; the session state remains available at Stop.
         return False
-    if SELF_WORKFLOW_EXPLICIT_TRIGGER_PATTERN.search(stripped):
-        return True
 
-    line_count = len([line for line in stripped.splitlines() if line.strip()])
-    stripped_without_urls = re.sub(r"https?://\S+", " ", stripped)
-    has_local_path_like = re.search(
-        r"\b[A-Za-z][A-Za-z0-9_-]*/[A-Za-z][A-Za-z0-9_.-]+\b",
-        stripped_without_urls,
-    )
-    has_path_like = bool(has_local_path_like or re.search(r"\.(?:py|md|json)\b", stripped))
-    has_action = SELF_WORKFLOW_ACTION_PATTERN.search(stripped) is not None
-    long_enough = len(stripped) >= 140 or line_count >= 3
-    return bool(has_action and (long_enough or has_path_like))
+    features = prompt_features(stripped)
+    has_artifact_context = bool(features["has_artifact_context"])
+    has_execution_request = bool(features["has_execution_request"])
+    long_enough = bool(features["long_enough"])
+    has_explicit_trigger = bool(features["has_explicit_trigger"])
+    if is_answer_only_request(stripped):
+        return False
+    if has_explicit_trigger:
+        return bool(has_execution_request or has_artifact_context or long_enough)
+    return bool(has_execution_request and (long_enough or has_artifact_context))
+
+
+def prefer_delta_only_followup(response: str) -> bool:
+    return DELTA_ONLY_RESPONSE_PATTERN.search(response) is not None
 
 
 def normalize_checks_run(value: Any) -> list[str]:
@@ -523,6 +570,9 @@ def default_verification_start_prompt(
         f"Do not stop yet. Before deciding completion, use {REFINMENT_SKILL} to tighten the verification brief. "
         "Then run the most relevant tests or verification checks, inspect the diff, "
         "and perform a focused self-review against the approved specification.\n"
+        "If verification finds only a narrow factual omission or recommendation change, do not restate the whole earlier answer. "
+        "Respond with the delta only: the corrected point, why it matters, and the revised conclusion.\n"
+        "If verification confirms the prior answer as-is, do not repeat the answer body. Briefly note the checks and finish.\n"
         f"Use {verification_done_keyword} only when verification and self-review are complete. "
         f"Use {task_done_keyword} only when the task is truly complete end-to-end.\n\n"
         "If you want to report structured completion evidence, include a fenced JSON object with:\n"
@@ -598,10 +648,19 @@ def default_verification_continue_prompt(
     verification_done_keyword: str,
     task_done_keyword: str,
 ) -> str:
+    delta_guidance = (
+        "When only a small correction or supplement is needed, give the delta only instead of retelling the whole answer.\n"
+    )
+    if prefer_delta_only_followup(response):
+        delta_guidance = (
+            "Keep the follow-up delta-only unless verification uncovered a broader problem. "
+            "Do not restate unchanged background.\n"
+        )
     return (
         f"Use {REFINMENT_SKILL} on the verification state. "
         "Decide whether any meaningful verification, diff inspection, or self-review work is still missing. "
         "Then perform the smallest missing verification or fix yourself in the same turn.\n"
+        f"{delta_guidance}"
         f"Emit {verification_done_keyword} and {task_done_keyword} only when the task is truly complete, "
         'or return a fenced JSON packet such as {"phase_signal":"task_complete","summary":"...","checks_run":["..."],"diff_reviewed":true,"self_review_complete":true} when the completion evidence is real.\n\n'
         f"Approved specification:\n{spec_markdown}\n\n"

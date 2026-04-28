@@ -14,6 +14,10 @@ The shared pattern is:
 4. completion hooks decide whether to stop or auto-continue that **same CLI**
 5. the loop ends only after verification evidence is present
 
+The runtime uses a generic intent split: answer-only turns usually stay
+outside this loop, while artifact/execution turns can enter it when they need
+bounded multi-step work.
+
 ## Active Runtime
 
 - Hook script: `hooks/scripts/self_workflow.py`
@@ -48,7 +52,8 @@ completion when more work is needed.
    or verification-readiness decision is unclear.
 4. **Verification**  
    `[[IMPLEMENTATION_DONE]]` is only a handoff into verification, not final
-   completion.
+   completion. If verification finds only a narrow omission, respond with the
+   correction delta instead of restating the full earlier answer.
 5. **Done**  
    Completion requires `[[VERIFICATION_DONE]]` plus `[[TASK_DONE]]`, or a
    structured `phase_signal="task_complete"` packet with real evidence.

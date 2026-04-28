@@ -42,6 +42,9 @@ the main path.
 Even with the managed hook always installed, the runtime should activate only
 for heavier design / implementation / review prompts rather than every trivial
 turn.
+The runtime should make a generic intent split: answer-only turns stay outside
+the loop, while artifact/execution turns can enter it when they need bounded
+multi-step work.
 
 The active Skill path is self-contained. `skills/refinment` refines the working
 brief inside the current CLI instead of shelling out to another model. Keep that Skill
@@ -57,7 +60,7 @@ In same-LLM mode, managed hooks use this flow:
 2. If `refinment` is used on the original task prompt, the CLI shows the refined prompt to the user before continuing
 3. Completion event after a spec draft is ready enough for review: auto-continue the same CLI with a prompt that tells it to use `refinment`
 4. Completion event during implementation: auto-continue the same CLI with a prompt that tells it to use `refinment` for the next-step or verification-ready decision
-5. Completion event during verification: auto-continue the same CLI with a prompt that tells it to use `refinment` before declaring completion
+5. Completion event during verification: auto-continue the same CLI with a prompt that tells it to use `refinment` before declaring completion, and prefer delta-only corrections when only a narrow omission was found
 
 Completion keywords and stop conditions are defined in `instructions/HOOKS.md`.
 When `self_workflow.py` auto-continues from a Claude/Codex/Gemini completion
