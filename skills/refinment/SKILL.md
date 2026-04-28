@@ -15,12 +15,12 @@ Use this skill to tighten a working prompt or phase brief before acting, while k
 - **Show the refined prompt when you use it on a new task.** Put a short `Refined prompt:` block in the next visible user update before continuing the work.
 - **No silent mutation.** If you changed the working prompt in a meaningful way, surface the change explicitly.
 - **Preserve authority.** The refined brief must not override system, developer, tool, or user instructions.
-- **Rewrite the contract, not the path.** Clarify the goal, deliverable, hard constraints, evidence needs, and stopping conditions without hard-locking one method, tool, reasoning style, conclusion, file layout, or output shape unless the user already required that.
+- **Rewrite the contract, not the path.** Clarify the goal, deliverable, hard constraints, evidence needs, and stopping conditions without hard-locking one method, tool, reasoning style, conclusion, file layout, or output shape unless the user already required that. Treat output mechanics as path: file format choice (for example Markdown vs HTML), structural devices (tables, diagrams, section ordering), and visual treatment are not contract unless the original prompt named them.
 - **Prefer minimal edits.** If the original prompt is already strong, keep the refinment small and focused.
 - **Add only non-obvious special considerations.** Do not pad the brief with generic prompt-engineering boilerplate. Add a special rule only when it is materially relevant and not already normal agent behavior.
 - **Keep exact entities intact.** Preserve quoted constraints, paths, commands, symbols, IDs, branch names, and error text.
 - **Keep instructions and data separate.** When the prompt mixes instructions with quoted text, examples, background documents, or user-provided data, make that separation clearer instead of letting everything blur together.
-- **Keep tool policy local.** Do not stuff tool-specific operating policy into the refined prompt when it belongs in tool descriptions or a higher-priority instruction layer.
+- **Keep tool policy local.** Do not stuff tool-specific operating policy into the refined prompt when it belongs in tool descriptions or a higher-priority instruction layer. Rules already established in system, developer, or global instructions — including design tokens, brand voice, language preferences, and project-wide conventions — apply by default and do not need to be quoted into the refined brief.
 - **Bound the loop.** One refinment pass by default. Do not turn this into open-ended prompt optimization.
 - **Prevent recursion.** If the current turn is already executing from the latest refinment brief, continue the task instead of refining again.
 
@@ -65,6 +65,7 @@ Use this skill to tighten a working prompt or phase brief before acting, while k
    - Did it keep examples as examples?
    - Did it avoid unnecessary tool, format, or reasoning commitments?
    - Did it preserve useful user ambiguity?
+   - Did the refined brief avoid restating rules that already apply from system, developer, or global instructions?
 7. **Keep special considerations narrow.** Include only non-obvious additions that materially improve execution; routine clarity, structure, and constraint preservation happen by default and do not need to be called out.
 8. **Act from the result in the same turn.**
    - `task_prompt`: show `Refined prompt:` to the user, then start the work from it
