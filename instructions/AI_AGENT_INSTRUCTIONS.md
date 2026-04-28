@@ -23,6 +23,7 @@
 | **Skill improvement logs** | When the user asks to inspect recent LLM CLI usage for skill improvements, run the local skill-improvement scanner and summarize only redacted proposals. |
 | **Design discipline** | For any user-facing output that involves visual or verbal style — copy tone, color choices, typography hints, UI suggestions, document layout — follow `instructions/DESIGN.md` (Act design language). Defer to the source guideline noted there for full implementation values. |
 | **Hook orchestration** | For Hook-based multi-LLM workflows, follow `instructions/HOOKS.md` for lifecycle, completion keywords, and stop conditions. |
+| **Auto-permission context** | If the user has opted in via `scripts/enable-auto-permission.sh`, this CLI session may have started with approval bypass (`codex --dangerously-bypass-approvals-and-sandbox`, `gemini --yolo`, or `claude --permission-mode auto`). That removes the per-action human gate, so the **completion quality gate, scope discipline, and explicit confirmation for risky actions matter more, not less**. Do not interpret a permissive runtime as permission to take destructive or out-of-scope actions silently. |
 
 ## Scope
 
