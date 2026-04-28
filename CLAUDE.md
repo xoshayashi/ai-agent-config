@@ -68,9 +68,9 @@ The orchestrator implements a Codex-as-hub loop driven by completion keywords (`
 
 Each subdirectory of `skills/` is a self-contained skill that gets symlinked into `$AI_AGENT_SKILLS_DIR` (default `~/.agents/skills`). The `template/` skill is the structural reference for new skills.
 
-### Editable-but-protected entrypoints
+### Editable entrypoints
 
-`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `AI_AGENT_INSTRUCTIONS.md`, and `.github/copilot-instructions.md` carry the macOS ACL `everyone deny delete` after setup (`AI_AGENT_PROTECT_LINKS=auto`). Files can be edited freely, but moving or renaming them locally requires removing the ACL first and reapplying it at the new path.
+`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, `AI_AGENT_INSTRUCTIONS.md`, and `.github/copilot-instructions.md` are now ordinary editable files. They may be changed, moved, or renamed as needed; keep the shared-source-of-truth pattern intact when doing so.
 
 ## Conventions enforced by validation
 
