@@ -29,55 +29,12 @@ SUPPORTED_EVENTS: dict[str, set[str]] = {
     "claude": {"Stop", "SubagentStop"},
     "gemini": {"AfterAgent"},
 }
-ACTIVE_PHASES = {"implementation", "spec_authoring", "spec_review", "verification"}
-
 REFINMENT_SKILL = "$refinment"
 
 DEFAULT_SPEC_DONE_KEYWORD = "[[SPEC_DONE]]"
 DEFAULT_IMPLEMENTATION_DONE_KEYWORD = "[[IMPLEMENTATION_DONE]]"
 DEFAULT_VERIFICATION_DONE_KEYWORD = "[[VERIFICATION_DONE]]"
 DEFAULT_TASK_DONE_KEYWORD = "[[TASK_DONE]]"
-FOLLOWUP_PROMPT_PATTERN = re.compile(
-    r"^\s*(continue|go on|keep going|proceed|next|ok|yes|please continue|implement|apply|fix it|"
-    r"続けて(?:ください)?|続行(?:してください)?|進めて(?:ください)?|次(?:へ)?|そのまま|"
-    r"お願いします|お願い|じゃあ|では|はい|了解|この仕様で実装して|これで進めて|それで進めて)"
-    r"(?:\b|[、。,.\s])",
-    re.IGNORECASE,
-)
-TRIVIAL_PROMPT_PATTERN = re.compile(
-    r"^\s*(ありがとう|thanks|thank you|ok|了解|はい|いいえ|stop|pause|status|進捗|止めて)[。.!?\s]*$",
-    re.IGNORECASE,
-)
-INFORMATIONAL_PROMPT_PATTERN = re.compile(
-    r"(\?|？|\bwhat\b|\bhow\b|\bwhy\b|\bcan\b|\bdifference\b|\bcompare\b|\bexplain\b|"
-    r"教えて|説明して|解説して|違い|どう(?:違う|使う|動く)?|なぜ|何が|可能ですか|できますか|比較して)",
-    re.IGNORECASE,
-)
-EXPLANATION_OUTPUT_PATTERN = re.compile(
-    r"((?:write|draft|create)\s+(?:a|an|the)?\s*(?:short\s+|brief\s+)?"
-    r"(?:summary|explanation|description|overview|clarification|comparison|answer|note)\b|"
-    r"(?:説明|解説|概要|要約|比較|回答)(?:を|の)?(?:短く|簡潔に)?(?:書いて|作って))",
-    re.IGNORECASE,
-)
-SELF_WORKFLOW_EXPLICIT_TRIGGER_PATTERN = re.compile(
-    r"(orchestrat|spec|design doc|architecture|review|verification|pull request|\bpr\b|"
-    r"仕様|設計|設計書|アーキテクチャ|実装計画|検証|レビュー|調査|分析|ブランチ|フック|"
-    r"hook|skill|agent|automation|自動化|リファクタ|テスト|不具合|バグ)",
-    re.IGNORECASE,
-)
-EXECUTION_REQUEST_PATTERN = re.compile(
-    r"(implement|build|fix|refactor|debug|write|create|update|edit|draft|generate|"
-    r"add|analy[sz]e|research|investigate|audit|"
-    r"作成|修正|実装|改善|更新|整理|追加|編集|書いて|作って|直して|調査|分析)",
-    re.IGNORECASE,
-)
-ARTIFACT_CONTEXT_PATTERN = re.compile(
-    r"(\brepo\b|\brepository\b|\bcodebase\b|\bbranch\b|\bcommit\b|\bdiff\b|"
-    r"\bfile\b|\bpath\b|\bdocument\b|\breport\b|\bspec\b|"
-    r"\bissue\b|\bprd\b|README|instructions/|hooks/|skills/|scripts/|"
-    r"リポジトリ|コードベース|ブランチ|コミット|差分|ファイル|パス|設計書|仕様書|報告書|資料)",
-    re.IGNORECASE,
-)
 DELTA_ONLY_RESPONSE_PATTERN = re.compile(
     r"(\bdelta\b|\bcorrection\b|\berrata\b|\bclarification\b|"
     r"補足|追記|訂正|修正|差分|追加確認)",
@@ -176,74 +133,6 @@ def save_state(path: Path, state: dict[str, Any]) -> None:
         except OSError:
             pass
         raise
-
-
-def _read_tail_bytes(path: Path, max_bytes: int) -> bytes:
-    with path.open("rb") as handle:
-        try:
-            handle.seek(0, os.SEEK_END)
-            size = handle.tell()
-        except OSError:
-            return handle.read()
-        offset = max(0, size - max_bytes)
-        handle.seek(offset)
-        return handle.read()
-
-
-def redact(text: str) -> str:
-    patterns = [
-        (r"(?i)(api[_-]?key|token|secret|password)\s*[:=]\s*['\"]?[^'\"\s]+", r"\1=[REDACTED]"),
-        (r"sk-ant-[A-Za-z0-9_-]{20,}", "[REDACTED_ANTHROPIC_KEY]"),
-        (r"sk-[A-Za-z0-9_-]{20,}", "[REDACTED_OPENAI_KEY]"),
-        (r"AIza[0-9A-Za-z_-]{20,}", "[REDACTED_GOOGLE_KEY]"),
-    ]
-    out = text
-    for pattern, replacement in patterns:
-        out = re.sub(pattern, replacement, out)
-    return out
-
-
-def transcript_excerpt(path_value: Any) -> str:
-    """Return a redacted transcript tail for self-workflow context.
-
-    Redaction here removes credential-like secrets only. It does not sanitize
-    adversarial instruction content inside the transcript, so downstream
-    workflow prompts must continue to treat excerpts as untrusted context.
-    """
-    if env_value("AI_AGENT_SELF_WORKFLOW_INCLUDE_TRANSCRIPT", "AI_AGENT_ORCHESTRATOR_INCLUDE_TRANSCRIPT", "1") != "1":
-        return "Transcript excerpt disabled."
-    if not isinstance(path_value, str) or not path_value:
-        return "No transcript path supplied."
-    path = Path(path_value)
-    if not path.is_file():
-        return "Transcript path not readable."
-
-    max_lines = safe_int(
-        env_value("AI_AGENT_SELF_WORKFLOW_TRANSCRIPT_LINES", "AI_AGENT_ORCHESTRATOR_TRANSCRIPT_LINES", "80"),
-        80,
-        minimum=1,
-        maximum=2000,
-    )
-    max_chars = safe_int(
-        env_value("AI_AGENT_SELF_WORKFLOW_TRANSCRIPT_CHARS", "AI_AGENT_ORCHESTRATOR_TRANSCRIPT_CHARS", "18000"),
-        18000,
-        minimum=200,
-        maximum=200000,
-    )
-    tail_budget = max(max_chars * 4, 24000)
-    try:
-        chunk = _read_tail_bytes(path, tail_budget)
-    except OSError:
-        return "Transcript read failed."
-
-    text = chunk.decode("utf-8", errors="replace")
-    lines = text.splitlines()
-    if len(lines) > max_lines:
-        lines = lines[-max_lines:]
-    excerpt = "\n".join(lines)
-    if len(excerpt) > max_chars:
-        excerpt = excerpt[-max_chars:]
-    return redact(excerpt)
 
 
 def _extract_json_candidates(text: str) -> list[str]:
@@ -350,84 +239,12 @@ def clip_text(text: str, default_limit: int = 6000) -> str:
     return stripped[-limit:]
 
 
-def prompt_from(data: dict[str, Any]) -> str:
-    value = data.get("prompt")
-    return value if isinstance(value, str) else ""
-
-
 def response_from(data: dict[str, Any]) -> str:
     for key in ("prompt_response", "last_assistant_message", "response"):
         value = data.get(key)
         if isinstance(value, str) and value.strip():
             return value
     return ""
-
-
-def should_keep_current_task(prompt: str) -> bool:
-    stripped = prompt.strip()
-    if not stripped:
-        return True
-    if FOLLOWUP_PROMPT_PATTERN.search(stripped):
-        return True
-    return False
-
-
-def prompt_features(prompt: str) -> dict[str, bool | int]:
-    stripped = prompt.strip()
-    line_count = len([line for line in stripped.splitlines() if line.strip()])
-    stripped_without_urls = re.sub(r"https?://\S+", " ", stripped)
-    has_local_path_like = re.search(
-        r"\b[A-Za-z][A-Za-z0-9_-]*/[A-Za-z][A-Za-z0-9_.-]+\b",
-        stripped_without_urls,
-    )
-    has_path_like = bool(has_local_path_like or re.search(r"\.(?:py|md|json)\b", stripped))
-    has_artifact_context = bool(has_path_like or ARTIFACT_CONTEXT_PATTERN.search(stripped_without_urls))
-    has_execution_request = EXECUTION_REQUEST_PATTERN.search(stripped) is not None
-    looks_informational = INFORMATIONAL_PROMPT_PATTERN.search(stripped) is not None
-    has_explanation_output_request = EXPLANATION_OUTPUT_PATTERN.search(stripped) is not None
-    long_enough = len(stripped) >= 140 or line_count >= 3
-    has_explicit_trigger = SELF_WORKFLOW_EXPLICIT_TRIGGER_PATTERN.search(stripped) is not None
-    return {
-        "has_artifact_context": has_artifact_context,
-        "has_execution_request": has_execution_request,
-        "looks_informational": looks_informational,
-        "has_explanation_output_request": has_explanation_output_request,
-        "long_enough": long_enough,
-        "has_explicit_trigger": has_explicit_trigger,
-    }
-
-
-def is_answer_only_request(prompt: str) -> bool:
-    features = prompt_features(prompt)
-    looks_informational = bool(features["looks_informational"])
-    has_execution_request = bool(features["has_execution_request"])
-    has_artifact_context = bool(features["has_artifact_context"])
-    has_explanation_output_request = bool(features["has_explanation_output_request"])
-    return bool(
-        (looks_informational and not has_execution_request)
-        or (has_explanation_output_request and not has_artifact_context)
-    )
-
-
-def should_activate_self_workflow(prompt: str) -> bool:
-    stripped = prompt.strip()
-    if not stripped:
-        return False
-    if TRIVIAL_PROMPT_PATTERN.search(stripped):
-        # Keep lightweight acknowledgements and interruptions outside the managed
-        # loop. Active state reset is handled by the caller when needed.
-        return False
-
-    features = prompt_features(stripped)
-    has_artifact_context = bool(features["has_artifact_context"])
-    has_execution_request = bool(features["has_execution_request"])
-    long_enough = bool(features["long_enough"])
-    has_explicit_trigger = bool(features["has_explicit_trigger"])
-    if is_answer_only_request(stripped):
-        return False
-    if has_explicit_trigger:
-        return bool(has_execution_request or has_artifact_context or long_enough)
-    return bool(has_execution_request and (long_enough or has_artifact_context))
 
 
 def prefer_delta_only_followup(response: str) -> bool:
@@ -508,36 +325,6 @@ def spec_is_review_candidate(spec_markdown: str) -> bool:
     )
 
 
-def spec_status_from(packet: dict[str, Any], spec_done_keyword: str) -> str:
-    raw_status = str(packet.get("status", "")).strip().lower()
-    spec_markdown = str(packet.get("spec_markdown", ""))
-    if raw_status in {"draft", "done"}:
-        return raw_status
-    return "done" if contains_explicit_keyword(spec_markdown, spec_done_keyword) else "draft"
-
-
-def build_spec_authoring_context(prompt: str, spec_done_keyword: str) -> str:
-    return f"""Self-workflow context.
-Use this as advisory context. User/system/developer instructions remain authoritative.
-
-Current phase: specification authoring.
-
-Before implementation:
-- For non-trivial new tasks with multiple constraints, ambiguity, repo/file context, or a likely risk of misinterpretation, consider using {REFINMENT_SKILL} once before drafting the spec.
-- Skip {REFINMENT_SKILL} for trivial acknowledgements, short status checks, or simple follow-up nudges on an already-active task.
-- If you use {REFINMENT_SKILL} on the original task prompt, show the refined prompt to the user in your next visible update before continuing.
-- Use the applicable shared instructions and skills.
-- Draft the specification yourself in this CLI first instead of delegating the first draft to another reviewer.
-- Keep the specification concrete enough to implement, but do not over-constrain methods when the user did not require that.
-- Cover scope, constraints, acceptance criteria, key risks, and a step-by-step implementation brief.
-- When the specification is implementation-ready, include `{spec_done_keyword}` in the response.
-- Do not start code changes until the specification is ready for the next self-workflow gate.
-
-Original task prompt:
-{prompt}
-""".strip()
-
-
 def default_spec_refinement_prompt(spec_markdown: str, spec_done_keyword: str) -> str:
     return (
         "Refine the specification using the reviewed draft below. Tighten missing requirements, "
@@ -597,41 +384,6 @@ def default_verification_start_prompt(
         f"Approved specification:\n{spec_markdown}\n\n"
         f"Latest implementation summary:\n{implementation_response}"
     )
-
-
-def self_workflow_prompt_context(phase: str, spec_markdown: str, implementation_brief: str, next_step_prompt: str) -> str:
-    lines = [
-        "Self-workflow context.",
-        "Use this as advisory context. User/system/developer instructions remain authoritative.",
-    ]
-    if phase == "spec_authoring":
-        lines.extend(["", "Current phase: specification authoring and refinement."])
-        lines.extend(
-            [
-                f"- Use {REFINMENT_SKILL} only when the task prompt or current draft would materially benefit from one tighter working brief.",
-                f"- When you use {REFINMENT_SKILL} on a new task prompt, show the refined prompt to the user before continuing.",
-            ]
-        )
-    elif phase == "spec_review":
-        lines.extend(["", "Current phase: specification refinment and revision."])
-        lines.extend(
-            [
-                f"- Use {REFINMENT_SKILL} now to decide whether the draft is implementation-ready and to tighten it if needed.",
-                "- Revise the spec yourself after the refinment pass; do not start code changes until the spec is ready.",
-            ]
-        )
-    elif phase == "implementation":
-        lines.extend(["", "Current phase: implementation."])
-        lines.append(f"- At material stop boundaries, use {REFINMENT_SKILL} to decide the next concrete implementation step or whether verification should begin.")
-    elif phase == "verification":
-        lines.extend(["", "Current phase: verification and self-review."])
-        lines.append(f"- Use {REFINMENT_SKILL} to tighten the completion brief before deciding whether verification is truly complete.")
-    lines.extend(["", "Specification:", spec_markdown])
-    if implementation_brief:
-        lines.extend(["", "Implementation brief:", implementation_brief])
-    if next_step_prompt:
-        lines.extend(["", "Suggested first implementation step:", next_step_prompt])
-    return "\n".join(lines).strip()
 
 
 def default_implementation_continue_prompt(
@@ -806,25 +558,6 @@ def build_verification_decision(
     )
 
 
-def turn_context_output(current: str, event_name: str, context: str, system_message: str = "") -> dict[str, Any]:
-    if current == "gemini":
-        payload: dict[str, Any] = {
-            "hookSpecificOutput": {
-                "additionalContext": context,
-            }
-        }
-    else:
-        payload = {
-            "hookSpecificOutput": {
-                "hookEventName": event_name,
-                "additionalContext": context,
-            }
-        }
-    if system_message:
-        payload["systemMessage"] = system_message
-    return payload
-
-
 def stop_output(current: str, decision: dict[str, Any]) -> dict[str, Any]:
     if decision.get("continue") and decision.get("prompt"):
         if current == "gemini":
@@ -845,104 +578,6 @@ def stop_output(current: str, decision: dict[str, Any]) -> dict[str, Any]:
     if note:
         return {"systemMessage": f"Self-workflow: {note}"}
     return {}
-
-
-def session_start_output(current: str, state: dict[str, Any]) -> dict[str, Any]:
-    phase = str(state.get("phase", "idle"))
-    if phase in {"implementation", "spec_authoring", "spec_review", "verification"}:
-        spec = str(state.get("spec_markdown", ""))
-        if spec:
-            label = "Current specification"
-            if phase == "spec_authoring":
-                label = "Current draft specification (needs refinement)"
-            elif phase == "spec_review":
-                label = "Current specification draft awaiting refinment/revision"
-            elif phase == "verification":
-                label = "Current approved specification (verification in progress)"
-            return turn_context_output(
-                current,
-                "SessionStart",
-                "Resuming self-workflow context.\n\n" + label + ":\n" + spec[:4000],
-            )
-    if phase == "done":
-        return turn_context_output(
-            current,
-            "SessionStart",
-            "Previous self-workflow session is marked done. Start a new task prompt to create a new spec loop.",
-        )
-    return {}
-
-
-def handle_user_prompt_submit(
-    current: str,
-    event_name: str,
-    data: dict[str, Any],
-    state: dict[str, Any],
-    path: Path,
-) -> dict[str, Any]:
-    prompt = prompt_from(data)
-    if not prompt.strip():
-        return {}
-
-    phase = str(state.get("phase", ""))
-    if phase == "implementation" and state.get("spec_markdown") and should_keep_current_task(prompt):
-        context = self_workflow_prompt_context(
-            "implementation",
-            str(state.get("spec_markdown", "")),
-            str(state.get("implementation_brief", "")),
-            "",
-        )
-        return turn_context_output(current, event_name, context)
-    if phase == "verification" and state.get("spec_markdown") and should_keep_current_task(prompt):
-        context = self_workflow_prompt_context(
-            "verification",
-            str(state.get("spec_markdown", "")),
-            str(state.get("implementation_brief", "")),
-            "",
-        )
-        return turn_context_output(current, event_name, context)
-    if phase in {"spec_authoring", "spec_review"} and state.get("spec_markdown") and should_keep_current_task(prompt):
-        context = self_workflow_prompt_context(
-            phase,
-            str(state.get("spec_markdown", "")),
-            str(state.get("implementation_brief", "")),
-            str(state.get("next_step_prompt", "")),
-        )
-        return turn_context_output(current, event_name, context)
-
-    if not should_activate_self_workflow(prompt):
-        if phase in ACTIVE_PHASES and not should_keep_current_task(prompt):
-            state.clear()
-            save_state(path, state)
-        return {}
-
-    spec_done_keyword, _, _, _ = completion_keywords()
-    if phase in ACTIVE_PHASES and not should_keep_current_task(prompt):
-        state.clear()
-    state.update(
-        {
-            "phase": "spec_authoring",
-            "original_prompt": prompt,
-            "refined_prompt": "",
-            "prompt_refinement_used": False,
-            "spec_markdown": "",
-            "implementation_brief": "",
-            "next_step_prompt": "",
-            "implementation_turn": 0,
-            "verification_turn": 0,
-            "spec_revision_count": 0,
-            "continuation_count": 0,
-            "same_prompt_count": 0,
-            "last_continuation_prompt": "",
-            "last_phase_signal": "",
-            "verification_summary": "",
-            "checks_run_count": 0,
-            "diff_reviewed": False,
-            "self_review_complete": False,
-        }
-    )
-    save_state(path, state)
-    return turn_context_output(current, event_name, build_spec_authoring_context(prompt, spec_done_keyword))
 
 
 def handle_stop(current: str, data: dict[str, Any], state: dict[str, Any], path: Path) -> dict[str, Any]:
@@ -1117,10 +752,6 @@ def handle_stop(current: str, data: dict[str, Any], state: dict[str, Any], path:
     decision = build_continue_decision(state, data, response)
     save_state(path, state)
     return stop_output(current, decision)
-
-
-def handle_session_start(current: str, state: dict[str, Any]) -> dict[str, Any]:
-    return session_start_output(current, state)
 
 
 def main() -> int:
