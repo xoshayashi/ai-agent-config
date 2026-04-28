@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Unit tests for hooks/scripts/multillm_orchestrator.py."""
+"""Unit tests for hooks/scripts/self_workflow.py."""
 
 from __future__ import annotations
 
@@ -12,11 +12,11 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-MODULE_PATH = REPO_ROOT / "hooks" / "scripts" / "multillm_orchestrator.py"
+MODULE_PATH = REPO_ROOT / "hooks" / "scripts" / "self_workflow.py"
 
 
 def load_module():
-    spec = importlib.util.spec_from_file_location("multillm_orchestrator", MODULE_PATH)
+    spec = importlib.util.spec_from_file_location("self_workflow", MODULE_PATH)
     if spec is None or spec.loader is None:  # pragma: no cover
         raise RuntimeError(f"cannot load {MODULE_PATH}")
     module = importlib.util.module_from_spec(spec)
@@ -24,7 +24,7 @@ def load_module():
     return module
 
 
-MLO = load_module()
+SWF = load_module()
 
 
 def assert_eq(actual, expected, message: str = "") -> None:
@@ -50,7 +50,7 @@ def with_env(updates: dict[str, str | None], fn):
 
 
 def test_parse_json_from_text() -> None:
-    parsed = MLO.parse_json_from_text('{"action":"continue","next_prompt_for_codex":"x"}')
+    parsed = SWF.parse_json_from_text('{"action":"continue","next_prompt_for_codex":"x"}')
     assert_eq(parsed.get("action"), "continue", "direct JSON parse")
 
 
@@ -60,7 +60,7 @@ def test_parse_json_from_fenced_text() -> None:
 {"status":"done","implementation_brief":"ok"}
 ```
 """
-    parsed = MLO.parse_json_from_text(text)
+    parsed = SWF.parse_json_from_text(text)
     assert_eq(parsed.get("status"), "done", "fenced JSON parse")
 
 
@@ -73,7 +73,7 @@ def test_completion_keywords_from_hooks_md() -> None:
         )
 
         def _run() -> None:
-            spec_done, implementation_done, verification_done, task_done = MLO.completion_keywords()
+            spec_done, implementation_done, verification_done, task_done = SWF.completion_keywords()
             assert_eq(spec_done, "[[SPEC_DONE]]", "spec keyword")
             assert_eq(implementation_done, "[[IMPLEMENTATION_DONE]]", "implementation keyword")
             assert_eq(verification_done, "[[VERIFICATION_DONE]]", "verification keyword default")
@@ -84,50 +84,64 @@ def test_completion_keywords_from_hooks_md() -> None:
 
 def test_should_skip_only_on_recursion_or_wrong_event() -> None:
     data = {"hook_event_name": "UserPromptSubmit", "stop_hook_active": False}
-    assert MLO.should_skip("codex", data) is False
+    assert SWF.should_skip("codex", data) is False
 
     def _run() -> None:
-        assert MLO.should_skip("codex", data) is True
+        assert SWF.should_skip("codex", data) is True
 
-    with_env({"AI_AGENT_ORCHESTRATOR_ACTIVE": "1"}, _run)
+    with_env({"AI_AGENT_SELF_WORKFLOW_ACTIVE": "1"}, _run)
 
 
-def test_codex_stop_output_continue() -> None:
-    payload = MLO.codex_stop_output(
+def test_stop_output_formats_for_codex_and_gemini() -> None:
+    payload = SWF.stop_output(
+        "codex",
+        {"continue": True, "prompt": "次のステップを実行", "note": "missing verification"},
+    )
+    gemini_payload = SWF.stop_output(
+        "gemini",
         {"continue": True, "prompt": "次のステップを実行", "note": "missing verification"}
     )
     assert_eq(payload.get("decision"), "block", "stop continuation decision")
+    assert_eq(gemini_payload.get("decision"), "deny", "gemini continuation decision")
     assert payload.get("reason")
 
 
+def test_turn_context_output_formats_for_claude_and_gemini() -> None:
+    claude_payload = SWF.turn_context_output("claude", "UserPromptSubmit", "context")
+    gemini_payload = SWF.turn_context_output("gemini", "BeforeAgent", "context")
+    assert_eq(claude_payload.get("hookSpecificOutput", {}).get("hookEventName"), "UserPromptSubmit", "claude hook event")
+    assert_eq(claude_payload.get("hookSpecificOutput", {}).get("additionalContext"), "context", "claude context")
+    assert_eq(gemini_payload.get("hookSpecificOutput", {}).get("additionalContext"), "context", "gemini context")
+
+
 def test_should_keep_current_task_followup_prompt() -> None:
-    assert MLO.should_keep_current_task("続けて")
-    assert MLO.should_keep_current_task("続けて。テストも追加して、最後に差分確認して")
-    assert MLO.should_keep_current_task("この仕様で実装して")
-    assert MLO.should_keep_current_task("fix it")
-    assert not MLO.should_keep_current_task("新しい機能を追加したい")
+    assert SWF.should_keep_current_task("続けて")
+    assert SWF.should_keep_current_task("続けて。テストも追加して、最後に差分確認して")
+    assert SWF.should_keep_current_task("この仕様で実装して")
+    assert SWF.should_keep_current_task("fix it")
+    assert not SWF.should_keep_current_task("新しい機能を追加したい")
 
 
-def test_should_activate_orchestration_prefers_complex_or_explicit_prompts() -> None:
-    assert MLO.should_activate_orchestration("このコードベースを分析して詳細な設計書を書いて")
-    assert MLO.should_activate_orchestration("Hook の仕様と実装計画を確認して修正して")
-    assert not MLO.should_activate_orchestration("ありがとう")
-    assert not MLO.should_activate_orchestration("status")
-    assert not MLO.should_activate_orchestration("improve the docstring")
-    assert not MLO.should_activate_orchestration("fix the error in https://example.com/api")
-    assert not MLO.should_activate_orchestration("fix 1/4 of the tests")
+def test_should_activate_self_workflow_prefers_complex_or_explicit_prompts() -> None:
+    assert SWF.should_activate_self_workflow("このコードベースを分析して詳細な設計書を書いて")
+    assert SWF.should_activate_self_workflow("Hook の仕様と実装計画を確認して修正して")
+    assert not SWF.should_activate_self_workflow("ありがとう")
+    assert not SWF.should_activate_self_workflow("status")
+    assert not SWF.should_activate_self_workflow("improve the docstring")
+    assert not SWF.should_activate_self_workflow("fix the error in https://example.com/api")
+    assert not SWF.should_activate_self_workflow("fix 1/4 of the tests")
 
 
 def test_spec_status_from_keyword() -> None:
     packet = {"status": "unknown", "spec_markdown": "ready\n[[SPEC_DONE]]"}
-    status = MLO.spec_status_from(packet, "[[SPEC_DONE]]")
+    status = SWF.spec_status_from(packet, "[[SPEC_DONE]]")
     assert_eq(status, "done", "spec status inferred from keyword")
 
 
 def test_contains_explicit_keyword_requires_standalone_line() -> None:
-    assert MLO.contains_explicit_keyword("done\n[[IMPLEMENTATION_DONE]]\n", "[[IMPLEMENTATION_DONE]]")
-    assert MLO.contains_explicit_keyword("- [[TASK_DONE]]", "[[TASK_DONE]]")
-    assert not MLO.contains_explicit_keyword("explain [[IMPLEMENTATION_DONE]] usage", "[[IMPLEMENTATION_DONE]]")
+    assert SWF.contains_explicit_keyword("done\n[[IMPLEMENTATION_DONE]]\n", "[[IMPLEMENTATION_DONE]]")
+    assert SWF.contains_explicit_keyword("- [[TASK_DONE]]", "[[TASK_DONE]]")
+    assert not SWF.contains_explicit_keyword("explain [[IMPLEMENTATION_DONE]] usage", "[[IMPLEMENTATION_DONE]]")
 
 
 def test_spec_is_review_candidate_requires_markdown_headings() -> None:
@@ -142,7 +156,7 @@ def test_spec_is_review_candidate_requires_markdown_headings() -> None:
             "説明" * 500,
         ]
     )
-    assert not MLO.spec_is_review_candidate(numbered_only)
+    assert not SWF.spec_is_review_candidate(numbered_only)
 
     structured = "\n".join(
         [
@@ -155,19 +169,19 @@ def test_spec_is_review_candidate_requires_markdown_headings() -> None:
             "## implementation plan",
         ]
     )
-    assert MLO.spec_is_review_candidate(structured)
+    assert SWF.spec_is_review_candidate(structured)
 
 
 def test_build_spec_authoring_context_mentions_keyword_and_skill() -> None:
-    text = MLO.build_spec_authoring_context("task", "[[SPEC_DONE]]")
+    text = SWF.build_spec_authoring_context("task", "[[SPEC_DONE]]")
     assert "[[SPEC_DONE]]" in text
     assert "$refinment" in text
     assert "show the refined prompt to the user" in text.lower()
-    assert "Draft the specification yourself in Codex first" in text
+    assert "Draft the specification yourself in this CLI first" in text
 
 
 def test_default_implementation_start_prompt_uses_spec_and_skill() -> None:
-    text = MLO.default_implementation_start_prompt("spec body", "brief", "[[BUILD_DONE]]")
+    text = SWF.default_implementation_start_prompt("spec body", "brief", "[[BUILD_DONE]]")
     assert "spec body" in text
     assert "brief" in text
     assert "$refinment" in text
@@ -176,7 +190,7 @@ def test_default_implementation_start_prompt_uses_spec_and_skill() -> None:
 
 
 def test_default_verification_start_prompt_mentions_structured_completion() -> None:
-    text = MLO.default_verification_start_prompt(
+    text = SWF.default_verification_start_prompt(
         "spec body",
         "implemented",
         "[[VERIFICATION_DONE]]",
@@ -188,7 +202,7 @@ def test_default_verification_start_prompt_mentions_structured_completion() -> N
 
 
 def test_default_spec_refinement_prompt_uses_supplied_keyword() -> None:
-    text = MLO.default_spec_refinement_prompt("spec body", "[[READY_FOR_BUILD]]")
+    text = SWF.default_spec_refinement_prompt("spec body", "[[READY_FOR_BUILD]]")
     assert "spec body" in text
     assert "[[READY_FOR_BUILD]]" in text
 
@@ -201,7 +215,7 @@ def test_build_continue_decision_requests_skill_driven_review() -> None:
         "last_continuation_prompt": "",
         "spec_markdown": "spec",
     }
-    decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response")
+    decision = SWF.build_continue_decision(state, {"transcript_path": ""}, "latest response")
     assert decision["continue"] is True
     assert "$refinment" in decision["prompt"]
     assert "Skill-driven implementation refinment requested" in decision["note"]
@@ -215,7 +229,7 @@ def test_build_continue_decision_avoids_external_reviewer_language() -> None:
         "last_continuation_prompt": "",
         "spec_markdown": "spec",
     }
-    decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response")
+    decision = SWF.build_continue_decision(state, {"transcript_path": ""}, "latest response")
     assert decision["continue"] is True
     assert "Gemini" not in decision["prompt"]
     assert "peer" not in decision["note"].lower()
@@ -231,11 +245,11 @@ def test_build_continue_decision_stops_at_continuation_cap() -> None:
     }
 
     def _run() -> None:
-        decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response")
+        decision = SWF.build_continue_decision(state, {"transcript_path": ""}, "latest response")
         assert decision["continue"] is False
         assert "Continuation cap reached" in decision["note"]
 
-    with_env({"AI_AGENT_ORCHESTRATOR_MAX_CONTINUATIONS_PER_TASK": "1"}, _run)
+    with_env({"AI_AGENT_SELF_WORKFLOW_MAX_CONTINUATIONS_PER_TASK": "1"}, _run)
 
 
 def test_build_continue_decision_stops_on_repeated_prompt() -> None:
@@ -244,28 +258,28 @@ def test_build_continue_decision_stops_on_repeated_prompt() -> None:
         "continuation_count": 0,
         "same_prompt_count": 2,
         "last_continuation_prompt": re_normalized_prompt(
-            MLO.default_implementation_continue_prompt("spec", "latest response", "[[IMPLEMENTATION_DONE]]")
+            SWF.default_implementation_continue_prompt("spec", "latest response", "[[IMPLEMENTATION_DONE]]")
         ),
         "spec_markdown": "spec",
     }
 
     def _run() -> None:
-        decision = MLO.build_continue_decision(state, {"transcript_path": ""}, "latest response")
+        decision = SWF.build_continue_decision(state, {"transcript_path": ""}, "latest response")
         assert decision["continue"] is False
         assert "Repeated continuation prompt detected" in decision["note"]
 
-    with_env({"AI_AGENT_ORCHESTRATOR_MAX_SAME_PROMPT": "2"}, _run)
+    with_env({"AI_AGENT_SELF_WORKFLOW_MAX_SAME_PROMPT": "2"}, _run)
 
 
 def test_handle_user_prompt_submit_bootstraps_spec_phase() -> None:
     with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
         state_path = Path(tmp) / "state.json"
-        payload = MLO.handle_user_prompt_submit({"prompt": "このコードベースを分析して設計書を書いて"}, {}, state_path)
+        payload = SWF.handle_user_prompt_submit("codex", "UserPromptSubmit", {"prompt": "このコードベースを分析して設計書を書いて"}, {}, state_path)
         output = payload.get("hookSpecificOutput", {})
         assert_eq(output.get("hookEventName"), "UserPromptSubmit", "bootstrap event")
         assert "[[SPEC_DONE]]" in str(output.get("additionalContext", ""))
         assert "$refinment" in str(output.get("additionalContext", ""))
-        saved = MLO.load_state(state_path)
+        saved = SWF.load_state(state_path)
         assert_eq(saved.get("phase"), "spec_authoring", "spec phase initialized")
         assert_eq(saved.get("spec_revision_count"), 0, "spec revision count initialized")
 
@@ -273,8 +287,8 @@ def test_handle_user_prompt_submit_bootstraps_spec_phase() -> None:
 def test_handle_user_prompt_submit_skips_light_prompts() -> None:
     with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
         state_path = Path(tmp) / "state.json"
-        payload = MLO.handle_user_prompt_submit({"prompt": "ありがとう"}, {}, state_path)
-        assert_eq(payload, {}, "light prompt should not trigger orchestration")
+        payload = SWF.handle_user_prompt_submit("codex", "UserPromptSubmit", {"prompt": "ありがとう"}, {}, state_path)
+        assert_eq(payload, {}, "light prompt should not trigger self-workflow")
         assert not state_path.exists()
 
 
@@ -282,10 +296,10 @@ def test_handle_stop_spec_authoring_requests_skill_review_when_ready() -> None:
     with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
         state_path = Path(tmp) / "state.json"
         state = {"phase": "spec_authoring", "original_prompt": "build feature", "spec_revision_count": 0}
-        payload = MLO.handle_stop({"response": "draft\n[[SPEC_DONE]]"}, state, state_path)
+        payload = SWF.handle_stop("codex", {"response": "draft\n[[SPEC_DONE]]"}, state, state_path)
         assert_eq(payload.get("decision"), "block", "should auto-continue into spec review")
         assert "$refinment" in str(payload.get("reason", ""))
-        saved = MLO.load_state(state_path)
+        saved = SWF.load_state(state_path)
         assert_eq(saved.get("phase"), "spec_review", "state promoted to spec_review")
 
 
@@ -304,10 +318,10 @@ def test_handle_stop_spec_authoring_can_use_structured_fallback_review() -> None
                 "## implementation plan",
             ]
         )
-        payload = MLO.handle_stop({"response": structured_spec}, state, state_path)
+        payload = SWF.handle_stop("codex", {"response": structured_spec}, state, state_path)
         assert_eq(payload.get("decision"), "block", "fallback review should continue")
         assert "$refinment" in str(payload.get("reason", ""))
-        saved = MLO.load_state(state_path)
+        saved = SWF.load_state(state_path)
         assert_eq(saved.get("phase"), "spec_review", "fallback review enters spec_review")
 
 
@@ -315,10 +329,10 @@ def test_handle_stop_spec_review_done_moves_to_implementation() -> None:
     with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
         state_path = Path(tmp) / "state.json"
         state = {"phase": "spec_review", "spec_markdown": "draft"}
-        payload = MLO.handle_stop({"response": "approved spec\n[[SPEC_DONE]]"}, state, state_path)
+        payload = SWF.handle_stop("codex", {"response": "approved spec\n[[SPEC_DONE]]"}, state, state_path)
         assert_eq(payload.get("decision"), "block", "implementation should auto-continue")
         assert "Start implementation" in str(payload.get("reason", ""))
-        saved = MLO.load_state(state_path)
+        saved = SWF.load_state(state_path)
         assert_eq(saved.get("phase"), "implementation", "state promoted to implementation")
 
 
@@ -326,10 +340,10 @@ def test_handle_stop_spec_review_without_keyword_requests_refinement() -> None:
     with tempfile.TemporaryDirectory(prefix="mlo-state-") as tmp:
         state_path = Path(tmp) / "state.json"
         state = {"phase": "spec_review", "spec_markdown": "draft"}
-        payload = MLO.handle_stop({"response": "still missing edge cases"}, state, state_path)
+        payload = SWF.handle_stop("codex", {"response": "still missing edge cases"}, state, state_path)
         assert_eq(payload.get("decision"), "block", "spec review should continue refining")
         assert "Refine the specification" in str(payload.get("reason", ""))
-        saved = MLO.load_state(state_path)
+        saved = SWF.load_state(state_path)
         assert_eq(saved.get("phase"), "spec_authoring", "returns to spec authoring")
 
 
@@ -341,10 +355,10 @@ def test_handle_stop_implementation_done_moves_to_verification() -> None:
             "spec_markdown": "approved spec [[SPEC_DONE]]",
             "implementation_turn": 0,
         }
-        payload = MLO.handle_stop({"response": "work finished\n[[IMPLEMENTATION_DONE]]"}, state, state_path)
+        payload = SWF.handle_stop("codex", {"response": "work finished\n[[IMPLEMENTATION_DONE]]"}, state, state_path)
         assert_eq(payload.get("decision"), "block", "should continue into verification")
         assert "[[VERIFICATION_DONE]]" in str(payload.get("reason", ""))
-        saved = MLO.load_state(state_path)
+        saved = SWF.load_state(state_path)
         assert_eq(saved.get("phase"), "verification", "state promoted to verification")
         assert_eq(saved.get("verification_turn"), 0, "verification turn initialized")
 
@@ -357,13 +371,14 @@ def test_handle_stop_structured_verification_ready_moves_to_verification() -> No
             "spec_markdown": "approved spec [[SPEC_DONE]]",
             "implementation_turn": 0,
         }
-        payload = MLO.handle_stop(
+        payload = SWF.handle_stop(
+            "codex",
             {"response": '```json\n{"phase_signal":"verification_ready","summary":"ready for checks"}\n```'},
             state,
             state_path,
         )
         assert_eq(payload.get("decision"), "block", "structured signal should continue into verification")
-        saved = MLO.load_state(state_path)
+        saved = SWF.load_state(state_path)
         assert_eq(saved.get("phase"), "verification", "state promoted to verification")
         assert_eq(saved.get("last_phase_signal"), "verification_ready", "phase signal recorded")
         assert_eq(saved.get("verification_summary"), "ready for checks", "summary recorded")
@@ -377,10 +392,10 @@ def test_handle_stop_task_done_without_verification_keeps_verifying() -> None:
             "spec_markdown": "approved spec [[SPEC_DONE]]",
             "implementation_turn": 0,
         }
-        payload = MLO.handle_stop({"response": "all done\n[[TASK_DONE]]"}, state, state_path)
+        payload = SWF.handle_stop("codex", {"response": "all done\n[[TASK_DONE]]"}, state, state_path)
         assert_eq(payload.get("decision"), "block", "should force verification before stop")
         assert "[[VERIFICATION_DONE]]" in str(payload.get("reason", ""))
-        saved = MLO.load_state(state_path)
+        saved = SWF.load_state(state_path)
         assert_eq(saved.get("phase"), "verification", "task done alone should not finish")
 
 
@@ -392,15 +407,16 @@ def test_handle_stop_structured_task_complete_without_verification_keeps_verifyi
             "spec_markdown": "approved spec [[SPEC_DONE]]",
             "implementation_turn": 0,
         }
-        payload = MLO.handle_stop(
+        payload = SWF.handle_stop(
+            "codex",
             {
-                "response": '```json\n{"phase_signal":"task_complete","summary":"tests passed","checks_run":["python3 tests/test_multillm_orchestrator.py"],"diff_reviewed":true,"self_review_complete":true}\n```'
+                "response": '```json\n{"phase_signal":"task_complete","summary":"tests passed","checks_run":["python3 tests/test_self_workflow.py"],"diff_reviewed":true,"self_review_complete":true}\n```'
             },
             state,
             state_path,
         )
         assert_eq(payload.get("decision"), "block", "structured task complete should still force verification")
-        saved = MLO.load_state(state_path)
+        saved = SWF.load_state(state_path)
         assert_eq(saved.get("phase"), "verification", "structured task complete alone should not finish")
         assert_eq(saved.get("checks_run_count"), 1, "checks count recorded")
         assert saved.get("diff_reviewed") is True
@@ -414,13 +430,14 @@ def test_handle_stop_verification_done_and_task_done_finishes() -> None:
             "phase": "verification",
             "spec_markdown": "approved spec [[SPEC_DONE]]",
         }
-        payload = MLO.handle_stop(
+        payload = SWF.handle_stop(
+            "codex",
             {"response": "checks passed\n[[VERIFICATION_DONE]]\n[[TASK_DONE]]"},
             state,
             state_path,
         )
         assert "Verification completion detected." in str(payload.get("systemMessage", ""))
-        saved = MLO.load_state(state_path)
+        saved = SWF.load_state(state_path)
         assert_eq(saved.get("phase"), "done", "verification plus task done should finish")
 
 
@@ -433,10 +450,10 @@ def test_build_verification_decision_accepts_structured_completion_evidence() ->
         "same_prompt_count": 1,
         "last_continuation_prompt": "continue verification",
     }
-    decision = MLO.build_verification_decision(
+    decision = SWF.build_verification_decision(
         state,
         {"transcript_path": ""},
-        '```json\n{"phase_signal":"task_complete","summary":"all checks complete","checks_run":["python3 tests/test_multillm_orchestrator.py","sh scripts/validate-repo.sh"],"diff_reviewed":true,"self_review_complete":true}\n```',
+        '```json\n{"phase_signal":"task_complete","summary":"all checks complete","checks_run":["python3 tests/test_self_workflow.py","sh scripts/validate-repo.sh"],"diff_reviewed":true,"self_review_complete":true}\n```',
         "[[VERIFICATION_DONE]]",
         "[[TASK_DONE]]",
     )
@@ -460,7 +477,7 @@ def test_build_verification_decision_continues_with_skill_prompt() -> None:
         "same_prompt_count": 0,
         "last_continuation_prompt": "",
     }
-    decision = MLO.build_verification_decision(
+    decision = SWF.build_verification_decision(
         state,
         {"transcript_path": ""},
         "verification still running",
@@ -481,7 +498,7 @@ def test_build_verification_decision_stops_at_verification_cap() -> None:
         "same_prompt_count": 1,
         "last_continuation_prompt": "continue verification",
     }
-    decision = MLO.build_verification_decision(
+    decision = SWF.build_verification_decision(
         state,
         {"transcript_path": ""},
         "verification still running",
@@ -505,9 +522,10 @@ def run_tests() -> int:
         test_parse_json_from_fenced_text,
         test_completion_keywords_from_hooks_md,
         test_should_skip_only_on_recursion_or_wrong_event,
-        test_codex_stop_output_continue,
+        test_stop_output_formats_for_codex_and_gemini,
+        test_turn_context_output_formats_for_claude_and_gemini,
         test_should_keep_current_task_followup_prompt,
-        test_should_activate_orchestration_prefers_complex_or_explicit_prompts,
+        test_should_activate_self_workflow_prefers_complex_or_explicit_prompts,
         test_spec_status_from_keyword,
         test_contains_explicit_keyword_requires_standalone_line,
         test_spec_is_review_candidate_requires_markdown_headings,

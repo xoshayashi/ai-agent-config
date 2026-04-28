@@ -433,7 +433,7 @@ say "codex home: $codex_home"
 say "claude home: $claude_home"
 say "gemini home: $gemini_home"
 if [ "$install_hooks" = "1" ]; then
-  say "note: Codex multi-LLM orchestration Hook is installed in skill-driven mode. Qualifying tasks activate automatically without a feature flag."
+  say "note: Self-workflow Hooks are installed in same-LLM mode. Qualifying tasks activate automatically without a feature flag."
 fi
 
 if [ "$install_instructions" = "1" ]; then

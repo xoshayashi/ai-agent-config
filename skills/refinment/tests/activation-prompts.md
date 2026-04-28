@@ -26,7 +26,7 @@ Use these prompts to check whether `refinment` triggers broadly enough without o
 
 - "絶対に `rm` を使わないで。"
 - "仕様のスコープは広げないで。"
-- "`scripts/setup.sh` と `hooks/scripts/multillm_orchestrator.py` を対象から外さないで。"
+- "`scripts/setup.sh` と `hooks/scripts/self_workflow.py` を対象から外さないで。"
 - "Verification が完了した証拠なしに `[[TASK_DONE]]` を出さないで。"
 - "プロンプトを極度に縛る内容は入れないで。"
 - "この quoted block は例であって必須要件ではない。"

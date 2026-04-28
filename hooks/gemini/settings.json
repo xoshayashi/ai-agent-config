@@ -21,11 +21,26 @@
         "matcher": "*",
         "hooks": [
           {
-            "name": "llm-config-response-strategy-bridge",
+            "name": "llm-config-self-workflow",
             "type": "command",
-            "command": "sh -lc '[ \"${AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY:-0}\" = \"1\" ] || exit 0; python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/response_strategy_bridge.py\" --current gemini'",
+            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current gemini",
             "timeout": 50000,
-            "description": "Optionally request one more turn using an external reviewer strategy."
+            "description": "Continue the same LLM's self-workflow when one more turn is needed."
+          }
+        ]
+      }
+    ],
+    "BeforeAgent": [
+      {
+        "_llm_config_managed": true,
+        "matcher": "*",
+        "hooks": [
+          {
+            "name": "llm-config-self-workflow-brief",
+            "type": "command",
+            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current gemini",
+            "timeout": 40000,
+            "description": "Inject self-workflow context before the turn starts."
           }
         ]
       }

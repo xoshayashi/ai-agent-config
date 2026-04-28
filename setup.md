@@ -104,45 +104,24 @@ CLI 側設定先:
 | Codex | `~/.codex/config.toml` と `~/.codex/hooks.json` |
 | Gemini CLI | `~/.gemini/settings.json` |
 
-### 回答後自律継続 Hook（任意）
+### Same-LLM Self-Workflow Hook
 
-`response_strategy_bridge.py` は設定に登録済みですが、既定では無効です。  
-有効化する場合のみ、シェル設定に次を追加します。
+`self_workflow.py` は Claude Code / Codex / Gemini CLI の Hook 設定に登録済みで、**常時 routed** です。
+ただし実際の loop は、qualifying-task 判定に通ったときだけ動きます。現在の CLI がそのまま次を実行します。
 
-```sh
-export AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY=1
-```
-
-追加で provider を固定する場合:
-
-```sh
-export AI_AGENT_RESPONSE_STRATEGY_PROVIDER=gemini   # gemini / codex / ollama
-```
-
-`ollama` を使う場合はモデル指定が必須です。
-
-```sh
-export AI_AGENT_RESPONSE_STRATEGY_PROVIDER=ollama
-export AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL=qwen2.5:latest
-```
-
-### Codex中心マルチLLMオーケストレーション Hook（任意）
-
-`multillm_orchestrator.py` は Codex Hook 設定に登録済みで、**常時 routed** です。  
-ただし実際の loop は、qualifying-task 判定に通ったときだけ動きます。Codexをハブとして次を実行します。
-
-1. `UserPromptSubmit`: Codexに仕様起草ブリーフを注入
-2. 必要時だけ Codex 自身が `refinment` で startup brief を整え、`Refined prompt:` を表示してから開始
-3. `Stop` で `[[SPEC_DONE]]` が出たら、Codex が `refinment` で仕様をもう一段締める
+1. startup event (`UserPromptSubmit` または `BeforeAgent`) で仕様起草ブリーフを注入
+2. 必要時だけ現在の CLI 自身が `refinment` で startup brief を整え、`Refined prompt:` を表示してから開始
+3. completion event で `[[SPEC_DONE]]` が出たら、同じ CLI が `refinment` で仕様をもう一段締める
 4. 仕様が整ったらそのまま実装に進める
-5. 実装中と verification 中も、Codex が必要時だけ `refinment` で next-step / completion brief を締めながら進行
+5. 実装中と verification 中も、同じ CLI が必要時だけ `refinment` で next-step / completion brief を締めながら進行
 
 注記:
 
-- Codex の orchestration Hook は常時 routed ですが、実際に loop を起動するのは **重い設計 / 実装 / レビュー系 prompt** が中心です
+- self-workflow Hook は常時 routed ですが、実際に loop を起動するのは **重い設計 / 実装 / レビュー系 prompt** が中心です
 - 入力前の brief 改善と phase boundary の引き締めは **Skill `refinment`** が担当します
-- `refinment` は self-contained で、外部 reviewer CLI を呼ばずに Codex 自身が brief を整えます
-- 新規タスクで `refinment` を使った場合、Codex は `Refined prompt:` を表示してから作業を始めます
+- `refinment` は self-contained で、外部 reviewer CLI を呼ばずに現在の CLI 自身が brief を整えます
+- 新規タスクで `refinment` を使った場合、その CLI は `Refined prompt:` を表示してから作業を始めます
+- 外部 reviewer を呼ぶ `response strategy` / `multi-LLM orchestration` は現行 main path では使いません
 
 完了キーワードと終了条件は `instructions/HOOKS.md` を参照します。
 
@@ -214,14 +193,14 @@ shell rc から marker block を削除し、シンボリックリンクを `tras
 | `AI_AGENT_INSTALL_SKILLS` | `1` | `0` で Skills のリンク作成をスキップ |
 | `AI_AGENT_INSTALL_HOOKS` | `1` | `0` で Hook 設定導入をスキップ |
 | `AI_AGENT_HOOKS_RUNTIME_LINK` | `~/.llm-config/hooks` | Hook スクリプト参照用の安定リンク |
-| `AI_AGENT_HOOKS_ENABLE_RESPONSE_STRATEGY` | `0` | `1` で回答後の peer レビュー継続 Hook を有効化 |
-| `AI_AGENT_RESPONSE_STRATEGY_PROVIDER` | `auto` | `auto` / `gemini` / `codex` / `ollama` |
-| `AI_AGENT_RESPONSE_STRATEGY_OLLAMA_MODEL` | Empty | `provider=ollama` 時に使うモデル名 |
 | `AI_AGENT_CONFLICT_MODE` | `backup` | `backup` / `skip` / `fail` |
 | `AI_AGENT_BACKUP_DIR` | `$AI_AGENT_STATE_DIR/backups/<timestamp>` | 競合時の退避先 |
 | `AI_AGENT_STATE_DIR` | `~/.llm-config` | `config.env` などの状態ファイル保存先 |
 | `AI_AGENT_PERSIST_CONFIG` | `1` | `0` で状態ファイルを書かない |
 | `AI_AGENT_REQUIRE_LLM_CLIS` | `1` | `1` で `claude` / `codex` / `gemini` の存在を事前チェック（不足時は失敗） |
+| `AI_AGENT_SELF_WORKFLOW_MAX_CONTINUATIONS_PER_TASK` | `5` | 自動継続の上限回数 |
+| `AI_AGENT_SELF_WORKFLOW_MAX_SAME_PROMPT` | `2` | 同じ継続プロンプトを繰り返せる上限 |
+| `AI_AGENT_SELF_WORKFLOW_MAX_VERIFICATION_TURNS` | `3` | verification 自動継続の上限回数 |
 | `AI_AGENT_DRY_RUN` | `0` | `1` で予行演習 |
 
 ## 更新
