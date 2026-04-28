@@ -1,44 +1,102 @@
-# Setup Error Guide
+# 困ったときの見方
 
-## このドキュメントの位置付け
+> [!IMPORTANT]
+> あわてて削除や上書きをしないでください。
+> この repo では、まず **原因を読み解き、次に一番小さい安全策を打つ** のが基本です。
 
-- **読者:** `scripts/setup.sh`（PC への初期設定）、`scripts/update.sh`（最新の設定を取り込む）、`scripts/uninstall.sh`（取り外し）、自動更新スケジュール登録、のいずれかで失敗した人。プログラミング経験は問いません。
-- **前提:** ターミナル（黒い画面のコマンド入力ツール）でこのリポジトリのスクリプトを動かしている。
-- **読み終えて分かること:** よく出るエラーが何を意味するか、どの順番で確認すれば自分のファイルを壊さずに進められるか。
+## このページの役割
 
-Use this guide when setup, update, scheduling, or uninstall fails. Explain errors in plain Japanese first, then suggest the smallest safe next step.
+- **読者:** `setup.sh`、`update.sh`、`uninstall.sh`、各種スケジュール登録で失敗した人
+- **読み終えると分かること:** エラーの意味、まず何を確かめるか、安全な再試行の順番
 
-## Common Errors
+## まずはこの順で確認
 
-| Error Signal | Plain Japanese Explanation | Safe Next Step |
+1. **どの段階で失敗したか**
+   導入前なのか、setup 中なのか、導入後なのかで見る場所が違います。
+2. **既存ファイルは残っているか**
+   この repo は破壊的に置換しない方針なので、慌てて復旧作業を始める前に状態を確認します。
+3. **最小の次の一手は何か**
+   いきなり全部やり直すより、足りない前提だけ直して再実行した方が安全です。
+4. **必要なら dry run**
+   `AI_AGENT_DRY_RUN=1` を付けると、変更せずに予定だけを確認できます。
+
+## 失敗箇所の見分け方
+
+```mermaid
+flowchart TD
+    A["エラーが出た"] --> B{"どの段階で起きた?"}
+    B --> C["導入前<br/>git / CLI / login"]
+    B --> D["setup / update 中<br/>権限・既存ファイル・trash"]
+    B --> E["導入後<br/>Hook / link / health-check"]
+```
+
+## よくあるエラーと意味
+
+| エラーや症状 | 何が起きているか | 最初にやる安全な一手 |
 |---|---|---|
-| `command not found: git` | GitHubから設定ファイルを取得するためのGitが入っていません。 | Gitをインストールしてから、同じ自然言語セットアップ依頼をもう一度実行します。 |
-| `missing required LLM CLI(s): ...` | `claude` / `codex` / `gemini` のいずれかが未インストールです。 | 不足しているCLIをインストール・ログイン後に再実行します。暫定的に進める場合は `AI_AGENT_REQUIRE_LLM_CLIS=0` を明示します。 |
-| GitHub authentication failed | GitHubにログインできていないか、private repositoryを読む権限がありません。 | GitHub CLIやブラウザ認証でログインし、対象リポジトリへアクセスできるか確認します。 |
-| `target exists but is not a git repository` | 設定リポジトリを置こうとした場所に、Git管理ではない別フォルダーがあります。 | 別の保存先を使うか、そのフォルダーの中身を確認してから安全に退避します。 |
-| `path already exists` | リンクを作りたい場所に同名のファイルやフォルダーがあります。 | 標準ではバックアップ先へ退避します。上書きせず、何が退避されるか説明します。 |
-| `permission denied` / `operation not permitted` | グローバル設定フォルダー（`~/.codex` / `~/.claude` / `~/.gemini`）や状態保存先に書き込む権限がありません。 | まずホームディレクトリ配下で実行しているか確認し、必要ならフォルダー権限を修正して再実行します。 |
-| `could not apply delete protection` | macOSの削除防止設定をリンクに付けられませんでした。リンク作成自体は成功している場合があります。 | まずリンクが読めるか確認します。削除防止が必須でなければ継続できます。 |
-| `trash is required for safe uninstall` | 安全に元へ戻すための `trash` コマンドが見つかりません。 | 完全削除はせず、`trash` をインストールするか、手動でゴミ箱へ移す方法を案内します。 |
-| `config repository has local changes` | 設定リポジトリに未保存の変更があり、更新すると作業を壊す可能性があります。 | 変更内容を確認し、必要ならコミットまたは退避してから更新します。 |
-| `not a git repository` | 更新対象がGitリポジトリではありません。 | 正しい `llm-config` の場所を探すか、GitHubから再取得します。 |
-| `AI_AGENT_TARGET_DIR is deprecated and ignored` | 旧方式（作業フォルダー配下へのリンク作成）の変数が指定されています。 | そのまま続行できます。必要なら `AI_AGENT_CODEX_HOME` / `AI_AGENT_CLAUDE_HOME` / `AI_AGENT_GEMINI_HOME` を使ってグローバル配置先を調整します。 |
-| `copilot-instructions.md` が見つからない | 現行実装では `.github/copilot-instructions.md` は repo-local 管理で、`scripts/setup.sh` や `scripts/health-check.sh` の対象外です。 | Copilot を使う対象リポジトリに `.github/copilot-instructions.md` を手動配置するか、このリポジトリの `instructions/.github/copilot-instructions.md` を正本として必要内容を反映します。 |
-| `launchctl` or `systemctl` scheduling failed | 自動更新のスケジュール登録（macOS の `launchctl`、Linux の `systemctl` という OS 標準のスケジューラ機構を使った定期実行登録）に失敗しました。設定本体は使える場合があります。 | まず手動更新コマンドを案内します。自動更新はOS別に再確認します。 |
-| Hookが起動しない (`statusMessage` が出ない) | `hooks.json` が未反映か、managed hook link や installable skill link が壊れている可能性があります。 | `~/.codex/config.toml` の `codex_hooks = true`、`~/.codex/hooks.json` の存在、`scripts/health-check.sh` の `hooks-self-workflow` 行、`~/.agents/skills/refinment` のリンクを確認し、`scripts/setup.sh` を再実行します。 |
-| `health: warn` | 基本動作は確認できましたが、未ログイン、未インストール、リンク未設定、リポジトリ未保存変更など確認が必要な項目があります。 | `scripts/health-check.sh` の各行を見て、最も小さい修正だけを提案します。 |
-| `health: fail` | Gitや設定リポジトリなど、更新や診断に必要な前提が見つかりません。 | リポジトリの場所、Gitの有無、GitHubからの再取得が必要かを確認します。 |
+| `command not found: git` | Git が入っていない | Git を入れてから再実行する |
+| `missing required LLM CLI(s): ...` | `claude` / `codex` / `gemini` のいずれかが未導入 | 不足分をインストール・ログインする |
+| GitHub authentication failed | GitHub 認証が未完了、または権限不足 | GitHub へログインできているか確認する |
+| `target exists but is not a git repository` | 置きたい場所に別フォルダがある | 中身を確認し、必要なら安全に退避する |
+| `path already exists` | リンク先に同名のファイルやフォルダがある | 何がぶつかっているか確認する |
+| `permission denied` / `operation not permitted` | 設定先や状態保存先へ書き込めない | ホーム配下で実行しているか確認する |
+| `trash is required for safe uninstall` | 安全な削除用コマンドがない | `trash` を導入してから再試行する |
+| `config repository has local changes` | 更新対象 repo に未保存の変更がある | 変更内容を確認し、退避かコミットを決める |
+| `not a git repository` | `update.sh` の対象が Git repo ではない | 正しい clone 先を確認する |
+| `copilot-instructions.md` が見つからない | Copilot は手動配置対象で自動 setup 対象外 | 対象 repo 側で `.github/copilot-instructions.md` を管理する |
+| `launchctl` / `systemctl` scheduling failed | 定期実行登録だけ失敗した | まずは手動コマンドで運用を継続する |
+| Hook が効かない | Hook 設定や Skill リンクが壊れている可能性 | `health-check.sh` で Hook 行を確認する |
+| `health: warn` | 動くが、確認すべき弱点がある | 警告行を1つずつ解消する |
+| `health: fail` | 前提が崩れていて診断の土台が足りない | Git / repo / state file の存在を優先確認する |
 
-## Response Pattern
+## 特に詰まりやすい場面
 
-1. **何が起きたか**を1から2文で説明する。
-2. **ユーザーのファイルが失われていないか**を確認する。
-3. **安全な次の一手**を1つ提示する。
-4. 迷う場合は `AI_AGENT_DRY_RUN=1`（実際には変更せず、何が起きるかだけを表示する確認モード）で再確認する。
+### 1. CLI が足りない
 
-## Safety Rules
+`setup.sh` は既定で Claude Code / Codex / Gemini CLI の3つを前提確認します。
+まだ全部は入れない方針なら、意図を持って次のように進めます。
 
-- Do not suggest permanent deletion.（**永続削除は提案しない。** 元に戻せない `rm` ではなく、ゴミ箱に送る `trash` を使う）
-- Use `trash` for cleanup and uninstall.
-- Prefer user-owned directories (`~/.codex`, `~/.claude`, `~/.gemini`, `~/.llm-config`) over system-wide protected locations.
-- If a command failed because knowledge may be outdated, check the official CLI or GitHub documentation before retrying.
+```sh
+AI_AGENT_REQUIRE_LLM_CLIS=0 sh scripts/setup.sh
+```
+
+### 2. Hook が起動しない
+
+確認ポイントは次の順です。
+
+1. `sh scripts/health-check.sh`
+2. `~/.codex/hooks.json` や `~/.claude/settings.json` に managed Hook が入っているか
+3. `~/.agents/skills/refinment` のリンクがあるか
+4. 必要なら `AI_AGENT_DRY_RUN=1 sh scripts/setup.sh` で予定を再確認してから再実行
+
+### 3. update が止まる
+
+`update.sh` は「手元の変更を守る」ため、作業ツリーが汚れていると止まります。
+これは故障ではなく、安全装置です。
+
+## エラー時の返し方の型
+
+問題を説明する側になったときは、次の順で書くと伝わりやすくなります。
+
+1. **何が起きたか**
+   例: 「Git が見つからないため、リポジトリを取得できません。」
+2. **ファイルは壊れていないか**
+   例: 「この時点では既存設定はまだ変更されていません。」
+3. **次にやる1手**
+   例: 「Git を導入して、同じコマンドを再実行してください。」
+
+## やってはいけない対処
+
+- `rm` で消す
+- 権限エラーの意味を確かめずにシステム領域へ手を出す
+- `health: warn` を「全部壊れている」と誤解して総入れ替えする
+- update 失敗時に、未保存変更を確認せず `git pull` を重ねる
+
+## 迷ったら
+
+```sh
+AI_AGENT_DRY_RUN=1 sh scripts/setup.sh
+sh scripts/health-check.sh
+```
+
+この2つで、「何が起きるはずか」と「いま何が不足しているか」をかなり切り分けられます。

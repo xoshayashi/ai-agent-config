@@ -1,68 +1,129 @@
-# このリポジトリは何か（概要）
+# はじめに: このリポジトリは何をしているのか
 
-## このドキュメントの位置付け
+> [!NOTE]
+> 3行で言うと:
+> - このリポジトリは、**Claude Code / Codex / Gemini CLI に同じ働き方を配る設定の母艦**です。
+> - 配るものは主に **Instructions（指示書）**、**Skills（再利用できる手順）**、**Hooks（自動で走る番人）** の3つです。
+> - GitHub Copilot にも同じ思想を共有しますが、Copilot は **repo-local instructions のみ** で、グローバル Hook 配布の対象ではありません。
 
-- **読者:** これからこのリポジトリを使うかもしれない人。プログラミング経験は問いません。
-- **前提:** AI のチャットアシスタント（ChatGPT のようなもの）をターミナル（黒い画面のコマンド入力ツール）から使う「CLI（コマンドラインインターフェース）」というツール群があることだけ知っていれば十分です。
-- **読み終えて分かること:** このリポジトリが何のためのものか、誰が使うのか、自分の PC を `setup.sh` で初期化すると何が起きるのか。
+## このページの役割
 
-技術的な詳細を読みたい場合は [README.md](../README.md) と [setup.md](../setup.md) を参照してください。
+- **読者:** 非エンジニアを含む、初めてこの repo を読む人
+- **前提:** 「AI をターミナルから使う CLI がある」くらいの理解で十分
+- **読み終えると分かること:** この repo の目的、向いている人、導入すると何がそろうか、次にどのページを読めばよいか
 
-## 一言で
+## 一言でいうと
 
-**3種類の AI エージェント CLI（Claude Code / Codex / Gemini CLI）に「同じ指示書・同じ便利スキル・同じ安全装置」を入れて回すための、共通の設定リポジトリ**です。
+**AI に毎回同じ説明をしなくても、複数の CLI へ共通ルールを配れるようにするリポジトリ**です。
 
-PC を変えてもチームを変えても、同じルールで AI が動くようにする「設定の元本」を1箇所にまとめておく、という発想です。
+たとえば、こんな悩みを減らすためにあります。
 
-## 誰のためのものか
+- Codex には安全ルールを入れたが、Claude Code には入っていない
+- チームで使う AI の振る舞いが人ごとにばらつく
+- 新しい PC に移るたび、同じ設定をもう一度作り直している
+- せっかく良い指示や手順を作っても、1つのツールの中だけで終わってしまう
 
-- Claude Code / Codex / Gemini CLI のうち **少なくとも1つ** を自分の PC で使っている人
-- 個人で複数 CLI を併用している人。CLI ごとに違うルールを書き分けるのが嫌な人
-- 小さなチームで「AI への指示」を揃えたい人。GitHub 経由で共有・更新したい人
-- GitHub Copilot 用の指示書（`.github/copilot-instructions.md`）も同じ源から作りたい人
+## まずは絵でつかむ
 
-逆に、**AI エージェント CLI を使っていない人には不要**です。ブラウザ版 ChatGPT や Claude しか使わない場合、このリポジトリの設定は何も呼び出されません。
+```mermaid
+flowchart LR
+    Repo["このリポジトリ"] --> Inst["Instructions<br/>共通の指示書"]
+    Repo --> Skill["Skills<br/>再利用できる手順書"]
+    Repo --> Hook["Hooks<br/>自動で動く小さな番人"]
 
-## このリポジトリが配るもの 3 種類
+    Inst --> Codex["Codex"]
+    Inst --> Claude["Claude Code"]
+    Inst --> Gemini["Gemini CLI"]
 
-| 種類 | 何か | 例 |
-|---|---|---|
-| **Instructions（指示書）** | AI に「こう振る舞ってほしい」を書いた Markdown ファイル | 「削除は `rm` ではなく `trash` を使う」など |
-| **Skills（スキル）** | 再利用可能な手順書フォルダ。AI が必要なときに自分で呼び出す | 「指示文を整える `refinment`」「Skill 自体を改善する `skill-design-research`」 |
-| **Hooks（フック）** | CLI が特定のタイミング（開始・停止など）に自動実行する小さなスクリプト | 「`rm` を見つけたら `trash` に置き換える」「仕様 → 実装 → 検証の流れを自動で回す」 |
+    Skill --> Codex
+    Skill --> Claude
+    Skill --> Gemini
 
-正本（書き換える元のファイル）は `instructions/` フォルダの中だけにあります。各 CLI の設定はこの正本を **シンボリックリンク**（短く言うと「ショートカット」）で参照する仕組みです。元を編集すれば全ての CLI に反映されます。
+    Hook --> Codex
+    Hook --> Claude
+    Hook --> Gemini
 
-## `scripts/setup.sh` を実行すると、自分の PC で何が起きるか
+    Repo -. 手動配置 .-> Copilot["GitHub Copilot<br/>repo-local instructions のみ"]
+```
 
-`setup.sh` は、PC 上の **3 つの決まった場所** にだけ手を入れます。それ以外のファイルは触りません。
+## 配っているものは何か
 
-| 場所 | 何が置かれるか |
+| 種類 | 非エンジニア向けの言い換え | この repo での役割 | 例 |
+|---|---|---|---|
+| **Instructions** | 就業ルール・基本方針 | AI の共通マナーや安全ルールをそろえる | `rm` を使わず `trash` を使う、最初に仕様を整理する |
+| **Skills** | よく使う作業手順書 | 繰り返し使う考え方や進め方を再利用する | `refinment`、`skill-design-research` |
+| **Hooks** | 自動で見張る番人 | 特定のタイミングで安全確認や進行制御を入れる | 削除ガード、self-workflow |
+
+## この repo を使うと何が変わるか
+
+| 使う前 | 使った後 |
 |---|---|
-| `~/.claude/` | Claude Code 用のグローバル指示書とフック設定 |
-| `~/.codex/` | Codex 用のグローバル指示書とフック設定 |
-| `~/.gemini/` | Gemini CLI 用のグローバル指示書とフック設定 |
+| CLI ごとに別々のルールを持ちやすい | 主要 CLI へ共通のルールを配れる |
+| 新しい PC で設定をやり直しやすい | `setup.sh` と `update.sh` で再現しやすい |
+| 良い手順が会話の中に埋もれやすい | `skills/` に切り出して再利用しやすい |
+| 危険な削除や雑な完了報告が起こりやすい | `trash` ルールや self-review が組み込まれる |
 
-加えて、リポジトリ本体への安定リンクが `~/.llm-config/hooks` に作られます。これがあるおかげで、リポジトリを別の場所に移しても CLI 設定は壊れません。
+## 誰に向いているか
 
-### 大事なルール（既存ファイルを壊さない設計）
+### 向いている人
 
-- **既に `settings.json` や `config.toml` がある場合、上書きしません**。共通フックの記述だけを既存ファイルに **追記（マージ）** します。衝突する内容があれば自動でバックアップフォルダに退避します。
-- **削除は `trash`（ゴミ箱に送る）だけ使います**。`rm` のような不可逆な削除は実行しません。
-- **`AI_AGENT_DRY_RUN=1` を頭に付けて実行すれば、何も変更せずに「何が起きるはずか」だけを表示できます**。初回はこれで様子を見るのが安全です。
+- Claude Code / Codex / Gemini CLI のうち、少なくとも1つを日常的に使う人
+- 1人で複数 CLI を併用し、動き方をそろえたい人
+- 小さなチームで AI エージェントの運用ルールを共有したい人
+- GitHub Copilot の repo-local instructions も同じ思想で管理したい人
 
-### GitHub Copilot は対象が違う
+### まだ不要な人
 
-Copilot は VS Code の拡張機能であり、この自動配置の対象には入っていません。代わりに、Copilot に読ませたいリポジトリで `instructions/.github/copilot-instructions.md` を正本として `.github/copilot-instructions.md` に手動配置します。詳細は [README.md](../README.md) と [setup.md](../setup.md) を見てください。
+- ブラウザ版 ChatGPT / Claude だけを使い、CLI は使っていない人
+- AI ごとの個別設定をわざと分けて運用したい人
+- PC 全体へのグローバル設定をまだ入れたくない人
 
-## 後から外したくなったら
+## この repo が「やらないこと」
 
-`scripts/uninstall.sh` を実行すると、このリポジトリが作ったリンクとフック追記だけを外して、元の状態に戻します。あなたが自分で書いた `settings.json` の中身は残ります。
+誤解しやすいので、先に境界も書いておきます。
 
-## ここから先
+- Claude Code / Codex / Gemini CLI そのものをインストールするわけではありません
+- ブラウザ版 ChatGPT や Claude の設定まで自動で変えるわけではありません
+- GitHub Copilot を他の3 CLI とまったく同じ Hook 基盤に乗せるわけではありません
+- ユーザーの既存設定を「全部こちらの形に置き換える」ことを目的にはしていません
 
-- 実際の設定手順: [setup.md](../setup.md)
-- 失敗したとき: [setup-error-guide.md](./setup-error-guide.md)
-- 仕組みの設計判断: [hooks-architecture-review.md](./hooks-architecture-review.md)
-- 自己完結フローの中身: [self-workflow-hooks.md](./self-workflow-hooks.md)
-- ログから Skill 改善案を作る自動化: [skill-improvement-automation.md](./skill-improvement-automation.md)
+## セットアップすると、自分の PC で何が起きるか
+
+まず大枠だけ押さえると、`scripts/setup.sh` は次のことをします。
+
+1. `~/.codex`、`~/.claude`、`~/.gemini` に共通設定を入れる
+2. `~/.agents/skills` に共有 Skill へのリンクを置く
+3. `~/.llm-config/hooks` に Hook 本体への安定リンクを置く
+4. 既存設定がある場合は、置き換えではなく **追記/マージ** で扱う
+
+> [!TIP]
+> 最初から本実行する必要はありません。`AI_AGENT_DRY_RUN=1 sh scripts/setup.sh` で、
+> 「何が起きる予定か」だけ先に確認できます。
+
+## この repo が大事にしていること
+
+- **1つの正本を持つこと**
+  `instructions/AI_AGENT_INSTRUCTIONS.md` を中心に、各 CLI 側は薄い入口ファイルで参照します。
+- **危険な削除を避けること**
+  `rm` ではなく `trash` を使うのが共通ルールです。
+- **設定を壊しにいかないこと**
+  既存の `settings.json` や `config.toml` は、可能な限り保持しながら必要部分だけ追加します。
+- **完了報告の前に見直すこと**
+  self-workflow と shared instructions の両方で、自己レビューを強く求めます。
+
+## 先に覚えると読みやすい用語
+
+| 用語 | 意味 |
+|---|---|
+| **CLI** | ターミナルから使う AI ツール。Claude Code、Codex、Gemini CLI など |
+| **グローバル設定** | ある1つのリポジトリだけでなく、その PC 全体で使う設定 |
+| **repo-local** | そのリポジトリの中だけで有効な設定 |
+| **シンボリックリンク** | 元ファイルを参照するショートカットのようなもの |
+| **Hook** | 開始や終了など、決まったタイミングで自動実行される処理 |
+
+## 次に読むなら
+
+- フォルダの役割をつかみたい: [repository-map.md](./repository-map.md)
+- 導入と運用を知りたい: [getting-started.md](./getting-started.md)
+- 失敗したときの見方を知りたい: [setup-error-guide.md](./setup-error-guide.md)
+- Hook の思想を知りたい: [hooks-architecture-review.md](./hooks-architecture-review.md)

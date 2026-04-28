@@ -1,100 +1,116 @@
-# Self-Workflow Hooks (2026-04)
+# Self-Workflow Hooks
 
-## このドキュメントの位置付け
+> [!NOTE]
+> このページは、「同じ CLI に最後までやり切らせる」self-workflow の中身を説明します。
 
-- **読者:** Claude Code / Codex / Gemini CLI で AI エージェントに「仕様 → 実装 → 検証」と段階的に作業させたい人。プログラミング経験は問いません。
-- **前提:** [hooks-architecture-review.md](./hooks-architecture-review.md) の結論（Hook = CLI が自動実行する小さなスクリプト、配布先はグローバルのみ）を読んだ前提で、その自己継続フローの中身を説明します。
-- **読み終えて分かること:** どの CLI でどのイベント名で動くか、どの完了キーワードで段階が切り替わるか、暴走を防ぐための安全装置として何が用意されているか。
+## このページの役割
 
-## Goal
+- **読者:** `[[SPEC_DONE]]` などのキーワードや、Hook による自己継続の流れを知りたい人
+- **前提:** [hooks-architecture-review.md](./hooks-architecture-review.md) を読んでいると理解しやすい
 
-Use Hooks so the current LLM CLI can finish its own work without handing the
-main path to another model.
+## 何をしたい仕組みか
 
-> 補足: 別のモデルにバトンを渡さず、作業を始めた **その CLI 自身が最後まで責任を持つ** ための仕組みです。
+**作業を始めた CLI 自身が、仕様作成 → 実装 → 検証まで責任を持って進み切ること** が目的です。
 
-This runtime currently covers Codex, Claude Code, and Gemini CLI. GitHub
-Copilot shares the same canonical instructions source, but it is not part of
-the managed Hook or self-workflow runtime path.
+別のモデルへ毎回バトンを渡すのではなく、必要な時だけ `refinment` で brief を整えながら、
+同じ CLI が段階的に進むようにしています。
 
-The shared pattern is:
+## まずは流れを見る
 
-1. the user sends a task to Codex, Claude Code, or Gemini CLI
-2. the startup hook injects a specification-first brief（最初に「仕様書から書け」と指示を差し込む）
-3. the CLI optionally uses `refinment` when the prompt or phase brief really
-   needs tightening（指示文を整える Skill。必要なときだけ呼ぶ）
-4. completion hooks decide whether to stop or auto-continue that **same CLI**（完了タイミングの Hook が、止めるか同じ CLI を再起動するかを決める）
-5. the loop ends only after verification evidence is present（検証の証拠が揃って初めてループ終了）
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant C as CLI
+    participant H as Hook
 
-The runtime uses a generic intent split: answer-only turns usually stay
-outside this loop, while artifact/execution turns can enter it when they need
-bounded multi-step work.
-If a loop is already active, non-follow-up turns outside that path should end
-the active loop state so stale continuations do not fire on the next stop
-event.
+    U->>C: タスクを依頼
+    C->>H: 開始イベント
+    H-->>C: 仕様先行の brief を注入
+    C->>C: 必要なら $refinment
+    C-->>U: 仕様ドラフト [[SPEC_DONE]]
+    C->>H: 完了イベント
+    H-->>C: 同じ CLI へ継続指示
+    C->>C: 実装
+    C-->>U: [[IMPLEMENTATION_DONE]]
+    C->>C: 検証と自己レビュー
+    C-->>U: [[VERIFICATION_DONE]] [[TASK_DONE]]
+```
 
-> 補足: 単に質問に答えるだけのターン（answer-only）は通常このループに乗りません。何かを作ったりコマンドを実行したりするターン（artifact/execution）だけが、必要に応じてループに入ります。
+## この仕組みがカバーする CLI
 
-## Active Runtime
-
-- Hook script: `hooks/scripts/self_workflow.py`
-- Supporting skill: `skills/refinment/`
-- State root: `~/.llm-config/self-workflow`（セッションごとの状態を保存する場所）
-- Shared lifecycle rules: `instructions/HOOKS.md`
-
-This is the current main path. External reviewer subprocesses are not part of
-the default flow.
-
-## Event Mapping
-
-| CLI | Startup event（開始合図） | Completion event（完了合図） |
+| CLI | 開始イベント | 完了イベント |
 |---|---|---|
 | Codex | `UserPromptSubmit` / `SessionStart` | `Stop` |
 | Claude Code | `UserPromptSubmit` | `Stop`, `SubagentStop` |
 | Gemini CLI | `BeforeAgent` | `AfterAgent` |
 
-The hook injects context on startup and returns a continuation prompt on
-completion when more work is needed.
+## フェーズの意味
 
-> 補足: 開始合図で「次に何をすべきか」を CLI に伝え、完了合図で「まだ続きが必要か」を判定して継続プロンプトを返します。
+| フェーズ | 何をするか | 主な合図 |
+|---|---|---|
+| 仕様作成 | ゴール、制約、受け入れ条件をまとめる | `[[SPEC_DONE]]` |
+| 実装 | 実際の編集や作成を進める | `[[IMPLEMENTATION_DONE]]` |
+| 検証 | 自己レビュー、確認、必要な修正を行う | `[[VERIFICATION_DONE]]` |
+| 完了 | 本当に終わりとして閉じる | `[[TASK_DONE]]` |
 
-## Phase Flow
+> [!TIP]
+> `[[IMPLEMENTATION_DONE]]` は「全部終わった」の意味ではありません。
+> 「実装は終わったので、次は検証へ進む」の合図です。
 
-1. **Specification authoring**（仕様書を書くフェーズ）
-   The CLI drafts the spec itself. `refinment` is optional and should stay
-   sparse.
-2. **Specification review gate**（仕様レビューのゲート）
-   `[[SPEC_DONE]]` or a structured fallback draft moves the task into a tighter
-   spec pass.
-3. **Implementation**（実装フェーズ）
-   The CLI continues step by step and uses `refinment` only when the next step
-   or verification-readiness decision is unclear.
-4. **Verification**（検証フェーズ）
-   `[[IMPLEMENTATION_DONE]]` is only a handoff into verification, not final
-   completion. If verification finds only a narrow omission, respond with the
-   correction delta instead of restating the full earlier answer. Plain
-   "updated files" status text should not trigger that stricter delta mode.
-5. **Done**（完了）
-   Completion requires `[[VERIFICATION_DONE]]` plus `[[TASK_DONE]]`, or a
-   structured `phase_signal="task_complete"` packet with real evidence.
+## `refinment` はいつ使うのか
 
-> 補足: `[[SPEC_DONE]]` などの二重角括弧キーワードは、CLI 出力の中で「ここでフェーズが切り替わる」と Hook 側に明示的に伝えるための合図です。
+`refinment` は常時ではなく、次のような場面でだけ使います。
 
-## Safety Design
+- ユーザー依頼の契約が曖昧で、仕様化した方が事故を防げるとき
+- 仕様はあるが、次の1手がぼやけているとき
+- 検証の前に、何をもって完了とするかを締め直したいとき
 
-- recursion guard: `AI_AGENT_SELF_WORKFLOW_ACTIVE=1`（再帰ループ防止のフラグ）
-- bounded continuation count and repeated-prompt caps（自動継続の回数と、同じプロンプト連発の上限）
-- bounded verification-turn caps（検証フェーズが永遠に続くのを防ぐ上限）
-- session-scoped local state（セッションごとに分離されたローカル状態）
-- fail-open behavior for unsupported or non-qualifying turns（対象外のターンは Hook を素通りさせる）
+つまり、**全部を重くするための仕組みではなく、必要な時だけ輪郭を出す道具** です。
 
-## Design Intent
+## どのタスクがこのループに入るか
 
-- keep execution ownership inside the current CLI
-- keep prompt tightening visible to the user
-- avoid routine cross-LLM reviewer latency
-- reuse one lifecycle across Codex, Claude Code, and Gemini CLI
+| 入りやすいタスク | ふつうは入らないタスク |
+|---|---|
+| 設計、実装、レビュー、調査、ドキュメント刷新 | 単純な質問、短い比較、雑談、進捗確認だけの返答 |
 
-## Related Docs
+self-workflow は、answer-only のやり取りまで全部を自動継続させる設計ではありません。
+重い仕事だけを対象にすることで、待ち時間と過剰な制御を抑えています。
 
-- Current architecture summary: [hooks-architecture-review.md](./hooks-architecture-review.md)
+## 安全装置
+
+| 安全装置 | 何を防ぐか |
+|---|---|
+| `AI_AGENT_SELF_WORKFLOW_ACTIVE=1` | 再帰的な暴走 |
+| continuation 上限 | 自動継続がいつまでも続くこと |
+| 同一プロンプト上限 | 同じ継続指示のループ |
+| verification 上限 | 検証だけが終わらないこと |
+| session ごとの state | 別セッションの混線 |
+| fail-open | 対象外タスクを無理に loop へ入れること |
+
+## どこに状態が残るか
+
+| 項目 | 場所 |
+|---|---|
+| Hook 本体 | `hooks/scripts/self_workflow.py` |
+| 補助 Skill | `skills/refinment/` |
+| 共有ルール | `instructions/HOOKS.md` |
+| セッション state | `~/.llm-config/self-workflow` |
+
+## Copilot との違い
+
+GitHub Copilot は同じ instructions の思想を共有しますが、この self-workflow runtime には入りません。
+
+- 入るもの: Claude Code / Codex / Gemini CLI
+- 入らないもの: GitHub Copilot
+
+## この設計の狙い
+
+- 作業の責任を今の CLI に持たせる
+- prompt 改善を必要時だけ、しかもユーザーに見える形で行う
+- routine reviewer latency を常時発生させない
+- 3つの CLI でほぼ同じライフサイクルを使う
+
+## 関連ページ
+
+- 設計思想の要約: [hooks-architecture-review.md](./hooks-architecture-review.md)
+- 導入と運用: [getting-started.md](./getting-started.md)

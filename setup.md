@@ -3,6 +3,8 @@
 このガイドは、共有 Instructions / Skills / Hooks を **グローバル設定**として導入する手順です。  
 グローバル導入の対象 CLI は **Claude Code / Codex / Gemini CLI** で、GitHub Copilot は **repo-local instructions** として同じ正本を参照します。
 
+> やさしい導線から入りたい場合は、先に [docs/getting-started.md](docs/getting-started.md) を読んでください。
+
 ## AI エージェント向け実行ルール
 
 - 既定の会話言語は日本語

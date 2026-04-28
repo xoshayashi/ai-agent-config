@@ -1,85 +1,104 @@
-# Skill Improvement Automation
+# Skill 改善の自動化
 
-## このドキュメントの位置付け
+> [!NOTE]
+> これは **任意機能** です。
+> まずは `setup.sh` と `health-check.sh` を普通に回せる状態を作り、そのあと必要なら導入してください。
 
-- **読者:** 自分が日々使っている AI エージェント CLI のログから「Skill（再利用可能な手順書）にどんな改善が要りそうか」を自動で拾わせたい人。プログラミング経験は問いません。
-- **前提:** Claude Code / Codex / Gemini CLI のいずれかを日常的に使っており、このリポジトリの `scripts/setup.sh` で初期設定が済んでいる。
-- **読み終えて分かること:** 何が自動化できるか／できないか、どこまで自動で進めるかを切り替える環境変数（CLI に渡す設定値）の名前、PR 作成や自動マージを有効化する具体的なコマンド。
+## このページの役割
 
-この自動化は、Claude Code、Codex、Gemini CLIの利用ログから **Skillで吸収すべき改善点** を見つけ、改善提案、PR作成（GitHub 上の変更提案）、Claudeレビュー対応、条件付き自動マージ（条件を満たした PR を自動で取り込む処理）までをつなぐためのローカル運用です。GitHub Copilot は現行実装では canonical instructions の共有対象ではありますが、同じログ収集・Hook・self-workflow 基盤には入っていません。
+- **読者:** 日々の CLI 利用ログから、「どの Skill を改善するとよさそうか」を自動で拾いたい人
+- **読み終えると分かること:** 何が自動化されるのか、どこまでローカルで閉じるのか、どの段階で GitHub PR へ進むのか
 
-## Feasibility / 実現可能性
+## 一言でいうと
 
-| 領域 | 判定 | 理由 |
-|---|---:|---|
-| **CLIログの定期チェック** | 可能 | ログは各ユーザーPCのローカル領域にあるため、`launchd`（macOS の標準スケジューラ）または `systemd`（Linux の標準スケジューラ）のユーザータイマーで定期実行できます。 |
-| **GitHub Actionsだけでのログ収集** | 不可 | GitHub-hosted runner（GitHub が用意するクラウド上の実行環境）はユーザーPC上のClaude Code、Codex、Gemini CLIログへアクセスできません。GitHub Actionsの `schedule` は既定ブランチ上で定時実行できますが、対象はGitHub側の環境です。 |
-| **改善提案PRの作成** | 可能 | `gh pr create` はタイトル、本文、base/head指定に対応しており、非対話のPR作成に使えます。 |
-| **Claudeレビュー後の自動改善** | 条件付きで可能 | ローカルの `claude -p` と `gh` が使え、対象PRブランチをチェックアウトできる場合に実行できます。 |
-| **自動マージ** | 条件付きで可能 | `gh pr merge --auto --match-head-commit <SHA>` により、要件が満たされた時だけマージ予約できます。未解決レビュー、失敗チェック、Draft、競合がある場合は止めます。 |
+**利用ログをそのまま外へ出さずに、改善のヒントだけを匿名化してレポートや PR に変える仕組み** です。
 
-**結論:** 生ログをGitHubへ集めるのではなく、**各ユーザーPCでローカルに抽出・匿名化し、改善提案だけをPR化する** 方式が現実的で安全です。
+## 全体像
 
-## Architecture / 全体像
-
-```text
-Local LLM CLI logs
-  -> scripts/skill-improvement-bot.py scan
-  -> redacted skill-improvement report
-  -> optional LLM patch pass
-  -> scripts/validate-repo.sh
-  -> gh pr create
-  -> Claude Code Review workflow
-  -> skill-improvement-bot.py review-open-prs
-  -> optional Claude feedback pass
-  -> gh pr merge --auto --match-head-commit
+```mermaid
+flowchart LR
+    Logs["ローカルの CLI ログ"] --> Scan["scan<br/>改善シグナル抽出"]
+    Scan --> Report["匿名化レポート"]
+    Report --> Patch["任意: LLM で改善パッチ案"]
+    Patch --> Validate["validate-repo.sh"]
+    Validate --> PR["任意: GitHub PR 作成"]
+    PR --> Review["任意: レビュー確認"]
+    Review --> Merge["任意: 自動マージ予約"]
 ```
 
-## Safety Defaults / 安全設計
+## ここで大事な前提
 
-- **生ログはコミットしない:** PRに入るのは `reports/skill-improvement/*.md` の匿名化済み要約だけです（生のログ本文は GitHub に上げません）。
-- **秘密情報は伏せる:** API key（外部サービスへのアクセスキー）、GitHub token、メールアドレス、長いハッシュ、ユーザーホームパスは redaction（自動で伏せ字にする処理）の対象です。
-- **スニペットは高プライバシーモードでPR化しない:** `AI_AGENT_IMPROVEMENT_INCLUDE_SNIPPETS=1` はローカル確認向けです。既定の `AI_AGENT_IMPROVEMENT_PRIVACY_MODE=high` では、スニペット入りレポートをPR化しようとすると停止します。
-- **外部LLMへの送信は任意:** Skill本文を自動修正する処理は `AI_AGENT_IMPROVEMENT_LLM` を指定した時だけ動きます。
-- **PR作成も任意:** `AI_AGENT_IMPROVEMENT_CREATE_PR=1` を設定しない限り、定期実行はローカルレポート生成に留まります。
-- **自動マージはさらに任意:** `AI_AGENT_IMPROVEMENT_AUTO_MERGE=1` を設定した場合のみ、信頼済みレビュー作者、チェック、未解決スレッド、Draft、競合を確認してからマージ予約します。
+| 項目 | 結論 | 理由 |
+|---|---:|---|
+| ログの定期チェック | できる | ログは各ユーザー PC 上にあるため |
+| GitHub Actions だけでログ収集 | できない | GitHub-hosted runner は各ユーザー PC のローカルログを読めないため |
+| 匿名化レポート作成 | できる | `skill-improvement-bot.py` がローカルで処理するため |
+| PR 作成 | 条件付きでできる | `gh` が使え、GitHub 認証が通る場合 |
+| レビュー対応や自動マージ | 条件付きでできる | レビュー状態・競合・チェック結果を満たす場合のみ |
 
-## Manual Commands / 手動実行
+## 安全設計
 
-ログから改善候補を確認します。
+- **生ログはコミットしない**
+  GitHub に上がる対象は、匿名化された提案レポートだけです。
+- **秘密情報は伏せる**
+  API key、token、メールアドレス、長いハッシュなどは redaction 対象です。
+- **PR 化は opt-in**
+  `AI_AGENT_IMPROVEMENT_CREATE_PR=1` を付けたときだけ PR を作ります。
+- **自動マージはさらに opt-in**
+  `AI_AGENT_IMPROVEMENT_AUTO_MERGE=1` を付けた場合だけ、条件確認後に予約します。
+- **外部 LLM 利用も opt-in**
+  `AI_AGENT_IMPROVEMENT_LLM` を指定したときだけ、改善パッチ案の自動生成に進みます。
+
+> [!IMPORTANT]
+> 高プライバシーモードでは、スニペット入りレポートをそのまま PR 化しないよう止めます。
+> ローカル確認用の詳細と、GitHub へ出す内容は分けて考える設計です。
+
+## 4段階で使える
+
+| 段階 | 何をするか | こんな時に向く |
+|---|---|---|
+| 1. **見るだけ** | ログを読み、改善候補を表示する | まず傾向だけ知りたい |
+| 2. **レポート化** | ローカルに匿名化レポートを作る | 定期的に棚卸ししたい |
+| 3. **PR 化** | GitHub に改善提案 PR を出す | チームでレビューしたい |
+| 4. **レビュー追従** | 既存 PR のレビュー状態を見て、必要なら追従する | 運用を半自動化したい |
+
+## よく使うコマンド
+
+### 改善候補を一覧で見る
 
 ```sh
 python3 scripts/skill-improvement-bot.py scan
 ```
 
-JSONで確認します。
+### JSON で見る
 
 ```sh
 python3 scripts/skill-improvement-bot.py scan --json
 ```
 
-レポートを作成します。
+### レポートを作る
 
 ```sh
 python3 scripts/skill-improvement-bot.py run
 ```
 
-`reports/` は通常のgit状態には出さないため `.gitignore` に入っています。PR作成時は、botがその実行で作った対象レポートだけを明示的にstageします。
-
-改善提案をPRにします。
+### PR を作る
 
 ```sh
 AI_AGENT_IMPROVEMENT_CREATE_PR=1 \
 python3 scripts/skill-improvement-bot.py run
 ```
 
-PRレビュー状態を確認します。
+> [!TIP]
+> PR 化に進む前に、`gh auth status` が通ることを確認しておくと詰まりにくくなります。
+
+### 既存 PR のレビュー状態を見る
 
 ```sh
 python3 scripts/skill-improvement-bot.py review-pr <PR_NUMBER>
 ```
 
-Claudeレビュー対応と自動マージまで有効にします。
+### レビュー追従と自動マージ予約まで行う
 
 ```sh
 AI_AGENT_IMPROVEMENT_APPLY_REVIEW=1 \
@@ -87,33 +106,30 @@ AI_AGENT_IMPROVEMENT_AUTO_MERGE=1 \
 python3 scripts/skill-improvement-bot.py review-open-prs
 ```
 
-## Scheduling / 定期実行
+## 定期実行
 
-推奨は **1日1回** です。頻度はセットアップ時の対話で決められます。
+推奨は **1日1回** です。
 
 | 選択肢 | 設定 | 用途 |
 |---|---|---|
-| **1日1回（推奨）** | `AI_AGENT_IMPROVEMENT_CADENCE=daily` | 通常運用 |
-| **12時間ごと** | `AI_AGENT_IMPROVEMENT_CADENCE=twice-daily` または `12h` | Skill更新が多い時期 |
-| **1週間ごと** | `AI_AGENT_IMPROVEMENT_CADENCE=weekly` | 改善PRの頻度を抑えたい場合 |
-| **手動のみ** | `AI_AGENT_IMPROVEMENT_CADENCE=manual` | 自動スキャンを止める場合 |
-| **カスタム** | `AI_AGENT_IMPROVEMENT_CADENCE=custom AI_AGENT_IMPROVEMENT_INTERVAL_SECONDS=<seconds>` | 管理者向け |
+| 1日1回 | `AI_AGENT_IMPROVEMENT_CADENCE=daily` | 通常運用 |
+| 12時間ごと | `AI_AGENT_IMPROVEMENT_CADENCE=twice-daily` または `12h` | 更新頻度が高い時期 |
+| 1週間ごと | `AI_AGENT_IMPROVEMENT_CADENCE=weekly` | PR 頻度を抑えたい |
+| 手動のみ | `AI_AGENT_IMPROVEMENT_CADENCE=manual` | 必要な時だけ回したい |
 
-Linuxの `systemd` タイマーは、スリープや電源OFFで実行間隔を逃したPCを追いつかせるため、起動後約10分にも1回実行します。
-
-dry-runで予定内容を確認します。
+dry run:
 
 ```sh
 AI_AGENT_DRY_RUN=1 sh scripts/schedule-skill-improvement.sh
 ```
 
-1日1回で設定します。
+通常導入:
 
 ```sh
 AI_AGENT_IMPROVEMENT_CADENCE=daily sh scripts/schedule-skill-improvement.sh
 ```
 
-PR作成まで自動化する場合は、`gh auth status` が成功する状態で次を設定します。
+PR 作成まで自動化:
 
 ```sh
 AI_AGENT_IMPROVEMENT_CREATE_PR=1 \
@@ -122,61 +138,43 @@ AI_AGENT_IMPROVEMENT_CADENCE=daily \
 sh scripts/schedule-skill-improvement.sh
 ```
 
-レビュー対応とマージ予約まで有効にする場合だけ、次を追加します。
+## まず覚える変数
 
-```sh
-AI_AGENT_IMPROVEMENT_APPLY_REVIEW=1 \
-AI_AGENT_IMPROVEMENT_AUTO_MERGE=1 \
-AI_AGENT_IMPROVEMENT_CREATE_PR=1 \
-AI_AGENT_IMPROVEMENT_LLM=claude \
-AI_AGENT_IMPROVEMENT_CADENCE=daily \
-sh scripts/schedule-skill-improvement.sh
-```
+| 変数 | 役割 |
+|---|---|
+| `AI_AGENT_IMPROVEMENT_CREATE_PR` | `1` で改善提案 PR を作る |
+| `AI_AGENT_IMPROVEMENT_LLM` | `claude` / `codex` / `gemini` のいずれかで改善案を作る |
+| `AI_AGENT_IMPROVEMENT_APPLY_REVIEW` | `1` でレビュー追従を試みる |
+| `AI_AGENT_IMPROVEMENT_AUTO_MERGE` | `1` で条件成立時に自動マージ予約を行う |
+| `AI_AGENT_IMPROVEMENT_CADENCE` | 定期実行の頻度を決める |
+| `AI_AGENT_IMPROVEMENT_INCLUDE_SNIPPETS` | ローカルレポートに短い匿名化スニペットを含める |
+| `AI_AGENT_IMPROVEMENT_PRIVACY_MODE` | PR 化の安全度を調整する |
 
-## Environment Variables / 環境変数
+## 何を「改善シグナル」と見なすか
 
-| 変数 | 既定値 | 意味 |
-|---|---|---|
-| `AI_AGENT_LOG_DAYS` | `14` | 何日前までのログを見るか |
-| `AI_AGENT_LOG_MAX_FILES` | `300` | 1回で読む最大ファイル数 |
-| `AI_AGENT_LOG_MAX_BYTES` | `120000` | 各ログファイル末尾から読む最大バイト数 |
-| `AI_AGENT_LOG_ROOTS` | 空 | 追加ログルート。複数はOSのパス区切りで指定 |
-| `AI_AGENT_LOG_ROOTS_ONLY` | `0` | `1` で既定ログルートを読まず、`AI_AGENT_LOG_ROOTS` だけを対象にする |
-| `AI_AGENT_IMPROVEMENT_INCLUDE_SNIPPETS` | `0` | `1` でローカルレポートに短いredacted snippetを含める |
-| `AI_AGENT_IMPROVEMENT_PRIVACY_MODE` | `high` | `high` ではsnippet入りレポートのPR化を止める |
-| `AI_AGENT_IMPROVEMENT_CREATE_PR` | `0` | `1` で改善提案PRを作成 |
-| `AI_AGENT_IMPROVEMENT_LLM` | 空 | `claude`、`codex`、`gemini` のいずれかで改善パッチを自動生成 |
-| `AI_AGENT_IMPROVEMENT_APPLY_REVIEW` | `0` | `1` でClaudeレビューの指摘対応を試みる |
-| `AI_AGENT_IMPROVEMENT_AUTO_MERGE` | `0` | `1` で条件成立時に自動マージ予約 |
-| `AI_AGENT_TRUSTED_REVIEW_AUTHORS` | `claude,claude-code` | 自動レビュー対応・自動マージで信頼するGitHub loginの完全一致リスト |
-| `AI_AGENT_IMPROVEMENT_ALLOW_DIRTY` | `0` | `1` でclean worktreeガードを解除。自動化が現在の変更を全て所有している時だけ使う |
-| `AI_AGENT_IMPROVEMENT_CADENCE` | `daily` | 定期実行の頻度 |
+この bot は、何でもかんでも改善提案にするわけではありません。
 
-## Health Check / 状態確認
+1. Skill 名や Skill パスに近い話題がログに出る
+2. そのあとに「修正」「漏れ」「足りない」「fix」「missing」などの再作業シグナルが続く
+3. それを `activation`、`validation`、`formatting`、`privacy` などの種類に分ける
+4. 生ログではなく、抽象化した提案に変える
 
-`scripts/health-check.sh` は、Skill改善スケジューラが `active`、`installed`、`missing`、`unsupported` のどれかを出します。
+つまり、**「使っていて実際に詰まった点」だけを拾うための仕組み** です。
 
-```sh
-sh scripts/health-check.sh
-```
+## どんな人に向いているか
 
-Windowsではこのリポジトリのスケジューラは未対応です。PowerShell運用では手動実行、またはWSL上で `scripts/schedule-skill-improvement.sh` を使ってください。
+- Skill 改善を場当たりではなく、ログ起点で回したい人
+- 改善提案を PR として残したい人
+- 個人の試行錯誤を、チームの再利用知に変えたい人
 
-## What Counts As A Signal / 改善シグナル
+## 向いていない使い方
 
-改善候補は、次のような流れを見た時だけ抽出します。
+- 生ログをそのまま GitHub に上げたい
+- いきなり完全自動マージまで任せたい
+- まだ setup や health-check が安定していない段階で導入したい
 
-1. 会話ログ中で対象Skill名やSkillパスに近い表現が出る。
-2. その後に「修正」「漏れ」「足りない」「もう一回」「did you」「missing」「fix」など、Skill実行後の追加修正らしい発話が続く。
-3. その内容を `activation`、`evidence`、`search`、`delegation`、`formatting`、`validation`、`privacy`、`pr-review` などへ分類する。
-4. 生の発話ではなく、抽象化した改善提案としてレポート化する。
+## 関連ページ
 
-これは完全な自動評価ではありません。**誤検知を前提に、PRレビューと検証を必ず通す設計** です。
-
-## Source Notes / 参照
-
-- GitHub CLIの `gh pr create` は非対話PR作成に必要な `--title`、`--body`、`--base`、`--head` を持ちます: <https://cli.github.com/manual/gh_pr_create>
-- GitHub CLIの `gh pr merge` は `--auto` と `--match-head-commit` を持ち、条件成立後のマージ予約とhead SHA固定に使えます: <https://cli.github.com/manual/gh_pr_merge>
-- GitHub Actionsの `schedule` はGitHub側の既定ブランチで走るため、ユーザーPCのローカルログ収集には向きません: <https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#schedule>
-- Gemini CLIは `--prompt` / `-p` によるheadless modeを持ち、スクリプト実行に使えます: <https://google-gemini.github.io/gemini-cli/docs/cli/headless.html>
-- Claude Codeは `claude -p`、`--output-format`、`--permission-mode` を持ち、非対話処理と権限モード指定に使えます: <https://code.claude.com/docs/en/cli-usage>
+- 通常の導入と日常運用: [getting-started.md](./getting-started.md)
+- 失敗時の見方: [setup-error-guide.md](./setup-error-guide.md)
+- root 手順書: [setup.md](../setup.md)

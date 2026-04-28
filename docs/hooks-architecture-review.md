@@ -1,51 +1,86 @@
-# Hooks Architecture Review (2026-04)
+# Hook 設計の考え方
 
-## このドキュメントの位置付け
+> [!NOTE]
+> このページは「なぜ今の Hook 構成にしたのか」を説明します。
+> 「Hook が実際にどう動くか」を知りたい場合は [self-workflow-hooks.md](./self-workflow-hooks.md) を読んでください。
 
-- **読者:** AI エージェントツール（Claude Code / Codex / Gemini CLI）の挙動を変えたい人。プログラミング経験は問いません。
-- **前提:** このリポジトリで配布している Hook（CLI が特定のタイミングで自動実行する小さなスクリプト）の構成が、なぜ今の形になっているかを知りたい人向け。
-- **読み終えて分かること:** 旧構成と現行構成の違い、現行構成を選んだ理由、現行構成で動いている部品の名前と役割。
-- **関連:** 実装の手順詳細は [self-workflow-hooks.md](./self-workflow-hooks.md)。
+## このページの役割
 
-## 結論
+- **読者:** Hook の配置方針や設計判断を知りたい人
+- **読み終えると分かること:** 今の構成が何を避け、何を優先しているか
 
-旧構成（project + user の二重配布、つまり「リポジトリ単位」と「PC 全体」の両方に Hook を入れる方式）と、旧 multi-LLM continuation 案（複数の LLM を経由して作業を続ける方式）は、重複実行・責務分散・待ち時間増加を起こしやすいため、次の単純構成に整理しました。
+## 結論を先に
 
-- **配布先はグローバルのみ**（PC 全体の設定。`~/.claude`, `~/.codex`, `~/.gemini`）
-- **常時ガードは安全系を優先**（`safe_delete_guard.py` = `rm` を `trash` に置き換える保護 Hook）
-- **自己完結フローは `self_workflow.py` に一本化**（同じ CLI が仕様 → 実装 → 検証まで責任を持つ）
-- **Hook ロジック本体はリポジトリ管理し、`$AI_AGENT_HOOKS_RUNTIME_LINK` から参照**（CLI 設定は安定リンク経由で本体を呼び出す）
+この repo の Hook 設計は、次の4つに整理されています。
 
-## なぜこの形にしたか
+1. **配布先はグローバルのみ**
+   `~/.claude`、`~/.codex`、`~/.gemini` のユーザー設定に入れる
+2. **安全系 Hook を最優先**
+   `safe_delete_guard.py` で危険な削除を防ぐ
+3. **作業は同じ CLI が最後まで持つ**
+   `self_workflow.py` により、仕様作成から検証まで同じ CLI が継続する
+4. **Hook 本体は repo に残し、各 CLI からは安定リンクで呼ぶ**
+   `~/.llm-config/hooks` を経由して参照する
 
-1. **重複実行を減らすため**
-   Hook の管理レイヤー（Hook をどこに置くか）を 1 つに固定し、project/user の多重登録（同じ Hook が2回走る状況）を避ける。
-2. **責任の所在を明確にするため**
-   作業を始めた CLI 自身が仕様、実装、検証まで継続する。
-3. **待ち時間を抑えるため**
-   外部 reviewer subprocess（別プロセスで動くレビュー LLM）を main path から外し、必要時だけ
-   `refinment`（指示文を引き締めるための Skill）で brief を締める。
+## まずは配置イメージ
 
-## 現行構成
+```mermaid
+flowchart LR
+    Repo["この repo の hooks/"] --> Stable["~/.llm-config/hooks<br/>安定リンク"]
+    Stable --> Claude["~/.claude/settings.json"]
+    Stable --> Codex["~/.codex/config.toml / hooks.json"]
+    Stable --> Gemini["~/.gemini/settings.json"]
+```
 
-- `safe_delete_guard.py`: 永続削除の防止（`rm -rf` などをブロックして `trash` に誘導）
-- `self_workflow.py`: spec -> implementation -> verification の phase loop（仕様→実装→検証の自己継続ループ）
-- `skills/refinment`: startup / phase boundary の brief tightening（開始時や段階の切れ目で指示文を整える Skill）
-- `instructions/.github/copilot-instructions.md`: Copilot 向け canonical instructions（GitHub Copilot 用の正本。**repo-local 運用、Hook runtime なし** = リポジトリ単位で配置するだけで、自動 Hook の対象には入れない）
+## なぜ「グローバルだけ」にしたのか
 
-この構成は Codex, Claude Code, Gemini CLI で共通です。違いは Hook event
-名（CLI ごとに通知タイミングの呼び方が違う点）だけで、ライフサイクル自体は `instructions/HOOKS.md` に揃えています。
+以前のように「project 単位」と「user 全体」の両方へ Hook を置くと、次の問題が起きやすくなります。
 
-GitHub Copilot はこの Hook runtime 構成には入りません。現行実装で共有して
-いるのは instructions の source of truth（指示文の正本）だけです。
+| 問題 | 何が困るか |
+|---|---|
+| 二重実行 | 同じ Hook が2回走り、意図しない動きになる |
+| 責任分散 | どのレイヤーの Hook が効いているのか分かりにくい |
+| 遅延増加 | 余計な継続や reviewer 呼び出しで待ち時間が伸びる |
 
-## 残るトレードオフ
+そこで今は、**「共通で効かせたいものはグローバル」「project 固有の事情は project 側で別管理」** という整理に寄せています。
 
-- project 固有 Hook を別途運用するなら、global は安全系・共通系、
-  project は業務固有、という役割分担を明示する必要がある
-- 完全な一元統制が必要な環境では、OS 管理ポリシーや managed settings
-  （企業管理の設定配布機構）との併用設計が必要
+## 現在の主役は2本
 
-## 参照
+| Hook / Skill | 役割 | ひと言でいうと |
+|---|---|---|
+| `safe_delete_guard.py` | 永続削除の防止 | 「危ない消し方を止める番人」 |
+| `self_workflow.py` | 仕様 → 実装 → 検証の自己継続 | 「同じ CLI に最後までやり切らせる進行係」 |
+| `skills/refinment` | 指示文の引き締め | 「必要な時だけ brief を整える補助役」 |
 
-- 現行設計: [self-workflow-hooks.md](./self-workflow-hooks.md)
+> [!TIP]
+> `refinment` は Hook そのものではありません。
+> Hook が「今は brief を整えた方がよい」と判断した場面で、現在の CLI がその Skill を使います。
+
+## 今の設計が優先していること
+
+| 優先していること | 具体的な意味 |
+|---|---|
+| 安全性 | `rm` を避ける、過剰な自動化を避ける |
+| 一貫性 | Claude Code / Codex / Gemini CLI で同じ考え方を使う |
+| 責任の明確さ | 作業を始めた CLI が最後まで仕上げる |
+| 軽さ | 外部 reviewer を常時 main path に入れない |
+
+## Copilot はどこまで同じか
+
+GitHub Copilot も同じ「共通 instructions の思想」は共有しますが、扱いは別です。
+
+- 共有するもの: `instructions/.github/copilot-instructions.md`
+- 共有しないもの: グローバル Hook 配布、self-workflow runtime、`setup.sh` による自動導入
+
+つまり、**Copilot は仲間だが、同じ Hook 基盤の上にはいない** という理解が近いです。
+
+## まだ残るトレードオフ
+
+- 業務ごとの細かな Hook まで一元化したい場合は、この repo だけでは足りない
+- 企業の管理ポリシーと併用するなら、別の配布設計が必要
+- 「全部を自動化したい」要求に対しては、安全側を優先してあえて抑えている部分がある
+
+## 次に読むなら
+
+- Hook の実行フローを知りたい: [self-workflow-hooks.md](./self-workflow-hooks.md)
+- 導入と運用を知りたい: [getting-started.md](./getting-started.md)

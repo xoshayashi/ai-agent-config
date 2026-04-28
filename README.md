@@ -3,7 +3,7 @@
 Claude Code / Codex / Gemini CLI で共通の Instructions・Skills・Hooks を配布し、GitHub Copilot には同じ source of truth を repo-local instructions として供給するためのリポジトリです。  
 **現在は 3 CLI のグローバル設定 + Copilot の repo-local instructions** という形で運用します。
 
-> はじめて読む方・非エンジニアの方は、まず [docs/overview.md](docs/overview.md)（このリポジトリは何か・何が起きるか・誰のためのものか）を参照してください。
+> はじめて読む方・非エンジニアの方は、まず [docs/README.md](docs/README.md) から入り、次に [docs/overview.md](docs/overview.md) を読むのがおすすめです。
 
 ## 何が設定されるか
 
@@ -176,7 +176,10 @@ shell rc から marker block を削除し、シンボリックリンクを `tras
 - `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` の entrypoint ファイルは、各 CLI の実際の読み込み挙動に合わせて管理しています。別のPCや別パスに clone した場合は、その clone 先から `scripts/setup.sh` を再実行して各CLI設定を作り直してください
 - Copilot 向けの canonical instructions は [instructions/.github/copilot-instructions.md](instructions/.github/copilot-instructions.md) に置き、repo 直下で CLI が生成する `/.github/copilot-instructions.md` はローカル専用として扱います
 - `scripts/setup.sh` / `scripts/health-check.sh` / Hook runtime は Copilot には触れません。Copilot は repo-local instructions の共有対象としてのみカバーしています
+- Docs の入口は [docs/README.md](docs/README.md)
+- リポジトリ地図は [docs/repository-map.md](docs/repository-map.md)
+- 導入と日常運用は [docs/getting-started.md](docs/getting-started.md)
 - エラー時は [docs/setup-error-guide.md](docs/setup-error-guide.md)
 - Skill 改善自動化は [docs/skill-improvement-automation.md](docs/skill-improvement-automation.md)
-- Hooks 設計検証は [docs/hooks-architecture-review.md](docs/hooks-architecture-review.md)
+- Hooks 設計の考え方は [docs/hooks-architecture-review.md](docs/hooks-architecture-review.md)
 - 現行の共通自己完結フローは [docs/self-workflow-hooks.md](docs/self-workflow-hooks.md)
