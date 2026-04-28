@@ -26,9 +26,13 @@
 - `safe_delete_guard.py`: 永続削除の防止
 - `self_workflow.py`: spec -> implementation -> verification の phase loop
 - `skills/refinment`: startup / phase boundary の brief tightening
+- `instructions/.github/copilot-instructions.md`: Copilot 向け canonical instructions（repo-local 運用、Hook runtime なし）
 
 この構成は Codex, Claude Code, Gemini CLI で共通です。違いは Hook event
 名だけで、ライフサイクル自体は `instructions/HOOKS.md` に揃えています。
+
+GitHub Copilot はこの Hook runtime 構成には入りません。現行実装で共有して
+いるのは instructions の source of truth だけです。
 
 ## 残るトレードオフ
 
