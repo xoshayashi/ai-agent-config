@@ -29,7 +29,6 @@ gha-creds-*.json
 /CLAUDE.md
 /AGENTS.md
 /GEMINI.md
-/.github/copilot-instructions.md
 
 # Logs and temporary files
 *.log
