@@ -55,12 +55,14 @@ case "$script_path" in
 esac
 
 config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
-state_dir=$(expand_home "${AI_AGENT_STATE_DIR:-$HOME/.llm-config}")
+state_dir=$(expand_home "${AI_AGENT_STATE_DIR:-$HOME/.ai-agent-config}")
 cadence=${AI_AGENT_IMPROVEMENT_CADENCE:-${AI_AGENT_UPDATE_CADENCE:-daily}}
 interval=${AI_AGENT_IMPROVEMENT_INTERVAL_SECONDS:-}
 disable_schedule=0
-label=${AI_AGENT_IMPROVEMENT_LABEL:-com.llm-config.skill-improvement}
+label=${AI_AGENT_IMPROVEMENT_LABEL:-com.ai-agent-config.skill-improvement}
 bot_script="$config_home/scripts/skill-improvement-bot.py"
+runtime_dir="$state_dir/runtime"
+runtime_skill_entrypoint="$runtime_dir/ai-agent-improvement"
 dry_run=${AI_AGENT_DRY_RUN:-0}
 create_pr=${AI_AGENT_IMPROVEMENT_CREATE_PR:-0}
 apply_review=${AI_AGENT_IMPROVEMENT_APPLY_REVIEW:-0}
@@ -110,6 +112,19 @@ esac
 python_bin=$(command -v python3 || true)
 [ -n "$python_bin" ] || fail "python3 is required for skill improvement automation"
 
+install_runtime_files() {
+  if [ "$dry_run" = "1" ]; then
+    say "would refresh skill-improvement runtime entrypoint: $runtime_skill_entrypoint"
+    return 0
+  fi
+  mkdir -p "$runtime_dir"
+  cat > "$runtime_skill_entrypoint" <<EOF
+#!/bin/sh
+exec "$python_bin" "$bot_script" cycle "\$@"
+EOF
+  chmod 755 "$runtime_skill_entrypoint"
+}
+
 os=$(uname -s 2>/dev/null || printf unknown)
 say "AI agent skill improvement scheduler"
 say "config: $config_home"
@@ -133,10 +148,10 @@ if [ "$disable_schedule" = "1" ]; then
     fi
   elif command -v systemctl >/dev/null 2>&1; then
     if [ "$dry_run" = "1" ]; then
-      say "would disable systemd user timer: llm-config-skill-improvement.timer"
+      say "would disable systemd user timer: ai-agent-config-skill-improvement.timer"
     else
-      systemctl --user disable --now llm-config-skill-improvement.timer >/dev/null 2>&1 || true
-      say "disabled systemd user timer if it existed: llm-config-skill-improvement.timer"
+      systemctl --user disable --now ai-agent-config-skill-improvement.timer >/dev/null 2>&1 || true
+      say "disabled systemd user timer if it existed: ai-agent-config-skill-improvement.timer"
     fi
   else
     warn "automatic scheduling is not supported on this system"
@@ -147,19 +162,19 @@ if [ "$disable_schedule" = "1" ]; then
 fi
 
 say "interval seconds: $interval"
+install_runtime_files
 
 if [ "$os" = "Darwin" ]; then
   launch_dir="$HOME/Library/LaunchAgents"
   plist="$launch_dir/$label.plist"
   if [ "$dry_run" = "1" ]; then
     say "would write launchd plist: $plist"
-    say "would schedule skill-improvement bot: $bot_script cycle"
+    say "would schedule skill-improvement entrypoint: $runtime_skill_entrypoint"
     exit 0
   fi
   mkdir -p "$launch_dir" "$state_dir"
   label_xml=$(xml_escape "$label")
-  python_bin_xml=$(xml_escape "$python_bin")
-  bot_script_xml=$(xml_escape "$bot_script")
+  runtime_skill_entrypoint_xml=$(xml_escape "$runtime_skill_entrypoint")
   state_dir_xml=$(xml_escape "$state_dir")
   config_home_xml=$(xml_escape "$config_home")
   create_pr_xml=$(xml_escape "$create_pr")
@@ -178,14 +193,14 @@ if [ "$os" = "Darwin" ]; then
   <string>$label_xml</string>
   <key>ProgramArguments</key>
   <array>
-    <string>$python_bin_xml</string>
-    <string>$bot_script_xml</string>
-    <string>cycle</string>
+    <string>$runtime_skill_entrypoint_xml</string>
   </array>
   <key>StartInterval</key>
   <integer>$interval</integer>
   <key>RunAtLoad</key>
   <true/>
+  <key>WorkingDirectory</key>
+  <string>$state_dir_xml</string>
   <key>EnvironmentVariables</key>
   <dict>
     <key>AI_AGENT_STATE_DIR</key>
@@ -222,12 +237,12 @@ EOF
   say "scheduled with launchd: $plist"
 elif command -v systemctl >/dev/null 2>&1; then
   systemd_dir="$HOME/.config/systemd/user"
-  service="$systemd_dir/llm-config-skill-improvement.service"
-  timer="$systemd_dir/llm-config-skill-improvement.timer"
+  service="$systemd_dir/ai-agent-config-skill-improvement.service"
+  timer="$systemd_dir/ai-agent-config-skill-improvement.timer"
   if [ "$dry_run" = "1" ]; then
     say "would write systemd service: $service"
     say "would write systemd timer: $timer"
-    say "would enable timer with systemctl --user enable --now llm-config-skill-improvement.timer"
+    say "would enable timer with systemctl --user enable --now ai-agent-config-skill-improvement.timer"
     exit 0
   fi
   systemd_require_safe_value "AI_AGENT_STATE_DIR" "$state_dir"
@@ -252,7 +267,8 @@ Environment="AI_AGENT_IMPROVEMENT_LLM=$improvement_llm"
 Environment="AI_AGENT_LOG_DAYS=$log_days"
 Environment="AI_AGENT_LOG_ROOTS=$log_roots"
 Environment="AI_AGENT_LOG_ROOTS_ONLY=$log_roots_only"
-ExecStart=$python_bin "$bot_script" cycle
+WorkingDirectory=$state_dir
+ExecStart=$runtime_skill_entrypoint
 EOF
   cat > "$timer" <<EOF
 [Unit]
@@ -262,13 +278,13 @@ Description=Run AI Agent Config skill improvement scan periodically
 # Run once after boot so machines that were asleep during the interval still catch up.
 OnBootSec=10m
 OnUnitActiveSec=${interval}s
-Unit=llm-config-skill-improvement.service
+Unit=ai-agent-config-skill-improvement.service
 
 [Install]
 WantedBy=timers.target
 EOF
   systemctl --user daemon-reload
-  systemctl --user enable --now llm-config-skill-improvement.timer
+  systemctl --user enable --now ai-agent-config-skill-improvement.timer
   say "scheduled with systemd user timer: $timer"
 else
   warn "automatic scheduling is not supported on this system"

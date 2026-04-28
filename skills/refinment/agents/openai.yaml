@@ -1,8 +1,7 @@
 metadata:
-  short_description: "Self-contained, contract-first prompt and phase refinment for Codex"
-  default_prompt: "Use $refinment only if this task or phase boundary materially needs a tighter contract, then show the refined prompt before proceeding and keep the method flexible unless the user fixed it."
+  short_description: "Self-contained, contract-first prompt and brief refinment for Codex"
+  default_prompt: "Use $refinment only if this task or brief materially needs a tighter contract, then show the refined prompt before proceeding and keep the method flexible unless the user fixed it."
   tags:
     - prompts
     - workflow
-    - self-workflow
   allow_implicit_invocation: true

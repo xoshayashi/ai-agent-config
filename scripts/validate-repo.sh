@@ -36,6 +36,7 @@ say "validate: python syntax"
 python3 -m py_compile "$repo_root/scripts/skill-improvement-bot.py"
 python3 -m py_compile "$repo_root/scripts/merge-hook-config.py"
 python3 -m py_compile "$repo_root/scripts/read-state-config.py"
+python3 -m py_compile "$repo_root/scripts/scheduled_update.py"
 for hook_script in "$repo_root"/hooks/scripts/*.py; do
   [ -f "$hook_script" ] || continue
   python3 -m py_compile "$hook_script"
@@ -47,20 +48,21 @@ AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/health-check.sh" --json
 say "validate: required docs and entrypoints"
 require_file "README.md"
 require_file "setup.md"
+require_file "AGENTS.md"
+require_file "CLAUDE.md"
 require_file "docs/setup-error-guide.md"
 require_file "docs/skill-improvement-automation.md"
 require_file "docs/hooks-architecture-review.md"
-require_file "docs/self-workflow-hooks.md"
 require_file "hooks/README.md"
 require_file "hooks/claude/settings.json"
 require_file "hooks/codex/config.toml"
 require_file "hooks/codex/hooks.json"
 require_file "hooks/gemini/settings.json"
 require_file "hooks/scripts/safe_delete_guard.py"
-require_file "hooks/scripts/self_workflow.py"
 require_file "scripts/install.sh"
 require_file "scripts/setup.sh"
 require_file "scripts/update.sh"
+require_file "scripts/scheduled_update.py"
 require_file "scripts/schedule-update.sh"
 require_file "scripts/schedule-skill-improvement.sh"
 require_file "scripts/uninstall.sh"
@@ -70,8 +72,10 @@ require_file "scripts/read-state-config.py"
 require_file "scripts/skill-improvement-bot.py"
 require_file "scripts/validate-repo.sh"
 require_file "tests/fixtures/skill-logs/sample.jsonl"
+require_file "tests/test_health_check.py"
 require_file "tests/test_merge_hook_config.py"
-require_file "tests/test_self_workflow.py"
+require_file "tests/test_safe_delete_guard.py"
+require_file "tests/test_scheduled_update.py"
 require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"
@@ -111,16 +115,37 @@ for doc in "$repo_root/README.md" "$repo_root/setup.md"; do
   grep -q "~/.gemini" "$doc" || fail "$doc does not mention global Gemini config directory"
 done
 
+say "validate: root agent entrypoints stay on the minimal architecture"
+grep -q "test_safe_delete_guard.py" "$repo_root/AGENTS.md" || fail "AGENTS.md does not reference test_safe_delete_guard.py"
+grep -q "test_safe_delete_guard.py" "$repo_root/CLAUDE.md" || fail "CLAUDE.md does not reference test_safe_delete_guard.py"
+! grep -q "test_self_workflow.py" "$repo_root/AGENTS.md" "$repo_root/CLAUDE.md" || fail "root entrypoints still reference deleted self-workflow tests"
+! grep -q "self_workflow.py" "$repo_root/AGENTS.md" "$repo_root/CLAUDE.md" || fail "root entrypoints still reference deleted self_workflow.py"
+! grep -q "~/.llm-config" "$repo_root/AGENTS.md" "$repo_root/CLAUDE.md" || fail "root entrypoints still reference the retired .llm-config path"
+! rg -q "enable-auto-permission|disable-auto-permission|shell/auto-permission|AI_AGENT_SHELL_ALIAS_LINK|auto-permission" \
+  "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/AGENTS.md" "$repo_root/CLAUDE.md" "$repo_root/instructions" \
+  || fail "auto-permission references remain in the minimal architecture docs"
+
 say "validate: skill-improvement automation is discoverable"
 grep -q "skill-improvement-bot.py" "$repo_root/README.md" || fail "README.md does not mention skill-improvement-bot.py"
+grep -q "schedule-update.sh" "$repo_root/setup.md" || fail "setup.md does not mention schedule-update.sh"
 grep -q "schedule-skill-improvement.sh" "$repo_root/setup.md" || fail "setup.md does not mention schedule-skill-improvement.sh"
 grep -q "AI_AGENT_IMPROVEMENT_CREATE_PR" "$repo_root/docs/skill-improvement-automation.md" || fail "skill improvement automation doc missing PR opt-in variable"
+
+say "validate: scheduler scripts support dry-run"
+AI_AGENT_DRY_RUN=1 AI_AGENT_CONFIG_HOME="$repo_root" AI_AGENT_STATE_DIR="$repo_root/.tmp-health" sh "$repo_root/scripts/schedule-update.sh" >/dev/null
+AI_AGENT_DRY_RUN=1 AI_AGENT_CONFIG_HOME="$repo_root" AI_AGENT_STATE_DIR="$repo_root/.tmp-health" sh "$repo_root/scripts/schedule-skill-improvement.sh" >/dev/null
 
 say "validate: merge-hook-config unit tests pass"
 python3 "$repo_root/tests/test_merge_hook_config.py"
 
-say "validate: self-workflow unit tests pass"
-python3 "$repo_root/tests/test_self_workflow.py"
+say "validate: health-check unit tests pass"
+python3 "$repo_root/tests/test_health_check.py"
+
+say "validate: safe-delete hook unit tests pass"
+python3 "$repo_root/tests/test_safe_delete_guard.py"
+
+say "validate: scheduled-update unit tests pass"
+python3 "$repo_root/tests/test_scheduled_update.py"
 
 say "validate: skill-improvement fixture scan detects proposal"
 # This fixture intentionally targets skill-design-research because it is the

@@ -105,7 +105,7 @@ env_hooks=${AI_AGENT_INSTALL_HOOKS-}
 env_hooks_runtime_set=${AI_AGENT_HOOKS_RUNTIME_LINK+x}
 env_hooks_runtime=${AI_AGENT_HOOKS_RUNTIME_LINK-}
 
-state_dir=${AI_AGENT_STATE_DIR:-$HOME/.llm-config}
+state_dir=${AI_AGENT_STATE_DIR:-$HOME/.ai-agent-config}
 state_file=${AI_AGENT_STATE_FILE:-$(expand_home "$state_dir")/config.env}
 state_loaded=0
 if load_state_file "$state_file"; then
@@ -130,7 +130,7 @@ uninstall_instructions=${AI_AGENT_UNINSTALL_INSTRUCTIONS:-1}
 uninstall_skills=${AI_AGENT_UNINSTALL_SKILLS:-1}
 uninstall_hooks=${AI_AGENT_UNINSTALL_HOOKS:-1}
 uninstall_state=${AI_AGENT_UNINSTALL_STATE:-1}
-hooks_runtime_link=${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}
+hooks_runtime_link=${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.ai-agent-config/hooks}
 
 case "$dry_run" in
   0|1) ;;

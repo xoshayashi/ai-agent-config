@@ -2,27 +2,14 @@
   "hooks": {
     "PreToolUse": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "matcher": "^Bash$",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/safe_delete_guard.py\" --current codex",
+            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.ai-agent-config/hooks}/scripts/safe_delete_guard.py\" --current codex",
             "timeout": 10,
             "statusMessage": "Checking shell command safety"
-          }
-        ]
-      }
-    ],
-    "Stop": [
-      {
-        "_llm_config_managed": true,
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current codex",
-            "timeout": 50,
-            "statusMessage": "Evaluating self-workflow continuation"
           }
         ]
       }
