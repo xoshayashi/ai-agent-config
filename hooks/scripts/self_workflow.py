@@ -40,7 +40,7 @@ DEFAULT_TASK_DONE_KEYWORD = "[[TASK_DONE]]"
 FOLLOWUP_PROMPT_PATTERN = re.compile(
     r"^\s*(continue|go on|keep going|proceed|next|ok|yes|please continue|implement|apply|fix it|"
     r"続けて(?:ください)?|続行(?:してください)?|進めて(?:ください)?|次(?:へ)?|そのまま|"
-    r"お願いします|お願い|じゃあ|では|この仕様で実装して|これで進めて|それで進めて)"
+    r"お願いします|お願い|じゃあ|では|はい|了解|この仕様で実装して|これで進めて|それで進めて)"
     r"(?:\b|[、。,.\s])",
     re.IGNORECASE,
 )
