@@ -143,7 +143,7 @@ def main() -> int:
         )
         skip_when_branch_mismatch = parse_flag(
             "AI_AGENT_UPDATE_SKIP_WHEN_BRANCH_MISMATCH",
-            config.get("AI_AGENT_UPDATE_SKIP_WHEN_BRANCH_MISMATCH", "0"),
+            config.get("AI_AGENT_UPDATE_SKIP_WHEN_BRANCH_MISMATCH", "1"),
         )
     except ValueError as exc:
         return fail(str(exc))

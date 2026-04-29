@@ -84,14 +84,13 @@ def test_dirty_repo_is_skipped_by_default() -> None:
         )
 
 
-def test_branch_mismatch_is_skipped_when_requested() -> None:
+def test_branch_mismatch_is_skipped_by_default() -> None:
     with tempfile.TemporaryDirectory(prefix="scheduled-update-test-") as tmp:
         repo = init_repo(Path(tmp), "feature")
         result = run_runner(
             repo,
             {
                 "AI_AGENT_UPDATE_BRANCH": "main",
-                "AI_AGENT_UPDATE_SKIP_WHEN_BRANCH_MISMATCH": "1",
             },
         )
         assert_true(result.returncode == 0, f"expected success, got rc={result.returncode}, stderr={result.stderr}")
@@ -103,7 +102,7 @@ def test_branch_mismatch_is_skipped_when_requested() -> None:
 
 TESTS = [
     test_dirty_repo_is_skipped_by_default,
-    test_branch_mismatch_is_skipped_when_requested,
+    test_branch_mismatch_is_skipped_by_default,
 ]
 
 
