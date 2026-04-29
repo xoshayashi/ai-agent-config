@@ -134,4 +134,5 @@ sh /path/to/ai-agent-config/scripts/uninstall.sh
 - 各 CLI のグローバル entrypoint ファイル（`~/.codex/AGENTS.md` / `~/.claude/CLAUDE.md` / `~/.gemini/GEMINI.md`）は、Codex では `~/.codex/...` を明示参照し、Claude Code / Gemini CLI では同じディレクトリに置かれる shared files を sibling-relative に参照します。別のPCや別パスに clone した場合は、その clone 先から `scripts/setup.sh` を再実行して各CLI設定を作り直してください
 - エラー時は [docs/setup-error-guide.md](docs/setup-error-guide.md)
 - Skill 改善自動化は [docs/skill-improvement-automation.md](docs/skill-improvement-automation.md)
+- optional な whole-task autonomous runtime は [docs/autonomous-runner.md](docs/autonomous-runner.md)
 - Hooks 設計検証は [docs/hooks-architecture-review.md](docs/hooks-architecture-review.md)
