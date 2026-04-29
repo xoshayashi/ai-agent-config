@@ -35,7 +35,7 @@ ensure_root_entrypoint_gone() {
       ;;
   esac
 
-  fail "$path should stay untracked at repo root"
+  fail "$path must not be tracked at repo root"
 }
 
 say "validate: shell syntax"
