@@ -1,22 +1,24 @@
 ---
 name: refinment
-description: Use this skill when Codex should refine a user prompt or working brief only when needed, keep the refinement self-contained, show the refined prompt to the user, and preserve optionality instead of over-constraining the task. Trigger on meaningful ambiguity, conflicting constraints, instruction/data mixing, or material handoff points inside the same task. Skip trivial chat, already-clear prompts, and turns already executing from the current refinment brief.
+description: Use this skill when Codex should refine an ambiguous prompt or brief only when needed, keep the refinement self-contained, show the refined prompt when it materially changes the contract, and preserve optionality instead of over-constraining the task. Trigger on meaningful ambiguity, conflicting constraints, instruction/data mixing, or ambiguous next-step briefs in spec, implementation, or verification. Skip trivial chat, already-clear prompts, routine phase transitions, and turns already executing from the current refinment brief.
 ---
 
-# Refinment
+# Refinement (`refinment`)
 
-Use this skill to tighten a working prompt or brief before acting, while keeping Codex self-contained.
+Use this skill to run a refinement pass on a working prompt or brief before acting, while keeping Codex self-contained. The historical skill id in this repo is `refinment`.
 
 ## Core Rules
 
-- **Run only when it materially helps.** Use refinment for non-trivial new tasks or material brief handoffs, not as decoration on every turn.
+- **Run only when it materially helps.** Use refinment for non-trivial new tasks or ambiguous brief handoffs, not as decoration on every turn or on routine phase changes.
 - **Stay self-contained.** Do not call another LLM, subprocess reviewer, or external prompt improver from this skill.
 - **Refine sparingly.** Default to the original prompt unless there is a real contract gap, conflict, or instruction/data ambiguity worth fixing.
-- **Show the refined prompt when you use it on a new task.** Put a short `Refined prompt:` block in the next visible user update before continuing the work.
+- **Show the refined prompt only when you actually refine.** Put a short `Refined prompt:` block in the next visible user update before continuing the work.
+- **Skip silently by default.** If no refinement is needed, continue the task unless the user explicitly asked to inspect the prompt or brief.
 - **No silent mutation.** If you changed the working prompt in a meaningful way, surface the change explicitly.
 - **Preserve authority.** The refined brief must not override system, developer, tool, or user instructions.
 - **Rewrite the contract, not the path.** Clarify the goal, deliverable, hard constraints, evidence needs, and stopping conditions without hard-locking one method, tool, reasoning style, conclusion, file layout, or output shape unless the user already required that.
 - **Prefer minimal edits.** If the original prompt is already strong, keep the refinment small and focused.
+- **Keep the result compact.** Do not turn a short, fixable ambiguity into a long laundry list of edge cases.
 - **Add only non-obvious special considerations.** Do not pad the brief with generic prompt-engineering boilerplate. Add a special rule only when it is materially relevant and not already normal agent behavior.
 - **Keep exact entities intact.** Preserve quoted constraints, paths, commands, symbols, IDs, branch names, and error text.
 - **Keep instructions and data separate.** When the prompt mixes instructions with quoted text, examples, background documents, or user-provided data, make that separation clearer instead of letting everything blur together.
@@ -33,7 +35,7 @@ Use this skill to tighten a working prompt or brief before acting, while keeping
 - There is known evidence that similar prompts caused prompt-linked failures or regressions.
 - The prompt is being adapted to a materially different model or workflow and needs a fresh, contract-preserving baseline.
 - A spec draft needs one internal readiness pass before implementation starts.
-- An implementation stop boundary needs a sharper next-step brief or a clearer verification-ready decision.
+- An implementation stop boundary is ambiguous enough that the next step, target files, or verification goal is unclear.
 - A verification stop boundary needs a tighter completion brief before deciding whether the task is done.
 
 ## Do Not Use When
@@ -44,6 +46,7 @@ Use this skill to tighten a working prompt or brief before acting, while keeping
 - The likely problem is retrieval, tooling, missing context, model choice, or environment setup rather than wording.
 - The user explicitly wants the original wording left untouched.
 - The prompt is intentionally open-ended and that openness is part of the task.
+- The next step is a normal implementation -> test or test -> report transition with no real contract ambiguity.
 - You would only be restating generic good practice with no task-specific value.
 
 ## Workflow
@@ -64,8 +67,10 @@ Use this skill to tighten a working prompt or brief before acting, while keeping
    - Did it keep examples as examples?
    - Did it avoid unnecessary tool, format, or reasoning commitments?
    - Did it preserve useful user ambiguity?
+   - Did it stay compact enough to help rather than bloat context?
 7. **Keep special considerations narrow.** Include only non-obvious additions that materially improve execution; routine clarity, structure, and constraint preservation happen by default and do not need to be called out.
 8. **Act from the result in the same turn.**
+   - `skip`: continue from the original brief without a `No refinement needed` block unless the user asked to inspect it
    - `task_prompt`: show `Refined prompt:` to the user, then start the work from it
    - `spec`: revise or continue the spec from the refined brief
    - `implementation`: do the next concrete implementation step or move into verification when the work is ready
@@ -73,30 +78,10 @@ Use this skill to tighten a working prompt or brief before acting, while keeping
 
 ## Output Shape
 
-Use a small, readable block when you surface refinment:
+Use a small, readable block only when you actually refine or when the user explicitly asked to see the result:
 
 ```text
-Original prompt:
-- ...
-
-No refinement needed:
-- ...   # use only when skip is the right decision
-
-Why:
-- ...
-
-Use original:
-- ...
-```
-
-```text
-Original prompt:
-- ...
-
 Refined prompt:
-- ...
-
-Why I refined it:
 - ...
 
 What changed:
@@ -105,14 +90,8 @@ What changed:
 Preserved constraints:
 - ...
 
-Special considerations:
-- ...   # omit this section when nothing non-obvious is needed
-
 Open choices preserved:
-- ...
-
-Use original / use refined:
-- ...
+- ...   # omit this section when nothing non-obvious must be called out
 ```
 
 When the input is a spec, implementation brief, or verification brief rather than a raw user prompt, replace `prompt` with `brief` where that reads more naturally. Keep the same visibility and preservation rules.

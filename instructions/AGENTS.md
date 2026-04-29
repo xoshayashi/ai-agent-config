@@ -1,6 +1,6 @@
 # Codex Project Instructions
 
-**Shared source of truth:** `~/.codex/AI_AGENT_INSTRUCTIONS.md`
+**Core instruction file:** `~/.codex/AI_AGENT_INSTRUCTIONS.md`
 
 Before starting any task, **read and follow `~/.codex/AI_AGENT_INSTRUCTIONS.md`**.
 

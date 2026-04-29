@@ -96,6 +96,12 @@ require_file "skills/refinment/SKILL.md"
 require_file "skills/refinment/agents/openai.yaml"
 require_file "skills/refinment/references/research-notes.md"
 require_file "skills/refinment/tests/activation-prompts.md"
+require_file "skills/skill-design-research/SKILL.md"
+require_file "skills/skill-design-research/agents/openai.yaml"
+require_file "skills/skill-design-research/references/activation-examples.md"
+require_file "skills/skill-design-research/references/research-foundations.md"
+require_file "skills/skill-design-research/references/source-quality.md"
+require_file "skills/skill-design-research/tests/activation-prompts.md"
 
 say "validate: installable skills have basic frontmatter"
 for skill in "$repo_root"/skills/*/SKILL.md; do
@@ -119,6 +125,9 @@ say "validate: repo-root agent entrypoints stay deleted"
 ensure_root_entrypoint_gone "AGENTS.md"
 ensure_root_entrypoint_gone "CLAUDE.md"
 ensure_root_entrypoint_gone "GEMINI.md"
+! grep -Fq "Shared source of truth" \
+  "$repo_root/instructions/AGENTS.md" "$repo_root/instructions/CLAUDE.md" "$repo_root/instructions/GEMINI.md" \
+  || fail "instruction entrypoints should describe a core instruction file, not a shared source-of-truth label"
 grep -Fq "~/.codex/AI_AGENT_INSTRUCTIONS.md" "$repo_root/instructions/AGENTS.md" \
   || fail "Codex AGENTS entrypoint must point to ~/.codex/AI_AGENT_INSTRUCTIONS.md"
 grep -Fq "~/.codex/DESIGN.md" "$repo_root/instructions/AGENTS.md" \
@@ -127,6 +136,10 @@ grep -Fq "~/.codex/HOOKS.md" "$repo_root/instructions/AGENTS.md" \
   || fail "Codex AGENTS entrypoint must point to ~/.codex/HOOKS.md"
 ! grep -Fq "./AI_AGENT_INSTRUCTIONS.md" "$repo_root/instructions/AGENTS.md" \
   || fail "Codex AGENTS entrypoint must not use cwd-relative shared instructions"
+hardcoded_repo_path_pattern='/Users/sh/Documents/ai-agent-config'
+! grep -REq "$hardcoded_repo_path_pattern" \
+  "$repo_root/instructions/AGENTS.md" "$repo_root/instructions/CLAUDE.md" "$repo_root/instructions/GEMINI.md" \
+  || fail "instruction entrypoints still contain a machine-specific repo path"
 auto_permission_pattern='enable-auto-permission|disable-auto-permission|shell/auto-permission|AI_AGENT_SHELL_ALIAS_LINK|auto-permission'
 ! grep -REq "$auto_permission_pattern" \
   "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/instructions" \

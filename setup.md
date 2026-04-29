@@ -120,6 +120,9 @@ CLI 側設定先:
 
 必要なときだけ `refinment` を使って brief を整える、という構成です。
 
+instruction / skill / reusable workflow の設計そのものを見直す task は、
+`skill-design-research` に寄せる想定です。
+
 ### 入力前プロンプト改善
 
 入力前のプロンプト改善は、グローバル Hook ではなく **Skill

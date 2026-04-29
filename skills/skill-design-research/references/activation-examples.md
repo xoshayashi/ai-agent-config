@@ -12,6 +12,7 @@ Use these examples when reviewing whether `skill-design-research` will activate 
 - "Review whether this prompt workflow is evidence-backed or just generic advice."
 - "Build a skill for self-review and evaluation based on academic sources."
 - "Tune the trigger description for this skill so realistic user requests activate it."
+- "This instruction module feels bloated. Audit what should stay global versus move into skills or references."
 
 ## Should Not Trigger
 
@@ -21,6 +22,8 @@ Use these examples when reviewing whether `skill-design-research` will activate 
 - "What is the current time?"
 - "Run the existing test suite."
 - "Add one missing import to this file."
+- "This prompt is a bit ambiguous; tighten it before you start."   # should route to `refinment`
+- "Rewrite this one paragraph but keep the workflow the same."
 
 ## Review Questions
 

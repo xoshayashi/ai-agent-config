@@ -9,8 +9,9 @@ engine.
 
 The main session should own specification, implementation, verification, and
 self-review. If a task needs a tighter brief, use `refinment` inside that same
-session instead of relying on a Hook to inject prompts, manage phases, or
-auto-continue work.
+session. If it needs reusable workflow or activation redesign, use
+`skill-design-research` instead of relying on a Hook to inject prompts, manage
+phases, or auto-continue work.
 
 ## What Hooks Are For
 

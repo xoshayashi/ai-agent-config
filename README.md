@@ -121,6 +121,7 @@ sh /path/to/ai-agent-config/scripts/uninstall.sh
 - managed Hook は **deterministic な safety/policy check だけ** に絞る
 - 仕様整理・実装・検証・セルフレビューの主導権は、Hook ではなく現在の CLI 本体に持たせる
 - 入力前の brief 整理が本当に必要なときだけ **Skill（`refinment`）** を使う
+- skill / instruction / reusable workflow 自体の設計見直しは **`skill-design-research`** に寄せる
 - `refinment` は self-contained。現在の CLI が必要と判断したときだけ brief を整え、必要なら `Refined prompt:` を表示してから作業を始める
 - Hook-driven orchestration、phase state、completion keyword の main path は持たない
 
