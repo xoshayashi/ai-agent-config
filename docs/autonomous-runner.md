@@ -62,6 +62,12 @@ failure rendering は registry に寄せます。
 
 provider ごとの実行コマンドは config で差し替えられます。
 
+## Security Considerations
+
+- `claude` の既定テンプレートは `--permission-mode bypassPermissions` を含みます。headless self-automation を優先するための明示的な tradeoff なので、使う scope と前提を理解した上で有効化してください。
+- `commit_all` は `git add -A` を使います。automation が所有している worktree を前提にしており、未追跡の一時ファイルや secrets を混ぜたくない場合は、worktree を分けるか commit/push をしない backend を使ってください。
+- verification の `shell` step は `/bin/sh -c` で実行します。login shell 固有の環境に依存しない、短い check を想定しています。
+
 ## v1 の範囲
 
 v1 は optional utility です。

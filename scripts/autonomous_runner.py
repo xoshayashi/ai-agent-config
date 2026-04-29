@@ -307,7 +307,7 @@ def describe_shell_step(step: dict[str, Any]) -> str:
 
 
 def execute_shell_step(repo: Path, step: dict[str, Any], dry_run: bool) -> dict[str, Any]:
-    result = run_command(["/bin/sh", "-lc", str(step["command"])], repo, dry_run=dry_run, check=False)
+    result = run_command(["/bin/sh", "-c", str(step["command"])], repo, dry_run=dry_run, check=False)
     success = result.returncode == 0
     return {
         "type": "shell",
@@ -800,6 +800,8 @@ def branch_ahead_count(repo: Path, base_branch: str) -> int:
 
 
 def commit_all(repo: Path, message: str, dry_run: bool) -> None:
+    # The runtime assumes the automation owns the worktree; callers should
+    # keep untracked files out of scope or disable commit/push delivery.
     git(repo, "add", "-A", dry_run=dry_run)
     git(repo, "commit", "-m", message, dry_run=dry_run)
 
@@ -828,20 +830,6 @@ def find_open_pr_for_branch(repo: Path, branch: str, dry_run: bool) -> dict[str,
     payload = json.loads(result.stdout or "[]")
     if not payload:
         return None
-    return payload[0]
-
-
-def pr_lookup(repo: Path, branch: str, dry_run: bool) -> dict[str, Any]:
-    if dry_run:
-        return {"number": 1, "url": "https://example.invalid/pr/1"}
-    result = run_command(
-        ["gh", "pr", "list", "--state", "open", "--head", branch, "--json", "number,url"],
-        repo,
-        check=True,
-    )
-    payload = json.loads(result.stdout or "[]")
-    if not payload:
-        raise SystemExit(f"error: could not find open PR for branch {branch}")
     return payload[0]
 
 
@@ -875,7 +863,10 @@ def create_pr(repo: Path, state: dict[str, Any], plan: DeliveryPlan, dry_run: bo
         repo,
         check=True,
     )
-    return pr_lookup(repo, state["head_branch"], dry_run)
+    refreshed = find_open_pr_for_branch(repo, state["head_branch"], dry_run)
+    if refreshed:
+        return refreshed
+    raise SystemExit(f"error: could not find open PR for branch {state['head_branch']}")
 
 
 def sync_github_pr_publication(
@@ -1166,6 +1157,7 @@ def verify_phase(
     prompt = build_verification_fix_prompt(state, failures)
     run_provider(config, state, state_path, repo, prompt, trace_path, dry_run)
 
+
 def followup_github_pr_backend(
     repo: Path,
     config: dict[str, Any],
@@ -1399,6 +1391,7 @@ def run_workflow(args: argparse.Namespace) -> int:
             state["blocker_class"] = state.get("blocker_class") or "runtime_error"
             detail = str(exc) or "workflow aborted"
             state["last_error"] = state.get("last_error") or detail
+            # Persist terminal state before re-raising so an interrupted run can resume cleanly.
             record_event(state, trace_path, "failed", blocker_class=state["blocker_class"], message=state["last_error"])
         save_state(state_path, state)
         raise
