@@ -119,6 +119,14 @@ say "validate: repo-root agent entrypoints stay deleted"
 ensure_root_entrypoint_gone "AGENTS.md"
 ensure_root_entrypoint_gone "CLAUDE.md"
 ensure_root_entrypoint_gone "GEMINI.md"
+grep -Fq "~/.codex/AI_AGENT_INSTRUCTIONS.md" "$repo_root/instructions/AGENTS.md" \
+  || fail "Codex AGENTS entrypoint must point to ~/.codex/AI_AGENT_INSTRUCTIONS.md"
+grep -Fq "~/.codex/DESIGN.md" "$repo_root/instructions/AGENTS.md" \
+  || fail "Codex AGENTS entrypoint must point to ~/.codex/DESIGN.md"
+grep -Fq "~/.codex/HOOKS.md" "$repo_root/instructions/AGENTS.md" \
+  || fail "Codex AGENTS entrypoint must point to ~/.codex/HOOKS.md"
+! grep -Fq "./AI_AGENT_INSTRUCTIONS.md" "$repo_root/instructions/AGENTS.md" \
+  || fail "Codex AGENTS entrypoint must not use cwd-relative shared instructions"
 auto_permission_pattern='enable-auto-permission|disable-auto-permission|shell/auto-permission|AI_AGENT_SHELL_ALIAS_LINK|auto-permission'
 ! grep -REq "$auto_permission_pattern" \
   "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/instructions" \
