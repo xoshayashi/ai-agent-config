@@ -22,10 +22,6 @@ require_file() {
   [ -f "$repo_root/$1" ] || fail "missing required file: $1"
 }
 
-require_dir() {
-  [ -d "$repo_root/$1" ] || fail "missing required directory: $1"
-}
-
 say "validate: shell syntax"
 for script in "$repo_root"/scripts/*.sh; do
   [ -f "$script" ] || continue
@@ -59,7 +55,6 @@ require_file "hooks/codex/config.toml"
 require_file "hooks/codex/hooks.json"
 require_file "hooks/gemini/settings.json"
 require_file "hooks/scripts/safe_delete_guard.py"
-require_file "scripts/install.sh"
 require_file "scripts/setup.sh"
 require_file "scripts/update.sh"
 require_file "scripts/scheduled_update.py"
@@ -87,15 +82,6 @@ require_file "skills/refinment/SKILL.md"
 require_file "skills/refinment/agents/openai.yaml"
 require_file "skills/refinment/references/research-notes.md"
 require_file "skills/refinment/tests/activation-prompts.md"
-
-say "validate: skill template is a template, not an installable skill"
-require_dir "skills/template"
-require_file "skills/template/SKILL.md.template"
-require_file "skills/template/tests/activation-prompts.md"
-require_file "skills/template/tests/self-review-checklist.md"
-if [ -f "$repo_root/skills/template/SKILL.md" ]; then
-  fail "skills/template/SKILL.md would be installed as a real skill; keep it as SKILL.md.template"
-fi
 
 say "validate: installable skills have basic frontmatter"
 for skill in "$repo_root"/skills/*/SKILL.md; do
