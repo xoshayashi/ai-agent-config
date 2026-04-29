@@ -22,6 +22,22 @@ require_file() {
   [ -f "$repo_root/$1" ] || fail "missing required file: $1"
 }
 
+ensure_root_entrypoint_gone() {
+  path="$1"
+  if ! git -C "$repo_root" ls-files --error-unmatch "$path" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  status=$(git -C "$repo_root" status --porcelain -- "$path")
+  case "$status" in
+    *D*)
+      return 0
+      ;;
+  esac
+
+  fail "$path should stay untracked at repo root"
+}
+
 say "validate: shell syntax"
 for script in "$repo_root"/scripts/*.sh; do
   [ -f "$script" ] || continue
@@ -44,8 +60,6 @@ AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/health-check.sh" --json
 say "validate: required docs and entrypoints"
 require_file "README.md"
 require_file "setup.md"
-require_file "AGENTS.md"
-require_file "CLAUDE.md"
 require_file "docs/setup-error-guide.md"
 require_file "docs/skill-improvement-automation.md"
 require_file "docs/hooks-architecture-review.md"
@@ -101,15 +115,13 @@ for doc in "$repo_root/README.md" "$repo_root/setup.md"; do
   grep -q "~/.gemini" "$doc" || fail "$doc does not mention global Gemini config directory"
 done
 
-say "validate: root agent entrypoints stay on the minimal architecture"
-grep -q "test_safe_delete_guard.py" "$repo_root/AGENTS.md" || fail "AGENTS.md does not reference test_safe_delete_guard.py"
-grep -q "test_safe_delete_guard.py" "$repo_root/CLAUDE.md" || fail "CLAUDE.md does not reference test_safe_delete_guard.py"
-! grep -q "test_self_workflow.py" "$repo_root/AGENTS.md" "$repo_root/CLAUDE.md" || fail "root entrypoints still reference deleted self-workflow tests"
-! grep -q "self_workflow.py" "$repo_root/AGENTS.md" "$repo_root/CLAUDE.md" || fail "root entrypoints still reference deleted self_workflow.py"
-! grep -q "~/.llm-config" "$repo_root/AGENTS.md" "$repo_root/CLAUDE.md" || fail "root entrypoints still reference the retired .llm-config path"
+say "validate: repo-root agent entrypoints stay untracked"
+ensure_root_entrypoint_gone "AGENTS.md"
+ensure_root_entrypoint_gone "CLAUDE.md"
+ensure_root_entrypoint_gone "GEMINI.md"
 auto_permission_pattern='enable-auto-permission|disable-auto-permission|shell/auto-permission|AI_AGENT_SHELL_ALIAS_LINK|auto-permission'
 ! grep -REq "$auto_permission_pattern" \
-  "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/AGENTS.md" "$repo_root/CLAUDE.md" "$repo_root/instructions" \
+  "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/instructions" \
   || fail "auto-permission references remain in the minimal architecture docs"
 
 say "validate: skill-improvement automation is discoverable"
