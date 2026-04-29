@@ -15,10 +15,11 @@ Use this guide when setup, update, scheduling, or uninstall fails. Explain error
 | `could not apply delete protection` | macOSの削除防止設定をリンクに付けられませんでした。リンク作成自体は成功している場合があります。 | まずリンクが読めるか確認します。削除防止が必須でなければ継続できます。 |
 | `trash is required for safe uninstall` | 安全に元へ戻すための `trash` コマンドが見つかりません。 | 完全削除はせず、`trash` をインストールするか、手動でゴミ箱へ移す方法を案内します。 |
 | `config repository has local changes` | 設定リポジトリに未保存の変更があり、更新すると作業を壊す可能性があります。 | 変更内容を確認し、必要ならコミットまたは退避してから更新します。 |
-| `not a git repository` | 更新対象がGitリポジトリではありません。 | 正しい `llm-config` の場所を探すか、GitHubから再取得します。 |
+| `not a git repository` | 更新対象がGitリポジトリではありません。 | 正しい `ai-agent-config` の場所を探すか、GitHubから再取得します。 |
 | `AI_AGENT_TARGET_DIR is deprecated and ignored` | 旧方式（作業フォルダー配下へのリンク作成）の変数が指定されています。 | そのまま続行できます。必要なら `AI_AGENT_CODEX_HOME` / `AI_AGENT_CLAUDE_HOME` / `AI_AGENT_GEMINI_HOME` を使ってグローバル配置先を調整します。 |
 | `launchctl` or `systemctl` scheduling failed | 自動更新のスケジュール登録に失敗しました。設定本体は使える場合があります。 | まず手動更新コマンドを案内します。自動更新はOS別に再確認します。 |
-| Hookが起動しない (`statusMessage` が出ない) | `hooks.json` が未反映か、managed hook link や installable skill link が壊れている可能性があります。 | `~/.codex/config.toml` の `codex_hooks = true`、`~/.codex/hooks.json` の存在、`scripts/health-check.sh` の `hooks-self-workflow` 行、`~/.agents/skills/refinment` のリンクを確認し、`scripts/setup.sh` を再実行します。 |
+| shell command safety hook が見えない / 動かない | 現在の managed Hook は shell command 実行時の safety check に限定されています。通常の会話では何も出ないことがあります。shell command 実行時にも反応しないなら設定未反映や設定ファイルのズレを疑います。 | 各 CLI の Hook 設定ファイル、`~/.codex/config.toml` の `codex_hooks = true`、`scripts/health-check.sh` の `hooks:` / `hooks-policy:` / `legacy:` 行を確認し、必要なら `sh scripts/setup.sh` を再実行します。 |
+| `can't open file '.../.llm-config/hooks/scripts/...'` | 起動済みのCLIセッションが旧 Hook パスを握ったままです。設定本体が新パスへ更新済みでも、このセッションだけ古い場所を見続けることがあります。 | `scripts/health-check.sh` で `legacy: llm-config=absent` か確認し、そのCLIセッションを再起動してから `sh scripts/setup.sh` を再実行します。 |
 | `health: warn` | 基本動作は確認できましたが、未ログイン、未インストール、リンク未設定、リポジトリ未保存変更など確認が必要な項目があります。 | `scripts/health-check.sh` の各行を見て、最も小さい修正だけを提案します。 |
 | `health: fail` | Gitや設定リポジトリなど、更新や診断に必要な前提が見つかりません。 | リポジトリの場所、Gitの有無、GitHubからの再取得が必要かを確認します。 |
 
@@ -33,5 +34,5 @@ Use this guide when setup, update, scheduling, or uninstall fails. Explain error
 
 - Do not suggest permanent deletion.
 - Use `trash` for cleanup and uninstall.
-- Prefer user-owned directories (`~/.codex`, `~/.claude`, `~/.gemini`, `~/.llm-config`) over system-wide protected locations.
+- Prefer user-owned directories (`~/.codex`, `~/.claude`, `~/.gemini`, `~/.ai-agent-config`) over system-wide protected locations.
 - If a command failed because knowledge may be outdated, check the official CLI or GitHub documentation before retrying.

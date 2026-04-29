@@ -7,11 +7,11 @@ This repository distributes shared AI-agent configuration for Claude Code, Codex
 ## Build, Test, and Development Commands
 
 - `sh scripts/validate-repo.sh`: run the full repository validation used by CI.
-- `python3 tests/test_self_workflow.py`: run one focused Python test file; replace the filename for other suites.
-- `AI_AGENT_DRY_RUN=1 sh scripts/setup.sh`: preview global config links and hook merges without applying changes.
+- `python3 tests/test_safe_delete_guard.py`: run one focused Python test file; replace the filename for other suites.
+- `AI_AGENT_DRY_RUN=1 sh scripts/setup.sh`: preview global config links, hook merges, and scheduler registration without applying changes.
 - `sh scripts/health-check.sh`: inspect the installed configuration state.
 
-There is no package-manager build step; most checks are shell syntax, Python syntax, health-check behavior, and direct unit scripts.
+There is no package-manager build step; most checks are shell syntax, Python syntax, health-check behavior, scheduler dry-runs, and direct unit scripts.
 
 ## Coding Style & Naming Conventions
 
@@ -19,12 +19,12 @@ Write shell scripts as POSIX `sh` where possible, starting with `set -eu`. Keep 
 
 ## Testing Guidelines
 
-Add or update direct test scripts in `tests/` when changing hook behavior, config merging, prompt refinement, or skill-log scanning. Keep fixture updates under `tests/fixtures/` small and intentional. Before opening a PR, run `sh scripts/validate-repo.sh`; for narrow changes, also run the affected `python3 tests/test_*.py` file while iterating.
+Add or update direct test scripts in `tests/` when changing hook behavior, config merging, prompt refinement, scheduling, or skill-log scanning. Keep fixture updates under `tests/fixtures/` small and intentional. Before opening a PR, run `sh scripts/validate-repo.sh`; for narrow changes, also run the affected `python3 tests/test_*.py` file while iterating.
 
 ## Commit & Pull Request Guidelines
 
-Follow the existing concise, lower-case imperative style, for example `tighten self-workflow activation heuristics` or `simplify refinment activation notes`. PR descriptions should state the affected area, behavior change, validation command results, and any setup or migration impact. Include screenshots only when changing generated visual documentation.
+Follow the existing concise, lower-case imperative style, for example `tighten safe-delete health reporting` or `simplify scheduler setup defaults`. PR descriptions should state the affected area, behavior change, validation command results, and any setup or migration impact. Include screenshots only when changing generated visual documentation.
 
 ## Agent-Specific Instructions
 
-Before contributor or agent work, read `instructions/AI_AGENT_INSTRUCTIONS.md`; also read `instructions/DESIGN.md` for user-facing copy or layout guidance, and `instructions/HOOKS.md` for self-workflow changes. For deletion work, use the safer `trash` workflow described in the shared instructions.
+Before contributor or agent work, read `instructions/AI_AGENT_INSTRUCTIONS.md`; also read `instructions/DESIGN.md` for user-facing copy or layout guidance, and `instructions/HOOKS.md` for shared Hook policy. For deletion work, use the safer `trash` workflow described in the shared instructions.

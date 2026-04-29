@@ -22,8 +22,8 @@
 | **Config updates** | When the user asks to urgently apply the latest shared instructions or skills, run the repository updater instead of waiting for the scheduled update. |
 | **Skill improvement logs** | When the user asks to inspect recent LLM CLI usage for skill improvements, run the local skill-improvement scanner and summarize only redacted proposals. |
 | **Design discipline** | For any user-facing output that involves visual or verbal style — copy tone, color choices, typography hints, UI suggestions, document layout — follow `instructions/DESIGN.md` (Act design language). Defer to the source guideline noted there for full implementation values. |
-| **Hook self-workflow** | For Hook-based same-LLM workflows, follow `instructions/HOOKS.md` for lifecycle, completion keywords, and stop conditions. |
-| **Auto-permission context** | If the user has opted in via `scripts/enable-auto-permission.sh`, this CLI session may have started with approval bypass (`codex --dangerously-bypass-approvals-and-sandbox`, `gemini --yolo`, or `claude --permission-mode auto`). That removes the per-action human gate, so the **completion quality gate, scope discipline, and explicit confirmation for risky actions matter more, not less**. Do not interpret a permissive runtime as permission to take destructive or out-of-scope actions silently. |
+| **Hooks** | Treat hooks as thin deterministic guardrails. Follow `instructions/HOOKS.md` and do not depend on hook-driven orchestration for normal task flow. |
+| **Permissive runtime context** | If this CLI session was started with approval bypass or auto-approval flags, the per-action human gate may be absent. That makes the **completion quality gate, scope discipline, and explicit confirmation for risky actions matter more, not less**. Do not interpret a permissive runtime as permission to take destructive or out-of-scope actions silently. |
 
 ## Scope
 
@@ -43,6 +43,7 @@
 - For external services, proceed when the user's requested outcome, target service/account, and target object or recipient are clear or safely inferable from context. Do not add extra approval steps solely because the action affects an external service.
 - If a higher-priority system, developer, tool, or service rule requires confirmation, follow that rule with the smallest possible interruption, then continue autonomously.
 - If new uncertainty appears during execution, make the smallest safe in-scope assumption and continue. Pause only when the next action would knowingly affect a target outside the agreed scope or when a higher-priority rule blocks progress.
+- If the working brief is materially ambiguous, use `refinment` once, show the refined prompt when it changes the contract, then continue in the same session. Do not wait for a Hook to decide the next step for routine in-scope work.
 
 ## File Deletion And Safety
 
@@ -80,7 +81,7 @@
 
 - If the user asks to **urgently update, refresh, or apply the latest shared AI agent instructions or skills**, run the config repository updater immediately instead of waiting for the scheduled update.
 - Treat Japanese shortcut phrases such as **「急ぎ対応したいんだけど」**, **「今すぐ最新にして」**, and **「最新のルールを反映して」** as urgent shared-config update requests when the setup/config context is clear. If the surrounding message clearly refers to a different urgent task, handle that task instead.
-- Locate the config repository from `AI_AGENT_CONFIG_HOME`, `$HOME/.llm-config/config.env`, or the symlink target of `AI_AGENT_INSTRUCTIONS.md`, then run `scripts/update.sh` from that repository and report the result in Japanese.
+- Locate the config repository from `AI_AGENT_CONFIG_HOME`, `$HOME/.ai-agent-config/config.env`, or the symlink target of `AI_AGENT_INSTRUCTIONS.md`, then run `scripts/update.sh` from that repository and report the result in Japanese.
 - If the user asks to check whether shared config is installed, healthy, logged in, or up to date, run `scripts/health-check.sh` from the config repository first, then explain the result in Japanese before deciding whether setup or update is needed.
 - If the user asks to **find skill improvements from recent usage logs**, run `scripts/skill-improvement-bot.py scan` from the config repository. Treat phrases such as **「最近のログからSkill改善点を見て」**, **「Skillで吸収できる改善点を確認して」**, and **「Skill改善PRまで自動で作って」** as this workflow when the setup/config context is clear.
 - Do not expose, quote, or commit raw LLM CLI logs. Share only redacted summaries and improvement proposals. Creating PRs, applying review feedback, or auto-merging must be driven by the repository's explicit automation flags and safety checks.
