@@ -149,6 +149,7 @@ def make_fake_gh(bin_dir: Path) -> None:
         phase = (repo / ".phase-state").read_text(encoding="utf-8").strip() if (repo / ".phase-state").exists() else "opened"
         merged = (repo / ".merged").exists()
         review_required_only = (repo / ".review-required-only").exists()
+        bad_json = (repo / ".bad-json").exists()
         argv = sys.argv[1:]
         if argv[:3] == ["repo", "view", "--json"]:
             print(json.dumps({"nameWithOwner": "octo/test"}))
@@ -160,6 +161,9 @@ def make_fake_gh(bin_dir: Path) -> None:
             print(json.dumps([{"number": 1, "url": "https://example.invalid/pr/1"}]))
             sys.exit(0)
         if argv[:2] == ["pr", "view"]:
+            if bad_json:
+                print("{this is not valid json}")
+                sys.exit(0)
             review_decision = "REVIEW_REQUIRED" if review_required_only else ("APPROVED" if phase == "ready" or merged else "CHANGES_REQUESTED")
             payload = {
                 "number": 1,
@@ -188,6 +192,9 @@ def make_fake_gh(bin_dir: Path) -> None:
             if (repo / ".truth-fail").exists():
                 print("graphql unavailable", file=sys.stderr)
                 sys.exit(1)
+            if bad_json:
+                print("{this is not valid json}")
+                sys.exit(0)
             unresolved = 0 if review_required_only or phase == "ready" else 1
             print(json.dumps({
                 "data": {
@@ -808,6 +815,63 @@ def test_provider_timeout_blocks_hung_run() -> None:
         assert_true(state["blocker_class"] == "provider_timeout", f"unexpected timeout blocker: {state}")
 
 
+def test_invalid_gh_json_is_saved_as_failure() -> None:
+    with tempfile.TemporaryDirectory(prefix="autonomous-runtime-") as tmp:
+        root = Path(tmp)
+        repo = init_repo(root)
+        run_git(repo, "checkout", "-b", "auto/test-bad-json")
+        (repo / "feature.txt").write_text("implemented\n", encoding="utf-8")
+        run_git(repo, "add", "feature.txt")
+        run_git(repo, "commit", "-m", "feature")
+        run_git(repo, "push", "-u", "origin", "auto/test-bad-json")
+        (repo / ".bad-json").write_text("1\n", encoding="utf-8")
+        bin_dir = root / "bin"
+        bin_dir.mkdir()
+        make_fake_provider(bin_dir)
+        make_fake_gh(bin_dir)
+        config = root / "runtime.json"
+        state_file = root / "state.json"
+        write_config(
+            config,
+            {
+                "provider": "fake",
+                "delivery": {
+                    "backend": "github_pr",
+                    "backends": {"github_pr": {"allow_followup_fixes": True, "allow_completion": False}},
+                },
+                "runtime": {"max_pending_polls": 0, "poll_interval_seconds": 0},
+                "verification": {"steps": [{"type": "shell", "command": "test -f feature.txt"}]},
+                "providers": {"fake": ["fake-provider", "{prompt}"]},
+            },
+        )
+        state_file.write_text(
+            json.dumps(
+                make_state(
+                    repo,
+                    "Stop on malformed GitHub JSON.",
+                    "followup",
+                    "github_pr",
+                    head_branch="auto/test-bad-json",
+                    artifacts={"delivery": {"github_pr": {"pull_request": {"number": 1, "url": "https://example.invalid/pr/1"}}}},
+                    backend_state={"github_pr": {"pr_ref": "1", "followup_retries": 0, "pending_polls": 0}},
+                )
+            ),
+            encoding="utf-8",
+        )
+        result = run_runner(
+            repo,
+            config,
+            {"BIN_DIR": str(bin_dir)},
+            "--state-file",
+            str(state_file),
+            "--allow-dirty",
+        )
+        assert_true(result.returncode != 0, f"runtime should fail on malformed JSON, rc={result.returncode}, stderr={result.stderr}")
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+        assert_true(state["status"] == "failed", f"failed state should be saved: {state}")
+        assert_true("could not parse JSON" in state["last_error"], f"unexpected last_error: {state}")
+
+
 def test_blocked_state_can_resume_after_fix() -> None:
     with tempfile.TemporaryDirectory(prefix="autonomous-runtime-") as tmp:
         root = Path(tmp)
@@ -1138,6 +1202,7 @@ TESTS = [
     test_legacy_state_schema_is_rejected,
     test_semantic_provider_blocker_is_respected,
     test_provider_timeout_blocks_hung_run,
+    test_invalid_gh_json_is_saved_as_failure,
     test_blocked_state_can_resume_after_fix,
     test_review_truth_failure_blocks_immediately,
     test_review_truth_is_optional_when_policy_disables_thread_gate,

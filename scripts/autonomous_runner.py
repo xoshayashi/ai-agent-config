@@ -722,6 +722,13 @@ def parse_runner_result(stdout: str) -> dict[str, Any] | None:
     return None
 
 
+def load_json_payload(raw: str, context: str) -> Any:
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise SystemExit(f"error: could not parse JSON for {context}") from exc
+
+
 def provider_env(state: dict[str, Any], state_path: Path) -> dict[str, str]:
     return {
         "AI_AGENT_STATE_FILE": str(state_path),
@@ -961,7 +968,7 @@ query($owner:String!, $name:String!, $number:Int!, $after:String) {
         result = run_command(cmd, repo, check=False)
         if result.returncode != 0:
             return -1
-        data = json.loads(result.stdout)
+        data = load_json_payload(result.stdout, "gh api graphql reviewThreads")
         threads = data["data"]["repository"]["pullRequest"]["reviewThreads"]
         unresolved += sum(1 for node in threads["nodes"] if not node.get("isResolved") and not node.get("isOutdated"))
         page = threads["pageInfo"]
@@ -1002,14 +1009,14 @@ def inspect_pr(repo: Path, config: dict[str, Any], pr_ref: str, dry_run: bool) -
         repo,
         check=True,
     )
-    data = json.loads(view.stdout)
+    data = load_json_payload(view.stdout, "gh pr view")
     checks_cmd = ["gh", "pr", "checks", pr_ref, "--json", "name,bucket,state,workflow"]
     if bool(policy.get("required_checks_only", True)):
         checks_cmd.append("--required")
     checks = run_command(checks_cmd, repo, check=False)
     if checks.returncode not in {0, 8}:
         raise SystemExit("error: could not inspect PR checks")
-    data["checks"] = json.loads(checks.stdout or "[]")
+    data["checks"] = load_json_payload(checks.stdout or "[]", "gh pr checks")
     data["min_required_checks"] = int(policy.get("min_required_checks", 0))
     data["unresolved_threads"] = unresolved_threads(repo, int(data["number"]), dry_run)
     return data
@@ -1182,6 +1189,8 @@ def verify_phase(
 
     prompt = build_verification_fix_prompt(state, failures)
     run_provider(config, state, state_path, repo, prompt, trace_path, dry_run)
+    if state.get("status") != "running":
+        return
 
 
 def followup_github_pr_backend(
