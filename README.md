@@ -130,7 +130,7 @@ sh /path/to/ai-agent-config/scripts/uninstall.sh
 
 - compatibility マトリクス運用は廃止済みです
 - 詳細手順は [setup.md](setup.md)
-- `AGENTS.md` / `CLAUDE.md` / `GEMINI.md` の entrypoint ファイルは、各 CLI の実際の読み込み挙動に合わせて管理しています。別のPCや別パスに clone した場合は、その clone 先から `scripts/setup.sh` を再実行して各CLI設定を作り直してください
+- 各 CLI のグローバル entrypoint ファイル（`~/.codex/AGENTS.md` / `~/.claude/CLAUDE.md` / `~/.gemini/GEMINI.md`）は、実際の読み込み挙動に合わせて管理しています。別のPCや別パスに clone した場合は、その clone 先から `scripts/setup.sh` を再実行して各CLI設定を作り直してください
 - エラー時は [docs/setup-error-guide.md](docs/setup-error-guide.md)
 - Skill 改善自動化は [docs/skill-improvement-automation.md](docs/skill-improvement-automation.md)
 - Hooks 設計検証は [docs/hooks-architecture-review.md](docs/hooks-architecture-review.md)

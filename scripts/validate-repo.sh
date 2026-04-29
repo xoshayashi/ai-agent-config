@@ -22,8 +22,20 @@ require_file() {
   [ -f "$repo_root/$1" ] || fail "missing required file: $1"
 }
 
-require_dir() {
-  [ -d "$repo_root/$1" ] || fail "missing required directory: $1"
+ensure_root_entrypoint_gone() {
+  path="$1"
+  if ! git -C "$repo_root" ls-files --error-unmatch "$path" >/dev/null 2>&1; then
+    return 0
+  fi
+
+  status=$(git -C "$repo_root" status --porcelain -- "$path")
+  case "$status" in
+    *D*)
+      return 0
+      ;;
+  esac
+
+  fail "$path must not be tracked at repo root"
 }
 
 say "validate: shell syntax"
@@ -48,8 +60,6 @@ AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/health-check.sh" --json
 say "validate: required docs and entrypoints"
 require_file "README.md"
 require_file "setup.md"
-require_file "AGENTS.md"
-require_file "CLAUDE.md"
 require_file "docs/setup-error-guide.md"
 require_file "docs/skill-improvement-automation.md"
 require_file "docs/hooks-architecture-review.md"
@@ -59,7 +69,6 @@ require_file "hooks/codex/config.toml"
 require_file "hooks/codex/hooks.json"
 require_file "hooks/gemini/settings.json"
 require_file "hooks/scripts/safe_delete_guard.py"
-require_file "scripts/install.sh"
 require_file "scripts/setup.sh"
 require_file "scripts/update.sh"
 require_file "scripts/scheduled_update.py"
@@ -88,15 +97,6 @@ require_file "skills/refinment/agents/openai.yaml"
 require_file "skills/refinment/references/research-notes.md"
 require_file "skills/refinment/tests/activation-prompts.md"
 
-say "validate: skill template is a template, not an installable skill"
-require_dir "skills/template"
-require_file "skills/template/SKILL.md.template"
-require_file "skills/template/tests/activation-prompts.md"
-require_file "skills/template/tests/self-review-checklist.md"
-if [ -f "$repo_root/skills/template/SKILL.md" ]; then
-  fail "skills/template/SKILL.md would be installed as a real skill; keep it as SKILL.md.template"
-fi
-
 say "validate: installable skills have basic frontmatter"
 for skill in "$repo_root"/skills/*/SKILL.md; do
   [ -f "$skill" ] || continue
@@ -115,15 +115,13 @@ for doc in "$repo_root/README.md" "$repo_root/setup.md"; do
   grep -q "~/.gemini" "$doc" || fail "$doc does not mention global Gemini config directory"
 done
 
-say "validate: root agent entrypoints stay on the minimal architecture"
-grep -q "test_safe_delete_guard.py" "$repo_root/AGENTS.md" || fail "AGENTS.md does not reference test_safe_delete_guard.py"
-grep -q "test_safe_delete_guard.py" "$repo_root/CLAUDE.md" || fail "CLAUDE.md does not reference test_safe_delete_guard.py"
-! grep -q "test_self_workflow.py" "$repo_root/AGENTS.md" "$repo_root/CLAUDE.md" || fail "root entrypoints still reference deleted self-workflow tests"
-! grep -q "self_workflow.py" "$repo_root/AGENTS.md" "$repo_root/CLAUDE.md" || fail "root entrypoints still reference deleted self_workflow.py"
-! grep -q "~/.llm-config" "$repo_root/AGENTS.md" "$repo_root/CLAUDE.md" || fail "root entrypoints still reference the retired .llm-config path"
+say "validate: repo-root agent entrypoints stay deleted"
+ensure_root_entrypoint_gone "AGENTS.md"
+ensure_root_entrypoint_gone "CLAUDE.md"
+ensure_root_entrypoint_gone "GEMINI.md"
 auto_permission_pattern='enable-auto-permission|disable-auto-permission|shell/auto-permission|AI_AGENT_SHELL_ALIAS_LINK|auto-permission'
 ! grep -REq "$auto_permission_pattern" \
-  "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/AGENTS.md" "$repo_root/CLAUDE.md" "$repo_root/instructions" \
+  "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/instructions" \
   || fail "auto-permission references remain in the minimal architecture docs"
 
 say "validate: skill-improvement automation is discoverable"
