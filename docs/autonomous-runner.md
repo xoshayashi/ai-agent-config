@@ -67,6 +67,7 @@ provider ごとの実行コマンドは config で差し替えられます。
 - `claude` の既定テンプレートは `--permission-mode bypassPermissions` を含みます。headless self-automation を優先するための明示的な tradeoff なので、使う scope と前提を理解した上で有効化してください。
 - `commit_all` は `git add -A` を使います。automation が所有している worktree を前提にしており、未追跡の一時ファイルや secrets を混ぜたくない場合は、worktree を分けるか commit/push をしない backend を使ってください。
 - verification の `shell` step は `/bin/sh -c` で実行します。login shell 固有の環境に依存しない、短い check を想定しています。
+- `provider_timeout_seconds` を設定すると、provider の無限待ちを避けられます。重い調査で無制限に待ちたい場合だけ `null` のままにしてください。
 
 ## v1 の範囲
 
@@ -99,7 +100,8 @@ example:
     "max_verification_retries": 2,
     "max_followup_retries": 2,
     "poll_interval_seconds": 20,
-    "max_pending_polls": 15
+    "max_pending_polls": 15,
+    "provider_timeout_seconds": null
   },
   "delivery": {
     "backend": "workspace",
@@ -131,8 +133,8 @@ example:
   },
   "providers": {
     "codex": ["codex", "exec", "--cd", "{repo}", "--full-auto", "{prompt}"],
-    "claude": ["claude", "-p", "{prompt}", "--permission-mode", "bypassPermissions", "--output-format", "json"],
-    "gemini": ["gemini", "-p", "{prompt}", "--approval-mode", "yolo", "--output-format", "json", "--skip-trust"]
+    "claude": ["claude", "-p", "{prompt}", "--permission-mode", "bypassPermissions"],
+    "gemini": ["gemini", "-p", "{prompt}", "--approval-mode", "yolo", "--skip-trust"]
   }
 }
 ```

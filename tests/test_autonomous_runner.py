@@ -124,6 +124,18 @@ def make_fake_provider(bin_dir: Path) -> None:
     write_executable(bin_dir / "fake-provider", script)
 
 
+def make_slow_provider(bin_dir: Path, sleep_seconds: float = 2.0) -> None:
+    script = textwrap.dedent(
+        f"""\
+        #!/usr/bin/env python3
+        import time
+        time.sleep({sleep_seconds})
+        print('RUNNER_RESULT: {{"status":"completed","summary":"slow provider completed"}}')
+        """
+    )
+    write_executable(bin_dir / "slow-provider", script)
+
+
 def make_fake_gh(bin_dir: Path) -> None:
     script = textwrap.dedent(
         """\
@@ -621,6 +633,7 @@ def test_builtin_provider_templates_follow_generic_placeholder_contract() -> Non
         template = providers[name]
         assert_true(isinstance(template, list) and template, f"missing provider template: {name}")
         assert_true(any("{prompt}" in part for part in template), f"{name} template should include prompt placeholder")
+        assert_true("--output-format" not in template, f"{name} template should not force JSON output: {template}")
         rendered = RUNNER_MODULE.substitute_template(
             template,
             {
@@ -761,6 +774,38 @@ def test_semantic_provider_blocker_is_respected() -> None:
         state = json.loads(state_file.read_text(encoding="utf-8"))
         assert_true(state["status"] == "blocked", f"unexpected state: {state}")
         assert_true(state["blocker_class"] == "missing_credentials", f"unexpected blocker: {state}")
+
+
+def test_provider_timeout_blocks_hung_run() -> None:
+    with tempfile.TemporaryDirectory(prefix="autonomous-runtime-") as tmp:
+        root = Path(tmp)
+        workspace = init_workspace(root)
+        bin_dir = root / "bin"
+        bin_dir.mkdir()
+        make_slow_provider(bin_dir, sleep_seconds=2.0)
+        config = root / "runtime.json"
+        state_file = root / "state.json"
+        write_config(
+            config,
+            {
+                "provider": "fake",
+                "delivery": {"backend": "workspace"},
+                "runtime": {"provider_timeout_seconds": 0.1},
+                "providers": {"fake": ["slow-provider", "{prompt}"]},
+            },
+        )
+        result = run_runner(
+            workspace,
+            config,
+            {"BIN_DIR": str(bin_dir)},
+            "--task",
+            "This should time out.",
+            "--state-file",
+            str(state_file),
+        )
+        assert_true(result.returncode != 0, f"runtime should have timed out, rc={result.returncode}, stderr={result.stderr}")
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+        assert_true(state["blocker_class"] == "provider_timeout", f"unexpected timeout blocker: {state}")
 
 
 def test_blocked_state_can_resume_after_fix() -> None:
@@ -1092,6 +1137,7 @@ TESTS = [
     test_legacy_config_shape_is_rejected,
     test_legacy_state_schema_is_rejected,
     test_semantic_provider_blocker_is_respected,
+    test_provider_timeout_blocks_hung_run,
     test_blocked_state_can_resume_after_fix,
     test_review_truth_failure_blocks_immediately,
     test_review_truth_is_optional_when_policy_disables_thread_gate,

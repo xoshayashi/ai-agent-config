@@ -8,7 +8,8 @@
     "max_verification_retries": 2,
     "max_followup_retries": 2,
     "poll_interval_seconds": 20,
-    "max_pending_polls": 15
+    "max_pending_polls": 15,
+    "provider_timeout_seconds": null
   },
   "delivery": {
     "backend": "workspace",
@@ -55,9 +56,7 @@
       "-p",
       "{prompt}",
       "--permission-mode",
-      "bypassPermissions",
-      "--output-format",
-      "json"
+      "bypassPermissions"
     ],
     "gemini": [
       "gemini",
@@ -65,8 +64,6 @@
       "{prompt}",
       "--approval-mode",
       "yolo",
-      "--output-format",
-      "json",
       "--skip-trust"
     ]
   }

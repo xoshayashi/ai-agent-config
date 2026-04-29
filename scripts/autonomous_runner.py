@@ -37,6 +37,7 @@ DEFAULT_CONFIG: dict[str, Any] = {
         "max_followup_retries": 2,
         "poll_interval_seconds": 20,
         "max_pending_polls": 15,
+        "provider_timeout_seconds": None,
     },
     "delivery": {
         "backend": "workspace",
@@ -79,8 +80,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "{prompt}",
             "--permission-mode",
             "bypassPermissions",
-            "--output-format",
-            "json",
         ],
         "gemini": [
             "gemini",
@@ -88,8 +87,6 @@ DEFAULT_CONFIG: dict[str, Any] = {
             "{prompt}",
             "--approval-mode",
             "yolo",
-            "--output-format",
-            "json",
             "--skip-trust",
         ],
     },
@@ -521,6 +518,7 @@ def run_command(
     capture_output: bool = True,
     check: bool = False,
     env_overrides: dict[str, str] | None = None,
+    timeout_seconds: float | None = None,
 ) -> subprocess.CompletedProcess[str]:
     if dry_run:
         return subprocess.CompletedProcess(args=args, returncode=0, stdout=f"dry-run: {format_command(args)}\n", stderr="")
@@ -535,6 +533,7 @@ def run_command(
             capture_output=capture_output,
             check=False,
             env=env,
+            timeout=timeout_seconds,
         )
     except FileNotFoundError as exc:
         missing = exc.filename or args[0]
@@ -732,6 +731,19 @@ def provider_env(state: dict[str, Any], state_path: Path) -> dict[str, str]:
     }
 
 
+def provider_timeout_seconds(config: dict[str, Any]) -> float | None:
+    raw = config.get("runtime", {}).get("provider_timeout_seconds")
+    if raw is None:
+        return None
+    try:
+        timeout = float(raw)
+    except (TypeError, ValueError) as exc:
+        raise SystemExit("error: runtime.provider_timeout_seconds must be a number or null") from exc
+    if timeout <= 0:
+        raise SystemExit("error: runtime.provider_timeout_seconds must be greater than zero when set")
+    return timeout
+
+
 def run_provider(
     config: dict[str, Any],
     state: dict[str, Any],
@@ -744,7 +756,21 @@ def run_provider(
     cmd = build_provider_command(config, state["provider"], repo, prompt, state_path)
     require_tool(cmd[0])
     record_event(state, trace_path, "provider_command", command=cmd)
-    result = run_command(cmd, repo, dry_run=dry_run, check=False, env_overrides=provider_env(state, state_path))
+    timeout_value = provider_timeout_seconds(config)
+    try:
+        result = run_command(
+            cmd,
+            repo,
+            dry_run=dry_run,
+            check=False,
+            env_overrides=provider_env(state, state_path),
+            timeout_seconds=timeout_value,
+        )
+    except subprocess.TimeoutExpired as exc:
+        state["status"] = "failed"
+        state["blocker_class"] = "provider_timeout"
+        state["last_error"] = f"provider command timed out after {timeout_value} seconds"
+        raise SystemExit(state["last_error"]) from exc
     record_event(
         state,
         trace_path,
