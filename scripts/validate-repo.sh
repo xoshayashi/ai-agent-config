@@ -22,19 +22,19 @@ require_file() {
   [ -f "$repo_root/$1" ] || fail "missing required file: $1"
 }
 
+require_absent() {
+  [ ! -e "$repo_root/$1" ] || fail "unexpected repository path exists: $1"
+}
+
 ensure_root_entrypoint_gone() {
-  path="$1"
+  path=$1
   if ! git -C "$repo_root" ls-files --error-unmatch "$path" >/dev/null 2>&1; then
     return 0
   fi
-
   status=$(git -C "$repo_root" status --porcelain -- "$path")
   case "$status" in
-    *D*)
-      return 0
-      ;;
+    *D*) return 0 ;;
   esac
-
   fail "$path must not be tracked at repo root"
 }
 
@@ -44,144 +44,62 @@ for script in "$repo_root"/scripts/*.sh; do
   sh -n "$script"
 done
 
-say "validate: python syntax"
-python3 -m py_compile "$repo_root/scripts/skill-improvement-bot.py"
-python3 -m py_compile "$repo_root/scripts/merge-hook-config.py"
-python3 -m py_compile "$repo_root/scripts/read-state-config.py"
-python3 -m py_compile "$repo_root/scripts/scheduled_update.py"
-python3 -m py_compile "$repo_root/scripts/autonomous_runner.py"
-for hook_script in "$repo_root"/hooks/scripts/*.py; do
-  [ -f "$hook_script" ] || continue
-  python3 -m py_compile "$hook_script"
-done
-
-say "validate: health check runs"
-AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/health-check.sh" --json >/dev/null
-
-say "validate: required docs and entrypoints"
+say "validate: required instruction-only files"
 require_file "README.md"
 require_file "setup.md"
 require_file "docs/setup-error-guide.md"
-require_file "docs/skill-improvement-automation.md"
-require_file "docs/hooks-architecture-review.md"
-require_file "docs/autonomous-runner.md"
-require_file "docs/examples/autonomous-runner.example.json"
-require_file "hooks/README.md"
-require_file "hooks/claude/settings.json"
-require_file "hooks/codex/config.toml"
-require_file "hooks/codex/hooks.json"
-require_file "hooks/gemini/settings.json"
-require_file "hooks/scripts/safe_delete_guard.py"
 require_file "scripts/setup.sh"
 require_file "scripts/update.sh"
-require_file "scripts/scheduled_update.py"
-require_file "scripts/schedule-update.sh"
-require_file "scripts/schedule-skill-improvement.sh"
 require_file "scripts/uninstall.sh"
 require_file "scripts/health-check.sh"
-require_file "scripts/merge-hook-config.py"
-require_file "scripts/read-state-config.py"
-require_file "scripts/skill-improvement-bot.py"
-require_file "scripts/autonomous_runner.py"
 require_file "scripts/validate-repo.sh"
-require_file "tests/fixtures/skill-logs/sample.jsonl"
-require_file "tests/test_health_check.py"
-require_file "tests/test_merge_hook_config.py"
-require_file "tests/test_safe_delete_guard.py"
-require_file "tests/test_scheduled_update.py"
-require_file "tests/test_autonomous_runner.py"
 require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"
 require_file "instructions/AI_AGENT_INSTRUCTIONS.md"
 require_file "instructions/DESIGN.md"
-require_file "instructions/HOOKS.md"
 require_file ".github/workflows/validate.yml"
-require_file "skills/refinment/SKILL.md"
-require_file "skills/refinment/agents/openai.yaml"
-require_file "skills/refinment/references/research-notes.md"
-require_file "skills/refinment/tests/activation-prompts.md"
-require_file "skills/skill-design-research/SKILL.md"
-require_file "skills/skill-design-research/agents/openai.yaml"
-require_file "skills/skill-design-research/references/activation-examples.md"
-require_file "skills/skill-design-research/references/research-foundations.md"
-require_file "skills/skill-design-research/references/source-quality.md"
-require_file "skills/skill-design-research/tests/activation-prompts.md"
+require_file ".github/workflows/claude-code-review.yml"
 
-say "validate: installable skills have basic frontmatter"
-for skill in "$repo_root"/skills/*/SKILL.md; do
-  [ -f "$skill" ] || continue
-  grep -q "^name:" "$skill" || fail "skill missing name frontmatter: $skill"
-  grep -q "^description:" "$skill" || fail "skill missing description frontmatter: $skill"
-done
+say "validate: repository surface"
+require_absent "hooks"
+require_absent "skills"
+require_absent "tests"
+require_absent "scripts/__pycache__"
+require_absent "instructions/HOOKS.md"
+require_absent "scripts/autonomous_runner.py"
+require_absent "scripts/merge-hook-config.py"
+require_absent "scripts/read-state-config.py"
+require_absent "scripts/scheduled_update.py"
+require_absent "scripts/schedule-update.sh"
+require_absent "scripts/schedule-skill-improvement.sh"
+require_absent "scripts/skill-improvement-bot.py"
+require_absent "docs/autonomous-runner.md"
+require_absent "docs/hooks-architecture-review.md"
+require_absent "docs/skill-improvement-automation.md"
+require_absent "docs/examples"
+require_absent ".github/workflows/claude.yml"
 
-say "validate: natural-language setup still names all required CLIs"
-for doc in "$repo_root/README.md" "$repo_root/setup.md"; do
-  grep -q "Claude Code" "$doc" || fail "$doc does not mention Claude Code"
-  grep -q "Codex" "$doc" || fail "$doc does not mention Codex"
-  grep -q "Gemini CLI" "$doc" || fail "$doc does not mention Gemini CLI"
-  grep -q "Hook" "$doc" || fail "$doc does not mention Hooks"
-  grep -q "~/.codex" "$doc" || fail "$doc does not mention global Codex config directory"
-  grep -q "~/.claude" "$doc" || fail "$doc does not mention global Claude config directory"
-  grep -q "~/.gemini" "$doc" || fail "$doc does not mention global Gemini config directory"
-done
-
-say "validate: repo-root agent entrypoints stay deleted"
+say "validate: entrypoint wording"
 ensure_root_entrypoint_gone "AGENTS.md"
 ensure_root_entrypoint_gone "CLAUDE.md"
 ensure_root_entrypoint_gone "GEMINI.md"
-! grep -Fq "Shared source of truth" \
-  "$repo_root/instructions/AGENTS.md" "$repo_root/instructions/CLAUDE.md" "$repo_root/instructions/GEMINI.md" \
-  || fail "instruction entrypoints should describe a core instruction file, not a shared source-of-truth label"
 grep -Fq "~/.codex/AI_AGENT_INSTRUCTIONS.md" "$repo_root/instructions/AGENTS.md" \
   || fail "Codex AGENTS entrypoint must point to ~/.codex/AI_AGENT_INSTRUCTIONS.md"
 grep -Fq "~/.codex/DESIGN.md" "$repo_root/instructions/AGENTS.md" \
   || fail "Codex AGENTS entrypoint must point to ~/.codex/DESIGN.md"
-grep -Fq "~/.codex/HOOKS.md" "$repo_root/instructions/AGENTS.md" \
-  || fail "Codex AGENTS entrypoint must point to ~/.codex/HOOKS.md"
-! grep -Fq "./AI_AGENT_INSTRUCTIONS.md" "$repo_root/instructions/AGENTS.md" \
-  || fail "Codex AGENTS entrypoint must not use cwd-relative shared instructions"
-hardcoded_repo_path_pattern='/Users/sh/Documents/ai-agent-config'
-! grep -REq "$hardcoded_repo_path_pattern" \
-  "$repo_root/instructions/AGENTS.md" "$repo_root/instructions/CLAUDE.md" "$repo_root/instructions/GEMINI.md" \
-  || fail "instruction entrypoints still contain a machine-specific repo path"
-auto_permission_pattern='enable-auto-permission|disable-auto-permission|shell/auto-permission|AI_AGENT_SHELL_ALIAS_LINK|auto-permission'
-! grep -REq "$auto_permission_pattern" \
-  "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/instructions" \
-  || fail "auto-permission references remain in the minimal architecture docs"
+! grep -Fq "HOOKS.md" "$repo_root/instructions/AGENTS.md" "$repo_root/instructions/CLAUDE.md" "$repo_root/instructions/GEMINI.md" \
+  || fail "instruction entrypoints must reference only current instruction files"
 
-say "validate: skill-improvement automation is discoverable"
-grep -q "skill-improvement-bot.py" "$repo_root/README.md" || fail "README.md does not mention skill-improvement-bot.py"
-grep -q "schedule-update.sh" "$repo_root/setup.md" || fail "setup.md does not mention schedule-update.sh"
-grep -q "schedule-skill-improvement.sh" "$repo_root/setup.md" || fail "setup.md does not mention schedule-skill-improvement.sh"
-grep -q "AI_AGENT_IMPROVEMENT_CREATE_PR" "$repo_root/docs/skill-improvement-automation.md" || fail "skill improvement automation doc missing PR opt-in variable"
+say "validate: docs and instructions stay within current scope"
+! grep -REq "autonomous-runner|skill-improvement-bot|safe_delete_guard|HOOKS\\.md|schedule-update|schedule-skill-improvement" \
+  "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/docs" "$repo_root/instructions" \
+  || fail "docs or instructions reference out-of-scope paths"
 
-say "validate: scheduler scripts support dry-run"
-AI_AGENT_DRY_RUN=1 AI_AGENT_CONFIG_HOME="$repo_root" AI_AGENT_STATE_DIR="$repo_root/.tmp-health" sh "$repo_root/scripts/schedule-update.sh" >/dev/null
-AI_AGENT_DRY_RUN=1 AI_AGENT_CONFIG_HOME="$repo_root" AI_AGENT_STATE_DIR="$repo_root/.tmp-health" sh "$repo_root/scripts/schedule-skill-improvement.sh" >/dev/null
+say "validate: health-check runs"
+AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/health-check.sh" --json >/dev/null
 
-say "validate: merge-hook-config unit tests pass"
-python3 "$repo_root/tests/test_merge_hook_config.py"
-
-say "validate: health-check unit tests pass"
-python3 "$repo_root/tests/test_health_check.py"
-
-say "validate: safe-delete hook unit tests pass"
-python3 "$repo_root/tests/test_safe_delete_guard.py"
-
-say "validate: scheduled-update unit tests pass"
-python3 "$repo_root/tests/test_scheduled_update.py"
-
-say "validate: autonomous-runner unit tests pass"
-python3 "$repo_root/tests/test_autonomous_runner.py"
-
-say "validate: skill-improvement fixture scan detects proposal"
-# This fixture intentionally targets skill-design-research because it is the
-# always-installed research/design skill in this repository.
-AI_AGENT_LOG_ROOTS_ONLY=1 \
-AI_AGENT_LOG_ROOTS="$repo_root/tests/fixtures/skill-logs" \
-python3 "$repo_root/scripts/skill-improvement-bot.py" scan --json \
-  | grep -q '"skill": "skill-design-research"' \
-  || fail "skill improvement fixture scan did not detect skill-design-research"
+say "validate: setup dry-run runs"
+AI_AGENT_DRY_RUN=1 AI_AGENT_CONFIG_HOME="$repo_root" AI_AGENT_REQUIRE_LLM_CLIS=0 sh "$repo_root/scripts/setup.sh" >/dev/null
 
 say "validation complete"
