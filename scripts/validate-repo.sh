@@ -115,7 +115,7 @@ for doc in "$repo_root/README.md" "$repo_root/setup.md"; do
   grep -q "~/.gemini" "$doc" || fail "$doc does not mention global Gemini config directory"
 done
 
-say "validate: repo-root agent entrypoints stay untracked"
+say "validate: repo-root agent entrypoints stay deleted"
 ensure_root_entrypoint_gone "AGENTS.md"
 ensure_root_entrypoint_gone "CLAUDE.md"
 ensure_root_entrypoint_gone "GEMINI.md"
