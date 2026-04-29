@@ -241,6 +241,9 @@ if [ "$os" = "Darwin" ]; then
 </dict>
 </plist>
 EOF
+  if command -v plutil >/dev/null 2>&1; then
+    plutil -lint "$plist" >/dev/null
+  fi
   launchctl unload "$plist" >/dev/null 2>&1 || true
   launchctl load "$plist"
   say "scheduled with launchd: $plist"

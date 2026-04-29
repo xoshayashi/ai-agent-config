@@ -67,7 +67,7 @@ def run_runner(repo: Path, extra_env: dict[str, str]) -> subprocess.CompletedPro
         )
 
 
-def test_dirty_repo_is_skipped_when_requested() -> None:
+def test_dirty_repo_is_skipped_by_default() -> None:
     with tempfile.TemporaryDirectory(prefix="scheduled-update-test-") as tmp:
         repo = init_repo(Path(tmp), "main")
         (repo / "local.txt").write_text("dirty\n", encoding="utf-8")
@@ -75,7 +75,6 @@ def test_dirty_repo_is_skipped_when_requested() -> None:
             repo,
             {
                 "AI_AGENT_UPDATE_BRANCH": "main",
-                "AI_AGENT_UPDATE_SKIP_WHEN_DIRTY": "1",
             },
         )
         assert_true(result.returncode == 0, f"expected success, got rc={result.returncode}, stderr={result.stderr}")
@@ -103,7 +102,7 @@ def test_branch_mismatch_is_skipped_when_requested() -> None:
 
 
 TESTS = [
-    test_dirty_repo_is_skipped_when_requested,
+    test_dirty_repo_is_skipped_by_default,
     test_branch_mismatch_is_skipped_when_requested,
 ]
 

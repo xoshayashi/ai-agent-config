@@ -139,7 +139,7 @@ def main() -> int:
         rerun_setup = parse_flag("AI_AGENT_UPDATE_RERUN_SETUP", config.get("AI_AGENT_UPDATE_RERUN_SETUP", "1"))
         skip_when_dirty = parse_flag(
             "AI_AGENT_UPDATE_SKIP_WHEN_DIRTY",
-            config.get("AI_AGENT_UPDATE_SKIP_WHEN_DIRTY", "0"),
+            config.get("AI_AGENT_UPDATE_SKIP_WHEN_DIRTY", "1"),
         )
         skip_when_branch_mismatch = parse_flag(
             "AI_AGENT_UPDATE_SKIP_WHEN_BRANCH_MISMATCH",
