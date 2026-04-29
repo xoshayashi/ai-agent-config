@@ -49,6 +49,7 @@ python3 -m py_compile "$repo_root/scripts/skill-improvement-bot.py"
 python3 -m py_compile "$repo_root/scripts/merge-hook-config.py"
 python3 -m py_compile "$repo_root/scripts/read-state-config.py"
 python3 -m py_compile "$repo_root/scripts/scheduled_update.py"
+python3 -m py_compile "$repo_root/scripts/autonomous_runner.py"
 for hook_script in "$repo_root"/hooks/scripts/*.py; do
   [ -f "$hook_script" ] || continue
   python3 -m py_compile "$hook_script"
@@ -63,6 +64,8 @@ require_file "setup.md"
 require_file "docs/setup-error-guide.md"
 require_file "docs/skill-improvement-automation.md"
 require_file "docs/hooks-architecture-review.md"
+require_file "docs/autonomous-runner.md"
+require_file "docs/examples/autonomous-runner.example.json"
 require_file "hooks/README.md"
 require_file "hooks/claude/settings.json"
 require_file "hooks/codex/config.toml"
@@ -79,12 +82,14 @@ require_file "scripts/health-check.sh"
 require_file "scripts/merge-hook-config.py"
 require_file "scripts/read-state-config.py"
 require_file "scripts/skill-improvement-bot.py"
+require_file "scripts/autonomous_runner.py"
 require_file "scripts/validate-repo.sh"
 require_file "tests/fixtures/skill-logs/sample.jsonl"
 require_file "tests/test_health_check.py"
 require_file "tests/test_merge_hook_config.py"
 require_file "tests/test_safe_delete_guard.py"
 require_file "tests/test_scheduled_update.py"
+require_file "tests/test_autonomous_runner.py"
 require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"
@@ -96,6 +101,12 @@ require_file "skills/refinment/SKILL.md"
 require_file "skills/refinment/agents/openai.yaml"
 require_file "skills/refinment/references/research-notes.md"
 require_file "skills/refinment/tests/activation-prompts.md"
+require_file "skills/skill-design-research/SKILL.md"
+require_file "skills/skill-design-research/agents/openai.yaml"
+require_file "skills/skill-design-research/references/activation-examples.md"
+require_file "skills/skill-design-research/references/research-foundations.md"
+require_file "skills/skill-design-research/references/source-quality.md"
+require_file "skills/skill-design-research/tests/activation-prompts.md"
 
 say "validate: installable skills have basic frontmatter"
 for skill in "$repo_root"/skills/*/SKILL.md; do
@@ -119,6 +130,21 @@ say "validate: repo-root agent entrypoints stay deleted"
 ensure_root_entrypoint_gone "AGENTS.md"
 ensure_root_entrypoint_gone "CLAUDE.md"
 ensure_root_entrypoint_gone "GEMINI.md"
+! grep -Fq "Shared source of truth" \
+  "$repo_root/instructions/AGENTS.md" "$repo_root/instructions/CLAUDE.md" "$repo_root/instructions/GEMINI.md" \
+  || fail "instruction entrypoints should describe a core instruction file, not a shared source-of-truth label"
+grep -Fq "~/.codex/AI_AGENT_INSTRUCTIONS.md" "$repo_root/instructions/AGENTS.md" \
+  || fail "Codex AGENTS entrypoint must point to ~/.codex/AI_AGENT_INSTRUCTIONS.md"
+grep -Fq "~/.codex/DESIGN.md" "$repo_root/instructions/AGENTS.md" \
+  || fail "Codex AGENTS entrypoint must point to ~/.codex/DESIGN.md"
+grep -Fq "~/.codex/HOOKS.md" "$repo_root/instructions/AGENTS.md" \
+  || fail "Codex AGENTS entrypoint must point to ~/.codex/HOOKS.md"
+! grep -Fq "./AI_AGENT_INSTRUCTIONS.md" "$repo_root/instructions/AGENTS.md" \
+  || fail "Codex AGENTS entrypoint must not use cwd-relative shared instructions"
+hardcoded_repo_path_pattern='/Users/sh/Documents/ai-agent-config'
+! grep -REq "$hardcoded_repo_path_pattern" \
+  "$repo_root/instructions/AGENTS.md" "$repo_root/instructions/CLAUDE.md" "$repo_root/instructions/GEMINI.md" \
+  || fail "instruction entrypoints still contain a machine-specific repo path"
 auto_permission_pattern='enable-auto-permission|disable-auto-permission|shell/auto-permission|AI_AGENT_SHELL_ALIAS_LINK|auto-permission'
 ! grep -REq "$auto_permission_pattern" \
   "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/instructions" \
@@ -145,6 +171,9 @@ python3 "$repo_root/tests/test_safe_delete_guard.py"
 
 say "validate: scheduled-update unit tests pass"
 python3 "$repo_root/tests/test_scheduled_update.py"
+
+say "validate: autonomous-runner unit tests pass"
+python3 "$repo_root/tests/test_autonomous_runner.py"
 
 say "validate: skill-improvement fixture scan detects proposal"
 # This fixture intentionally targets skill-design-research because it is the

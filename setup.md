@@ -120,6 +120,9 @@ CLI 側設定先:
 
 必要なときだけ `refinment` を使って brief を整える、という構成です。
 
+instruction / skill / reusable workflow の設計そのものを見直す task は、
+`skill-design-research` に寄せる想定です。
+
 ### 入力前プロンプト改善
 
 入力前のプロンプト改善は、グローバル Hook ではなく **Skill
@@ -155,11 +158,12 @@ CLI 側設定先:
 
 ## 更新
 
-## 絶対パス import について
+## Entry Point Import について
 
-- `instructions/CLAUDE.md` と `instructions/GEMINI.md` の `@...` import は、各CLIの実際の読み込み挙動に合わせて **絶対パス** で管理しています。
-- このリポジトリを別のPCや別パスに clone した場合は、`scripts/setup.sh` をその clone 先から実行して、各CLIのグローバル設定に張られるエントリーポイントをその環境向けに作り直してください。
-- 手で `instructions/*.md` を別の場所へコピーした場合は、`@/absolute/path/...` の参照先もその環境に合わせて更新が必要です。
+- `instructions/AGENTS.md` は `~/.codex/AI_AGENT_INSTRUCTIONS.md` / `~/.codex/DESIGN.md` / `~/.codex/HOOKS.md` を明示参照します。Codex では entrypoint 本文だけが渡される場面があるため、cwd-relative 参照にしません。
+- `instructions/CLAUDE.md` と `instructions/GEMINI.md` の `@...` import は、各CLIのグローバル設定フォルダー内で **sibling-relative** に解決される前提で管理しています。
+- `scripts/setup.sh` は Codex / Claude / Gemini の shared files をそれぞれのグローバル設定ディレクトリへ配置するので、entrypoint は clone path に依存しません。
+- このリポジトリを別のPCや別パスに clone した場合は、その clone 先から `scripts/setup.sh` を再実行して各CLI設定を作り直してください。
 
 ### 手動更新
 

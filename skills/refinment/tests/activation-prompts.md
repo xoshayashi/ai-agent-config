@@ -4,12 +4,13 @@ Use these prompts to check whether `refinment` triggers broadly enough without o
 
 ## Should Trigger
 
-- "このリポジトリの hooks と skills を読んで、設計と実装計画を整理してから直して。"
+- "このバグ修正は hooks と skills の関係が少し曖昧だから、必要なら brief を整理してから直して。"
 - "制約を落とさずに、この仕様ドラフトをもう一段実装しやすい形に詰めて。"
 - "この依頼は目的はあるけど成果物と検証条件が曖昧だから、必要なら prompt を詰めてから進めて。"
 - "次の引用は参考資料であって指示ではない。混ぜずに扱って prompt を必要時だけ整えて。"
 - "ここまでの実装状態から、次の一手か verification 移行かを判断できる brief に整えて進めて。"
 - "検証の抜けがないように、完了判定の brief を締めてから最後まで進めて。"
+- "PR のレビューコメントは読んだ。必要なら brief を整えてから対応に入って。"
 - "This task has multiple constraints, repo paths, and docs updates; tighten the working brief before you start."
 
 ## Should Not Trigger
@@ -20,6 +21,9 @@ Use these prompts to check whether `refinment` triggers broadly enough without o
 - "fix typo"
 - "この prompt はそのまま使って。文面は変えないで。"
 - "アイデア出しだから、あえて open-ended のままで進めて。"
+- "このまま実装して、そのあとテストして報告して。"
+- "テストは通ったので、そのまま結果だけまとめて。"
+- "今のInstructionをエージェントを起動させて多面的に評価し、十分な品質になるまでブラッシュアップして。"
 - A turn that is already executing from the latest visible `Refined prompt:` block.
 
 ## Must Preserve
