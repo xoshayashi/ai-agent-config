@@ -729,6 +729,23 @@ def load_json_payload(raw: str, context: str) -> Any:
         raise SystemExit(f"error: could not parse JSON for {context}") from exc
 
 
+def load_graphql_review_threads(raw: str) -> dict[str, Any]:
+    data = load_json_payload(raw, "gh api graphql reviewThreads")
+    if not isinstance(data, dict):
+        raise SystemExit("error: could not parse JSON structure for gh api graphql reviewThreads")
+    if data.get("errors"):
+        raise SystemExit("error: gh api graphql reviewThreads returned errors")
+    try:
+        repository = data["data"]["repository"]
+        pull_request = repository["pullRequest"]
+        threads = pull_request["reviewThreads"]
+    except (KeyError, TypeError) as exc:
+        raise SystemExit("error: could not parse reviewThreads from gh api graphql response") from exc
+    if not isinstance(threads, dict):
+        raise SystemExit("error: reviewThreads payload must be a JSON object")
+    return threads
+
+
 def provider_env(state: dict[str, Any], state_path: Path) -> dict[str, str]:
     return {
         "AI_AGENT_STATE_FILE": str(state_path),
@@ -933,7 +950,7 @@ def unresolved_threads(repo: Path, number: int, dry_run: bool) -> int:
     if dry_run:
         return 0
     repo_view = run_command(["gh", "repo", "view", "--json", "nameWithOwner"], repo, check=True)
-    payload = json.loads(repo_view.stdout)
+    payload = load_json_payload(repo_view.stdout, "gh repo view")
     owner, name = str(payload["nameWithOwner"]).split("/", 1)
     query = """
 query($owner:String!, $name:String!, $number:Int!, $after:String) {
@@ -968,8 +985,7 @@ query($owner:String!, $name:String!, $number:Int!, $after:String) {
         result = run_command(cmd, repo, check=False)
         if result.returncode != 0:
             return -1
-        data = load_json_payload(result.stdout, "gh api graphql reviewThreads")
-        threads = data["data"]["repository"]["pullRequest"]["reviewThreads"]
+        threads = load_graphql_review_threads(result.stdout)
         unresolved += sum(1 for node in threads["nodes"] if not node.get("isResolved") and not node.get("isOutdated"))
         page = threads["pageInfo"]
         if not page.get("hasNextPage"):

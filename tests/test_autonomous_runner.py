@@ -150,8 +150,13 @@ def make_fake_gh(bin_dir: Path) -> None:
         merged = (repo / ".merged").exists()
         review_required_only = (repo / ".review-required-only").exists()
         bad_json = (repo / ".bad-json").exists()
+        bad_repo_view_json = (repo / ".bad-repo-view-json").exists()
+        graphql_error = (repo / ".graphql-error").exists()
         argv = sys.argv[1:]
         if argv[:3] == ["repo", "view", "--json"]:
+            if bad_repo_view_json:
+                print("{this is not valid json}")
+                sys.exit(0)
             print(json.dumps({"nameWithOwner": "octo/test"}))
             sys.exit(0)
         if argv[:2] == ["pr", "create"]:
@@ -194,6 +199,9 @@ def make_fake_gh(bin_dir: Path) -> None:
                 sys.exit(1)
             if bad_json:
                 print("{this is not valid json}")
+                sys.exit(0)
+            if graphql_error:
+                print(json.dumps({"errors": [{"message": "not found"}], "data": None}))
                 sys.exit(0)
             unresolved = 0 if review_required_only or phase == "ready" else 1
             print(json.dumps({
@@ -872,6 +880,120 @@ def test_invalid_gh_json_is_saved_as_failure() -> None:
         assert_true("could not parse JSON" in state["last_error"], f"unexpected last_error: {state}")
 
 
+def test_invalid_repo_view_json_is_saved_as_failure() -> None:
+    with tempfile.TemporaryDirectory(prefix="autonomous-runtime-") as tmp:
+        root = Path(tmp)
+        repo = init_repo(root)
+        run_git(repo, "checkout", "-b", "auto/test-bad-repo-view-json")
+        (repo / "feature.txt").write_text("implemented\n", encoding="utf-8")
+        run_git(repo, "add", "feature.txt")
+        run_git(repo, "commit", "-m", "feature")
+        run_git(repo, "push", "-u", "origin", "auto/test-bad-repo-view-json")
+        (repo / ".bad-repo-view-json").write_text("1\n", encoding="utf-8")
+        bin_dir = root / "bin"
+        bin_dir.mkdir()
+        make_fake_provider(bin_dir)
+        make_fake_gh(bin_dir)
+        config = root / "runtime.json"
+        state_file = root / "state.json"
+        write_config(
+            config,
+            {
+                "provider": "fake",
+                "delivery": {
+                    "backend": "github_pr",
+                    "backends": {"github_pr": {"allow_followup_fixes": True, "allow_completion": False}},
+                },
+                "runtime": {"max_pending_polls": 0, "poll_interval_seconds": 0},
+                "verification": {"steps": [{"type": "shell", "command": "test -f feature.txt"}]},
+                "providers": {"fake": ["fake-provider", "{prompt}"]},
+            },
+        )
+        state_file.write_text(
+            json.dumps(
+                make_state(
+                    repo,
+                    "Stop on malformed repo view JSON.",
+                    "followup",
+                    "github_pr",
+                    head_branch="auto/test-bad-repo-view-json",
+                    artifacts={"delivery": {"github_pr": {"pull_request": {"number": 1, "url": "https://example.invalid/pr/1"}}}},
+                    backend_state={"github_pr": {"pr_ref": "1", "followup_retries": 0, "pending_polls": 0}},
+                )
+            ),
+            encoding="utf-8",
+        )
+        result = run_runner(
+            repo,
+            config,
+            {"BIN_DIR": str(bin_dir)},
+            "--state-file",
+            str(state_file),
+            "--allow-dirty",
+        )
+        assert_true(result.returncode != 0, f"runtime should fail on malformed repo view JSON, rc={result.returncode}, stderr={result.stderr}")
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+        assert_true(state["status"] == "failed", f"failed state should be saved: {state}")
+        assert_true("gh repo view" in state["last_error"], f"unexpected last_error: {state}")
+
+
+def test_graphql_error_envelope_is_saved_as_failure() -> None:
+    with tempfile.TemporaryDirectory(prefix="autonomous-runtime-") as tmp:
+        root = Path(tmp)
+        repo = init_repo(root)
+        run_git(repo, "checkout", "-b", "auto/test-graphql-error")
+        (repo / "feature.txt").write_text("implemented\n", encoding="utf-8")
+        run_git(repo, "add", "feature.txt")
+        run_git(repo, "commit", "-m", "feature")
+        run_git(repo, "push", "-u", "origin", "auto/test-graphql-error")
+        (repo / ".graphql-error").write_text("1\n", encoding="utf-8")
+        bin_dir = root / "bin"
+        bin_dir.mkdir()
+        make_fake_provider(bin_dir)
+        make_fake_gh(bin_dir)
+        config = root / "runtime.json"
+        state_file = root / "state.json"
+        write_config(
+            config,
+            {
+                "provider": "fake",
+                "delivery": {
+                    "backend": "github_pr",
+                    "backends": {"github_pr": {"allow_followup_fixes": True, "allow_completion": False}},
+                },
+                "runtime": {"max_pending_polls": 0, "poll_interval_seconds": 0},
+                "verification": {"steps": [{"type": "shell", "command": "test -f feature.txt"}]},
+                "providers": {"fake": ["fake-provider", "{prompt}"]},
+            },
+        )
+        state_file.write_text(
+            json.dumps(
+                make_state(
+                    repo,
+                    "Stop on malformed GraphQL envelopes.",
+                    "followup",
+                    "github_pr",
+                    head_branch="auto/test-graphql-error",
+                    artifacts={"delivery": {"github_pr": {"pull_request": {"number": 1, "url": "https://example.invalid/pr/1"}}}},
+                    backend_state={"github_pr": {"pr_ref": "1", "followup_retries": 0, "pending_polls": 0}},
+                )
+            ),
+            encoding="utf-8",
+        )
+        result = run_runner(
+            repo,
+            config,
+            {"BIN_DIR": str(bin_dir)},
+            "--state-file",
+            str(state_file),
+            "--allow-dirty",
+        )
+        assert_true(result.returncode != 0, f"runtime should fail on GraphQL error envelope, rc={result.returncode}, stderr={result.stderr}")
+        state = json.loads(state_file.read_text(encoding="utf-8"))
+        assert_true(state["status"] == "failed", f"failed state should be saved: {state}")
+        assert_true("gh api graphql reviewThreads returned errors" in state["last_error"], f"unexpected last_error: {state}")
+
+
 def test_blocked_state_can_resume_after_fix() -> None:
     with tempfile.TemporaryDirectory(prefix="autonomous-runtime-") as tmp:
         root = Path(tmp)
@@ -1203,6 +1325,8 @@ TESTS = [
     test_semantic_provider_blocker_is_respected,
     test_provider_timeout_blocks_hung_run,
     test_invalid_gh_json_is_saved_as_failure,
+    test_invalid_repo_view_json_is_saved_as_failure,
+    test_graphql_error_envelope_is_saved_as_failure,
     test_blocked_state_can_resume_after_fix,
     test_review_truth_failure_blocks_immediately,
     test_review_truth_is_optional_when_policy_disables_thread_gate,
