@@ -99,20 +99,21 @@ env_hooks=${AI_AGENT_INSTALL_HOOKS-}
 env_hooks_runtime_set=${AI_AGENT_HOOKS_RUNTIME_LINK+x}
 env_hooks_runtime=${AI_AGENT_HOOKS_RUNTIME_LINK-}
 
-state_dir=${AI_AGENT_STATE_DIR:-$HOME/.llm-config}
-legacy_state_dir=${AI_AGENT_LEGACY_STATE_DIR:-$HOME/.ai-agent-config}
+state_dir=${AI_AGENT_STATE_DIR:-$HOME/.ai-agent-config}
 if [ -n "${AI_AGENT_STATE_FILE:-}" ]; then
   state_file=$(expand_home "$AI_AGENT_STATE_FILE")
 else
   state_file=$(expand_home "$state_dir")/config.env
-  legacy_state_file=$(expand_home "$legacy_state_dir")/config.env
-  if [ ! -f "$state_file" ] && [ -f "$legacy_state_file" ]; then
-    state_file=$legacy_state_file
-  fi
 fi
 state_loaded=0
 if load_state_file "$state_file"; then
   state_loaded=1
+fi
+
+# Launchd/systemd jobs may start with an inaccessible current working directory.
+# This script always uses absolute paths, so move to a safe directory first.
+if ! cd "$HOME" 2>/dev/null; then
+  cd /
 fi
 
 [ "${env_config_set:-}" = "x" ] && AI_AGENT_CONFIG_HOME=$env_config
@@ -205,7 +206,7 @@ if [ "$rerun_setup" = "1" ]; then
     "AI_AGENT_INSTALL_INSTRUCTIONS=${AI_AGENT_INSTALL_INSTRUCTIONS:-1}" \
     "AI_AGENT_INSTALL_SKILLS=${AI_AGENT_INSTALL_SKILLS:-1}" \
     "AI_AGENT_INSTALL_HOOKS=${AI_AGENT_INSTALL_HOOKS:-1}" \
-    "AI_AGENT_HOOKS_RUNTIME_LINK=${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}" \
+    "AI_AGENT_HOOKS_RUNTIME_LINK=${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.ai-agent-config/hooks}" \
     "AI_AGENT_CONFLICT_MODE=${AI_AGENT_CONFLICT_MODE:-backup}" \
     "AI_AGENT_REQUIRE_LLM_CLIS=${AI_AGENT_REQUIRE_LLM_CLIS:-1}" \
     "AI_AGENT_STATE_DIR=$state_dir" \

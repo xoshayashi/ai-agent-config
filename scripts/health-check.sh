@@ -196,16 +196,11 @@ env_skills=${AI_AGENT_SKILLS_DIR-}
 env_hooks_runtime_set=${AI_AGENT_HOOKS_RUNTIME_LINK+x}
 env_hooks_runtime=${AI_AGENT_HOOKS_RUNTIME_LINK-}
 
-state_dir=${AI_AGENT_STATE_DIR:-$HOME/.llm-config}
-legacy_state_dir=${AI_AGENT_LEGACY_STATE_DIR:-$HOME/.ai-agent-config}
+state_dir=${AI_AGENT_STATE_DIR:-$HOME/.ai-agent-config}
 if [ -n "${AI_AGENT_STATE_FILE:-}" ]; then
   state_file=$(expand_home "$AI_AGENT_STATE_FILE")
 else
   state_file=$(expand_home "$state_dir")/config.env
-  legacy_state_file=$(expand_home "$legacy_state_dir")/config.env
-  if [ ! -f "$state_file" ] && [ -f "$legacy_state_file" ]; then
-    state_file=$legacy_state_file
-  fi
 fi
 state_loaded=false
 if load_state_file "$state_file"; then
@@ -238,7 +233,7 @@ codex_home=$(expand_home "${AI_AGENT_CODEX_HOME:-$HOME/.codex}")
 claude_home=$(expand_home "${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}")
 gemini_home=$(expand_home "${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}")
 skills_dir=${AI_AGENT_SKILLS_DIR:-$HOME/.agents/skills}
-hooks_runtime_link=${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}
+hooks_runtime_link=${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.ai-agent-config/hooks}
 hooks_runtime_path=$(expand_home "$hooks_runtime_link")
 
 git_path=$(command_path git)
@@ -249,9 +244,10 @@ gemini_path=$(command_path gemini)
 ollama_path=$(command_path ollama)
 
 skill_improvement_schedule=unsupported
+update_schedule=unsupported
 os=$(uname -s 2>/dev/null || printf unknown)
 if [ "$os" = "Darwin" ]; then
-  skill_improvement_label=${AI_AGENT_IMPROVEMENT_LABEL:-com.llm-config.skill-improvement}
+  skill_improvement_label=${AI_AGENT_IMPROVEMENT_LABEL:-com.ai-agent-config.skill-improvement}
   skill_improvement_plist="$HOME/Library/LaunchAgents/$skill_improvement_label.plist"
   if [ -f "$skill_improvement_plist" ]; then
     if launchctl list "$skill_improvement_label" >/dev/null 2>&1; then
@@ -262,13 +258,31 @@ if [ "$os" = "Darwin" ]; then
   else
     skill_improvement_schedule=missing
   fi
+  update_label=${AI_AGENT_UPDATE_LABEL:-com.ai-agent-config.update}
+  update_plist="$HOME/Library/LaunchAgents/$update_label.plist"
+  if [ -f "$update_plist" ]; then
+    if launchctl list "$update_label" >/dev/null 2>&1; then
+      update_schedule=active
+    else
+      update_schedule=installed
+    fi
+  else
+    update_schedule=missing
+  fi
 elif command -v systemctl >/dev/null 2>&1; then
-  if systemctl --user is-active llm-config-skill-improvement.timer >/dev/null 2>&1; then
+  if systemctl --user is-active ai-agent-config-skill-improvement.timer >/dev/null 2>&1; then
     skill_improvement_schedule=active
-  elif systemctl --user is-enabled llm-config-skill-improvement.timer >/dev/null 2>&1; then
+  elif systemctl --user is-enabled ai-agent-config-skill-improvement.timer >/dev/null 2>&1; then
     skill_improvement_schedule=installed
   else
     skill_improvement_schedule=missing
+  fi
+  if systemctl --user is-active ai-agent-config-update.timer >/dev/null 2>&1; then
+    update_schedule=active
+  elif systemctl --user is-enabled ai-agent-config-update.timer >/dev/null 2>&1; then
+    update_schedule=installed
+  else
+    update_schedule=missing
   fi
 fi
 
@@ -380,55 +394,53 @@ hook_config_status_for() {
       printf 'present-unmanaged'
       return 0
     fi
-status=$(python3 - "$dst" <<'PY'
+	status=$(python3 - "$dst" "$expected" <<'PY'
 import json
 import sys
 from pathlib import Path
 
-path = Path(sys.argv[1])
+MANAGED_FLAG = "_ai_agent_config_managed"
+
+
+def load(path: Path) -> dict:
+    return json.loads(path.read_text(encoding="utf-8"))
+
+
+def managed_groups(hooks: dict) -> set[str]:
+    result: set[str] = set()
+    for groups in hooks.values():
+        if not isinstance(groups, list):
+            continue
+        for group in groups:
+            if not isinstance(group, dict):
+                continue
+            if group.get(MANAGED_FLAG) is True:
+                result.add(json.dumps(group, sort_keys=True, separators=(",", ":"), ensure_ascii=False))
+    return result
+
+
 try:
-    data = json.loads(path.read_text(encoding="utf-8"))
+    destination = load(Path(sys.argv[1]))
+    source = load(Path(sys.argv[2]))
 except Exception:
     print("present-unmanaged")
     raise SystemExit(0)
 
-hooks = data.get("hooks")
-if not isinstance(hooks, dict):
+destination_hooks = destination.get("hooks")
+source_hooks = source.get("hooks")
+if not isinstance(destination_hooks, dict) or not isinstance(source_hooks, dict):
     print("present-unmanaged")
     raise SystemExit(0)
 
-legacy_hints = {
-    "safe_delete_guard.py",
-    "peer_prompt_refinement.py",
-    "refinment.py",
-    "self_workflow.py",
-    "response_strategy_bridge.py",
-    "multillm_orchestrator.py",
-}
+destination_managed = managed_groups(destination_hooks)
+source_managed = managed_groups(source_hooks)
+if not destination_managed:
+    print("present-unmanaged")
+elif destination_managed == source_managed:
+    print("appended")
+else:
+    print("mismatch-managed")
 
-for groups in hooks.values():
-    if not isinstance(groups, list):
-        continue
-    for group in groups:
-        if not isinstance(group, dict):
-            continue
-        if group.get("_llm_config_managed") is True:
-            print("appended")
-            raise SystemExit(0)
-        hook_items = group.get("hooks")
-        if not isinstance(hook_items, list):
-            continue
-        for hook in hook_items:
-            if not isinstance(hook, dict):
-                continue
-            command = hook.get("command")
-            if not isinstance(command, str):
-                continue
-            if "AI_AGENT_HOOKS_RUNTIME_LINK" in command and any(hint in command for hint in legacy_hints):
-                print("appended-legacy")
-                raise SystemExit(0)
-
-print("present-unmanaged")
 PY
 )
     printf '%s' "${status:-present-unmanaged}"
@@ -499,12 +511,19 @@ else
   skills_text_summary="total=$skills_total warn=$skills_warn"
 fi
 
-self_workflow_mode=generic-same-llm
-if [ ! -f "$config_home/hooks/scripts/self_workflow.py" ]; then
-  self_workflow_status=missing-script
+if [ ! -f "$config_home/hooks/scripts/safe_delete_guard.py" ]; then
+  safe_delete_hook_status=missing-script
   mark_status warn
 else
-  self_workflow_status=ready
+  safe_delete_hook_status=ready
+fi
+
+legacy_llm_config_dir=$HOME/.llm-config
+if [ -e "$legacy_llm_config_dir" ]; then
+  legacy_llm_config_status=present
+  mark_status warn
+else
+  legacy_llm_config_status=absent
 fi
 
 for status in \
@@ -559,8 +578,9 @@ if [ "$format" = "json" ]; then
   printf '    "gemini-hooks": "%s"\n' "$gemini_hook_status"
   printf '  },\n'
   printf '  "skills": {\n%b\n  },\n' "$skills_json_body"
-  printf '  "hooks": {"self_workflow": {"mode": "%s", "status": "%s"}},\n' "$(json_escape "$self_workflow_mode")" "$self_workflow_status"
-  printf '  "automation": {"skill_improvement_schedule": "%s"}\n' "$skill_improvement_schedule"
+  printf '  "hooks": {"policy": "minimal", "safe_delete_guard": {"status": "%s"}},\n' "$safe_delete_hook_status"
+  printf '  "legacy": {"llm_config_dir": "%s"},\n' "$legacy_llm_config_status"
+  printf '  "automation": {"update_schedule": "%s", "skill_improvement_schedule": "%s"}\n' "$update_schedule" "$skill_improvement_schedule"
   printf '}\n'
 else
   printf 'AI Agent Config health: %s\n' "$(overall_status)"
@@ -576,10 +596,10 @@ else
     "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_hooks_doc_status" "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_hooks_doc_status" "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_hooks_doc_status"
   printf 'hooks: runtime=%s claude=%s codex-config=%s codex-hooks=%s gemini=%s\n' \
     "$hook_runtime_status" "$claude_hook_status" "$codex_config_status" "$codex_hook_status" "$gemini_hook_status"
-  printf 'hooks-self-workflow: mode=%s status=%s\n' \
-    "$self_workflow_mode" "$self_workflow_status"
+  printf 'hooks-policy: minimal safe-delete=%s\n' "$safe_delete_hook_status"
+  printf 'legacy: llm-config=%s\n' "$legacy_llm_config_status"
   printf 'skills: %s\n' "$skills_text_summary"
-  printf 'automation: skill-improvement-schedule=%s\n' "$skill_improvement_schedule"
+  printf 'automation: update-schedule=%s skill-improvement-schedule=%s\n' "$update_schedule" "$skill_improvement_schedule"
 fi
 
 if [ "$strict" = "1" ] && [ "$(overall_status)" != "ok" ]; then

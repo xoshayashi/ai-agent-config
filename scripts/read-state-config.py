@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Safely parse llm-config state env files without shell evaluation."""
+"""Safely parse ai-agent-config state env files without shell evaluation."""
 
 from __future__ import annotations
 

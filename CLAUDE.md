@@ -14,7 +14,8 @@ sh scripts/validate-repo.sh
 
 # Individual unit test files
 python3 tests/test_merge_hook_config.py
-python3 tests/test_self_workflow.py
+python3 tests/test_health_check.py
+python3 tests/test_safe_delete_guard.py
 
 # Setup / update / health-check / uninstall, dry-run first
 AI_AGENT_DRY_RUN=1 sh scripts/setup.sh
@@ -26,13 +27,13 @@ sh scripts/health-check.sh --json   # masked by default; set AI_AGENT_HEALTH_RED
 python3 scripts/skill-improvement-bot.py scan
 ```
 
-There is no test runner, no linter, and no package manager. `validate-repo.sh` does: `sh -n` syntax checks for shell scripts, `python3 -m py_compile` for Python, doc-grep assertions on README/setup, the two unit tests above, and a fixture scan for the skill-improvement bot.
+There is no test runner, no linter, and no package manager. `validate-repo.sh` does: `sh -n` syntax checks for shell scripts, `python3 -m py_compile` for Python, doc-grep assertions on README/setup and root entrypoints, scheduler dry-run checks, the three unit tests above, and a fixture scan for the skill-improvement bot.
 
 ## Architecture
 
 ### Single source of truth pattern
 
-`instructions/AI_AGENT_INSTRUCTIONS.md` is the canonical instruction set. The per-CLI files (`instructions/CLAUDE.md`, `instructions/AGENTS.md` for Codex, and `instructions/GEMINI.md`) are **thin entrypoints** that import or point to `AI_AGENT_INSTRUCTIONS.md`, plus `DESIGN.md` (Act design language) and `HOOKS.md` (self-workflow lifecycle) where supported. When updating shared behavior, edit `AI_AGENT_INSTRUCTIONS.md`; only touch entrypoint files when the entrypoint mechanism itself changes.
+`instructions/AI_AGENT_INSTRUCTIONS.md` is the canonical instruction set. The per-CLI files (`instructions/CLAUDE.md`, `instructions/AGENTS.md` for Codex, and `instructions/GEMINI.md`) are **thin entrypoints** that import or point to `AI_AGENT_INSTRUCTIONS.md`, plus `DESIGN.md` (Act design language) and `HOOKS.md` (shared Hook policy) where supported. When updating shared behavior, edit `AI_AGENT_INSTRUCTIONS.md`; only touch entrypoint files when the entrypoint mechanism itself changes.
 
 ### Stable-link installation model
 
@@ -44,7 +45,7 @@ There is no test runner, no linter, and no package manager. `validate-repo.sh` d
 | Codex | `~/.codex/AGENTS.md` → `instructions/AGENTS.md` | `~/.codex/config.toml` + `~/.codex/hooks.json` (merged) |
 | Gemini CLI | `~/.gemini/GEMINI.md` → `instructions/GEMINI.md` | `~/.gemini/settings.json` (merged) |
 
-Hook scripts in `hooks/scripts/*.py` are referenced through one indirection — the stable link `${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}` → `<repo>/hooks`. This means CLI hook config can keep an absolute path like `~/.llm-config/hooks/scripts/safe_delete_guard.py` while the underlying repo can move.
+Hook scripts in `hooks/scripts/*.py` are referenced through one indirection — the stable link `${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.ai-agent-config/hooks}` → `<repo>/hooks`. This keeps the CLI hook config stable even if the repo itself moves.
 
 ### Existing-config policy
 
@@ -52,29 +53,34 @@ Hook scripts in `hooks/scripts/*.py` are referenced through one indirection — 
 
 ### Hook layers
 
-Two active hook scripts in `hooks/scripts/`, each with a different default:
+One managed hook script is active by default:
 
 | Hook | Default | Trigger |
 |---|---|---|
 | `safe_delete_guard.py` | **On** | Blocks `rm`-style commands and redirects to `trash` |
-| `self_workflow.py` | Registered for Claude/Codex/Gemini managed events | Selectively activates on qualifying tasks |
 
-`self_workflow.py` implements a same-LLM loop driven by completion keywords (`[[SPEC_DONE]]` → spec refinment gate → `[[IMPLEMENTATION_DONE]]` → verification → `[[VERIFICATION_DONE]]` → `[[TASK_DONE]]`) plus structured phase packets. Startup and phase-boundary brief tightening live in the self-contained `refinment` Skill. The lifecycle and stop conditions live in `instructions/HOOKS.md`; do not duplicate them elsewhere.
+Hooks stay thin and deterministic. Prompt tightening, execution flow, verification, and self-review live in the main session plus shared instructions and skills, not in managed Hook state machines.
+
+### Automation
+
+`setup.sh` now also registers two launchd/systemd schedulers by default unless cadence is set to `manual`:
+
+| Scheduler | Default cadence | Purpose |
+|---|---|---|
+| `schedule-update.sh` | daily | Pull the latest `ai-agent-config` changes and re-apply setup |
+| `schedule-skill-improvement.sh` | daily | Scan local CLI logs and write redacted skill-improvement reports |
 
 ### Skills
 
 Each subdirectory of `skills/` is a self-contained skill that gets symlinked into `$AI_AGENT_SKILLS_DIR` (default `~/.agents/skills`). The `template/` skill is the structural reference for new skills.
-
-### Editable entrypoints
-
-`AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, and `AI_AGENT_INSTRUCTIONS.md` are now ordinary editable files. They may be changed, moved, or renamed as needed; keep the shared-source-of-truth pattern intact when doing so.
 
 ## Conventions enforced by validation
 
 `scripts/validate-repo.sh` will fail the build if:
 
 - `README.md` or `setup.md` stop mentioning all three CLI names, the three global config dirs (`~/.codex`, `~/.claude`, `~/.gemini`), or "Hook"
-- `README.md` stops referencing `skill-improvement-bot.py`, or `setup.md` stops referencing `schedule-skill-improvement.sh`
+- root `AGENTS.md` / `CLAUDE.md` drift back to deleted self-workflow surfaces
+- `README.md` stops referencing `skill-improvement-bot.py`, or `setup.md` stops referencing scheduler setup scripts
 - `docs/skill-improvement-automation.md` stops naming the `AI_AGENT_IMPROVEMENT_CREATE_PR` opt-in variable
 - The skill-improvement fixture scan no longer detects `skill-design-research` in `tests/fixtures/skill-logs/`
 

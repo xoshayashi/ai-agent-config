@@ -1,15 +1,15 @@
 ---
 name: refinment
-description: Use this skill when Codex should refine a user prompt or phase brief only when needed, keep the refinement self-contained, show the refined prompt to the user, and preserve optionality instead of over-constraining the task. Trigger on meaningful ambiguity, conflicting constraints, instruction/data mixing, or material phase boundaries. Skip trivial chat, already-clear prompts, and turns already executing from the current refinment brief.
+description: Use this skill when Codex should refine a user prompt or working brief only when needed, keep the refinement self-contained, show the refined prompt to the user, and preserve optionality instead of over-constraining the task. Trigger on meaningful ambiguity, conflicting constraints, instruction/data mixing, or material handoff points inside the same task. Skip trivial chat, already-clear prompts, and turns already executing from the current refinment brief.
 ---
 
 # Refinment
 
-Use this skill to tighten a working prompt or phase brief before acting, while keeping Codex self-contained.
+Use this skill to tighten a working prompt or brief before acting, while keeping Codex self-contained.
 
 ## Core Rules
 
-- **Run only when it materially helps.** Use refinment for non-trivial new tasks or material self-workflow boundaries, not as decoration on every turn.
+- **Run only when it materially helps.** Use refinment for non-trivial new tasks or material brief handoffs, not as decoration on every turn.
 - **Stay self-contained.** Do not call another LLM, subprocess reviewer, or external prompt improver from this skill.
 - **Refine sparingly.** Default to the original prompt unless there is a real contract gap, conflict, or instruction/data ambiguity worth fixing.
 - **Show the refined prompt when you use it on a new task.** Put a short `Refined prompt:` block in the next visible user update before continuing the work.
@@ -35,7 +35,6 @@ Use this skill to tighten a working prompt or phase brief before acting, while k
 - A spec draft needs one internal readiness pass before implementation starts.
 - An implementation stop boundary needs a sharper next-step brief or a clearer verification-ready decision.
 - A verification stop boundary needs a tighter completion brief before deciding whether the task is done.
-- The self-workflow context explicitly suggests using `$refinment` now.
 
 ## Do Not Use When
 
@@ -69,8 +68,8 @@ Use this skill to tighten a working prompt or phase brief before acting, while k
 8. **Act from the result in the same turn.**
    - `task_prompt`: show `Refined prompt:` to the user, then start the work from it
    - `spec`: revise or continue the spec from the refined brief
-   - `implementation`: do the next concrete implementation step or emit the verification-ready signal
-   - `verification`: run the smallest missing verification/self-review step or emit completion only when evidence is real
+   - `implementation`: do the next concrete implementation step or move into verification when the work is ready
+   - `verification`: run the smallest missing verification/self-review step or declare completion only when evidence is real
 
 ## Output Shape
 

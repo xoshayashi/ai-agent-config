@@ -2,30 +2,15 @@
   "hooks": {
     "BeforeTool": [
       {
-        "_llm_config_managed": true,
+        "_ai_agent_config_managed": true,
         "matcher": "run_shell_command",
         "hooks": [
           {
-            "name": "llm-config-safe-delete-guard",
+            "name": "ai-agent-config-safe-delete-guard",
             "type": "command",
-            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/safe_delete_guard.py\" --current gemini",
+            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.ai-agent-config/hooks}/scripts/safe_delete_guard.py\" --current gemini",
             "timeout": 10000,
             "description": "Block permanent shell deletion commands and suggest the safer trash workflow."
-          }
-        ]
-      }
-    ],
-    "AfterAgent": [
-      {
-        "_llm_config_managed": true,
-        "matcher": "*",
-        "hooks": [
-          {
-            "name": "llm-config-self-workflow",
-            "type": "command",
-            "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/self_workflow.py\" --current gemini",
-            "timeout": 50000,
-            "description": "Continue the same LLM's self-workflow when one more turn is needed."
           }
         ]
       }

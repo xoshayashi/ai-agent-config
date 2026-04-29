@@ -25,6 +25,7 @@ import importlib.util
 import json
 import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import traceback
@@ -48,10 +49,10 @@ MHC = load_module()
 
 SAMPLE_HOOK = {
     "type": "command",
-    "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.llm-config/hooks}/scripts/safe_delete_guard.py\" --current claude",
+    "command": "python3 \"${AI_AGENT_HOOKS_RUNTIME_LINK:-$HOME/.ai-agent-config/hooks}/scripts/safe_delete_guard.py\" --current claude",
     "timeout": 10,
 }
-SAMPLE_GROUP = {"_llm_config_managed": True, "matcher": "Bash", "hooks": [SAMPLE_HOOK]}
+SAMPLE_GROUP = {"_ai_agent_config_managed": True, "matcher": "Bash", "hooks": [SAMPLE_HOOK]}
 SAMPLE_SOURCE_JSON = {"hooks": {"PreToolUse": [SAMPLE_GROUP]}}
 
 USER_HOOK_GROUP = {
@@ -132,14 +133,14 @@ def test_merge_json_preserves_user_hook() -> None:
         assert SAMPLE_GROUP in groups, "managed hook must be added"
 
 
-def test_merge_json_replaces_stale_managed_hook() -> None:
+def test_merge_json_preserves_unmarked_runtime_link_hook() -> None:
     with in_tempdir() as tmp:
         src = Path(tmp) / "src.json"
         dst = Path(tmp) / "dst.json"
         write_json(src, SAMPLE_SOURCE_JSON)
 
-        old_managed = {
-            "matcher": "*",  # old matcher
+        unmarked_hook = {
+            "matcher": "*",
             "hooks": [
                 {
                     "type": "command",
@@ -150,15 +151,15 @@ def test_merge_json_replaces_stale_managed_hook() -> None:
         }
         write_json(
             dst,
-            {"hooks": {"PreToolUse": [old_managed, USER_HOOK_GROUP]}},
+            {"hooks": {"PreToolUse": [unmarked_hook, USER_HOOK_GROUP]}},
         )
 
         MHC.merge_json_file(src, dst, dry_run=False)
         result = read_json(dst)
         groups = result["hooks"]["PreToolUse"]
-        assert old_managed not in groups, "stale managed hook must be removed"
+        assert unmarked_hook in groups, "unmarked hook must be preserved"
         assert SAMPLE_GROUP in groups, "current managed hook must be present"
-        assert USER_HOOK_GROUP in groups, "user hook must survive cleanup"
+        assert USER_HOOK_GROUP in groups, "user hook must survive merge"
 
 
 def test_merge_json_keeps_unmarked_user_hook_with_runtime_link() -> None:
@@ -203,7 +204,26 @@ def test_merge_json_no_duplicate_when_destination_lacks_marker() -> None:
         result = read_json(dst)
         groups = result["hooks"]["PreToolUse"]
         assert len(groups) == 1, f"legacy managed group should not duplicate: {groups}"
-        assert groups[0].get("_llm_config_managed") is True, "legacy group should be upgraded to explicit marker"
+        assert groups[0].get("_ai_agent_config_managed") is True, "group should be upgraded to explicit marker"
+
+
+def test_merge_json_upgrades_legacy_managed_marker_without_duplicate() -> None:
+    with in_tempdir() as tmp:
+        src = Path(tmp) / "src.json"
+        dst = Path(tmp) / "dst.json"
+        write_json(src, SAMPLE_SOURCE_JSON)
+        legacy_marker_group = {
+            "_legacy_managed": True,
+            "matcher": "Bash",
+            "hooks": [SAMPLE_HOOK],
+        }
+        write_json(dst, {"hooks": {"PreToolUse": [legacy_marker_group]}})
+
+        MHC.merge_json_file(src, dst, dry_run=False)
+        result = read_json(dst)
+        groups = result["hooks"]["PreToolUse"]
+        assert len(groups) == 1, f"legacy marker group should not duplicate: {groups}"
+        assert groups[0].get("_ai_agent_config_managed") is True, "legacy marker should be upgraded"
 
 
 def test_merge_json_pops_empty_event() -> None:
@@ -216,23 +236,21 @@ def test_merge_json_pops_empty_event() -> None:
         # Source declares only PreToolUse — no entries for OldEvent.
         write_json(src, {"hooks": {"PreToolUse": [SAMPLE_GROUP]}})
 
-        old_managed = {
+        unmarked_group = {
             "matcher": "*",
             "hooks": [
                 {
                     "type": "command",
-                    "command": "python3 ${AI_AGENT_HOOKS_RUNTIME_LINK}/scripts/peer_prompt_refinement.py --current claude",
+                    "command": "python3 ${AI_AGENT_HOOKS_RUNTIME_LINK}/scripts/safe_delete_guard.py --current claude",
                     "timeout": 30,
                 }
             ],
         }
-        write_json(dst, {"hooks": {"OldEvent": [old_managed]}})
+        write_json(dst, {"hooks": {"OldEvent": [unmarked_group]}})
 
         MHC.merge_json_file(src, dst, dry_run=False)
         result = read_json(dst)
-        assert "OldEvent" not in result.get("hooks", {}), (
-            f"OldEvent should be popped after empty cleanup, got: {result}"
-        )
+        assert "OldEvent" in result.get("hooks", {}), "unmarked event must be preserved"
 
 
 def test_merge_json_atomic_write_no_temp_leftover() -> None:
@@ -304,6 +322,41 @@ def test_remove_json_cleans_legacy_event_not_in_source() -> None:
         assert changed
         result = read_json(dst)
         assert "hooks" not in result, "legacy managed event should be removed"
+
+
+def test_remove_json_cleans_legacy_managed_marker_group() -> None:
+    with in_tempdir() as tmp:
+        src = Path(tmp) / "src.json"
+        dst = Path(tmp) / "dst.json"
+        write_json(src, SAMPLE_SOURCE_JSON)
+        legacy_marker_group = {
+            "_legacy_managed": True,
+            "matcher": "UserPromptSubmit",
+            "hooks": [SAMPLE_HOOK],
+        }
+        write_json(dst, {"hooks": {"UserPromptSubmit": [legacy_marker_group]}})
+
+        changed = MHC.remove_json_file(src, dst, dry_run=False)
+        assert changed
+        result = read_json(dst)
+        assert "hooks" not in result, "legacy marker managed event should be removed"
+
+
+def test_remove_json_dry_run_message_mentions_managed_hooks() -> None:
+    with in_tempdir() as tmp:
+        src = Path(tmp) / "src.json"
+        dst = Path(tmp) / "dst.json"
+        write_json(src, SAMPLE_SOURCE_JSON)
+        write_json(dst, {"hooks": {"PreToolUse": [SAMPLE_GROUP]}})
+
+        result = subprocess.run(
+            [sys.executable, str(MODULE_PATH), "json", str(src), str(dst), "--remove", "--dry-run"],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        expected = f"would remove managed hooks from: {dst}"
+        assert_eq(result.stdout.strip(), expected, "dry-run remove message")
 
 
 # ---------- Codex TOML tests ----------
@@ -400,7 +453,7 @@ def test_remove_codex_orphan_managed_begin_preserved() -> None:
 
 
 def test_remove_codex_marker_only_pair() -> None:
-    """The non-fenced marker pair (`# llm-config managed hooks` + codex_hooks=true)
+    """The non-fenced marker pair (`# ai-agent-config managed hooks` + codex_hooks=true)
     is removed cleanly without touching surrounding content.
     """
     with in_tempdir() as tmp:
@@ -408,7 +461,7 @@ def test_remove_codex_marker_only_pair() -> None:
         dst.write_text(
             "[features]\n"
             "foo = true\n"
-            "# llm-config managed hooks\n"
+            "# ai-agent-config managed hooks\n"
             "codex_hooks = true\n"
             "[other]\n"
             "value = 1\n",
@@ -426,7 +479,7 @@ def test_remove_codex_restores_previous_marker() -> None:
         dst = Path(tmp) / "config.toml"
         dst.write_text(
             "[features]\n"
-            "# llm-config managed hooks previous: codex_hooks = false\n"
+            "# ai-agent-config managed hooks previous: codex_hooks = false\n"
             "codex_hooks = true\n",
             encoding="utf-8",
         )
@@ -442,15 +495,18 @@ TESTS = [
     test_merge_json_fresh_destination,
     test_merge_json_idempotent,
     test_merge_json_preserves_user_hook,
-    test_merge_json_replaces_stale_managed_hook,
+    test_merge_json_preserves_unmarked_runtime_link_hook,
     test_merge_json_keeps_unmarked_user_hook_with_runtime_link,
     test_merge_json_no_duplicate_when_destination_lacks_marker,
+    test_merge_json_upgrades_legacy_managed_marker_without_duplicate,
     test_merge_json_pops_empty_event,
     test_merge_json_atomic_write_no_temp_leftover,
     test_merge_json_dry_run_no_write,
     test_remove_json_pops_event_when_empty,
     test_remove_json_preserves_user_hook,
     test_remove_json_cleans_legacy_event_not_in_source,
+    test_remove_json_cleans_legacy_managed_marker_group,
+    test_remove_json_dry_run_message_mentions_managed_hooks,
     test_merge_codex_no_features_section,
     test_merge_codex_existing_features_no_codex_hooks,
     test_merge_codex_idempotent,
