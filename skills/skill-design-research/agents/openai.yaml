@@ -1,7 +1,0 @@
-interface:
-  display_name: "Skill Design Research"
-  short_description: "Research-backed design and activation audits for skills, instructions, agents, and reusable workflows"
-  default_prompt: "Use $skill-design-research for non-trivial skill, instruction, agent, or reusable workflow design that needs research grounding, activation tuning, or bloat trimming. Do not use it for one-off prompt tightening that belongs in refinment."
-
-policy:
-  allow_implicit_invocation: true

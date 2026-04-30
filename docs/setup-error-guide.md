@@ -1,38 +1,20 @@
 # Setup Error Guide
 
-Use this guide when setup, update, scheduling, or uninstall fails. Explain errors in plain Japanese first, then suggest the smallest safe next step.
+Instruction-only 構成での代表的な確認ポイントです。
 
-## Common Errors
-
-| Error Signal | Plain Japanese Explanation | Safe Next Step |
+| Symptom | Meaning | Fix |
 |---|---|---|
-| `command not found: git` | GitHubから設定ファイルを取得するためのGitが入っていません。 | Gitをインストールしてから、同じ自然言語セットアップ依頼をもう一度実行します。 |
-| `missing required LLM CLI(s): ...` | `claude` / `codex` / `gemini` のいずれかが未インストールです。 | 不足しているCLIをインストール・ログイン後に再実行します。暫定的に進める場合は `AI_AGENT_REQUIRE_LLM_CLIS=0` を明示します。 |
-| GitHub authentication failed | GitHubにログインできていないか、private repositoryを読む権限がありません。 | GitHub CLIやブラウザ認証でログインし、対象リポジトリへアクセスできるか確認します。 |
-| `target exists but is not a git repository` | 設定リポジトリを置こうとした場所に、Git管理ではない別フォルダーがあります。 | 別の保存先を使うか、そのフォルダーの中身を確認してから安全に退避します。 |
-| `path already exists` | リンクを作りたい場所に同名のファイルやフォルダーがあります。 | 標準ではバックアップ先へ退避します。上書きせず、何が退避されるか説明します。 |
-| `permission denied` / `operation not permitted` | グローバル設定フォルダー（`~/.codex` / `~/.claude` / `~/.gemini`）や状態保存先に書き込む権限がありません。 | まずホームディレクトリ配下で実行しているか確認し、必要ならフォルダー権限を修正して再実行します。 |
-| `could not apply delete protection` | macOSの削除防止設定をリンクに付けられませんでした。リンク作成自体は成功している場合があります。 | まずリンクが読めるか確認します。削除防止が必須でなければ継続できます。 |
-| `trash is required for safe uninstall` | 安全に元へ戻すための `trash` コマンドが見つかりません。 | 完全削除はせず、`trash` をインストールするか、手動でゴミ箱へ移す方法を案内します。 |
-| `config repository has local changes` | 設定リポジトリに未保存の変更があり、更新すると作業を壊す可能性があります。 | 変更内容を確認し、必要ならコミットまたは退避してから更新します。 |
-| `not a git repository` | 更新対象がGitリポジトリではありません。 | 正しい `ai-agent-config` の場所を探すか、GitHubから再取得します。 |
-| `AI_AGENT_TARGET_DIR is deprecated and ignored` | 旧方式（作業フォルダー配下へのリンク作成）の変数が指定されています。 | そのまま続行できます。必要なら `AI_AGENT_CODEX_HOME` / `AI_AGENT_CLAUDE_HOME` / `AI_AGENT_GEMINI_HOME` を使ってグローバル配置先を調整します。 |
-| `launchctl` or `systemctl` scheduling failed | 自動更新のスケジュール登録に失敗しました。設定本体は使える場合があります。 | まず手動更新コマンドを案内します。自動更新はOS別に再確認します。 |
-| shell command safety hook が見えない / 動かない | 現在の managed Hook は shell command 実行時の safety check に限定されています。通常の会話では何も出ないことがあります。shell command 実行時にも反応しないなら設定未反映や設定ファイルのズレを疑います。 | 各 CLI の Hook 設定ファイル、`~/.codex/config.toml` の `codex_hooks = true`、`scripts/health-check.sh` の `hooks:` / `hooks-policy:` / `legacy:` 行を確認し、必要なら `sh scripts/setup.sh` を再実行します。 |
-| `can't open file '.../.llm-config/hooks/scripts/...'` | 起動済みのCLIセッションが旧 Hook パスを握ったままです。設定本体が新パスへ更新済みでも、このセッションだけ古い場所を見続けることがあります。 | `scripts/health-check.sh` で `legacy: llm-config=absent` か確認し、そのCLIセッションを再起動してから `sh scripts/setup.sh` を再実行します。 |
-| `health: warn` | 基本動作は確認できましたが、未ログイン、未インストール、リンク未設定、リポジトリ未保存変更など確認が必要な項目があります。 | `scripts/health-check.sh` の各行を見て、最も小さい修正だけを提案します。 |
-| `health: fail` | Gitや設定リポジトリなど、更新や診断に必要な前提が見つかりません。 | リポジトリの場所、Gitの有無、GitHubからの再取得が必要かを確認します。 |
+| `missing required LLM CLI(s)` | `setup.sh` が Claude Code / Codex / Gemini CLI の存在を確認し、未導入の CLI を見つけました。 | CLI を導入するか、link 作成だけ先に行うなら `AI_AGENT_REQUIRE_LLM_CLIS=0 sh scripts/setup.sh` を使います。 |
+| `skipping existing path` | default の `skip` mode が既存ファイルを保持したため、対象 link は作られていません。 | `sh scripts/health-check.sh` で未リンク箇所を確認し、置き換えてよい場合は `AI_AGENT_CONFLICT_MODE=replace sh scripts/setup.sh` を使います。 |
+| `path already exists` | `AI_AGENT_CONFLICT_MODE=fail` で、配置先に既存ファイルがあります。 | 既存ファイルを確認し、`skip` に変えるか、backup して置き換えるなら `replace` で再実行します。 |
+| `trash is required for uninstall` | `uninstall.sh` は安全な削除のため `trash` を要求します。 | macOS なら `brew install trash`、Linux なら `trash-cli` を導入してから再実行します。 |
+| health が `warn` | instruction link、CLI コマンド、または repository 状態に確認点があります。 | `AI_AGENT_HEALTH_REDACT=0 sh scripts/health-check.sh` で具体 path を見て、必要なら `sh scripts/setup.sh` を再実行します。 |
+| command path error が出る | CLI の個人設定、または起動済みセッションが、この checkout に含まれない command path を保持している可能性があります。 | 該当 CLI の個人設定から存在しない command path を外し、CLI セッションを再起動します。 |
 
-## Response Pattern
+## 確認手順
 
-1. **何が起きたか**を1から2文で説明する。
-2. **ユーザーのファイルが失われていないか**を確認する。
-3. **安全な次の一手**を1つ提示する。
-4. 迷う場合は `AI_AGENT_DRY_RUN=1` で再確認する。
-
-## Safety Rules
-
-- Do not suggest permanent deletion.
-- Use `trash` for cleanup and uninstall.
-- Prefer user-owned directories (`~/.codex`, `~/.claude`, `~/.gemini`, `~/.ai-agent-config`) over system-wide protected locations.
-- If a command failed because knowledge may be outdated, check the official CLI or GitHub documentation before retrying.
+```sh
+AI_AGENT_HEALTH_REDACT=0 sh scripts/health-check.sh
+sh scripts/setup.sh
+sh scripts/health-check.sh
+```

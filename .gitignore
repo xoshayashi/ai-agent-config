@@ -20,7 +20,7 @@ Thumbs.db
 *.pfx
 gha-creds-*.json
 
-# Local agent/runtime state
+# Local agent state
 .claude/
 .codex/
 .gemini/
@@ -33,11 +33,9 @@ gha-creds-*.json
 # Logs and temporary files
 *.log
 logs/
-reports/
 tmp/
 temp/
 .cache/
-.llm-config-backups/
 
 # Common dependency/build artifacts
 node_modules/
