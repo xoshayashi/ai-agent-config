@@ -1,0 +1,131 @@
+#!/bin/sh
+set -eu
+
+say() {
+  printf '%s\n' "$*"
+}
+
+fail() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+xml_escape() {
+  printf '%s' "$1" | sed \
+    -e 's/&/\&amp;/g' \
+    -e 's/</\&lt;/g' \
+    -e 's/>/\&gt;/g' \
+    -e 's/"/\&quot;/g' \
+    -e "s/'/\&apos;/g"
+}
+
+script_path=$0
+case "$script_path" in
+  */*) script_dir=$(CDPATH= cd "$(dirname "$script_path")" && pwd -P) ;;
+  *) script_dir=$(CDPATH= cd "$(dirname "$(command -v "$script_path")")" && pwd -P) ;;
+esac
+
+repo_root=$(CDPATH= cd "$script_dir/.." && pwd -P)
+runner="$repo_root/scripts/daily-llm-history-instruction-review"
+[ -x "$runner" ] || fail "runner is not executable: $runner"
+
+os=$(uname -s 2>/dev/null || printf unknown)
+[ "$os" = "Darwin" ] || fail "daily instruction review installer currently supports macOS launchd only"
+
+label=${AI_AGENT_DAILY_REVIEW_LABEL:-com.ai-agent-config.daily-llm-history-instruction-review}
+legacy_label=com.ai-agent-config.daily-instruction-review
+hour=${AI_AGENT_DAILY_REVIEW_HOUR:-0}
+minute=${AI_AGENT_DAILY_REVIEW_MINUTE:-0}
+launch_domain="gui/$(id -u)"
+launch_dir="$HOME/Library/LaunchAgents"
+plist="$launch_dir/$label.plist"
+log_dir="$repo_root/cron-log"
+launchd_path="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.claude/bin:/usr/bin:/bin:/usr/sbin:/sbin"
+
+case "$hour" in
+  ''|*[!0-9]*) fail "AI_AGENT_DAILY_REVIEW_HOUR must be an integer from 0 to 23" ;;
+esac
+case "$minute" in
+  ''|*[!0-9]*) fail "AI_AGENT_DAILY_REVIEW_MINUTE must be an integer from 0 to 59" ;;
+esac
+[ "$hour" -ge 0 ] && [ "$hour" -le 23 ] || fail "AI_AGENT_DAILY_REVIEW_HOUR must be an integer from 0 to 23"
+[ "$minute" -ge 0 ] && [ "$minute" -le 59 ] || fail "AI_AGENT_DAILY_REVIEW_MINUTE must be an integer from 0 to 59"
+display_time=$(printf '%02d:%02d' "$hour" "$minute")
+
+mkdir -p "$launch_dir" "$log_dir"
+
+label_xml=$(xml_escape "$label")
+runner_xml=$(xml_escape "$runner")
+repo_root_xml=$(xml_escape "$repo_root")
+stdout_xml=$(xml_escape "$log_dir/launchd.out.log")
+stderr_xml=$(xml_escape "$log_dir/launchd.err.log")
+path_xml=$(xml_escape "$launchd_path")
+
+unload_plist() {
+  target_plist=$1
+  launchctl bootout "$launch_domain" "$target_plist" >/dev/null 2>&1 \
+    || launchctl unload "$target_plist" >/dev/null 2>&1 \
+    || true
+}
+
+load_plist() {
+  target_plist=$1
+  launchctl bootstrap "$launch_domain" "$target_plist" >/dev/null 2>&1 \
+    || launchctl load "$target_plist"
+}
+
+cat > "$plist" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>Label</key>
+  <string>$label_xml</string>
+  <key>ProgramArguments</key>
+  <array>
+    <string>$runner_xml</string>
+  </array>
+  <key>StartCalendarInterval</key>
+  <dict>
+    <key>Hour</key>
+    <integer>$hour</integer>
+    <key>Minute</key>
+    <integer>$minute</integer>
+  </dict>
+  <key>EnvironmentVariables</key>
+  <dict>
+    <key>PATH</key>
+    <string>$path_xml</string>
+  </dict>
+  <key>WorkingDirectory</key>
+  <string>$repo_root_xml</string>
+  <key>StandardOutPath</key>
+  <string>$stdout_xml</string>
+  <key>StandardErrorPath</key>
+  <string>$stderr_xml</string>
+</dict>
+</plist>
+EOF
+
+if command -v plutil >/dev/null 2>&1; then
+  plutil -lint "$plist" >/dev/null
+fi
+
+if [ "$legacy_label" != "$label" ]; then
+  legacy_plist="$launch_dir/$legacy_label.plist"
+  if [ -f "$legacy_plist" ]; then
+    unload_plist "$legacy_plist"
+    command -v trash >/dev/null 2>&1 || fail "trash is required to remove legacy schedule: $legacy_plist; install it with: brew install trash-cli"
+    trash "$legacy_plist"
+    say "removed legacy launchd schedule: $legacy_plist"
+  fi
+fi
+
+unload_plist "$plist"
+load_plist "$plist"
+
+say "scheduled daily instruction review with launchd"
+say "label: $label"
+say "time: $display_time daily"
+say "plist: $plist"
+say "logs: $log_dir"

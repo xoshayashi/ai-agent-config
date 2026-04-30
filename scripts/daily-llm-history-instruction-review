@@ -1,0 +1,221 @@
+#!/bin/sh
+set -eu
+
+say() {
+  printf '%s\n' "$*"
+}
+
+fail() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+script_path=$0
+case "$script_path" in
+  */*) script_dir=$(CDPATH= cd "$(dirname "$script_path")" && pwd -P) ;;
+  *) script_dir=$(CDPATH= cd "$(dirname "$(command -v "$script_path")")" && pwd -P) ;;
+esac
+
+repo_root=$(CDPATH= cd "$script_dir/.." && pwd -P)
+log_dir="$repo_root/cron-log"
+timestamp=$(date +%Y%m%d-%H%M%S)
+summary_file="$log_dir/$timestamp.md"
+log_keep=${AI_AGENT_DAILY_REVIEW_LOG_KEEP:-30}
+history_days=2
+
+mkdir -p "$log_dir"
+
+case "$log_keep" in
+  ''|*[!0-9]*) fail "AI_AGENT_DAILY_REVIEW_LOG_KEEP must be a non-negative integer" ;;
+esac
+
+PATH="/opt/homebrew/bin:/usr/local/bin:$HOME/.local/bin:$HOME/.claude/bin:/usr/bin:/bin:/usr/sbin:/sbin:$PATH"
+claude_bin=${CLAUDE_BIN:-$(command -v claude || true)}
+[ -n "$claude_bin" ] || fail "claude command not found"
+trash_bin=${TRASH_BIN:-$(command -v trash || true)}
+[ -n "$trash_bin" ] || fail "trash command not found; install it with: brew install trash-cli"
+
+history_link_dir=$(mktemp -d "${TMPDIR:-/tmp}/ai-agent-history-links.XXXXXX")
+cleanup_history_links() {
+  if [ -d "$history_link_dir" ]; then
+    for history_copy in "$history_link_dir"/*; do
+      [ -e "$history_copy" ] || continue
+      [ -L "$history_copy" ] && continue
+      [ -f "$history_copy" ] || continue
+      chmod 600 "$history_copy" 2>/dev/null || true
+      : > "$history_copy" 2>/dev/null || true
+    done
+    "$trash_bin" "$history_link_dir" >/dev/null 2>&1 || true
+  fi
+}
+trap cleanup_history_links EXIT HUP INT TERM
+
+rotate_logs() {
+  [ "$log_keep" -gt 0 ] || return 0
+
+  old_logs=$(ls -1t "$log_dir"/*.md 2>/dev/null | sed -n "$((log_keep + 1)),\$p" || true)
+  [ -n "$old_logs" ] || return 0
+
+  printf '%s\n' "$old_logs" | while IFS= read -r old_log; do
+    [ -n "$old_log" ] || continue
+    "$trash_bin" "$old_log"
+  done
+}
+
+copy_history_tail() {
+  source_path=$1
+  copy_name=$2
+  max_lines=$3
+
+  [ -f "$source_path" ] || return 0
+  tail -n "$max_lines" "$source_path" > "$history_link_dir/$copy_name" 2>/dev/null || true
+  chmod 400 "$history_link_dir/$copy_name" 2>/dev/null || true
+}
+
+history_cutoff_date() {
+  days=$1
+  offset=$((days - 1))
+
+  date -v-"$offset"d +%Y-%m-%d 2>/dev/null \
+    || date -d "$offset days ago" +%Y-%m-%d 2>/dev/null
+}
+
+copy_recent_jsonl_dates() {
+  source_path=$1
+  copy_name=$2
+  days=$3
+
+  [ -f "$source_path" ] || return 0
+
+  cutoff=$(history_cutoff_date "$days") || return 0
+  # JSONL history is expected to contain ISO-style YYYY-MM-DD timestamps.
+  awk -v cutoff="$cutoff" '
+    {
+      line = $0
+      while (match(line, /[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/)) {
+        observed = substr(line, RSTART, RLENGTH)
+        if (observed >= cutoff) {
+          print
+          next
+        }
+        line = substr(line, RSTART + RLENGTH)
+      }
+    }
+  ' "$source_path" > "$history_link_dir/$copy_name" 2>/dev/null || true
+  chmod 400 "$history_link_dir/$copy_name" 2>/dev/null || true
+}
+
+link_recent_history_files() {
+  source_dir=$1
+  link_prefix=$2
+  max_files=$3
+
+  [ -d "$source_dir" ] || return 0
+
+  count=0
+  find "$source_dir" -maxdepth 1 -type f -mtime "-$history_days" -exec ls -t {} + 2>/dev/null | while IFS= read -r source_path; do
+    count=$((count + 1))
+    [ "$count" -le "$max_files" ] || break
+    ln -s "$source_path" "$history_link_dir/${link_prefix}_${count}" 2>/dev/null || true
+  done
+}
+
+rotate_logs
+copy_recent_jsonl_dates "$HOME/.claude/history.jsonl" "claude_history_recent.jsonl" "$history_days"
+link_recent_history_files "$HOME/.claude/sessions" "claude_session" 20
+link_recent_history_files "$HOME/.claude/projects" "claude_project" 20
+copy_recent_jsonl_dates "$HOME/.codex/history.jsonl" "codex_history_recent.jsonl" "$history_days"
+copy_recent_jsonl_dates "$HOME/.codex/session_index.jsonl" "codex_session_index_recent.jsonl" "$history_days"
+link_recent_history_files "$HOME/.codex/sessions" "codex_session" 20
+copy_history_tail "$HOME/.gemini/history" "gemini_history_tail" 500
+
+prompt=$(cat <<PROMPT
+You are running as Claude Code in non-interactive mode for the ai-agent-config daily instruction review.
+
+Goal:
+Review the recent interaction history across Claude Code, Codex, and Gemini CLI, understand recurring inefficiencies between the user and the LLMs, and update shared instructions only when a durable, broadly useful improvement is clear.
+
+Repository:
+$repo_root
+
+Editable scope:
+- Claude Code starts in $repo_root/instructions and should edit only files in that directory.
+- If a broader docs or validation update appears necessary, report it as follow-up instead of editing outside instructions.
+
+History access:
+- Review the bounded symlink set in: $history_link_dir
+- The directory contains selected recent Claude Code, Codex, and Gemini CLI history links plus date-filtered JSONL history slices. Treat missing, empty, or unreadable targets as unreadable sources.
+
+Rules:
+- Do not copy raw conversation logs, secrets, tokens, private messages, or long verbatim excerpts into the repository or the summary.
+- Prefer the latest $history_days calendar dates of activity. If timestamps are hard to compare, inspect recent files by mtime and sample conservatively.
+- Look for repeated inefficiencies, such as preventable clarifying loops, stale assumptions, missing verification, over-specific instructions, poor routing, repeated tool mistakes, or output style drift.
+- Edit instructions only for repeated or high-leverage patterns. If no durable pattern is found, make no instruction change.
+- Keep instruction updates abstract, generic, and compact. Integrate organically by rewriting existing guidance rather than appending isolated rules.
+- Preserve user work and existing uncommitted changes. Do not commit, push, or open a PR.
+- Do not write to the history symlink directory or any CLI home configuration directory.
+- After editing instructions, run:
+  1. AI_AGENT_CONFIG_HOME="$repo_root" AI_AGENT_REQUIRE_LLM_CLIS=0 ../scripts/setup.sh
+  2. ../scripts/validate-repo.sh
+  3. git diff --check
+
+Output:
+Print one concise Markdown execution summary only. Include:
+- Reviewed sources and any unreadable sources
+- Inefficiency patterns found
+- Instruction changes made, or why no change was made
+- Verification commands and results
+- Remaining risk or follow-up
+
+This stdout is written to:
+$summary_file
+PROMPT
+)
+
+{
+  say "# Daily Instruction Review"
+  say ""
+  say "- Started: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+  say "- Repository: $repo_root"
+  say "- Runner: Claude Code non-interactive mode"
+  say "- History links: $history_link_dir"
+  say "- Log retention: latest $log_keep Markdown summaries"
+  say ""
+  say "## Claude Summary"
+  say ""
+} > "$summary_file"
+
+set +e
+(
+  cd "$repo_root/instructions"
+  "$claude_bin" \
+    --print \
+    --permission-mode dontAsk \
+    --name "ai-agent-config-daily-llm-history-instruction-review" \
+    --max-budget-usd "${AI_AGENT_DAILY_REVIEW_MAX_BUDGET_USD:-2}" \
+    --add-dir "$repo_root/instructions" \
+    --add-dir "$history_link_dir" \
+    --allowedTools "Read" "Grep" "Glob" "LS" "Edit" "MultiEdit" "Bash(git status*)" "Bash(git diff*)" "Bash(git ls-files*)" "Bash(git -C * status*)" "Bash(git -C * diff*)" "Bash(git -C * ls-files*)" "Bash(../scripts/validate-repo.sh*)" "Bash(AI_AGENT_CONFIG_HOME=* AI_AGENT_REQUIRE_LLM_CLIS=* ../scripts/setup.sh*)" \
+    --disallowedTools "Write" "WebFetch" "WebSearch" "Bash(git commit*)" "Bash(git push*)" "Bash(git -C * commit*)" "Bash(git -C * push*)" "Bash(gh *)" "Bash(../scripts/install-*)" "Bash(../scripts/uninstall-*)" \
+    "$prompt"
+) >> "$summary_file" 2>&1
+status=$?
+set -e
+
+{
+  say ""
+  say "## Repository Diff"
+  say ""
+  if git -C "$repo_root" diff --quiet -- instructions README.md setup.md scripts .gitignore; then
+    say "- No repository changes after review."
+  else
+    git -C "$repo_root" diff --stat -- instructions README.md setup.md scripts .gitignore
+  fi
+  say ""
+  say "## Runner"
+  say ""
+  say "- Finished: $(date '+%Y-%m-%d %H:%M:%S %Z')"
+  say "- Exit status: $status"
+} >> "$summary_file"
+
+exit "$status"
