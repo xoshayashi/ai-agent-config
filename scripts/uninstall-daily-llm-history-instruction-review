@@ -1,0 +1,43 @@
+#!/bin/sh
+set -eu
+
+say() {
+  printf '%s\n' "$*"
+}
+
+fail() {
+  printf 'error: %s\n' "$*" >&2
+  exit 1
+}
+
+label=${AI_AGENT_DAILY_REVIEW_LABEL:-com.ai-agent-config.daily-llm-history-instruction-review}
+legacy_label=com.ai-agent-config.daily-instruction-review
+launch_domain="gui/$(id -u)"
+launch_dir="$HOME/Library/LaunchAgents"
+
+unload_plist() {
+  target_plist=$1
+  launchctl bootout "$launch_domain" "$target_plist" >/dev/null 2>&1 \
+    || launchctl unload "$target_plist" >/dev/null 2>&1 \
+    || true
+}
+
+remove_label() {
+  target_label=$1
+  plist="$launch_dir/$target_label.plist"
+
+  if [ ! -f "$plist" ]; then
+    say "no launchd schedule found: $plist"
+    return
+  fi
+
+  unload_plist "$plist"
+  command -v trash >/dev/null 2>&1 || fail "trash is required to remove $plist; install it with: brew install trash-cli"
+  trash "$plist"
+  say "removed daily LLM history instruction review schedule: $plist"
+}
+
+remove_label "$label"
+if [ "$legacy_label" != "$label" ]; then
+  remove_label "$legacy_label"
+fi

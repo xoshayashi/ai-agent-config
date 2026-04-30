@@ -39,12 +39,15 @@ ensure_root_entrypoint_gone() {
 }
 
 say "validate: shell syntax"
-for script in "$repo_root"/scripts/*.sh; do
+for script in "$repo_root"/scripts/*; do
   [ -f "$script" ] || continue
-  sh -n "$script"
+  first_line=$(sed -n '1p' "$script")
+  case "$first_line" in
+    *"/sh"|*"/bash"|*"env sh"|*"env bash") sh -n "$script" ;;
+  esac
 done
 
-say "validate: required instruction-only files"
+say "validate: required files"
 require_file "README.md"
 require_file "setup.md"
 require_file "docs/setup-error-guide.md"
@@ -53,6 +56,15 @@ require_file "scripts/update.sh"
 require_file "scripts/uninstall.sh"
 require_file "scripts/health-check.sh"
 require_file "scripts/validate-repo.sh"
+require_file "scripts/daily-llm-history-instruction-review"
+require_file "scripts/install-daily-llm-history-instruction-review"
+require_file "scripts/uninstall-daily-llm-history-instruction-review"
+[ -x "$repo_root/scripts/daily-llm-history-instruction-review" ] \
+  || fail "daily review runner must be executable"
+[ -x "$repo_root/scripts/install-daily-llm-history-instruction-review" ] \
+  || fail "daily review installer must be executable"
+[ -x "$repo_root/scripts/uninstall-daily-llm-history-instruction-review" ] \
+  || fail "daily review uninstaller must be executable"
 require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"
@@ -79,6 +91,10 @@ require_absent "docs/hooks-architecture-review.md"
 require_absent "docs/skill-improvement-automation.md"
 require_absent "docs/examples"
 require_absent ".github/workflows/claude.yml"
+
+say "validate: daily review log directory stays local"
+git -C "$repo_root" check-ignore -q cron-log/ \
+  || fail "cron-log/ must be ignored"
 
 say "validate: entrypoint wording"
 ensure_root_entrypoint_gone "AGENTS.md"
