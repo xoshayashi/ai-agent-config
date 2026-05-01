@@ -29,6 +29,7 @@ PLACEHOLDER_BLOCKERS = [
     "master_components",
     "deck_master_refs",
     "deck_header_master_lock",
+    "visual_design_quality_traits",
     "component_inventory",
     "equalized_groups",
     "shared_edges",
@@ -51,6 +52,9 @@ PLACEHOLDER_BLOCKERS = [
     "overload_controls",
     "header_anchor",
     "footer_anchor_baseline",
+    "header_footer_text_color_lock",
+    "message_box_text_size_lock",
+    "post_generation_design_balance_check",
     "source_policy",
     "speaker_notes_text",
     "brand_accent_usage_budget",
@@ -151,6 +155,15 @@ def canonical_planning_block(
   image_repair_prompt: [concrete repair prompt if blockers or majors remain]
   image_repair_history: [iteration -> issue -> repair action -> regenerated PNG path -> re-audit result]
   final_image_quality_status: pending until every generated PNG has no blockers or majors and deck-level consistency passes
+  deck_tone_consistency_review: [first third vs middle third vs last third tone comparison after generation]
+  deck_tone_consistency_status: pending / approved / repair_required
+  deck_tone_repair_plan: [slides to regenerate or edit if tone drift appears]
+  post_generation_design_balance_check: required on actual generated PNGs before Google Slides insertion; checks whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity
+  whitespace_occupancy_balance_status: pending / approved / repair_required
+  typography_balance_status: pending / approved / repair_required
+  color_consistency_status: pending / approved / repair_required
+  outer_padding_consistency_status: pending / approved / repair_required
+  header_integrity_status: pending / approved / repair_required
   layout_archetype: {archetype}
   grid_mode: {grid_mode}
   column_spans: [12-column spans, integer columns only]
@@ -167,16 +180,19 @@ def canonical_planning_block(
       h: [px]
   master_components: [header, footer baseline, card/table/insight/icon masters]
   deck_master_refs: [reuse refs for header/footer/insight/table/card if deck-level]
+  deck_tone_master_lock: [slide base, typography scale, header/footer, Deep Blue use, Honey use, illustration style, icon family, density rhythm, whitespace/occupancy rhythm, card/table geometry, outer padding, source baseline, negative prompt]
+  visual_design_quality_traits: [design treatment only: calm light base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, intentional canvas occupancy; do not change slide count, claim order, or storyline solely for this]
   deck_header_master_lock:
     coordinate_basis: 1672x941
     status: exact_required_before_generation
     header_safe_area: [x/y/w/h exact selected values; ATOM default x=44 y=24 w=1584 h=136]
-    vertical_line: [x/y/w/h/color exact selected values; ATOM default x=50 y=56 w=10 h=104 color #0B2F5B]
-    h1: [x/y/w/max_lines/font_size/weight/line_height/color exact selected values; ATOM default x=84 y=28 w=1380 max_lines=1 size=30pt weight=700 line_height=1.14 color #2D332E]
-    subtitle: [x/y/w/max_lines/font_size/weight/line_height/color exact selected values; ATOM default x=84 y=72 w=1380 max_lines=1 size=30pt weight=400 line_height=1.12 color #4D544E]
-    visual_alignment: [visible line top flush with visible H1 glyph top; visible line bottom flush with subtitle lower visual edge; never protrude upward]
+    vertical_line: [x/y/w/h/color exact selected values; ATOM default x=50 y=48 w=10 h=104 color #0B2F5B]
+    header_line_top_rule: [line top at or 0-6px below visible H1 glyph top, never above; upward protrusion is blocker]
+    h1: [x/y/w/max_lines/font_size/weight/line_height/color exact selected values; ATOM default x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.10 color #2D332E]
+    subtitle: [x/y/w/max_lines/font_size/weight/line_height/color exact selected values; ATOM default x=88 y=78 w=1332 max_lines=1 size=28pt weight=400 line_height=1.18 color #4D544E]
+    visual_alignment: [visible line top at or 0-6px below visible H1 glyph top; visible line bottom 4-8px below subtitle lower visual edge; never protrude upward]
     body_start_y: [exact selected value; ATOM default 190, or 224 only if explicit two-line H1 fallback is declared]
-    upper_right_clear_zone: [x/y/w/h exact selected values and empty; ATOM default x=1450 y=24 w=178 h=124]
+    upper_right_clear_zone: [x/y/w/h exact selected values and empty; ATOM default x=1420 y=24 w=208 h=88]
     forbidden_header_elements: [slide number, title kicker, header badge, logo/right object unless guideline requires it, body objects above body_start_y]
   component_inventory: [master components and coordinates]
   equalized_groups: [cards, rows, phase cards, icons]
@@ -186,7 +202,7 @@ def canonical_planning_block(
   signature_visual_plan: [main motif, supporting motifs, style, and why this slide deserves a memorable but restrained visual]
   illustration_region: [x/y/w/h in 1672 basis, or none for quiet table]
   illustration_intensity: 0_none / 1_marginal / 2_integrated / 3_restrained_signature
-  human_designed_illustration_style: clean controlled editorial/vector illustration, crisp silhouette, intentional simplification, restrained fills, one clear focal motif, 2-3 supporting details, projection/viewpoint chosen from the slide claim, no rough sketch, no arbitrary pseudo-depth, and no glossy AI concept-art finish
+  human_designed_illustration_style: clean controlled editorial/vector illustration, crisp silhouette, intentional simplification, restrained fills, clear focal motif, only useful supporting details, projection/viewpoint chosen from the slide claim, no rough sketch, no arbitrary pseudo-depth, and no glossy AI concept-art finish
   creative_variance: low / medium / high; high acts like the requested higher temperature for composition, crop, viewpoint, and layout rhythm while locking brand/header/text/source rules
   density_tier: T1_sparse / T2_balanced / T3_dense / T4_appendix_dense
   density_layers: [main figure/table, evidence strip, rail/legend, optional Insight]
@@ -200,17 +216,25 @@ def canonical_planning_block(
   density_guardrails: [preserve distinct claims, combine only repeated or shared-comparison slides, no smaller body text, no decorative illustration detail]
   header_anchor:
     vertical_line: exact x/y/w/h/color copied from deck_header_master_lock
+    header_line_top_rule: copied from deck_header_master_lock and checked after generation
     h1: exact x/y/w/max_lines/font_size/weight/line_height/color copied from deck_header_master_lock
     subtitle: exact x/y/w/max_lines/font_size/weight/line_height/color copied from deck_header_master_lock
     visual_alignment: exact visual alignment rule copied from deck_header_master_lock
     body_start_y: exact selected y copied from deck_header_master_lock
     upper_right_clear_zone: exact x/y/w/h copied from deck_header_master_lock and kept empty
   footer_anchor_baseline: 1672 basis x=44-56 baseline y=895-912, planned even if source_line is none
+  header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E; no Deep Blue/Honey/arbitrary gray in header or footer text
+  message_box_text_size_lock: message-box/Insight text compact 24-26pt or standard 22-24pt; always at least 4pt smaller than selected H1 and never a second title
   table_note_microline: none / [one line above source baseline]
   source_line: none / Source: [traceable source names copied from provided or researched sources only]
   source_policy: real traceable sources only; no draft, upload, internal-note, or production-route wording
   brand_accent_usage_budget: restrained visual area; for ATOM work, Deep Blue uses 6-12% and never appears as body text
+  deep_blue_usage_lock: exact #0B2F5B structural use; one active body blue system; no blue H1/subtitle/body/footer text; no extra blue hues
   brand_accent_system_role: header band / rule / icon / number / badge / matrix highlight / none, adjusted to the embedded ATOM design system
+  visual_asset_judgment: use illustration/icons only if they improve understanding, memory, comparison, or navigation; no quota and no filler
+  visual_asset_role: integrated_line_illustration / margin_vignette / icon_evidence_strip / diagram_embedded_icons / process_icons / data_icon_markers / none
+  icon_system_plan: none / [role, style, stroke, color logic, grouping, why it helps]
+  illustration_presence: none / marginal / integrated / restrained_signature
   insight_decision:
     keep_remove: [keep/remove]
     reason: [interpretation or decision need]
@@ -312,17 +336,20 @@ final_image_prompt:
   Plan coordinates on a 1672x941 basis with ATOM delivery target 1920x1080 after resize if required.
   Use size terminology consistently: 1920x1080 is FHD/1080p delivery, 2048x1152 is 16:9 2K-width generation, 2560x1440 is QHD/1440p generation, and 3840x2160 is 4K UHD generation.
   Use a 12-column grid, 8px spacing rhythm, precise shared edges, and fixed header/footer anchors.
-  Define and preserve one deck_header_master_lock with exact selected values, not ranges: coordinate_basis, header_safe_area, vertical_line x/y/w/h/color, H1 x/y/w/max_lines/font_size/weight/line_height/color, subtitle x/y/w/max_lines/font_size/weight/line_height/color, visual_alignment, body_start_y, and upper_right_clear_zone. Repeat it verbatim across the deck.
+  Define deck_tone_master_lock before slide-level prompting and preserve it through the whole deck: slide base, typography scale, header/footer, Deep Blue role, Honey treatment, illustration style, icon family, density rhythm, whitespace/occupancy rhythm, card/table geometry, outer padding, source baseline, and negative prompt. Later slides must feel like the same deck as the first approved pilot slides.
+  Apply visual_design_quality_traits as design treatment: calm light base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, and deliberate canvas occupancy. Do not alter slide count, claim order, or storyline solely for visual style.
+  Define and preserve one deck_header_master_lock with exact selected values, not ranges: coordinate_basis, header_safe_area, vertical_line x/y/w/h/color, header_line_top_rule, H1 x/y/w/max_lines/font_size/weight/line_height/color, subtitle x/y/w/max_lines/font_size/weight/line_height/color, visual_alignment, body_start_y, and upper_right_clear_zone. Repeat it verbatim across the deck. Treat the header as the lowest-freedom component; no_header_ranges_in_final_prompts.
   Include coordinate_inventory_1672 and reuse master_components before generating repeated objects.
   Use Noto Sans JP style or closest clean Japanese sans-serif.
-  For ATOM work, use #FCFBF8 to #F4F3EF slide base, #2D332E text, #4D544E or #6E756E subtitle/footer, #0B2F5B Deep Blue structure.
-  H1 30-34pt weight 700 #2D332E, subtitle 26-30pt weight 400 #4D544E, body 18pt equivalent. Use the exact default ATOM header: 1672 basis header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=48 w=10 h=104 #0B2F5B; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.10 #2D332E; subtitle x=88 y=78 w=1332 max_lines=1 size=28pt weight=400 line_height=1.18 #4D544E; visual_alignment line top flush with visible H1 glyph top within 0-4px and line bottom 4-8px below subtitle lower visual edge; body_start_y=190; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty. Two-line H1 fallback: vertical_line y=48 h=132, subtitle y=112, body_start_y=224. No Deep Blue H1.
+  For ATOM work, use #FCFBF8 to #F4F3EF slide base, #2D332E text, #4D544E subtitle, #6E756E footer/source/table-note text, and #0B2F5B Deep Blue structure.
+  H1 30-34pt weight 700 #2D332E, subtitle 26-30pt weight 400 #4D544E, body 18pt equivalent. Use the exact default ATOM header: 1672 basis header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=48 w=10 h=104 #0B2F5B; header_line_top_rule line top at or 0-6px below visible H1 glyph top, never above; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.10 #2D332E; subtitle x=88 y=78 w=1332 max_lines=1 size=28pt weight=400 line_height=1.18 #4D544E; visual_alignment line top never protrudes above H1 and line bottom 4-8px below subtitle lower visual edge; body_start_y=190; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty. Two-line H1 fallback: vertical_line y=48 with h recalculated to end 4-8px below subtitle lower visual edge, subtitle y=112, body_start_y=224. No Deep Blue H1.
+  Lock header and footer text colors as one Ink-family hierarchy: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E. Do not use Deep Blue, Honey, yellow, or arbitrary gray for header/footer text.
   Let structure, numbers, rules, spacing, and typography carry the hierarchy.
   Use small Lucide-style line icons only as quiet wayfinding anchors.
   Include visual_richness_role, illustration_intensity, creative_variance, and density_tier in the prompt. Use human-designed editorial/vector illustrations and purpose-built motifs where planned; avoid text-only, table-only, or generic icon-row-only slides unless marked quiet_table.
   Include density_design in the prompt. Density should answer the reader's decision_question through grouped information units, comparison baselines, evidence strips, right rails, small multiples, annotations, units, assumptions, and source cues. Do not solve density with smaller body text, extra decorative cards, or illustration detail.
   When creative_variance is high, vary composition, viewpoint, crop, asymmetric region balance, visual metaphor, and layout rhythm; keep brand, header, exact text, grid, and source policy locked.
-  Keep illustration subordinate to the argument: chart/table/matrix/roadmap remains primary where planned, with one clear focal motif, 2-3 supporting details, clean controlled linework, crisp silhouettes, restrained fills, and small annotations.
+  Keep illustration subordinate to the argument: chart/table/matrix/roadmap remains primary where planned, with a clear focal motif, only useful supporting details, clean controlled linework, crisp silhouettes, restrained fills, and small annotations.
   Keep speaker notes out of the slide image. Speaker notes are inserted later into Google Slides notes pages and should not appear as visible on-slide text.
   Do not hard-code one visual grammar across slides. Select the projection, viewpoint, abstraction level, motif, and level of detail from the slide claim; use depth or spatial perspective only when it carries meaning. Do not use decorative trapezoid planes, fake perspective floors, isometric boxes, tilted architectural slabs, vanishing points, or pseudo-3D depth as a shortcut for freshness.
   For humanoid or robot topics, avoid a central full-body robot or city skyline by default; prefer small interaction details, system cues, partial figures, or embedded operational motifs that clarify the slide claim.
@@ -330,7 +357,9 @@ final_image_prompt:
   Use Deep Blue structurally with a 4-8% visual area budget, up to 12% only for strong closing slides, and never for body text.
   Use Honey only for ATOM or compatible guidelines where it is a decision signal: #F7EECF flat pale Honey fill, #C49A2C 4-5px full-height left accent line, #2D332E text, one component maximum.
   Use flat solid fills for all message boxes and Insight surfaces; do not add patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
+  Apply message_box_text_size_lock: message-box/Insight text is compact 24-26pt or standard 22-24pt, always at least 4pt smaller than the selected H1, and never a second title or second hero headline.
   Keep Honey quiet and consistent: no saturated yellow fills, no dark yellow message boxes, no large yellow areas, no yellow title underline, and no Honey color variation across a deck.
+  Use illustrations/icons when they help understanding, memory, comparison, or navigation; do not add them by quota. A slide with no icon or illustration is acceptable when the structure already carries the claim.
   Do not minimize numbers by default. Keep sourced or explicitly assumed numbers when they help comparison, sizing, prioritization, credibility, or decision-making; remove only unsupported, redundant, unreadable, or decorative numbers.
   Render ONLY the exact text strings listed in the planning block or final prompt; do not invent extra labels.
   Keep footer_anchor_baseline planned even when source_line is none.
@@ -339,7 +368,7 @@ final_image_prompt:
 
 negative_prompt:
   pure black, old mustard, neon teal, generic gradient, glassmorphism, glow, heavy shadow,
-  stock template feel, oversized title, missing header line, short/thin header line, header line protruding above H1, header line taller than title/subtitle block, shifted H1, shifted subtitle, H1 inside body region, header safe area filled, blue H1 in ATOM slides, generic icon-only composition, rough doodle, messy hand-drawn sketch, overpowered AI-looking illustration, trapezoid planes, fake perspective floor, isometric boxes, tilted slab, vanishing-point grid, pseudo-3D depth, central full-body robot, large city skyline, luminous touch point, heroic robot, abstract 3D, cinematic glow, decorative accent surface, patterned message box, textured message box, gradient message box, decorative motif inside message box, strong yellow message box, saturated yellow fill, dark yellow fill, large yellow area, yellow title underline,
+  stock template feel, oversized title, missing header line, short/thin header line, header line protruding above H1, header line taller than title/subtitle block, shifted H1, shifted subtitle, H1 inside body region, header safe area filled, header deformation, inconsistent outer padding, body content invading margins, accidental empty dead zone, overcrowded canvas, blue H1 in ATOM slides, blue footer text, honey footer text, yellow footer text, random footer gray, mismatched source color, generic icon-only composition, rough doodle, messy hand-drawn sketch, overpowered AI-looking illustration, trapezoid planes, fake perspective floor, isometric boxes, tilted slab, vanishing-point grid, pseudo-3D depth, central full-body robot, large city skyline, luminous touch point, heroic robot, abstract 3D, cinematic glow, decorative accent surface, patterned message box, textured message box, gradient message box, decorative motif inside message box, message box text larger than H1, message box as title, oversized insight text, unstable text weights, random bold text, strong yellow message box, saturated yellow fill, dark yellow fill, large yellow area, yellow title underline,
   slide number, header number badge, title kicker, logo in upper-right clear zone, KEY INSIGHT label,
   body text below 18pt equivalent, invented source, upload filename as source,
   unresolved grid, unequal repeated cards, footer baseline drift, isolated floating accent headers
@@ -349,13 +378,16 @@ post_generation_audit:
   - generation_route is Codex built-in image generation, not local rendering or a user-key workaround
   - image_size {size} is valid for gpt-image-2, labeled as {size_label(size)}, and final delivery is resized only after generation if needed
   - H1 and subtitle hierarchy is clear
-  - deck_header_master_lock is visible and consistent; left header line is present, does not protrude above the H1 glyph top, and H1 color follows the embedded ATOM design system
+  - deck_header_master_lock is visible and consistent; left header line is present, obeys header_line_top_rule, does not protrude above the H1 glyph top, and H1 color follows the embedded ATOM design system
+  - header_footer_text_color_lock is honored: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E
+  - header/footer text does not use Deep Blue, Honey, yellow, or arbitrary gray
   - visual_richness_role is fulfilled; planned illustration or visual motif is present when required
   - illustration_intensity is respected; illustration feels designer-authored and does not overpower the slide
   - density_tier and density_design are fulfilled without shrinking body text below 18pt equivalent
   - density_levers improve the claim through comparison, evidence, annotation, grouping, or source cues rather than decoration
   - decision-relevant numbers are preserved when legible; numbers are not minimized by default
   - message boxes and Insight surfaces use flat solid fills only, with no decorative patterns or motifs
+  - message_box_text_size_lock is honored: message-box/Insight text is smaller than H1 and never reads as a second title
   - Honey message boxes use #F7EECF fill, #C49A2C 4-5px left accent line, and #2D332E text consistently
   - saturated yellow, dark yellow, or large yellow areas are absent
   - coordinate_inventory_1672 matches visible major objects
@@ -367,7 +399,10 @@ post_generation_audit:
   - Insight component is selective, compatible with the embedded ATOM design system, and not decorative
   - footer baseline is preserved
   - Source is absent or real-source only
+  - footer/source/table-note text uses #6E756E consistently when present
   - speaker_notes_text exists for deck slides but does not appear on the slide image
+  - deck_tone_consistency_status is approved after comparing first third, middle third, and last third for palette, linework, icon family, illustration intensity, density rhythm, card geometry, and source behavior
+  - post_generation_design_balance_check is approved on actual generated PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, header integrity, card/table height equalization, line-weight consistency, icon-family consistency, Deep Blue scatter, Honey strength, and human-designed operational diagram feel
   - pre_google_slides_image_review has inspected the actual generated PNG, not only the prompt
   - image_review_status is approved only when there are no blocker or major issues
   - Google Slides roll-up starts only after final_image_quality_status is approved for every generated PNG
@@ -376,6 +411,8 @@ post_generation_audit:
 pre_google_slides_image_review:
   - Inspect the actual generated PNG with multimodal review before any Google Slides insertion.
   - Score model route, exact text, header lock, grid/shared edges, typography, density, illustration clarity, human-designed feel, source hygiene, and speaker-notes separation.
+  - Score deck_tone_consistency across all generated PNGs after every generation or repair batch.
+  - Score post_generation_design_balance_check: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
   - Classify each finding as blocker, major, minor, or accepted.
   - If any blocker or major exists, create image_repair_prompt, regenerate or edit the PNG, replace the output file, and repeat this review.
   - Continue until final_image_quality_status is approved, or stop at five review/regeneration iterations and report unresolved issues.
@@ -418,7 +455,12 @@ def deck_plan_tail() -> str:
         information_unit_budget:
         density_guardrails:
   - deck_master_refs:
+  - deck_tone_master_lock:
+  - visual_design_quality_traits:
   - deck_header_master_lock:
+  - header_line_top_rule:
+  - deep_blue_usage_lock:
+  - visual_asset_judgment:
   - visual_richness_mix_plan:
   - density_tier_plan:
   - density_design_plan:
@@ -472,9 +514,16 @@ def text_structure_tail() -> str:
       image_repair_prompt:
       image_repair_history:
       final_image_quality_status:
+      deck_tone_consistency_review:
+      deck_tone_consistency_status:
+      visual_design_quality_traits:
       visual_structure: comparison / table / flow / roadmap / loop / matrix / KPI strip / architecture stack / signature visual
       visual_richness_role: restrained_signature_illustration / diagram_embedded_illustration / data_visual / icon_evidence / quiet_table
+      visual_asset_judgment:
+      visual_asset_role: integrated_line_illustration / margin_vignette / icon_evidence_strip / diagram_embedded_icons / process_icons / data_icon_markers / none
+      icon_system_plan:
       signature_visual_plan:
+      illustration_presence: none / marginal / integrated / restrained_signature
       illustration_intensity: 0_none / 1_marginal / 2_integrated / 3_restrained_signature
       human_designed_illustration_style:
       creative_variance: low / medium / high
@@ -489,6 +538,11 @@ def text_structure_tail() -> str:
       information_unit_budget:
       density_guardrails:
       deck_header_master_lock:
+      header_line_top_rule:
+      deck_tone_master_lock:
+      deep_blue_usage_lock:
+      header_footer_text_color_lock:
+      message_box_text_size_lock:
       layout_archetype:
       grid_mode:
       exact_text:

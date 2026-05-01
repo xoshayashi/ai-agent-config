@@ -47,18 +47,53 @@ When the user asks to `generate`, `create`, `output`, `export`, or `produce` sli
 
 - `1 slide = 1 claim`.
 - `1 slide = 1 dominant structure`.
+- Before image generation, define `deck_tone_master_lock` and reuse it through the whole deck. This prevents late-deck tone drift.
+- Use a calm, dense operating-deck look: light neutral base, fixed compact header, precise thin-line grid, equalized pale cards/tables, restrained line icons, small technical editorial illustrations, and one quiet interpretation surface when useful.
 - Major regions are max 3. A repeated table, row system, card group, or panel group counts as 1 region when it is one system.
 - Information density may be slightly high, but body text remains `18pt` equivalent or larger.
 - Do not impose a default numeric cap. Keep as many decision-relevant numbers, denominators, comparisons, units, and assumptions as the slide can keep legible and well-grouped.
 - H1 is `30-34pt`; subtitle is `26-30pt`; body is around `18pt`.
 - Use `30-32pt` H1 for long Japanese titles; use `34pt` only for short mixed alphanumeric titles.
 - Slide beauty comes from structure, typography, numbers, whitespace, rules, and quiet visual rhythm.
-- Use small symbols and icons only as reading anchors.
+- Use illustrations and icons when they help the reader understand, remember, compare, or navigate the claim; they are not mandatory on every slide.
+- Use small symbols and icons as reading anchors, category markers, evidence cues, or step markers; avoid decorative icon scattering.
 - Use no realistic photos. Translate sites, people, products, robots, facilities, stores, factories, and cities into diagrams, line drawings, table icons, or editorial illustrations.
 - Illustration should be edited and designer-authored, not rough hand-drawn, glossy AI concept art, photoreal, cinematic, or decorative pseudo-3D.
 - Insight components are selective. Use them only when they advance interpretation, decision, turning point, conclusion, or reading speed.
 - Source contains only traceable real information sources. Draft names, upload filenames, production notes, internal memos, or original manuscript labels never appear in Source.
 - Grid fidelity is a quality condition before decoration.
+
+Deck tone master:
+
+- deck_tone_master_lock includes slide base, typography scale, header/footer lock, Deep Blue usage, Honey usage, illustration style, density rhythm, whitespace/occupancy rhythm, card/table geometry, outer padding, Source baseline, and negative prompt.
+- Use the first 1-2 approved pilot slides as `deck_consistency_reference`; later slides must feel like the same deck, not a new template.
+- tone_drift_guard: review the last third of a deck against the first third. Block if later slides become more saturated, more glossy, more illustrated, more card-heavy, more icon-heavy, darker, or looser in spacing without an explicit section reason.
+- Section opener or closing slides may vary composition, but not palette roles, header/footer, typography scale, illustration language, message-box treatment, or source behavior.
+- Keep the mix stable: if early slides use restrained line illustration and structured tables, later slides should use the same family of linework, fills, icons, card radius, and rule weights.
+
+Visual design quality traits:
+
+- Overall feel: an investor/strategy operating deck, not a poster. Calm, precise, information-rich, with visible human editorial hierarchy.
+- Canvas use: body regions should feel usefully occupied while retaining clean margins. Avoid both dead blank zones and edge-to-edge crowding; a strong slide usually has a filled main field plus one controlled rail, strip, or conclusion surface.
+- Surfaces: use pale solid Light Gray cards/tables with thin rules, small radii, consistent padding, and equalized heights. Prefer a single component skeleton reused across table cells, cards, rails, and process nodes.
+- Lines: use crisp, thin structural lines and dividers. Strong borders, heavy shadows, thick boxes, or decorative outlines make the deck feel less precise and less human-edited.
+- Header: the same compact header master appears on every slide. The body begins below the same visual y-line, and no illustration, chart, badge, or card enters the header shell.
+- Typography: H1 leads, subtitle supports, body labels and table text are compact but legible. Section labels, row labels, and tiny chart annotations stay subordinate to the H1/subtitle hierarchy.
+- Color: Deep Blue is the only strong recurring color and reads as one system per slide. Pale gray fills and Charcoal Ink carry most of the page. Honey is rare, pale, flat, and used for interpretation only.
+- Icons: use small, consistent line icons as semantic anchors inside circles, table cells, cards, process badges, or evidence strips. Icon families, stroke weight, circle size, and color logic stay consistent across the deck.
+- Illustration: use small technical editorial line drawings embedded in the layout, such as facility cuts, shelves, roads, bridges, devices, hands, tools, partial robots, and simple operating scenes. Keep them flat, quiet, and explanatory; avoid big hero art.
+- Density: density comes from organized panels, small multiples, KPI strips, labels, arrows, and annotations. Do not increase density through noisy decoration, random icon scatter, or smaller unreadable text.
+- Freshness: make the slide feel fresh through a precise viewpoint, an elegant table/diagram hybrid, a memorable small line illustration, or a clean spatial relationship. Do not use pseudo-3D, trapezoids, tilted slabs, dramatic perspective, glow, or cinematic concept art.
+
+Visual asset judgment:
+
+- visual_asset_judgment: every generated slide should decide whether an illustration/icon system helps the claim, and briefly state the reason.
+- Use roles such as `integrated_line_illustration`, `margin_vignette`, `icon_evidence_strip`, `diagram_embedded_icons`, `process_icons`, `data_icon_markers`, or `none`.
+- Chapter openers, turning points, and final vision slides often benefit from `integrated_line_illustration` or `margin_vignette`, but only when it adds memory or emotional clarity.
+- Evidence, market, economics, and roadmap slides often benefit from `icon_evidence_strip`, `diagram_embedded_icons`, `process_icons`, or `data_icon_markers`, but only when they improve scanning or comparison.
+- Icons and illustrations must explain the claim: actor, task, object, constraint, flow, environment, risk, or outcome. Do not use generic decorative symbols.
+- Keep illustration intensity mostly `1_marginal` or `2_integrated`; use `3_restrained_signature` only for a small number of memorable slides.
+- Icon style is deck-locked: Lucide-like line icons, consistent stroke, consistent circle/label geometry, same color logic, and no mixed icon families.
 
 ### 2. Grid Strategy
 
@@ -131,17 +166,21 @@ Learned layout grammar:
 
 Header anchor:
 
+- Treat the header as the lowest-freedom component in the slide. Creative variance, illustration style, density, and layout archetype never change it.
 - Header is `left vertical line + H1 + subtitle`.
 - Left vertical line is Deep Blue `#0B2F5B`, no number attached.
 - H1 is Charcoal Ink `#2D332E`, `700`, `30-34pt`.
 - Subtitle is Ink-2 `#4D544E`, `400`, `26-30pt`, line-height `1.16-1.24`.
+- Header/footer text color lock: H1 `#2D332E`, subtitle `#4D544E`, footer/source/table-note text `#6E756E`. These are one Ink-family hierarchy and must not vary by slide.
+- Deep Blue and Honey are not header/footer text colors. Deep Blue appears in the header line or structural rules; Honey appears only in approved Insight/message surfaces.
 - Subtitle is a supporting sentence, not body text or caption; it should be clearly larger than body text and one step smaller than H1.
-- Standard `1672` header line: `x=44-56`, `y=34-42`, `w=10-12`, `h=88-100`.
-- Standard `1920` header line: `x=50-64`, `y=39-48`, `w=12-14`, `h=101-115`.
-- H1 starts `24-30px` to the right of the vertical line; standard `1672` H1 x is `88-104`.
-- Header right clear zone: `1672 x=1420-1628 y=24-88`; `1920 x=1630-1868 y=28-101`. Keep it quiet across the deck.
-- The line top should be almost flush with H1 top, upward protrusion `0-4px` max.
-- The line bottom may extend `4-8px` below the subtitle visual bottom.
+- Draft planning may use ranges to choose a header, but no_header_ranges_in_final_prompts: final image prompts must resolve the header to exact `x/y/w/h/color/font` values before generation.
+- Standard exact `1672` ATOM header line is `x=50 y=48 w=10 h=104`. Standard exact H1 starts at `x=88 y=34`.
+- Standard exact `1920` equivalent after resize is approximately `x=57 y=55 w=12 h=119`; use the `1672x941` master as the prompt basis unless the user explicitly asks for another basis.
+- Header right clear zone is exact by default: `1672 x=1420 y=24 w=208 h=88`. Keep it empty across the deck.
+- header_line_top_rule: the vertical line top must sit at or slightly below the first visible H1 glyph top; allowed downward gap `0-6px`; upward protrusion is `0px` and is a blocker.
+- If the generator makes the line protrude, repair by shortening or lowering the line, not by moving H1 upward or shrinking the header.
+- The line bottom may extend `4-8px` below the subtitle visual bottom; it must not become a tall decorative bar.
 - Header-to-body breathing room is `40-52px`.
 - H1 max 2 lines. If H1 becomes 2 lines, lower subtitle and body start.
 
@@ -152,7 +191,7 @@ header_safe_area: x=44 y=24 w=1584 h=136
 vertical_line: x=50 y=48 w=10 h=104 color #0B2F5B
 H1: x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.10 color #2D332E
 subtitle: x=88 y=78 w=1332 max_lines=1 size=28pt weight=400 line_height=1.18 color #4D544E
-visual_alignment: line top flush with visible H1 glyph top within 0-4px; line bottom 4-8px below subtitle lower visual edge
+visual_alignment: line top at or 0-6px below visible H1 glyph top, never above; line bottom 4-8px below subtitle lower visual edge
 body_start_y: 190
 upper_right_clear_zone: x=1420 y=24 w=208 h=88 empty
 forbidden_header_elements: slide number, title kicker, badge, logo, right object, body object
@@ -167,6 +206,13 @@ subtitle y=112
 body_start_y=224
 ```
 
+Header QA blockers:
+
+- Missing left vertical line, H1, or subtitle.
+- Any extra header element: slide number, title kicker, badge, logo, decorative icon, right-side object, or body object inside the header safe area.
+- H1, subtitle, or footer/source/table-note text color outside `header_footer_text_color_lock`.
+- Left vertical line protrudes above the visible H1 glyph top, looks detached from the H1/subtitle block, or changes x/y/w/h across slides without an explicit new master.
+
 Source baseline:
 
 - Source is optional and appears only when real traceable sources exist.
@@ -175,6 +221,8 @@ Source baseline:
 - `1672` standard: `x=44-56`, baseline `y=895-912`.
 - `1920` standard: `x=50-64`, baseline `y=1027-1046`.
 - Source font: `11-12pt`, `400`, `#6E756E`.
+- Footer/source/table-note text always uses Ink-3 `#6E756E`, `400`. Do not use Deep Blue, Honey, Charcoal Ink, random gray, or opacity variants for footer text.
+- If the footer has multiple fragments, all footer fragments share the same `#6E756E` color and baseline hierarchy.
 - Source format: `Source: 情報源A / 情報源B / 情報源C`.
 - Table notes, if needed, are a separate `table_note_microline` above Source.
 
@@ -209,11 +257,16 @@ Palette:
 
 Deep Blue:
 
-- Deep Blue is a structural support color.
-- Use it for left header line, table header, phase card header, matrix highlight, structural rules, step badges, and selected key numbers.
-- Do not use Deep Blue as normal body text.
-- Standard Deep Blue visual area: `4-8%`; strong closing slide max `12%`.
-- If a dark Deep Blue bottom surface is used, quiet the table header, right rail, or card headers so only one blue area leads.
+- deep_blue_usage_lock: Deep Blue is a structural color, not a general emphasis color.
+- Exact primary Deep Blue is `#0B2F5B`. Do not introduce extra navy, royal blue, cyan-blue, blue gradients, or opacity-made variants.
+- Always use Deep Blue for the left header line.
+- In the body, choose one active Deep Blue system per slide: table/card header band, process lane spine, matrix axes/quadrant highlight, structural divider/rule, step badges, or one key-number marker system.
+- The header line does not count against the active body system. Body Deep Blue should read as one coordinated system, not separate blue decorations.
+- Standard Deep Blue area budget is `4-8%`; dense table slides may reach `10%`; rare chapter/closing slides may reach `12%`. Do not exceed `12%`.
+- Do not use Deep Blue as H1, subtitle, body paragraph text, footer/source/table-note text, arbitrary icon color, decorative illustration fill, or message-box wallpaper.
+- Deep Blue deep `#071F3D` is reserved for rare dark surfaces or strongest header bands; if used, it replaces other strong blue areas on that slide.
+- Deep Blue mist `#D6E1EE` is a quiet structural tint only. Text on mist stays Charcoal Ink `#2D332E`; do not make blue-on-blue text.
+- If a dark Deep Blue bottom surface is used, quiet the table header, right rail, card headers, icons, and key numbers so only one blue area leads.
 
 Insight surface family:
 
@@ -225,7 +278,8 @@ Insight surface family:
 - Deep Blue surface background: `#D6E1EE`; left accent: `#0B2F5B` or `#071F3D`.
 - Honey surface background: flat pale Honey `#F7EECF`; left accent: muted Honey `#C49A2C`.
 - Honey surfaces must feel quieter than Deep Blue surfaces. Use pale fill, Charcoal Ink text, and one thin left accent line; do not use saturated yellow as a large area.
-- Insight surface text is smaller than H1: compact `24-26pt / 600`, standard `22-24pt / 600`, always at least `4pt` smaller than selected H1.
+- message_box_text_size_lock: Insight/message-box text must always be smaller than the selected H1. Use compact `24-26pt / 600` or standard `22-24pt / 600`, and keep it at least `4pt` smaller than selected H1. If H1 is `30pt`, message-box text is max `26pt`; if H1 is `32pt`, message-box text is max `28pt` but should normally stay `22-26pt`.
+- Message boxes must never become a second title, second hero headline, or larger visual voice than the H1.
 - Bottom Insight surface is not a footer. Use it selectively.
 - Dark Deep Blue bottom appears in about 1 slide for an 8-10 slide deck and 1-2 slides for a 12 slide deck.
 
@@ -272,7 +326,8 @@ Icons:
 - Icon circle uses pale Light Gray field and Deep Blue stroke icon.
 - Circle diameter is equalized within a slide.
 - Dark filled icon circles are limited to one role system.
-- Deck-wide icon budget: about 3 large dark icon circles or 6 small line icons per slide, excluding numeric step badges.
+- Use an icon system when it improves navigation, comparison, or evidence grouping; skip it when the table/chart/text hierarchy already carries the slide cleanly.
+- Avoid decorative icon filler. A slide with no icons is acceptable when that absence feels intentional rather than empty.
 - Step badge: Deep Blue filled circle, white number, diameter `30-42px`.
 - Icons support reading order; meaning must still be conveyed by text and structure.
 
@@ -283,7 +338,7 @@ Signature illustration / diagram:
 - Start illustration as a grid-aligned supporting region; promote it only when it carries evidence, worldview, or system intuition.
 - ATOM visuals are editorial illustration, diagram, structure map, and line icon visuals.
 - Avoid realistic photography, photoreal people/offices/scenery, stock-photo aesthetics, cinematic scenes, glossy AI art, abstract 3D, isometric boxes, trapezoid planes, fake perspective floors, and decorative depth.
-- technical editorial line illustration: clean controlled vector linework, crisp silhouettes, intentional simplification, pale Light Gray fills, restrained flat shading, one focal motif, 2-3 supporting details, deliberate whitespace, Deep Blue structural accents, optional one Honey focus cue.
+- technical editorial line illustration: clean controlled vector linework, crisp silhouettes, intentional simplification, pale Light Gray fills, restrained flat shading, a clear focal motif, only useful supporting details, deliberate whitespace, Deep Blue structural accents, optional Honey focus cue when it aids interpretation.
 - For workflow/process/before-after claims, use technical storyboard grammar when helpful: three aligned line-illustration panels, Deep Blue arrows, lower icon strip, separate Insight surface.
 - Translate rooms, workers, robots, tools, dashboards, facilities, stores, factories, and streets into clean line drawings with pale Light Gray fills.
 - For AI/robot/future themes, prefer small workflow cuts, hand/detail scenes, UI fragments, tool-use moments, partial figures, or embedded operational motifs over central full-body robots or futuristic skylines.
@@ -423,20 +478,29 @@ Brand token gate:
 - H1/body are Charcoal Ink.
 - Deep Blue `#0B2F5B` and Light Gray `#DDE3EA` are structural.
 - Honey is a decision signal.
+- The visual treatment stays calm and dense: light base, compact fixed header, thin-line structures, equalized pale surfaces, restrained icons/line drawings.
+- Color consistency check: palette roles stay consistent across slides; no late-slide saturation jump, random accent color, arbitrary gray, or unplanned blue/yellow emphasis appears.
 - Subtitle is `#4D544E`, `400`, `26-30pt`, and visually secondary to H1 but larger than body.
+- Header/footer text color lock is honored: H1 `#2D332E`, subtitle `#4D544E`, footer/source/table-note text `#6E756E`.
+- No Deep Blue, Honey, saturated yellow, or arbitrary gray appears in header/footer text.
 - Honey max 1 per slide; Honey component uses left accent + tint background.
 - Deep Blue and Honey surfaces share one component skeleton.
 - Insight and Honey message boxes use flat solid fills only; no pattern, texture, gradient, motif, or internal illustration.
+- message_box_text_size_lock is honored: Insight/message-box text is always smaller than H1 and never behaves like a second title.
 - Honey message boxes use `#F7EECF` fill, `#C49A2C` left line, and `#2D332E` text consistently. Strong yellow fills are not part of the component.
 - Raw Honey appears only as a tiny cue when necessary, never as a full box fill or title emphasis.
-- Icons are quiet wayfinding and within deck-wide icon budget.
+- Icons are quiet wayfinding or evidence cues, never filler.
+- visual_asset_judgment is satisfied: illustrations/icons are present when helpful, absent when unnecessary, and never generic decoration.
 
 Layout gate:
 
 - `layout_archetype`, `grid_mode`, `component_inventory`, `row_tracks`, `column_tracks`, `shared_edges` exist.
 - Major region count is in budget.
+- Canvas occupancy is intentional: body space is substantially used by a clear main field plus optional rail/strip/conclusion surface, without broad accidental emptiness.
+- Whitespace and occupancy balance feels intentional: the slide is neither accidentally empty nor crowded, and the main structure owns the canvas without crushing the margins.
 - Header anchor and upper-right clear zone are consistent.
 - Source baseline anchor is fixed.
+- Outer padding consistency is visible across the deck: left/right/top/bottom margins do not drift slide to slide, and body content does not creep into the header/footer shell.
 - Separator x matches grid mode.
 - Main object edges snap to grid.
 - Same-row objects share top/bottom lines.
@@ -449,10 +513,12 @@ Typography gate:
 
 - H1 `30-34pt / 700`.
 - Subtitle `26-30pt / 400 / #4D544E`.
-- Insight text below H1: compact `24-26pt / 600`, standard `22-24pt / 600`.
+- Footer/source/table-note text `11-12pt / 400 / #6E756E`.
+- Insight/message-box text: compact `24-26pt / 600`, standard `22-24pt / 600`, always at least `4pt` smaller than selected H1.
 - Body is readable at `18pt` equivalent.
 - H1 max 2 lines; subtitle max 2 lines.
 - Weights are `400 / 600 / 700`.
+- Typography balance check: size and weight hierarchy is stable across slides; body labels, table headers, Insight text, and captions do not compete with H1/subtitle or randomly change weight.
 - Numerals use tabular alignment.
 
 Content gate:
@@ -467,26 +533,34 @@ Content gate:
 Deck gate:
 
 - Deck keeps precise alignment while showing priority, rhythm, and breathing room.
+- Visual design traits are stable across the deck: light base, line weight, card radius, pale fills, icon stroke, illustration density, and header compactness do not drift.
+- deck_tone_master_lock is stable from first third to last third: palette, linework, icon family, illustration intensity, density rhythm, card geometry, and source behavior do not drift.
 - Header and Source baseline are consistent.
 - Insight component geometry and baseline are consistent.
 - Honey count and variants feel selective.
 - Deep Blue area fits slide role.
+- Visual asset mix is intentional: icons/illustrations appear where they improve comprehension or memorability, and are absent where the structure is already strong.
 - Freshness comes from composition, whitespace, viewpoint, comparison axis, or quiet illustration, not decoration.
 - Large illustrations appear only where claim memory benefits.
-- At least one in every three slides avoids card-led composition in a long deck.
+- Avoid long card-led stretches in a deck; vary composition when the argument benefits from a different structure.
 - Density and calm coexist.
 
 Pre-Google Slides generated image gate:
 
 - Review the actual generated PNGs, not only the prompt or plan.
 - Run at least one multimodal self-review pass before Google Slides insertion.
-- Score each image on model route, exact text, header lock, grid/shared edges, typography, information density, illustration clarity, human-designed feel, source hygiene, speaker-notes separation, and deck consistency.
+- Run a deck-level tone consistency pass after every generation/repair batch, before Google Slides insertion.
+- Score each image on model route, exact text, visual design quality traits, header lock, grid/shared edges, typography, information density, illustration clarity, human-designed feel, source hygiene, speaker-notes separation, and deck consistency.
+- Run `post_generation_design_balance_check` on the actual generated PNGs: whitespace and occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
+- In `post_generation_design_balance_check`, explicitly inspect canvas occupancy versus blank zones, external padding drift, header line/H1/subtitle integrity, card/table height equalization, line-weight consistency, icon-family consistency, Deep Blue scatter, Honey strength, and whether illustrations look like human-designed operational diagrams rather than generated concept art.
+- Score the whole image set on `deck_tone_consistency`: palette role consistency, Deep Blue usage consistency, Honey treatment consistency, header/footer consistency, illustration style family, icon family, density rhythm, card/table geometry, whitespace rhythm, source baseline, and first-third vs last-third tone match.
+- Compare the first third, middle third, and last third of the generated deck. The last third must not become more saturated, darker, glossier, more icon-heavy, more illustrated, more card-heavy, or looser in spacing unless the planned section role explicitly requires it.
 - Classify issues as `blocker`, `major`, `minor`, or `accepted`.
 - Any blocker or major issue requires a repair prompt and a regenerated or edited PNG before roll-up.
-- Typical blockers: wrong/non-generated route, missing or malformed header line, title/color drift, unreadable body text, invented labels/sources, speaker notes visible on slide, severe grid drift, or wrong slide claim.
-- Typical major issues: weak header consistency, low information density against the plan, unclear illustration, AI-looking illustration, excessive illustration dominance, unbalanced whitespace, repeated-card monotony, source baseline drift, or mismatch between slide claim and visual structure.
+- Typical blockers: wrong/non-generated route, missing or malformed header line, header deformation, title/color drift, unreadable body text, invented labels/sources, speaker notes visible on slide, severe grid drift, body content invading header/footer margins, or wrong slide claim.
+- Typical major issues: weak header consistency, weak visual design quality, low information density against the plan, unclear illustration, AI-looking illustration, excessive illustration dominance, message-box text larger than or equal to H1, unbalanced whitespace/occupancy, inconsistent outer padding, unstable text size/weight hierarchy, color role drift, card/table height inconsistency, icon-family mixing, repeated-card monotony, source baseline drift, mismatch between slide claim and visual structure, late-deck tone drift, missing useful visual assets where the slide feels sparse, or generic decorative icon filler.
 - Minor issues can remain only if they do not affect readability, brand fidelity, source integrity, or deck consistency.
-- Continue iterations until every slide has no blockers or majors and the deck-level consistency pass is approved.
+- Continue iterations until every slide has no blockers or majors and `deck_tone_consistency_status: approved`.
 - Default practical ceiling is five review/regeneration iterations per slide. If the ceiling is reached, report unresolved issues and do not silently claim final quality.
 
 ### 9. Prompt Patterns
@@ -508,6 +582,7 @@ ATOM slide contract:
 - use insight_surface_master for message boxes
 - use Deep Blue and Honey Insight surfaces in one surface family
 - message boxes use flat solid fills only, with no pattern, texture, gradient, motif, or internal illustration
+- message boxes use message_box_text_size_lock: text is never equal to or larger than H1
 - keep body readable at 18pt equivalent
 - omit page numbers
 - use editorial illustration/diagram/structure map/line icons, never photoreal stock
@@ -616,6 +691,16 @@ image_review_findings:
 image_repair_prompt:
 image_repair_history:
 final_image_quality_status:
+deck_tone_consistency_review:
+deck_tone_consistency_status:
+deck_tone_repair_plan:
+post_generation_design_balance_check:
+visual_design_quality_traits:
+whitespace_occupancy_balance_status:
+typography_balance_status:
+color_consistency_status:
+outer_padding_consistency_status:
+header_integrity_status:
 layout_archetype:
 grid_mode:
 column_spans:
@@ -627,14 +712,21 @@ major_regions:
 coordinate_inventory_1672:
 master_components:
 deck_master_refs:
+deck_tone_master_lock:
 deck_header_master_lock:
+header_line_top_rule:
+deep_blue_usage_lock:
+visual_asset_judgment:
 component_inventory:
 equalized_groups:
 shared_edges:
 hand_placed_exceptions:
 visual_richness_role:
+visual_asset_role:
+icon_system_plan:
 signature_visual_plan:
 illustration_region:
+illustration_presence:
 illustration_intensity:
 human_designed_illustration_style:
 creative_variance:
@@ -646,6 +738,8 @@ density_levers:
 density_guardrails:
 header_anchor:
 footer_anchor_baseline:
+header_footer_text_color_lock:
+message_box_text_size_lock:
 table_note_microline:
 source_line:
 source_policy:
@@ -693,8 +787,12 @@ Negative prompt essentials:
 ```text
 pure black, old mustard, neon teal, generic gradient, glassmorphism, glow, heavy shadow,
 stock template feel, missing header line, header line protruding above H1, blue H1, header safe area filled,
+header deformation, inconsistent outer padding, body content invading margins, accidental empty dead zone, overcrowded canvas,
 slide number, header number badge, title kicker, logo in upper-right clear zone,
+blue body text, blue subtitle, blue footer text, honey footer text, yellow footer text, random footer gray, mismatched source color,
+multiple blue hues, arbitrary blue highlights, blue gradient, decorative blue fill, blue icon clutter,
 patterned message box, textured message box, gradient message box, decorative motif inside message box,
+message box text larger than H1, message box as title, oversized insight text, unstable text weights, random bold text,
 strong yellow message box, saturated yellow fill, dark yellow fill, large yellow area, yellow title underline,
 rough doodle, messy hand-drawn sketch, overpowered AI-looking illustration,
 trapezoid planes, fake perspective floor, isometric boxes, tilted slab, vanishing-point grid, pseudo-3D depth,
