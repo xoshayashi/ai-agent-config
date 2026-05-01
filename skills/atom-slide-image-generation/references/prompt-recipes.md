@@ -47,16 +47,19 @@ Generate at 1536x864 for drafts, 2048x1152 for 16:9 2K-width working review, or 
 Plan all layout using a 1672x941 coordinate basis, with ATOM delivery target 1920x1080 after resize if required.
 Treat 1920x1080 as FHD/1080p delivery, 2048x1152 as practical 16:9 2K-width generation, and 3840x2160 as 4K UHD generation.
 Use a shared 12-column grid, 8px spacing rhythm, and precise header/footer anchors.
-For decks, define and reuse one deck header master. Repeat the same left vertical line, H1, subtitle, visual alignment rule, body-start y, header safe area, and clear zone in every slide prompt. Final prompts must use exact selected x/y/w/h/color/font values for the header, not ranges. The line must align to the visible H1/subtitle glyph block; it must not protrude above the H1 just because the text box starts higher.
+For decks, define and reuse one deck header master. Treat the header as the lowest-freedom component: repeat the same left vertical line, H1, subtitle, visual alignment rule, body-start y, header safe area, and clear zone in every slide prompt. no_header_ranges_in_final_prompts: final prompts must use exact selected x/y/w/h/color/font values for the header, not ranges. Apply header_line_top_rule: the line top must sit at or slightly below the first visible H1 glyph top, never above it just because the text box starts higher.
 Request Noto Sans JP style or the closest clean Japanese sans-serif and keep text short enough to audit.
-For ATOM work, use Charcoal Ink #2D332E for H1/body, grey Ink #4D544E or #6E756E for subtitle/footer, Deep Blue #0B2F5B for structure, and Honey only as a quiet decision signal.
+For ATOM work, use Charcoal Ink #2D332E for H1/body, Ink-2 #4D544E for subtitle, Ink-3 #6E756E for footer/source/table-note text, Deep Blue #0B2F5B for structure, and Honey only as a quiet decision signal.
+Lock header/footer text colors as one Ink-family hierarchy: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E. Do not use Deep Blue, Honey, yellow, or arbitrary gray for header/footer text.
 No slide numbers, no title kicker, no numbered header badge.
 Avoid pure black, old Mustard, neon teal, heavy shadows, glow, glassmorphism, decorative gradients, and generic stock imagery.
 Use small Lucide-style line icons only as quiet wayfinding where they clarify reading order.
-Use human-designed editorial/vector illustrations and purpose-built motifs when the claim needs memory or freshness; avoid long runs of text/table-only slides, but keep charts, tables, matrices, or roadmaps as the primary structure when they carry the argument.
+Use human-designed editorial/vector illustrations and purpose-built motifs when the claim needs memory, freshness, scanning help, or comparison support; do not add them by quota. Keep charts, tables, matrices, or roadmaps as the primary structure when they carry the argument.
+Use calm operating-deck visual quality traits: light neutral base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small technical editorial illustrations, and deliberate canvas occupancy. Treat these as design treatment only, not as a reason to change slide count, claim order, or storyline.
 Design information density before image generation. Density should answer more of the reader's decision question in one view through hierarchy, evidence, comparison, annotation, source cues, and context layers; do not use smaller type, extra decoration, or visual noise as density.
 Do not minimize numbers by default. Keep decision-relevant sourced or explicitly assumed numbers when they support comparison, sizing, prioritization, credibility, or decision-making.
 Message boxes and Insight surfaces must use flat solid fills only; no patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
+Apply message_box_text_size_lock: Insight/message-box text must always be smaller than the selected H1 and must never become a second title.
 Honey message boxes have one fixed treatment: #F7EECF flat pale fill, #C49A2C 4-5px full-height left accent line, #2D332E text. Avoid saturated yellow fills, dark yellow boxes, large yellow areas, and yellow title underlines.
 Preserve distinct claims as distinct slides. Combine slides only when claims repeat, the same comparison must be seen together, or the user explicitly requests a shorter deck.
 Do not prompt for rough hand-drawn sketches, glossy AI-looking hero art, or arbitrary pseudo-depth. Avoid rough doodle, messy sketch, luminous, cinematic, heroic robot, futuristic city, abstract 3D, dramatic glow, photoreal, ultra-detailed, decorative trapezoid planes, tilted floors, isometric boxes, vanishing-point perspective, or wallpaper-like concept art unless the user explicitly asks for that style.
@@ -66,6 +69,7 @@ When the user asks to raise temperature, use `creative_variance: high` rather th
 Required image model: gpt-image-2.
 Final slide image files must be actual Codex built-in image-generation outputs. Local wireframes or deterministic renders are not final generated images.
 For multi-slide decks, roll approved generated PNGs into a native Google Slides deck as image-only full-bleed slides, then attach speaker notes to each slide's notes page. Speaker notes are generated from the deck structure, not from image generation, and should contain talk track, evidence/assumption cue, source caveat if needed, and transition cue.
+Before Google Slides roll-up, run post_generation_design_balance_check on actual generated PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
 ```
 
 ## Single Slide Planning Block
@@ -118,24 +122,44 @@ coordinate_inventory_1672:
     h:
 master_components:
 deck_master_refs:
+deck_tone_master_lock:
+visual_design_quality_traits:
+post_generation_design_balance_check:
+whitespace_occupancy_balance_status:
+typography_balance_status:
+color_consistency_status:
+outer_padding_consistency_status:
+header_integrity_status:
 deck_header_master_lock:
   coordinate_basis:
   status: exact_required_before_generation
   header_safe_area:
   vertical_line:
+  header_line_top_rule:
   h1:
   subtitle:
   visual_alignment:
   body_start_y:
   upper_right_clear_zone:
   forbidden_header_elements:
+header_footer_text_color_lock:
+  h1: "#2D332E"
+  subtitle: "#4D544E"
+  footer_source_table_note: "#6E756E"
+  forbidden_text_colors: Deep Blue, Honey, yellow, arbitrary gray
+message_box_text_size_lock:
+deep_blue_usage_lock:
+visual_asset_judgment:
 component_inventory:
 equalized_groups:
 shared_edges:
 hand_placed_exceptions:
 visual_richness_role:
+visual_asset_role:
+icon_system_plan:
 signature_visual_plan:
 illustration_region:
+illustration_presence:
 illustration_intensity:
 human_designed_illustration_style:
 creative_variance:
@@ -214,9 +238,11 @@ ATOM slide contract:
 - define coordinate_inventory_1672 with x/y/w/h for major objects
 - define master_components and deck_master_refs before repeating cards, rows, icons, or bands
 - define deck_header_master_lock before any slide prompt and repeat it verbatim across the deck; exact header values are required before generation
+- apply visual_design_quality_traits as design treatment: calm light base, compact fixed header, thin rules, pale equalized surfaces, restrained icons/line drawings, intentional canvas occupancy
 - define component_inventory, row_tracks, column_tracks, equalized_groups, and shared_edges
 - lock header anchor first: left vertical line + H1 + subtitle + visual alignment + header safe area + body_start_y + upper-right clear zone
 - lock footer_anchor_baseline even when source_line is none
+- lock header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E
 - keep source_line separate from table_note_microline
 - draft speaker_notes_text for every deck slide before image generation; keep notes off the slide image and out of the exact on-slide text
 - assign visual_richness_role, illustration_intensity, creative_variance, and density_tier before generation
@@ -224,16 +250,18 @@ ATOM slide contract:
 - add density through decision-relevant comparisons, benchmarks, units, denominators, assumptions, annotations, evidence strips, right rails, small multiples, and source cues; never through smaller type or decorative illustration detail
 - keep decision-relevant numbers when they are legible and grouped; do not force a minimal-numbers rule
 - use human-designed editorial/vector illustrations for chapter openers, turning points, complex systems, and final vision slides
-- keep illustration subordinate: one clear focal motif, 2-3 supporting details, clean controlled linework, crisp silhouettes, restrained fills, a projection/viewpoint chosen from the claim, no rough sketch, no arbitrary pseudo-depth, and no glossy AI concept-art finish
-- keep H1 28-32pt, subtitle 21-23pt grey, body 18pt equivalent
-- if primary_guideline is ATOM, use ATOM header rules instead: H1 Charcoal Ink #2D332E, subtitle 30-32pt #4D544E, exact left vertical line, no blue H1
-- if the ATOM guideline does not provide a more specific master, use the default exact ATOM header: 1672x941 basis; header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=56 w=10 h=104 #0B2F5B; H1 x=84 y=28 w=1380 max_lines=1 size=30pt weight=700 line_height=1.14 #2D332E; subtitle x=84 y=72 w=1380 max_lines=1 size=30pt weight=400 line_height=1.12 #4D544E; visual_alignment line top flush with visible H1 glyph top and line bottom flush with subtitle lower visual edge; body_start_y=190; upper_right_clear_zone x=1450 y=24 w=178 h=124 empty
+- keep illustration subordinate: a clear focal motif, only useful supporting details, clean controlled linework, crisp silhouettes, restrained fills, a projection/viewpoint chosen from the claim, no rough sketch, no arbitrary pseudo-depth, and no glossy AI concept-art finish
+- use ATOM typography: H1 30-34pt, subtitle 26-30pt, body 18pt equivalent
+- use ATOM header rules: H1 Charcoal Ink #2D332E, subtitle #4D544E, exact left vertical line, no blue H1
+- use the default exact ATOM header unless the user explicitly provides a newer embedded master: 1672x941 basis; header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=48 w=10 h=104 #0B2F5B; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.10 #2D332E; subtitle x=88 y=78 w=1332 max_lines=1 size=28pt weight=400 line_height=1.18 #4D544E; visual_alignment line top at or 0-6px below visible H1 glyph top, never above; line bottom 4-8px below subtitle lower visual edge; body_start_y=190; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty
 - make the slide feel human-crafted through priority, breathing room, and editorial rhythm
+- keep the slide in a strategy operating-deck look: useful occupancy, small explanatory visuals, crisp rules, low-contrast surfaces, and no ornamental depth
 - let structure, spacing, rules, numbers, and typography carry hierarchy
 - use the embedded ATOM design system's accent color structurally with a restrained area budget; for ATOM work, Deep Blue uses a 6-12% area budget and never appears as body text
 - use Insight component only if it adds interpretation or decision weight and is compatible with the embedded ATOM design system
 - if Honey is used in ATOM or compatible guidelines, use #F7EECF flat pale fill + #C49A2C 4-5px full-height left accent line + #2D332E text, one component maximum
 - keep all Insight/message boxes flat solid fill only; no patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations
+- keep Insight/message-box text smaller than H1; it must not become a second title or second hero headline
 - keep Honey quiet: no saturated yellow fill, no dark yellow message box, no large yellow area, and no Honey color variation across a deck
 - Source only if traceable real sources are available
 - final bitmap generation must use gpt-image-2
@@ -317,6 +345,12 @@ Output:
     information_unit_budget:
     density_guardrails:
     deck_header_master_lock:
+    header_line_top_rule:
+    deck_tone_master_lock:
+    deep_blue_usage_lock:
+    visual_asset_judgment:
+    visual_asset_role:
+    icon_system_plan:
     layout_archetype:
     grid_mode:
     exact_text:
@@ -356,14 +390,15 @@ Process:
 5. Define the deck_header_master_lock with exact selected x/y/w/h/color/font values and carry it verbatim into every slide prompt.
 6. Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide, with a deck-level mix of human-designed editorial/vector illustrations, data visuals, small system scenes, icon evidence, and quiet tables.
 7. Assign density_design for every slide: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
-8. Assign Insight components selectively across the deck: 8 slides usually need 2-3 total Insight components and 1-2 Honey components; 12 slides usually need 3-5 total Insight components and 2-3 Honey components, only when compatible with the embedded ATOM design system.
-9. Vary dominant structures so the deck does not feel template-filled.
-10. Mark restrained illustration candidates where the idea becomes more memorable or fresh without becoming a rough sketch or glossy hero illustration.
-11. Flag slides that should split because density would force body below 18pt equivalent or create competing major regions.
-12. Define source policy per slide: none / real source list.
-13. Define deck-level master refs: header, footer baseline, Insight surface skeleton, table/card masters, icon circle sizes.
-14. Draft speaker_notes_text for every slide before generation. Each note should support presentation delivery, not duplicate all visible text: short talk track, key evidence or assumption to mention, source caveat if needed, and transition to the next slide.
-15. Run Guideline/Brand, Header Master, Layout, Typography, Visual Richness, Density, Content, and Deck gates.
+8. Assign visual_design_quality_traits as visual treatment only: compact fixed header, thin structural lines, pale cards/tables, restrained icons, explanatory line drawings, and stable outer padding.
+9. Assign Insight components selectively across the deck only when they add interpretation, decision weight, or reading speed; Honey remains rare and purposeful.
+10. Vary dominant structures so the deck does not feel template-filled.
+11. Mark restrained illustration candidates where the idea becomes more memorable or fresh without becoming a rough sketch or glossy hero illustration.
+12. Flag slides that should split because density would force body below 18pt equivalent or create competing major regions.
+13. Define source policy per slide: none / real source list.
+14. Define deck-level master refs: header, footer baseline, Insight surface skeleton, table/card masters, icon circle sizes.
+15. Draft speaker_notes_text for every slide before generation. Each note should support presentation delivery, not duplicate all visible text: short talk track, key evidence or assumption to mention, source caveat if needed, and transition to the next slide.
+16. Run Guideline/Brand, Header Master, Layout, Typography, Visual Richness, Density, Content, and Deck gates.
 ```
 
 ## Screenshot Or Render Repair Prompt
@@ -405,6 +440,7 @@ Evaluate:
 - Does the table, diagram, or comparison need a one-sentence interpretation?
 - Does the slide contain a strategic turning point, winning logic, or decision?
 - Would the component become a second title or second hero?
+- Is the component text smaller than the selected H1 by at least 4pt?
 - Is the deck underusing or overusing Insight components?
 - Which choice is quietest and clearest under the embedded ATOM design system: none, outlined thesis, outlined bottom, brand surface, dark brand surface, or Honey surface when ATOM?
 - If Honey is chosen, does it help the reader decide faster?
@@ -417,6 +453,7 @@ Output:
 - deck_count_check
 - one-sentence component text if kept
 - surface skeleton: geometry, height, radius, padding, left accent, background, text color
+- text size lock: compact 24-26pt or standard 22-24pt, always smaller than H1
 - alternative visual guidance if removed
 ```
 
@@ -427,15 +464,16 @@ Repair this slide image prompt for text balance, grid fidelity, and visual hiera
 
 Priority:
 1. Do not solve crowding by shrinking body text below 18pt equivalent.
-2. Keep H1 28-32pt and subtitle 21-23pt grey.
+2. Keep ATOM header fixed: H1 30-34pt #2D332E, subtitle 26-30pt #4D544E, exact left vertical line, header_line_top_rule, and no header ranges in the final prompt.
 3. Rebuild grid_mode, column_spans, row_tracks, column_tracks, separator_x, outer_padding, and shared_edges.
 4. Add coordinate_inventory_1672 and master_components if missing.
 5. Remove repeated explanation and weak labels.
 6. Use headings, numbers, rules, spacing, and comparison axes for reading order.
 7. Reduce equal-strength regions.
 8. Add, change, or remove Insight component based on interpretation need and the embedded ATOM design system.
-9. Split the slide if the claim or structure is overloaded.
-10. Clean source policy.
+9. Keep every message-box/Insight text smaller than H1; repair oversized boxes before other visual polish.
+10. Split the slide if the claim or structure is overloaded.
+11. Clean source policy.
 
 Output:
 - revised canonical planning block
@@ -452,23 +490,33 @@ Audit each slide as pass/fail.
 
 Guideline/Brand:
 - Embedded ATOM palette and type hierarchy are followed
+- Header/footer text color lock is followed: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E
+- Deep Blue and Honey are absent from header/footer text
 - ATOM Honey is not decorative when used; it is a quiet pale signal, never a strong yellow block
 - Primary accent is structural and not body text; for ATOM work, Deep Blue has a 6-12% area budget
+- Color consistency is stable across the deck: no random accent, arbitrary gray, saturation jump, or late-slide color drift
 
 Layout:
 - layout_archetype, grid_mode, component_inventory exist
 - coordinate_inventory_1672 and master_components exist
 - row_tracks, column_tracks, equalized_groups, shared_edges exist
-- header/footer anchors are fixed
+- header/footer anchors are fixed with exact values, not ranges
+- header_line_top_rule passes: the left vertical line top is at or below the first visible H1 glyph top and never protrudes upward
+- Whitespace and occupancy balance is intentional: no accidental empty dead zone, no overcrowded canvas, no content crushing the margins
+- Outer padding is consistent with the deck master and does not drift between slides
+- Header integrity is intact: no missing line, warped line, shifted H1/subtitle, or body content inside the header shell
+- Visual design quality traits are present: thin rules, pale equalized surfaces, consistent card/table heights, consistent icon stroke/circle sizes, and small explanatory line drawings where useful
 - repeated elements are equalized
 - rail and Insight do not compete
 
 Typography:
-- H1 28-32pt, default 30pt
-- long Japanese H1 uses 28-30pt; short mixed titles may use 32pt
-- subtitle 21-23pt grey
+- H1 30-34pt, default 32pt
+- long Japanese H1 uses 30-32pt; short mixed titles may use 34pt
+- subtitle 26-30pt #4D544E
+- Insight/message-box text 22-26pt and at least 4pt smaller than selected H1
 - body readable at 18pt equivalent
 - weights stay within 400/600/700
+- Typography balance is stable: size and weight hierarchy does not drift slide to slide, and no label/table/Insight text competes with H1
 
 Content:
 - one claim
@@ -490,6 +538,9 @@ Model:
 Deck:
 - layouts vary naturally
 - visible priority, rhythm, and breathing room
+- post_generation_design_balance_check is approved for generated PNGs before Google Slides roll-up
+- deck_tone_consistency_status is approved after comparing first, middle, and last thirds
+- visual design quality traits stay consistent from first to last slide: line weight, pale surfaces, card radius, icon family, illustration density, Deep Blue role, Honey treatment, and outer padding
 - no mechanical card-only repetition
 - Insight components are selective and compatible with the embedded ATOM design system
 - Google Slides roll-up contains exactly one full-bleed generated PNG per slide, in order

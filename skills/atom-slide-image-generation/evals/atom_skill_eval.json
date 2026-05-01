@@ -25,7 +25,10 @@
     {"pattern": "Honey hex", "reason": "No decorative Honey motif guidance should remain for message boxes."},
     {"pattern": "#D39A19", "reason": "Honey should use the quieter #C49A2C accent, not the stronger yellow accent."},
     {"pattern": "rgba\\(236,200,90,0\\.30\\)", "reason": "Honey message boxes should use the fixed pale solid fill #F7EECF."},
-    {"pattern": "dark-yellow", "reason": "Honey should not be prompted as dark yellow."}
+    {"pattern": "dark-yellow", "reason": "Honey should not be prompted as dark yellow."},
+    {"pattern": "visual_asset_requirement", "reason": "Visual assets should be judgment-based, not quota-based."},
+    {"pattern": "At least 70%", "reason": "Do not impose numeric quotas for illustrations or icons."},
+    {"pattern": "two consecutive slides", "reason": "Do not impose numeric quotas for illustrations or icons."}
   ],
   "required_skill_phrases": [
     "name: atom-slide-image-generation",
@@ -42,11 +45,27 @@
     "pre_google_slides_image_review",
     "final_image_quality_status",
     "repair_iteration_plan",
+    "header_footer_text_color_lock",
+    "header_line_top_rule",
+    "message_box_text_size_lock",
+    "deck_tone_master_lock",
+    "deck_tone_consistency_status",
+    "post_generation_design_balance_check",
+    "visual_design_quality_traits",
+    "whitespace_occupancy_balance_status",
+    "typography_balance_status",
+    "color_consistency_status",
+    "outer_padding_consistency_status",
+    "header_integrity_status",
+    "deep_blue_usage_lock",
+    "visual_asset_judgment",
+    "no_header_ranges_in_final_prompts",
     "Do not impose a default numeric cap",
     "flat solid fill",
     "#F7EECF",
     "#C49A2C",
     "Honey surfaces must feel quieter than Deep Blue surfaces",
+    "footer/source/table-note text `#6E756E`",
     "technical editorial line illustration",
     "bottom-main compact",
     "full-bleed"
@@ -63,7 +82,7 @@
       "name": "single_slide_prompt",
       "args": ["--mode", "single-slide-image", "--archetype", "market-table + layered-rail", "--grid-mode", "70/30", "--size", "2048x1152"],
       "expect_exit": 0,
-      "must_contain": ["gpt-image-2", "speaker_notes_text", "pre_google_slides_image_review", "repair_iteration_plan", "no default cap on decision-relevant numbers", "flat solid fill", "#F7EECF", "#C49A2C", "No Deep Blue H1", "Google Slides roll-up"],
+      "must_contain": ["gpt-image-2", "speaker_notes_text", "pre_google_slides_image_review", "repair_iteration_plan", "header_footer_text_color_lock", "header_line_top_rule", "message_box_text_size_lock", "deck_tone_master_lock", "deck_tone_consistency_status", "post_generation_design_balance_check", "visual_design_quality_traits", "whitespace_occupancy_balance_status", "typography_balance_status", "color_consistency_status", "outer_padding_consistency_status", "header_integrity_status", "deep_blue_usage_lock", "visual_asset_judgment", "no_header_ranges_in_final_prompts", "footer/source/table-note #6E756E", "no default cap on decision-relevant numbers", "flat solid fill", "#F7EECF", "#C49A2C", "No Deep Blue H1", "Google Slides roll-up"],
       "must_not_contain": ["ATOM_Slide_Patterns", "act-slide", "Petrol"]
     },
     {
