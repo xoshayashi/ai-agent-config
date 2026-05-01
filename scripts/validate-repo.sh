@@ -75,7 +75,6 @@ require_file ".github/workflows/claude-code-review.yml"
 
 say "validate: repository surface"
 require_absent "hooks"
-require_absent "skills"
 require_absent "tests"
 require_absent "scripts/__pycache__"
 require_absent "instructions/HOOKS.md"
@@ -91,6 +90,19 @@ require_absent "docs/hooks-architecture-review.md"
 require_absent "docs/skill-improvement-automation.md"
 require_absent "docs/examples"
 require_absent ".github/workflows/claude.yml"
+
+if [ -d "$repo_root/skills" ]; then
+  find "$repo_root/skills" -name __pycache__ -type d | grep -q . \
+    && fail "skills/ must not contain __pycache__ directories"
+  for skill_dir in "$repo_root"/skills/*; do
+    [ -d "$skill_dir" ] || fail "skills/ must contain skill directories only"
+    [ -f "$skill_dir/SKILL.md" ] || fail "missing skill entrypoint: skills/$(basename "$skill_dir")/SKILL.md"
+    grep -Eq '^name: ' "$skill_dir/SKILL.md" \
+      || fail "skill SKILL.md must define name: skills/$(basename "$skill_dir")/SKILL.md"
+    grep -Eq '^description: ' "$skill_dir/SKILL.md" \
+      || fail "skill SKILL.md must define description: skills/$(basename "$skill_dir")/SKILL.md"
+  done
+fi
 
 say "validate: daily review log directory stays local"
 git -C "$repo_root" check-ignore -q cron-log/ \
