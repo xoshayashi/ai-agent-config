@@ -1,0 +1,77 @@
+{
+  "runtime_scan_globs": [
+    "SKILL.md",
+    "agents/**/*.yaml",
+    "references/**/*.md",
+    "scripts/**/*.py"
+  ],
+  "forbidden_patterns": [
+    {"pattern": "\\bAct\\b", "reason": "No old skill name or brand wording should remain."},
+    {"pattern": "\\bACT\\b", "reason": "No old skill name or brand wording should remain."},
+    {"pattern": "act-slide", "reason": "No old skill identifier should remain."},
+    {"pattern": "build_act", "reason": "No old helper script name should remain."},
+    {"pattern": "ATOM_Slide_Patterns", "reason": "Skill must not depend on the external ATOM pattern file."},
+    {"pattern": "/Users/sh/Library", "reason": "Skill must not hard-code local guideline paths."},
+    {"pattern": "プロダクト事業部", "reason": "No old source guideline path remnants."},
+    {"pattern": "デザインガイドライン", "reason": "No old source guideline path remnants."},
+    {"pattern": "Petrol", "reason": "ATOM uses Deep Blue, not the old accent naming."},
+    {"pattern": "#008A80", "reason": "ATOM uses Deep Blue, not the old accent color."},
+    {"pattern": "Forest Charcoal", "reason": "ATOM token is Charcoal Ink."},
+    {"pattern": "provided slide guideline", "reason": "Default prompt should use embedded ATOM design system, not an external/provided guideline."},
+    {"pattern": "slide/brand guideline", "reason": "Skill should not frame itself around external guideline loading."},
+    {"pattern": "minimal numbers", "reason": "Do not impose a minimal-numbers slide rule."},
+    {"pattern": "minimum numbers", "reason": "Do not impose a minimal-numbers slide rule."},
+    {"pattern": "最小限の数字", "reason": "Do not impose a minimal-numbers slide rule."},
+    {"pattern": "Honey hex", "reason": "No decorative Honey motif guidance should remain for message boxes."},
+    {"pattern": "#D39A19", "reason": "Honey should use the quieter #C49A2C accent, not the stronger yellow accent."},
+    {"pattern": "rgba\\(236,200,90,0\\.30\\)", "reason": "Honey message boxes should use the fixed pale solid fill #F7EECF."},
+    {"pattern": "dark-yellow", "reason": "Honey should not be prompted as dark yellow."}
+  ],
+  "required_skill_phrases": [
+    "name: atom-slide-image-generation",
+    "The ATOM design system is embedded in this SKILL.md",
+    "do not read an external ATOM slide pattern file",
+    "12-column grid",
+    "#0B2F5B",
+    "#2D332E",
+    "#DDE3EA",
+    "speaker notes",
+    "Google Slides",
+    "gpt-image-2",
+    "Codex built-in image generation",
+    "pre_google_slides_image_review",
+    "final_image_quality_status",
+    "repair_iteration_plan",
+    "Do not impose a default numeric cap",
+    "flat solid fill",
+    "#F7EECF",
+    "#C49A2C",
+    "Honey surfaces must feel quieter than Deep Blue surfaces",
+    "technical editorial line illustration",
+    "bottom-main compact",
+    "full-bleed"
+  ],
+  "helper_checks": [
+    {
+      "name": "deck_plan_2k",
+      "args": ["--mode", "deck-plan", "--size", "2048x1152"],
+      "expect_exit": 0,
+      "must_contain": ["embedded ATOM design system", "speaker_notes_plan", "pre_google_slides_review_plan", "google_slides_rollup_plan"],
+      "must_not_contain": ["ATOM_Slide_Patterns", "act-slide", "Petrol"]
+    },
+    {
+      "name": "single_slide_prompt",
+      "args": ["--mode", "single-slide-image", "--archetype", "market-table + layered-rail", "--grid-mode", "70/30", "--size", "2048x1152"],
+      "expect_exit": 0,
+      "must_contain": ["gpt-image-2", "speaker_notes_text", "pre_google_slides_image_review", "repair_iteration_plan", "no default cap on decision-relevant numbers", "flat solid fill", "#F7EECF", "#C49A2C", "No Deep Blue H1", "Google Slides roll-up"],
+      "must_not_contain": ["ATOM_Slide_Patterns", "act-slide", "Petrol"]
+    },
+    {
+      "name": "reject_1920x1080_direct_generation",
+      "args": ["--mode", "deck-plan", "--size", "1920x1080"],
+      "expect_exit": 1,
+      "must_contain": ["requires both edges to be multiples of 16"],
+      "must_not_contain": []
+    }
+  ]
+}

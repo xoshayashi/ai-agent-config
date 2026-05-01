@@ -57,7 +57,7 @@ AI_AGENT_CONFLICT_MODE=fail sh scripts/setup.sh
 sh scripts/validate-repo.sh
 ```
 
-この validation は、必要なファイルの存在、repository surface、entrypoint 参照、health-check と setup dry-run を確認します。
+この validation は、必要なファイルの存在、repository surface、任意の `skills/` 構造、entrypoint 参照、health-check と setup dry-run を確認します。
 
 ## Daily Review
 

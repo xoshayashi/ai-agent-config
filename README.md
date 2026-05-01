@@ -86,6 +86,6 @@ sh /path/to/ai-agent-config/scripts/uninstall.sh
 
 ## 保守方針
 
-- 構成は `instructions/`、`scripts/`、最小 docs、CI validation、on-demand PR review workflow、日次 instruction レビューに絞ります。
+- 構成は `instructions/`、`scripts/`、必要に応じた `skills/`、最小 docs、CI validation、on-demand PR review workflow、日次 instruction レビューに絞ります。
 - Instruction の構造を変えたら、`README.md`、`setup.md`、`scripts/validate-repo.sh` も同じ変更で合わせます。
 - 日次レビューで Instruction を変える場合は、既存文言に有機的に統合し、単なる追記を避けます。
