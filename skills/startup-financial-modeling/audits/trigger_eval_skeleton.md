@@ -11,7 +11,7 @@
 
 | # | Query 抜粋 | 予想 trigger 率 | should-trigger rationale | 変動予想 keyword |
 |---|---|---|---|---|
-| 1 | "うちの SaaS、ARR ¥240M、Series A の調達額と評価額レンジを 17 sheet モデル..." | **95%** | 直接 keyword 多数 (SaaS / ARR / Series A / 17 sheet / cap table / NRR / MRR) | "ARR" / "17 sheet" の重み |
+| 1 | "うちの SaaS、ARR ¥240M、Series A の調達額と評価額レンジを 14 sheet モデル..." | **95%** | 直接 keyword 多数 (SaaS / ARR / Series A / 14 sheet / cap table / NRR / MRR) | "ARR" / "14 sheet" の重み |
 | 2 | "J-KISS 2.0 で ¥150M 調達済み (cap ¥1.2B、disc 20%)、来年 Series A..." | **95%** | J-KISS / Series A / cap / discount / converted shares / 希薄化 waterfall は description で全て list 済 | "J-KISS" は description にあり |
 | 3 | "VC のインベストメントメモを書きたい...Rule of 40 = 38、Burn Multiple = 1.8...kill criteria...Football field" | **90%** | IC memo / Rule of 40 / Burn Multiple / Football field / kill criteria | "kill criteria" は description にないが context 強い |
 | 4 | "Q4 SaaS forecast、3 年分... Salesforce export...三表 (PL / BS / CF) 突合せ + sensitivity" | **85%** | three-statement / sensitivity / SaaS / forecast | "Salesforce" は分散要因だが context 強い |
@@ -71,7 +71,7 @@
 ```bash
 # 0. baseline trigger 率測定
 cd skills/startup-financial-modeling/
-python ~/.claude/plugins/cache/anthropic-agent-skills/document-skills/12ab35c2eb56/skills/skill-creator/scripts/run_loop.py \
+python <document-skills-cache>/skills/skill-creator/scripts/run_loop.py \
   --skill-path . \
   --eval-path evals/evals.json \
   --max-iterations 0  # baseline only

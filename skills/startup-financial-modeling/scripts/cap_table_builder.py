@@ -24,12 +24,16 @@ from __future__ import annotations
 
 import argparse
 import math
+import os
+import sys
 from dataclasses import dataclass, field
 from typing import Literal
 
 from openpyxl import Workbook
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import ib_format as ib
 

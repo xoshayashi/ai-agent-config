@@ -7,12 +7,12 @@
     {
       "id": 1,
       "name": "saas_series_a_3yr_model",
-      "prompt": "うちは B2B SaaS で、現状 ARR ¥240M (MRR ¥20M)、月次 8% 成長、NRR 115%、GRR 92%、CAC payback 14 ヶ月、Gross Margin 78%、ARR per FTE ¥35M、従業員 50 名 (うち Eng 18 / Sales 12 / CS 8 / G&A 12)。Series A で ¥800M の調達を想定、pre-money は ¥3.2B。ESOP pool 12% を post-money で確保したい。3 年分の月次三表モデル + cap table + DCF + sensitivity を 17 sheet xlsx で作って、IC memo (1 ページ要約) も付けて。会計基準は J-GAAP、通貨は JPY、決算月は 3 月。",
-      "expected_output": "17 sheet xlsx (00_Cover ... 16_IC_Memo) + IC memo (.md or in-sheet)。三表突合 OK / Cap Table 検算 OK (founder 持分 % が closed-form 一致) / SaaS metrics canonical 計算 (Magic Number x4 quarterly annualized / Rule of 40 = Growth + FCF margin) / IB Color 規約準拠 (hard input #0000FF) / 量的閾値 PASS/WATCH/FAIL マーカー / 4 段投資判断ゲート通過判定。",
+      "prompt": "うちは B2B SaaS で、現状 ARR ¥240M (MRR ¥20M)、月次 8% 成長、NRR 115%、GRR 92%、CAC payback 14 ヶ月、Gross Margin 78%、ARR per FTE ¥35M、従業員 50 名 (うち Eng 18 / Sales 12 / CS 8 / G&A 12)。Series A で ¥800M の調達を想定、pre-money は ¥3.2B。ESOP pool 12% を post-money で確保したい。3 年分の月次三表モデル + cap table + DCF + sensitivity を 14 sheet xlsx で作って、IC memo (1 ページ要約) も付けて。会計基準は J-GAAP、通貨は JPY、決算月は 3 月。",
+      "expected_output": "14 sheet xlsx (00_Cover ... 13_IC_Memo) + IC memo (.md or in-sheet)。三表突合 OK / Cap Table 検算 OK (founder 持分 % が closed-form 一致) / SaaS metrics canonical 計算 (Magic Number x4 quarterly annualized / Rule of 40 = Growth + FCF margin) / IB Color 規約準拠 (hard input #0000FF) / 量的閾値 PASS/WATCH/FAIL マーカー / 4 段投資判断ゲート通過判定。",
       "files": [],
       "applicable_references": ["00", "01a", "01b", "02", "03", "04a", "04b", "05", "06", "07", "08", "10", "11", "15", "16", "_terminology", "_master_decision_tree", "_self_review_protocol"],
       "assertions": [
-        { "id": "A1", "text": "Output xlsx contains exactly 17 sheets named per `_terminology §3` (00_Cover ... 16_IC_Memo)", "type": "structural" },
+        { "id": "A1", "text": "Output xlsx contains exactly 14 sheets named per `_terminology §3` (00_Cover ... 13_IC_Memo)", "type": "structural" },
         { "id": "A2", "text": "Hard input cells are colored `#0000FF` (blue) per `_terminology §1` IB Color spec", "type": "design" },
         { "id": "A3", "text": "BS Total Assets = Total Liabilities + Equity for all 36 monthly periods (within ±¥1 tolerance)", "type": "calculation" },
         { "id": "A4", "text": "CFS ending cash equals BS cash for all 36 monthly periods (`06_three_statement.md §12.1` 三表突合)", "type": "calculation" },
@@ -56,13 +56,13 @@
         { "id": "C4", "text": "Magic Number / Rule of 40 canonical formula compliance checked per `_terminology §6`; non-canonical variants flagged with rationale requirement", "type": "metric" },
         { "id": "C5", "text": "Cap Table Σ% = 100% within 0.01% verified; FDSO computation including issued + outstanding options + unallocated pool checked per `04b §1.1`", "type": "calculation" },
         { "id": "C6", "text": "IB Color violations (hard input not `#0000FF`, formula not `#000000`, cross-sheet link not `#008000`, external not `#FF0000`) listed with Sheet:Cell location per `_terminology §1`", "type": "design" },
-        { "id": "C7", "text": "Sheet naming canonical check (00_Cover ... 16_IC_Memo) per `_terminology §3`; non-canonical names flagged", "type": "structural" },
+        { "id": "C7", "text": "Sheet naming canonical check (00_Cover ... 13_IC_Memo) per `_terminology §3`; non-canonical names flagged", "type": "structural" },
         { "id": "C8", "text": "業態 × Stage applicability check per `_stress_framework §4.1`; misapplied metrics (e.g., LTV/CAC for pre-revenue, Burn Multiple at ARR < $1M) flagged with Severity classification (Critical / High / Medium / Low) and rationale", "type": "logic" }
       ]
     }
   ],
   "trigger_eval_queries_should_trigger": [
-    "うちの SaaS、ARR がやっと ¥240M に届いた。Series A の調達額と評価額のレンジを 17 sheet モデルに落とし込みたい。MRR の月次成長 8%、NRR は 115%。希薄化込みでファウンダーの持分が何 % 残るかも cap table で見たい",
+    "うちの SaaS、ARR がやっと ¥240M に届いた。Series A の調達額と評価額のレンジを 14 sheet モデルに落とし込みたい。MRR の月次成長 8%、NRR は 115%。希薄化込みでファウンダーの持分が何 % 残るかも cap table で見たい",
     "J-KISS 2.0 で ¥150M 調達済み (cap ¥1.2B、disc 20%)、来年 Series A で pre ¥3B 想定。post-money cap iterative で converted shares 計算して、希薄化 waterfall を Excel で出して",
     "VC のインベストメントメモを書きたい。投資先は B2B SaaS、ARR $5M、Rule of 40 = 38、Burn Multiple = 1.8。kill criteria 通ってるか、Football field で valuation 妥当性も併せて",
     "boss から「Q4 SaaS forecast、3 年分」と振られた。データは Salesforce の export (cohort 別 ARR) と SaaSOptics 月次。三表 (PL / BS / CF) 突合せ + sensitivity も付けてって",

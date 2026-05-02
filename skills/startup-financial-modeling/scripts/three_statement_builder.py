@@ -1,5 +1,5 @@
 """
-three_statement_builder.py — SaaS Series A scaffold for 17-sheet xlsx 財務モデル
+three_statement_builder.py — SaaS Series A scaffold for 14-sheet xlsx 財務モデル
 
 Source of truth:
   - references/06_three_statement.md §2-4 (IS/BS/CFS/WC/Debt full row layouts)
@@ -228,7 +228,7 @@ def build_workbook(input_data: SaaSInput) -> Workbook:
     default = wb.active
     wb.remove(default)
 
-    # Create all 17 sheets in canonical order.
+    # Create all 14 sheets in canonical order.
     sheets: dict[str, Worksheet] = {}
     for name in ib.CANONICAL_SHEET_ORDER:
         sheets[name] = wb.create_sheet(name)
@@ -259,7 +259,7 @@ def build_workbook(input_data: SaaSInput) -> Workbook:
     # `=INDEX(<Name>, m)` references — 行/列 insertion 耐性を担保する。
     _register_canonical_named_ranges(wb, inp.forecast_period_months)
 
-    # Phase 6 補強 §2.X: canonical 6-role × 17-sheet tab color (one pass).
+    # Phase 6 補強 §2.X: canonical 6-role × 14-sheet tab color (one pass).
     # Overrides any role-based set_tab_color calls inside individual builders
     # so the workbook is guaranteed D10-compliant at save time.
     ib.apply_canonical_tab_colors(wb)
