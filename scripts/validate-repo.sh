@@ -125,8 +125,10 @@ say "validate: docs and instructions stay within current scope"
 ! grep -REq "autonomous-runner|skill-improvement-bot|safe_delete_guard|HOOKS\\.md|schedule-update|schedule-skill-improvement" \
   "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/docs" "$repo_root/instructions" \
   || fail "docs or instructions reference out-of-scope paths"
-grep -Fq "Codex App Automations" "$repo_root/README.md" "$repo_root/setup.md" \
-  || fail "daily review docs must prefer Codex App Automations"
+grep -Fq "Codex App Automations" "$repo_root/README.md" \
+  || fail "README.md must prefer Codex App Automations for daily review docs"
+grep -Fq "Codex App Automations" "$repo_root/setup.md" \
+  || fail "setup.md must prefer Codex App Automations for daily review docs"
 grep -Fq 'daily-llm-history-instruction-review' "$repo_root/docs/codex-automation-daily-review.md" \
   || fail "Codex automation guide must include the daily review skill name"
 grep -Fq 'install_skill_links' "$repo_root/scripts/setup.sh" \
