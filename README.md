@@ -26,7 +26,7 @@ Claude Code / Codex / Gemini CLI に共通の Instructions を配布するため
 
 1. `git` が使えること
 2. Claude Code / Codex / Gemini CLI を使う場合は、それぞれインストール済みであること
-3. `uninstall.sh` や legacy の日次レビュー解除を使う場合は `trash` コマンドがあること
+3. `uninstall.sh` を使う場合は `trash` コマンドがあること
 4. 日次レビューを使う場合は Codex App Automations が使えること
 
 ## セットアップ
@@ -71,21 +71,6 @@ automation を作ると、Claude Code / Codex / Gemini CLI の最近の履歴を
 要約的に確認し、反復的な非効率があれば `instructions/` を抽象的に更新します。
 
 詳しい作成手順は `docs/codex-automation-daily-review.md` を参照してください。
-
-既存の macOS `launchd` 登録を外す場合:
-
-```sh
-./scripts/uninstall-daily-llm-history-instruction-review
-```
-
-Codex App Automations が使えない環境だけ、legacy fallback として
-macOS `launchd` installer を使います。
-
-```sh
-./scripts/install-daily-llm-history-instruction-review
-```
-
-legacy fallback の実行ログは `cron-log/` に Markdown 要約として保存します。このフォルダーは git 管理外です。
 
 ## 取り外し
 
