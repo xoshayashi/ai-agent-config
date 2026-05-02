@@ -47,6 +47,14 @@ Model and reasoning: default.
 
 Prompt:
 Use the `$daily-llm-history-instruction-review` skill.
+
+If any repository changes are made, complete the GitHub closeout before ending:
+create or continue a branch named
+`daily-llm-history-instruction-review-YYYYMMDD`, commit only the intended
+changes, push it, open a pull request against `main`, add `codex` and
+`codex-automation` labels when available, monitor checks and review comments,
+address actionable feedback, mark the PR ready when clean, squash merge it, and
+delete the remote branch. If no repository files changed, do not open a PR.
 ```
 
 別時刻にする場合は Codex app の schedule UI で調整します。custom cadence を使う
@@ -60,6 +68,8 @@ OS schedule を外す前に、最初の数回は Codex app の Automations pane 
 - recent Claude Code / Codex / Gemini CLI history sources を読めている
 - repository edits が documented scope に収まっている
 - edits がある場合に validation が通っている
+- edits がある場合に PR が作成され、review feedback が解消され、clean な状態で
+  merge まで完了している
 - unreadable sources を raw logs としてコピーせず、要約で報告している
 
 Codex automation が active になり、少なくとも 1 回よい run が完了したら、
@@ -81,3 +91,5 @@ macOS schedule を登録できます。
 fallback は trusted local environment でのみ使います。`launchd` logs に
 `Operation not permitted` が出る場合は、macOS privacy settings で該当 app /
 shell に project folder へのアクセス権を付与するか、Codex automation に移行します。
+legacy `launchd` fallback は local review 用で、PR 作成や merge closeout は
+Codex App Automation 側で行います。
