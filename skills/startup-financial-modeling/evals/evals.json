@@ -47,7 +47,7 @@
       "name": "existing_xlsx_sanity_audit",
       "prompt": "添付の SaaS スタートアップ財務モデル (xlsx) を audit してほしい。① 三表突合 (BS = L+E、CFS ending cash = BS cash、NI → RE tie) が崩れてないか、② SaaS metrics の計算が canonical か (特に Magic Number が x4 quarterly annualized か、Rule of 40 が FCF margin ベースか)、③ Cap Table の Σ% = 100% / FDSO 計算が正しいか、④ IB Color 規約に違反 (hard input が黒等) がないか、⑤ Sheet naming が canonical (00_Cover...) か、⑥ 業態 × Stage の applicability matrix で誤適用メトリクスがないか (例: ARR < $1M で Burn Multiple 表示)。違反箇所を Sheet:Cell で列挙して、優先度 (Critical/High/Medium/Low) と修正案を出して。",
       "expected_output": "監査レポート (markdown 形式): ① 違反 issue 一覧 (Severity / Sheet:Cell / 違反内容 / 修正案)、② canonical 値との差分表、③ Self-Review §8 5 check の Pass/Fail、④ 推奨修正 priority ranking。",
-      "files": ["sample_saas_model.xlsx"],
+      "files": [],
       "applicable_references": ["01b", "02", "03", "04b", "06", "_terminology", "_self_review_protocol", "_stress_framework"],
       "assertions": [
         { "id": "C1", "text": "Audit report covers at least 4 of the 6 axes (A consistency / B calculation / C logic / D grounding / E strategy / F implementation) per `_self_review_protocol §2`", "type": "structural" },
@@ -88,6 +88,7 @@
   "notes": [
     "Phase 6 (scripts/build_model.py) 着手後に assertions を追加し、aggregate_benchmark.py で quantitative benchmark を取得",
     "trigger eval は skill-creator の run_loop.py で description 最適化に使用 (Phase 7)",
-    "Multi-clip 業態 (Bio / Media / B2B Services / Manufacturing / Real Estate / AI) のテストケースは Phase 6 phase 2 で追加"
+    "Multi-clip 業態 (Bio / Media / B2B Services / Manufacturing / Real Estate / AI) のテストケースは Phase 6 phase 2 で追加",
+    "case 3 は添付された xlsx を audit する想定で、repo fixture は持たない"
   ]
 }
