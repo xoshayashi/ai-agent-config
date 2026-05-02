@@ -103,6 +103,19 @@ remove_managed_link() {
   trash_path "$dst" "$label"
 }
 
+remove_skill_links() {
+  [ -d "$skill_source_root" ] || return 0
+
+  for target_home in "$codex_home" "$claude_home" "$gemini_home"; do
+    target_root="$target_home/skills"
+    for skill_dir in "$skill_source_root"/*; do
+      [ -d "$skill_dir" ] || continue
+      skill_name=$(basename "$skill_dir")
+      remove_managed_link "$target_root/$skill_name" "$skill_dir" "skill link"
+    done
+  done
+}
+
 say "AI agent config uninstall (instructions only)"
 say "config: $config_home"
 
@@ -118,19 +131,6 @@ remove_managed_link "$claude_home/DESIGN.md" "$src_root/DESIGN.md" "instruction 
 remove_managed_link "$gemini_home/GEMINI.md" "$src_root/GEMINI.md" "instruction link"
 remove_managed_link "$gemini_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "instruction link"
 remove_managed_link "$gemini_home/DESIGN.md" "$src_root/DESIGN.md" "instruction link"
-
-remove_skill_links() {
-  [ -d "$skill_source_root" ] || return 0
-
-  for target_home in "$codex_home" "$claude_home" "$gemini_home"; do
-    target_root="$target_home/skills"
-    for skill_dir in "$skill_source_root"/*; do
-      [ -d "$skill_dir" ] || continue
-      skill_name=$(basename "$skill_dir")
-      remove_managed_link "$target_root/$skill_name" "$skill_dir" "skill link"
-    done
-  done
-}
 
 remove_skill_links
 

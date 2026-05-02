@@ -192,9 +192,9 @@ gemini_design_status=$(link_status_for "$gemini_home/DESIGN.md" "$config_home/in
 gemini_skills_status=$(skills_status_for "$gemini_home")
 
 for status in \
-  "$codex_agents_status" "$codex_shared_status" "$codex_design_status" \
-  "$claude_entry_status" "$claude_shared_status" "$claude_design_status" \
-  "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status"; do
+  "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status" \
+  "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status" \
+  "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status"; do
   [ "$status" = "ok" ] || mark_status warn
 done
 

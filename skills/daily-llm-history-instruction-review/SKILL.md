@@ -16,7 +16,8 @@ safe because it may run unattended.
 
 ## Repository And Scope
 
-- Repository: `/Users/sh/Documents/ai-agent-config`
+- Repository: the current `ai-agent-config` checkout. If needed, set
+  `AI_AGENT_CONFIG_HOME` to that checkout path before running verification.
 - Editable scope by default: `instructions/`
 - If an instruction change also requires docs or validation alignment, edit the
   smallest matching files in `README.md`, `setup.md`, `docs/`, or
@@ -83,7 +84,7 @@ content that belongs in a project-specific file, skill, or temporary note.
 After any edit, run:
 
 ```sh
-AI_AGENT_CONFIG_HOME="/Users/sh/Documents/ai-agent-config" AI_AGENT_REQUIRE_LLM_CLIS=0 sh scripts/setup.sh
+AI_AGENT_CONFIG_HOME="${AI_AGENT_CONFIG_HOME:-$PWD}" AI_AGENT_REQUIRE_LLM_CLIS=0 sh scripts/setup.sh
 sh scripts/validate-repo.sh
 git diff --check
 ```
