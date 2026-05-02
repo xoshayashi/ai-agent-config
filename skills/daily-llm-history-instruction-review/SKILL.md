@@ -22,8 +22,7 @@ safe because it may run unattended.
 - If an instruction change also requires docs or validation alignment, edit the
   smallest matching files in `README.md`, `setup.md`, `docs/`, or
   `scripts/validate-repo.sh`.
-- Do not commit, push, open PRs, alter CLI home configuration, or modify raw
-  history files.
+- Do not alter CLI home configuration or modify raw history files.
 - Preserve user work. If the repository is dirty, read the relevant diffs before
   editing and avoid unrelated files.
 
@@ -95,6 +94,27 @@ If no files changed, run at least:
 sh scripts/validate-repo.sh
 ```
 
+## GitHub Closeout
+
+For Codex App Automation runs, complete repository closeout when the review
+creates repository changes:
+
+- Create a branch named `daily-llm-history-instruction-review-YYYYMMDD` using
+  the local run date, unless that branch or an open PR for the same run already
+  exists. Continue the existing branch/PR if present.
+- Commit only the intended review changes. Preserve unrelated user work.
+- Push the branch and open a pull request against `main`.
+- Add `codex` and `codex-automation` labels when those labels exist. If they do
+  not exist, skip them and mention that in the summary.
+- Monitor checks, review comments, and unresolved review threads until the PR is
+  clean. Address actionable feedback with follow-up commits and rerun the
+  verification commands.
+- Mark the PR ready if it was opened as draft, then merge it when checks pass,
+  review feedback is resolved, and the merge state is clean. Prefer squash merge
+  and delete the remote branch.
+
+If no repository files changed, do not open a PR.
+
 ## Final Summary
 
 Print one concise Markdown summary:
@@ -103,4 +123,5 @@ Print one concise Markdown summary:
 - inefficiency patterns found
 - instruction changes made, or why no change was made
 - verification commands and results
+- PR URL and merge status when changes were made
 - remaining risk or follow-up
