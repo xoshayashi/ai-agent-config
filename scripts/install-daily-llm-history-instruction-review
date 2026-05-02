@@ -124,6 +124,9 @@ fi
 unload_plist "$plist"
 load_plist "$plist"
 
+say "note: this launchd installer is a legacy fallback"
+say "preferred scheduler: Codex App Automations"
+say "guide: $repo_root/docs/codex-automation-daily-review.md"
 say "scheduled daily instruction review with launchd"
 say "label: $label"
 say "time: $display_time daily"

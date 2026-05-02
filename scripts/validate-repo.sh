@@ -51,6 +51,7 @@ say "validate: required files"
 require_file "README.md"
 require_file "setup.md"
 require_file "docs/setup-error-guide.md"
+require_file "docs/codex-automation-daily-review.md"
 require_file "scripts/setup.sh"
 require_file "scripts/update.sh"
 require_file "scripts/uninstall.sh"
@@ -70,6 +71,7 @@ require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"
 require_file "instructions/AI_AGENT_INSTRUCTIONS.md"
 require_file "instructions/DESIGN.md"
+require_file "skills/daily-llm-history-instruction-review/SKILL.md"
 require_file ".github/workflows/validate.yml"
 require_file ".github/workflows/claude-code-review.yml"
 
@@ -123,6 +125,16 @@ say "validate: docs and instructions stay within current scope"
 ! grep -REq "autonomous-runner|skill-improvement-bot|safe_delete_guard|HOOKS\\.md|schedule-update|schedule-skill-improvement" \
   "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/docs" "$repo_root/instructions" \
   || fail "docs or instructions reference out-of-scope paths"
+grep -Fq "Codex App Automations" "$repo_root/README.md" "$repo_root/setup.md" \
+  || fail "daily review docs must prefer Codex App Automations"
+grep -Fq 'daily-llm-history-instruction-review' "$repo_root/docs/codex-automation-daily-review.md" \
+  || fail "Codex automation guide must include the daily review skill name"
+grep -Fq 'install_skill_links' "$repo_root/scripts/setup.sh" \
+  || fail "setup.sh must install shared skill links"
+grep -Fq 'remove_skill_links' "$repo_root/scripts/uninstall.sh" \
+  || fail "uninstall.sh must remove shared skill links"
+grep -Fq 'skills_status_for' "$repo_root/scripts/health-check.sh" \
+  || fail "health-check.sh must report shared skill links"
 
 say "validate: health-check runs"
 AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/health-check.sh" --json >/dev/null

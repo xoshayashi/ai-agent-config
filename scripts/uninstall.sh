@@ -43,6 +43,7 @@ config_home=$(expand_home "${AI_AGENT_CONFIG_HOME:-$default_config_home}")
 codex_home=$(expand_home "${AI_AGENT_CODEX_HOME:-$HOME/.codex}")
 claude_home=$(expand_home "${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}")
 gemini_home=$(expand_home "${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}")
+skill_source_root="$config_home/skills"
 
 run() {
   if [ "$dry_run" = "1" ]; then
@@ -117,5 +118,20 @@ remove_managed_link "$claude_home/DESIGN.md" "$src_root/DESIGN.md" "instruction 
 remove_managed_link "$gemini_home/GEMINI.md" "$src_root/GEMINI.md" "instruction link"
 remove_managed_link "$gemini_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "instruction link"
 remove_managed_link "$gemini_home/DESIGN.md" "$src_root/DESIGN.md" "instruction link"
+
+remove_skill_links() {
+  [ -d "$skill_source_root" ] || return 0
+
+  for target_home in "$codex_home" "$claude_home" "$gemini_home"; do
+    target_root="$target_home/skills"
+    for skill_dir in "$skill_source_root"/*; do
+      [ -d "$skill_dir" ] || continue
+      skill_name=$(basename "$skill_dir")
+      remove_managed_link "$target_root/$skill_name" "$skill_dir" "skill link"
+    done
+  done
+}
+
+remove_skill_links
 
 say "uninstall complete"

@@ -83,6 +83,7 @@ codex_home=$(abs_dir "${AI_AGENT_CODEX_HOME:-$HOME/.codex}")
 claude_home=$(abs_dir "${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}")
 gemini_home=$(abs_dir "${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}")
 timestamp=$(date +%Y%m%d-%H%M%S)
+skill_source_root="$config_home/skills"
 
 if [ -n "${AI_AGENT_TARGET_DIR:-}" ]; then
   warn "AI_AGENT_TARGET_DIR is ignored. Instructions are installed globally."
@@ -167,6 +168,21 @@ install_instruction_links() {
   install_link "$src_root/DESIGN.md" "$gemini_home/DESIGN.md"
 }
 
+install_skill_links() {
+  [ -d "$skill_source_root" ] || return 0
+
+  for target_home in "$codex_home" "$claude_home" "$gemini_home"; do
+    target_root="$target_home/skills"
+    run mkdir -p "$target_root"
+
+    for skill_dir in "$skill_source_root"/*; do
+      [ -d "$skill_dir" ] || continue
+      skill_name=$(basename "$skill_dir")
+      install_link "$skill_dir" "$target_root/$skill_name"
+    done
+  done
+}
+
 say "AI agent config setup (instructions only)"
 say "config: $config_home"
 say "codex home: $codex_home"
@@ -174,5 +190,6 @@ say "claude home: $claude_home"
 say "gemini home: $gemini_home"
 
 install_instruction_links
+install_skill_links
 
 say "setup complete"
