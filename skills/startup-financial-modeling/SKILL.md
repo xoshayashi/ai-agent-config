@@ -1,11 +1,6 @@
 ---
 name: startup-financial-modeling
-description: |
-  Build IB-quality 14-sheet xlsx financial models for startups: three-statement (IS/BS/CFS), cap table & dilution waterfall, valuation (DCF / Comps / Football field), pricing thesis, M&A exit waterfall, IC memo. Covers Pre-Seed to Pre-IPO, SaaS / Marketplace / D2C / Fintech / Hardware / Bio / AI, US Delaware C-corp & Japan 株式会社 / J-KISS / 政策金融公庫.
-
-  Trigger for any quantitative startup-finance output: financial / three-statement model, cap table, SAFE / J-KISS conversion, valuation (DCF / WACC / Comps / sensitivity), Rule of 40, NRR, LTV/CAC, Burn Multiple, CAC Payback, Runway, IPO readiness, venture debt, M&A waterfall / earn-out / founder net, TAM / SAM / SOM, pricing thesis / WTP / gainsharing, comps benchmark — even without "model". Especially when ARR / MRR / stage / 業態 is given.
-
-  Do NOT trigger for pitch deck design (use pptx), market analysis prose, customer discovery (mom-test, opportunity solution tree), strategy frameworks (blue ocean ERRC, MEDDIC), Excel formatting, or API / scripting tasks.
+description: "Build IB-quality 14-sheet xlsx startup financial models, cap tables, valuation outputs, pricing theses, and IC memos across Pre-Seed to Pre-IPO for US/Japan startups. Trigger for quantitative startup-finance work (three-statement models, SAFE/J-KISS, DCF/comps, Rule of 40, NRR, LTV/CAC, Burn Multiple, runway, venture debt, M&A waterfall, TAM/SAM/SOM, WTP) and skip pitch-deck design, prose-only market analysis, or scripting tasks."
 ---
 
 # Startup Financial Modeling
@@ -139,4 +134,3 @@ IB 品質の **14 sheet xlsx 財務モデル** + IC memo + cap table を生成�
 - 数値再計算 sampling 7/7 一致
 
 詳細は `audits/skill_creator_review.md` および `audits/final_status.md` を参照。
-
