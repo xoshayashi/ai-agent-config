@@ -12,7 +12,7 @@ Note:
   in the Phase 6 task (a practical intersection of §12 + 01b §6). Roll-forwards
   in §12.1 that require all sub-schedules populated (PP&E AD, APIC, Lease ROU/Liab,
   Deferred Revenue, NOL, DTA) are deferred — they will be added when the
-  corresponding 17-sheet schedules are fully built. H8/H10 use sampling strategies
+  corresponding 14-sheet schedules are fully built. H8/H10 use sampling strategies
   to keep runtime under a few seconds on typical 5y models.
 
   Phase 6 補強 (2026-05): added H16 (#REF!/error literal detection),
@@ -45,6 +45,7 @@ License: internal (Act / startup-financial-modeling skill)
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import sys
 from dataclasses import dataclass, field
@@ -55,6 +56,8 @@ from openpyxl.cell.cell import Cell
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 import ib_format as ibf
 
@@ -1874,7 +1877,7 @@ def _check_d9_chart_palette(wb: Workbook, report: CheckReport) -> None:
 
 
 def _check_d10_tab_color(wb: Workbook, report: CheckReport) -> None:
-    """D10 — Sheet tab color matches canonical 6-role × 17-sheet mapping.
+    """D10 — Sheet tab color matches canonical 6-role × 14-sheet mapping.
 
     Source of truth:
       ib_format.SHEET_ROLE_MAPPING + ib_format.TAB_COLOR_BY_ROLE
@@ -1914,7 +1917,7 @@ def _check_d10_tab_color(wb: Workbook, report: CheckReport) -> None:
     if inspected == 0:
         report.add(CheckResult(
             "D10", "info", "Tab color matches role",
-            detail="None of the canonical 17 sheets present",
+            detail="None of the canonical 14 sheets present",
         ))
         return
     if not bad:
@@ -2443,7 +2446,7 @@ def to_sanity_sheet(wb: Workbook, report: CheckReport) -> None:
 
 def _main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(
-        description="Run sanity checks against a 17-sheet xlsx model"
+        description="Run sanity checks against a 14-sheet xlsx model"
     )
     ap.add_argument("xlsx_path", nargs="?")
     ap.add_argument("--business-model", default="saas")
@@ -2643,7 +2646,7 @@ def _build_passing_design_wb() -> Workbook:
             cell.font = Font(bold=True)
             cell.fill = PatternFill("solid", fgColor=ibf.BG_HEADER_BAND)
 
-    # Remaining canonical sheets so D10 (17-sheet coverage) is exercised.
+    # Remaining canonical sheets so D10 (14-sheet coverage) is exercised.
     # Stub the output / driver / check / memo sheets — D10 only inspects
     # tab color, but D1 needs A column width = COL_MARGIN_WIDTH so we run
     # setup_sheet_layout on each stub.
