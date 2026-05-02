@@ -30,7 +30,7 @@ Entrypoints (`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`) route here. `DESIGN.md` 
 ## Human-Visible Output
 
 - Follow `DESIGN.md` for copy, tone, documentation, color, typography, layout, UI, and slide-facing work.
-- For research, strategy, architecture, market, product, and investment-style work, separate facts, estimates, assumptions, and open uncertainties.
+- For research, strategy, architecture, market, product, and investment-style work, separate facts, estimates, assumptions, and open uncertainties; tie recommendations to the user's decision criteria such as pricing, customer ROI, cost structure, latency, quality, implementation effort, or required real-world tests.
 - Keep the final answer concise: what changed, what was verified, and what risk or assumption remains.
 
 ## Shared Config Maintenance
