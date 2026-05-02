@@ -117,11 +117,36 @@ link_status_for() {
   fi
 }
 
+skills_status_for() {
+  home=$1
+  target_root="$home/skills"
+  if [ ! -d "$target_root" ]; then
+    printf missing-parent
+    return 0
+  fi
+
+  status=ok
+  for skill_dir in "$skill_source_root"/*; do
+    [ -d "$skill_dir" ] || continue
+    skill_name=$(basename "$skill_dir")
+    link_status=$(link_status_for "$target_root/$skill_name" "$skill_dir")
+    case "$link_status" in
+      ok) ;;
+      *)
+        status=$link_status
+        break
+        ;;
+    esac
+  done
+  printf '%s' "$status"
+}
+
 default_config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
 config_home=$(expand_home "${AI_AGENT_CONFIG_HOME:-$default_config_home}")
 codex_home=$(expand_home "${AI_AGENT_CODEX_HOME:-$HOME/.codex}")
 claude_home=$(expand_home "${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}")
 gemini_home=$(expand_home "${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}")
+skill_source_root="$config_home/skills"
 
 git_status=$(command_status git)
 claude_status=$(command_status claude)
@@ -156,17 +181,20 @@ done
 codex_agents_status=$(link_status_for "$codex_home/AGENTS.md" "$config_home/instructions/AGENTS.md")
 codex_shared_status=$(link_status_for "$codex_home/AI_AGENT_INSTRUCTIONS.md" "$config_home/instructions/AI_AGENT_INSTRUCTIONS.md")
 codex_design_status=$(link_status_for "$codex_home/DESIGN.md" "$config_home/instructions/DESIGN.md")
+codex_skills_status=$(skills_status_for "$codex_home")
 claude_entry_status=$(link_status_for "$claude_home/CLAUDE.md" "$config_home/instructions/CLAUDE.md")
 claude_shared_status=$(link_status_for "$claude_home/AI_AGENT_INSTRUCTIONS.md" "$config_home/instructions/AI_AGENT_INSTRUCTIONS.md")
 claude_design_status=$(link_status_for "$claude_home/DESIGN.md" "$config_home/instructions/DESIGN.md")
+claude_skills_status=$(skills_status_for "$claude_home")
 gemini_entry_status=$(link_status_for "$gemini_home/GEMINI.md" "$config_home/instructions/GEMINI.md")
 gemini_shared_status=$(link_status_for "$gemini_home/AI_AGENT_INSTRUCTIONS.md" "$config_home/instructions/AI_AGENT_INSTRUCTIONS.md")
 gemini_design_status=$(link_status_for "$gemini_home/DESIGN.md" "$config_home/instructions/DESIGN.md")
+gemini_skills_status=$(skills_status_for "$gemini_home")
 
 for status in \
-  "$codex_agents_status" "$codex_shared_status" "$codex_design_status" \
-  "$claude_entry_status" "$claude_shared_status" "$claude_design_status" \
-  "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status"; do
+  "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status" \
+  "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status" \
+  "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status"; do
   [ "$status" = "ok" ] || mark_status warn
 done
 
@@ -181,9 +209,9 @@ if [ "$format" = "json" ]; then
   printf '  "repository": {"status": "%s", "branch": "%s", "dirty": %s},\n' "$repo_status" "$(json_escape "$repo_branch")" "$(json_nullable_bool "$repo_dirty")"
   printf '  "commands": {"git": "%s", "claude": "%s", "codex": "%s", "gemini": "%s"},\n' "$git_status" "$claude_status" "$codex_status" "$gemini_status"
   printf '  "links": {\n'
-  printf '    "codex_AGENTS.md": "%s", "codex_AI_AGENT_INSTRUCTIONS.md": "%s", "codex_DESIGN.md": "%s",\n' "$codex_agents_status" "$codex_shared_status" "$codex_design_status"
-  printf '    "claude_CLAUDE.md": "%s", "claude_AI_AGENT_INSTRUCTIONS.md": "%s", "claude_DESIGN.md": "%s",\n' "$claude_entry_status" "$claude_shared_status" "$claude_design_status"
-  printf '    "gemini_GEMINI.md": "%s", "gemini_AI_AGENT_INSTRUCTIONS.md": "%s", "gemini_DESIGN.md": "%s"\n' "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status"
+  printf '    "codex_AGENTS.md": "%s", "codex_AI_AGENT_INSTRUCTIONS.md": "%s", "codex_DESIGN.md": "%s", "codex_skills": "%s",\n' "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status"
+  printf '    "claude_CLAUDE.md": "%s", "claude_AI_AGENT_INSTRUCTIONS.md": "%s", "claude_DESIGN.md": "%s", "claude_skills": "%s",\n' "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status"
+  printf '    "gemini_GEMINI.md": "%s", "gemini_AI_AGENT_INSTRUCTIONS.md": "%s", "gemini_DESIGN.md": "%s", "gemini_skills": "%s"\n' "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status"
   printf '  }\n'
   printf '}\n'
 else
@@ -192,10 +220,10 @@ else
   printf 'config: %s\n' "$(display_path "$config_home")"
   printf 'repository: %s branch=%s dirty=%s\n' "$repo_status" "$repo_branch" "$repo_dirty"
   printf 'commands: git=%s claude=%s codex=%s gemini=%s\n' "$git_status" "$claude_status" "$codex_status" "$gemini_status"
-  printf 'links: codex(AGENTS=%s shared=%s design=%s) claude(CLAUDE=%s shared=%s design=%s) gemini(GEMINI=%s shared=%s design=%s)\n' \
-    "$codex_agents_status" "$codex_shared_status" "$codex_design_status" \
-    "$claude_entry_status" "$claude_shared_status" "$claude_design_status" \
-    "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status"
+  printf 'links: codex(AGENTS=%s shared=%s design=%s skills=%s) claude(CLAUDE=%s shared=%s design=%s skills=%s) gemini(GEMINI=%s shared=%s design=%s skills=%s)\n' \
+    "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status" \
+    "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status" \
+    "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status"
 fi
 
 if [ "$strict" = "1" ] && [ "$(overall_status)" != "ok" ]; then

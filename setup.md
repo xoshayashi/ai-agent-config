@@ -1,6 +1,6 @@
 # Setup
 
-このリポジトリは、Claude Code / Codex / Gemini CLI のグローバル instruction files と、日次の instruction 改善レビューを管理します。
+このリポジトリは、Claude Code / Codex / Gemini CLI のグローバル instruction files と、Codex App Automations ベースの日次 instruction 改善レビューを管理します。
 
 ## インストール内容
 
@@ -9,12 +9,15 @@
 | `~/.codex/AGENTS.md` | `instructions/AGENTS.md` |
 | `~/.codex/AI_AGENT_INSTRUCTIONS.md` | `instructions/AI_AGENT_INSTRUCTIONS.md` |
 | `~/.codex/DESIGN.md` | `instructions/DESIGN.md` |
+| `~/.codex/skills/<name>` | `skills/<name>` |
 | `~/.claude/CLAUDE.md` | `instructions/CLAUDE.md` |
 | `~/.claude/AI_AGENT_INSTRUCTIONS.md` | `instructions/AI_AGENT_INSTRUCTIONS.md` |
 | `~/.claude/DESIGN.md` | `instructions/DESIGN.md` |
+| `~/.claude/skills/<name>` | `skills/<name>` |
 | `~/.gemini/GEMINI.md` | `instructions/GEMINI.md` |
 | `~/.gemini/AI_AGENT_INSTRUCTIONS.md` | `instructions/AI_AGENT_INSTRUCTIONS.md` |
 | `~/.gemini/DESIGN.md` | `instructions/DESIGN.md` |
+| `~/.gemini/skills/<name>` | `skills/<name>` |
 
 ## 基本コマンド
 
@@ -61,13 +64,40 @@ sh scripts/validate-repo.sh
 
 ## Daily Review
 
-`scripts/install-daily-llm-history-instruction-review` は macOS `launchd` に `com.ai-agent-config.daily-llm-history-instruction-review` を登録し、毎日 00:00 に `scripts/daily-llm-history-instruction-review` を直接実行します。
+推奨ルートは Codex App Automations です。
+`docs/codex-automation-daily-review.md` にある automation 作成リクエストを
+Codex app で実行し、毎日 00:00 に
+`$daily-llm-history-instruction-review` を呼び出す standalone project
+automation を作ります。
 
 実行内容:
 
 - Claude Code / Codex / Gemini CLI の直近 2 日分を中心にした履歴を要約的に確認
 - 非効率が反復している場合のみ `instructions/` を抽象的に更新
 - `scripts/setup.sh`、`scripts/validate-repo.sh`、`git diff --check` を実行
-- `cron-log/` に Markdown 要約を保存
 
-`cron-log/` は git 管理外です。時刻は `AI_AGENT_DAILY_REVIEW_HOUR` / `AI_AGENT_DAILY_REVIEW_MINUTE`、ログ保持数は `AI_AGENT_DAILY_REVIEW_LOG_KEEP` で変更できます。`AI_AGENT_DAILY_REVIEW_LOG_KEEP=0` はローテーション無効です。Claude Code は `instructions/` を作業ディレクトリにし、履歴は一時 symlink set、日付で絞った JSONL history、Gemini history の tail slice だけを参照します。`Edit` / `MultiEdit` の実効範囲は Claude Code の cwd と `--add-dir` 境界に依存するため、この日次処理は信頼済みローカル環境でのみ使います。
+既存の macOS `launchd` schedule を外す場合:
+
+```sh
+./scripts/uninstall-daily-llm-history-instruction-review
+```
+
+Codex App Automations が使えない環境では、legacy fallback として
+`scripts/install-daily-llm-history-instruction-review` を使えます。これは macOS
+`launchd` に `com.ai-agent-config.daily-llm-history-instruction-review` を登録し、
+毎日 00:00 に `scripts/daily-llm-history-instruction-review` を直接実行します。
+
+legacy fallback の `cron-log/` は git 管理外です。時刻は
+`AI_AGENT_DAILY_REVIEW_HOUR` / `AI_AGENT_DAILY_REVIEW_MINUTE`、ログ保持数は
+`AI_AGENT_DAILY_REVIEW_LOG_KEEP` で変更できます。
+`AI_AGENT_DAILY_REVIEW_LOG_KEEP=0` はローテーション無効です。この fallback は
+Claude Code を `instructions/` で起動し、履歴は一時 symlink set、日付で絞った
+JSONL history、Gemini history の tail slice だけを参照します。`Edit` /
+`MultiEdit` の実効範囲は Claude Code の cwd と `--add-dir` 境界に依存するため、
+信頼済みローカル環境でのみ使います。
+
+`setup.sh` の skill links は `skills/<name>` を `~/.codex/skills/<name>`、
+`~/.claude/skills/<name>`、`~/.gemini/skills/<name>` にリンクします。skill が
+見えない時は `sh scripts/setup.sh` を再実行し、各 CLI を再起動します。
+
+日次 review の automation は `daily-llm-history-instruction-review` skill を使います。
