@@ -58,14 +58,8 @@ require_file "scripts/uninstall.sh"
 require_file "scripts/health-check.sh"
 require_file "scripts/validate-repo.sh"
 require_file "scripts/daily-llm-history-instruction-review"
-require_file "scripts/install-daily-llm-history-instruction-review"
-require_file "scripts/uninstall-daily-llm-history-instruction-review"
 [ -x "$repo_root/scripts/daily-llm-history-instruction-review" ] \
   || fail "daily review runner must be executable"
-[ -x "$repo_root/scripts/install-daily-llm-history-instruction-review" ] \
-  || fail "daily review installer must be executable"
-[ -x "$repo_root/scripts/uninstall-daily-llm-history-instruction-review" ] \
-  || fail "daily review uninstaller must be executable"
 require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"
