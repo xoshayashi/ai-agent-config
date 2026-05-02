@@ -26,6 +26,8 @@ sh scripts/setup.sh
 sh scripts/health-check.sh
 sh scripts/update.sh
 sh scripts/uninstall.sh
+./scripts/install-daily-llm-history-instruction-review
+./scripts/uninstall-daily-llm-history-instruction-review
 ```
 
 `setup.sh` は既定で Claude Code / Codex / Gemini CLI のコマンド存在を確認します。まだ入れていない CLI がある状態で link だけ作りたい場合は、次のように実行します。
@@ -73,6 +75,26 @@ automation を作ります。
 - Claude Code / Codex / Gemini CLI の直近 2 日分を中心にした履歴を要約的に確認
 - 非効率が反復している場合のみ `instructions/` を抽象的に更新
 - `scripts/setup.sh`、`scripts/validate-repo.sh`、`git diff --check` を実行
+
+既存の macOS `launchd` schedule を外す場合:
+
+```sh
+./scripts/uninstall-daily-llm-history-instruction-review
+```
+
+Codex App Automations が使えない環境では、legacy fallback として
+`scripts/install-daily-llm-history-instruction-review` を使えます。これは macOS
+`launchd` に `com.ai-agent-config.daily-llm-history-instruction-review` を登録し、
+毎日 00:00 に `scripts/daily-llm-history-instruction-review` を直接実行します。
+
+legacy fallback の `cron-log/` は git 管理外です。時刻は
+`AI_AGENT_DAILY_REVIEW_HOUR` / `AI_AGENT_DAILY_REVIEW_MINUTE`、ログ保持数は
+`AI_AGENT_DAILY_REVIEW_LOG_KEEP` で変更できます。
+`AI_AGENT_DAILY_REVIEW_LOG_KEEP=0` はローテーション無効です。この fallback は
+Claude Code を `instructions/` で起動し、履歴は一時 symlink set、日付で絞った
+JSONL history、Gemini history の tail slice だけを参照します。`Edit` /
+`MultiEdit` の実効範囲は Claude Code の cwd と `--add-dir` 境界に依存するため、
+信頼済みローカル環境でのみ使います。
 
 `setup.sh` の skill links は `skills/<name>` を `~/.codex/skills/<name>`、
 `~/.claude/skills/<name>`、`~/.gemini/skills/<name>` にリンクします。skill が

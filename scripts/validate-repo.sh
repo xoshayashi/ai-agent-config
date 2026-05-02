@@ -58,8 +58,14 @@ require_file "scripts/uninstall.sh"
 require_file "scripts/health-check.sh"
 require_file "scripts/validate-repo.sh"
 require_file "scripts/daily-llm-history-instruction-review"
+require_file "scripts/install-daily-llm-history-instruction-review"
+require_file "scripts/uninstall-daily-llm-history-instruction-review"
 [ -x "$repo_root/scripts/daily-llm-history-instruction-review" ] \
   || fail "daily review runner must be executable"
+[ -x "$repo_root/scripts/install-daily-llm-history-instruction-review" ] \
+  || fail "daily review installer must be executable"
+[ -x "$repo_root/scripts/uninstall-daily-llm-history-instruction-review" ] \
+  || fail "daily review uninstaller must be executable"
 require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"
@@ -116,7 +122,7 @@ grep -Fq "~/.codex/DESIGN.md" "$repo_root/instructions/AGENTS.md" \
   || fail "instruction entrypoints must reference only current instruction files"
 
 say "validate: docs and instructions stay within current scope"
-! grep -REq "autonomous-runner|skill-improvement-bot|safe_delete_guard|HOOKS\\.md|schedule-update|schedule-skill-improvement|launchd" \
+! grep -REq "autonomous-runner|skill-improvement-bot|safe_delete_guard|HOOKS\\.md|schedule-update|schedule-skill-improvement" \
   "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/docs" "$repo_root/instructions" \
   || fail "docs or instructions reference out-of-scope paths"
 grep -Fq "Codex App Automations" "$repo_root/README.md" \
