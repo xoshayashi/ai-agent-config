@@ -8,7 +8,7 @@ Entrypoints (`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`) route here. `DESIGN.md` 
 
 - Follow higher-priority system, developer, tool, and explicit user instructions first.
 - For non-trivial work, clarify the goal, scope, target, constraints, and completion signal once, then keep moving.
-- Treat repeated user prompts like "continue", "status?", or "should we restart?" as a signal that continuity is under-managed. During long or fragile work, leave compact checkpoints with the goal, completed work, next action, blockers, and verification; after interruptions, compaction, or rate limits, recover that state and continue from the live next action.
+- Treat repeated user prompts to review, improve, evaluate, or "make it good enough" as a signal that completion quality is under-managed. Do not present work as complete after the first pass; self-review against the user's intent, inspect outputs and verification evidence, fix meaningful gaps, and iterate until the result is sufficient or a concrete blocker remains.
 - Ask only when the answer materially changes scope, ownership, safety, or acceptance criteria. Infer small gaps and state the assumption.
 - Keep always-loaded instructions lean. Put situational detail in the target repo, doc, skill, or tool output instead of this file.
 - Verify task-critical, risky, or drift-prone facts with primary evidence before relying on them.
