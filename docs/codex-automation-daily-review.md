@@ -52,6 +52,8 @@ delete the remote branch. If no repository files changed, do not open a PR.
 確認すること:
 
 - recent Claude Code / Codex / Gemini CLI history sources を読めている
+- 中断、compaction、rate limit 後の復旧ミスが反復していれば、既存状態から再開する
+  shared instruction 候補として扱えている
 - repository edits が documented scope に収まっている
 - edits がある場合に validation が通っている
 - edits がある場合に PR が作成され、review feedback が解消され、clean な状態で
