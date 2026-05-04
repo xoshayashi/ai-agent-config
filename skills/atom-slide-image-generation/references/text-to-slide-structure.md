@@ -30,7 +30,8 @@ Use this reference when the input is a long memo, equity story, research note, t
 - Set density intentionally. A strategic deck can be slightly dense, but density should mean more decision-relevant information per view, not more objects or smaller type. Use structured layers, rails, evidence strips, mini charts, comparison baselines, and short labels while keeping body text at 18pt equivalent or larger.
 - Do not impose a default numeric cap. Preserve decision-relevant sourced or explicitly assumed numbers when they help comparison, sizing, prioritization, credibility, or decision-making.
 - Message boxes and Insight surfaces should use a flat solid fill only. Do not add patterns, textures, gradients, motifs, icon wallpaper, or internal illustration inside message boxes.
-- Apply `message_box_text_size_lock`: Insight/message-box text must always be smaller than H1 and must not become a second title.
+- Apply `message_box_scale_lock`: Insight/message-box components are compact interpretation surfaces, not display surfaces. Prefer one short judgment sentence, one line when possible and two lines maximum; trim or move explanation to notes instead of enlarging the box.
+- Apply `message_box_text_size_lock`: Insight/message-box text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than H1, and must not become a second title or compete with subtitle.
 - Lock deck-level header and footer masters before slide design. The header is the lowest-freedom component: every slide must reuse the same visible header elements, exact selected geometry, title color, subtitle size/color, visual alignment rule, body_start_y, and clear zone. Header fields must be exact values in final prompts, not ranges or loose descriptions.
 - Apply `header_line_top_rule`: the left vertical line top must sit at or slightly below the first visible H1 glyph top; upward protrusion is a blocker. If it fails, repair the line x/y/h before touching H1.
 - Apply `header_footer_text_color_lock`: H1 `#2D332E`, subtitle `#4D544E`, footer/source/table-note text `#6E756E`. Do not use Deep Blue, Honey, yellow, or arbitrary gray for header/footer text.
@@ -216,6 +217,7 @@ header_footer_text_color_lock:
   subtitle: "#4D544E"
   footer_source_table_note: "#6E756E"
   forbidden_text_colors: Deep Blue, Honey, yellow, arbitrary gray
+message_box_scale_lock:
 message_box_text_size_lock:
 deck_tone_master_lock:
 post_generation_design_balance_check:

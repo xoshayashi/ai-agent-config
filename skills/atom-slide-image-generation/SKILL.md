@@ -278,8 +278,10 @@ Insight surface family:
 - Deep Blue surface background: `#D6E1EE`; left accent: `#0B2F5B` or `#071F3D`.
 - Honey surface background: flat pale Honey `#F7EECF`; left accent: muted Honey `#C49A2C`.
 - Honey surfaces must feel quieter than Deep Blue surfaces. Use pale fill, Charcoal Ink text, and one thin left accent line; do not use saturated yellow as a large area.
-- message_box_text_size_lock: Insight/message-box text must always be smaller than the selected H1. Use compact `24-26pt / 600` or standard `22-24pt / 600`, and keep it at least `4pt` smaller than selected H1. If H1 is `30pt`, message-box text is max `26pt`; if H1 is `32pt`, message-box text is max `28pt` but should normally stay `22-26pt`.
-- Message boxes must never become a second title, second hero headline, or larger visual voice than the H1.
+- message_box_scale_lock: Message boxes are compact interpretation surfaces, not display surfaces. Prefer the smallest variant that keeps the sentence legible; do not enlarge the box to rescue long prose.
+- message_box_text_size_lock: Insight/message-box text must always be smaller than the selected H1 and subtitle. Default to `20-24pt / 600`; use `24-26pt / 600` only for rare section-close or dark-surface moments. Keep it at least `6pt` smaller than selected H1. If H1 is `30pt`, message-box text is max `24pt`; if H1 is `32pt`, message-box text is max `26pt` only by exception and should normally stay `22-24pt`.
+- Message boxes must never become a second title, second hero headline, second subtitle, or larger visual voice than the H1.
+- Message box copy is a short judgment sentence: target one line, max two lines. If the sentence needs more than two lines, trim it, split the slide, or move explanation to speaker notes instead of increasing surface height.
 - Bottom Insight surface is not a footer. Use it selectively.
 - Dark Deep Blue bottom appears in about 1 slide for an 8-10 slide deck and 1-2 slides for a 12 slide deck.
 
@@ -300,20 +302,23 @@ Honey component variants:
 
 | Variant | Use | Placement | Strength |
 | --- | --- | --- | --- |
-| `bottom-main` | slide conclusion | body region bottom, above Source, side margin `80px` | medium |
-| `top-thesis` | chapter / market definition / strategic thesis | below header | medium |
-| `rail-wide` | right rail interpretation | lower right rail | medium |
-| `rail-tall` | future state / design principle | tall lower-right card | strong |
+| `bottom-main` | slide conclusion | body region bottom, above Source, side margin `96px` | low-medium |
+| `top-thesis` | chapter / market definition / strategic thesis | below header | medium, compact height |
+| `rail-wide` | right rail interpretation | lower right rail | low-medium |
+| `rail-tall` | future state / design principle | lower-right rail only when rail owns interpretation | medium, use sparingly |
 | `inline-pill` | short in-table cue | row or small card | weak |
 
 Insight surface coordinates, `1672` basis:
 
 ```text
-bottom-main compact: x=80 y=800 w=1512 h=72
-bottom-main standard: x=80 y=746 w=1512 h=112
-right edge: x=1592
-left accent line: 5-7px, full height
-radius: 8px or 12px
+bottom-main compact default: x=96 y=812 w=1480 h=56
+bottom-main standard max: x=96 y=790 w=1480 h=78
+bottom-main tall exception: x=96 y=760 w=1480 h=104, only for rare section-close slides with no competing rail or table emphasis
+right edge default: x=1576
+left accent line: 4-5px, full height
+radius: 8px
+padding: 18-22px horizontal, 12-16px vertical
+text lines: 1 line preferred, 2 lines maximum
 Source separation: keep Source on its own baseline below
 ```
 
@@ -486,7 +491,8 @@ Brand token gate:
 - Honey max 1 per slide; Honey component uses left accent + tint background.
 - Deep Blue and Honey surfaces share one component skeleton.
 - Insight and Honey message boxes use flat solid fills only; no pattern, texture, gradient, motif, or internal illustration.
-- message_box_text_size_lock is honored: Insight/message-box text is always smaller than H1 and never behaves like a second title.
+- message_box_scale_lock is honored: message boxes stay compact and are not enlarged to carry long prose.
+- message_box_text_size_lock is honored: Insight/message-box text is smaller than H1 and subtitle and never behaves like a second title.
 - Honey message boxes use `#F7EECF` fill, `#C49A2C` left line, and `#2D332E` text consistently. Strong yellow fills are not part of the component.
 - Raw Honey appears only as a tiny cue when necessary, never as a full box fill or title emphasis.
 - Icons are quiet wayfinding or evidence cues, never filler.
@@ -514,7 +520,7 @@ Typography gate:
 - H1 `30-34pt / 700`.
 - Subtitle `26-30pt / 400 / #4D544E`.
 - Footer/source/table-note text `11-12pt / 400 / #6E756E`.
-- Insight/message-box text: compact `24-26pt / 600`, standard `22-24pt / 600`, always at least `4pt` smaller than selected H1.
+- Insight/message-box text: default `20-24pt / 600`; `24-26pt / 600` only by exception, always at least `6pt` smaller than selected H1 and visually below subtitle.
 - Body is readable at `18pt` equivalent.
 - H1 max 2 lines; subtitle max 2 lines.
 - Weights are `400 / 600 / 700`.
@@ -582,7 +588,8 @@ ATOM slide contract:
 - use insight_surface_master for message boxes
 - use Deep Blue and Honey Insight surfaces in one surface family
 - message boxes use flat solid fills only, with no pattern, texture, gradient, motif, or internal illustration
-- message boxes use message_box_text_size_lock: text is never equal to or larger than H1
+- message boxes use message_box_scale_lock: compact surface, smallest legible variant, no long-prose enlargement
+- message boxes use message_box_text_size_lock: text is never equal to or larger than H1 or subtitle
 - keep body readable at 18pt equivalent
 - omit page numbers
 - use editorial illustration/diagram/structure map/line icons, never photoreal stock
@@ -739,6 +746,7 @@ density_guardrails:
 header_anchor:
 footer_anchor_baseline:
 header_footer_text_color_lock:
+message_box_scale_lock:
 message_box_text_size_lock:
 table_note_microline:
 source_line:
@@ -792,7 +800,8 @@ slide number, header number badge, title kicker, logo in upper-right clear zone,
 blue body text, blue subtitle, blue footer text, honey footer text, yellow footer text, random footer gray, mismatched source color,
 multiple blue hues, arbitrary blue highlights, blue gradient, decorative blue fill, blue icon clutter,
 patterned message box, textured message box, gradient message box, decorative motif inside message box,
-message box text larger than H1, message box as title, oversized insight text, unstable text weights, random bold text,
+oversized message box, over-tall message box, bulky insight surface, message box text larger than H1,
+message box text competing with subtitle, message box as title, oversized insight text, unstable text weights, random bold text,
 strong yellow message box, saturated yellow fill, dark yellow fill, large yellow area, yellow title underline,
 rough doodle, messy hand-drawn sketch, overpowered AI-looking illustration,
 trapezoid planes, fake perspective floor, isometric boxes, tilted slab, vanishing-point grid, pseudo-3D depth,

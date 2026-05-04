@@ -53,6 +53,7 @@ PLACEHOLDER_BLOCKERS = [
     "header_anchor",
     "footer_anchor_baseline",
     "header_footer_text_color_lock",
+    "message_box_scale_lock",
     "message_box_text_size_lock",
     "post_generation_design_balance_check",
     "source_policy",
@@ -224,7 +225,8 @@ def canonical_planning_block(
     upper_right_clear_zone: exact x/y/w/h copied from deck_header_master_lock and kept empty
   footer_anchor_baseline: 1672 basis x=44-56 baseline y=895-912, planned even if source_line is none
   header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E; no Deep Blue/Honey/arbitrary gray in header or footer text
-  message_box_text_size_lock: message-box/Insight text compact 24-26pt or standard 22-24pt; always at least 4pt smaller than selected H1 and never a second title
+  message_box_scale_lock: compact interpretation surface; use the smallest legible variant; do not enlarge the box to carry long prose
+  message_box_text_size_lock: message-box/Insight text default 20-24pt, 24-26pt only by exception; always at least 6pt smaller than selected H1, visually below subtitle, and never a second title
   table_note_microline: none / [one line above source baseline]
   source_line: none / Source: [traceable source names copied from provided or researched sources only]
   source_policy: real traceable sources only; no draft, upload, internal-note, or production-route wording
@@ -357,7 +359,8 @@ final_image_prompt:
   Use Deep Blue structurally with a 4-8% visual area budget, up to 12% only for strong closing slides, and never for body text.
   Use Honey only for ATOM or compatible guidelines where it is a decision signal: #F7EECF flat pale Honey fill, #C49A2C 4-5px full-height left accent line, #2D332E text, one component maximum.
   Use flat solid fills for all message boxes and Insight surfaces; do not add patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
-  Apply message_box_text_size_lock: message-box/Insight text is compact 24-26pt or standard 22-24pt, always at least 4pt smaller than the selected H1, and never a second title or second hero headline.
+  Apply message_box_scale_lock: message boxes are compact interpretation surfaces, not display surfaces; keep copy to one short judgment sentence, prefer one line, max two lines, and do not enlarge the surface to rescue long prose.
+  Apply message_box_text_size_lock: message-box/Insight text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below the subtitle, and never becomes a second title or second hero headline.
   Keep Honey quiet and consistent: no saturated yellow fills, no dark yellow message boxes, no large yellow areas, no yellow title underline, and no Honey color variation across a deck.
   Use illustrations/icons when they help understanding, memory, comparison, or navigation; do not add them by quota. A slide with no icon or illustration is acceptable when the structure already carries the claim.
   Do not minimize numbers by default. Keep sourced or explicitly assumed numbers when they help comparison, sizing, prioritization, credibility, or decision-making; remove only unsupported, redundant, unreadable, or decorative numbers.
@@ -368,7 +371,7 @@ final_image_prompt:
 
 negative_prompt:
   pure black, old mustard, neon teal, generic gradient, glassmorphism, glow, heavy shadow,
-  stock template feel, oversized title, missing header line, short/thin header line, header line protruding above H1, header line taller than title/subtitle block, shifted H1, shifted subtitle, H1 inside body region, header safe area filled, header deformation, inconsistent outer padding, body content invading margins, accidental empty dead zone, overcrowded canvas, blue H1 in ATOM slides, blue footer text, honey footer text, yellow footer text, random footer gray, mismatched source color, generic icon-only composition, rough doodle, messy hand-drawn sketch, overpowered AI-looking illustration, trapezoid planes, fake perspective floor, isometric boxes, tilted slab, vanishing-point grid, pseudo-3D depth, central full-body robot, large city skyline, luminous touch point, heroic robot, abstract 3D, cinematic glow, decorative accent surface, patterned message box, textured message box, gradient message box, decorative motif inside message box, message box text larger than H1, message box as title, oversized insight text, unstable text weights, random bold text, strong yellow message box, saturated yellow fill, dark yellow fill, large yellow area, yellow title underline,
+  stock template feel, oversized title, missing header line, short/thin header line, header line protruding above H1, header line taller than title/subtitle block, shifted H1, shifted subtitle, H1 inside body region, header safe area filled, header deformation, inconsistent outer padding, body content invading margins, accidental empty dead zone, overcrowded canvas, blue H1 in ATOM slides, blue footer text, honey footer text, yellow footer text, random footer gray, mismatched source color, generic icon-only composition, rough doodle, messy hand-drawn sketch, overpowered AI-looking illustration, trapezoid planes, fake perspective floor, isometric boxes, tilted slab, vanishing-point grid, pseudo-3D depth, central full-body robot, large city skyline, luminous touch point, heroic robot, abstract 3D, cinematic glow, decorative accent surface, patterned message box, textured message box, gradient message box, decorative motif inside message box, oversized message box, over-tall message box, bulky insight surface, message box text larger than H1, message box text competing with subtitle, message box as title, oversized insight text, unstable text weights, random bold text, strong yellow message box, saturated yellow fill, dark yellow fill, large yellow area, yellow title underline,
   slide number, header number badge, title kicker, logo in upper-right clear zone, KEY INSIGHT label,
   body text below 18pt equivalent, invented source, upload filename as source,
   unresolved grid, unequal repeated cards, footer baseline drift, isolated floating accent headers
@@ -387,7 +390,8 @@ post_generation_audit:
   - density_levers improve the claim through comparison, evidence, annotation, grouping, or source cues rather than decoration
   - decision-relevant numbers are preserved when legible; numbers are not minimized by default
   - message boxes and Insight surfaces use flat solid fills only, with no decorative patterns or motifs
-  - message_box_text_size_lock is honored: message-box/Insight text is smaller than H1 and never reads as a second title
+  - message_box_scale_lock is honored: message boxes stay compact and are not enlarged to carry long prose
+  - message_box_text_size_lock is honored: message-box/Insight text is smaller than H1 and subtitle and never reads as a second title
   - Honey message boxes use #F7EECF fill, #C49A2C 4-5px left accent line, and #2D332E text consistently
   - saturated yellow, dark yellow, or large yellow areas are absent
   - coordinate_inventory_1672 matches visible major objects
@@ -542,6 +546,7 @@ def text_structure_tail() -> str:
       deck_tone_master_lock:
       deep_blue_usage_lock:
       header_footer_text_color_lock:
+      message_box_scale_lock:
       message_box_text_size_lock:
       layout_archetype:
       grid_mode:

@@ -59,7 +59,8 @@ Use calm operating-deck visual quality traits: light neutral base, compact fixed
 Design information density before image generation. Density should answer more of the reader's decision question in one view through hierarchy, evidence, comparison, annotation, source cues, and context layers; do not use smaller type, extra decoration, or visual noise as density.
 Do not minimize numbers by default. Keep decision-relevant sourced or explicitly assumed numbers when they support comparison, sizing, prioritization, credibility, or decision-making.
 Message boxes and Insight surfaces must use flat solid fills only; no patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
-Apply message_box_text_size_lock: Insight/message-box text must always be smaller than the selected H1 and must never become a second title.
+Apply message_box_scale_lock: message boxes are compact interpretation surfaces, not display surfaces; use one short judgment sentence, prefer one line, allow two lines maximum, and trim or move explanation to notes instead of increasing the box.
+Apply message_box_text_size_lock: Insight/message-box text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below subtitle, and must never become a second title.
 Honey message boxes have one fixed treatment: #F7EECF flat pale fill, #C49A2C 4-5px full-height left accent line, #2D332E text. Avoid saturated yellow fills, dark yellow boxes, large yellow areas, and yellow title underlines.
 Preserve distinct claims as distinct slides. Combine slides only when claims repeat, the same comparison must be seen together, or the user explicitly requests a shorter deck.
 Do not prompt for rough hand-drawn sketches, glossy AI-looking hero art, or arbitrary pseudo-depth. Avoid rough doodle, messy sketch, luminous, cinematic, heroic robot, futuristic city, abstract 3D, dramatic glow, photoreal, ultra-detailed, decorative trapezoid planes, tilted floors, isometric boxes, vanishing-point perspective, or wallpaper-like concept art unless the user explicitly asks for that style.
@@ -147,6 +148,7 @@ header_footer_text_color_lock:
   subtitle: "#4D544E"
   footer_source_table_note: "#6E756E"
   forbidden_text_colors: Deep Blue, Honey, yellow, arbitrary gray
+message_box_scale_lock:
 message_box_text_size_lock:
 deep_blue_usage_lock:
 visual_asset_judgment:
@@ -261,7 +263,8 @@ ATOM slide contract:
 - use Insight component only if it adds interpretation or decision weight and is compatible with the embedded ATOM design system
 - if Honey is used in ATOM or compatible guidelines, use #F7EECF flat pale fill + #C49A2C 4-5px full-height left accent line + #2D332E text, one component maximum
 - keep all Insight/message boxes flat solid fill only; no patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations
-- keep Insight/message-box text smaller than H1; it must not become a second title or second hero headline
+- apply message_box_scale_lock: keep Insight/message boxes compact, one short judgment sentence, one line preferred and two lines maximum; trim or move explanation to notes instead of growing the surface
+- keep Insight/message-box text 20-24pt by default, 24-26pt only by exception, at least 6pt smaller than H1, visually below subtitle; it must not become a second title or second hero headline
 - keep Honey quiet: no saturated yellow fill, no dark yellow message box, no large yellow area, and no Honey color variation across a deck
 - Source only if traceable real sources are available
 - final bitmap generation must use gpt-image-2
@@ -440,7 +443,8 @@ Evaluate:
 - Does the table, diagram, or comparison need a one-sentence interpretation?
 - Does the slide contain a strategic turning point, winning logic, or decision?
 - Would the component become a second title or second hero?
-- Is the component text smaller than the selected H1 by at least 4pt?
+- Can the component stay as one short judgment sentence, preferably one line and never more than two?
+- Is the component text smaller than the selected H1 by at least 6pt and visually below subtitle?
 - Is the deck underusing or overusing Insight components?
 - Which choice is quietest and clearest under the embedded ATOM design system: none, outlined thesis, outlined bottom, brand surface, dark brand surface, or Honey surface when ATOM?
 - If Honey is chosen, does it help the reader decide faster?
@@ -453,7 +457,8 @@ Output:
 - deck_count_check
 - one-sentence component text if kept
 - surface skeleton: geometry, height, radius, padding, left accent, background, text color
-- text size lock: compact 24-26pt or standard 22-24pt, always smaller than H1
+- scale lock: compact surface, smallest legible variant, no long-prose enlargement
+- text size lock: default 20-24pt, 24-26pt only by exception, at least 6pt smaller than H1 and below subtitle
 - alternative visual guidance if removed
 ```
 
@@ -513,7 +518,7 @@ Typography:
 - H1 30-34pt, default 32pt
 - long Japanese H1 uses 30-32pt; short mixed titles may use 34pt
 - subtitle 26-30pt #4D544E
-- Insight/message-box text 22-26pt and at least 4pt smaller than selected H1
+- Insight/message-box text 20-24pt by default, 24-26pt only by exception, and at least 6pt smaller than selected H1
 - body readable at 18pt equivalent
 - weights stay within 400/600/700
 - Typography balance is stable: size and weight hierarchy does not drift slide to slide, and no label/table/Insight text competes with H1
