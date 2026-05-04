@@ -1,18 +1,20 @@
 ---
 name: daily-llm-history-instruction-review
-description: "Review recent Claude Code, Codex, and Gemini CLI interaction history, identify repeated user-agent inefficiencies, and update shared instruction files only when a durable improvement is clear. Use for the ai-agent-config daily instruction review, especially from Codex App Automations."
+description: "Review recent Claude Code, Codex, and Gemini CLI interaction history, identify repeated user-agent inefficiencies, and update shared instruction files only when a durable improvement is clear. Use for on-demand ai-agent-config instruction reviews."
 ---
 
 # Daily LLM History Instruction Review
 
 ## Purpose
 
-Run a bounded review of recent Claude Code, Codex, and Gemini CLI activity for the
-`ai-agent-config` repository. The goal is to improve shared instructions only
-when recent history shows a repeated, durable pattern that is worth encoding.
+Run a bounded review of recent Claude Code, Codex, and Gemini CLI activity for
+the `ai-agent-config` repository. The goal is to improve shared instructions
+only when recent history shows a repeated, durable pattern that is worth
+encoding.
 
-This skill is intended for Codex App Automations. Keep the output concise and
-safe because it may run unattended.
+This skill is intended for on-demand review. Scheduled execution is not the
+default; prefer a human-triggered review when recent interaction history shows a
+real workflow problem.
 
 ## Repository And Scope
 
@@ -58,6 +60,9 @@ to inspect.
 
 Look for repeated or high-leverage patterns such as:
 
+- repeated user prompts that compensate for missing agent behavior, such as
+  status checks, resume requests, restart questions, "why did this stop?"
+  prompts, or reminders to verify, continue, publish, or clean up
 - preventable clarification loops
 - stale assumptions that should have been verified
 - recurring tool mistakes or permission misunderstandings
@@ -66,6 +71,13 @@ Look for repeated or high-leverage patterns such as:
 - missing validation or weak completion checks
 - unsafe or overly broad edits
 
+For repeated user prompts, do not merely encode "when the user says X, do Y".
+Translate the pattern into proactive agent behavior that should make the prompt
+less necessary next time. Examples include leaving durable checkpoints before
+long work, reporting current state before waiting, resuming from live artifacts
+after interruption, verifying before claiming completion, or carrying requested
+closeout through without another nudge.
+
 Do not update instructions for one-off preferences, isolated mistakes, or
 content that belongs in a project-specific file, skill, or temporary note.
 
@@ -73,6 +85,8 @@ content that belongs in a project-specific file, skill, or temporary note.
 
 - Keep instruction updates compact and generic.
 - Rewrite nearby guidance instead of appending isolated rules.
+- Prefer behavior-level guidance that reduces future user steering over
+  trigger-response rules tied to a specific phrase.
 - Preserve the core layer plus companion guide model:
   `AI_AGENT_INSTRUCTIONS.md` is the core shared contract, and `DESIGN.md` is the
   companion guide for human-visible output.
@@ -96,8 +110,8 @@ sh scripts/validate-repo.sh
 
 ## GitHub Closeout
 
-For Codex App Automation runs, complete repository closeout when the review
-creates repository changes:
+For on-demand runs where the user asks for repository closeout, complete it when
+the review creates repository changes:
 
 - Create a branch named `daily-llm-history-instruction-review-YYYYMMDD` using
   the local run date, unless that branch or an open PR for the same run already
