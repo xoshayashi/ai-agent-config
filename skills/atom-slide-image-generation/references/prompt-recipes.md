@@ -518,7 +518,7 @@ Typography:
 - H1 30-34pt, default 32pt
 - long Japanese H1 uses 30-32pt; short mixed titles may use 34pt
 - subtitle 26-30pt #4D544E
-- Insight/message-box text 20-24pt by default, 24-26pt only by exception, and at least 6pt smaller than selected H1
+- Insight/message-box text 20-24pt by default, 24-26pt only by exception, and at least 6pt smaller than selected H1 and visually below subtitle
 - body readable at 18pt equivalent
 - weights stay within 400/600/700
 - Typography balance is stable: size and weight hierarchy does not drift slide to slide, and no label/table/Insight text competes with H1
