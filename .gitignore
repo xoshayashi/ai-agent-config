@@ -33,7 +33,6 @@ gha-creds-*.json
 # Logs and temporary files
 *.log
 logs/
-cron-log/
 tmp/
 temp/
 .cache/

@@ -51,15 +51,12 @@ say "validate: required files"
 require_file "README.md"
 require_file "setup.md"
 require_file "docs/setup-error-guide.md"
-require_file "docs/codex-automation-daily-review.md"
+require_file "docs/llm-history-instruction-review.md"
 require_file "scripts/setup.sh"
 require_file "scripts/update.sh"
 require_file "scripts/uninstall.sh"
 require_file "scripts/health-check.sh"
 require_file "scripts/validate-repo.sh"
-require_file "scripts/daily-llm-history-instruction-review"
-[ -x "$repo_root/scripts/daily-llm-history-instruction-review" ] \
-  || fail "daily review runner must be executable"
 require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"
@@ -75,6 +72,7 @@ require_absent "tests"
 require_absent "scripts/__pycache__"
 require_absent "instructions/HOOKS.md"
 require_absent "scripts/autonomous_runner.py"
+require_absent "scripts/daily-llm-history-instruction-review"
 require_absent "scripts/merge-hook-config.py"
 require_absent "scripts/read-state-config.py"
 require_absent "scripts/scheduled_update.py"
@@ -82,6 +80,7 @@ require_absent "scripts/schedule-update.sh"
 require_absent "scripts/schedule-skill-improvement.sh"
 require_absent "scripts/skill-improvement-bot.py"
 require_absent "docs/autonomous-runner.md"
+require_absent "docs/codex-automation-daily-review.md"
 require_absent "docs/hooks-architecture-review.md"
 require_absent "docs/skill-improvement-automation.md"
 require_absent "docs/examples"
@@ -100,10 +99,6 @@ if [ -d "$repo_root/skills" ]; then
   done
 fi
 
-say "validate: daily review log directory stays local"
-git -C "$repo_root" check-ignore -q cron-log/ \
-  || fail "cron-log/ must be ignored"
-
 say "validate: entrypoint wording"
 ensure_root_entrypoint_gone "AGENTS.md"
 ensure_root_entrypoint_gone "CLAUDE.md"
@@ -119,12 +114,15 @@ say "validate: docs and instructions stay within current scope"
 ! grep -REq "autonomous-runner|skill-improvement-bot|safe_delete_guard|HOOKS\\.md|schedule-update|schedule-skill-improvement" \
   "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/docs" "$repo_root/instructions" \
   || fail "docs or instructions reference out-of-scope paths"
-grep -Fq "Codex App Automations" "$repo_root/README.md" \
-  || fail "README.md must prefer Codex App Automations for daily review docs"
-grep -Fq "Codex App Automations" "$repo_root/setup.md" \
-  || fail "setup.md must prefer Codex App Automations for daily review docs"
-grep -Fq 'daily-llm-history-instruction-review' "$repo_root/docs/codex-automation-daily-review.md" \
-  || fail "Codex automation guide must include the daily review skill name"
+grep -Fq "on-demand" "$repo_root/README.md" \
+  || fail "README.md must describe history review as on-demand"
+grep -Fq "on-demand" "$repo_root/setup.md" \
+  || fail "setup.md must describe history review as on-demand"
+grep -Fq 'daily-llm-history-instruction-review' "$repo_root/docs/llm-history-instruction-review.md" \
+  || fail "history review guide must include the review skill name"
+! grep -REq "Codex App Automations|standalone project automation|daily at 00:00|cron-log" \
+  "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/docs" "$repo_root/instructions" "$repo_root/skills/daily-llm-history-instruction-review" \
+  || fail "daily history review docs must not reintroduce scheduled automation"
 grep -Fq 'install_skill_links' "$repo_root/scripts/setup.sh" \
   || fail "setup.sh must install shared skill links"
 grep -Fq 'remove_skill_links' "$repo_root/scripts/uninstall.sh" \
