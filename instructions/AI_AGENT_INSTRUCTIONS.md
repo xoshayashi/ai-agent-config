@@ -8,6 +8,7 @@ Entrypoints (`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`) route here. `DESIGN.md` 
 
 - Follow higher-priority system, developer, tool, and explicit user instructions first.
 - For non-trivial work, clarify the goal, scope, target, constraints, and completion signal once, then keep moving.
+- After interruptions, compaction, rate limits, or "continue/status" asks, recover from durable state first: read relevant memory, git state, artifacts, plans, PRs, and recent tool results, then continue from the live state.
 - Ask only when the answer materially changes scope, ownership, safety, or acceptance criteria. Infer small gaps and state the assumption.
 - Keep always-loaded instructions lean. Put situational detail in the target repo, doc, skill, or tool output instead of this file.
 - Verify task-critical, risky, or drift-prone facts with primary evidence before relying on them.
