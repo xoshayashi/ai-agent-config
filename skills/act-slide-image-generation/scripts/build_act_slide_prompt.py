@@ -100,7 +100,7 @@ def validate_size(size: str) -> str:
     normalized = f"{width}x{height}"
     if normalized not in ALLOWED_16_9_SIZES:
         allowed = ", ".join(sorted(ALLOWED_16_9_SIZES))
-        raise SystemExit(f"Invalid --size '{normalized}'. This ATOM slide skill only supports 16:9 gpt-image-2 sizes: {allowed}.")
+        raise SystemExit(f"Invalid --size '{normalized}'. This ACT slide skill only supports 16:9 gpt-image-2 sizes: {allowed}.")
     return normalized
 
 
@@ -131,7 +131,7 @@ def canonical_planning_block(
     return f"""planning_block:
   slide_claim: [one sentence]
   primary_guideline: {primary_guideline}
-  guideline_priority: embedded ATOM design system in SKILL.md is the default source of truth
+  guideline_priority: embedded ACT design system in SKILL.md is the default source of truth
   generation_mode: {"image_edit" if mode == "repair" else "new_image"}
   image_model: {IMAGE_MODEL}
   image_size: {size}
@@ -142,7 +142,7 @@ def canonical_planning_block(
   image_moderation: auto
   image_n: 1
   image_streaming: optional for exploration, final QA uses completed image
-  image_delivery_size: 1920x1080 after resize if exact ATOM delivery size is required
+  image_delivery_size: 1920x1080 after resize if exact ACT delivery size is required
   generation_route: Codex built-in image generation
   generation_route_lock: PPTX is a delivery wrapper only; never use PPTX, PowerPoint export, screenshots, local rendering, HTML, SVG, canvas, or PIL to create final PNGs.
   image_generation_order: Correct order: generate gpt-image-2 PNGs, review and repair PNGs, then package approved PNGs into PPTX.
@@ -210,19 +210,19 @@ def canonical_planning_block(
       h: [px]
   master_components: [header, footer baseline, card/table/insight/icon masters]
   deck_master_refs: [reuse refs for header/footer/insight/table/card if deck-level]
-  deck_tone_master_lock: [slide base, typography scale, header/footer, Deep Blue use, Honey use, illustration style, icon family, density rhythm, whitespace/occupancy rhythm, card/table geometry, outer padding, source baseline, negative prompt]
+  deck_tone_master_lock: [slide base, typography scale, header/footer, Petrol use, Honey use, illustration style, icon family, density rhythm, whitespace/occupancy rhythm, card/table geometry, outer padding, source baseline, negative prompt]
   visual_design_quality_traits: [design treatment only: calm light base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, intentional canvas occupancy; do not change slide count, claim order, or storyline solely for this]
   deck_header_master_lock:
     coordinate_basis: 1672x941
     status: exact_required_before_generation
-    header_safe_area: [x/y/w/h exact selected values; ATOM default x=44 y=24 w=1584 h=136]
-    vertical_line: [x/y/w/h/color exact selected values; ATOM default x=50 y=48 w=10 h=104 color #0B2F5B]
+    header_safe_area: [x/y/w/h exact selected values; ACT default x=44 y=24 w=1584 h=136]
+    vertical_line: [x/y/w/h/color exact selected values; ACT default x=50 y=48 w=10 h=104 color #008A80]
     header_line_top_rule: [line top at or 0-6px below visible H1 glyph top, never above; upward protrusion is blocker]
-    h1: [x/y/w/max_lines/font_family/font_size/weight/line_height/color exact selected values; ATOM default x=88 y=34 w=1332 max_lines=1 font_family=Noto Sans JP size=32pt weight=700 line_height=1.10 color #2D332E]
-    subtitle: [x/y/w/max_lines/font_family/font_size/weight/line_height/color exact selected values; ATOM default x=88 y=78 w=1332 max_lines=1 font_family=Noto Sans JP size=28pt weight=400 line_height=1.18 color #4D544E]
+    h1: [x/y/w/max_lines/font_family/font_size/weight/line_height/color exact selected values; ACT default x=88 y=34 w=1332 max_lines=1 font_family=Noto Sans JP size=32pt weight=700 line_height=1.10 color #2D332E]
+    subtitle: [x/y/w/max_lines/font_family/font_size/weight/line_height/color exact selected values; ACT default x=88 y=78 w=1332 max_lines=1 font_family=Noto Sans JP size=28pt weight=400 line_height=1.18 color #4D544E]
     visual_alignment: [visible line top at or 0-6px below visible H1 glyph top; visible line bottom 4-8px below subtitle lower visual edge; never protrude upward]
-    body_start_y: [exact selected value; ATOM default 190, or 224 only if explicit two-line H1 fallback is declared]
-    upper_right_clear_zone: [x/y/w/h exact selected values and empty; ATOM default x=1420 y=24 w=208 h=88]
+    body_start_y: [exact selected value; ACT default 190, or 224 only if explicit two-line H1 fallback is declared]
+    upper_right_clear_zone: [x/y/w/h exact selected values and empty; ACT default x=1420 y=24 w=208 h=88]
     forbidden_header_elements: [slide number, title kicker, header badge, logo/right object unless guideline requires it, body objects above body_start_y]
   component_inventory: [master components and coordinates]
   equalized_groups: [cards, rows, phase cards, icons]
@@ -253,7 +253,7 @@ def canonical_planning_block(
     body_start_y: exact selected y copied from deck_header_master_lock
     upper_right_clear_zone: exact x/y/w/h copied from deck_header_master_lock and kept empty
   footer_anchor_baseline: 1672 basis x=44-56 baseline y=895-912, planned even if source_line is none
-  header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E; no Deep Blue/Honey/arbitrary gray in header or footer text
+  header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E; no Petrol/Honey/arbitrary gray in header or footer text
   message_box_scale_lock: compact interpretation surface; use the smallest legible variant; do not enlarge the box to carry long prose
   message_box_text_size_lock: message-box/Insight text default 20-24pt, 24-26pt only by exception; always at least 6pt smaller than selected H1, visually below subtitle, and never a second title
   table_note_microline: none / [one line above source baseline]
@@ -261,9 +261,9 @@ def canonical_planning_block(
   source_line: Source: [traceable source names copied from provided or researched sources only] / none only when no traceable source exists
   source_policy: real traceable sources only; no draft, upload, internal-note, or production-route wording
   source_density_rule: Do not drop real source names to reduce visual density; shorten or group source names instead.
-  brand_accent_usage_budget: restrained visual area; for ATOM work, Deep Blue uses standard 4-8%, may reach 10% on dense table slides, and may reach 12% only for rare chapter/closing slides; it never appears as body text
-  deep_blue_usage_lock: exact #0B2F5B structural use; one active body blue system; no blue H1/subtitle/body/footer text; no extra blue hues
-  brand_accent_system_role: header band / rule / icon / number / badge / matrix highlight / none, adjusted to the embedded ATOM design system
+  brand_accent_usage_budget: restrained visual area; for ACT work, Petrol uses 6-12% and never appears as body text
+  petrol_usage_lock: exact #008A80 structural use; one active body Petrol system; no Petrol H1/subtitle/body/footer text; no extra teal/blue hues
+  brand_accent_system_role: header band / rule / icon / number / badge / matrix highlight / none, adjusted to the embedded ACT design system
   visual_asset_judgment: use illustration/icons only if they improve understanding, memory, comparison, or navigation; no quota and no filler
   visual_asset_role: integrated_line_illustration / margin_vignette / icon_evidence_strip / diagram_embedded_icons / process_icons / data_icon_markers / none
   icon_system_plan: none / [role, style, stroke, color logic, grouping, why it helps]
@@ -271,14 +271,14 @@ def canonical_planning_block(
   insight_decision:
     keep_remove: [keep/remove]
     reason: [interpretation or decision need]
-    variant: none / bottom-main / top-thesis / rail-wide / rail-tall / inline-pill / outlined thesis / outlined bottom / brand surface / dark brand surface / Honey surface when ATOM
+    variant: none / bottom-main / top-thesis / rail-wide / rail-tall / inline-pill / outlined thesis / outlined bottom / brand surface / dark brand surface / Honey surface when ACT
     deck_count_check: [single slide or deck-level count]
     geometry: [x/y/w/h in 1672 basis if kept]
     height: [px]
     radius: 8px or 12px
     padding: [px]
-    left_accent: [Honey uses #C49A2C 4-5px full-height left line; Deep Blue uses embedded ATOM design system accent line spec]
-    background: [flat solid fill color only; Honey message box uses #F7EECF; no pattern, texture, gradient, motif, or internal illustration]
+    left_accent: [Honey uses #C49A2C 4-5px full-height left line; Petrol uses embedded ACT design system accent line spec]
+    background: [flat solid fill color only; Honey message box uses #F5E2A8; no pattern, texture, gradient, motif, or internal illustration]
     text: [one judgment sentence if kept]
   human_crafted_feel: priority, breathing room, editorial rhythm
   qa_risks: [overcrowding, weak hierarchy, source uncertainty, decorative accent surface, unresolved grid]
@@ -289,8 +289,9 @@ def mode_guidance(mode: str) -> str:
     if mode == "text-structure":
         return """mode_guidance:
   - Convert the long text into a slide-image deck structure before writing image prompts.
-  - Use the embedded ATOM design system in SKILL.md; do not load an external ATOM pattern file.
+  - Use the embedded ACT design system in SKILL.md; do not load an external ACT pattern file.
   - Define deck_thesis, audience_decision, storyline_frame, section_map, and slide-level action_title claims.
+  - Plan slide 1 as opening_thesis_slide, not a title-only opener: include the core thesis, 2-4 proof/tension points, a real visual structure, and a narrative bridge.
   - Map every claim to evidence, source_policy, visual_structure, layout_archetype, grid_mode, exact_text_budget, and split_merge_decision.
   - Apply source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists.
   - Build layout_diversity_plan: assign layout_family for each slide across full-field, balanced comparison, right-main, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase families when the argument benefits.
@@ -307,10 +308,11 @@ def mode_guidance(mode: str) -> str:
     if mode == "deck-plan":
         return """mode_guidance:
   - Define deck thesis and one claim per slide.
-  - Use the embedded ATOM design system in SKILL.md; do not load an external ATOM pattern file.
+  - Use the embedded ACT design system in SKILL.md; do not load an external ACT pattern file.
+  - Start with opening_thesis_slide rather than a title-only first slide: the opener should make the main phrase memorable while also showing the thesis, tension/proof points, structure, and bridge.
   - Select layout_archetype and grid_mode for every slide.
   - Apply source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists.
-  - Create layout_diversity_plan and layout_rotation_guard before final prompts so the deck can use the expanded pattern catalogue without drifting from ATOM brand and header rules.
+  - Create layout_diversity_plan and layout_rotation_guard before final prompts so the deck can use the expanded pattern catalogue without drifting from ACT brand and header rules.
   - Define deck_header_master_lock before any slide-level prompt. Do not leave header coordinates as ranges.
   - Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide; use human-designed editorial/vector illustrations on chapter openers, turning points, complex systems, and final vision slides.
   - Assign density_design for every slide: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
@@ -370,26 +372,27 @@ prompt_readiness: draft_scaffold_until_blocking_unresolved_items_none
 
 draft_image_prompt_scaffold:
 {prompt_lead}
-  Use the embedded ATOM design system in SKILL.md. Do not load an external ATOM pattern file.
+  Use the embedded ACT design system in SKILL.md. Do not load an external ACT pattern file.
   PPTX is a delivery wrapper only. Never create final PNGs by exporting, rendering, or screenshotting a PPTX.
   Correct order: generate gpt-image-2 PNGs, review and repair PNGs, then package approved PNGs into PPTX.
   If gpt-image-2 image generation is blocked, stop rather than manufacturing final PNGs through PPTX or local rendering.
 
-  Plan coordinates on a 1672x941 basis with ATOM delivery target 1920x1080 after resize if required.
+  Plan coordinates on a 1672x941 basis with ACT delivery target 1920x1080 after resize if required.
   Use size terminology consistently: 1920x1080 is FHD/1080p delivery, 2048x1152 is 16:9 2K-width generation, 2560x1440 is QHD/1440p generation, and 3840x2160 is 4K UHD generation.
   Use a 12-column grid, 8px spacing rhythm, precise shared edges, and fixed header/footer anchors.
-  Define deck_tone_master_lock before slide-level prompting and preserve it through the whole deck: slide base, typography scale, header/footer, Deep Blue role, Honey treatment, illustration style, icon family, density rhythm, whitespace/occupancy rhythm, card/table geometry, outer padding, source baseline, and negative prompt. Later slides must feel like the same deck as the first approved pilot slides.
+  Define deck_tone_master_lock before slide-level prompting and preserve it through the whole deck: slide base, typography scale, header/footer, Petrol role, Honey treatment, illustration style, icon family, density rhythm, whitespace/occupancy rhythm, card/table geometry, outer padding, source baseline, and negative prompt. Later slides must feel like the same deck as the first approved pilot slides.
   Apply visual_design_quality_traits as design treatment: calm light base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, and deliberate canvas occupancy. Do not alter slide count, claim order, or storyline solely for visual style.
   Apply layout_diversity_plan at deck level: choose layout families from full-field, left-main/right-rail, right-main/left-context, balanced diptych, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase patterns according to the slide claim. Use layout_rotation_guard so neighboring slides do not fall into the same composition by habit; repeated families should make comparison easier.
   Define and preserve one deck_header_master_lock with exact selected values, not ranges: coordinate_basis, header_safe_area, vertical_line x/y/w/h/color, header_line_top_rule, H1 x/y/w/max_lines/font_size/weight/line_height/color, subtitle x/y/w/max_lines/font_size/weight/line_height/color, visual_alignment, body_start_y, and upper_right_clear_zone. Repeat it verbatim across the deck. Treat the header as the lowest-freedom component; no_header_ranges_in_final_prompts.
   Include coordinate_inventory_1672 and reuse master_components before generating repeated objects.
   Use Noto Sans JP for every visible text string, including Latin/English letters, numbers, symbols, and Japanese. Do not mix in any other typeface; if exact font rendering is unavailable in image generation, use the closest Noto Sans JP-like rendering without changing the font family intent.
-  For ATOM work, use #FCFBF8 to #F4F3EF slide base, #2D332E text, #4D544E subtitle, #6E756E footer/source/table-note text, and #0B2F5B Deep Blue structure.
-  H1 30-34pt weight 700 #2D332E, subtitle 26-30pt weight 400 #4D544E, body 18pt equivalent. Use the exact default ATOM header: 1672 basis header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=48 w=10 h=104 #0B2F5B; header_line_top_rule line top at or 0-6px below visible H1 glyph top, never above; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.10 #2D332E; subtitle x=88 y=78 w=1332 max_lines=1 size=28pt weight=400 line_height=1.18 #4D544E; visual_alignment line top never protrudes above H1 and line bottom 4-8px below subtitle lower visual edge; body_start_y=190; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty. Two-line H1 fallback: vertical_line y=48 with h recalculated to end 4-8px below subtitle lower visual edge, subtitle y=112, body_start_y=224. No Deep Blue H1.
-  Lock header and footer text colors as one Ink-family hierarchy: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E. Do not use Deep Blue, Honey, yellow, or arbitrary gray for header/footer text.
+  For ACT work, use #FCFBF8 to #F4F3EF slide base, #2D332E text, #4D544E subtitle, #6E756E footer/source/table-note text, and #008A80 Petrol structure.
+  H1 30-34pt weight 700 #2D332E, subtitle 26-30pt weight 400 #4D544E, body 18pt equivalent. Use the exact default ACT header: 1672 basis header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=48 w=10 h=104 #008A80; header_line_top_rule line top at or 0-6px below visible H1 glyph top, never above; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.10 #2D332E; subtitle x=88 y=78 w=1332 max_lines=1 size=28pt weight=400 line_height=1.18 #4D544E; visual_alignment line top never protrudes above H1 and line bottom 4-8px below subtitle lower visual edge; body_start_y=190; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty. Two-line H1 fallback: vertical_line y=48 with h recalculated to end 4-8px below subtitle lower visual edge, subtitle y=112, body_start_y=224. No Petrol H1.
+  Lock header and footer text colors as one Ink-family hierarchy: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E. Do not use Petrol, Honey, yellow, or arbitrary gray for header/footer text.
   Let structure, numbers, rules, spacing, and typography carry the hierarchy.
   Use small Lucide-style line icons only as quiet wayfinding anchors.
   Include visual_richness_role, illustration_intensity, creative_variance, and density_tier in the prompt. Use human-designed editorial/vector illustrations and purpose-built motifs where planned; avoid text-only, table-only, or generic icon-row-only slides unless marked quiet_table.
+  For deck openers, apply opening_density_gate: first slide role is opening_thesis_slide, first_slide_not_title_only is true, and the slide includes a core thesis, 2-4 proof/tension points, one visible market-shift/matrix/causal-map/wedge structure, and a bridge to the next section.
   Include density_design in the prompt. Density should answer the reader's decision_question through grouped information units, comparison baselines, evidence strips, right rails, small multiples, annotations, units, assumptions, and source cues. Do not solve density with smaller body text, extra decorative cards, or illustration detail.
   When creative_variance is high, vary composition, viewpoint, crop, asymmetric region balance, visual metaphor, and layout rhythm; keep brand, header, exact text, grid, and source policy locked.
   Keep illustration subordinate to the argument: chart/table/matrix/roadmap remains primary where planned, with a clear focal motif, only useful supporting details, clean controlled linework, crisp silhouettes, restrained fills, and small annotations.
@@ -397,8 +400,8 @@ draft_image_prompt_scaffold:
   Do not hard-code one visual grammar across slides. Select the projection, viewpoint, abstraction level, motif, and level of detail from the slide claim; use depth or spatial perspective only when it carries meaning. Do not use decorative trapezoid planes, fake perspective floors, isometric boxes, tilted architectural slabs, vanishing points, or pseudo-3D depth as a shortcut for freshness.
   For humanoid or robot topics, avoid a central full-body robot or city skyline by default; prefer small interaction details, system cues, partial figures, or embedded operational motifs that clarify the slide claim.
   Create freshness through viewpoint, asymmetric composition, designed margin vignettes, evidence strips, partial cutaways, and magnified details, not decoration or glossy concept art.
-  Use Deep Blue structurally with a 4-8% visual area budget, up to 12% only for strong closing slides, and never for body text.
-  Use Honey only for ATOM or compatible guidelines where it is a decision signal: #F7EECF flat pale Honey fill, #C49A2C 4-5px full-height left accent line, #2D332E text, one component maximum.
+  Use Petrol structurally with a 6-12% visual area budget, and never for body text.
+  Use Honey only for ACT or compatible guidelines where it is a decision signal: #F5E2A8 flat pale Honey fill, #C49A2C 4-5px full-height left accent line, #2D332E text, one component maximum.
   Use flat solid fills for all message boxes and Insight surfaces; do not add patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
   Apply message_box_scale_lock: message boxes are compact interpretation surfaces, not display surfaces; keep copy to one short judgment sentence, prefer one line, max two lines, and do not enlarge the surface to rescue long prose.
   Apply message_box_text_size_lock: message-box/Insight text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below the subtitle, and never becomes a second title or second hero headline.
@@ -416,6 +419,7 @@ negative_prompt_hard_blockers:
   local-rendered substitute, non-gpt-image output, missing or malformed header line, header line protruding above H1,
   H1/subtitle/source color drift, body content invading header/footer, unreadable body text below 18pt equivalent,
   invented labels or sources, speaker notes visible on slide, unresolved grid, severe grid drift,
+  title-only first slide or low-density opener without proof/tension points,
   patterned or textured message box, oversized message box, message-box text competing with H1/subtitle,
   saturated yellow message box, decorative pseudo-3D depth, photoreal stock imagery, rough sketch aesthetic,
   mechanical left-main/right-rail repetition without comparison purpose, slide number, title kicker, logo in upper-right clear zone
@@ -425,9 +429,9 @@ post_generation_audit:
   - generation_route is Codex built-in image generation, not local rendering or a user-key workaround
   - image_size {size} is valid for gpt-image-2, labeled as {size_label(size)}, and final delivery is resized only after generation if needed
   - H1 and subtitle hierarchy is clear
-  - deck_header_master_lock is visible and consistent; left header line is present, obeys header_line_top_rule, does not protrude above the H1 glyph top, and H1 color follows the embedded ATOM design system
+  - deck_header_master_lock is visible and consistent; left header line is present, obeys header_line_top_rule, does not protrude above the H1 glyph top, and H1 color follows the embedded ACT design system
   - header_footer_text_color_lock is honored: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E
-  - header/footer text does not use Deep Blue, Honey, yellow, or arbitrary gray
+  - header/footer text does not use Petrol, Honey, yellow, or arbitrary gray
   - visual_richness_role is fulfilled; planned illustration or visual motif is present when required
   - illustration_intensity is respected; illustration feels designer-authored and does not overpower the slide
   - density_tier and density_design are fulfilled without shrinking body text below 18pt equivalent
@@ -436,22 +440,22 @@ post_generation_audit:
   - message boxes and Insight surfaces use flat solid fills only, with no decorative patterns or motifs
   - message_box_scale_lock is honored: message boxes stay compact and are not enlarged to carry long prose
   - message_box_text_size_lock is honored: message-box/Insight text is smaller than H1 and subtitle and never reads as a second title
-  - Honey message boxes use #F7EECF fill, #C49A2C 4-5px left accent line, and #2D332E text consistently
+  - Honey message boxes use #F5E2A8 fill, #C49A2C 4-5px left accent line, and #2D332E text consistently
   - saturated yellow, dark yellow, or large yellow areas are absent
   - coordinate_inventory_1672 matches visible major objects
   - all major regions snap to grid/shared edges
   - layout_family matches the slide claim, and layout_diversity_plan / layout_rotation_guard make deck-level composition feel intentionally varied rather than mechanically repeated
   - repeated elements are equalized
   - body text remains readable
-  - embedded ATOM design system palette and typography are followed
+  - embedded ACT design system palette and typography are followed
   - brand accent is structural and not body text
-  - Insight component is selective, compatible with the embedded ATOM design system, and not decorative
+  - Insight component is selective, compatible with the embedded ACT design system, and not decorative
   - footer baseline is preserved
   - Source footer follows source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
   - footer/source/table-note text uses #6E756E consistently when present
   - speaker_notes_text exists for deck slides but does not appear on the slide image
   - deck_tone_consistency_status is approved after comparing first third, middle third, and last third for palette, linework, icon family, illustration intensity, density rhythm, card geometry, and source behavior
-  - post_generation_design_balance_check is approved on actual generated PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, header integrity, card/table height equalization, line-weight consistency, icon-family consistency, Deep Blue scatter, Honey strength, and human-designed operational diagram feel
+  - post_generation_design_balance_check is approved on actual generated PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, header integrity, card/table height equalization, line-weight consistency, icon-family consistency, Petrol scatter, Honey strength, and human-designed operational diagram feel
   - pre_package_image_review has inspected the actual generated PNG, not only the prompt
   - pre_google_slides_image_review is also approved when Google Slides roll-up is requested
   - image_review_status is approved only when there are no blocker or major issues
@@ -482,9 +486,17 @@ def deck_plan_tail() -> str:
   - primary_guideline:
   - guideline_priority:
   - brand_style_notes:
+  - opening_slide_rule:
+      opening_slide_role: opening_thesis_slide
+      first_slide_not_title_only: true
+      opening_density_gate: core thesis + 2-4 proof/tension points + visible market-shift/matrix/causal-map/wedge structure + bridge
+      low_density_opener_repair: add evidence, tension, comparison, or mechanism before image generation
   - slide_list:
       - slide_number:
         slide_claim:
+        opening_slide_role: opening_thesis_slide / standard_story_slide
+        first_slide_not_title_only: true / N/A
+        opening_density_gate:
         layout_archetype:
         layout_family:
         composition_family:
@@ -527,7 +539,7 @@ def deck_plan_tail() -> str:
   - visual_design_quality_traits:
   - deck_header_master_lock:
   - header_line_top_rule:
-  - deep_blue_usage_lock:
+  - petrol_usage_lock:
   - visual_asset_judgment:
   - visual_richness_mix_plan:
   - density_tier_plan:
@@ -571,6 +583,11 @@ def text_structure_tail() -> str:
   source_ledger:
   appendix_candidates:
   open_questions:
+  opening_slide_rule:
+    opening_slide_role: opening_thesis_slide
+    first_slide_not_title_only: true
+    opening_density_gate: core thesis + 2-4 proof/tension points + visible market-shift/matrix/causal-map/wedge structure + bridge
+    low_density_opener_repair:
   section_map:
     - section:
       role:
@@ -579,6 +596,9 @@ def text_structure_tail() -> str:
     - slide_id:
       chapter:
       action_title:
+      opening_slide_role: opening_thesis_slide / standard_story_slide
+      first_slide_not_title_only: true / N/A
+      opening_density_gate:
       reader_question_answered:
       claim_type: context / urgency / solution / evidence / moat / market / economics / roadmap / risk / vision
       evidence_items:
@@ -640,7 +660,7 @@ def text_structure_tail() -> str:
       deck_header_master_lock:
       header_line_top_rule:
       deck_tone_master_lock:
-      deep_blue_usage_lock:
+      petrol_usage_lock:
       header_footer_text_color_lock:
       message_box_scale_lock:
       message_box_text_size_lock:
@@ -720,8 +740,8 @@ def main() -> None:
     parser.add_argument("--quality", default="high", choices=["low", "medium", "high", "auto"])
     parser.add_argument(
         "--primary-guideline",
-        default="embedded ATOM design system",
-        help="Optional label only; embedded ATOM design system is the default and no external pattern file is required.",
+        default="embedded ACT design system",
+        help="Optional label only; embedded ACT design system is the default and no external pattern file is required.",
     )
     args = parser.parse_args()
 

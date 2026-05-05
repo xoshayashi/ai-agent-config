@@ -16,6 +16,7 @@ Use this reference when the input is a long memo, equity story, research note, t
 - One slide must use one dominant structure. A table, comparison axis, flow, roadmap, matrix, loop, or rail can dominate, but do not make two structures compete.
 - Use action titles: the H1 should state the takeaway, not just name the topic.
 - Build the storyline before designing slides. Read only the action titles in order; they should form the deck's argument without body text.
+- Start with a high-signal opening thesis, not a title-only first slide. The opener can use the deck's main phrase, but it should also carry the core thesis, 2-4 proof/tension points, a visible market-shift / matrix / causal-map / wedge structure, and a bridge into the next section.
 - Put the conclusion or recommendation early enough for an executive/investor reader to understand the point before details.
 - Every slide needs a role in the story: set context, prove urgency, explain solution, show moat, size market, prove traction/plan, handle risk, or close the thesis.
 - Treat claim, evidence, visual, and source as separate jobs: claim says `so what`, evidence says `why believe`, visual says `how to see`, and source says `can we trust it`.
@@ -37,7 +38,7 @@ Use this reference when the input is a long memo, equity story, research note, t
 - Apply `message_box_text_size_lock`: Insight/message-box text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than H1, and must not become a second title or compete with subtitle.
 - Lock deck-level header and footer masters before slide design. The header is the lowest-freedom component: every slide must reuse the same visible header elements, exact selected geometry, title color, subtitle size/color, visual alignment rule, body_start_y, and clear zone. Header fields must be exact values in final prompts, not ranges or loose descriptions.
 - Apply `header_line_top_rule`: the left vertical line top must sit at or slightly below the first visible H1 glyph top; upward protrusion is a blocker. If it fails, repair the line x/y/h before touching H1.
-- Apply `header_footer_text_color_lock`: H1 `#2D332E`, subtitle `#4D544E`, footer/source/table-note text `#6E756E`. Do not use Deep Blue, Honey, yellow, or arbitrary gray for header/footer text.
+- Apply `header_footer_text_color_lock`: H1 `#2D332E`, subtitle `#4D544E`, footer/source/table-note text `#6E756E`. Do not use Petrol, Honey, yellow, or arbitrary gray for header/footer text.
 - Define `deck_tone_master_lock` before image generation and check generated images for whole-deck tone consistency before PPTX or Google Slides roll-up.
 - After image generation, run `post_generation_design_balance_check` on actual PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
 - Use `visual_asset_judgment`: add illustration/icons only when they help understanding, memory, comparison, or navigation; do not add them by quota.
@@ -52,7 +53,7 @@ Use this reference when the input is a long memo, equity story, research note, t
 
 1. **Intake**
    - Identify audience, decision, intended use, language, required source strictness, and output count flexibility.
-   - Use the embedded ATOM design system in SKILL.md as the source of style and component truth.
+   - Use the embedded ACT design system in SKILL.md as the source of style and component truth.
    - Preserve source URLs and source names separately from the narrative.
    - Apply `source_line_lock`: render `Source: ...` when traceable sources exist; use `source_line: none` only when no traceable source exists.
    - Split the input into chapters, paragraphs, data points, quotes, assumptions, and uncertainties. Assign stable `source_span_id` values when source tracing matters.
@@ -70,6 +71,8 @@ Use this reference when the input is a long memo, equity story, research note, t
    - Each sentence should answer "so what?".
    - Prefer concrete nouns, active verbs, and useful sourced numbers.
    - Reject topic labels such as `Market`, `Solution`, `Roadmap`, or `Moat` unless they are part of a full claim.
+   - Set slide 1 as `opening_thesis_slide` and record `first_slide_not_title_only: true`.
+   - Run `opening_density_gate`: repair slide 1 before generation if it only contains a brand/name/slogan, lacks proof or tension, lacks a real visual structure, or does not bridge into the deck.
 
 4. **Claim To Evidence Map**
    - For each slide, list evidence type: sourced fact, user assumption, analogy, forecast, operating model, or strategic interpretation.
@@ -105,7 +108,7 @@ Use this reference when the input is a long memo, equity story, research note, t
 7. **Deck Master Gate**
    - Define `deck_header_master_lock`, `header_footer_text_color_lock`, `footer_anchor_baseline`, `insight_surface_master`, and repeated table/card/icon masters before generating a deck.
    - Fail any final prompt whose `deck_header_master_lock` is range-only, missing x/y/w/h/color/font_family/font values, or uses any font family other than Noto Sans JP for visible text.
-   - For ATOM-style guidelines, fail any plan whose H1 becomes Deep Blue, whose left vertical line is missing, whose left vertical line protrudes above the visible H1 glyph top, whose subtitle size/color drifts, whose body starts above the locked `body_start_y`, or whose header clear zone is filled.
+   - For ACT-style guidelines, fail any plan whose H1 becomes Petrol, whose left vertical line is missing, whose left vertical line protrudes above the visible H1 glyph top, whose subtitle size/color drifts, whose body starts above the locked `body_start_y`, or whose header clear zone is filled.
 
 8. **Speaker Notes Plan**
    - Draft `speaker_notes_text` for every deck slide before image prompting.
@@ -165,6 +168,11 @@ For every slide, answer:
 ```text
 deck_thesis:
 audience_decision:
+opening_slide_rule:
+  opening_slide_role: opening_thesis_slide
+  first_slide_not_title_only: true
+  opening_density_gate:
+  low_density_opener_repair:
 primary_guideline:
 guideline_priority:
 brand_style_notes:
@@ -178,6 +186,9 @@ open_questions:
 slide_id:
 chapter:
 action_title:
+opening_slide_role:
+first_slide_not_title_only:
+opening_density_gate:
 reader_question_answered:
 claim_type:
 supporting_evidence:
@@ -222,7 +233,7 @@ header_footer_text_color_lock:
   h1: "#2D332E"
   subtitle: "#4D544E"
   footer_source_table_note: "#6E756E"
-  forbidden_text_colors: Deep Blue, Honey, yellow, arbitrary gray
+  forbidden_text_colors: Petrol, Honey, yellow, arbitrary gray
 message_box_scale_lock:
 message_box_text_size_lock:
 deck_tone_master_lock:
@@ -233,7 +244,7 @@ color_consistency_status:
 outer_padding_consistency_status:
 header_integrity_status:
 visual_design_quality_traits:
-deep_blue_usage_lock:
+petrol_usage_lock:
 visual_asset_judgment:
 layout_archetype:
 layout_family:

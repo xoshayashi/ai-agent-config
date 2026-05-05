@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Evaluate the ATOM slide image skill for self-contained behavior."""
+"""Evaluate the ACT slide image skill for self-contained behavior."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[1]
-CONFIG = ROOT / "evals" / "atom_skill_eval.json"
+CONFIG = ROOT / "evals" / "act_skill_eval.json"
 
 
 @dataclass
@@ -53,7 +53,7 @@ def check_frontmatter() -> Result:
     desc = re.search(r'^description:\s*"(.+)"\s*$', frontmatter, re.MULTILINE)
     if not name:
         return Result("frontmatter", False, "Missing scalar name")
-    if name.group(1) != "atom-slide-image-generation":
+    if name.group(1) != "act-slide-image-generation":
         return Result("frontmatter", False, f"Unexpected skill name: {name.group(1)}")
     if not desc:
         return Result("frontmatter", False, "Missing quoted scalar description")
@@ -99,7 +99,7 @@ def check_script_syntax() -> Result:
 
 
 def run_helper_check(check: dict) -> Result:
-    script = ROOT / "scripts" / "build_atom_slide_prompt.py"
+    script = ROOT / "scripts" / "build_act_slide_prompt.py"
     env = os.environ.copy()
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     proc = subprocess.run(
@@ -200,8 +200,10 @@ def run_pptx_package_check() -> Result:
 
 def check_no_old_files() -> list[Result]:
     old_paths = [
-        ROOT / "references" / "act-slide-patterns-essentials.md",
-        ROOT / "scripts" / "build_act_slide_prompt.py",
+        ROOT / "references" / "atom-slide-patterns-essentials.md",
+        ROOT / "scripts" / "build_atom_slide_prompt.py",
+        ROOT / "scripts" / "eval_atom_skill.py",
+        ROOT / "evals" / "atom_skill_eval.json",
     ]
     results = [Result(f"old_file_absent:{path.relative_to(ROOT)}", not path.exists(), "exists" if path.exists() else "") for path in old_paths]
     pycache_dirs = [p.relative_to(ROOT) for p in ROOT.rglob("__pycache__") if p.is_dir()]
@@ -212,7 +214,7 @@ def check_no_old_files() -> list[Result]:
 def main() -> int:
     config = load_config()
     files = runtime_files(config["runtime_scan_globs"])
-    content_files = [path for path in files if path.relative_to(ROOT).as_posix() != "scripts/eval_atom_skill.py"]
+    content_files = [path for path in files if path.relative_to(ROOT).as_posix() != "scripts/eval_act_skill.py"]
     results: list[Result] = []
     results.append(check_frontmatter())
     results.extend(check_no_old_files())

@@ -37,7 +37,7 @@ If the user asks for slide image generation, final images must come from `gpt-im
 
 ## Required GPT Image 2 Settings
 
-Use these defaults for ATOM slide images:
+Use these defaults for ACT slide images:
 
 ```text
 generation_mode: new_image / image_edit
@@ -59,12 +59,12 @@ Important size rule:
 
 - `gpt-image-2` requires both edges to be multiples of `16`.
 - `1920x1080` is not a valid direct generation size because `1080` is not divisible by `16`.
-- Keep ATOM planning and delivery thinking in `1920x1080`, but generate at `1536x864`, `2048x1152`, or `2560x1440`, then resize to `1920x1080` if exact delivery dimensions are required.
+- Keep ACT planning and delivery thinking in `1920x1080`, but generate at `1536x864`, `2048x1152`, or `2560x1440`, then resize to `1920x1080` if exact delivery dimensions are required.
 - `1536x864`: fast draft layout and composition checks.
 - `2048x1152`: 16:9 2K-width working review when you need more detail without jumping to the largest practical size.
 - `2560x1440`: recommended high-fidelity final 16:9 slide image size.
 - `3840x2160`: valid 16:9 4K UHD size, but use only when explicitly requested because it is more expensive, slower, and may be more variable.
-- Strict cinema/DCI sizes such as `2048x1080` and `4096x2160` are not ATOM 16:9 slide targets; `4096x2160` also exceeds the current `3840px` maximum edge constraint for this workflow.
+- Strict cinema/DCI sizes such as `2048x1080` and `4096x2160` are not ACT 16:9 slide targets; `4096x2160` also exceeds the current `3840px` maximum edge constraint for this workflow.
 
 Other model constraints from the official references:
 
@@ -111,7 +111,7 @@ Render ONLY these text strings, verbatim:
 - Label 1: "..."
 
 Style:
-[embedded ATOM palette, typography, icon style, human-crafted rhythm]
+[embedded ACT palette, typography, icon style, human-crafted rhythm]
 
 Constraints:
 [preserve grid, no extra text, no logos, no stock imagery, source policy]
@@ -147,12 +147,12 @@ Keep everything else exactly the same: layout, grid, arrows, labels, source base
 ```
 
 - Repeat critical invariants on every edit turn because image edits can drift.
-- If the runtime revises prompts internally, inspect any visible revised prompt or generated result for drift; regenerate with a tighter prompt if ATOM constraints weaken.
+- If the runtime revises prompts internally, inspect any visible revised prompt or generated result for drift; regenerate with a tighter prompt if ACT constraints weaken.
 
 ## Slide-Specific Quality Heuristics
 
 - Prefer low-quality built-in image-generation drafts for rough composition variants when the tool exposes quality controls.
-- Move to `quality: "high"` for final ATOM slides with Japanese text, small labels, tables, diagrams, or brand-sensitive components.
+- Move to `quality: "high"` for final ACT slides with Japanese text, small labels, tables, diagrams, or brand-sensitive components.
 - Generate one slide at a time for text-heavy slides; batch only when text is minimal or the slide family is simple.
 - Use reference images for screenshot repair or style matching, but name each input explicitly: `Image 1: current slide render`, `Image 2: style reference`.
 - Preserve footer/source baseline even when no Source text is rendered.
