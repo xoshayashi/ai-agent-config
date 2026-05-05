@@ -114,7 +114,7 @@ Style:
 [embedded ATOM palette, typography, icon style, human-crafted rhythm]
 
 Constraints:
-[preserve grid, no extra text, no logos, no stock imagery, source policy]
+[preserve grid, no extra text, brand-safe visual subject selection, source policy]
 
 Negative prompt:
 [things to avoid]
@@ -128,7 +128,9 @@ QA:
 - Put every literal on-slide string in quotes.
 - Use `Render ONLY these text strings, verbatim:` to reduce extra text.
 - Keep text short; reduce labels before asking the model to render many small words.
+- Convert abstract claims into a concrete visual anchor before generation: name the observable scene or object, viewpoint/crop, and 2-4 specific visual details.
 - Specify font style, size, color, and placement for text.
+- Apply max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
 - For brand names or unusual words, spell them letter-by-letter.
 - Ask for sharp text rendering and high contrast.
 - Use `quality: "medium"` or `quality: "high"` for dense text, small labels, multi-font layouts, and final slides.
@@ -143,7 +145,7 @@ QA:
 
 ```text
 Change only [specific issue].
-Keep everything else exactly the same: layout, grid, arrows, labels, source baseline, typography hierarchy, colors, icons, and surrounding objects.
+Keep everything else exactly the same: layout, grid, arrows, labels, source text position, typography hierarchy, colors, icons, and surrounding objects.
 ```
 
 - Repeat critical invariants on every edit turn because image edits can drift.
@@ -155,6 +157,6 @@ Keep everything else exactly the same: layout, grid, arrows, labels, source base
 - Move to `quality: "high"` for final ATOM slides with Japanese text, small labels, tables, diagrams, or brand-sensitive components.
 - Generate one slide at a time for text-heavy slides; batch only when text is minimal or the slide family is simple.
 - Use reference images for screenshot repair or style matching, but name each input explicitly: `Image 1: current slide render`, `Image 2: style reference`.
-- Preserve footer/source baseline even when no Source text is rendered.
+- Preserve the footer/source alignment position even when no Source text is rendered; do not draw a visible horizontal line for that baseline.
 - Run a visual QA pass after generation, preferably with high-detail/original vision inspection for dense screenshots.
 - Model/route QA must explicitly confirm the image used Codex built-in image generation, not local rendering.
