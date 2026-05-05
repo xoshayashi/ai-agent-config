@@ -52,6 +52,9 @@
     "Google Slides",
     "PPTX",
     "PPTX Roll-Up",
+    "PPTX is a delivery wrapper only; never use PPTX, PowerPoint export, screenshots, local rendering, HTML, SVG, canvas, or PIL to create final PNGs.",
+    "Correct order: gpt-image-2 PNG generation -> PNG review/repair -> PPTX roll-up.",
+    "If gpt-image-2 image generation is blocked, stop rather than manufacturing final PNGs through PPTX or local rendering.",
     "scripts/package_slide_images_to_pptx.py",
     "gpt-image-2",
     "Codex built-in image generation",
@@ -115,7 +118,7 @@
       "name": "single_slide_prompt",
       "args": ["--mode", "single-slide-image", "--archetype", "market-table + layered-rail", "--grid-mode", "70/30", "--size", "2048x1152"],
       "expect_exit": 0,
-      "must_contain": ["gpt-image-2", "speaker_notes_text", "pre_google_slides_image_review", "pre_package_image_review", "repair_iteration_plan", "header_footer_text_color_lock", "header_line_top_rule", "message_box_scale_lock", "message_box_text_size_lock", "deck_tone_master_lock", "deck_tone_consistency_status", "post_generation_design_balance_check", "visual_design_quality_traits", "whitespace_occupancy_balance_status", "typography_balance_status", "color_consistency_status", "outer_padding_consistency_status", "header_integrity_status", "petrol_usage_lock", "visual_asset_judgment", "layout_diversity_plan", "layout_rotation_guard", "layout_sequence_table", "opening_thesis_slide", "first_slide_not_title_only", "opening_density_gate", "image_review_matrix", "deck_consistency_matrix", "prompt_readiness", "draft_image_prompt_scaffold", "negative_prompt_hard_blockers", "google_slides_delivery: optional only when explicitly requested", "pptx_delivery", "pptx_packaging_route", "no_header_ranges_in_final_prompts", "Use Noto Sans JP for every visible text string", "footer/source/table-note #6E756E", "no default cap on decision-relevant numbers", "flat solid fill", "#F5E2A8", "#C49A2C", "No Petrol H1", "PPTX roll-up", "Google Slides roll-up"],
+      "must_contain": ["gpt-image-2", "speaker_notes_text", "pre_google_slides_image_review", "pre_package_image_review", "repair_iteration_plan", "header_footer_text_color_lock", "header_line_top_rule", "message_box_scale_lock", "message_box_text_size_lock", "deck_tone_master_lock", "deck_tone_consistency_status", "post_generation_design_balance_check", "visual_design_quality_traits", "whitespace_occupancy_balance_status", "typography_balance_status", "color_consistency_status", "outer_padding_consistency_status", "header_integrity_status", "petrol_usage_lock", "visual_asset_judgment", "layout_diversity_plan", "layout_rotation_guard", "layout_sequence_table", "opening_thesis_slide", "first_slide_not_title_only", "opening_density_gate", "image_review_matrix", "deck_consistency_matrix", "prompt_readiness", "draft_image_prompt_scaffold", "negative_prompt_hard_blockers", "google_slides_delivery: optional only when explicitly requested", "pptx_delivery", "pptx_packaging_route", "PPTX is a delivery wrapper only", "Never create final PNGs by exporting, rendering, or screenshotting a PPTX", "Correct order: generate gpt-image-2 PNGs, review and repair PNGs, then package approved PNGs into PPTX", "no_header_ranges_in_final_prompts", "Use Noto Sans JP for every visible text string", "footer/source/table-note #6E756E", "no default cap on decision-relevant numbers", "flat solid fill", "#F5E2A8", "#C49A2C", "No Petrol H1", "PPTX roll-up", "Google Slides roll-up"],
       "must_not_contain": ["ATOM", "atom-slide", "Deep Blue", "#0B2F5B", "Act_Slide_Patterns"]
     },
     {

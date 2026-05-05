@@ -40,6 +40,9 @@ speaker_notes_status: drafted / inserted / blocked
 
 Do not request `1920x1080` directly from `gpt-image-2`; use a valid multiple-of-16 image-generation size and resize after generation when needed.
 Do not substitute local rendering, screenshots, SVG, PIL, canvas, or PPT exports for final image-generation output.
+PPTX is a delivery wrapper only; never use PPTX, PowerPoint export, screenshots, local rendering, HTML, SVG, canvas, or PIL to create final PNGs.
+Correct order: gpt-image-2 PNG generation -> PNG review/repair -> PPTX roll-up.
+If gpt-image-2 image generation is blocked, stop rather than manufacturing final PNGs through PPTX or local rendering.
 
 ## Base Image Contract
 

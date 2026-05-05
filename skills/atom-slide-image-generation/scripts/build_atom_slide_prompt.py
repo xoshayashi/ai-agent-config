@@ -144,6 +144,9 @@ def canonical_planning_block(
   image_streaming: optional for exploration, final QA uses completed image
   image_delivery_size: 1920x1080 after resize if exact ATOM delivery size is required
   generation_route: Codex built-in image generation
+  generation_route_lock: PPTX is a delivery wrapper only; never use PPTX, PowerPoint export, screenshots, local rendering, HTML, SVG, canvas, or PIL to create final PNGs.
+  image_generation_order: Correct order: generate gpt-image-2 PNGs, review and repair PNGs, then package approved PNGs into PPTX.
+  blocked_generation_rule: If gpt-image-2 image generation is blocked, stop rather than manufacturing final PNGs through PPTX or local rendering.
   generation_status: pending_builtin_generation
   output_files: [filled after Codex image generation]
   google_slides_delivery: optional only when explicitly requested; otherwise not_requested
@@ -364,6 +367,9 @@ prompt_readiness: draft_scaffold_until_blocking_unresolved_items_none
 draft_image_prompt_scaffold:
 {prompt_lead}
   Use the embedded ATOM design system in SKILL.md. Do not load an external ATOM pattern file.
+  PPTX is a delivery wrapper only. Never create final PNGs by exporting, rendering, or screenshotting a PPTX.
+  Correct order: generate gpt-image-2 PNGs, review and repair PNGs, then package approved PNGs into PPTX.
+  If gpt-image-2 image generation is blocked, stop rather than manufacturing final PNGs through PPTX or local rendering.
 
   Plan coordinates on a 1672x941 basis with ATOM delivery target 1920x1080 after resize if required.
   Use size terminology consistently: 1920x1080 is FHD/1080p delivery, 2048x1152 is 16:9 2K-width generation, 2560x1440 is QHD/1440p generation, and 3840x2160 is 4K UHD generation.

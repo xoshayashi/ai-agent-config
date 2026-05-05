@@ -9,6 +9,8 @@ The ATOM design system is embedded in this SKILL.md; do not read an external ATO
 
 Mandatory: final images use `gpt-image-2` through Codex built-in image generation; first PNGs need review and repair; speaker notes accompany PPTX; Create Google Slides only when explicitly requested.
 
+Generation route lock: PPTX is a delivery wrapper only; never use PPTX, PowerPoint export, screenshots, local rendering, HTML, SVG, canvas, or PIL to create final PNGs. Correct order: gpt-image-2 PNG generation -> PNG review/repair -> PPTX roll-up. If gpt-image-2 image generation is blocked, stop rather than manufacturing final PNGs through PPTX or local rendering.
+
 Design: `12-column grid`, `1672x941`, `#0B2F5B`, `#2D332E`, `#DDE3EA`, `#F7EECF`, `#C49A2C`, footer/source/table-note text `#6E756E`, `all_text_font_lock: Noto Sans JP for every visible string including Latin/English/numbers/symbols/Japanese`, `header_footer_text_color_lock`, `header_line_top_rule`, `no_header_ranges_in_final_prompts`, `deep_blue_usage_lock`, `brand_accent_usage_budget`, `message_box_scale_lock`, `message_box_text_size_lock`, `flat solid fill`, Honey surfaces must feel quieter than Deep Blue surfaces, `technical editorial line illustration`.
 
 Logic: `1 slide = 1 claim`, `1 slide = 1 dominant structure`, Do not impose a default numeric cap, `visual_design_quality_traits`, `visual_asset_judgment`, `layout_diversity_plan`, `layout_rotation_guard`, `layout_sequence_table`, `right-main + left-context-rail`, `center-hub + surrounding-nodes`, `top-map + bottom-detail-table`, `bottom-main compact`.
