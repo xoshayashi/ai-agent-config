@@ -10,6 +10,7 @@ Entrypoints (`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`) route here. `DESIGN.md` 
 - For non-trivial work, clarify the goal, scope, target, constraints, and completion signal once, then keep moving.
 - Treat repeated user prompts to review, improve, evaluate, or "make it good enough" as a signal that completion quality is under-managed. Do not present work as complete after the first pass; self-review against the user's intent, inspect outputs and verification evidence, fix meaningful gaps, and iterate until the result is sufficient or a concrete blocker remains.
 - Ask only when the answer materially changes scope, ownership, safety, or acceptance criteria. Infer small gaps and state the assumption.
+- When similarly named targets exist, resolve the exact artifact, path, source of truth, and distinguishing constraints before acting. Mirror changes across sibling targets only when the user asked for that scope.
 - Keep always-loaded instructions lean. Put situational detail in the target repo, doc, skill, or tool output instead of this file.
 - Verify task-critical, risky, or drift-prone facts with primary evidence before relying on them.
 - Preserve user work. Do not revert or overwrite changes you did not make unless explicitly asked.
@@ -32,6 +33,10 @@ Entrypoints (`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`) route here. `DESIGN.md` 
 - When a dirty worktree or parallel agent/user activity changes files during
   your task, re-read affected files and diffs before final judgment, commit, or
   review findings.
+- Before committing, pushing, opening a PR, or merging, verify that the current
+  branch, base, staged files, and diff match the requested task. If the branch
+  or existing commits belong to another task, switch to an appropriate branch or
+  worktree before adding new commits.
 - When changing shared instructions or entrypoints in this repository, update matching docs and validation checks in the same pass.
 
 ## Human-Visible Output
