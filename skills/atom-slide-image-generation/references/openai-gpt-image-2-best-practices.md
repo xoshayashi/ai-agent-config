@@ -82,7 +82,7 @@ Other model constraints from the official references:
 
 - In Codex built-in image-generation mode, this skill does not expose a model `temperature` parameter.
 - When a user asks to raise temperature, translate that into `creative_variance: high` in the planning and prompt language.
-- High creative variance should change composition, viewpoint, crop, region balance, visual metaphor, and hand-drawn sketch rhythm.
+- High creative variance should change composition, viewpoint, crop, region balance, visual metaphor, editorial rhythm, asymmetric composition, and viewpoint variation.
 - High creative variance must not loosen exact text, source hygiene, header master, brand tokens, grid alignment, readability, or model route.
 - For decks, test high variance with 1-2 pilot slides before generating the full set.
 

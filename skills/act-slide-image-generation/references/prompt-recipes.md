@@ -32,7 +32,9 @@ image_streaming: optional for exploration, final QA uses completed image
 image_delivery_size: 1920x1080 after resize if exact ACT delivery size is required
 generation_route: Codex built-in image generation
 generation_status: generated_with_builtin_gpt-image-2 / blocked
-google_slides_delivery: image-only roll-up after generated PNGs pass QA, unless user asks for files only
+pptx_delivery: image-only PPTX roll-up after generated PNGs pass QA, unless user asks for files only
+pptx_status: pending_generated_images_and_pre_package_image_review / created / blocked
+google_slides_delivery: optional image-only roll-up after generated PNGs pass QA when explicitly requested
 speaker_notes_status: drafted / inserted / blocked
 ```
 
@@ -47,8 +49,10 @@ Generate at 1536x864 for drafts, 2048x1152 for 16:9 2K-width working review, or 
 Plan all layout using a 1672x941 coordinate basis, with ACT delivery target 1920x1080 after resize if required.
 Treat 1920x1080 as FHD/1080p delivery, 2048x1152 as practical 16:9 2K-width generation, and 3840x2160 as 4K UHD generation.
 Use a shared 12-column grid, 8px spacing rhythm, and precise header/footer anchors.
-For decks, define and reuse one deck header master. Treat the header as the lowest-freedom component: repeat the same left vertical line, H1, subtitle, visual alignment rule, body-start y, header safe area, and clear zone in every slide prompt. no_header_ranges_in_final_prompts: final prompts must use exact selected x/y/w/h/color/font values for the header, not ranges. Apply header_line_top_rule: the line top must sit at or slightly below the first visible H1 glyph top, never above it just because the text box starts higher.
-Request Noto Sans JP style or the closest clean Japanese sans-serif and keep text short enough to audit.
+For decks, define and reuse one deck header master. Treat the header as the lowest-freedom component: repeat the same left vertical line, H1, subtitle, visual alignment rule, body-start y, header safe area, and clear zone in every slide prompt. no_header_ranges_in_final_prompts: final prompts must use exact selected x/y/w/h/color/font_family/font values for the header, not ranges. Apply header_line_top_rule: the line top must sit at or slightly below the first visible H1 glyph top, never above it just because the text box starts higher.
+For decks, define layout_diversity_plan and layout_rotation_guard before final prompts. Choose layout families from full-field, left-main/right-rail, right-main/left-context, balanced diptych, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase patterns according to the slide claim and evidence type.
+For decks, use opening_density_gate on slide 1: make it an opening_thesis_slide, set first_slide_not_title_only, and combine the memorable main phrase with a core thesis, 2-4 proof/tension points, a visible market-shift/matrix/causal-map/wedge structure, and a bridge into the deck.
+Request Noto Sans JP for every visible string, including Latin/English letters, numbers, symbols, and Japanese. Do not request or mix any other typeface; keep text short enough to audit.
 For ACT work, use Forest Charcoal #2D332E for H1/body, Ink-2 #4D544E for subtitle, Ink-3 #6E756E for footer/source/table-note text, Petrol #008A80 for structure, and Honey only as a quiet decision signal.
 Lock header/footer text colors as one Ink-family hierarchy: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E. Do not use Petrol, Honey, yellow, or arbitrary gray for header/footer text.
 No slide numbers, no title kicker, no numbered header badge.
@@ -69,8 +73,8 @@ For humanoid/robot decks, represent the idea through small interaction details, 
 When the user asks to raise temperature, use `creative_variance: high` rather than claiming an API temperature parameter. High variance means more freedom in viewpoint, crop, asymmetry, visual metaphor, and layout rhythm, while all brand, header, exact text, grid, and source constraints remain locked.
 Required image model: gpt-image-2.
 Final slide image files must be actual Codex built-in image-generation outputs. Local wireframes or deterministic renders are not final generated images.
-For multi-slide decks, roll approved generated PNGs into a native Google Slides deck as image-only full-bleed slides, then attach speaker notes to each slide's notes page. Speaker notes are generated from the deck structure, not from image generation, and should contain talk track, evidence/assumption cue, source caveat if needed, and transition cue.
-Before Google Slides roll-up, run post_generation_design_balance_check on actual generated PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
+For multi-slide decks, roll approved generated PNGs into a PPTX deck as image-only full-bleed slides, then attach speaker notes when the packaging route supports notes. Speaker notes are generated from the deck structure, not from image generation, and should contain talk track, evidence/assumption cue, source caveat if needed, and transition cue. Create Google Slides only when explicitly requested.
+Before PPTX or Google Slides roll-up, run post_generation_design_balance_check on actual generated PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, header integrity, and layout family rhythm.
 ```
 
 ## Single Slide Planning Block
@@ -95,19 +99,34 @@ image_delivery_size:
 generation_route:
 generation_status:
 output_files:
-google_slides_delivery:
-google_slides_status:
-google_slides_title:
-google_slides_file_id:
-google_slides_url:
-google_slides_slide_count:
-google_slides_route:
-google_slides_image_mapping:
-google_slides_speaker_notes_mapping:
+google_slides_delivery: optional only when explicitly requested
+google_slides_status: not_requested unless explicitly requested
+google_slides_title: N/A unless explicitly requested
+google_slides_file_id: N/A unless explicitly requested
+google_slides_url: N/A unless explicitly requested
+google_slides_slide_count: N/A unless explicitly requested
+google_slides_route: N/A unless explicitly requested
+google_slides_image_mapping: N/A unless explicitly requested
+google_slides_speaker_notes_mapping: N/A unless explicitly requested
+pptx_delivery:
+pptx_status:
+pptx_output_path:
+pptx_slide_count:
+pptx_packaging_route:
+pptx_image_mapping:
+pptx_speaker_notes_mapping:
 speaker_notes_plan:
 speaker_notes_status:
 speaker_notes_text:
+opening_slide_role:
+first_slide_not_title_only:
+opening_density_gate:
 layout_archetype:
+layout_family:
+composition_family:
+layout_diversity_plan:
+layout_rotation_guard:
+layout_sequence_table:
 grid_mode:
 column_spans:
 row_tracks:
@@ -126,6 +145,9 @@ deck_master_refs:
 deck_tone_master_lock:
 visual_design_quality_traits:
 post_generation_design_balance_check:
+pre_package_image_review:
+image_review_matrix:
+deck_consistency_matrix:
 whitespace_occupancy_balance_status:
 typography_balance_status:
 color_consistency_status:
@@ -209,12 +231,13 @@ Then output:
 
 ```text
 image_model: gpt-image-2
-final_image_prompt:
-negative_prompt:
+prompt_readiness:
+draft_image_prompt_scaffold:
+negative_prompt_hard_blockers:
 post_generation_audit:
 ```
 
-Block generation if `layout_archetype`, `grid_mode`, `coordinate_inventory_1672`, `master_components`, or `source_policy` remains unresolved.
+Block generation if `layout_archetype`, `layout_family`, `layout_diversity_plan`, `layout_rotation_guard`, `layout_sequence_table`, `grid_mode`, `coordinate_inventory_1672`, `master_components`, or `source_policy` remains unresolved.
 
 ## Single Slide Image Prompt
 
@@ -236,7 +259,9 @@ ACT slide contract:
 - use n=1 for final text-heavy slides; use multiple variations only for draft exploration
 - 1 slide = 1 claim
 - 1 dominant structure
+- for deck openers, first_slide_not_title_only: use opening_thesis_slide with a thesis, 2-4 proof/tension points, a visible structure, and a bridge
 - select one layout_archetype and grid_mode before writing text
+- define layout_family, layout_diversity_plan, and layout_rotation_guard for decks before writing final prompts
 - define coordinate_inventory_1672 with x/y/w/h for major objects
 - define master_components and deck_master_refs before repeating cards, rows, icons, or bands
 - define deck_header_master_lock before any slide prompt and repeat it verbatim across the deck; exact header values are required before generation
@@ -269,7 +294,7 @@ ACT slide contract:
 - Source only if traceable real sources are available
 - final bitmap generation must use gpt-image-2
 - if actual Codex built-in image generation is blocked, stop and report the blocker; do not create final images via code rendering or a user-key workaround
-- after all generated PNGs pass QA, create a Google Slides roll-up unless the user asks for image files only: one full-bleed generated PNG per slide, same order, no extra overlays, and speaker notes inserted into the corresponding slide notes page
+- after all generated PNGs pass QA, create a PPTX roll-up unless the user asks for image files only: one full-bleed generated PNG per slide, same order, no extra overlays, and speaker notes inserted when supported; create Google Slides only when explicitly requested
 - place every literal string under `Exact text` in quotes and request ONLY those strings
 - use "Draw" or "Create" for generation prompts, and "Edit" plus preservation language for repair prompts
 - for healthcare, finance, law, or regulated domains, do not add market, clinical, regulatory, or compliance facts unless sources are provided or researched
@@ -280,8 +305,9 @@ Output:
 3. final image prompt
 4. negative prompt
 5. generation route and output files, or blocker
-6. Google Slides roll-up status with speaker notes status for decks
-7. post-generation audit checklist
+6. PPTX roll-up status with speaker notes status for decks
+7. Google Slides roll-up status when explicitly requested
+8. post-generation audit checklist
 ```
 
 ## Text To Slide Structure Prompt
@@ -293,7 +319,7 @@ Process:
 1. Extract the deck thesis and audience decision.
 2. Create intake_map with source_span_id values for chapters, facts, quotes, assumptions, and uncertainties.
 3. Choose one storyline frame: SCQA, problem-solution-evidence, past-present-future, market-problem-solution-moat, or investment-thesis-risk-milestones.
-4. Draft slide-level action titles as standalone claims. No topic labels.
+4. Draft slide-level action titles as standalone claims. No topic labels; slide 1 should be an opening_thesis_slide, not a title-only opener.
 5. Build claim_backlog, evidence_ledger, source_ledger, appendix_candidates, and open_questions.
 6. For each claim, assign supporting evidence, source policy, visual structure, visual richness role, illustration intensity, creative variance, density tier, and density risk.
 7. Run a density design gate for each slide: set reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
@@ -322,6 +348,9 @@ Output:
   - slide_id:
     chapter:
     action_title:
+    opening_slide_role:
+    first_slide_not_title_only:
+    opening_density_gate:
     reader_question_answered:
     claim_type:
     evidence_items:
@@ -355,6 +384,9 @@ Output:
     visual_asset_role:
     icon_system_plan:
     layout_archetype:
+    layout_family:
+    layout_diversity_plan:
+    layout_rotation_guard:
     grid_mode:
     exact_text:
       h1:
@@ -388,16 +420,17 @@ Design constraints:
 Process:
 1. Define the deck thesis.
 2. Read and apply the embedded ACT design system first; use bundled ACT mechanics only where compatible.
-3. Define each slide claim as one sentence.
-4. Select one layout_archetype and one grid_mode for each slide.
-5. Define the deck_header_master_lock with exact selected x/y/w/h/color/font values and carry it verbatim into every slide prompt.
-6. Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide, with a deck-level mix of human-designed editorial/vector illustrations, data visuals, small system scenes, icon evidence, and quiet tables.
-7. Assign density_design for every slide: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
-8. Assign visual_design_quality_traits as visual treatment only: compact fixed header, thin structural lines, pale cards/tables, restrained icons, explanatory line drawings, and stable outer padding.
-9. Assign Insight components selectively across the deck only when they add interpretation, decision weight, or reading speed; Honey remains rare and purposeful.
-10. Vary dominant structures so the deck does not feel template-filled.
-11. Mark restrained illustration candidates where the idea becomes more memorable or fresh without becoming a rough sketch or glossy hero illustration.
-12. Flag slides that should split because density would force body below 18pt equivalent or create competing major regions.
+3. Define each slide claim as one sentence, with slide 1 as an opening_thesis_slide that passes opening_density_gate.
+4. Select one layout_archetype, layout_family, and grid_mode for each slide.
+5. Create layout_diversity_plan and layout_rotation_guard so the sequence can use full-field, balanced comparison, right-main, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase families where useful.
+6. Define the deck_header_master_lock with exact selected x/y/w/h/color/font values and carry it verbatim into every slide prompt.
+7. Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide, with a deck-level mix of human-designed editorial/vector illustrations, data visuals, small system scenes, icon evidence, and quiet tables.
+8. Assign density_design for every slide: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
+9. Assign visual_design_quality_traits as visual treatment only: compact fixed header, thin structural lines, pale cards/tables, restrained icons, explanatory line drawings, and stable outer padding.
+10. Assign Insight components selectively across the deck only when they add interpretation, decision weight, or reading speed; Honey remains rare and purposeful.
+11. Vary dominant structures so the deck feels edited around the argument.
+12. Mark restrained illustration candidates where the idea becomes more memorable or fresh without becoming a rough sketch or glossy hero illustration.
+13. Flag slides that should split because density would force body below 18pt equivalent or create competing major regions.
 13. Define source policy per slide: none / real source list.
 14. Define deck-level master refs: header, footer baseline, Insight surface skeleton, table/card masters, icon circle sizes.
 15. Draft speaker_notes_text for every slide before generation. Each note should support presentation delivery, not duplicate all visible text: short talk track, key evidence or assumption to mention, source caveat if needed, and transition to the next slide.
@@ -502,7 +535,7 @@ Guideline/Brand:
 - Color consistency is stable across the deck: no random accent, arbitrary gray, saturation jump, or late-slide color drift
 
 Layout:
-- layout_archetype, grid_mode, component_inventory exist
+- layout_archetype, layout_family, layout_diversity_plan, layout_rotation_guard, grid_mode, component_inventory exist
 - coordinate_inventory_1672 and master_components exist
 - row_tracks, column_tracks, equalized_groups, shared_edges exist
 - header/footer anchors are fixed with exact values, not ranges
@@ -542,13 +575,15 @@ Model:
 
 Deck:
 - layouts vary naturally
+- layout_diversity_plan and layout_rotation_guard are reflected in the generated image sequence
 - visible priority, rhythm, and breathing room
-- post_generation_design_balance_check is approved for generated PNGs before Google Slides roll-up
+- post_generation_design_balance_check is approved for generated PNGs before PPTX or Google Slides roll-up
 - deck_tone_consistency_status is approved after comparing first, middle, and last thirds
 - visual design quality traits stay consistent from first to last slide: line weight, pale surfaces, card radius, icon family, illustration density, Petrol role, Honey treatment, and outer padding
 - no mechanical card-only repetition
 - Insight components are selective and compatible with the embedded ACT design system
-- Google Slides roll-up contains exactly one full-bleed generated PNG per slide, in order
+- PPTX roll-up contains exactly one full-bleed generated PNG per slide, in order
+- Google Slides roll-up contains exactly one full-bleed generated PNG per slide when explicitly requested
 - speaker notes exist on every slide and match the slide claim, evidence, caveats, and transition
 
 For every fail:

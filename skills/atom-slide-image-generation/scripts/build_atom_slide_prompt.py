@@ -30,6 +30,11 @@ PLACEHOLDER_BLOCKERS = [
     "deck_master_refs",
     "deck_header_master_lock",
     "visual_design_quality_traits",
+    "layout_family",
+    "layout_diversity_plan",
+    "layout_rotation_guard",
+    "layout_sequence_table",
+    "recent_layout_memory",
     "component_inventory",
     "equalized_groups",
     "shared_edges",
@@ -58,6 +63,10 @@ PLACEHOLDER_BLOCKERS = [
     "post_generation_design_balance_check",
     "source_policy",
     "speaker_notes_text",
+    "pptx_rollup_plan",
+    "pptx_package_status",
+    "image_review_matrix",
+    "deck_consistency_matrix",
     "brand_accent_usage_budget",
     "brand_accent_system_role",
     "insight_decision",
@@ -137,35 +146,52 @@ def canonical_planning_block(
   generation_route: Codex built-in image generation
   generation_status: pending_builtin_generation
   output_files: [filled after Codex image generation]
-  google_slides_delivery: image-only roll-up with speaker notes after all generated PNGs pass QA, unless user asks for image files only
-  google_slides_status: pending_generated_images_and_pre_google_slides_image_review
-  google_slides_title: [filled when creating native Google Slides deck]
-  google_slides_file_id: [filled after deck creation]
-  google_slides_url: [filled after deck creation]
-  google_slides_slide_count: [must match generated image count]
-  google_slides_route: direct_native_slides_batch_update / packaging_pptx_import / blocked
-  google_slides_image_mapping: [slide_id -> generated PNG path -> Google slide objectId]
-  google_slides_speaker_notes_mapping: [slide_id -> speakerNotesObjectId -> inserted note status]
-  speaker_notes_plan: one note per deck slide, drafted before image generation and inserted into Google Slides notes page after image roll-up
+  google_slides_delivery: optional only when explicitly requested; otherwise not_requested
+  google_slides_status: not_requested / pending_generated_images_and_pre_google_slides_image_review / inserted / blocked
+  google_slides_title: N/A unless explicitly requested
+  google_slides_file_id: N/A unless explicitly requested
+  google_slides_url: N/A unless explicitly requested
+  google_slides_slide_count: N/A unless explicitly requested; if requested, must match generated image count
+  google_slides_route: N/A unless explicitly requested / direct_native_slides_batch_update / packaging_pptx_import / blocked
+  google_slides_image_mapping: N/A unless explicitly requested; if requested, [slide_id -> generated PNG path -> Google slide objectId]
+  google_slides_speaker_notes_mapping: N/A unless explicitly requested; if requested, [slide_id -> speakerNotesObjectId -> inserted note status]
+  pptx_delivery: default image-only roll-up after all generated PNGs pass QA, unless user asks for image files only
+  pptx_status: pending_generated_images_and_pre_package_image_review
+  pptx_title: [filled when creating PPTX deck]
+  pptx_output_path: [filled after PPTX creation]
+  pptx_slide_count: [must match generated image count]
+  pptx_packaging_route: scripts/package_slide_images_to_pptx.py / presentation_app_import / blocked
+  pptx_image_mapping: [slide_id -> generated PNG path -> PPTX slide index]
+  pptx_speaker_notes_mapping: [slide_id -> note source -> inserted / sidecar / blocked]
+  speaker_notes_plan: one note per deck slide, drafted before image generation and inserted into PPTX or Google Slides notes page after image roll-up when the packaging route supports notes
   speaker_notes_status: drafted / inserted / blocked
   speaker_notes_text: [talk track + evidence/assumption cue + source caveat if relevant + transition cue; keep off slide image]
   pre_google_slides_image_review: required on actual generated PNG before any Google Slides insertion
+  pre_package_image_review: required on actual generated PNG before any PPTX or Google Slides insertion
   image_review_iteration: 0 before first review; increment after each regenerated or edited PNG
   image_review_status: pending / approved / repair_required / blocked
   image_review_findings: [blocker/major/minor findings from multimodal self-review]
   image_repair_prompt: [concrete repair prompt if blockers or majors remain]
   image_repair_history: [iteration -> issue -> repair action -> regenerated PNG path -> re-audit result]
+  image_review_matrix: [slide_id -> iteration -> png_path -> blockers -> majors -> repair_prompt -> new_png_path -> status]
+  deck_consistency_matrix: [first_third -> middle_third -> last_third -> tone/layout/spacing/source consistency findings]
   final_image_quality_status: pending until every generated PNG has no blockers or majors and deck-level consistency passes
   deck_tone_consistency_review: [first third vs middle third vs last third tone comparison after generation]
   deck_tone_consistency_status: pending / approved / repair_required
   deck_tone_repair_plan: [slides to regenerate or edit if tone drift appears]
-  post_generation_design_balance_check: required on actual generated PNGs before Google Slides insertion; checks whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity
+  post_generation_design_balance_check: required on actual generated PNGs before PPTX or Google Slides insertion; checks whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity
   whitespace_occupancy_balance_status: pending / approved / repair_required
   typography_balance_status: pending / approved / repair_required
   color_consistency_status: pending / approved / repair_required
   outer_padding_consistency_status: pending / approved / repair_required
   header_integrity_status: pending / approved / repair_required
   layout_archetype: {archetype}
+  layout_family: full-field / left-main-right-rail / right-main-left-context / balanced-diptych / top-bottom / center-hub / process / matrix / small-multiple / swimlane / staircase
+  composition_family: [same family label used for deck-level rhythm review]
+  layout_diversity_plan: [deck-level plan for rotating compatible layout families according to claim type, evidence type, and decision question]
+  layout_rotation_guard: [review neighboring slides for mechanical repetition; repeated families must serve comparison or deliberate rhythm]
+  layout_sequence_table: [slide_number -> section_role -> claim_type -> layout_family -> composition_family -> previous_family -> repeat_or_change_reason]
+  recent_layout_memory: [previous 3-5 slide layout families and why this slide repeats or changes]
   grid_mode: {grid_mode}
   column_spans: [12-column spans, integer columns only]
   row_tracks: [header/body/rail/insight/source baselines]
@@ -189,8 +215,8 @@ def canonical_planning_block(
     header_safe_area: [x/y/w/h exact selected values; ATOM default x=44 y=24 w=1584 h=136]
     vertical_line: [x/y/w/h/color exact selected values; ATOM default x=50 y=48 w=10 h=104 color #0B2F5B]
     header_line_top_rule: [line top at or 0-6px below visible H1 glyph top, never above; upward protrusion is blocker]
-    h1: [x/y/w/max_lines/font_size/weight/line_height/color exact selected values; ATOM default x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.10 color #2D332E]
-    subtitle: [x/y/w/max_lines/font_size/weight/line_height/color exact selected values; ATOM default x=88 y=78 w=1332 max_lines=1 size=28pt weight=400 line_height=1.18 color #4D544E]
+    h1: [x/y/w/max_lines/font_family/font_size/weight/line_height/color exact selected values; ATOM default x=88 y=34 w=1332 max_lines=1 font_family=Noto Sans JP size=32pt weight=700 line_height=1.10 color #2D332E]
+    subtitle: [x/y/w/max_lines/font_family/font_size/weight/line_height/color exact selected values; ATOM default x=88 y=78 w=1332 max_lines=1 font_family=Noto Sans JP size=28pt weight=400 line_height=1.18 color #4D544E]
     visual_alignment: [visible line top at or 0-6px below visible H1 glyph top; visible line bottom 4-8px below subtitle lower visual edge; never protrude upward]
     body_start_y: [exact selected value; ATOM default 190, or 224 only if explicit two-line H1 fallback is declared]
     upper_right_clear_zone: [x/y/w/h exact selected values and empty; ATOM default x=1420 y=24 w=208 h=88]
@@ -218,8 +244,8 @@ def canonical_planning_block(
   header_anchor:
     vertical_line: exact x/y/w/h/color copied from deck_header_master_lock
     header_line_top_rule: copied from deck_header_master_lock and checked after generation
-    h1: exact x/y/w/max_lines/font_size/weight/line_height/color copied from deck_header_master_lock
-    subtitle: exact x/y/w/max_lines/font_size/weight/line_height/color copied from deck_header_master_lock
+    h1: exact x/y/w/max_lines/font_family/font_size/weight/line_height/color copied from deck_header_master_lock
+    subtitle: exact x/y/w/max_lines/font_family/font_size/weight/line_height/color copied from deck_header_master_lock
     visual_alignment: exact visual alignment rule copied from deck_header_master_lock
     body_start_y: exact selected y copied from deck_header_master_lock
     upper_right_clear_zone: exact x/y/w/h copied from deck_header_master_lock and kept empty
@@ -230,7 +256,7 @@ def canonical_planning_block(
   table_note_microline: none / [one line above source baseline]
   source_line: none / Source: [traceable source names copied from provided or researched sources only]
   source_policy: real traceable sources only; no draft, upload, internal-note, or production-route wording
-  brand_accent_usage_budget: restrained visual area; for ATOM work, Deep Blue uses 6-12% and never appears as body text
+  brand_accent_usage_budget: restrained visual area; for ATOM work, Deep Blue uses standard 4-8%, may reach 10% on dense table slides, and may reach 12% only for rare chapter/closing slides; it never appears as body text
   deep_blue_usage_lock: exact #0B2F5B structural use; one active body blue system; no blue H1/subtitle/body/footer text; no extra blue hues
   brand_accent_system_role: header band / rule / icon / number / badge / matrix highlight / none, adjusted to the embedded ATOM design system
   visual_asset_judgment: use illustration/icons only if they improve understanding, memory, comparison, or navigation; no quota and no filler
@@ -261,8 +287,10 @@ def mode_guidance(mode: str) -> str:
   - Use the embedded ATOM design system in SKILL.md; do not load an external ATOM pattern file.
   - Define deck_thesis, audience_decision, storyline_frame, section_map, and slide-level action_title claims.
   - Map every claim to evidence, source_policy, visual_structure, layout_archetype, grid_mode, exact_text_budget, and split_merge_decision.
+  - Build layout_diversity_plan: assign layout_family for each slide across full-field, balanced comparison, right-main, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase families when the argument benefits.
+  - Use layout_rotation_guard to keep repeated structures purposeful: repeat a family for like-for-like comparison, and change family when claim type, evidence type, or decision question changes.
   - Draft speaker_notes_text for every slide: concise talk track, evidence/assumption cue, source caveat if relevant, and transition cue.
-  - Add pre_google_slides_image_review fields for every slide so generated PNGs are reviewed and repaired before Slides insertion.
+  - Add pre_package_image_review and pre_google_slides_image_review fields for every slide so generated PNGs are reviewed and repaired before PPTX or Slides insertion.
   - Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide before image prompting.
   - Run density_design for every slide: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
   - Add useful density through comparison, benchmarks, denominators, assumptions, annotations, evidence strips, right rails, small multiples, and source cues; do not add density through smaller type or decorative illustration detail.
@@ -275,14 +303,15 @@ def mode_guidance(mode: str) -> str:
   - Define deck thesis and one claim per slide.
   - Use the embedded ATOM design system in SKILL.md; do not load an external ATOM pattern file.
   - Select layout_archetype and grid_mode for every slide.
+  - Create layout_diversity_plan and layout_rotation_guard before final prompts so the deck can use the expanded pattern catalogue without drifting from ATOM brand and header rules.
   - Define deck_header_master_lock before any slide-level prompt. Do not leave header coordinates as ranges.
   - Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide; use human-designed editorial/vector illustrations on chapter openers, turning points, complex systems, and final vision slides.
   - Assign density_design for every slide: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
   - Preserve distinct claims as separate slides; combine only repeated claims or evidence that must be compared in one view.
   - Define deck master refs for header, footer baseline, Insight surfaces, tables, cards, and icon circles.
   - Allocate Insight components selectively across the deck and avoid mechanical card-only repetition.
-  - Draft speaker_notes_text for every slide and plan Google Slides roll-up with one full-bleed generated PNG plus corresponding speaker notes per slide.
-  - Plan a pre_google_slides_image_review loop: inspect actual generated PNGs, classify blocker/major/minor issues, repair/regenerate, and approve only after image quality is sufficient.
+  - Draft speaker_notes_text for every slide and plan PPTX roll-up with one full-bleed generated PNG plus corresponding speaker notes per slide. Plan Google Slides only when explicitly requested.
+  - Plan a pre_package_image_review loop: inspect actual generated PNGs, classify blocker/major/minor issues, repair/regenerate, and approve only after image quality is sufficient.
   - Do not generate final images until each slide has its own canonical planning block."""
     if mode == "repair":
         return """mode_guidance:
@@ -298,8 +327,8 @@ def mode_guidance(mode: str) -> str:
   - For every fail, choose trim, split, regrid, quiet hierarchy, add/remove Insight, or source cleanup.
   - Re-audit after proposed changes."""
     return """mode_guidance:
-  - Produce one slide planning block, then image_model, final_image_prompt, negative_prompt, and post_generation_audit.
-  - Include a pre_google_slides_image_review and repair_iteration_plan; do not treat first generation as final without inspecting the actual PNG.
+  - Produce one slide planning block, then image_model, draft_image_prompt_scaffold, negative_prompt_hard_blockers, and post_generation_audit.
+  - Include pre_package_image_review, pre_google_slides_image_review, and repair_iteration_plan; do not treat first generation as final without inspecting the actual PNG.
   - Treat unresolved layout_archetype or grid_mode as blockers before final generation."""
 
 
@@ -330,8 +359,9 @@ def image_prompt_tail(size: str, quality: str, mode: str, primary_guideline: str
         prompt_lead = f"""  Draw a 16:9 strategy slide image with {IMAGE_MODEL}, image_size {size}, image_quality {quality}, background opaque, output_format png, moderation auto, n=1."""
     return f"""image_model: {IMAGE_MODEL}
 generation_route: Codex built-in image generation
+prompt_readiness: draft_scaffold_until_blocking_unresolved_items_none
 
-final_image_prompt:
+draft_image_prompt_scaffold:
 {prompt_lead}
   Use the embedded ATOM design system in SKILL.md. Do not load an external ATOM pattern file.
 
@@ -340,9 +370,10 @@ final_image_prompt:
   Use a 12-column grid, 8px spacing rhythm, precise shared edges, and fixed header/footer anchors.
   Define deck_tone_master_lock before slide-level prompting and preserve it through the whole deck: slide base, typography scale, header/footer, Deep Blue role, Honey treatment, illustration style, icon family, density rhythm, whitespace/occupancy rhythm, card/table geometry, outer padding, source baseline, and negative prompt. Later slides must feel like the same deck as the first approved pilot slides.
   Apply visual_design_quality_traits as design treatment: calm light base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, and deliberate canvas occupancy. Do not alter slide count, claim order, or storyline solely for visual style.
+  Apply layout_diversity_plan at deck level: choose layout families from full-field, left-main/right-rail, right-main/left-context, balanced diptych, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase patterns according to the slide claim. Use layout_rotation_guard so neighboring slides do not fall into the same composition by habit; repeated families should make comparison easier.
   Define and preserve one deck_header_master_lock with exact selected values, not ranges: coordinate_basis, header_safe_area, vertical_line x/y/w/h/color, header_line_top_rule, H1 x/y/w/max_lines/font_size/weight/line_height/color, subtitle x/y/w/max_lines/font_size/weight/line_height/color, visual_alignment, body_start_y, and upper_right_clear_zone. Repeat it verbatim across the deck. Treat the header as the lowest-freedom component; no_header_ranges_in_final_prompts.
   Include coordinate_inventory_1672 and reuse master_components before generating repeated objects.
-  Use Noto Sans JP style or closest clean Japanese sans-serif.
+  Use Noto Sans JP for every visible text string, including Latin/English letters, numbers, symbols, and Japanese. Do not mix in any other typeface; if exact font rendering is unavailable in image generation, use the closest Noto Sans JP-like rendering without changing the font family intent.
   For ATOM work, use #FCFBF8 to #F4F3EF slide base, #2D332E text, #4D544E subtitle, #6E756E footer/source/table-note text, and #0B2F5B Deep Blue structure.
   H1 30-34pt weight 700 #2D332E, subtitle 26-30pt weight 400 #4D544E, body 18pt equivalent. Use the exact default ATOM header: 1672 basis header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=48 w=10 h=104 #0B2F5B; header_line_top_rule line top at or 0-6px below visible H1 glyph top, never above; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.10 #2D332E; subtitle x=88 y=78 w=1332 max_lines=1 size=28pt weight=400 line_height=1.18 #4D544E; visual_alignment line top never protrudes above H1 and line bottom 4-8px below subtitle lower visual edge; body_start_y=190; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty. Two-line H1 fallback: vertical_line y=48 with h recalculated to end 4-8px below subtitle lower visual edge, subtitle y=112, body_start_y=224. No Deep Blue H1.
   Lock header and footer text colors as one Ink-family hierarchy: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E. Do not use Deep Blue, Honey, yellow, or arbitrary gray for header/footer text.
@@ -369,12 +400,13 @@ final_image_prompt:
   Do not include slide numbers, title kickers, numbered header badges, KEY INSIGHT labels, invented sources, or production-route source wording.
   Make the composition feel human-crafted through visible priority, breathing room, and editorial rhythm.
 
-negative_prompt:
-  pure black, old mustard, neon teal, generic gradient, glassmorphism, glow, heavy shadow,
-  stock template feel, oversized title, missing header line, short/thin header line, header line protruding above H1, header line taller than title/subtitle block, shifted H1, shifted subtitle, H1 inside body region, header safe area filled, header deformation, inconsistent outer padding, body content invading margins, accidental empty dead zone, overcrowded canvas, blue H1 in ATOM slides, blue footer text, honey footer text, yellow footer text, random footer gray, mismatched source color, generic icon-only composition, rough doodle, messy hand-drawn sketch, overpowered AI-looking illustration, trapezoid planes, fake perspective floor, isometric boxes, tilted slab, vanishing-point grid, pseudo-3D depth, central full-body robot, large city skyline, luminous touch point, heroic robot, abstract 3D, cinematic glow, decorative accent surface, patterned message box, textured message box, gradient message box, decorative motif inside message box, oversized message box, over-tall message box, bulky insight surface, message box text larger than H1, message box text competing with subtitle, message box as title, oversized insight text, unstable text weights, random bold text, strong yellow message box, saturated yellow fill, dark yellow fill, large yellow area, yellow title underline,
-  slide number, header number badge, title kicker, logo in upper-right clear zone, KEY INSIGHT label,
-  body text below 18pt equivalent, invented source, upload filename as source,
-  unresolved grid, unequal repeated cards, footer baseline drift, isolated floating accent headers
+negative_prompt_hard_blockers:
+  local-rendered substitute, non-gpt-image output, missing or malformed header line, header line protruding above H1,
+  H1/subtitle/source color drift, body content invading header/footer, unreadable body text below 18pt equivalent,
+  invented labels or sources, speaker notes visible on slide, unresolved grid, severe grid drift,
+  patterned or textured message box, oversized message box, message-box text competing with H1/subtitle,
+  saturated yellow message box, decorative pseudo-3D depth, photoreal stock imagery, rough sketch aesthetic,
+  mechanical left-main/right-rail repetition without comparison purpose, slide number, title kicker, logo in upper-right clear zone
 
 post_generation_audit:
   - image model is {IMAGE_MODEL}
@@ -396,6 +428,7 @@ post_generation_audit:
   - saturated yellow, dark yellow, or large yellow areas are absent
   - coordinate_inventory_1672 matches visible major objects
   - all major regions snap to grid/shared edges
+  - layout_family matches the slide claim, and layout_diversity_plan / layout_rotation_guard make deck-level composition feel intentionally varied rather than mechanically repeated
   - repeated elements are equalized
   - body text remains readable
   - embedded ATOM design system palette and typography are followed
@@ -407,14 +440,17 @@ post_generation_audit:
   - speaker_notes_text exists for deck slides but does not appear on the slide image
   - deck_tone_consistency_status is approved after comparing first third, middle third, and last third for palette, linework, icon family, illustration intensity, density rhythm, card geometry, and source behavior
   - post_generation_design_balance_check is approved on actual generated PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, header integrity, card/table height equalization, line-weight consistency, icon-family consistency, Deep Blue scatter, Honey strength, and human-designed operational diagram feel
-  - pre_google_slides_image_review has inspected the actual generated PNG, not only the prompt
+  - pre_package_image_review has inspected the actual generated PNG, not only the prompt
+  - pre_google_slides_image_review is also approved when Google Slides roll-up is requested
   - image_review_status is approved only when there are no blocker or major issues
-  - Google Slides roll-up starts only after final_image_quality_status is approved for every generated PNG
+  - PPTX roll-up starts only after final_image_quality_status is approved for every generated PNG
+  - PPTX roll-up contains one full-bleed generated PNG per slide in order, with speaker notes inserted when packaging supports notes
   - Google Slides roll-up, when requested, contains one full-bleed generated PNG per slide and speaker notes inserted on every corresponding slide
 
-pre_google_slides_image_review:
-  - Inspect the actual generated PNG with multimodal review before any Google Slides insertion.
+pre_package_image_review:
+  - Inspect the actual generated PNG with multimodal review before any PPTX or Google Slides insertion.
   - Score model route, exact text, header lock, grid/shared edges, typography, density, illustration clarity, human-designed feel, source hygiene, and speaker-notes separation.
+  - Score layout_family fit and layout_rotation_guard across the generated image set.
   - Score deck_tone_consistency across all generated PNGs after every generation or repair batch.
   - Score post_generation_design_balance_check: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
   - Classify each finding as blocker, major, minor, or accepted.
@@ -438,6 +474,10 @@ def deck_plan_tail() -> str:
       - slide_number:
         slide_claim:
         layout_archetype:
+        layout_family:
+        composition_family:
+        previous_layout_family:
+        repeat_or_change_reason:
         grid_mode:
         visual_richness_role:
         illustration_intensity:
@@ -459,6 +499,16 @@ def deck_plan_tail() -> str:
         information_unit_budget:
         density_guardrails:
   - deck_master_refs:
+  - layout_diversity_plan:
+  - layout_rotation_guard:
+  - layout_sequence_table:
+      - slide_number:
+        section_role:
+        claim_type:
+        layout_family:
+        composition_family:
+        previous_family:
+        repeat_or_change_reason:
   - deck_tone_master_lock:
   - visual_design_quality_traits:
   - deck_header_master_lock:
@@ -472,7 +522,23 @@ def deck_plan_tail() -> str:
   - source_collection_needs:
   - speaker_notes_plan:
   - pre_google_slides_review_plan:
-  - google_slides_rollup_plan:
+  - pre_package_image_review_plan:
+  - image_review_matrix:
+      - slide_id:
+        iteration:
+        png_path:
+        blockers:
+        majors:
+        repair_prompt:
+        new_png_path:
+        status:
+  - deck_consistency_matrix:
+      first_third:
+      middle_third:
+      last_third:
+      tone_layout_spacing_source_findings:
+  - pptx_rollup_plan:
+  - google_slides_rollup_plan: optional only when explicitly requested
   - slides_requiring_full_planning_block:
   - blocking_unresolved_items: all slide-level planning blocks remain required before image generation
 """
@@ -512,14 +578,29 @@ def text_structure_tail() -> str:
       speaker_notes_source_cues:
       speaker_notes_transition:
       pre_google_slides_image_review:
+      pre_package_image_review:
       image_review_iteration:
       image_review_status:
       image_review_findings:
       image_repair_prompt:
       image_repair_history:
+      image_review_matrix:
+        slide_id:
+        iteration:
+        png_path:
+        blockers:
+        majors:
+        repair_prompt:
+        new_png_path:
+        status:
       final_image_quality_status:
       deck_tone_consistency_review:
       deck_tone_consistency_status:
+      deck_consistency_matrix:
+        first_third:
+        middle_third:
+        last_third:
+        tone_layout_spacing_source_findings:
       visual_design_quality_traits:
       visual_structure: comparison / table / flow / roadmap / loop / matrix / KPI strip / architecture stack / signature visual
       visual_richness_role: restrained_signature_illustration / diagram_embedded_illustration / data_visual / icon_evidence / quiet_table
@@ -549,6 +630,12 @@ def text_structure_tail() -> str:
       message_box_scale_lock:
       message_box_text_size_lock:
       layout_archetype:
+      layout_family:
+      composition_family:
+      layout_diversity_plan:
+      layout_rotation_guard:
+      layout_sequence_table:
+      recent_layout_memory:
       grid_mode:
       exact_text:
         h1:
@@ -564,8 +651,13 @@ def text_structure_tail() -> str:
       prompt_text_budget:
       image_prompt_ready: yes/no
   title_readthrough_check:
+  layout_diversity_plan:
+  layout_rotation_guard:
+  layout_sequence_table:
   unresolved_items:
-  next_step: create canonical planning blocks for image_prompt_ready slides, run Codex built-in image generation pilot, then run pre_google_slides_image_review before any Google Slides insertion."""
+  pptx_rollup_plan:
+  google_slides_rollup_plan: optional only when explicitly requested
+  next_step: create canonical planning blocks for image_prompt_ready slides, run Codex built-in image generation pilot, then run pre_package_image_review before any PPTX or Google Slides insertion."""
 
 
 def audit_tail() -> str:

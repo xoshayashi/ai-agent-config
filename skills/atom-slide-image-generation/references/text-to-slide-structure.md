@@ -21,6 +21,9 @@ Use this reference when the input is a long memo, equity story, research note, t
 - Treat claim, evidence, visual, and source as separate jobs: claim says `so what`, evidence says `why believe`, visual says `how to see`, and source says `can we trust it`.
 - Map each claim to evidence and source policy before image prompting. Unsupported facts are either removed from the slide or marked as research/source needs.
 - Convert prose into visual grammar: comparison, table, flow, roadmap, loop, matrix, KPI strip, architecture stack, or signature visual. Avoid prose boxes as the default.
+- Use the expanded layout palette positively: full-field, left-main/right-rail, right-main/left-context, balanced diptych, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase families are all available when they clarify the claim.
+- Create `layout_diversity_plan` before final prompts. Let repeated layouts serve deliberate comparison, and let composition change when the claim role, evidence type, time horizon, or decision question changes.
+- Apply `layout_rotation_guard` during deck review so the sequence feels intentionally edited rather than locked to a single left-wide/right-narrow habit.
 - Plan visual richness before prompt writing, while keeping illustration subordinate to the argument. Do not let a long deck collapse into text/table slides, but do not overcorrect into glossy AI-looking hero art or rough sketch lines. Assign restrained human-designed editorial illustrations to chapter openers, turning points, and final vision slides; assign small diagram-embedded illustrations or data visuals to evidence and strategy slides; reserve quiet tables for truly tabular arguments.
 - Apply visual design quality traits as design treatment only: calm light base, compact fixed header, thin rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, and intentional canvas occupancy. Do not change slide count, claim order, or storyline solely to match a visual style.
 - Set illustration intensity before prompt writing: `0_none`, `1_marginal`, `2_integrated`, or `3_restrained_signature`. Use `3_restrained_signature` sparingly. Most slides should use `1_marginal` or `2_integrated`, where the chart, table, matrix, or roadmap remains primary.
@@ -35,7 +38,7 @@ Use this reference when the input is a long memo, equity story, research note, t
 - Lock deck-level header and footer masters before slide design. The header is the lowest-freedom component: every slide must reuse the same visible header elements, exact selected geometry, title color, subtitle size/color, visual alignment rule, body_start_y, and clear zone. Header fields must be exact values in final prompts, not ranges or loose descriptions.
 - Apply `header_line_top_rule`: the left vertical line top must sit at or slightly below the first visible H1 glyph top; upward protrusion is a blocker. If it fails, repair the line x/y/h before touching H1.
 - Apply `header_footer_text_color_lock`: H1 `#2D332E`, subtitle `#4D544E`, footer/source/table-note text `#6E756E`. Do not use Deep Blue, Honey, yellow, or arbitrary gray for header/footer text.
-- Define `deck_tone_master_lock` before image generation and check generated images for whole-deck tone consistency before Google Slides roll-up.
+- Define `deck_tone_master_lock` before image generation and check generated images for whole-deck tone consistency before PPTX or Google Slides roll-up.
 - After image generation, run `post_generation_design_balance_check` on actual PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
 - Use `visual_asset_judgment`: add illustration/icons only when they help understanding, memory, comparison, or navigation; do not add them by quota.
 - Keep long-text overflow outside the slide: use `claim_backlog`, `evidence_ledger`, and `appendix_candidates` rather than cramming all extracted points into the canvas.
@@ -83,7 +86,7 @@ Use this reference when the input is a long memo, equity story, research note, t
      - rollout plan -> phase roadmap
      - use cases -> grid/table
      - vision or chapter opener -> signature visual
-   - Assign `layout_archetype` and `grid_mode` before writing final on-slide text.
+   - Assign `layout_archetype`, `layout_family`, `layout_diversity_plan`, `layout_rotation_guard`, and `grid_mode` before writing final on-slide text.
    - Assign `visual_richness_role`: `restrained_signature_illustration`, `diagram_embedded_illustration`, `data_visual`, `icon_evidence`, or `quiet_table`.
    - Assign `illustration_intensity`: `0_none`, `1_marginal`, `2_integrated`, or `3_restrained_signature`.
    - Assign `creative_variance`: `low`, `medium`, or `high`.
@@ -99,19 +102,19 @@ Use this reference when the input is a long memo, equity story, research note, t
 
 7. **Deck Master Gate**
    - Define `deck_header_master_lock`, `header_footer_text_color_lock`, `footer_anchor_baseline`, `insight_surface_master`, and repeated table/card/icon masters before generating a deck.
-   - Fail any final prompt whose `deck_header_master_lock` is range-only or missing x/y/w/h/color/font values.
+   - Fail any final prompt whose `deck_header_master_lock` is range-only, missing x/y/w/h/color/font_family/font values, or uses any font family other than Noto Sans JP for visible text.
    - For ATOM-style guidelines, fail any plan whose H1 becomes Deep Blue, whose left vertical line is missing, whose left vertical line protrudes above the visible H1 glyph top, whose subtitle size/color drifts, whose body starts above the locked `body_start_y`, or whose header clear zone is filled.
 
 8. **Speaker Notes Plan**
    - Draft `speaker_notes_text` for every deck slide before image prompting.
    - Use the deck language unless the user specifies otherwise.
    - Notes should include: the spoken claim in plain language, the evidence or assumption to mention, source caveat or confidence level when relevant, and a transition to the next slide.
-   - Keep notes out of `exact_text` and out of the image prompt's on-slide text. Speaker notes belong in Google Slides notes pages after image generation.
+   - Keep notes out of `exact_text` and out of the image prompt's on-slide text. Speaker notes belong in PPTX or Google Slides notes pages after image generation.
    - Do not add unsupported facts, invented sources, internal prompt notes, file paths, or production-route language to speaker notes.
 
 9. **Image Prompt Handoff**
    - For each slide, output: action title, subtitle, exact text, visual structure, visual richness role, illustration intensity, density tier, coordinates, source policy, Insight decision, and negative prompt.
-   - Block generation until `layout_archetype`, `grid_mode`, `visual_richness_role`, `illustration_intensity`, `creative_variance`, `density_tier`, `source_policy`, `exact_text`, `speaker_notes_text`, `deck_header_master_lock`, `header_line_top_rule`, and `coordinate_inventory_1672` are resolved.
+   - Block generation until `layout_archetype`, `layout_family`, `layout_diversity_plan`, `layout_rotation_guard`, `grid_mode`, `visual_richness_role`, `illustration_intensity`, `creative_variance`, `density_tier`, `source_policy`, `exact_text`, `speaker_notes_text`, `deck_header_master_lock`, `header_line_top_rule`, and `coordinate_inventory_1672` are resolved.
    - Generate pilot slides first for any deck over 3 slides.
 
 ## Density Design Best Practices
@@ -230,6 +233,10 @@ visual_design_quality_traits:
 deep_blue_usage_lock:
 visual_asset_judgment:
 layout_archetype:
+layout_family:
+layout_diversity_plan:
+layout_rotation_guard:
+layout_sequence_table:
 grid_mode:
 exact_text:
 exact_text_budget:
@@ -239,6 +246,10 @@ density_risk:
 split_merge_decision:
 prompt_text_budget:
 image_prompt_ready:
+pptx_rollup_plan:
+pre_package_image_review:
+image_review_matrix:
+deck_consistency_matrix:
 unresolved_items:
 ```
 
