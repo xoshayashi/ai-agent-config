@@ -242,7 +242,7 @@ def canonical_planning_block(
     information_units: [claim, context, comparison, trend, mechanism, risk, implication, assumption, source]
     density_levers: [KPI strip, right rail, evidence strip, small multiples, annotation, benchmark/context column, source cue]
     overload_controls: [one dominant structure, max three major regions, body >=18pt equivalent, grouped labels, no decorative density]
-  information_unit_budget: [H1, subtitle, grouped body labels, decision-relevant data labels or rows, optional one-sentence Insight, optional source; no default cap on decision-relevant numbers]
+  information_unit_budget: [H1, subtitle, grouped body labels, decision-relevant data labels or rows, optional one-sentence Insight, required source when traceable; no default cap on decision-relevant numbers]
   density_guardrails: [preserve distinct claims, combine only repeated or shared-comparison slides, no smaller body text, no decorative illustration detail]
   header_anchor:
     vertical_line: exact x/y/w/h/color copied from deck_header_master_lock
@@ -257,8 +257,10 @@ def canonical_planning_block(
   message_box_scale_lock: compact interpretation surface; use the smallest legible variant; do not enlarge the box to carry long prose
   message_box_text_size_lock: message-box/Insight text default 20-24pt, 24-26pt only by exception; always at least 6pt smaller than selected H1, visually below subtitle, and never a second title
   table_note_microline: none / [one line above source baseline]
-  source_line: none / Source: [traceable source names copied from provided or researched sources only]
+  source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
+  source_line: Source: [traceable source names copied from provided or researched sources only] / none only when no traceable source exists
   source_policy: real traceable sources only; no draft, upload, internal-note, or production-route wording
+  source_density_rule: Do not drop real source names to reduce visual density; shorten or group source names instead.
   brand_accent_usage_budget: restrained visual area; for ACT work, Petrol uses 6-12% and never appears as body text
   petrol_usage_lock: exact #008A80 structural use; one active body Petrol system; no Petrol H1/subtitle/body/footer text; no extra teal/blue hues
   brand_accent_system_role: header band / rule / icon / number / badge / matrix highlight / none, adjusted to the embedded ACT design system
@@ -291,6 +293,7 @@ def mode_guidance(mode: str) -> str:
   - Define deck_thesis, audience_decision, storyline_frame, section_map, and slide-level action_title claims.
   - Plan slide 1 as opening_thesis_slide, not a title-only opener: include the core thesis, 2-4 proof/tension points, a real visual structure, and a narrative bridge.
   - Map every claim to evidence, source_policy, visual_structure, layout_archetype, grid_mode, exact_text_budget, and split_merge_decision.
+  - Apply source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists.
   - Build layout_diversity_plan: assign layout_family for each slide across full-field, balanced comparison, right-main, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase families when the argument benefits.
   - Use layout_rotation_guard to keep repeated structures purposeful: repeat a family for like-for-like comparison, and change family when claim type, evidence type, or decision question changes.
   - Draft speaker_notes_text for every slide: concise talk track, evidence/assumption cue, source caveat if relevant, and transition cue.
@@ -308,6 +311,7 @@ def mode_guidance(mode: str) -> str:
   - Use the embedded ACT design system in SKILL.md; do not load an external ACT pattern file.
   - Start with opening_thesis_slide rather than a title-only first slide: the opener should make the main phrase memorable while also showing the thesis, tension/proof points, structure, and bridge.
   - Select layout_archetype and grid_mode for every slide.
+  - Apply source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists.
   - Create layout_diversity_plan and layout_rotation_guard before final prompts so the deck can use the expanded pattern catalogue without drifting from ACT brand and header rules.
   - Define deck_header_master_lock before any slide-level prompt. Do not leave header coordinates as ranges.
   - Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide; use human-designed editorial/vector illustrations on chapter openers, turning points, complex systems, and final vision slides.
@@ -322,7 +326,7 @@ def mode_guidance(mode: str) -> str:
         return """mode_guidance:
   - Inspect the screenshot or rendered slide first.
   - Inventory visible header/footer, grid, row/column tracks, repeated sizes, typography, brand accent/Insight use, and source hygiene.
-  - Audit missing header line, H1 color drift, subtitle drift, missing illustration, overpowered AI-looking illustration, under-dense structure, and generic icon-only composition.
+  - Audit missing Source footer when traceable sources exist, missing header line, H1 color drift, subtitle drift, missing illustration, overpowered AI-looking illustration, under-dense structure, and generic icon-only composition.
   - Rebuild the canonical planning block from the observed slide before revising.
   - Fix grid drift and text overflow before color or decorative changes."""
     if mode == "audit":
@@ -406,6 +410,8 @@ draft_image_prompt_scaffold:
   Do not minimize numbers by default. Keep sourced or explicitly assumed numbers when they help comparison, sizing, prioritization, credibility, or decision-making; remove only unsupported, redundant, unreadable, or decorative numbers.
   Render ONLY the exact text strings listed in the planning block or final prompt; do not invent extra labels.
   Keep footer_anchor_baseline planned even when source_line is none.
+  Apply source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists.
+  Do not drop real source names to reduce visual density; shorten or group source names instead.
   Do not include slide numbers, title kickers, numbered header badges, KEY INSIGHT labels, invented sources, or production-route source wording.
   Make the composition feel human-crafted through visible priority, breathing room, and editorial rhythm.
 
@@ -445,7 +451,7 @@ post_generation_audit:
   - brand accent is structural and not body text
   - Insight component is selective, compatible with the embedded ACT design system, and not decorative
   - footer baseline is preserved
-  - Source is absent or real-source only
+  - Source footer follows source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
   - footer/source/table-note text uses #6E756E consistently when present
   - speaker_notes_text exists for deck slides but does not appear on the slide image
   - deck_tone_consistency_status is approved after comparing first third, middle third, and last third for palette, linework, icon family, illustration intensity, density rhythm, card geometry, and source behavior
@@ -503,7 +509,9 @@ def deck_plan_tail() -> str:
         density_tier:
         signature_visual_plan:
         insight_decision:
+        source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
         source_policy:
+        source_line:
         density_risk:
         speaker_notes_text:
         speaker_notes_source_cues:
@@ -597,7 +605,8 @@ def text_structure_tail() -> str:
       evidence_strength:
       source_span_ids:
       source_policy: real source / none / research needed
-      source_line: none / Source: [traceable source names copied from provided or researched sources only]
+      source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
+      source_line: Source: [traceable source names copied from provided or researched sources only] / none only when no traceable source exists
       source_urls:
       assumptions:
       speaker_notes_text:

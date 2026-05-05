@@ -55,6 +55,7 @@ Use this reference when the input is a long memo, equity story, research note, t
    - Identify audience, decision, intended use, language, required source strictness, and output count flexibility.
    - Use the embedded ACT design system in SKILL.md as the source of style and component truth.
    - Preserve source URLs and source names separately from the narrative.
+   - Apply `source_line_lock`: render `Source: ...` when traceable sources exist; use `source_line: none` only when no traceable source exists.
    - Split the input into chapters, paragraphs, data points, quotes, assumptions, and uncertainties. Assign stable `source_span_id` values when source tracing matters.
 
 2. **Storyline Frame**
@@ -76,7 +77,8 @@ Use this reference when the input is a long memo, equity story, research note, t
 4. **Claim To Evidence Map**
    - For each slide, list evidence type: sourced fact, user assumption, analogy, forecast, operating model, or strategic interpretation.
    - Keep `claim_backlog`, `evidence_ledger`, `source_ledger`, `appendix_candidates`, and `open_questions` separate from final slide text.
-   - Decide `source_line`: real traceable source / none / research needed.
+   - Decide `source_line`: `Source: ...` with real traceable source names / `none` only when no traceable source exists / research needed.
+   - Do not drop real source names to reduce visual density; shorten or group source names instead.
    - Do not place internal process notes, upload filenames, or draft provenance in Source.
 
 5. **Visual Structure Assignment**
@@ -127,7 +129,7 @@ Use this pass before slide-level prompts. Density is a design decision, not a co
 ### Density Ladder
 
 - `T1_sparse`: opener, chapter turn, or final vision. One claim, one strong visual or data point, optional subtitle. No body paragraph.
-- `T2_balanced`: default strategy page. One main figure/table/diagram plus 2-4 labels, one small context cue, optional source.
+- `T2_balanced`: default strategy page. One main figure/table/diagram plus 2-4 labels, one small context cue, and Source footer when traceable sources exist.
 - `T3_dense`: investor/evidence page. One main structure plus a KPI strip, right rail or evidence strip, chart annotations, units, benchmark/context column, and source cue.
 - `T4_appendix_dense`: reference page only when accepted. Table or small multiples can dominate, but visual grouping and typography must still be readable.
 
@@ -193,6 +195,7 @@ supporting_evidence:
 evidence_strength:
 source_span_ids:
 source_policy:
+source_line_lock:
 source_line:
 source_urls:
 assumptions:
@@ -267,6 +270,8 @@ unresolved_items:
 ## Source Notes
 
 These practices synthesize common executive-presentation guidance:
+
+- Source footers are part of credibility, not decoration. Render `Source: ...` when traceable sources exist; use `source_line: none` only when no traceable source exists, and shorten or group names instead of deleting them for density.
 
 - IBCS SUCCESS emphasizes saying a clear message, structuring content, simplifying clutter, and condensing information into high-density business communication: `https://www.ibcs.com/IBCS/`
 - Assertion-evidence guidance supports a claim headline plus visual proof instead of dense prose: `https://www.writing.engr.psu.edu/guidelines_AE_slides.pdf`

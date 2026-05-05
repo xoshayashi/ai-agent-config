@@ -58,6 +58,7 @@ For decks, use opening_density_gate on slide 1: make it an opening_thesis_slide,
 Request Noto Sans JP for every visible string, including Latin/English letters, numbers, symbols, and Japanese. Do not request or mix any other typeface; keep text short enough to audit.
 For ACT work, use Forest Charcoal #2D332E for H1/body, Ink-2 #4D544E for subtitle, Ink-3 #6E756E for footer/source/table-note text, Petrol #008A80 for structure, and Honey only as a quiet decision signal.
 Lock header/footer text colors as one Ink-family hierarchy: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E. Do not use Petrol, Honey, yellow, or arbitrary gray for header/footer text.
+source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists. Do not drop real source names to reduce visual density; shorten or group source names instead.
 No slide numbers, no title kicker, no numbered header badge.
 Avoid pure black, old Mustard, neon teal, heavy shadows, glow, glassmorphism, decorative gradients, and generic stock imagery.
 Use small Lucide-style line icons only as quiet wayfinding where they clarify reading order.
@@ -209,6 +210,7 @@ header_anchor:
   upper_right_clear_zone:
 footer_anchor_baseline:
 table_note_microline:
+source_line_lock:
 source_line:
 source_policy:
 brand_accent_usage_budget:
@@ -274,6 +276,8 @@ ACT slide contract:
 - lock footer_anchor_baseline even when source_line is none
 - lock header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E
 - keep source_line separate from table_note_microline
+- source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
+- Do not drop real source names to reduce visual density; shorten or group source names instead.
 - draft speaker_notes_text for every deck slide before image generation; keep notes off the slide image and out of the exact on-slide text
 - assign visual_richness_role, illustration_intensity, creative_variance, and density_tier before generation
 - define density_design before generation: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails
@@ -294,7 +298,7 @@ ACT slide contract:
 - apply message_box_scale_lock: keep Insight/message boxes compact, one short judgment sentence, one line preferred and two lines maximum; trim or move explanation to notes instead of growing the surface
 - keep Insight/message-box text 20-24pt by default, 24-26pt only by exception, at least 6pt smaller than H1, visually below subtitle; it must not become a second title or second hero headline
 - keep Honey quiet: no saturated yellow fill, no dark yellow message box, no large yellow area, and no Honey color variation across a deck
-- Source only if traceable real sources are available
+- Render Source: ... in the footer whenever traceable real sources are available; source_line: none is allowed only when no traceable source exists
 - final bitmap generation must use gpt-image-2
 - if actual Codex built-in image generation is blocked, stop and report the blocker; do not create final images via code rendering or a user-key workaround
 - after all generated PNGs pass QA, create a PPTX roll-up unless the user asks for image files only: one full-bleed generated PNG per slide, same order, no extra overlays, and speaker notes inserted when supported; create Google Slides only when explicitly requested
@@ -360,6 +364,7 @@ Output:
     evidence_strength:
     source_span_ids:
     source_policy:
+    source_line_lock:
     source_line:
     source_urls:
     assumptions:
