@@ -25,7 +25,13 @@ Entrypoints (`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`) route here. `DESIGN.md` 
 
 - Prefer existing project patterns over new abstractions.
 - Use the narrowest verification that gives real confidence.
+- For user-facing app or workflow fixes, verify the actual path the user will
+  run: entrypoint command, visible state, logs, and error surface. Tests alone
+  are not enough when the reported failure is interactive or runtime-visible.
 - If an attempt repeatedly fails, stop guessing and check the relevant source of truth.
+- When a dirty worktree or parallel agent/user activity changes files during
+  your task, re-read affected files and diffs before final judgment, commit, or
+  review findings.
 - When changing shared instructions or entrypoints in this repository, update matching docs and validation checks in the same pass.
 
 ## Human-Visible Output
