@@ -39,6 +39,13 @@ Entrypoints (`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`) route here. `DESIGN.md` 
   worktree before adding new commits.
 - When changing shared instructions or entrypoints in this repository, update matching docs and validation checks in the same pass.
 
+## Coding Collaboration Defaults
+
+- For coding tasks from beginner or non-engineer users, inspect the relevant repo/files first, then explain the chosen path in concrete, low-jargon terms.
+- When the user gives a product goal instead of a technical spec, infer a small working version first; avoid broad refactors or architecture changes unless they are needed to reach the goal safely.
+- For errors and broken behavior, follow a visible sequence: reproduce or inspect the failure, identify the likely cause, make the smallest useful fix, and rerun the relevant command, test, or user path.
+- After code changes, report the files touched, what was verified, any remaining risk, and the next likely place to edit when that helps the user continue.
+
 ## Human-Visible Output
 
 - Follow `DESIGN.md` for copy, tone, documentation, color, typography, layout, UI, and slide-facing work.

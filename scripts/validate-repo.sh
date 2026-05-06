@@ -118,6 +118,10 @@ grep -Fq "Codex App Automations" "$repo_root/README.md" \
   || fail "README.md must prefer Codex App Automations for daily review docs"
 grep -Fq "Codex App Automations" "$repo_root/setup.md" \
   || fail "setup.md must prefer Codex App Automations for daily review docs"
+grep -Fq '## Coding Collaboration Defaults' "$repo_root/instructions/AI_AGENT_INSTRUCTIONS.md" \
+  || fail "shared instructions must include coding collaboration defaults"
+grep -Fq 'Coding Collaboration Defaults' "$repo_root/README.md" \
+  || fail "README.md must mention coding collaboration defaults"
 grep -Fq 'daily-llm-history-instruction-review' "$repo_root/docs/codex-automation-daily-review.md" \
   || fail "Codex automation guide must include the daily review skill name"
 for launchd_doc in "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/docs/codex-automation-daily-review.md"; do
