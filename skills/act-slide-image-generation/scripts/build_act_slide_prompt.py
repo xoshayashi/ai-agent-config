@@ -285,6 +285,8 @@ def canonical_planning_block(
   header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E; no Petrol/Honey/arbitrary gray in header or footer text
   message_box_scale_lock: compact interpretation surface; use the smallest legible variant; do not enlarge the box to carry long prose
   message_box_text_size_lock: message-box/Insight text default 20-24pt, 24-26pt only by exception; always at least 6pt smaller than selected H1, visually below subtitle, and never a second title
+  message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface; plan line box, padding, and baseline so the sentence sits at the visual center
+  insight_surface_placement_lock: when an Insight/message-box is kept, place it as a deliberate interpretation bridge tied to the body silhouette and footer baseline; bottom variants sit in the breathing space between body content and Source, centered to the interpreted region or full body block, with Source kept separate on its invisible baseline
   max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
   table_note_microline: none / [one text note line above source text; not a horizontal rule]
   source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
@@ -310,6 +312,8 @@ def canonical_planning_block(
     padding: [px]
     left_accent: [Honey uses #C49A2C 4-5px full-height left line; Petrol uses embedded ACT design system accent line spec]
     background: [flat solid fill color only; Honey message box uses #F5E2A8; no pattern, texture, gradient, motif, or internal illustration]
+    text_alignment: [optically centered horizontally and vertically within the surface]
+    placement_relation: [inside the 12-column grid; tied to the interpreted body region; bottom variants bridge body content and Source without touching either]
     text: [one judgment sentence if kept]
   human_crafted_feel: priority, breathing room, editorial rhythm
   qa_risks: [overcrowding, weak hierarchy, source uncertainty, decorative accent surface, unresolved grid]
@@ -460,6 +464,8 @@ draft_image_prompt_scaffold:
   Use flat solid fills for all message boxes and Insight surfaces; do not add patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
   Apply message_box_scale_lock: message boxes are compact interpretation surfaces, not display surfaces; keep copy to one short judgment sentence, prefer one line, max two lines, and do not enlarge the surface to rescue long prose.
   Apply message_box_text_size_lock: message-box/Insight text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below the subtitle, and never becomes a second title or second hero headline.
+  Apply message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface; use balanced padding and line-box placement so the sentence reads intentional, not baseline-drifted.
+  Apply insight_surface_placement_lock: when kept, the Insight/message-box belongs to the body composition and footer rhythm; bottom variants sit in the breathing space between body content and Source, centered to the interpreted region or full body block, while Source remains a separate footer cue on its invisible baseline.
   Enforce max_text_size_lock across every visible string; do not use display typography, hero numerals, badges, or message-box text above the cap.
   Keep Honey quiet and consistent: no saturated yellow fills, no dark yellow message boxes, no large yellow areas, no yellow title underline, and no Honey color variation across a deck.
   Use illustrations/icons when they help understanding, memory, comparison, or navigation; do not add them by quota. A slide with no icon or illustration is acceptable when the structure already carries the claim.
@@ -508,6 +514,8 @@ post_generation_audit:
   - message boxes and Insight surfaces use flat solid fills only, with no decorative patterns or motifs
   - message_box_scale_lock is honored: message boxes stay compact and are not enlarged to carry long prose
   - message_box_text_size_lock is honored: message-box/Insight text is smaller than H1 and subtitle and never reads as a second title
+  - message_box_text_alignment_lock is honored: Insight/message-box text is optically centered horizontally and vertically inside the surface
+  - insight_surface_placement_lock is honored: kept Insight/message-box surfaces bridge the interpreted body region and footer rhythm, and bottom variants sit between body content and Source without competing with either
   - Honey message boxes use #F5E2A8 fill, #C49A2C 4-5px left accent line, and #2D332E text consistently
   - saturated yellow, dark yellow, or large yellow areas are absent
   - coordinate_inventory_1672 matches visible major objects

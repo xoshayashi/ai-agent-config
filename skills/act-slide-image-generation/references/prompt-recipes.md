@@ -528,6 +528,9 @@ Evaluate:
 - Which choice is quietest and clearest under the embedded ACT design system: none, outlined thesis, outlined bottom, brand surface, dark brand surface, or Honey surface when ACT?
 - If Honey is chosen, does it help the reader decide faster?
 - Does the Honey component use the fixed pale treatment (#F5E2A8 fill, #C49A2C 4-5px left line, #2D332E text)?
+- Is the Insight/message-box footprint tied to the interpreted body region and footer rhythm rather than floating in leftover space?
+- For bottom variants, does it sit as a centered bridge between body content and Source, with clear breathing room above and below?
+- Is the Insight/message-box text optically centered inside the surface both horizontally and vertically?
 
 Output:
 - keep/remove
@@ -596,6 +599,8 @@ Layout:
 - Editorial polish repair has improved specificity, proportion, rhythm, and focal hierarchy
 - repeated elements are equalized
 - supporting region and Insight do not compete
+- Insight/message-box placement is integrated with the body silhouette and Source baseline rather than used as a patch for an empty corner
+- Insight/message-box text is optically centered horizontally and vertically within its surface
 
 Typography:
 - max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
@@ -613,6 +618,7 @@ Content:
 - density_design answers a clear decision_question and does not rely on smaller type or decorative detail
 - information units are grouped and each added layer improves the claim
 - Insight adds interpretation, not repetition
+- Insight/message-box placement creates a calm reading bridge between the relevant content and the footer when used at the bottom
 - Source is optional and real-source only
 - source_line and table_note_microline are separate
 - source_separator_lock passes: no horizontal divider, rule, underline, or hairline appears above Source

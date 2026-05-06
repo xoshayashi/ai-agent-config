@@ -45,6 +45,8 @@ Use this reference when the input is a long memo, equity story, research note, t
 - Message boxes and Insight surfaces should use a flat solid fill only. Do not add patterns, textures, gradients, motifs, icon wallpaper, or internal illustration inside message boxes.
 - Apply `message_box_scale_lock`: Insight/message-box components are compact interpretation surfaces, not display surfaces. Prefer one short judgment sentence, one line when possible and two lines maximum; trim or move explanation to notes instead of enlarging the box.
 - Apply `message_box_text_size_lock`: Insight/message-box text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than H1, and must not become a second title or compete with subtitle.
+- Apply `message_box_text_alignment_lock`: Insight/message-box text sits at the optical center of the surface, both horizontally and vertically, using balanced padding and a centered line box.
+- Apply `insight_surface_placement_lock`: decide the Insight footprint with the body silhouette and footer rhythm. Bottom Insight variants should bridge the body content and Source footer area with clear breathing room, centered to the interpreted region or full body block, while Source remains separate on its invisible baseline.
 - Apply `max_text_size_lock`: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
 - Lock deck-level header and footer masters before slide design. The header is the lowest-freedom component: every slide must reuse the same visible header elements, exact selected geometry, title color, subtitle size/color, visual alignment rule, body_start_y, and clear zone. Header fields must be exact values in final prompts, not ranges or loose descriptions.
 - Apply `header_line_top_rule`: the left vertical line top must sit at or slightly below the first visible H1 glyph top; upward protrusion is a blocker. If it fails, repair the line x/y/h before touching H1.
@@ -254,6 +256,8 @@ header_footer_text_color_lock:
   forbidden_text_colors: Petrol, Honey, yellow, arbitrary gray
 message_box_scale_lock:
 message_box_text_size_lock:
+message_box_text_alignment_lock:
+insight_surface_placement_lock:
 max_text_size_lock:
 imageability_lock:
 concrete_visual_anchor:
@@ -305,6 +309,7 @@ These practices synthesize common executive-presentation guidance:
 
 - Source footers are part of credibility, not decoration. Render `Source: ...` when traceable sources exist; use `source_line: none` only when no traceable source exists, and shorten or group names instead of deleting them for density.
 - Source footers sit on an invisible alignment baseline. Do not draw a horizontal divider, rule, underline, or hairline above Source.
+- Source footers remain separate from Insight/message-box text. Treat the space above Source as part of the composition rhythm: it can hold a centered bottom Insight when interpretation is useful, but the Insight and Source should read as two different layers.
 
 - IBCS SUCCESS emphasizes saying a clear message, structuring content, simplifying clutter, and condensing information into high-density business communication: `https://www.ibcs.com/IBCS/`
 - Assertion-evidence guidance supports a claim headline plus visual proof instead of dense prose: `https://www.writing.engr.psu.edu/guidelines_AE_slides.pdf`
