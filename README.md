@@ -86,5 +86,6 @@ sh /path/to/ai-agent-config/scripts/uninstall.sh
 ## 保守方針
 
 - 構成は `instructions/`、`scripts/`、必要に応じた `skills/`、最小 docs、CI validation、on-demand PR review workflow、Codex Automations ベースの日次 instruction レビューに絞ります。
+- 初心者向けの coding support は `instructions/AI_AGENT_INSTRUCTIONS.md` の `Coding Collaboration Defaults` に集約し、長い個別プロンプト例を常時ロードしないようにします。
 - Instruction の構造を変えたら、`README.md`、`setup.md`、`scripts/validate-repo.sh` も同じ変更で合わせます。
 - 履歴レビューで Instruction を変える場合は、既存文言に有機的に統合し、単なる追記を避けます。
