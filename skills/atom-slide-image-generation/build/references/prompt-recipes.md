@@ -66,7 +66,7 @@ Generate at 1536x864 for drafts, 2048x1152 for 16:9 2K-width working review, or 
 Plan all layout using a 1672x941 coordinate basis, with ATOM delivery target 1920x1080 after resize if required.
 Treat 1920x1080 as FHD/1080p delivery, 2048x1152 as practical 16:9 2K-width generation, and 3840x2160 as 4K UHD generation.
 Use a shared 12-column grid, 8px spacing rhythm, and precise header/footer anchors.
-For decks, define and reuse one deck header master. Treat the header as the lowest-freedom component: repeat the same left vertical line, H1, subtitle, visual alignment rule, body-start y, header safe area, and clear zone in every slide prompt. no_header_ranges_in_final_prompts: final prompts must use exact selected x/y/w/h/color/font_family/font values for the header, not ranges. Apply header_line_top_rule: the line top must sit at or slightly below the first visible H1 glyph top, never above it just because the text box starts higher.
+For decks, define and reuse one deck header master. Treat the header as the lowest-freedom component: repeat the same left accent, H1, subtitle, visual alignment rule, body-start y, header safe area, and clear zone in every slide prompt. no_header_ranges_in_final_prompts: final prompts must use exact selected x/y/w/h/color/font_family/font values for the header, not ranges. Apply header_left_accent_master_lock: the accent is a fixed header-block anchor tied to the H1/subtitle stack and copied verbatim across the deck, not a page-edge rail, tall sidebar, body marker, chapter stripe, or ornament. Apply header_left_accent_reference_lock: match the approved 1672x941 reference geometry x=50 y=40 w=10 h=120 color #0B2F5B unless a newer embedded master is supplied. Apply header_left_accent_shape_lock: one solid 10px vertical rectangle, square or 0-2px radius ends, no pill caps, glow, shadow, gradient, split segments, or duplicate marks. Apply header_left_accent_controlled_overhang_rule: controlled 8-16px top overhang above the first visible H1 glyph top is correct because the accent anchors H1 + subtitle. Apply header_left_accent_top_protrusion_blocker: more than 18px above H1, page-top floating, clipping outside header_safe_area, detachment from H1/subtitle, or body intrusion is a blocker.
 For decks, apply deck_tone_signature_lock: preserve one material system for base, typography, rule weight, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior while varying only claim-led layouts.
 For decks, define layout_diversity_plan and layout_rotation_guard before final prompts. Choose layout families from full-field, asymmetric main/supporting-context, balanced diptych, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase patterns according to the slide claim and evidence type.
 For decks, apply post_generation_full_deck_review_loop: after generating slide PNGs, review every actual image before claiming completion. Maintain all_generated_images_reviewed, weak_slide_regeneration_queue, content_quality_status, design_quality_status, deck_unity_status, final_image_quality_status, and completion_ready_status; use regenerate_until_quality_approved until the queue is empty or generation is blocked.
@@ -218,6 +218,11 @@ deck_header_master_lock:
   header_safe_area:
   vertical_line:
   header_line_top_rule:
+  header_left_accent_master_lock:
+  header_left_accent_reference_lock:
+  header_left_accent_shape_lock:
+  header_left_accent_controlled_overhang_rule:
+  header_left_accent_top_protrusion_blocker:
   h1:
   subtitle:
   visual_alignment:
@@ -362,7 +367,7 @@ ATOM slide contract:
 - max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
 - use ATOM typography: H1 30-34pt, subtitle 26-30pt, body 18pt equivalent
 - use ATOM header rules: H1 Charcoal Ink #2D332E, subtitle #4D544E, exact left vertical line, no blue H1
-- use the default exact ATOM header unless the user explicitly provides a newer embedded master: 1672x941 basis; header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=48 w=10 h=104 #0B2F5B; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.10 #2D332E; subtitle x=88 y=78 w=1332 max_lines=1 size=28pt weight=400 line_height=1.18 #4D544E; visual_alignment line top at or 0-6px below visible H1 glyph top, never above; line bottom 4-8px below subtitle lower visual edge; body_start_y=190; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty
+- use the default exact ATOM header unless the user explicitly provides a newer embedded master: 1672x941 basis; header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=40 w=10 h=120 #0B2F5B; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.10 #2D332E; subtitle x=88 y=78 w=1332 max_lines=1 size=28pt weight=400 line_height=1.18 #4D544E; visual_alignment accent top uses controlled 8-16px overhang above the first visible H1 glyph top, never more than 18px above it, and accent bottom sits 4-10px below subtitle lower visual edge; body_start_y=190; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty
 - make the slide feel human-crafted through priority, breathing room, and editorial rhythm
 - keep the slide in a strategy operating-deck look: useful occupancy, small explanatory visuals, crisp rules, low-contrast surfaces, and no ornamental depth
 - let structure, spacing, rules, numbers, and typography carry hierarchy
@@ -586,7 +591,7 @@ Repair this slide image prompt for text balance, grid fidelity, and visual hiera
 
 Priority:
 1. Do not solve crowding by shrinking body text below 18pt equivalent.
-2. Keep ATOM header fixed: H1 30-34pt #2D332E, subtitle 26-30pt #4D544E, exact left vertical line, header_line_top_rule, and no header ranges in the final prompt.
+2. Keep ATOM header fixed: H1 30-34pt #2D332E, subtitle 26-30pt #4D544E, exact header-block left accent, header_left_accent_reference_lock, header_left_accent_controlled_overhang_rule, header_left_accent_top_protrusion_blocker, and no header ranges in the final prompt.
 3. Rebuild grid_mode, column_spans, row_tracks, column_tracks, separator_x, outer_padding, and shared_edges.
 4. Add coordinate_inventory_1672 and master_components if missing.
 5. Remove repeated explanation and weak labels.
@@ -624,7 +629,11 @@ Layout:
 - coordinate_inventory_1672 and master_components exist
 - row_tracks, column_tracks, equalized_groups, shared_edges exist
 - header/footer anchors are fixed with exact values, not ranges
-- header_line_top_rule passes: the left vertical line top is at or below the first visible H1 glyph top and never protrudes upward
+- header_left_accent_master_lock passes: the accent is a fixed header-block anchor spanning H1 + subtitle, not a page-edge rail, tall sidebar, body marker, chapter stripe, or ornament
+- header_left_accent_reference_lock passes: the accent matches the approved reference geometry x=50 y=40 w=10 h=120 on the 1672x941 basis unless a newer embedded master is supplied
+- header_left_accent_shape_lock passes: the accent is one solid 10px vertical rectangle with square or 0-2px radius ends and no pill cap, glow, shadow, gradient, split segment, or duplicate mark
+- header_left_accent_controlled_overhang_rule passes: the top uses a controlled 8-16px overhang above the first visible H1 glyph top
+- header_left_accent_top_protrusion_blocker passes: no visible accent pixel sits more than 18px above the first visible H1 glyph top, outside header_safe_area, detached from H1/subtitle, or inside body_start_y
 - Whitespace and occupancy balance is intentional: no accidental empty dead zone, no overcrowded canvas, no content crushing the margins
 - Secondary regions in split or auxiliary-region layouts read as complete decision panels, not loose leftover areas
 - Body silhouette is closed: main and secondary regions share intentional outer edges, lower edges, and footer clearance

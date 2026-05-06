@@ -72,6 +72,11 @@ PLACEHOLDER_BLOCKERS = [
     "density_guardrails",
     "overload_controls",
     "header_anchor",
+    "header_left_accent_master_lock",
+    "header_left_accent_reference_lock",
+    "header_left_accent_shape_lock",
+    "header_left_accent_controlled_overhang_rule",
+    "header_left_accent_top_protrusion_blocker",
     "footer_anchor_baseline",
     "header_footer_text_color_lock",
     "message_box_scale_lock",
@@ -268,11 +273,16 @@ def canonical_planning_block(
     coordinate_basis: 1672x941
     status: exact_required_before_generation
     header_safe_area: [x/y/w/h exact selected values; ATOM default x=44 y=24 w=1584 h=136]
-    vertical_line: [x/y/w/h/color exact selected values; ATOM default x=50 y=48 w=10 h=104 color #0B2F5B]
-    header_line_top_rule: [line top at or 0-6px below visible H1 glyph top, never above; upward protrusion is blocker]
+    vertical_line: [x/y/w/h/color exact selected values; ATOM default x=50 y=40 w=10 h=120 color #0B2F5B]
+    header_line_top_rule: [accent top may sit 8-16px above first visible H1 glyph top as a header-block anchor; never more than 18px above H1, outside header_safe_area, or detached from H1/subtitle]
+    header_left_accent_master_lock: [single header-block left accent copied verbatim on every slide; it spans the H1 + subtitle stack; it is not a page-edge rail, sidebar, body marker, chapter stripe, or slide-specific decoration]
+    header_left_accent_reference_lock: [match approved reference geometry on a 1672x941 basis: x=50 y=40 w=10 h=120 color #0B2F5B]
+    header_left_accent_shape_lock: [single solid vertical rectangle, 10px wide, 0-2px radius, no pill caps, shadow, glow, gradient, split segments, or duplicate accent]
+    header_left_accent_controlled_overhang_rule: [controlled 8-16px top overhang above the H1 glyph top is correct; uncontrolled page-top protrusion is not]
+    header_left_accent_top_protrusion_blocker: [any accent top more than 18px above the first visible H1 glyph top, clipped/floating near page top, detached from H1/subtitle, or extending into body_start_y is a blocker]
     h1: [x/y/w/max_lines/font_family/font_size/weight/line_height/color exact selected values; ATOM default x=88 y=34 w=1332 max_lines=1 font_family=Noto Sans JP size=32pt weight=700 line_height=1.10 color #2D332E]
     subtitle: [x/y/w/max_lines/font_family/font_size/weight/line_height/color exact selected values; ATOM default x=88 y=78 w=1332 max_lines=1 font_family=Noto Sans JP size=28pt weight=400 line_height=1.18 color #4D544E]
-    visual_alignment: [visible line top at or 0-6px below visible H1 glyph top; visible line bottom 4-8px below subtitle lower visual edge; never protrude upward]
+    visual_alignment: [visible accent top uses controlled 8-16px header-block overhang above H1 glyph top; visible accent bottom lands 4-10px below subtitle lower visual edge; no uncontrolled upward protrusion]
     body_start_y: [exact selected value; ATOM default 190, or 224 only if explicit two-line H1 fallback is declared]
     upper_right_clear_zone: [x/y/w/h exact selected values and empty; ATOM default x=1420 y=24 w=208 h=88]
     forbidden_header_elements: [slide number, title kicker, header badge, logo/right object unless guideline requires it, body objects above body_start_y]
@@ -305,6 +315,11 @@ def canonical_planning_block(
   header_anchor:
     vertical_line: exact x/y/w/h/color copied from deck_header_master_lock
     header_line_top_rule: copied from deck_header_master_lock and checked after generation
+    header_left_accent_master_lock: exact header-block left accent spanning H1 + subtitle; not a page-edge rail, sidebar, body marker, or decoration
+    header_left_accent_reference_lock: exact reference geometry x=50 y=40 w=10 h=120 on 1672x941 basis unless a newer embedded master is supplied
+    header_left_accent_shape_lock: single solid vertical rectangle, 10px wide, 0-2px radius, no cap/glow/shadow/gradient/split
+    header_left_accent_controlled_overhang_rule: controlled 8-16px top overhang above H1 glyph top is correct
+    header_left_accent_top_protrusion_blocker: top more than 18px above H1 glyph top, page-top floating, clipping, detachment from H1/subtitle, or body intrusion is a blocker; repair x/y/h before any other polish
     h1: exact x/y/w/max_lines/font_family/font_size/weight/line_height/color copied from deck_header_master_lock
     subtitle: exact x/y/w/max_lines/font_family/font_size/weight/line_height/color copied from deck_header_master_lock
     visual_alignment: exact visual alignment rule copied from deck_header_master_lock
@@ -474,12 +489,17 @@ draft_image_prompt_scaffold:
   Apply secondary_region_integrity_lock: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field.
   Apply body_silhouette_lock: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions.
   Apply layout_diversity_plan at deck level: choose layout families from full-field, asymmetric main/supporting-context, balanced diptych, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase patterns according to the slide claim. Use layout_rotation_guard so neighboring slides do not fall into the same composition by habit; repeated families should make comparison easier.
-  Define and preserve one deck_header_master_lock with exact selected values, not ranges: coordinate_basis, header_safe_area, vertical_line x/y/w/h/color, header_line_top_rule, H1 x/y/w/max_lines/font_size/weight/line_height/color, subtitle x/y/w/max_lines/font_size/weight/line_height/color, visual_alignment, body_start_y, and upper_right_clear_zone. Repeat it verbatim across the deck. Treat the header as the lowest-freedom component; no_header_ranges_in_final_prompts.
+  Apply header_left_accent_master_lock: the left accent is a fixed header-block anchor tied to the H1/subtitle stack and copied verbatim on every slide; it is not a page-edge rail, tall sidebar, body marker, chapter stripe, or slide-specific ornament.
+  Apply header_left_accent_reference_lock: match the approved reference geometry on a 1672x941 basis unless a newer embedded master is explicitly supplied: x=50 y=40 w=10 h=120, color #0B2F5B.
+  Apply header_left_accent_shape_lock: draw one solid vertical rectangle only, 10px wide, with square or 0-2px radius ends and no pill caps, shadow, glow, gradient, split segments, duplicate marks, or decorative extension.
+  Apply header_left_accent_controlled_overhang_rule: a controlled 8-16px top overhang above the first visible H1 glyph top is correct because the accent anchors the whole H1 + subtitle header block.
+  Apply header_left_accent_top_protrusion_blocker: if the accent top is more than 18px above the first visible H1 glyph top, floats near the page top, clips outside the header safe area, detaches from the H1/subtitle stack, or enters body_start_y, mark the slide repair_required and fix the accent x/y/h before any other polish.
+  Define and preserve one deck_header_master_lock with exact selected values, not ranges: coordinate_basis, header_safe_area, vertical_line x/y/w/h/color, header_line_top_rule, header_left_accent_master_lock, header_left_accent_reference_lock, header_left_accent_controlled_overhang_rule, H1 x/y/w/max_lines/font_size/weight/line_height/color, subtitle x/y/w/max_lines/font_size/weight/line_height/color, visual_alignment, body_start_y, and upper_right_clear_zone. Repeat it verbatim across the deck. Treat the header as the lowest-freedom component; no_header_ranges_in_final_prompts.
   Include coordinate_inventory_1672 and reuse master_components before generating repeated objects.
   Use Noto Sans JP for every visible text string, including Latin/English letters, numbers, symbols, and Japanese. Do not mix in any other typeface; if exact font rendering is unavailable in image generation, use the closest Noto Sans JP-like rendering without changing the font family intent.
   Apply max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
   For ATOM work, use #FCFBF8 to #F4F3EF slide base, #2D332E text, #4D544E subtitle, #6E756E footer/source/table-note text, and #0B2F5B Deep Blue structure.
-  H1 30-34pt weight 700 #2D332E, subtitle 26-30pt weight 400 #4D544E, body 18pt equivalent. Use the exact default ATOM header: 1672 basis header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=48 w=10 h=104 #0B2F5B; header_line_top_rule line top at or 0-6px below visible H1 glyph top, never above; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.10 #2D332E; subtitle x=88 y=78 w=1332 max_lines=1 size=28pt weight=400 line_height=1.18 #4D544E; visual_alignment line top never protrudes above H1 and line bottom 4-8px below subtitle lower visual edge; body_start_y=190; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty. Two-line H1 fallback: vertical_line y=48 with h recalculated to end 4-8px below subtitle lower visual edge, subtitle y=112, body_start_y=224. No Deep Blue H1.
+  H1 30-34pt weight 700 #2D332E, subtitle 26-30pt weight 400 #4D544E, body 18pt equivalent. Use the exact default ATOM header: 1672 basis header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=40 w=10 h=120 #0B2F5B; header_line_top_rule accent top may sit 8-16px above the first visible H1 glyph top and never more than 18px above it; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.10 #2D332E; subtitle x=88 y=78 w=1332 max_lines=1 size=28pt weight=400 line_height=1.18 #4D544E; visual_alignment accent spans the H1 + subtitle block with controlled top overhang and bottom 4-10px below subtitle lower visual edge; body_start_y=190; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty. Two-line H1 fallback: vertical_line y=40 with h recalculated to end 6-10px below subtitle lower visual edge, subtitle y=112, body_start_y=224. No Deep Blue H1.
   Lock header and footer text colors as one Ink-family hierarchy: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E. Do not use Deep Blue, Honey, yellow, or arbitrary gray for header/footer text.
   Let structure, numbers, rules, spacing, and typography carry the hierarchy.
   Use small Lucide-style line icons as quiet wayfinding only when they clarify reading order, evidence, or interaction.
@@ -517,7 +537,7 @@ draft_image_prompt_scaffold:
   Make the composition feel human-crafted through visible priority, breathing room, and editorial rhythm.
 
 negative_prompt_hard_blockers:
-  local-rendered substitute, non-gpt-image output, missing or malformed header line, header line protruding above H1,
+  local-rendered substitute, non-gpt-image output, missing or malformed header line, uncontrolled header accent protrusion, header accent floating near page top,
   H1/subtitle/source color drift, horizontal divider above Source, body content invading header/footer, visible text above max_text_size_lock, unreadable body text below 18pt equivalent,
   invented labels or sources, speaker notes visible on slide, unresolved grid, severe grid drift, hard-to-picture abstract visual,
   patterned or textured message box, oversized message box, message-box text competing with H1/subtitle,
@@ -530,7 +550,10 @@ post_generation_audit:
   - image_size {size} is valid for gpt-image-2, labeled as {size_label(size)}, and final delivery is resized only after generation if needed
   - H1 and subtitle hierarchy is clear
   - max_text_size_lock is honored: no visible text exceeds 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
-  - deck_header_master_lock is visible and consistent; left header line is present, obeys header_line_top_rule, does not protrude above the H1 glyph top, and H1 color follows the embedded ATOM design system
+  - deck_header_master_lock is visible and consistent; left header accent is present, matches header_left_accent_reference_lock unless superseded by a newer embedded master, obeys header_line_top_rule and header_left_accent_master_lock, anchors the H1 + subtitle stack, is not a page-edge rail/sidebar/body marker, and H1 color follows the embedded ATOM design system
+  - header_left_accent_shape_lock passes: the accent is one solid 10px vertical rectangle with no pill cap, glow, shadow, gradient, duplicate mark, or decorative extension
+  - header_left_accent_controlled_overhang_rule passes: the accent has the approved controlled top overhang above H1, not a clipped or floating page-top protrusion
+  - header_left_accent_top_protrusion_blocker passes: no visible accent pixel sits more than 18px above the first visible H1 glyph top, outside header_safe_area, detached from H1/subtitle, or inside body_start_y
   - header_footer_text_color_lock is honored: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E
   - header/footer text does not use Deep Blue, Honey, yellow, or arbitrary gray
   - illustration_tone_lock is honored: all illustrations share one flat 2D editorial vector system across the generated PNG set
@@ -701,6 +724,11 @@ def deck_plan_tail() -> str:
   - visual_design_quality_traits:
   - deck_header_master_lock:
   - header_line_top_rule:
+  - header_left_accent_master_lock:
+  - header_left_accent_reference_lock:
+  - header_left_accent_shape_lock:
+  - header_left_accent_controlled_overhang_rule:
+  - header_left_accent_top_protrusion_blocker:
   - deep_blue_usage_lock:
   - visual_asset_judgment:
   - visual_richness_mix_plan:
@@ -869,6 +897,11 @@ def text_structure_tail() -> str:
       density_guardrails:
       deck_header_master_lock:
       header_line_top_rule:
+      header_left_accent_master_lock:
+      header_left_accent_reference_lock:
+      header_left_accent_shape_lock:
+      header_left_accent_controlled_overhang_rule:
+      header_left_accent_top_protrusion_blocker:
       deck_tone_master_lock:
       illustration_tone_lock:
       illustration_style_sheet:

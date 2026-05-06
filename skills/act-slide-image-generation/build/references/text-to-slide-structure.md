@@ -56,7 +56,7 @@ Use this reference when the input is a long memo, equity story, research note, t
 - Apply `insight_surface_placement_lock`: decide the Insight footprint with the body silhouette and footer rhythm. Bottom Insight variants should bridge the body content and Source footer area with clear breathing room, centered to the interpreted region or full body block, while Source remains separate on its invisible baseline.
 - Apply `max_text_size_lock`: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
 - Lock deck-level header and footer masters before slide design. Apply `header_identity_lock`: the header is always the same compact left vertical line + H1 + subtitle system, never a slide-specific decoration surface. Every slide must reuse the same visible header elements, exact selected geometry, title color, subtitle size/color, visual alignment rule, body_start_y, and clear zone. Header fields must be exact values in final prompts, not ranges or loose descriptions.
-- Apply `header_line_top_rule`: the left vertical line top must sit at or slightly below the first visible H1 glyph top; upward protrusion is a blocker. If it fails, repair the line x/y/h before touching H1.
+- Apply `header_line_top_rule`: the left vertical line is the approved header-block anchor, not a short title tick. On the 1672x941 basis, use `vertical_line x=50 y=40 w=10 h=120 #008A80` unless a newer embedded master is supplied. Its top may sit 8-16px above the first visible H1 glyph top; more than 18px above H1, page-top floating, clipping outside `header_safe_area`, detachment from H1/subtitle, or body intrusion is a blocker. If it fails, repair the line x/y/h before touching H1.
 - Apply `header_integrity_blocker_lock`: malformed, missing, oversized, recolored, right-decorated, or intruded headers are blockers; repair header identity before other visual polish.
 - Apply `header_footer_text_color_lock`: H1 `#2D332E`, subtitle `#4D544E`, footer/source/table-note text `#6E756E`. Do not use Petrol, Honey, yellow, or arbitrary gray for header/footer text.
 - Define `deck_tone_master_lock` before image generation and check generated images for whole-deck tone consistency before PPTX or Google Slides roll-up.
@@ -136,9 +136,9 @@ Use this reference when the input is a long memo, equity story, research note, t
    - Combine adjacent slides only when they repeat the same claim, depend on the same comparison, or require one shared decision frame.
 
 7. **Deck Master Gate**
-   - Define `deck_header_master_lock`, `header_identity_lock`, `header_integrity_blocker_lock`, `deck_tone_signature_lock`, `illustration_tone_lock`, `illustration_style_sheet`, `header_footer_text_color_lock`, `footer_anchor_baseline`, `insight_surface_master`, and repeated table/card/icon masters before generating a deck.
+   - Define `deck_header_master_lock`, `header_identity_lock`, `header_left_accent_reference_lock`, `header_left_accent_controlled_overhang_rule`, `header_integrity_blocker_lock`, `deck_tone_signature_lock`, `illustration_tone_lock`, `illustration_style_sheet`, `header_footer_text_color_lock`, `footer_anchor_baseline`, `insight_surface_master`, and repeated table/card/icon masters before generating a deck.
    - Fail any final prompt whose `deck_header_master_lock` is range-only, missing x/y/w/h/color/font_family/font values, or uses any font family other than Noto Sans JP for visible text.
-   - For ACT-style guidelines, fail any plan whose H1 becomes Petrol, whose left vertical line is missing, whose left vertical line protrudes above the visible H1 glyph top, whose subtitle size/color drifts, whose body starts above the locked `body_start_y`, or whose header clear zone is filled.
+   - For ACT-style guidelines, fail any plan whose H1 becomes Petrol, whose left vertical line is missing, whose left vertical line does not match the approved header-block geometry, whose line top is more than 18px above the visible H1 glyph top, whose line floats near the page top or detaches from H1/subtitle, whose subtitle size/color drifts, whose body starts above the locked `body_start_y`, or whose header clear zone is filled.
    - Fail any deck whose slides change material language without a claim-led reason: random base colors, rule weights, card/table fills, icon families, illustration finish, accent intensity, Insight treatment, or Source behavior.
 
 8. **Speaker Notes Plan**
@@ -150,7 +150,7 @@ Use this reference when the input is a long memo, equity story, research note, t
 
 9. **Image Prompt Handoff**
    - For each slide, output: action title, subtitle, exact text, visual structure, visual richness role, illustration intensity, density tier, coordinates, source policy, Insight decision, and negative prompt.
-   - Block generation until `layout_archetype`, `layout_family`, `layout_diversity_plan`, `layout_rotation_guard`, `grid_mode`, `visual_richness_role`, `illustration_intensity`, `creative_variance`, `density_tier`, `source_policy`, `exact_text`, `speaker_notes_text`, `deck_header_master_lock`, `header_identity_lock`, `header_integrity_blocker_lock`, `deck_tone_signature_lock`, `illustration_tone_lock`, `illustration_style_sheet`, `header_line_top_rule`, `message_box_compactness_blocker_lock`, and `coordinate_inventory_1672` are resolved.
+   - Block generation until `layout_archetype`, `layout_family`, `layout_diversity_plan`, `layout_rotation_guard`, `grid_mode`, `visual_richness_role`, `illustration_intensity`, `creative_variance`, `density_tier`, `source_policy`, `exact_text`, `speaker_notes_text`, `deck_header_master_lock`, `header_identity_lock`, `header_left_accent_reference_lock`, `header_left_accent_controlled_overhang_rule`, `header_left_accent_top_protrusion_blocker`, `header_integrity_blocker_lock`, `deck_tone_signature_lock`, `illustration_tone_lock`, `illustration_style_sheet`, `header_line_top_rule`, `message_box_compactness_blocker_lock`, and `coordinate_inventory_1672` are resolved.
    - Generate pilot slides first for any deck over 3 slides.
 
 ## Density Design Best Practices
@@ -258,6 +258,11 @@ deck_header_master_lock:
   header_safe_area:
   vertical_line:
   header_line_top_rule:
+  header_left_accent_master_lock:
+  header_left_accent_reference_lock:
+  header_left_accent_shape_lock:
+  header_left_accent_controlled_overhang_rule:
+  header_left_accent_top_protrusion_blocker:
   h1:
   subtitle:
   visual_alignment:
