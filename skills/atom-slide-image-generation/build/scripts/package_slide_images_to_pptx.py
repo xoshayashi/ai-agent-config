@@ -78,6 +78,15 @@ def validate_image_file(path: Path) -> None:
     validate_image_bytes(path.read_bytes(), path.suffix, str(path))
 
 
+def validate_master_image_path(path: Path) -> None:
+    parts = tuple(part.lower() for part in path.parts)
+    if "slides_package" in parts:
+        raise SystemExit(f"{path} is under slides_package/. Use the approved slides_final/ PNG master instead.")
+    for idx, part in enumerate(parts[:-1]):
+        if part == "render_check" and parts[idx + 1] == "pdf_pages":
+            raise SystemExit(f"{path} is under render_check/pdf_pages/. Use the approved slides_final/ PNG master instead.")
+
+
 def natural_key(path: Path) -> list[object]:
     parts = re.split(r"(\d+)", path.name.lower())
     return [int(part) if part.isdigit() else part for part in parts]
@@ -96,6 +105,7 @@ def collect_images(inputs: Iterable[str]) -> list[Path]:
     if not images:
         raise SystemExit("No PNG/JPEG slide images were provided.")
     for image in images:
+        validate_master_image_path(image)
         validate_image_file(image)
     return images
 

@@ -78,6 +78,15 @@ def validate_image_file(path: Path) -> None:
     validate_image_bytes(path.read_bytes(), path.suffix, str(path))
 
 
+def validate_master_image_path(path: Path) -> None:
+    parts = tuple(part.lower() for part in path.parts)
+    if "slides_package" in parts:
+        raise SystemExit(f"{path} is under slides_package/. Use the approved slides_final/ PNG master instead.")
+    for idx, part in enumerate(parts[:-1]):
+        if part == "render_check" and parts[idx + 1] == "pdf_pages":
+            raise SystemExit(f"{path} is under render_check/pdf_pages/. Use the approved slides_final/ PNG master instead.")
+
+
 def natural_key(path: Path) -> list[object]:
     parts = re.split(r"(\d+)", path.name.lower())
     return [int(part) if part.isdigit() else part for part in parts]
@@ -96,6 +105,7 @@ def collect_images(inputs: Iterable[str]) -> list[Path]:
     if not images:
         raise SystemExit("No PNG/JPEG slide images were provided.")
     for image in images:
+        validate_master_image_path(image)
         validate_image_file(image)
     return images
 
@@ -378,7 +388,7 @@ def theme_xml() -> str:
     return '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="ImageOnly">
   <a:themeElements>
-    <a:clrScheme name="ImageOnly"><a:dk1><a:srgbClr val="2D332E"/></a:dk1><a:lt1><a:srgbClr val="FCFBF8"/></a:lt1><a:dk2><a:srgbClr val="4D544E"/></a:dk2><a:lt2><a:srgbClr val="F7FBF9"/></a:lt2><a:accent1><a:srgbClr val="008A80"/></a:accent1><a:accent2><a:srgbClr val="C49A2C"/></a:accent2><a:accent3><a:srgbClr val="B3DDD9"/></a:accent3><a:accent4><a:srgbClr val="6E756E"/></a:accent4><a:accent5><a:srgbClr val="004F49"/></a:accent5><a:accent6><a:srgbClr val="F5E2A8"/></a:accent6><a:hlink><a:srgbClr val="008A80"/></a:hlink><a:folHlink><a:srgbClr val="004F49"/></a:folHlink></a:clrScheme>
+    <a:clrScheme name="ImageOnly"><a:dk1><a:srgbClr val="2D332E"/></a:dk1><a:lt1><a:srgbClr val="FFFDFC"/></a:lt1><a:dk2><a:srgbClr val="4D544E"/></a:dk2><a:lt2><a:srgbClr val="FAFAF7"/></a:lt2><a:accent1><a:srgbClr val="008A80"/></a:accent1><a:accent2><a:srgbClr val="C49A2C"/></a:accent2><a:accent3><a:srgbClr val="F7FBF9"/></a:accent3><a:accent4><a:srgbClr val="6E756E"/></a:accent4><a:accent5><a:srgbClr val="004F49"/></a:accent5><a:accent6><a:srgbClr val="F5E2A8"/></a:accent6><a:hlink><a:srgbClr val="008A80"/></a:hlink><a:folHlink><a:srgbClr val="004F49"/></a:folHlink></a:clrScheme>
     <a:fontScheme name="ImageOnly"><a:majorFont><a:latin typeface="Noto Sans JP"/><a:ea typeface="Noto Sans JP"/></a:majorFont><a:minorFont><a:latin typeface="Noto Sans JP"/><a:ea typeface="Noto Sans JP"/></a:minorFont></a:fontScheme>
     <a:fmtScheme name="ImageOnly"><a:fillStyleLst><a:solidFill><a:schemeClr val="lt1"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="9525"><a:solidFill><a:schemeClr val="dk1"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="lt1"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme>
   </a:themeElements>

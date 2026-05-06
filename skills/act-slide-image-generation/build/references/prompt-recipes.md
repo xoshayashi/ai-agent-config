@@ -48,6 +48,11 @@ generation_block_rule: if generation or repair is blocked, mark completion_ready
 review_manifest: required JSON record covering every generated PNG before PPTX packaging
 review_manifest_status: approved
 validate_review_manifest: run before PPTX packaging
+output_artifact_mastering_lock: slides_final/ is the only loose-PNG master for approved generated slide images
+single_final_png_master_lock: review manifests and package mappings reference the slides_final/ master path
+no_duplicate_png_output_lock: do not keep duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/
+contact_sheet_mastering_lock: keep one retained contact sheet by default, render_check/contact_sheet_review.png, built from slides_final/
+single_contact_sheet_policy: do not retain parallel contact_sheet_generated*, contact_sheet_package*, and contact_sheet_pdf_render* files for the same slide set
 ```
 
 Do not request `1920x1080` directly from `gpt-image-2`; use a valid multiple-of-16 image-generation size and resize after generation when needed.
@@ -57,6 +62,8 @@ Correct order: gpt-image-2 PNG generation -> PNG review/repair -> PPTX roll-up.
 If gpt-image-2 image generation is blocked, stop rather than manufacturing final PNGs through PPTX or local rendering.
 completion_blocker: do not report complete while any generated slide has blocker, major, deck-consistency, content-quality, or design-quality issues.
 PPTX package gate requires an approved review manifest.
+Output artifact gate: keep approved generated PNGs only under `slides_final/`; `slides_package/` contains PPTX, speaker notes, review manifest, and metadata only; `render_check/pdf_pages/` is disposable render QA output only.
+Contact sheet gate: keep one retained `render_check/contact_sheet_review.png` by default. If package/PDF render QA needs comparison, create one `render_check/contact_sheet_delivery_compare.png` or `render_check/render_diff_report.json`, not parallel generated/package/pdf_render contact sheets.
 
 ## Base Image Contract
 
@@ -76,6 +83,8 @@ Request Noto Sans JP for every visible string, including Latin/English letters, 
 max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
 For ACT work, use Forest Charcoal #2D332E for H1/body, Ink-2 #4D544E for subtitle, Ink-3 #6E756E for footer/source/table-note text, Petrol #008A80 for structure, and Honey only as a quiet decision signal.
 Lock header/footer text colors as one Ink-family hierarchy: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E. Do not use Petrol, Honey, yellow, or arbitrary gray for header/footer text.
+source_real_only_lock: render Source footer only for real traceable external/provided sources; if no real source exists, set source_line: none and draw no Source footer text.
+source_placeholder_blocklist: never use placeholder provenance labels such as brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions as Source text.
 source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists. Do not drop real source names to reduce visual density; shorten or group source names instead.
 source_separator_lock: no horizontal divider, rule, underline, or hairline above Source. Treat the footer/source baseline as an invisible alignment position, not a visible stroke.
 density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting.
@@ -92,7 +101,8 @@ No slide numbers, no title kicker, no numbered header badge.
 Use the embedded palette with restrained contrast, flat fills, quiet rules, and purposeful visual subjects.
 Use small Lucide-style line icons only as quiet wayfinding where they clarify reading order.
 Use human-designed editorial/vector illustrations and purpose-built motifs when the claim needs memory, freshness, scanning help, or comparison support; do not add them by quota. Keep charts, tables, matrices, or roadmaps as the primary structure when they carry the argument.
-Use calm operating-deck visual quality traits: light neutral base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small technical editorial illustrations, and deliberate canvas occupancy. Treat these as design treatment only, not as a reason to change slide count, claim order, or storyline.
+Use calm operating-deck visual quality traits: near-white warm base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small technical editorial illustrations, and deliberate canvas occupancy. Treat these as design treatment only, not as a reason to change slide count, claim order, or storyline.
+Apply near_white_slide_base_lock: use #FFFDFC as the default ACT slide canvas, with #FAFAF7 only as a subtle warm off-white tint; keep #F7FBF9 for panels/cards, not the page background, and avoid darker cream/beige page bases.
 Design information density before image generation. Density should answer more of the reader's decision question in one view through hierarchy, evidence, comparison, annotation, source cues, and context layers; do not use smaller type, extra decoration, or visual noise as density.
 Do not minimize numbers by default. Keep decision-relevant sourced or explicitly assumed numbers when they support comparison, sizing, prioritization, credibility, or decision-making.
 Message boxes and Insight surfaces must use flat solid fills only; no patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
@@ -106,7 +116,7 @@ Create polish through clear figure-ground separation, composed region balance, p
 When the user asks to raise temperature, use `creative_variance: high` rather than claiming an API temperature parameter. High variance means more freedom in viewpoint, crop, asymmetry, visual metaphor, and layout rhythm, while all brand, header, exact text, grid, and source constraints remain locked.
 Required image model: gpt-image-2.
 Final slide image files must be actual Codex built-in image-generation outputs. Local wireframes or deterministic renders are not final generated images.
-For multi-slide decks, roll approved generated PNGs into a PPTX deck as image-only full-bleed slides, then attach speaker notes when the packaging route supports notes. Speaker notes are generated from the deck structure, not from image generation, and should contain talk track, evidence/assumption cue, source caveat if needed, and transition cue. Create Google Slides only when explicitly requested.
+For multi-slide decks, roll approved generated PNGs into a PPTX deck as image-only full-bleed slides, then attach speaker notes when the packaging route supports notes. Speaker notes are generated from the deck structure, not from image generation. Apply speaker_notes_depth_lock: notes should be substantial Japanese PPT talk scripts, normally 4-7 sentences or roughly 180-320 Japanese chars per slide, with opening framing, 2-3 evidence/assumption talking points, implication, caveat/source context when relevant, and transition cue. Create Google Slides only when explicitly requested.
 Before PPTX or Google Slides roll-up, run post_generation_design_balance_check on actual generated PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, header integrity, and layout family rhythm.
 ```
 
@@ -132,6 +142,11 @@ image_delivery_size:
 generation_route:
 generation_status:
 output_files:
+output_artifact_mastering_lock:
+single_final_png_master_lock:
+no_duplicate_png_output_lock:
+contact_sheet_mastering_lock:
+single_contact_sheet_policy:
 google_slides_delivery: optional only when explicitly requested
 google_slides_status: not_requested unless explicitly requested
 google_slides_title: N/A unless explicitly requested
@@ -150,6 +165,7 @@ pptx_image_mapping:
 pptx_speaker_notes_mapping:
 speaker_notes_plan:
 speaker_notes_status:
+speaker_notes_depth_lock:
 speaker_notes_text:
 opening_slide_role:
 first_slide_not_title_only:
@@ -270,6 +286,8 @@ header_anchor:
   upper_right_clear_zone:
 footer_anchor_baseline:
 table_note_microline:
+source_real_only_lock:
+source_placeholder_blocklist:
 source_line_lock:
 source_separator_lock:
 source_line:
@@ -331,7 +349,8 @@ ACT slide contract:
 - define coordinate_inventory_1672 with x/y/w/h for major objects
 - define master_components and deck_master_refs before repeating cards, rows, icons, or bands
 - define deck_header_master_lock before any slide prompt and repeat it verbatim across the deck; exact header values are required before generation
-- apply visual_design_quality_traits as design treatment: calm light base, compact fixed header, thin rules, pale equalized surfaces, restrained icons/line drawings, intentional canvas occupancy
+- apply visual_design_quality_traits as design treatment: near-white warm base, compact fixed header, thin rules, pale equalized surfaces, restrained icons/line drawings, intentional canvas occupancy
+- apply near_white_slide_base_lock: #FFFDFC default slide canvas, optional #FAFAF7 subtle tint, no darker cream/beige page background
 - define component_inventory, row_tracks, column_tracks, equalized_groups, and shared_edges
 - lock header anchor first: left vertical line + H1 + subtitle + visual alignment + header safe area + body_start_y + upper-right clear zone
 - apply header_identity_lock and header_integrity_blocker_lock before visual polish
@@ -340,10 +359,15 @@ ACT slide contract:
 - lock footer_anchor_baseline even when source_line is none
 - lock header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E
 - keep source_line separate from table_note_microline
+- source_real_only_lock: render Source only for real traceable external/provided sources; otherwise source_line none and no Source footer
+- source_placeholder_blocklist: no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions as Source
 - source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
 - source_separator_lock: no horizontal divider, rule, underline, or hairline above Source
+- output_artifact_mastering_lock: slides_final/ is the only loose-PNG master; package and render-check folders hold only derivative artifacts
+- no_duplicate_png_output_lock: no duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/
+- contact_sheet_mastering_lock: one retained contact_sheet_review.png by default; comparison sheet only when delivery QA requires it
 - Do not drop real source names to reduce visual density; shorten or group source names instead.
-- draft speaker_notes_text for every deck slide before image generation; keep notes off the slide image and out of the exact on-slide text
+- draft speaker_notes_text for every deck slide before image generation; apply speaker_notes_depth_lock so PPT notes are substantial Japanese talk scripts, not terse bullets; keep notes off the slide image and out of the exact on-slide text
 - assign visual_richness_role, illustration_intensity, creative_variance, and density_tier before generation
 - define density_design before generation: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails
 - density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
@@ -377,7 +401,9 @@ ACT slide contract:
 - keep Insight/message-box text 20-24pt by default, 24-26pt only by exception, at least 6pt smaller than H1, visually below subtitle; it must not become a second title or second hero headline
 - keep Insight/message-box surfaces compact; if the surface starts to dominate, behave like a banner, or rescue weak layout, shorten text, narrow it, move detail to body/notes, or remove it
 - keep Honey quiet: no saturated yellow fill, no dark yellow message box, no large yellow area, and no Honey color variation across a deck
-- Render Source: ... in the footer whenever traceable real sources are available; source_line: none is allowed only when no traceable source exists
+- Source: render only real traceable source names; when no real source exists, use source_line: none and do not show a Source footer. Never use brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, working assumptions, or other placeholder provenance as Source text.
+- Output files: keep `slides_final/` as the only loose-PNG master. Do not duplicate approved generated PNGs into `slides_package/` or `render_check/pdf_pages/`; package and render-check artifacts must reference the `slides_final/` master.
+- Keep only one retained contact sheet by default: `render_check/contact_sheet_review.png`. Use one comparison contact sheet or a render diff JSON only when delivery/render QA needs it.
 - final bitmap generation must use gpt-image-2
 - if actual Codex built-in image generation is blocked, stop and report the blocker; do not create final images via code rendering or a user-key workaround
 - after all generated PNGs pass QA, create a PPTX roll-up unless the user asks for image files only: one full-bleed generated PNG per slide, same order, no extra overlays, and speaker notes inserted when supported; create Google Slides only when explicitly requested
@@ -414,7 +440,7 @@ Process:
 10. Define deck_header_master_lock, invisible footer alignment baseline, Insight surface master, and repeated table/card/icon masters before image generation.
 11. Read only the action titles in order and repair logical gaps before image generation.
 12. Freeze quoted exact_text for every slide; do not leave copywriting to image generation.
-13. Draft speaker_notes_text for every slide: talk track, evidence/assumption cue, source caveat when relevant, and transition cue.
+13. Draft speaker_notes_text for every slide with speaker_notes_depth_lock: 4-7 substantive Japanese sentences or roughly 180-320 Japanese chars, covering framing, 2-3 evidence/assumption cues, implication, caveat/source context when relevant, and transition cue.
 14. For each final slide, produce the canonical planning block and then the image prompt.
 
 Output:
@@ -443,6 +469,13 @@ Output:
     evidence_strength:
     source_span_ids:
     source_policy:
+    source_real_only_lock:
+    source_placeholder_blocklist:
+    output_artifact_mastering_lock:
+    single_final_png_master_lock:
+    no_duplicate_png_output_lock:
+    contact_sheet_mastering_lock:
+    single_contact_sheet_policy:
     source_line_lock:
     source_separator_lock:
     source_line:
@@ -521,7 +554,7 @@ Process:
 13. Flag slides that should split because density would force body below 18pt equivalent or create competing major regions.
 14. Define source policy per slide: none / real source list.
 15. Define deck-level master refs: header, invisible footer alignment baseline, Insight surface skeleton, table/card masters, icon circle sizes.
-16. Draft speaker_notes_text for every slide before generation. Each note should support presentation delivery, not duplicate all visible text: short talk track, key evidence or assumption to mention, source caveat if needed, and transition to the next slide.
+16. Draft speaker_notes_text for every slide before generation. Each note should support presentation delivery, not duplicate all visible text: use speaker_notes_depth_lock with a substantial Japanese talk script, key evidence or assumptions to mention, source caveat if needed, implication, and transition to the next slide.
 17. Run Guideline/Brand, Header Master, Layout, Typography, Visual Richness, Density, Content, and Deck gates.
 ```
 
@@ -674,6 +707,11 @@ Content:
 - Insight/message-box placement creates a calm reading bridge between the relevant content and the footer when used at the bottom
 - Source is optional and real-source only
 - source_line and table_note_microline are separate
+- source_real_only_lock passes: Source footer is shown only for real traceable external/provided sources
+- source_placeholder_blocklist passes: no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions appears as Source text
+- output_artifact_mastering_lock passes: `slides_final/` is the only loose-PNG master and package/render-check artifacts reference it
+- no_duplicate_png_output_lock passes: no duplicate loose final PNG copies remain across `slides_final/`, `slides_package/`, and `render_check/pdf_pages/`
+- contact_sheet_mastering_lock passes: only one retained contact sheet exists by default, unless one explicit delivery comparison sheet or render diff report is needed
 - source_separator_lock passes: no horizontal divider, rule, underline, or hairline appears above Source
 - no unsupported facts
 
@@ -701,7 +739,7 @@ Deck:
 - Insight components are selective and compatible with the embedded ACT design system
 - PPTX roll-up contains exactly one full-bleed generated PNG per slide, in order
 - Google Slides roll-up contains exactly one full-bleed generated PNG per slide when explicitly requested
-- speaker notes exist on every slide and match the slide claim, evidence, caveats, and transition
+- speaker_notes_depth_lock passes: speaker notes exist on every slide, are substantial enough for PPT delivery, and match the slide claim, evidence, caveats, implication, and transition
 
 For every fail:
 1. Explain the issue.

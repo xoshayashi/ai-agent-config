@@ -86,6 +86,13 @@ PLACEHOLDER_BLOCKERS = [
     "insight_surface_placement_lock",
     "post_generation_design_balance_check",
     "source_policy",
+    "source_real_only_lock",
+    "source_placeholder_blocklist",
+    "output_artifact_mastering_lock",
+    "single_final_png_master_lock",
+    "no_duplicate_png_output_lock",
+    "contact_sheet_mastering_lock",
+    "single_contact_sheet_policy",
     "speaker_notes_text",
     "pptx_rollup_plan",
     "pptx_package_status",
@@ -173,6 +180,13 @@ def canonical_planning_block(
   blocked_generation_rule: If gpt-image-2 image generation is blocked, stop rather than manufacturing final PNGs through PPTX or local rendering.
   generation_status: pending_builtin_generation
   output_files: [filled after Codex image generation]
+  output_artifact_mastering_lock: slides_final/ is the only loose-PNG master for approved generated slide images; package and review artifacts reference it instead of making additional loose PNG copies
+  single_final_png_master_lock: keep each approved final PNG in exactly one master path under slides_final/ and record that path in review_manifest, pptx_image_mapping, and google_slides_image_mapping when requested
+  slides_package_policy: slides_package/ contains PPTX, speaker notes, review_manifest, and metadata only; do not copy final PNG files into slides_package/
+  render_check_policy: render_check/pdf_pages/ is optional disposable QA output from PDF/PPT render checks, not a second source of truth; do not copy slides_final/ PNGs there, and overwrite or ignore stale render_check artifacts between checks
+  no_duplicate_png_output_lock: do not keep duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/; when duplication appears, preserve slides_final/ as master and update manifests/mappings to reference it
+  contact_sheet_mastering_lock: keep one retained contact sheet by default, render_check/contact_sheet_review.png, built from slides_final/ master PNGs
+  single_contact_sheet_policy: do not retain parallel contact_sheet_generated*, contact_sheet_package*, and contact_sheet_pdf_render* files for the same slide set; if delivery QA requires comparison, create one render_check/contact_sheet_delivery_compare.png or render_check/render_diff_report.json and remove or ignore intermediate contact sheets
   google_slides_delivery: optional only when explicitly requested; otherwise not_requested
   google_slides_status: not_requested / pending_generated_images_and_pre_google_slides_image_review / inserted / blocked
   google_slides_title: N/A unless explicitly requested
@@ -218,7 +232,7 @@ def canonical_planning_block(
   generation_block_rule: if generation or repair is blocked, mark completion_ready_status: blocked and do not package or report complete
   review_manifest: required JSON record covering every generated PNG before PPTX packaging
   review_manifest_status: approved only when every image path is covered and all quality statuses are approved
-  validate_review_manifest: run before PPTX packaging; reject missing, partial, pending, blocked, or weak-slide manifests
+  validate_review_manifest: run before PPTX packaging; reject missing, partial, pending, blocked, weak-slide, or duplicate-loose-PNG manifests
   deck_tone_consistency_review: [first third vs middle third vs last third tone comparison after generation]
   deck_tone_consistency_status: pending / approved / repair_required
   deck_tone_repair_plan: [slides to regenerate or edit if tone drift appears]
@@ -334,6 +348,8 @@ def canonical_planning_block(
   insight_surface_placement_lock: when an Insight/message-box is kept, place it as a deliberate interpretation bridge tied to the body silhouette and footer baseline
   max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
   table_note_microline: none / [one text note line above source text; not a horizontal rule]
+  source_real_only_lock: render Source footer only for real traceable external/provided sources; if no real source exists, set source_line: none and draw no Source footer text
+  source_placeholder_blocklist: never use placeholder provenance labels such as brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions as Source text
   source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
   source_separator_lock: no horizontal divider, rule, underline, or hairline above Source
   source_line: Source: [traceable source names copied from provided or researched sources only] / none only when no traceable source exists
@@ -371,7 +387,9 @@ def mode_guidance(mode: str) -> str:
   - Define deck_thesis, audience_decision, storyline_frame, section_map, and slide-level action_title claims.
   - Plan slide 1 as opening_thesis_slide, not a title-only opener: include the core thesis, 2-4 proof/tension points, a real visual structure, and a narrative bridge.
   - Map every claim to evidence, source_policy, visual_structure, layout_archetype, grid_mode, exact_text_budget, and split_merge_decision.
-  - Apply source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists.
+  - Apply source_real_only_lock and source_line_lock: render Source: ... only for real traceable external/provided sources; use source_line: none and draw no Source footer when no real source exists.
+  - Apply output_artifact_mastering_lock, single_final_png_master_lock, and no_duplicate_png_output_lock: use slides_final/ as the single loose-PNG master; slides_package/ stores PPTX/notes/manifest only; render_check/pdf_pages/ is disposable QA output only.
+  - Apply contact_sheet_mastering_lock and single_contact_sheet_policy: keep one retained contact sheet from slides_final/ by default; generate a comparison contact sheet only when delivery/render QA needs it.
   - Build layout_diversity_plan: assign layout_family for each slide across full-field, asymmetric main/supporting-context, balanced comparison, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase families when the argument benefits.
   - Use layout_rotation_guard to keep repeated structures purposeful: repeat a family for like-for-like comparison, and change family when claim type, evidence type, or decision question changes.
   - Draft speaker_notes_text for every slide: concise talk track, evidence/assumption cue, source caveat if relevant, and transition cue.
@@ -397,7 +415,9 @@ def mode_guidance(mode: str) -> str:
   - Use the embedded ATOM design system in SKILL.md; do not load an external ATOM pattern file.
   - Start with opening_thesis_slide rather than a title-only first slide: the opener should make the main phrase memorable while also showing the thesis, tension/proof points, structure, and bridge.
   - Select layout_archetype and grid_mode for every slide.
-  - Apply source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists.
+  - Apply source_real_only_lock and source_line_lock: render Source: ... only for real traceable external/provided sources; use source_line: none and draw no Source footer when no real source exists.
+  - Apply output_artifact_mastering_lock, single_final_png_master_lock, and no_duplicate_png_output_lock: use slides_final/ as the single loose-PNG master; slides_package/ stores PPTX/notes/manifest only; render_check/pdf_pages/ is disposable QA output only.
+  - Apply contact_sheet_mastering_lock and single_contact_sheet_policy: keep one retained contact sheet from slides_final/ by default; generate a comparison contact sheet only when delivery/render QA needs it.
   - Create layout_diversity_plan and layout_rotation_guard before final prompts so the deck can use the expanded pattern catalogue without drifting from ATOM brand and header rules.
   - Define deck_header_master_lock before any slide-level prompt. Do not leave header coordinates as ranges.
   - Apply illustration_tone_lock and illustration_style_sheet before slide-level variation.
@@ -472,6 +492,13 @@ draft_image_prompt_scaffold:
   PPTX is a delivery wrapper only. Never create final PNGs by exporting, rendering, or screenshotting a PPTX.
   Correct order: generate gpt-image-2 PNGs, review and repair PNGs, then package approved PNGs into PPTX.
   If gpt-image-2 image generation is blocked, stop rather than manufacturing final PNGs through PPTX or local rendering.
+  Apply output_artifact_mastering_lock: write approved generated PNGs once under slides_final/ and treat that path as the sole loose-PNG master.
+  Apply single_final_png_master_lock: review_manifest, pptx_image_mapping, and any Google Slides mapping must reference the slides_final/ master path rather than copied PNGs.
+  Apply slides_package_policy: slides_package/ contains PPTX, speaker notes, review_manifest, and metadata only; do not copy final PNG files into slides_package/.
+  Apply render_check_policy: render_check/pdf_pages/ is optional disposable QA output from rendered PDF/PPT checks only, not another copy of final PNGs.
+  Apply no_duplicate_png_output_lock: do not keep duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/.
+  Apply contact_sheet_mastering_lock: keep one retained contact sheet by default, render_check/contact_sheet_review.png, built from slides_final/ master PNGs.
+  Apply single_contact_sheet_policy: do not retain parallel contact_sheet_generated*, contact_sheet_package*, and contact_sheet_pdf_render* files for the same slide set; if package/PDF render QA needs comparison, create one contact_sheet_delivery_compare.png or render_diff_report.json instead.
 
   Plan coordinates on a 1672x941 basis with ATOM delivery target 1920x1080 after resize if required.
   Use size terminology consistently: 1920x1080 is FHD/1080p delivery, 2048x1152 is 16:9 2K-width generation, 2560x1440 is QHD/1440p generation, and 3840x2160 is 4K UHD generation.
@@ -530,16 +557,18 @@ draft_image_prompt_scaffold:
   Do not minimize numbers by default. Keep sourced or explicitly assumed numbers when they help comparison, sizing, prioritization, credibility, or decision-making; remove only unsupported, redundant, unreadable, or decorative numbers.
   Render ONLY the exact text strings listed in the planning block or final prompt; do not invent extra labels.
   Keep footer_anchor_baseline planned as an invisible alignment position even when source_line is none.
+  Apply source_real_only_lock: render Source footer only for real traceable external/provided sources; if no real source exists, set source_line: none and draw no Source footer text.
+  Apply source_placeholder_blocklist: never use placeholder provenance labels such as brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions as Source text.
   Apply source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists.
   Apply source_separator_lock: no horizontal divider, rule, underline, or hairline above Source.
   Do not drop real source names to reduce visual density; shorten or group source names instead.
-  Do not include slide numbers, title kickers, numbered header badges, KEY INSIGHT labels, invented sources, or production-route source wording.
+  Do not include slide numbers, title kickers, numbered header badges, KEY INSIGHT labels, invented sources, placeholder source labels, or production-route source wording.
   Make the composition feel human-crafted through visible priority, breathing room, and editorial rhythm.
 
 negative_prompt_hard_blockers:
   local-rendered substitute, non-gpt-image output, missing or malformed header line, uncontrolled header accent protrusion, header accent floating near page top,
   H1/subtitle/source color drift, horizontal divider above Source, body content invading header/footer, visible text above max_text_size_lock, unreadable body text below 18pt equivalent,
-  invented labels or sources, speaker notes visible on slide, unresolved grid, severe grid drift, hard-to-picture abstract visual,
+  invented labels or sources, placeholder Source footer such as brand assumptions or brand analysis, speaker notes visible on slide, duplicate loose final PNG copies across output folders, parallel contact sheets for generated/package/pdf_render of the same slide set, unresolved grid, severe grid drift, hard-to-picture abstract visual,
   patterned or textured message box, oversized message box, message-box text competing with H1/subtitle,
   saturated yellow message box, mixed illustration tone, inconsistent face detail or body proportion, decorative pseudo-3D depth, rough sketch aesthetic,
   mechanical repeated composition without narrative or comparison purpose, generic icon-only composition, dated template composition, slide number, title kicker, logo in upper-right clear zone
@@ -594,6 +623,11 @@ post_generation_audit:
   - brand accent is structural and not body text
   - Insight component is selective, compatible with the embedded ATOM design system, and not decorative
   - invisible footer alignment baseline is preserved without drawing a line
+  - output_artifact_mastering_lock is honored: slides_final/ is the single loose-PNG master, slides_package/ contains package artifacts only, and render_check/pdf_pages/ is disposable QA output only
+  - no_duplicate_png_output_lock is honored: no duplicate loose final PNG copies are retained across slides_final/, slides_package/, and render_check/pdf_pages/
+  - contact_sheet_mastering_lock is honored: the retained contact sheet is a single render_check/contact_sheet_review.png from slides_final/ unless one explicit delivery comparison sheet or render_diff_report is needed
+  - single_contact_sheet_policy is honored: no parallel contact_sheet_generated*, contact_sheet_package*, and contact_sheet_pdf_render* files are retained for the same slide set
+  - Source footer follows source_real_only_lock: Source appears only for real traceable external/provided sources; no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions appear as Source text
   - Source footer follows source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
   - Source footer follows source_separator_lock: no horizontal divider, rule, underline, or hairline above Source
   - footer/source/table-note text uses #6E756E consistently when present
@@ -609,7 +643,7 @@ post_generation_audit:
   - regenerate_until_quality_approved has been applied to every weak slide
   - completion_blocker: do not report complete while any generated slide has blocker, major, deck-consistency, content-quality, or design-quality issues
   - generation_block_rule: if generation or repair is blocked, mark completion_ready_status: blocked and do not package or report complete
-  - review_manifest_status: approved after validate_review_manifest covers every generated PNG path, confirms weak_slide_regeneration_queue is empty, and confirms all final/content/design/deck-unity/completion statuses are approved
+  - review_manifest_status: approved after validate_review_manifest covers every generated PNG path, confirms slides_final/ master paths are used, confirms weak_slide_regeneration_queue is empty, and confirms all final/content/design/deck-unity/completion statuses are approved
   - post_generation_design_balance_check is approved on actual generated PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, header integrity, card/table height equalization, line-weight consistency, icon-family consistency, Deep Blue scatter, Honey strength, and human-designed operational diagram feel
   - pre_package_image_review has inspected the actual generated PNG, not only the prompt
   - pre_google_slides_image_review is also approved when Google Slides roll-up is requested
@@ -673,6 +707,13 @@ def deck_plan_tail() -> str:
         density_tier:
         signature_visual_plan:
         insight_decision:
+        output_artifact_mastering_lock: slides_final/ is the only loose-PNG master; package and render-check folders hold only derivative artifacts
+        single_final_png_master_lock: review manifests and package mappings reference the slides_final/ master path
+        no_duplicate_png_output_lock: no duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/
+        contact_sheet_mastering_lock: one retained contact_sheet_review.png by default; comparison sheet only when delivery QA requires it
+        single_contact_sheet_policy: no parallel generated/package/pdf_render contact sheets for the same slide set
+        source_real_only_lock: render Source only for real traceable external/provided sources; otherwise source_line none and no Source footer
+        source_placeholder_blocklist: no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions as Source
         source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
         source_separator_lock: no horizontal divider, rule, underline, or hairline above Source
         source_policy:
@@ -816,6 +857,13 @@ def text_structure_tail() -> str:
       evidence_strength:
       source_span_ids:
       source_policy: real source / none / research needed
+      output_artifact_mastering_lock:
+      single_final_png_master_lock:
+      no_duplicate_png_output_lock:
+      contact_sheet_mastering_lock:
+      single_contact_sheet_policy:
+      source_real_only_lock: render Source only for real traceable external/provided sources; otherwise source_line none and no Source footer
+      source_placeholder_blocklist: no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions as Source
       source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
       source_separator_lock: no horizontal divider, rule, underline, or hairline above Source
       source_line: Source: [traceable source names copied from provided or researched sources only] / none only when no traceable source exists

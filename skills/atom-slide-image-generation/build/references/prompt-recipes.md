@@ -48,6 +48,11 @@ generation_block_rule: if generation or repair is blocked, mark completion_ready
 review_manifest: required JSON record covering every generated PNG before PPTX packaging
 review_manifest_status: approved
 validate_review_manifest: run before PPTX packaging
+output_artifact_mastering_lock: slides_final/ is the only loose-PNG master for approved generated slide images
+single_final_png_master_lock: review manifests and package mappings reference the slides_final/ master path
+no_duplicate_png_output_lock: do not keep duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/
+contact_sheet_mastering_lock: keep one retained contact sheet by default, render_check/contact_sheet_review.png, built from slides_final/
+single_contact_sheet_policy: do not retain parallel contact_sheet_generated*, contact_sheet_package*, and contact_sheet_pdf_render* files for the same slide set
 ```
 
 Do not request `1920x1080` directly from `gpt-image-2`; use a valid multiple-of-16 image-generation size and resize after generation when needed.
@@ -57,6 +62,8 @@ Correct order: gpt-image-2 PNG generation -> PNG review/repair -> PPTX roll-up.
 If gpt-image-2 image generation is blocked, stop rather than manufacturing final PNGs through PPTX or local rendering.
 completion_blocker: do not report complete while any generated slide has blocker, major, deck-consistency, content-quality, or design-quality issues.
 PPTX package gate requires an approved review manifest.
+Output artifact gate: keep approved generated PNGs only under `slides_final/`; `slides_package/` contains PPTX, speaker notes, review manifest, and metadata only; `render_check/pdf_pages/` is disposable render QA output only.
+Contact sheet gate: keep one retained `render_check/contact_sheet_review.png` by default. If package/PDF render QA needs comparison, create one `render_check/contact_sheet_delivery_compare.png` or `render_check/render_diff_report.json`, not parallel generated/package/pdf_render contact sheets.
 
 ## Base Image Contract
 
@@ -75,6 +82,8 @@ Request Noto Sans JP for every visible string, including Latin/English letters, 
 max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
 For ATOM work, use Charcoal Ink #2D332E for H1/body, Ink-2 #4D544E for subtitle, Ink-3 #6E756E for footer/source/table-note text, Deep Blue #0B2F5B for structure, and Honey only as a quiet decision signal.
 Lock header/footer text colors as one Ink-family hierarchy: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E. Do not use Deep Blue, Honey, yellow, or arbitrary gray for header/footer text.
+source_real_only_lock: render Source footer only for real traceable external/provided sources; if no real source exists, set source_line: none and draw no Source footer text.
+source_placeholder_blocklist: never use placeholder provenance labels such as brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions as Source text.
 source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists. Do not drop real source names to reduce visual density; shorten or group source names instead.
 source_separator_lock: no horizontal divider, rule, underline, or hairline above Source. Treat the footer/source baseline as an invisible alignment position, not a visible stroke.
 density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting.
@@ -133,6 +142,11 @@ image_delivery_size:
 generation_route:
 generation_status:
 output_files:
+output_artifact_mastering_lock:
+single_final_png_master_lock:
+no_duplicate_png_output_lock:
+contact_sheet_mastering_lock:
+single_contact_sheet_policy:
 google_slides_delivery: optional only when explicitly requested
 google_slides_status: not_requested unless explicitly requested
 google_slides_title: N/A unless explicitly requested
@@ -274,6 +288,8 @@ header_anchor:
   upper_right_clear_zone:
 footer_anchor_baseline:
 table_note_microline:
+source_real_only_lock:
+source_placeholder_blocklist:
 source_line_lock:
 source_separator_lock:
 source_line:
@@ -342,8 +358,13 @@ ATOM slide contract:
 - lock footer_anchor_baseline even when source_line is none
 - lock header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E
 - keep source_line separate from table_note_microline
+- source_real_only_lock: render Source only for real traceable external/provided sources; otherwise source_line none and no Source footer
+- source_placeholder_blocklist: no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions as Source
 - source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
 - source_separator_lock: no horizontal divider, rule, underline, or hairline above Source
+- output_artifact_mastering_lock: slides_final/ is the only loose-PNG master; package and render-check folders hold only derivative artifacts
+- no_duplicate_png_output_lock: no duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/
+- contact_sheet_mastering_lock: one retained contact_sheet_review.png by default; comparison sheet only when delivery QA requires it
 - Do not drop real source names to reduce visual density; shorten or group source names instead.
 - draft speaker_notes_text for every deck slide before image generation; keep notes off the slide image and out of the exact on-slide text
 - assign visual_richness_role, illustration_intensity, creative_variance, and density_tier before generation
@@ -378,7 +399,9 @@ ATOM slide contract:
 - apply message_box_scale_lock: keep Insight/message boxes compact, one short judgment sentence, one line preferred and two lines maximum; trim or move explanation to notes instead of growing the surface
 - keep Insight/message-box text 20-24pt by default, 24-26pt only by exception, at least 6pt smaller than H1, visually below subtitle; it must not become a second title or second hero headline
 - keep Honey quiet: no saturated yellow fill, no dark yellow message box, no large yellow area, and no Honey color variation across a deck
-- Render Source: ... in the footer whenever traceable real sources are available; source_line: none is allowed only when no traceable source exists
+- Source: render only real traceable source names; when no real source exists, use source_line: none and do not show a Source footer. Never use brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, working assumptions, or other placeholder provenance as Source text.
+- Output files: keep `slides_final/` as the only loose-PNG master. Do not duplicate approved generated PNGs into `slides_package/` or `render_check/pdf_pages/`; package and render-check artifacts must reference the `slides_final/` master.
+- Keep only one retained contact sheet by default: `render_check/contact_sheet_review.png`. Use one comparison contact sheet or a render diff JSON only when delivery/render QA needs it.
 - final bitmap generation must use gpt-image-2
 - if actual Codex built-in image generation is blocked, stop and report the blocker; do not create final images via code rendering or a user-key workaround
 - after all generated PNGs pass QA, create a PPTX roll-up unless the user asks for image files only: one full-bleed generated PNG per slide, same order, no extra overlays, and speaker notes inserted when supported; create Google Slides only when explicitly requested
@@ -444,6 +467,13 @@ Output:
     evidence_strength:
     source_span_ids:
     source_policy:
+    source_real_only_lock:
+    source_placeholder_blocklist:
+    output_artifact_mastering_lock:
+    single_final_png_master_lock:
+    no_duplicate_png_output_lock:
+    contact_sheet_mastering_lock:
+    single_contact_sheet_policy:
     source_line_lock:
     source_separator_lock:
     source_line:
@@ -665,6 +695,11 @@ Content:
 - Insight adds interpretation, not repetition
 - Source is optional and real-source only
 - source_line and table_note_microline are separate
+- source_real_only_lock passes: Source footer is shown only for real traceable external/provided sources
+- source_placeholder_blocklist passes: no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions appears as Source text
+- output_artifact_mastering_lock passes: `slides_final/` is the only loose-PNG master and package/render-check artifacts reference it
+- no_duplicate_png_output_lock passes: no duplicate loose final PNG copies remain across `slides_final/`, `slides_package/`, and `render_check/pdf_pages/`
+- contact_sheet_mastering_lock passes: only one retained contact sheet exists by default, unless one explicit delivery comparison sheet or render diff report is needed
 - source_separator_lock passes: no horizontal divider, rule, underline, or hairline appears above Source
 - no unsupported facts
 

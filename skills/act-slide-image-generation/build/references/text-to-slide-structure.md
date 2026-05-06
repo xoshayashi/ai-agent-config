@@ -39,7 +39,8 @@ Use this reference when the input is a long memo, equity story, research note, t
 - Apply `secondary_region_integrity_lock`: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field.
 - Apply `body_silhouette_lock`: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions.
 - Plan visual richness before prompt writing, with the argument-carrying structure as the reader's path. Long decks can stay varied through data visuals, matrices, flows, evidence strips, and small diagram-embedded illustrations; restrained human-designed editorial illustrations work best on chapter openers, turning points, and final vision slides, while quiet tables serve truly tabular arguments.
-- Apply visual design quality traits as design treatment only: calm light base, compact fixed header, thin rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, and intentional canvas occupancy. Do not change slide count, claim order, or storyline solely to match a visual style.
+- Apply visual design quality traits as design treatment only: near-white warm base, compact fixed header, thin rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, and intentional canvas occupancy. Do not change slide count, claim order, or storyline solely to match a visual style.
+- Apply `near_white_slide_base_lock`: use `#FFFDFC` as the default ACT slide canvas, with `#FAFAF7` only as a subtle warm off-white tint; keep `#F7FBF9` for panels/cards, not the full slide background, and avoid darker cream/beige page bases.
 - Apply `deck_tone_signature_lock`: keep one material system across the deck for base, typography, rule weight, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior. Vary claim-led layouts without changing the deck's visual language.
 - Apply `illustration_tone_lock`: keep all illustrations in one deck on the same editorial vector system.
 - Define `illustration_style_sheet` before prompt writing and reuse it across the deck: flat 2D business/healthcare workflow scenes, simplified people, tablets/laptops, document stacks, CRM/report panels, rounded UI cards, small icon badges, soft pale mint or warm gray fills, Petrol and charcoal linework, restrained Honey highlights, consistent 2-3px stroke, crop, facial detail, body proportion, and fill opacity.
@@ -66,7 +67,7 @@ Use this reference when the input is a long memo, equity story, research note, t
 - Keep long-text overflow outside the slide: use `claim_backlog`, `evidence_ledger`, and `appendix_candidates` rather than cramming all extracted points into the canvas.
 - Reduce prose before generation. Keep H1, subtitle, short labels, decision-relevant numbers, and one Insight sentence when needed; remove only unsupported, redundant, unreadable, or decorative numbers.
 - Freeze display text before generation. Put all on-slide strings in quoted `exact_text` fields; do not let image generation invent or rewrite slide copy.
-- Draft speaker notes as part of slide structure, before image generation. Notes should help the presenter say the argument clearly without adding unsupported claims: concise talk track, evidence/assumption cue, source caveat when needed, and transition cue.
+- Draft speaker notes as part of slide structure, before image generation. Apply `speaker_notes_depth_lock`: notes should help the presenter say the argument clearly without adding unsupported claims, using 4-7 substantive Japanese sentences or roughly 180-320 Japanese chars per slide unless the user requests brief notes. Include framing, 2-3 evidence/assumption cues, implication, source caveat when needed, and transition cue.
 - Create a text budget per slide. If the visual would need dense paragraphs, split the slide or move detail to notes.
 - Use a pilot-first process for image generation: generate 1-2 representative slides, audit quality, then expand.
 
@@ -76,6 +77,10 @@ Use this reference when the input is a long memo, equity story, research note, t
    - Identify audience, decision, intended use, language, required source strictness, and output count flexibility.
    - Use the embedded ACT design system in SKILL.md as the source of style and component truth.
    - Preserve source URLs and source names separately from the narrative.
+   - Apply `source_real_only_lock`: render Source only for real traceable external/provided sources; if no real source exists, set `source_line: none` and draw no Source footer.
+   - Apply `source_placeholder_blocklist`: never use brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, working assumptions, upload names, or draft provenance as Source text.
+   - Apply `output_artifact_mastering_lock`: approved generated PNGs live once in `slides_final/`; `slides_package/` holds PPTX, notes, manifest, and metadata only; `render_check/pdf_pages/` is disposable render QA output.
+   - Apply `contact_sheet_mastering_lock`: keep one retained `render_check/contact_sheet_review.png` by default; use one comparison sheet or render diff report only when delivery/render QA needs it.
    - Apply `source_line_lock`: render `Source: ...` when traceable sources exist; use `source_line: none` only when no traceable source exists.
    - Apply `source_separator_lock`: no horizontal divider, rule, underline, or hairline above Source.
    - Split the input into chapters, paragraphs, data points, quotes, assumptions, and uncertainties. Assign stable `source_span_id` values when source tracing matters.
@@ -101,7 +106,8 @@ Use this reference when the input is a long memo, equity story, research note, t
    - Keep `claim_backlog`, `evidence_ledger`, `source_ledger`, `appendix_candidates`, and `open_questions` separate from final slide text.
    - Decide `source_line`: `Source: ...` with real traceable source names / `none` only when no traceable source exists / research needed.
    - Do not drop real source names to reduce visual density; shorten or group source names instead.
-   - Do not place internal process notes, upload filenames, or draft provenance in Source.
+   - Do not place internal process notes, upload filenames, draft provenance, brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions in Source.
+   - Keep package and render-check artifacts pointing at `slides_final/` master PNGs; do not duplicate the same final PNG set into `slides_package/` or `render_check/pdf_pages/`.
 
 5. **Visual Structure Assignment**
    - Pick one dominant structure per slide:
@@ -142,7 +148,7 @@ Use this reference when the input is a long memo, equity story, research note, t
    - Fail any deck whose slides change material language without a claim-led reason: random base colors, rule weights, card/table fills, icon families, illustration finish, accent intensity, Insight treatment, or Source behavior.
 
 8. **Speaker Notes Plan**
-   - Draft `speaker_notes_text` for every deck slide before image prompting.
+   - Draft `speaker_notes_text` for every deck slide before image prompting, with `speaker_notes_depth_lock` so PPT notes are substantial enough to present from.
    - Use the deck language unless the user specifies otherwise.
    - Notes should include: the spoken claim in plain language, the evidence or assumption to mention, source caveat or confidence level when relevant, and a transition to the next slide.
    - Keep notes out of `exact_text` and out of the image prompt's on-slide text. Speaker notes belong in PPTX or Google Slides notes pages after image generation.
@@ -150,7 +156,7 @@ Use this reference when the input is a long memo, equity story, research note, t
 
 9. **Image Prompt Handoff**
    - For each slide, output: action title, subtitle, exact text, visual structure, visual richness role, illustration intensity, density tier, coordinates, source policy, Insight decision, and negative prompt.
-   - Block generation until `layout_archetype`, `layout_family`, `layout_diversity_plan`, `layout_rotation_guard`, `grid_mode`, `visual_richness_role`, `illustration_intensity`, `creative_variance`, `density_tier`, `source_policy`, `exact_text`, `speaker_notes_text`, `deck_header_master_lock`, `header_identity_lock`, `header_left_accent_reference_lock`, `header_left_accent_controlled_overhang_rule`, `header_left_accent_top_protrusion_blocker`, `header_integrity_blocker_lock`, `deck_tone_signature_lock`, `illustration_tone_lock`, `illustration_style_sheet`, `header_line_top_rule`, `message_box_compactness_blocker_lock`, and `coordinate_inventory_1672` are resolved.
+   - Block generation until `layout_archetype`, `layout_family`, `layout_diversity_plan`, `layout_rotation_guard`, `grid_mode`, `visual_richness_role`, `illustration_intensity`, `creative_variance`, `density_tier`, `source_policy`, `exact_text`, `speaker_notes_depth_lock`, `speaker_notes_text`, `near_white_slide_base_lock`, `deck_header_master_lock`, `header_identity_lock`, `header_left_accent_reference_lock`, `header_left_accent_controlled_overhang_rule`, `header_left_accent_top_protrusion_blocker`, `header_integrity_blocker_lock`, `deck_tone_signature_lock`, `illustration_tone_lock`, `illustration_style_sheet`, `header_line_top_rule`, `message_box_compactness_blocker_lock`, and `coordinate_inventory_1672` are resolved.
    - Generate pilot slides first for any deck over 3 slides.
 
 ## Density Design Best Practices
@@ -226,11 +232,19 @@ supporting_evidence:
 evidence_strength:
 source_span_ids:
 source_policy:
+source_real_only_lock:
+source_placeholder_blocklist:
+output_artifact_mastering_lock:
+single_final_png_master_lock:
+no_duplicate_png_output_lock:
+contact_sheet_mastering_lock:
+single_contact_sheet_policy:
 source_line_lock:
 source_separator_lock:
 source_line:
 source_urls:
 assumptions:
+speaker_notes_depth_lock:
 speaker_notes_text:
 speaker_notes_source_cues:
 speaker_notes_transition:
@@ -342,6 +356,11 @@ generation_block_rule:
 review_manifest:
 review_manifest_status: approved
 validate_review_manifest:
+slides_final_master_path:
+slides_package_policy:
+render_check_policy:
+contact_sheet_review_path:
+render_diff_report:
 unresolved_items:
 ```
 
@@ -349,9 +368,17 @@ unresolved_items:
 
 These practices synthesize common executive-presentation guidance:
 
-- Source footers are part of credibility, not decoration. Render `Source: ...` when traceable sources exist; use `source_line: none` only when no traceable source exists, and shorten or group names instead of deleting them for density.
+- Source footers are part of credibility, not decoration. Render `Source: ...` only when traceable real external/provided sources exist; use `source_line: none` and draw no Source footer when no traceable source exists. Never render brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, working assumptions, upload names, or draft provenance as Source.
 - Source footers sit on an invisible alignment baseline. Do not draw a horizontal divider, rule, underline, or hairline above Source.
 - Source footers remain separate from Insight/message-box text. Treat the space above Source as part of the composition rhythm: it can hold a centered bottom Insight when interpretation is useful, but the Insight and Source should read as two different layers.
+
+## Output Artifact Notes
+
+- `slides_final/` is the single loose-PNG master for approved generated slide images.
+- `slides_package/` should contain PPTX, speaker notes, review manifest, and metadata only. It should not contain copied slide PNGs.
+- `render_check/pdf_pages/` is disposable QA output from a rendered PDF/PPT check. It is not a source of truth and can be regenerated.
+- Keep one retained contact sheet by default: `render_check/contact_sheet_review.png` from `slides_final/`.
+- If delivery QA needs generated-vs-package-vs-PDF comparison, create one `render_check/contact_sheet_delivery_compare.png` or `render_check/render_diff_report.json`; do not retain parallel `contact_sheet_generated*`, `contact_sheet_package*`, and `contact_sheet_pdf_render*` files for the same slide set.
 
 - IBCS SUCCESS emphasizes saying a clear message, structuring content, simplifying clutter, and condensing information into high-density business communication: `https://www.ibcs.com/IBCS/`
 - Assertion-evidence guidance supports a claim headline plus visual proof instead of dense prose: `https://www.writing.engr.psu.edu/guidelines_AE_slides.pdf`

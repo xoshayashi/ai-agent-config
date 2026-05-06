@@ -70,6 +70,10 @@ Use this reference when the input is a long memo, equity story, research note, t
    - Identify audience, decision, intended use, language, required source strictness, and output count flexibility.
    - Use the embedded ATOM design system in SKILL.md as the source of style and component truth.
    - Preserve source URLs and source names separately from the narrative.
+   - Apply `source_real_only_lock`: render Source only for real traceable external/provided sources; if no real source exists, set `source_line: none` and draw no Source footer.
+   - Apply `source_placeholder_blocklist`: never use brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, working assumptions, upload names, or draft provenance as Source text.
+   - Apply `output_artifact_mastering_lock`: approved generated PNGs live once in `slides_final/`; `slides_package/` holds PPTX, notes, manifest, and metadata only; `render_check/pdf_pages/` is disposable render QA output.
+   - Apply `contact_sheet_mastering_lock`: keep one retained `render_check/contact_sheet_review.png` by default; use one comparison sheet or render diff report only when delivery/render QA needs it.
    - Apply `source_line_lock`: render `Source: ...` when traceable sources exist; use `source_line: none` only when no traceable source exists.
    - Apply `source_separator_lock`: no horizontal divider, rule, underline, or hairline above Source.
    - Split the input into chapters, paragraphs, data points, quotes, assumptions, and uncertainties. Assign stable `source_span_id` values when source tracing matters.
@@ -95,7 +99,8 @@ Use this reference when the input is a long memo, equity story, research note, t
    - Keep `claim_backlog`, `evidence_ledger`, `source_ledger`, `appendix_candidates`, and `open_questions` separate from final slide text.
    - Decide `source_line`: `Source: ...` with real traceable source names / `none` only when no traceable source exists / research needed.
    - Do not drop real source names to reduce visual density; shorten or group source names instead.
-   - Do not place internal process notes, upload filenames, or draft provenance in Source.
+   - Do not place internal process notes, upload filenames, draft provenance, brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions in Source.
+   - Keep package and render-check artifacts pointing at `slides_final/` master PNGs; do not duplicate the same final PNG set into `slides_package/` or `render_check/pdf_pages/`.
 
 5. **Visual Structure Assignment**
    - Pick one dominant structure per slide:
@@ -219,6 +224,13 @@ supporting_evidence:
 evidence_strength:
 source_span_ids:
 source_policy:
+source_real_only_lock:
+source_placeholder_blocklist:
+output_artifact_mastering_lock:
+single_final_png_master_lock:
+no_duplicate_png_output_lock:
+contact_sheet_mastering_lock:
+single_contact_sheet_policy:
 source_line_lock:
 source_separator_lock:
 source_line:
@@ -329,6 +341,11 @@ generation_block_rule:
 review_manifest:
 review_manifest_status: approved
 validate_review_manifest:
+slides_final_master_path:
+slides_package_policy:
+render_check_policy:
+contact_sheet_review_path:
+render_diff_report:
 unresolved_items:
 ```
 
@@ -336,8 +353,16 @@ unresolved_items:
 
 These practices synthesize common executive-presentation guidance:
 
-- Source footers are part of credibility, not decoration. Render `Source: ...` when traceable sources exist; use `source_line: none` only when no traceable source exists, and shorten or group names instead of deleting them for density.
+- Source footers are part of credibility, not decoration. Render `Source: ...` only when traceable real external/provided sources exist; use `source_line: none` and draw no Source footer when no traceable source exists. Never render brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, working assumptions, upload names, or draft provenance as Source.
 - Source footers sit on an invisible alignment baseline. Do not draw a horizontal divider, rule, underline, or hairline above Source.
+
+## Output Artifact Notes
+
+- `slides_final/` is the single loose-PNG master for approved generated slide images.
+- `slides_package/` should contain PPTX, speaker notes, review manifest, and metadata only. It should not contain copied slide PNGs.
+- `render_check/pdf_pages/` is disposable QA output from a rendered PDF/PPT check. It is not a source of truth and can be regenerated.
+- Keep one retained contact sheet by default: `render_check/contact_sheet_review.png` from `slides_final/`.
+- If delivery QA needs generated-vs-package-vs-PDF comparison, create one `render_check/contact_sheet_delivery_compare.png` or `render_check/render_diff_report.json`; do not retain parallel `contact_sheet_generated*`, `contact_sheet_package*`, and `contact_sheet_pdf_render*` files for the same slide set.
 
 - IBCS SUCCESS emphasizes saying a clear message, structuring content, simplifying clutter, and condensing information into high-density business communication: `https://www.ibcs.com/IBCS/`
 - Assertion-evidence guidance supports a claim headline plus visual proof instead of dense prose: `https://www.writing.engr.psu.edu/guidelines_AE_slides.pdf`

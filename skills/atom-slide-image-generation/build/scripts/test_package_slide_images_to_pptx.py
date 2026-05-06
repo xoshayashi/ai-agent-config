@@ -103,6 +103,21 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 pptx_packager.validate_review_manifest(str(manifest), images)
 
+    def test_rejects_derived_png_input_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            package_image = root / "slides_package" / "slide01.png"
+            render_image = root / "render_check" / "pdf_pages" / "page-01.png"
+            package_image.parent.mkdir()
+            render_image.parent.mkdir(parents=True)
+            package_image.write_bytes(png_bytes())
+            render_image.write_bytes(png_bytes())
+
+            with self.assertRaises(SystemExit):
+                pptx_packager.collect_images([str(package_image)])
+            with self.assertRaises(SystemExit):
+                pptx_packager.collect_images([str(render_image)])
+
 
 if __name__ == "__main__":
     unittest.main()
