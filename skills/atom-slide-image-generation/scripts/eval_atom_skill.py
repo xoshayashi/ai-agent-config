@@ -142,6 +142,30 @@ def valid_png_bytes(rgb: tuple[int, int, int] = (255, 255, 255)) -> bytes:
     )
 
 
+def approved_review_manifest(images: list[Path]) -> dict[str, object]:
+    return {
+        "all_generated_images_reviewed": True,
+        "weak_slide_regeneration_queue": [],
+        "final_image_quality_status": "approved",
+        "content_quality_status": "approved",
+        "design_quality_status": "approved",
+        "deck_unity_status": "approved",
+        "completion_ready_status": "approved",
+        "review_manifest_status": "approved",
+        "slides": [
+            {
+                "slide_id": str(idx),
+                "png_path": str(image),
+                "image_review_status": "approved",
+                "final_image_quality_status": "approved",
+                "blockers": [],
+                "majors": [],
+            }
+            for idx, image in enumerate(images, 1)
+        ],
+    }
+
+
 def run_pptx_package_check() -> Result:
     script = ROOT / "scripts" / "package_slide_images_to_pptx.py"
     png_bytes = valid_png_bytes()
@@ -155,9 +179,22 @@ def run_pptx_package_check() -> Result:
         image2.write_bytes(png_bytes)
         notes = tmp_path / "notes.json"
         notes.write_text(json.dumps(["note 1", "note 2"], ensure_ascii=False), encoding="utf-8")
+        manifest = tmp_path / "review-manifest.json"
+        manifest.write_text(json.dumps(approved_review_manifest([image1, image2]), ensure_ascii=False), encoding="utf-8")
         output = tmp_path / "deck.pptx"
         proc = subprocess.run(
-            [sys.executable, str(script), "--output", str(output), "--notes-json", str(notes), str(image1), str(image2)],
+            [
+                sys.executable,
+                str(script),
+                "--output",
+                str(output),
+                "--notes-json",
+                str(notes),
+                "--review-manifest",
+                str(manifest),
+                str(image1),
+                str(image2),
+            ],
             cwd=ROOT,
             env=env,
             text=True,
@@ -171,6 +208,8 @@ def run_pptx_package_check() -> Result:
         if "pptx_package_status: created" not in combined or "pptx_slide_count: 2" not in combined:
             return Result("pptx_package_check", False, combined[:2000])
         if "pptx_image_mapping:" not in combined or "pptx_speaker_notes_mapping:" not in combined:
+            return Result("pptx_package_check", False, combined[:2000])
+        if "review_manifest_status: approved" not in combined:
             return Result("pptx_package_check", False, combined[:2000])
         try:
             import zipfile

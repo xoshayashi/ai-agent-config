@@ -145,6 +145,88 @@ def load_notes(
     return notes
 
 
+APPROVED_STATUSES = {
+    "final_image_quality_status",
+    "content_quality_status",
+    "design_quality_status",
+    "deck_unity_status",
+    "completion_ready_status",
+    "review_manifest_status",
+}
+
+
+def normalize_manifest_path(value: object, base: Path) -> Path | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    path = Path(value).expanduser()
+    if not path.is_absolute():
+        path = base / path
+    return path.resolve()
+
+
+def require_approved_status(data: dict[str, object], key: str) -> None:
+    if data.get(key) != "approved":
+        raise SystemExit(f"review_manifest {key} must be approved.")
+
+
+def validate_review_manifest(manifest_file: str | None, images: list[Path]) -> None:
+    if not manifest_file:
+        raise SystemExit("PPTX package gate requires an approved review manifest. Provide --review-manifest.")
+
+    manifest_path = Path(manifest_file).expanduser()
+    data = json.loads(manifest_path.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        raise SystemExit("review_manifest must be a JSON object.")
+
+    if data.get("all_generated_images_reviewed") is not True:
+        raise SystemExit("review_manifest all_generated_images_reviewed must be true.")
+
+    queue = data.get("weak_slide_regeneration_queue")
+    if queue not in (None, [], {}):
+        raise SystemExit("review_manifest weak_slide_regeneration_queue must be empty.")
+
+    for key in APPROVED_STATUSES:
+        require_approved_status(data, key)
+
+    slides = data.get("slides")
+    if not isinstance(slides, list):
+        raise SystemExit("review_manifest slides must be a list.")
+    if len(slides) != len(images):
+        raise SystemExit(f"review_manifest slide count {len(slides)} does not match image count {len(images)}.")
+
+    expected_paths = {image.resolve() for image in images}
+    manifest_paths: set[Path] = set()
+    base = manifest_path.parent
+    for idx, slide in enumerate(slides, 1):
+        if not isinstance(slide, dict):
+            raise SystemExit(f"review_manifest slide {idx} must be an object.")
+        for key in ("image_review_status", "final_image_quality_status"):
+            if slide.get(key) != "approved":
+                raise SystemExit(f"review_manifest slide {idx} {key} must be approved.")
+        for key in ("blockers", "majors"):
+            findings = slide.get(key)
+            if findings not in (None, [], {}):
+                raise SystemExit(f"review_manifest slide {idx} has non-empty {key}.")
+        path = (
+            normalize_manifest_path(slide.get("png_path"), base)
+            or normalize_manifest_path(slide.get("image_path"), base)
+            or normalize_manifest_path(slide.get("input"), base)
+        )
+        if path is None:
+            raise SystemExit(f"review_manifest slide {idx} is missing png_path.")
+        manifest_paths.add(path)
+
+    if manifest_paths != expected_paths:
+        missing = sorted(str(path) for path in expected_paths - manifest_paths)
+        extra = sorted(str(path) for path in manifest_paths - expected_paths)
+        detail = []
+        if missing:
+            detail.append("missing: " + ", ".join(missing))
+        if extra:
+            detail.append("extra: " + ", ".join(extra))
+        raise SystemExit("review_manifest image paths must match package images; " + "; ".join(detail))
+
+
 def rels_xml(relationships: list[tuple[str, str, str]]) -> str:
     items = "\n".join(
         f'  <Relationship Id="{rid}" Type="{escape(kind)}" Target="{escape(target)}"/>'
@@ -474,17 +556,20 @@ def main() -> int:
     parser.add_argument("--notes-json", help="Optional JSON list/object with speaker notes")
     parser.add_argument("--notes-file", help="Optional text file split by form-feed or ---SLIDE---")
     parser.add_argument("--no-require-notes", action="store_true", help="Allow PPTX packaging without speaker notes")
+    parser.add_argument("--review-manifest", help="Approved post-generation review manifest JSON")
     args = parser.parse_args()
 
     images = collect_images(args.images)
     output = Path(args.output).expanduser()
     notes = load_notes(args.notes_json, args.notes_file, len(images), images, require_notes=not args.no_require_notes)
+    validate_review_manifest(args.review_manifest, images)
     build_pptx(output, images, notes)
     validate_pptx(output, images, notes)
     print(f"pptx_output_path: {output}")
     print(f"pptx_slide_count: {len(images)}")
     print("pptx_image_mapping: " + json.dumps(image_mapping(images), ensure_ascii=False, sort_keys=True))
     print("pptx_speaker_notes_mapping: " + json.dumps(notes_mapping(notes), ensure_ascii=False, sort_keys=True))
+    print("review_manifest_status: approved")
     print("pptx_package_status: created")
     return 0
 

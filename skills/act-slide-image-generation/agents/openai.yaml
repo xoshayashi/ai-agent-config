@@ -1,4 +1,4 @@
 interface:
   display_name: "ACT Slide Image Generation"
   short_description: "Structure text and generate ACT slide images"
-  default_prompt: "Use $act-slide-image-generation to use the embedded ACT design system, convert this brief or long text into slide structure, generate gpt-image-2 16:9 slide PNGs via Codex built-in image generation, review and repair the PNGs, then package approved PNGs into PPTX as a delivery wrapper only."
+  default_prompt: "Use $act-slide-image-generation to use the embedded ACT design system, convert this brief or long text into slide structure, generate gpt-image-2 16:9 slide PNGs via Codex built-in image generation, review every actual PNG as a full deck, regenerate weak slides until completion_ready_status is approved, then package approved PNGs into PPTX as a delivery wrapper only."

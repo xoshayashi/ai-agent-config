@@ -36,6 +36,18 @@ pptx_delivery: image-only PPTX roll-up after generated PNGs pass QA, unless user
 pptx_status: pending_generated_images_and_pre_package_image_review / created / blocked
 google_slides_delivery: optional image-only roll-up after generated PNGs pass QA when explicitly requested
 speaker_notes_status: drafted / inserted / blocked
+post_generation_full_deck_review_loop: after generating slide PNGs, review every actual image before claiming completion
+all_generated_images_reviewed: false until every output PNG has been opened and reviewed
+weak_slide_regeneration_queue: [slides needing regeneration or edit before completion]
+content_quality_status: pending / approved / repair_required
+design_quality_status: pending / approved / repair_required
+deck_unity_status: pending / approved / repair_required
+completion_ready_status: blocked until all image, content, design, and deck-unity gates are approved
+regenerate_until_quality_approved: keep regenerating or editing weak slides until completion_ready_status is approved
+generation_block_rule: if generation or repair is blocked, mark completion_ready_status: blocked and do not package or report complete
+review_manifest: required JSON record covering every generated PNG before PPTX packaging
+review_manifest_status: approved
+validate_review_manifest: run before PPTX packaging
 ```
 
 Do not request `1920x1080` directly from `gpt-image-2`; use a valid multiple-of-16 image-generation size and resize after generation when needed.
@@ -43,6 +55,8 @@ Do not substitute local rendering, screenshots, SVG, PIL, canvas, or PPT exports
 PPTX is a delivery wrapper only; never use PPTX, PowerPoint export, screenshots, local rendering, HTML, SVG, canvas, or PIL to create final PNGs.
 Correct order: gpt-image-2 PNG generation -> PNG review/repair -> PPTX roll-up.
 If gpt-image-2 image generation is blocked, stop rather than manufacturing final PNGs through PPTX or local rendering.
+completion_blocker: do not report complete while any generated slide has blocker, major, deck-consistency, content-quality, or design-quality issues.
+PPTX package gate requires an approved review manifest.
 
 ## Base Image Contract
 
@@ -52,7 +66,10 @@ Generate at 1536x864 for drafts, 2048x1152 for 16:9 2K-width working review, or 
 Plan all layout using a 1672x941 coordinate basis, with ACT delivery target 1920x1080 after resize if required.
 Treat 1920x1080 as FHD/1080p delivery, 2048x1152 as practical 16:9 2K-width generation, and 3840x2160 as 4K UHD generation.
 Use a shared 12-column grid, 8px spacing rhythm, and precise header/footer anchors.
-For decks, define and reuse one deck header master. Treat the header as the lowest-freedom component: repeat the same left vertical line, H1, subtitle, visual alignment rule, body-start y, header safe area, and clear zone in every slide prompt. no_header_ranges_in_final_prompts: final prompts must use exact selected x/y/w/h/color/font_family/font values for the header, not ranges. Apply header_line_top_rule: the line top must sit at or slightly below the first visible H1 glyph top, never above it just because the text box starts higher.
+For decks, define and reuse one deck header master. Apply header_identity_lock: the header is always the same compact left vertical line + H1 + subtitle system, never a slide-specific decoration surface. Treat the header as the lowest-freedom component: repeat the same left vertical line, H1, subtitle, visual alignment rule, body-start y, header safe area, and clear zone in every slide prompt. no_header_ranges_in_final_prompts: final prompts must use exact selected x/y/w/h/color/font_family/font values for the header, not ranges. Apply header_line_top_rule: the line top must sit at or slightly below the first visible H1 glyph top, never above it just because the text box starts higher. Apply header_integrity_blocker_lock: malformed, missing, oversized, recolored, right-decorated, or intruded headers are blockers.
+For decks, apply deck_tone_signature_lock: preserve one material system for base, typography, rule weight, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior while varying only claim-led layouts.
+For decks, apply illustration_tone_lock: keep all illustrations in one deck on the same editorial vector system. Define illustration_style_sheet before generation and reuse it verbatim: flat 2D business and healthcare workflow illustration; simplified people; tablets, laptops, document stacks, CRM panels, report cards, timelines, handoff arrows, and small icon badges; soft pale mint or warm gray fills; Petrol and charcoal linework; restrained Honey highlights; consistent 2-3px stroke, crop, face detail, body proportion, and fill opacity.
+For decks, apply post_generation_full_deck_review_loop: after generating slide PNGs, review every actual image before claiming completion. Maintain all_generated_images_reviewed, weak_slide_regeneration_queue, content_quality_status, design_quality_status, deck_unity_status, final_image_quality_status, and completion_ready_status; use regenerate_until_quality_approved until the queue is empty or generation is blocked.
 For decks, define layout_diversity_plan and layout_rotation_guard before final prompts. Choose layout families from full-field, asymmetric main/supporting-context, balanced diptych, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase patterns according to the slide claim and evidence type.
 For decks, use opening_density_gate on slide 1: make it an opening_thesis_slide, set first_slide_not_title_only, and combine the memorable main phrase with a core thesis, 2-4 proof/tension points, a visible market-shift/matrix/causal-map/wedge structure, and a bridge into the deck.
 Request Noto Sans JP for every visible string, including Latin/English letters, numbers, symbols, and Japanese. Do not request or mix any other typeface; keep text short enough to audit.
@@ -79,8 +96,9 @@ Use calm operating-deck visual quality traits: light neutral base, compact fixed
 Design information density before image generation. Density should answer more of the reader's decision question in one view through hierarchy, evidence, comparison, annotation, source cues, and context layers; do not use smaller type, extra decoration, or visual noise as density.
 Do not minimize numbers by default. Keep decision-relevant sourced or explicitly assumed numbers when they support comparison, sizing, prioritization, credibility, or decision-making.
 Message boxes and Insight surfaces must use flat solid fills only; no patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
-Apply message_box_scale_lock: message boxes are compact interpretation surfaces, not display surfaces; use one short judgment sentence, prefer one line, allow two lines maximum, and trim or move explanation to notes instead of increasing the box.
+Apply message_box_scale_lock: message boxes are compact interpretation surfaces, not display surfaces; use one short judgment sentence, prefer one line, allow two lines maximum, and trim, move explanation to notes/body, or remove the component instead of increasing the box.
 Apply message_box_text_size_lock: Insight/message-box text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below subtitle, and must never become a second title.
+Apply message_box_compactness_blocker_lock: an Insight/message-box that dominates the slide, behaves like a banner, spans beyond the interpreted region, grows tall to carry prose, or compensates for layout imbalance is a blocker.
 Honey message boxes have one fixed treatment: #F5E2A8 flat pale fill, #C49A2C 4-5px full-height left accent line, #2D332E text. Avoid saturated yellow fills, dark yellow boxes, large yellow areas, and yellow title underlines.
 Preserve distinct claims as distinct slides. Combine slides only when claims repeat, the same comparison must be seen together, or the user explicitly requests a shorter deck.
 Choose a concrete visual grammar per slide from the claim and evidence. Select the projection, viewpoint, abstraction level, motif, and level of detail deliberately; the chosen visual can be a diagram, scene, system view, comparison, object detail, spatial view, sequence, or metaphor when it clarifies the argument.
@@ -174,8 +192,20 @@ secondary_region_integrity_lock:
 body_silhouette_lock:
 post_generation_design_balance_check:
 pre_package_image_review:
+post_generation_full_deck_review_loop:
+all_generated_images_reviewed:
 image_review_matrix:
 deck_consistency_matrix:
+weak_slide_regeneration_queue:
+content_quality_status:
+design_quality_status:
+deck_unity_status:
+completion_ready_status:
+regenerate_until_quality_approved:
+generation_block_rule:
+review_manifest:
+review_manifest_status: approved
+validate_review_manifest:
 whitespace_occupancy_balance_status:
 typography_balance_status:
 color_consistency_status:
@@ -299,6 +329,9 @@ ACT slide contract:
 - apply visual_design_quality_traits as design treatment: calm light base, compact fixed header, thin rules, pale equalized surfaces, restrained icons/line drawings, intentional canvas occupancy
 - define component_inventory, row_tracks, column_tracks, equalized_groups, and shared_edges
 - lock header anchor first: left vertical line + H1 + subtitle + visual alignment + header safe area + body_start_y + upper-right clear zone
+- apply header_identity_lock and header_integrity_blocker_lock before visual polish
+- apply deck_tone_signature_lock before slide-level variation; vary layouts from claims while keeping material language consistent
+- apply illustration_tone_lock and illustration_style_sheet before image prompting; keep people, devices, document objects, UI panels, icon badges, linework, fills, and crop consistent across the deck
 - lock footer_anchor_baseline even when source_line is none
 - lock header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E
 - keep source_line separate from table_note_microline
@@ -309,6 +342,9 @@ ACT slide contract:
 - assign visual_richness_role, illustration_intensity, creative_variance, and density_tier before generation
 - define density_design before generation: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails
 - density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
+- consulting_structure_bias: gently prefer strategy-consulting style structure when it clarifies the claim, without forcing it on every slide
+- structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
+- use issue trees, driver trees, 2x2 matrices, value chains, funnels, waterfalls, KPI bridges, decision tables, before/after bridges, or hypothesis-evidence-implication rows when they improve the reader's decision path; skip them when they would clutter the focal claim
 - structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation
 - add density through decision-relevant comparisons, benchmarks, units, denominators, assumptions, annotations, evidence strips, supporting context regions, small multiples, and source cues; never through smaller type or decorative illustration detail
 - imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation
@@ -320,11 +356,11 @@ ACT slide contract:
 - make abstract claims imageable through a specific operating view, workflow handoff, document stack, data row, map route, queue, machine cell, screen state, evidence artifact, or customer moment that fits the claim
 - keep decision-relevant numbers when they are legible and grouped; do not force a minimal-numbers rule
 - use human-designed editorial/vector illustrations for chapter openers, turning points, complex systems, and final vision slides
-- keep illustration subordinate: a clear focal motif, only useful supporting details, clean controlled linework, crisp silhouettes, restrained fills, a projection/viewpoint chosen from the claim, no rough sketch, no arbitrary pseudo-depth, and no glossy AI concept-art finish
+- keep illustration subordinate: a clear focal motif, only useful supporting details, clean controlled flat 2D linework, crisp silhouettes, restrained fills, rounded UI panels, small icon badges, a projection/viewpoint chosen from the claim, no rough sketch, no arbitrary pseudo-depth, and no glossy AI concept-art finish
 - max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
-- use ACT typography: H1 30-34pt, subtitle 26-30pt, body 18pt equivalent
-- use ACT header rules: H1 Forest Charcoal #2D332E, subtitle #4D544E, exact left vertical line, no blue H1
-- use the default exact ACT header unless the user explicitly provides a newer embedded master: 1672x941 basis; header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=48 w=10 h=104 #008A80; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.10 #2D332E; subtitle x=88 y=78 w=1332 max_lines=1 size=28pt weight=400 line_height=1.18 #4D544E; visual_alignment line top at or 0-6px below visible H1 glyph top, never above; line bottom 4-8px below subtitle lower visual edge; body_start_y=190; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty
+- use ACT typography: H1 30-34pt, subtitle 21-23pt, body 18pt equivalent
+- use ACT header rules: H1 Forest Charcoal #2D332E, subtitle #4D544E, exact compact left vertical line, no blue H1, no right-side header decoration
+- use the default exact compact ACT header unless the user explicitly provides a newer embedded master: 1672x941 basis; header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=44 w=10 h=76 #008A80; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.14 #2D332E; subtitle x=88 y=82 w=1332 max_lines=1 size=22pt weight=400 line_height=1.18 #4D544E; visual_alignment line top at or 0-6px below visible H1 glyph top, never above; line bottom 4-8px below subtitle lower visual edge; body_start_y=180; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty
 - make the slide feel human-crafted through priority, breathing room, and editorial rhythm
 - keep the slide in a strategy operating-deck look: useful occupancy, small explanatory visuals, crisp rules, low-contrast surfaces, and no ornamental depth
 - let structure, spacing, rules, numbers, and typography carry hierarchy
@@ -334,6 +370,7 @@ ACT slide contract:
 - keep all Insight/message boxes flat solid fill only; no patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations
 - apply message_box_scale_lock: keep Insight/message boxes compact, one short judgment sentence, one line preferred and two lines maximum; trim or move explanation to notes instead of growing the surface
 - keep Insight/message-box text 20-24pt by default, 24-26pt only by exception, at least 6pt smaller than H1, visually below subtitle; it must not become a second title or second hero headline
+- keep Insight/message-box surfaces compact; if the surface starts to dominate, behave like a banner, or rescue weak layout, shorten text, narrow it, move detail to body/notes, or remove it
 - keep Honey quiet: no saturated yellow fill, no dark yellow message box, no large yellow area, and no Honey color variation across a deck
 - Render Source: ... in the footer whenever traceable real sources are available; source_line: none is allowed only when no traceable source exists
 - final bitmap generation must use gpt-image-2
@@ -551,7 +588,7 @@ Repair this slide image prompt for text balance, grid fidelity, and visual hiera
 
 Priority:
 1. Do not solve crowding by shrinking body text below 18pt equivalent.
-2. Keep ACT header fixed: H1 30-34pt #2D332E, subtitle 26-30pt #4D544E, exact left vertical line, header_line_top_rule, and no header ranges in the final prompt.
+2. Keep ACT header fixed: compact left vertical line + H1 + subtitle, H1 30-34pt #2D332E, subtitle 21-23pt #4D544E, exact left vertical line, header_line_top_rule, header_identity_lock, header_integrity_blocker_lock, and no header ranges in the final prompt.
 3. Rebuild grid_mode, column_spans, row_tracks, column_tracks, separator_x, outer_padding, and shared_edges.
 4. Add coordinate_inventory_1672 and master_components if missing.
 5. Remove repeated explanation and weak labels.
@@ -582,23 +619,29 @@ Guideline/Brand:
 - ACT Honey is not decorative when used; it is a quiet pale signal, never a strong yellow block
 - Primary accent is structural and not body text; for ACT work, Petrol has a 6-12% area budget
 - Color consistency is stable across the deck: no random accent, arbitrary gray, saturation jump, or late-slide color drift
+- Deck tone signature is stable: base, typography, rule weight, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior feel like one material system
+- Illustration tone is stable: illustration_tone_lock, illustration_style_sheet, and illustration_consistency_status pass across people, devices, documents, CRM/report panels, UI cards, icon badges, fills, stroke, crop, and facial detail
 
 Layout:
 - layout_archetype, layout_family, layout_diversity_plan, layout_rotation_guard, grid_mode, component_inventory exist
 - coordinate_inventory_1672 and master_components exist
 - row_tracks, column_tracks, equalized_groups, shared_edges exist
 - header/footer anchors are fixed with exact values, not ranges
+- header_identity_lock passes: the header remains the compact left vertical line + H1 + subtitle system, not a slide-specific decoration surface
 - header_line_top_rule passes: the left vertical line top is at or below the first visible H1 glyph top and never protrudes upward
+- header_integrity_blocker_lock passes: no malformed, missing, oversized, recolored, right-decorated, or intruded header remains
 - Whitespace and occupancy balance is intentional: no accidental empty dead zone, no overcrowded canvas, no content crushing the margins
 - Secondary regions in split or auxiliary-region layouts read as complete decision panels, not loose leftover areas
 - Body silhouette is closed: main and secondary regions share intentional outer edges, lower edges, and footer clearance
 - Outer padding is consistent with the deck master and does not drift between slides
 - Header integrity is intact: no missing line, warped line, shifted H1/subtitle, or body content inside the header shell
 - Visual design quality traits are present: thin rules, pale equalized surfaces, consistent card/table heights, consistent icon stroke/circle sizes, and small explanatory line drawings where useful
+- Illustration style sheet is visible where illustration is used: flat 2D workflow scenes, simplified human figures, device/document/UI objects, restrained fills, and consistent Petrol/charcoal linework
 - Imageability is present: concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details are named before generation
 - Editorial polish repair has improved specificity, proportion, rhythm, and focal hierarchy
 - repeated elements are equalized
 - supporting region and Insight do not compete
+- Insight/message-box compactness passes: the surface does not dominate the slide, behave like a banner, grow tall for prose, or compensate for layout imbalance
 - Insight/message-box placement is integrated with the body silhouette and Source baseline rather than used as a patch for an empty corner
 - Insight/message-box text is optically centered horizontally and vertically within its surface
 
@@ -606,7 +649,7 @@ Typography:
 - max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
 - H1 30-34pt, default 32pt
 - long Japanese H1 uses 30-32pt; short mixed titles may use 34pt
-- subtitle 26-30pt #4D544E
+- subtitle 21-23pt #4D544E
 - Insight/message-box text 20-24pt by default, 24-26pt only by exception, and at least 6pt smaller than selected H1 and visually below subtitle
 - body readable at 18pt equivalent
 - weights stay within 400/600/700
@@ -616,6 +659,7 @@ Content:
 - one claim
 - title is a claim, subtitle supports
 - density_design answers a clear decision_question and does not rely on smaller type or decorative detail
+- consulting_structure_bias and structured_density_bias are applied selectively: structure and density increase the decision value without turning every slide into a consulting template
 - information units are grouped and each added layer improves the claim
 - Insight adds interpretation, not repetition
 - Insight/message-box placement creates a calm reading bridge between the relevant content and the footer when used at the bottom
@@ -636,6 +680,12 @@ Deck:
 - layout_diversity_plan and layout_rotation_guard are reflected in the generated image sequence
 - visible priority, rhythm, and breathing room
 - post_generation_design_balance_check is approved for generated PNGs before PPTX or Google Slides roll-up
+- post_generation_full_deck_review_loop has reviewed every actual generated image before completion
+- all_generated_images_reviewed is true, weak_slide_regeneration_queue is empty, and completion_ready_status is approved
+- content_quality_status, design_quality_status, and deck_unity_status are approved across the full generated image set
+- regenerate_until_quality_approved has been used for every slide with weak content, weak design, tone inconsistency, text/source/header issues, or poor deck unity
+- generation_block_rule passes: if generation or repair is blocked, completion_ready_status is blocked and PPTX packaging does not start
+- review_manifest_status is approved after validate_review_manifest confirms every generated PNG is covered and all quality gates are approved
 - deck_tone_consistency_status is approved after comparing first, middle, and last thirds
 - visual design quality traits stay consistent from first to last slide: line weight, pale surfaces, card radius, icon family, illustration density, Petrol role, Honey treatment, and outer padding
 - no mechanical card-only repetition

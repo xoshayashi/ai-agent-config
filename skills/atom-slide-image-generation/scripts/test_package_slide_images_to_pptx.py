@@ -33,24 +33,75 @@ def png_bytes() -> bytes:
     )
 
 
+def approved_manifest(image_paths: list[Path]) -> dict[str, object]:
+    return {
+        "all_generated_images_reviewed": True,
+        "weak_slide_regeneration_queue": [],
+        "final_image_quality_status": "approved",
+        "content_quality_status": "approved",
+        "design_quality_status": "approved",
+        "deck_unity_status": "approved",
+        "completion_ready_status": "approved",
+        "review_manifest_status": "approved",
+        "slides": [
+            {
+                "slide_id": str(idx),
+                "png_path": str(path),
+                "image_review_status": "approved",
+                "final_image_quality_status": "approved",
+                "blockers": [],
+                "majors": [],
+            }
+            for idx, path in enumerate(image_paths, 1)
+        ],
+    }
+
+
 class PackageSlideImagesToPptxTest(unittest.TestCase):
     def test_package_preserves_media_and_notes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             image = root / "slide01.png"
             notes = root / "notes.json"
+            manifest = root / "review.json"
             output = root / "deck.pptx"
             image.write_bytes(png_bytes())
             notes.write_text(json.dumps(["note 1"]), encoding="utf-8")
+            manifest.write_text(json.dumps(approved_manifest([image])), encoding="utf-8")
 
             images = pptx_packager.collect_images([str(image)])
             slide_notes = pptx_packager.load_notes(str(notes), None, 1, images)
+            pptx_packager.validate_review_manifest(str(manifest), images)
             pptx_packager.build_pptx(output, images, slide_notes)
             pptx_packager.validate_pptx(output, images, slide_notes)
 
             with zipfile.ZipFile(output) as archive:
                 self.assertIn("ppt/media/image1.png", archive.namelist())
                 self.assertIn("note 1", archive.read("ppt/notesSlides/notesSlide1.xml").decode("utf-8"))
+
+    def test_requires_review_manifest_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image = root / "slide01.png"
+            image.write_bytes(png_bytes())
+            images = pptx_packager.collect_images([str(image)])
+
+            with self.assertRaises(SystemExit):
+                pptx_packager.validate_review_manifest(None, images)
+
+    def test_rejects_unapproved_review_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image = root / "slide01.png"
+            manifest = root / "review.json"
+            image.write_bytes(png_bytes())
+            data = approved_manifest([image])
+            data["completion_ready_status"] = "blocked"
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+            images = pptx_packager.collect_images([str(image)])
+
+            with self.assertRaises(SystemExit):
+                pptx_packager.validate_review_manifest(str(manifest), images)
 
 
 if __name__ == "__main__":
