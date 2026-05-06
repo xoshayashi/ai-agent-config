@@ -2,8 +2,8 @@
   "runtime_scan_globs": [
     "SKILL.md",
     "agents/**/*.yaml",
-    "references/**/*.md",
-    "scripts/**/*.py"
+    "build/references/*.md",
+    "build/scripts/*.py"
   ],
   "forbidden_patterns": [
     {"pattern": "\\bATOM\\b", "reason": "No old skill name or brand wording should remain."},
