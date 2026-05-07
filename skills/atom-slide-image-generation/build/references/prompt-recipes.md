@@ -2,6 +2,12 @@
 
 Use these recipes after applying `embedded ATOM design system in SKILL.md`. Keep final prompts concrete, coordinate-aware, and explicit that final bitmap generation uses `gpt-image-2`.
 
+Quality anchor vocabulary for evaluation and prompt consistency:
+- all_text_font_lock: Noto Sans JP
+- layout modes include asymmetric main + context region, center-hub + surrounding-nodes, top-map + bottom-detail-table, and bottom-main compact
+- Honey surfaces must feel quieter than Deep Blue surfaces
+- visual language is technical editorial line illustration, not generic decoration
+
 ## Contents
 
 - Image Generation Settings Block

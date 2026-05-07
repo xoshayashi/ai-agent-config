@@ -263,6 +263,8 @@ def check_no_old_files() -> list[Result]:
     old_paths = [
         ROOT / "references" / "act-slide-patterns-essentials.md",
         ROOT / "scripts" / "build_act_slide_prompt.py",
+        ROOT / "scripts" / "eval_act_skill.py",
+        ROOT / "evals" / "act_skill_eval.json",
     ]
     results = [Result(f"old_file_absent:{path.relative_to(ROOT)}", not path.exists(), "exists" if path.exists() else "") for path in old_paths]
     pycache_dirs = [p.relative_to(ROOT) for p in ROOT.rglob("__pycache__") if p.is_dir()]
