@@ -93,6 +93,7 @@ PLACEHOLDER_BLOCKERS = [
     "no_duplicate_png_output_lock",
     "contact_sheet_mastering_lock",
     "single_contact_sheet_policy",
+    "speaker_notes_depth_lock",
     "speaker_notes_text",
     "pptx_rollup_plan",
     "pptx_package_status",
@@ -204,9 +205,10 @@ def canonical_planning_block(
   pptx_packaging_route: scripts/package_slide_images_to_pptx.py / presentation_app_import / blocked
   pptx_image_mapping: [slide_id -> generated PNG path -> PPTX slide index]
   pptx_speaker_notes_mapping: [slide_id -> note source -> inserted / sidecar / blocked]
-  speaker_notes_plan: one note per deck slide, drafted before image generation and inserted into PPTX or Google Slides notes page after image roll-up when the packaging route supports notes
+  speaker_notes_plan: one substantial note per deck slide, drafted before image generation and inserted into PPTX or Google Slides notes page after image roll-up when the packaging route supports notes
   speaker_notes_status: drafted / inserted / blocked
-  speaker_notes_text: [talk track + evidence/assumption cue + source caveat if relevant + transition cue; keep off slide image]
+  speaker_notes_depth_lock: [PPT talk script should be 4-7 substantive Japanese sentences or roughly 180-320 Japanese chars per slide unless the user requests brief notes; include opening framing, 2-3 evidence/assumption talking points, implication, caveat when relevant, and transition; do not invent facts]
+  speaker_notes_text: [substantial PPT talk script + evidence/assumption cue + source caveat if relevant + transition cue; keep off slide image]
   opening_slide_role: opening_thesis_slide / standard_story_slide
   first_slide_not_title_only: true / N/A
   opening_density_gate: slide 1 has core thesis, 2-4 proof/tension points, visible market-shift/matrix/causal-map/wedge structure, and bridge
@@ -392,7 +394,7 @@ def mode_guidance(mode: str) -> str:
   - Apply contact_sheet_mastering_lock and single_contact_sheet_policy: keep one retained contact sheet from slides_final/ by default; generate a comparison contact sheet only when delivery/render QA needs it.
   - Build layout_diversity_plan: assign layout_family for each slide across full-field, asymmetric main/supporting-context, balanced comparison, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase families when the argument benefits.
   - Use layout_rotation_guard to keep repeated structures purposeful: repeat a family for like-for-like comparison, and change family when claim type, evidence type, or decision question changes.
-  - Draft speaker_notes_text for every slide: concise talk track, evidence/assumption cue, source caveat if relevant, and transition cue.
+  - Draft speaker_notes_text for every slide with speaker_notes_depth_lock: substantial Japanese PPT talk script, 4-7 sentences or roughly 180-320 Japanese chars, with framing, evidence/assumption cues, implication, caveat if relevant, and transition.
   - Add pre_package_image_review, pre_google_slides_image_review, post_generation_full_deck_review_loop, all_generated_images_reviewed, weak_slide_regeneration_queue, content_quality_status, design_quality_status, deck_unity_status, completion_ready_status, and regenerate_until_quality_approved fields so generated PNGs are reviewed, repaired, and re-reviewed before PPTX, Slides insertion, or completion.
   - Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide before image prompting.
   - Apply illustration_tone_lock and illustration_style_sheet before image prompting so people, devices, UI panels, document objects, icon badges, linework, fills, and crop stay consistent across the deck.
@@ -433,7 +435,7 @@ def mode_guidance(mode: str) -> str:
   - Preserve distinct claims as separate slides; combine only repeated claims or evidence that must be compared in one view.
   - Define deck master refs for header, invisible footer alignment baseline, Insight surfaces, tables, cards, and icon circles.
   - Allocate Insight components selectively across the deck and avoid mechanical card-only repetition.
-  - Draft speaker_notes_text for every slide and plan PPTX roll-up with one full-bleed generated PNG plus corresponding speaker notes per slide. Plan Google Slides only when explicitly requested.
+  - Draft speaker_notes_text for every slide with speaker_notes_depth_lock and plan PPTX roll-up with one full-bleed generated PNG plus corresponding substantial speaker notes per slide. Plan Google Slides only when explicitly requested.
   - Plan post_generation_full_deck_review_loop: after generating slide PNGs, review every actual image before claiming completion, classify blocker/major/minor issues, fill weak_slide_regeneration_queue, repair/regenerate, and continue until all_generated_images_reviewed is true, the queue is empty, and completion_ready_status is approved.
   - Apply completion_blocker: do not report complete while any generated slide has blocker, major, deck-consistency, content-quality, or design-quality issues.
   - Do not generate final images until each slide has its own canonical planning block."""
@@ -539,7 +541,8 @@ draft_image_prompt_scaffold:
   When creative_variance is high, vary composition, viewpoint, crop, asymmetric region balance, visual metaphor, and layout rhythm; keep brand, header, exact text, grid, and source policy locked.
   Let the planned chart/table/matrix/roadmap carry the argument where it is the clearest reader path; illustration adds memory, wayfinding, and selective emphasis through a clear focal motif, useful supporting details, clean controlled linework, crisp silhouettes, restrained fills, rounded UI panels, small icon badges, and short annotations.
   Make abstract claims imageable by naming the concrete visual anchor and visible details: an operating view, workflow handoff, document stack, data row, map route, queue, machine cell, screen state, evidence artifact, or customer moment that fits the claim.
-  Keep speaker notes out of the slide image. Speaker notes are inserted later into Google Slides notes pages and should not appear as visible on-slide text.
+  Apply speaker_notes_depth_lock: for PPTX decks, write speaker notes as a substantial Japanese talk script, normally 4-7 sentences or roughly 180-320 Japanese characters per slide unless the user requests brief notes. Include opening framing, 2-3 evidence or assumption talking points, the implication to say aloud, caveat/source context when relevant, and a transition to the next slide.
+  Keep speaker notes out of the slide image. Speaker notes are inserted later into PPTX or Google Slides notes pages and should not appear as visible on-slide text.
   Do not hard-code one visual grammar across slides. Select the projection, viewpoint, abstraction level, motif, and level of detail from the slide claim; use depth or spatial perspective only when it carries meaning. Do not use decorative trapezoid planes, fake perspective floors, isometric boxes, tilted architectural slabs, vanishing points, or pseudo-3D depth as a shortcut for freshness.
   Keep visual subject selection open and claim-led; use the subject that makes the argument most observable through scale, interaction, place, evidence, or operating context.
   Create freshness through viewpoint, asymmetric composition, designed margin vignettes, evidence strips, partial cutaways, and magnified details, not decoration or glossy concept art.
@@ -631,7 +634,7 @@ post_generation_audit:
   - Source footer follows source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
   - Source footer follows source_separator_lock: no horizontal divider, rule, underline, or hairline above Source
   - footer/source/table-note text uses #6E756E consistently when present
-  - speaker_notes_text exists for deck slides but does not appear on the slide image
+  - speaker_notes_depth_lock is honored: speaker_notes_text exists for deck slides, is substantial enough for PPT presentation delivery, and does not appear on the slide image
   - post_generation_full_deck_review_loop is complete: after generating slide PNGs, every actual image has been opened, compared against the deck, and reviewed before claiming completion
   - all_generated_images_reviewed is true for the current output file set
   - weak_slide_regeneration_queue is empty after reviewing tone consistency, content quality, design quality, text legibility, source/footer/header integrity, illustration consistency, consulting structure fit, and deck unity
@@ -719,6 +722,7 @@ def deck_plan_tail() -> str:
         source_policy:
         source_line:
         density_risk:
+        speaker_notes_depth_lock: substantial PPT talk script, 4-7 Japanese sentences or roughly 180-320 Japanese chars unless user requests brief notes
         speaker_notes_text:
         speaker_notes_source_cues:
         speaker_notes_transition:
@@ -781,6 +785,7 @@ def deck_plan_tail() -> str:
   - insight_count_plan:
   - source_collection_needs:
   - speaker_notes_plan:
+  - speaker_notes_depth_lock: substantial Japanese PPT talk script, 4-7 sentences or roughly 180-320 Japanese chars per slide unless user requests brief notes
   - pre_google_slides_review_plan:
   - pre_package_image_review_plan:
   - post_generation_full_deck_review_loop: after generating slide PNGs, review every actual image before claiming completion
@@ -869,6 +874,7 @@ def text_structure_tail() -> str:
       source_line: Source: [traceable source names copied from provided or researched sources only] / none only when no traceable source exists
       source_urls:
       assumptions:
+      speaker_notes_depth_lock:
       speaker_notes_text:
       speaker_notes_source_cues:
       speaker_notes_transition:
