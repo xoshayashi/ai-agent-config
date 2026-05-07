@@ -41,6 +41,8 @@ temp/
 node_modules/
 dist/
 build/
+!skills/*/build/
+!skills/*/build/**
 .venv/
 venv/
 __pycache__/

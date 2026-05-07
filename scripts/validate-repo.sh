@@ -86,6 +86,9 @@ require_absent "docs/skill-improvement-automation.md"
 require_absent "docs/examples"
 require_absent ".github/workflows/claude.yml"
 
+tracked_ignored=$(git -C "$repo_root" ls-files -ci --exclude-standard)
+[ -z "$tracked_ignored" ] || fail "tracked files must not be ignored by .gitignore: $(printf '%s' "$tracked_ignored" | tr '\n' ' ')"
+
 if [ -d "$repo_root/skills" ]; then
   find "$repo_root/skills" -name __pycache__ -type d | grep -q . \
     && fail "skills/ must not contain __pycache__ directories"
