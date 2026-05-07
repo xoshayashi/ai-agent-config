@@ -77,7 +77,9 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
 
             with zipfile.ZipFile(output) as archive:
                 self.assertIn("ppt/media/image1.png", archive.namelist())
-                self.assertIn("note 1", archive.read("ppt/notesSlides/notesSlide1.xml").decode("utf-8"))
+                notes_xml = archive.read("ppt/notesSlides/notesSlide1.xml").decode("utf-8")
+                self.assertIn('type="sld"', notes_xml)
+                self.assertIn("note 1", notes_xml)
 
     def test_requires_review_manifest_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:

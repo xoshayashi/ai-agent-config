@@ -338,7 +338,11 @@ def notes_slide_xml(idx: int, note: str) -> str:
       <p:nvGrpSpPr><p:cNvPr id="1" name=""/><p:cNvGrpSpPr/><p:nvPr/></p:nvGrpSpPr>
       <p:grpSpPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{NOTES_CX}" cy="{NOTES_CY}"/><a:chOff x="0" y="0"/><a:chExt cx="{NOTES_CX}" cy="{NOTES_CY}"/></a:xfrm></p:grpSpPr>
       <p:sp>
-        <p:nvSpPr><p:cNvPr id="2" name="Speaker notes {idx}"/><p:cNvSpPr/><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>
+        <p:nvSpPr><p:cNvPr id="2" name="Slide image placeholder {idx}"/><p:cNvSpPr/><p:nvPr><p:ph type="sld"/></p:nvPr></p:nvSpPr>
+        <p:spPr><a:xfrm><a:off x="685800" y="457200"/><a:ext cx="5486400" cy="3086100"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
+      </p:sp>
+      <p:sp>
+        <p:nvSpPr><p:cNvPr id="3" name="Speaker notes {idx}"/><p:cNvSpPr/><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr>
         <p:spPr><a:xfrm><a:off x="685800" y="4572000"/><a:ext cx="5486400" cy="3657600"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></p:spPr>
         <p:txBody><a:bodyPr/><a:lstStyle/>{paragraphs(note)}</p:txBody>
       </p:sp>

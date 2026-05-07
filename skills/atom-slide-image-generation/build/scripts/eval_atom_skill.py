@@ -98,8 +98,29 @@ def check_script_syntax() -> Result:
     return Result("script_syntax", True)
 
 
+def check_entrypoint_symlinks() -> list[Result]:
+    expected = {
+        "scripts/build_atom_slide_prompt.py": "../build/scripts/build_atom_slide_prompt.py",
+        "scripts/eval_atom_skill.py": "../build/scripts/eval_atom_skill.py",
+        "scripts/package_slide_images_to_pptx.py": "../build/scripts/package_slide_images_to_pptx.py",
+        "scripts/test_package_slide_images_to_pptx.py": "../build/scripts/test_package_slide_images_to_pptx.py",
+    }
+    results: list[Result] = []
+    for rel_path, target in expected.items():
+        path = ROOT / rel_path
+        actual = os.readlink(path) if path.is_symlink() else ""
+        results.append(
+            Result(
+                f"entrypoint_symlink:{rel_path}",
+                actual == target,
+                f"expected {target}, found {actual or 'regular/missing file'}",
+            )
+        )
+    return results
+
+
 def run_helper_check(check: dict) -> Result:
-    script = ROOT / "scripts" / "build_atom_slide_prompt.py"
+    script = ROOT / "build" / "scripts" / "build_atom_slide_prompt.py"
     env = os.environ.copy()
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     proc = subprocess.run(
@@ -167,7 +188,7 @@ def approved_review_manifest(images: list[Path]) -> dict[str, object]:
 
 
 def run_pptx_package_check() -> Result:
-    script = ROOT / "scripts" / "package_slide_images_to_pptx.py"
+    script = ROOT / "build" / "scripts" / "package_slide_images_to_pptx.py"
     png_bytes = valid_png_bytes()
     env = os.environ.copy()
     env["PYTHONDONTWRITEBYTECODE"] = "1"
@@ -238,6 +259,7 @@ def run_pptx_package_check() -> Result:
 
 
 def check_no_old_files() -> list[Result]:
+    # Guard against stale cross-brand artifacts copied into the ATOM skill root.
     old_paths = [
         ROOT / "references" / "act-slide-patterns-essentials.md",
         ROOT / "scripts" / "build_act_slide_prompt.py",
@@ -262,6 +284,7 @@ def main() -> int:
     results.extend(check_forbidden_patterns(config, content_files))
     results.extend(check_required_phrases(config, files))
     results.append(check_script_syntax())
+    results.extend(check_entrypoint_symlinks())
     for check in config["helper_checks"]:
         results.append(run_helper_check(check))
     results.append(run_pptx_package_check())
