@@ -35,6 +35,8 @@ sh /path/to/ai-agent-config/scripts/setup.sh
 ```
 
 `setup.sh` は instruction links と skill links を作成します。既存ファイルがある場合は既定で skip します。置き換える場合は `AI_AGENT_CONFLICT_MODE=replace` を指定します。
+置換時の skill backup は各 CLI home の `skill-backups/` に移し、`skills/`
+直下には残しません。
 
 CLI の存在チェックを省く場合:
 
