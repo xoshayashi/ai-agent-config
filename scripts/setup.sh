@@ -84,6 +84,7 @@ claude_home=$(abs_dir "${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}")
 gemini_home=$(abs_dir "${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}")
 timestamp=$(date +%Y%m%d-%H%M%S)
 skill_source_root="$config_home/skills"
+retired_skill_names="daily-llm-history-instruction-review"
 
 if [ -n "${AI_AGENT_TARGET_DIR:-}" ]; then
   warn "AI_AGENT_TARGET_DIR is ignored. Instructions are installed globally."
@@ -119,6 +120,25 @@ replace_existing() {
   say "replace: $dst -> $backup_path"
   clear_link_protection "$dst"
   run mv "$dst" "$backup_path"
+}
+
+trash_managed_path() {
+  path=$1
+  label=$2
+  if [ ! -e "$path" ] && [ ! -L "$path" ]; then
+    return 0
+  fi
+  if ! command -v trash >/dev/null 2>&1; then
+    warn "trash unavailable; skip $label cleanup: $path"
+    return 0
+  fi
+  if [ "$dry_run" = "1" ]; then
+    say "would trash $label: $path"
+    return 0
+  fi
+  clear_link_protection "$path"
+  say "trash $label: $path"
+  trash "$path"
 }
 
 install_link() {
@@ -183,6 +203,28 @@ install_skill_links() {
   done
 }
 
+remove_retired_skill_links() {
+  for target_home in "$codex_home" "$claude_home" "$gemini_home"; do
+    target_root="$target_home/skills"
+    for skill_name in $retired_skill_names; do
+      dst="$target_root/$skill_name"
+      expected="$skill_source_root/$skill_name"
+      if [ ! -L "$dst" ]; then
+        if [ -e "$dst" ]; then
+          warn "skip non-link retired skill path: $dst"
+        fi
+        continue
+      fi
+      current=$(readlink "$dst" 2>/dev/null || true)
+      if [ "$current" != "$expected" ]; then
+        warn "skip unmanaged retired skill link: $dst -> $current"
+        continue
+      fi
+      trash_managed_path "$dst" "retired skill link"
+    done
+  done
+}
+
 say "AI agent config setup (instructions only)"
 say "config: $config_home"
 say "codex home: $codex_home"
@@ -190,6 +232,7 @@ say "claude home: $claude_home"
 say "gemini home: $gemini_home"
 
 install_instruction_links
+remove_retired_skill_links
 install_skill_links
 
 say "setup complete"
