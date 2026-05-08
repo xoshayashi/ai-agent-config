@@ -132,9 +132,13 @@ trash_managed_path() {
     warn "trash unavailable; skip $label cleanup: $path"
     return 0
   fi
+  if [ "$dry_run" = "1" ]; then
+    say "would trash $label: $path"
+    return 0
+  fi
   clear_link_protection "$path"
   say "trash $label: $path"
-  run trash "$path"
+  trash "$path"
 }
 
 install_link() {
