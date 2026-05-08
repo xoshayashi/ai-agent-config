@@ -1,6 +1,6 @@
 # Setup
 
-このリポジトリは、Claude Code / Codex / Gemini CLI のグローバル instruction files と、Codex App Automations ベースの日次 instruction 改善レビューを管理します。
+このリポジトリは、Claude Code / Codex / Gemini CLI のグローバル instruction files と共有 skill links を管理します。
 
 ## インストール内容
 
@@ -60,23 +60,10 @@ sh scripts/validate-repo.sh
 
 この validation は、必要なファイルの存在、repository surface、任意の `skills/` 構造、entrypoint 参照、health-check と setup dry-run を確認します。
 
-## Daily Review
-
-推奨ルートは Codex App Automations です。launchd は使いません。
-`docs/codex-automation-daily-review.md` にある automation 作成リクエストを
-Codex app で実行し、毎日 00:00 に
-`$daily-llm-history-instruction-review` を呼び出す standalone project
-automation を作ります。
-
-実行内容:
-
-- Claude Code / Codex / Gemini CLI の直近 2 日分を中心にした履歴を要約的に確認
-- 非効率が反復している場合のみ `instructions/` を抽象的に更新
-- 完了後の見直し指示を、完了宣言前の self-review と改善 Iteration に翻訳
-- `scripts/setup.sh`、`scripts/validate-repo.sh`、`git diff --check` を実行
+## Skill Links
 
 `setup.sh` の skill links は `skills/<name>` を `~/.codex/skills/<name>`、
 `~/.claude/skills/<name>`、`~/.gemini/skills/<name>` にリンクします。skill が
 見えない時は `sh scripts/setup.sh` を再実行し、各 CLI を再起動します。
-
-日次 review の automation は `daily-llm-history-instruction-review` skill を使います。
+廃止済みの管理対象 skill symlink は、`setup.sh` または `uninstall.sh` の実行時に
+通常ファイルや別 target の symlink と区別して片付けます。

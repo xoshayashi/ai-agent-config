@@ -51,7 +51,6 @@ say "validate: required files"
 require_file "README.md"
 require_file "setup.md"
 require_file "docs/setup-error-guide.md"
-require_file "docs/codex-automation-daily-review.md"
 require_file "scripts/setup.sh"
 require_file "scripts/update.sh"
 require_file "scripts/uninstall.sh"
@@ -62,7 +61,6 @@ require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"
 require_file "instructions/AI_AGENT_INSTRUCTIONS.md"
 require_file "instructions/DESIGN.md"
-require_file "skills/daily-llm-history-instruction-review/SKILL.md"
 require_file ".github/workflows/validate.yml"
 require_file ".github/workflows/claude-code-review.yml"
 
@@ -73,6 +71,7 @@ require_absent "scripts/__pycache__"
 require_absent "instructions/HOOKS.md"
 require_absent "scripts/autonomous_runner.py"
 require_absent "scripts/daily-llm-history-instruction-review"
+require_absent "skills/daily-llm-history-instruction-review"
 require_absent "scripts/merge-hook-config.py"
 require_absent "scripts/read-state-config.py"
 require_absent "scripts/scheduled_update.py"
@@ -80,6 +79,7 @@ require_absent "scripts/schedule-update.sh"
 require_absent "scripts/schedule-skill-improvement.sh"
 require_absent "scripts/skill-improvement-bot.py"
 require_absent "docs/autonomous-runner.md"
+require_absent "docs/codex-automation-daily-review.md"
 require_absent "docs/llm-history-instruction-review.md"
 require_absent "docs/hooks-architecture-review.md"
 require_absent "docs/skill-improvement-automation.md"
@@ -117,27 +117,21 @@ say "validate: docs and instructions stay within current scope"
 ! grep -REq "autonomous-runner|skill-improvement-bot|safe_delete_guard|HOOKS\\.md|schedule-update|schedule-skill-improvement" \
   "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/docs" "$repo_root/instructions" \
   || fail "docs or instructions reference out-of-scope paths"
-grep -Fq "Codex App Automations" "$repo_root/README.md" \
-  || fail "README.md must prefer Codex App Automations for daily review docs"
-grep -Fq "Codex App Automations" "$repo_root/setup.md" \
-  || fail "setup.md must prefer Codex App Automations for daily review docs"
+! grep -REq "daily-llm-history-instruction-review|codex-automation-daily-review|Codex App Automations|日次 instruction|日次レビュー|履歴レビュー" \
+  "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/docs" "$repo_root/instructions" "$repo_root/skills" \
+  || fail "daily history review automation has been removed and must not be referenced"
 grep -Fq '## Coding Collaboration Defaults' "$repo_root/instructions/AI_AGENT_INSTRUCTIONS.md" \
   || fail "shared instructions must include coding collaboration defaults"
 grep -Fq 'Coding Collaboration Defaults' "$repo_root/README.md" \
   || fail "README.md must mention coding collaboration defaults"
-grep -Fq 'daily-llm-history-instruction-review' "$repo_root/docs/codex-automation-daily-review.md" \
-  || fail "Codex automation guide must include the daily review skill name"
-for launchd_doc in "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/docs/codex-automation-daily-review.md"; do
-  grep -Fq 'launchd は使いません' "$launchd_doc" \
-    || fail "daily review docs must state launchd is not used: ${launchd_doc#$repo_root/}"
-done
-! grep -REq "cron-log|scripts/daily-llm-history-instruction-review" \
-  "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/docs" "$repo_root/instructions" "$repo_root/skills/daily-llm-history-instruction-review" \
-  || fail "daily history review docs must not reintroduce launchd runner paths"
 grep -Fq 'install_skill_links' "$repo_root/scripts/setup.sh" \
   || fail "setup.sh must install shared skill links"
 grep -Fq 'remove_skill_links' "$repo_root/scripts/uninstall.sh" \
   || fail "uninstall.sh must remove shared skill links"
+grep -Fq 'remove_retired_skill_links' "$repo_root/scripts/setup.sh" \
+  || fail "setup.sh must clean retired managed skill links"
+grep -Fq 'remove_retired_skill_links' "$repo_root/scripts/uninstall.sh" \
+  || fail "uninstall.sh must clean retired managed skill links"
 grep -Fq 'skills_status_for' "$repo_root/scripts/health-check.sh" \
   || fail "health-check.sh must report shared skill links"
 

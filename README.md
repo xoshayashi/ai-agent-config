@@ -2,7 +2,7 @@
 
 Claude Code / Codex / Gemini CLI に共通の Instructions を配布するためのリポジトリです。
 
-このリポジトリは、各 CLI のグローバル設定フォルダーへ instruction files をリンクします。必要に応じて、履歴にもとづく instruction 改善レビューを Codex App Automations で実行します。
+このリポジトリは、各 CLI のグローバル設定フォルダーへ instruction files をリンクします。
 
 ## 配置されるもの
 
@@ -27,7 +27,6 @@ Claude Code / Codex / Gemini CLI に共通の Instructions を配布するため
 1. `git` が使えること
 2. Claude Code / Codex / Gemini CLI を使う場合は、それぞれインストール済みであること
 3. `uninstall.sh` を使う場合は `trash` コマンドがあること
-4. 日次レビューを使う場合は Codex App Automations が使えること
 
 ## セットアップ
 
@@ -63,18 +62,6 @@ sh /path/to/ai-agent-config/scripts/health-check.sh
 AI_AGENT_HEALTH_REDACT=0 sh scripts/health-check.sh
 ```
 
-## 日次 Instruction レビュー
-
-推奨ルートは Codex App Automations です。launchd は使いません。
-毎日 00:00 に `$daily-llm-history-instruction-review` を実行する standalone
-project automation を作ると、Claude Code / Codex / Gemini CLI の最近の履歴を
-要約的に確認し、反復的な非効率があれば `instructions/` を抽象的に更新します。
-
-特に「self-review して」「eval/Iteration を回して」「品質が足りない」
-のようなユーザーの反復プロンプトは、その文言への反応ではなく、完了宣言前の
-self-review と改善 Iteration を agent behavior として instruction 化します。詳しくは
-`docs/codex-automation-daily-review.md` を参照してください。
-
 ## 取り外し
 
 ```sh
@@ -85,7 +72,6 @@ sh /path/to/ai-agent-config/scripts/uninstall.sh
 
 ## 保守方針
 
-- 構成は `instructions/`、`scripts/`、必要に応じた `skills/`、最小 docs、CI validation、on-demand PR review workflow、Codex Automations ベースの日次 instruction レビューに絞ります。
+- 構成は `instructions/`、`scripts/`、必要に応じた `skills/`、最小 docs、CI validation、on-demand PR review workflow に絞ります。
 - 初心者向けの coding support は `instructions/AI_AGENT_INSTRUCTIONS.md` の `Coding Collaboration Defaults` に集約し、長い個別プロンプト例を常時ロードしないようにします。
 - Instruction の構造を変えたら、`README.md`、`setup.md`、`scripts/validate-repo.sh` も同じ変更で合わせます。
-- 履歴レビューで Instruction を変える場合は、既存文言に有機的に統合し、単なる追記を避けます。

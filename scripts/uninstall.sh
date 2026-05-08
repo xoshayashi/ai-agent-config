@@ -44,6 +44,7 @@ codex_home=$(expand_home "${AI_AGENT_CODEX_HOME:-$HOME/.codex}")
 claude_home=$(expand_home "${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}")
 gemini_home=$(expand_home "${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}")
 skill_source_root="$config_home/skills"
+retired_skill_names="daily-llm-history-instruction-review"
 
 run() {
   if [ "$dry_run" = "1" ]; then
@@ -116,6 +117,15 @@ remove_skill_links() {
   done
 }
 
+remove_retired_skill_links() {
+  for target_home in "$codex_home" "$claude_home" "$gemini_home"; do
+    target_root="$target_home/skills"
+    for skill_name in $retired_skill_names; do
+      remove_managed_link "$target_root/$skill_name" "$skill_source_root/$skill_name" "retired skill link"
+    done
+  done
+}
+
 say "AI agent config uninstall (instructions only)"
 say "config: $config_home"
 
@@ -133,5 +143,6 @@ remove_managed_link "$gemini_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_
 remove_managed_link "$gemini_home/DESIGN.md" "$src_root/DESIGN.md" "instruction link"
 
 remove_skill_links
+remove_retired_skill_links
 
 say "uninstall complete"
