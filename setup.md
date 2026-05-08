@@ -42,7 +42,7 @@ AI_AGENT_REQUIRE_LLM_CLIS=0 sh scripts/setup.sh
 |---|---|
 | `skip` | 既存 path を残して skip |
 | `fail` | 既存 path があれば失敗 |
-| `replace` | 既存 path を同じ directory の `<name>.backup-<timestamp>` へ移してから link 作成 |
+| `replace` | 既存 path を backup folder へ移してから link 作成。skill は `~/.codex/skill-backups/`、`~/.claude/skill-backups/`、`~/.gemini/skill-backups/` に逃がし、`skills/` 直下には置きません。 |
 
 例:
 
@@ -67,3 +67,7 @@ sh scripts/validate-repo.sh
 見えない時は `sh scripts/setup.sh` を再実行し、各 CLI を再起動します。
 廃止済みの管理対象 skill symlink は、`setup.sh` または `uninstall.sh` の実行時に
 通常ファイルや別 target の symlink と区別して片付けます。
+既存の `*.backup-*` skill が `skills/` 直下にある場合も、setup 時に各 home の
+`skill-backups/` へ移動し、バックアップが skill として読み込まれないようにします。
+旧 skill root として残っている `~/.agents/skills/*.backup-*` も同じく
+`~/.agents/skill-backups/` へ移動します。

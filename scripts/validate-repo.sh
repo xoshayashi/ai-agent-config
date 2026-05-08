@@ -94,6 +94,10 @@ if [ -d "$repo_root/skills" ]; then
     && fail "skills/ must not contain __pycache__ directories"
   for skill_dir in "$repo_root"/skills/*; do
     [ -d "$skill_dir" ] || fail "skills/ must contain skill directories only"
+    skill_name=$(basename "$skill_dir")
+    case "$skill_name" in
+      *.backup-*) fail "backup skill directories must not live under skills/: skills/$skill_name" ;;
+    esac
     [ -f "$skill_dir/SKILL.md" ] || fail "missing skill entrypoint: skills/$(basename "$skill_dir")/SKILL.md"
     grep -Eq '^name: ' "$skill_dir/SKILL.md" \
       || fail "skill SKILL.md must define name: skills/$(basename "$skill_dir")/SKILL.md"
@@ -126,6 +130,8 @@ grep -Fq 'Coding Collaboration Defaults' "$repo_root/README.md" \
   || fail "README.md must mention coding collaboration defaults"
 grep -Fq 'install_skill_links' "$repo_root/scripts/setup.sh" \
   || fail "setup.sh must install shared skill links"
+grep -Fq 'skill-backups' "$repo_root/scripts/setup.sh" \
+  || fail "setup.sh must keep skill backups outside skill roots"
 grep -Fq 'remove_skill_links' "$repo_root/scripts/uninstall.sh" \
   || fail "uninstall.sh must remove shared skill links"
 grep -Fq 'remove_retired_skill_links' "$repo_root/scripts/setup.sh" \

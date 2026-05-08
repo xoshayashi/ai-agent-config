@@ -114,12 +114,39 @@ clear_link_protection() {
   fi
 }
 
+backup_root_for() {
+  dst=$1
+  parent=$(dirname "$dst")
+  case "$parent" in
+    */skills) printf '%s/skill-backups\n' "$(dirname "$parent")" ;;
+    *) printf '%s/.ai-agent-config-backups\n' "$parent" ;;
+  esac
+}
+
+unique_backup_path() {
+  backup_dir=$1
+  backup_name=$2
+  candidate="$backup_dir/$backup_name"
+  suffix=1
+  while [ -e "$candidate" ] || [ -L "$candidate" ]; do
+    candidate="$backup_dir/$backup_name.$suffix"
+    suffix=$((suffix + 1))
+  done
+  printf '%s\n' "$candidate"
+}
+
 replace_existing() {
   dst=$1
-  backup_path="$dst.backup-$timestamp"
+  backup_dir=$(backup_root_for "$dst")
+  backup_path=$(unique_backup_path "$backup_dir" "$(basename "$dst").backup-$timestamp")
   say "replace: $dst -> $backup_path"
+  run mkdir -p "$backup_dir"
+  if [ "$dry_run" = "1" ]; then
+    run mv "$dst" "$backup_path"
+    return 0
+  fi
   clear_link_protection "$dst"
-  run mv "$dst" "$backup_path"
+  mv "$dst" "$backup_path"
 }
 
 trash_managed_path() {
@@ -198,6 +225,12 @@ install_skill_links() {
     for skill_dir in "$skill_source_root"/*; do
       [ -d "$skill_dir" ] || continue
       skill_name=$(basename "$skill_dir")
+      case "$skill_name" in
+        *.backup-*)
+          warn "skip backup skill source: $skill_dir"
+          continue
+          ;;
+      esac
       install_link "$skill_dir" "$target_root/$skill_name"
     done
   done
@@ -225,12 +258,41 @@ remove_retired_skill_links() {
   done
 }
 
+move_skill_backups_out_of_root() {
+  skill_root=$1
+  backup_root=$2
+  [ -d "$skill_root" ] || return 0
+
+  for backup_path in "$skill_root"/*.backup-*; do
+    [ -e "$backup_path" ] || [ -L "$backup_path" ] || continue
+    backup_dst=$(unique_backup_path "$backup_root" "$(basename "$backup_path")")
+    say "move skill backup out of skill root: $backup_path -> $backup_dst"
+    run mkdir -p "$backup_root"
+    if [ "$dry_run" = "1" ]; then
+      run mv "$backup_path" "$backup_dst"
+      continue
+    fi
+    clear_link_protection "$backup_path"
+    mv "$backup_path" "$backup_dst"
+  done
+}
+
+move_existing_skill_backups() {
+  for target_home in "$codex_home" "$claude_home" "$gemini_home"; do
+    move_skill_backups_out_of_root "$target_home/skills" "$target_home/skill-backups"
+  done
+
+  legacy_agents_home=$(expand_home "${AI_AGENT_LEGACY_AGENTS_HOME:-$HOME/.agents}")
+  move_skill_backups_out_of_root "$legacy_agents_home/skills" "$legacy_agents_home/skill-backups"
+}
+
 say "AI agent config setup (instructions only)"
 say "config: $config_home"
 say "codex home: $codex_home"
 say "claude home: $claude_home"
 say "gemini home: $gemini_home"
 
+move_existing_skill_backups
 install_instruction_links
 remove_retired_skill_links
 install_skill_links
