@@ -119,7 +119,7 @@ backup_root_for() {
   parent=$(dirname "$dst")
   case "$parent" in
     */skills) printf '%s/skill-backups\n' "$(dirname "$parent")" ;;
-    *) printf '%s/.ai-agent-config-backups\n' "$parent" ;;
+    *) printf '%s\n' "$parent" ;;
   esac
 }
 

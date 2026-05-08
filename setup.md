@@ -42,7 +42,7 @@ AI_AGENT_REQUIRE_LLM_CLIS=0 sh scripts/setup.sh
 |---|---|
 | `skip` | 既存 path を残して skip |
 | `fail` | 既存 path があれば失敗 |
-| `replace` | 既存 path を backup folder へ移してから link 作成。skill は `~/.codex/skill-backups/`、`~/.claude/skill-backups/`、`~/.gemini/skill-backups/` に逃がし、`skills/` 直下には置きません。 |
+| `replace` | 既存 path を backup folder へ移してから link 作成。skill は `~/.codex/skill-backups/`、`~/.claude/skill-backups/`、`~/.gemini/skill-backups/`、旧 `~/.agents/skill-backups/` に逃がし、`skills/` 直下には置きません。 |
 
 例:
 

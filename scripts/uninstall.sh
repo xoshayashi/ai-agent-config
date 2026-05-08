@@ -142,6 +142,8 @@ remove_managed_link "$gemini_home/GEMINI.md" "$src_root/GEMINI.md" "instruction 
 remove_managed_link "$gemini_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "instruction link"
 remove_managed_link "$gemini_home/DESIGN.md" "$src_root/DESIGN.md" "instruction link"
 
+# Preserve skill-backups directories. They may contain user files moved out of
+# active skill roots so backup folders are not loaded as skills.
 remove_skill_links
 remove_retired_skill_links
 
