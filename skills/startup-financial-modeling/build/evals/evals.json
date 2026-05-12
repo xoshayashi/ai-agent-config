@@ -18,7 +18,8 @@
         { "id": "A3", "text": "Workbook includes raw base-currency monetary values, correct non-monetary units, direct formulas, no workbook-scoped names, no merged cells, and no text wrapping", "type": "implementation" },
         { "id": "A4", "text": "KPI reflects actual economics such as fleet, utilization, payback, gross margin, runway, burn multiple, capital efficiency, and deployment capacity", "type": "metric" },
         { "id": "A5", "text": "Valuation and funding logic tie to scenarios, cash runway, dilution, lease/debt capacity, and investor return rather than a generic revenue multiple only", "type": "valuation" },
-        { "id": "A6", "text": "IC memo interprets KPI, downside triggers, valuation support, financing/dilution, and DD actions instead of merely listing workbook tabs", "type": "memo" }
+        { "id": "A6", "text": "IC memo interprets KPI, downside triggers, valuation support, financing/dilution, and DD actions instead of merely listing workbook tabs", "type": "memo" },
+        { "id": "A7", "text": "Generated defaults are labeled by evidence status and weak default assumptions are linked to scenario, benchmark refresh, or DD actions rather than presented as sourced facts", "type": "evidence" }
       ]
     },
     {
@@ -63,7 +64,8 @@
         { "id": "D2", "text": "Capital stack includes debt, lease, equity, secondary, covenants, cash uses, and investor ownership effects", "type": "calculation" },
         { "id": "D3", "text": "Valuation supports DCF, exit multiple, comparables, SOTP, and investor return logic with scenario linkage", "type": "valuation" },
         { "id": "D4", "text": "DD memo highlights source facts, assumptions, unresolved diligence questions, and sensitivity drivers", "type": "memo" },
-        { "id": "D5", "text": "Valuation explains method credibility and exclusions across DCF, multiples, SOTP, IPO support, and investor return rather than averaging every method blindly", "type": "valuation" }
+        { "id": "D5", "text": "Valuation explains method credibility and exclusions across DCF, multiples, SOTP, IPO support, and investor return rather than averaging every method blindly", "type": "valuation" },
+        { "id": "D6", "text": "Investor return view includes ownership, dilution, MOIC, IRR when timing matters, net debt or preference effects where relevant, and downside breakpoints", "type": "valuation" }
       ]
     },
     {
@@ -138,6 +140,19 @@
         { "id": "I2", "text": "Evidence strength controls decomposition depth and weak assumptions are carried into validation tests", "type": "evidence" },
         { "id": "I3", "text": "Sensitivity axes are chosen from pricing uncertainty and decision impact, not from a fixed default grid", "type": "scenario" },
         { "id": "I4", "text": "Artifact remains focused and does not force irrelevant full three-statement sheets", "type": "structure" }
+      ]
+    },
+    {
+      "id": 10,
+      "name": "misleading_label_hybrid_startup",
+      "prompt": "AI SaaSと呼んでいるが、実態はハードウェア導入、保守、リース、利用料が混ざるスタートアップです。資金調達向けモデルを作ってください。",
+      "expected_output": "Hybrid driver model that composes recurring, asset, service, lease, and deployment-capacity mechanics from primitives rather than forcing a pure SaaS template.",
+      "files": [],
+      "applicable_references": ["_modeling_kernel", "_assumption_decomposition_patterns", "_kpi_analytics", "_scenario_sensitivity_playbook", "_valuation_and_return_logic", "_ic_memo_depth", "_output_modes"],
+      "assertions": [
+        { "id": "J1", "text": "The model selects economic units from evidenced revenue/cost/capital flows instead of the SaaS label alone", "type": "consistency" },
+        { "id": "J2", "text": "KPI and scenario axes include deployment capacity, utilization, service burden, capex or lease availability, and runway where relevant", "type": "metric" },
+        { "id": "J3", "text": "Valuation and memo explain why SaaS multiples alone are insufficient if hardware/service economics drive risk", "type": "valuation" }
       ]
     }
   ],

@@ -63,6 +63,25 @@ need price x churn, a runway decision may need burn x financing timing, a debt
 decision may need EBITDA x covenant headroom, and a hardware model may need
 BOM x deployment utilization.
 
+## Mechanic-Aware Axes
+
+Choose axes from the actual economic unit and weakest evidence, not the company
+label:
+
+- recurring contract: conversion, ACV/expansion, churn/retention, CAC or sales
+  capacity;
+- marketplace / transaction: GMV liquidity, take rate, incentives/fraud, repeat
+  behavior, settlement or working-capital timing;
+- asset / hardware: deployment capacity, utilization, BOM/service cost, capex,
+  warranty, lease/debt availability;
+- balance-sheet / fintech: origination, loss/collection, funding cost, warehouse
+  headroom, regulatory capital;
+- proof-before-revenue: milestone timing, prototype or trial cost, grant/advance
+  coverage, hiring capacity.
+
+When a workbook helper emits starter cases, rename and annotate the axes so the
+reader sees which evidenced weakness each case is pressuring.
+
 ## Breakpoints
 
 Where possible, calculate or explain breakpoints:

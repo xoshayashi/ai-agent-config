@@ -34,6 +34,8 @@ from economic_kernel import (  # noqa: E402
     driver_surfaces_for,
     ending_units as _ending_units,
     extract_source_facts,
+    kpi_definitions_for,
+    scenario_drivers_for,
 )
 
 
@@ -630,6 +632,7 @@ def _add_bar_chart(ws: Worksheet, title: str, data_ref: Reference, cats_ref: Ref
 def _build_guide(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Guide"]
     _setup_sheet(ws, f"{facts.company} Financial Model Guide", "Generic economic-kernel workbook assembled from the source narrative.", None)
+    _set_column_widths(ws, {2: 30, 3: 92})
     rows = [
         ("Purpose", "Investor-ready startup financial plan with traceable assumptions and editable formulas."),
         ("Source story signals", facts.source_summary),
@@ -848,7 +851,7 @@ def _build_cost(wb: Workbook, facts: SourceFacts) -> None:
     _section(ws, 6, "Gross profit bridge")
     rows = [
         (7, "Total revenue", "JPY", "='Revenue Build'!{c}18"),
-        (8, "Variable COGS", "JPY", "={c}7*'Assumptions'!{c}24+'Revenue Build'!{c}7*SUM('Assumptions'!{c}58:{c}60)"),
+        (8, "Variable COGS", "JPY", "={c}7*'Assumptions'!{c}24"),
         (9, "Delivery cost", "JPY", "='Revenue Build'!{c}9*'Assumptions'!{c}25*12"),
         (10, "Cloud / platform cost", "JPY", "='Revenue Build'!{c}9*'Assumptions'!{c}26*12"),
         (11, "Support cost", "JPY", "='Revenue Build'!{c}20*'Assumptions'!{c}27*12"),
@@ -1121,7 +1124,7 @@ def _build_exit_waterfall(wb: Workbook, facts: SourceFacts) -> None:
         _apply_text_header(ws.cell(5, col), header)
     cases = [
         ("Downside", f"='Scenarios'!{get_column_letter(START_PERIOD_COL)}18"),
-        ("Base", f"='Valuation'!{_final_period_col(facts)}22"),
+        ("Base", f"='Valuation'!{_final_period_col(facts)}24"),
         ("Upside", f"='Scenarios'!{get_column_letter(START_PERIOD_COL + 2)}18"),
     ]
     for row, (label, exit_ev) in enumerate(cases, start=6):
@@ -1204,10 +1207,15 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
     for col, header in enumerate(headers, start=2):
         _apply_text_header(ws.cell(63, col), header)
     interpretation_rows = [
-        ("Runway", "CF ending cash / burn", "cash survival matters", "cash forecast / financing terms", "below target runway", "round timing or burn reset"),
-        ("Unit margin", "unit gross profit / price", "unit economics drive value", "pricing and cost support", "margin below target", "price, cost, or service-load DD"),
-        ("Burn multiple", "cash burn / net new revenue", "funding efficiency", "cash flow and revenue ramp", "burn not justified by growth", "capital efficiency and round size"),
-        ("Ownership", "capital stack dilution", "dilution material", "capital stack and valuation", "dilution above tolerance", "round structure and option pool"),
+        (
+            item.name,
+            item.formula_driver,
+            item.applies_when,
+            item.source_context,
+            item.downside_trigger,
+            item.ic_implication,
+        )
+        for item in kpi_definitions_for(facts)
     ]
     for row, values in enumerate(interpretation_rows, start=64):
         for col, value in enumerate(values, start=2):
@@ -1223,13 +1231,9 @@ def _build_scenarios(wb: Workbook, facts: SourceFacts) -> None:
         ws.cell(5, col, label)
         ib.apply_year_header(ws.cell(5, col), label)
     _section(ws, 6, "Driver settings")
-    drivers = [
-        ("Volume scale", "x", 0.70, 1.00, 1.30),
-        ("Price / rate scale", "x", 0.88, 1.00, 1.12),
-        ("COGS factor", "x", 1.18, 1.00, 0.88),
-        ("OpEx factor", "x", 1.14, 1.00, 0.92),
-    ]
-    for r, (label, unit, down, base, up) in enumerate(drivers, start=7):
+    drivers = scenario_drivers_for(facts)
+    for r, driver in enumerate(drivers, start=7):
+        label, unit, down, base, up = driver.label, driver.unit, driver.downside, driver.base, driver.upside
         _label(ws, r, label, unit)
         for col, value in zip(scenario_cols, [down, base, up]):
             ws.cell(r, col, value)
@@ -1251,14 +1255,15 @@ def _build_scenarios(wb: Workbook, facts: SourceFacts) -> None:
             ws.cell(r, col, _scenario_output_formula(facts, label, c))
             _apply_value_style(ws.cell(r, col), ib.FMT_PERCENT if unit == "%" else _money_format(facts))
     _section(ws, 23, "Scenario interpretation")
-    _set_column_widths(ws, {2: 24, 3: 40, 4: 42, 5: 34, 6: 48})
+    _set_column_widths(ws, {2: 24, 3: 40, 4: 98, 5: 34, 6: 64})
     headers = ["Case", "Cause", "Linked driver changes", "Breakpoint", "DD action"]
     for col, header in enumerate(headers, start=2):
         _apply_text_header(ws.cell(24, col), header)
+    driver_summary = "; ".join(driver.label for driver in drivers[:4])
     scenario_notes = [
-        ("Downside", "weakest material evidence fails", "demand, pricing, cost, financing move together", "cash gap or runway breach", "validate weak evidence before relying on plan"),
+        ("Downside", drivers[0].why, driver_summary, drivers[0].breakpoint, drivers[0].decision_implication),
         ("Base", "selected operating plan", "selected assumptions reconcile to support checks", "support ratios stay credible", "refresh stale sources before circulation"),
-        ("Upside", "validated demand and better terms", "stronger conversion, pricing, cost, or financing", "capacity becomes next constraint", "confirm execution capacity"),
+        ("Upside", drivers[-1].why, driver_summary, drivers[-1].breakpoint, drivers[-1].decision_implication),
     ]
     for row, values in enumerate(scenario_notes, start=25):
         for col, value in enumerate(values, start=2):
@@ -1286,13 +1291,16 @@ def _build_sensitivity(wb: Workbook, facts: SourceFacts) -> None:
     _setup_sheet(ws, f"{facts.company} — Sensitivity", "Two-variable sensitivity around the decision-critical drivers.", None)
     _set_column_widths(ws, {START_PERIOD_COL - 1: LAYOUT.period_width})
     final_col = _final_period_col(facts)
-    _section(ws, 5, f"{facts.period_labels[-1]} EBITDA — volume scale x price/rate scale")
+    drivers = scenario_drivers_for(facts)
+    x_axis = drivers[0]
+    y_axis = drivers[1]
+    _section(ws, 5, f"{facts.period_labels[-1]} EBITDA — {x_axis.label} x {y_axis.label}")
     scales = [0.60, 0.80, 1.00, 1.20, 1.40]
     prices = [0.80, 0.90, 1.00, 1.10, 1.20]
     matrix_cols = list(range(START_PERIOD_COL, START_PERIOD_COL + len(scales)))
     row_axis_col = get_column_letter(START_PERIOD_COL - 1)
-    _label(ws, 7, "Volume scale", "x")
-    _label(ws, 8, "Price / rate scale", "x")
+    _label(ws, 7, x_axis.label, x_axis.unit)
+    _label(ws, 8, y_axis.label, y_axis.unit)
     for idx, scale in zip(matrix_cols, scales):
         ws.cell(7, idx, scale)
         ib.apply_hard_input(ws.cell(7, idx), ib.FMT_MULTIPLE)
@@ -1321,12 +1329,12 @@ def _build_sensitivity(wb: Workbook, facts: SourceFacts) -> None:
             _apply_value_style(ws.cell(r, c), ib.FMT_PERCENT)
     ib.apply_heatmap_3color(ws, f"{get_column_letter(matrix_cols[0])}18:{get_column_letter(matrix_cols[-1])}22")
     _section(ws, 25, "Sensitivity rationale")
-    _set_column_widths(ws, {2: 24, 3: 54, 4: 34, 5: 34, 6: 54})
+    _set_column_widths(ws, {2: 24, 3: 100, 4: 34, 5: 34, 6: 64})
     headers = ["Matrix", "Why selected", "Output pressured", "Breakpoint", "Decision implication"]
     for col, header in enumerate(headers, start=2):
         _apply_text_header(ws.cell(26, col), header)
     rationale_rows = [
-        ("Operating economics", "replace with highest-impact weak drivers", "EBITDA and cash capacity", "EBITDA or runway turns negative", "pricing, cost, or growth plan must change"),
+        ("Operating economics", f"selected from weak-evidence drivers: {x_axis.label} and {y_axis.label}", "EBITDA and cash capacity", "EBITDA or runway turns negative", "pricing, cost, or growth plan must change"),
         ("Financing terms", "use when dilution is decision-critical", "founder ownership and investor return", "ownership falls below tolerance", "round size, valuation, or instrument mix must change"),
     ]
     for row, values in enumerate(rationale_rows, start=27):
@@ -1365,10 +1373,18 @@ def _build_valuation(wb: Workbook, facts: SourceFacts) -> None:
     _write_values(ws, 17, "GP-implied EV", "JPY", [f"=${basis_col}$8*{get_column_letter(c)}14" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
     _write_values(ws, 18, "EBITDA-implied EV", "JPY", [f"=${basis_col}$9*{get_column_letter(c)}15" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
     _write_values(ws, 19, "Primary-method EV", "JPY", [f"=IF(${basis_col}$9>0,{get_column_letter(c)}18,IF(${basis_col}$8>0,{get_column_letter(c)}17,{get_column_letter(c)}16))" for c in cols], kind="formula", fmt=ib.FMT_MONEY, bold=True)
-    _write_values(ws, 20, "DCF EV", "JPY", [f"=MAX(0,'CF'!{get_column_letter(c)}16*(1+${basis_col}$11)/MAX(0.01,${basis_col}$10-${basis_col}$11))" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
-    _write_values(ws, 21, "SOTP EV", "JPY", [f"='Segments'!$C$6*{get_column_letter(c)}19" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
-    _write_values(ws, 22, "Selected EV", "JPY", [f"={get_column_letter(c)}19" for c in cols], kind="formula", fmt=ib.FMT_MONEY, bold=True)
-    _highlight_row(ws, 22, START_PERIOD_COL + len(cols) - 1)
+    pv_forecast = []
+    pv_terminal = []
+    for idx, col in enumerate(cols, start=1):
+        terms = [f"'CF'!{get_column_letter(c)}16/(1+${basis_col}$10)^{offset}" for offset, c in enumerate(cols[:idx], start=1)]
+        pv_forecast.append(f"=MAX(0,SUM({','.join(terms)}))")
+        pv_terminal.append(f"=MAX(0,'CF'!{get_column_letter(col)}16*(1+${basis_col}$11)/MAX(0.01,${basis_col}$10-${basis_col}$11)/(1+${basis_col}$10)^{idx})")
+    _write_values(ws, 20, "PV of forecast FCF", "JPY", pv_forecast, kind="formula", fmt=ib.FMT_MONEY)
+    _write_values(ws, 21, "PV of terminal value", "JPY", pv_terminal, kind="formula", fmt=ib.FMT_MONEY)
+    _write_values(ws, 22, "DCF EV", "JPY", [f"={get_column_letter(c)}20+{get_column_letter(c)}21" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
+    _write_values(ws, 23, "SOTP EV", "JPY", [f"='Segments'!$C$6*{get_column_letter(c)}19" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
+    _write_values(ws, 24, "Selected EV", "JPY", [f"=IF({get_column_letter(c)}19>0,{get_column_letter(c)}19,IF({get_column_letter(c)}22>0,{get_column_letter(c)}22,{get_column_letter(c)}23))" for c in cols], kind="formula", fmt=ib.FMT_MONEY, bold=True)
+    _highlight_row(ws, 24, START_PERIOD_COL + len(cols) - 1)
     _section(ws, 30, "Method credibility")
     _set_column_widths(ws, {2: 24, 3: 42, 4: 34, 5: 42, 6: 26})
     headers = ["Method", "Role", "Use when", "Exclusion / caution", "Linked driver"]
@@ -1388,10 +1404,11 @@ def _build_valuation(wb: Workbook, facts: SourceFacts) -> None:
     _section(ws, 25, "Investor return")
     _write_values(ws, 26, "Equity invested", "JPY", [f"='Capital Stack'!{get_column_letter(c)}7" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
     _write_values(ws, 27, "New investor ownership", "%", [f"='Capital Stack'!{get_column_letter(c)}16" for c in cols], kind="formula", fmt=ib.FMT_PERCENT)
-    _write_values(ws, 28, "MOIC at selected EV", "x", [f"=IF({get_column_letter(c)}26=0,\"-\",{get_column_letter(c)}22*{get_column_letter(c)}27/{get_column_letter(c)}26)" for c in cols], kind="formula", fmt=ib.FMT_MULTIPLE)
+    _write_values(ws, 28, "MOIC at selected EV", "x", [f"=IF({get_column_letter(c)}26=0,\"-\",{get_column_letter(c)}24*{get_column_letter(c)}27/{get_column_letter(c)}26)" for c in cols], kind="formula", fmt=ib.FMT_MULTIPLE)
+    _write_values(ws, 29, "Illustrative IRR", "%", [f"=IF({get_column_letter(c)}28=\"-\",\"-\",{get_column_letter(c)}28^(1/{max(idx, 1)})-1)" for idx, c in enumerate(cols, start=1)], kind="formula", fmt=ib.FMT_PERCENT)
     _highlight_row(ws, 28, START_PERIOD_COL + len(cols) - 1)
     cats = Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=13)
-    _add_bar_chart(ws, "Exit EV range", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=16, max_row=22), cats, "B40", _money_unit(facts))
+    _add_bar_chart(ws, "Exit EV range", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=16, max_row=24), cats, "B40", _money_unit(facts))
 
 
 def _build_market_support(wb: Workbook, facts: SourceFacts) -> None:
@@ -1445,12 +1462,14 @@ def _build_benchmarks(wb: Workbook, facts: SourceFacts) -> None:
 def _build_ic_memo(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["IC Memo"]
     _setup_sheet(ws, f"{facts.company} — IC Memo Notes", "Investment committee summary generated from the model and source story.", None)
+    final_col = _final_period_col(facts)
     sections = [
         ("Investment thesis", f"{facts.company} is modeled through an economic kernel described as {facts.mechanics}; use this as a driver composition, not a sector template."),
-        ("KPI readout", "Read KPI rows with their formula, source context, downside trigger, and IC implication; omit or replace metrics that do not change the decision."),
+        ("KPI readout", f"=\"Final runway: \"&TEXT('KPI'!{final_col}20,\"0.0\")&\" months; burn multiple: \"&TEXT('KPI'!{final_col}18,\"0.0x\")&\"; gross margin: \"&TEXT('KPI'!{final_col}16,\"0%\")"),
+        ("Funding and dilution", f"=\"Final funding gap: \"&TEXT('Scenarios'!{get_column_letter(START_PERIOD_COL)}19,\"¥#,##0,,M\")&\"; new investor ownership: \"&TEXT('Capital Stack'!{final_col}16,\"0%\")&\"; founder ownership: \"&TEXT('Ownership'!{final_col}7,\"0%\")"),
+        ("Valuation and return", f"=\"Selected EV: \"&TEXT('Valuation'!{final_col}24,\"¥#,##0,,M\")&\"; MOIC: \"&TEXT('Valuation'!{final_col}28,\"0.0x\")&\"; IRR: \"&TEXT('Valuation'!{final_col}29,\"0%\")"),
         ("What must be true", "Selected demand, pricing, cost-to-serve, capacity, financing, and valuation assumptions must reconcile to their support ratios or be carried as weak evidence."),
-        ("Upside case", "Upside requires linked driver proof, not isolated scalar shocks: conversion, pricing, cost, capacity, financing terms, and valuation support should move coherently."),
-        ("Downside case", "Downside is decision-relevant when it creates a funding gap, runway breach, covenant issue, unacceptable dilution, or valuation support break."),
+        ("Scenario breakpoint", "Downside is decision-relevant when it creates a funding gap, runway breach, covenant issue, unacceptable dilution, or valuation support break."),
         ("DD questions", "Prioritize DD around weak-evidence drivers, benchmark freshness, customer ROI proof, retention/cohort behavior, cost-to-serve, capital terms, tax/debt constraints, and exit support."),
         ("Source boundary", "Source fields should contain traceable evidence or evidence status only; refresh material benchmarks before external circulation."),
     ]
@@ -1458,7 +1477,10 @@ def _build_ic_memo(wb: Workbook, facts: SourceFacts) -> None:
     for title, body in sections:
         _section(ws, row, title)
         ws.cell(row + 1, 2, body)
-        ib.apply_comment(ws.cell(row + 1, 2), wrap_text=False)
+        if isinstance(body, str) and body.startswith("="):
+            _apply_value_style(ws.cell(row + 1, 2), "General")
+        else:
+            ib.apply_comment(ws.cell(row + 1, 2), wrap_text=False)
         ws.row_dimensions[row + 1].height = 46
         row += 4
 

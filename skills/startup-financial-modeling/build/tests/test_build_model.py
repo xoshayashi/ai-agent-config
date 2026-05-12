@@ -147,6 +147,13 @@ def test_economic_kernel_is_separate_from_workbook_renderer() -> None:
     assert "from economic_kernel import" in builder_text
 
 
+def test_japanese_money_units_parse_at_correct_scale() -> None:
+    assert kernel.money_yen([r"([0-9,.]+)\s*(万|億|兆)"], "900億円", 0) == 90_000_000_000
+    assert kernel.money_yen([r"([0-9,.]+)\s*(万|億|兆)"], "1.2兆円", 0) == 1_200_000_000_000
+    assert kernel.money_yen([r"([0-9,.]+)\s*(万|億|兆)"], "3200万円", 0) == 32_000_000
+    assert kernel.money_yen([r"([0-9,.]+)\s*(m|bn|b)"], "12bn", 0) == 12_000_000_000
+
+
 def test_generated_workbook_contains_interpretive_analysis_surfaces() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "full.xlsx"
@@ -159,10 +166,41 @@ def test_generated_workbook_contains_interpretive_analysis_surfaces() -> None:
         assert wb["Valuation"]["B30"].value == "Method credibility"
         assert wb["Benchmarks"]["B5"].value == "source_id"
         assert wb["IC Memo"]["B10"].value == "KPI readout"
+        assert isinstance(wb["IC Memo"]["B11"].value, str) and wb["IC Memo"]["B11"].value.startswith("=")
 
         formulas = [formula for _, _, formula in _formula_cells(wb)]
         assert not any("AVERAGE(" in formula and "'Valuation'" not in formula for formula in formulas)
         assert "Primary-method EV" in "\n".join(str(cell.value) for cell in wb["Valuation"]["C"] if cell.value)
+        assert "PV of forecast FCF" in "\n".join(str(cell.value) for cell in wb["Valuation"]["C"] if cell.value)
+        assert "Illustrative IRR" in "\n".join(str(cell.value) for cell in wb["Valuation"]["C"] if cell.value)
+
+
+def test_mechanic_specific_kpi_and_scenario_axes_are_rendered() -> None:
+    cases = [
+        ("# Marketplace\nMarketplace with GMV, take rate, buyer and seller liquidity. Source: management memo.", "Take rate", "GMV / liquidity scale"),
+        ("# Robotics\nHardware robot deployment with BOM, service, lease financing and utilization. Source: management memo.", "Asset payback", "Deployment capacity scale"),
+        ("# Lending\nFintech lending model with origination, credit loss, warehouse line and collections. Source: management memo.", "Loss / collection quality", "Warehouse / debt headroom"),
+    ]
+    for source_text, expected_kpi, expected_driver in cases:
+        tmp, wb = _sample_source_workbook(source_text)
+        try:
+            kpi_text = "\n".join(str(cell.value) for row in wb["KPI"].iter_rows() for cell in row if cell.value is not None)
+            scenario_text = "\n".join(str(cell.value) for row in wb["Scenarios"].iter_rows() for cell in row if cell.value is not None)
+            assert expected_kpi in kpi_text
+            assert expected_driver in scenario_text
+        finally:
+            tmp.cleanup()
+
+
+def test_cost_build_does_not_double_count_detailed_service_costs_in_variable_cogs() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "full.xlsx"
+        build_model.build_model(None, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+
+        formula = wb["Cost Build"].cell(8, FIRST_VALUE_COL).value
+        assert formula == f"={FIRST_VALUE_LETTER}7*'Assumptions'!{FIRST_VALUE_LETTER}24"
+        assert "SUM('Assumptions'!" not in formula
 
 
 def test_orchestrator_no_longer_routes_through_legacy_saas_skeleton() -> None:
@@ -996,7 +1034,7 @@ def test_source_plan_tables_do_not_overlap_metadata_columns() -> None:
     )
     try:
         assert [wb["Scenarios"].cell(7, c).value for c in range(FIRST_VALUE_COL, FIRST_VALUE_COL + 3)] == [0.70, 1.00, 1.30]
-        assert wb["Scenarios"].cell(7, source_plan.LAYOUT.label_col).value == "Volume scale"
+        assert wb["Scenarios"].cell(7, source_plan.LAYOUT.label_col).value == "New logo / conversion scale"
         assert wb["Scenarios"].cell(7, source_plan.LAYOUT.unit_col).value == "x"
         assert wb["Financing"].cell(16, FIRST_VALUE_COL).value == f"='Scenarios'!{FIRST_VALUE_LETTER}19"
         assert [wb["Sensitivity"].cell(7, c).value for c in range(FIRST_VALUE_COL, FIRST_VALUE_COL + 5)] == [0.60, 0.80, 1.00, 1.20, 1.40]
@@ -1237,7 +1275,10 @@ if __name__ == "__main__":
     test_skill_uses_generic_economic_kernel_not_stage_matrix()
     test_prompt_guidance_resists_fixed_template_routing()
     test_economic_kernel_is_separate_from_workbook_renderer()
+    test_japanese_money_units_parse_at_correct_scale()
     test_generated_workbook_contains_interpretive_analysis_surfaces()
+    test_mechanic_specific_kpi_and_scenario_axes_are_rendered()
+    test_cost_build_does_not_double_count_detailed_service_costs_in_variable_cogs()
     test_orchestrator_no_longer_routes_through_legacy_saas_skeleton()
     test_focused_modes_use_generic_kernel_after_bundle_filter()
     test_full_model_uses_direct_formula_refs()

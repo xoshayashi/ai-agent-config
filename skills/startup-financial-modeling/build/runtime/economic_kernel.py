@@ -85,6 +85,29 @@ class AssumptionGroup:
 
 
 @dataclass(frozen=True)
+class ScenarioDriver:
+    label: str
+    unit: str
+    downside: float
+    base: float
+    upside: float
+    why: str
+    output_pressured: str
+    breakpoint: str
+    decision_implication: str
+
+
+@dataclass(frozen=True)
+class KPIDefinition:
+    name: str
+    formula_driver: str
+    applies_when: str
+    source_context: str
+    downside_trigger: str
+    ic_implication: str
+
+
+@dataclass(frozen=True)
 class SourceFacts:
     years: list[int]
     period_labels: list[str]
@@ -551,9 +574,13 @@ def money_yen(patterns: Iterable[str], text: str, default: int) -> int:
             value = float(raw)
         except ValueError:
             continue
-        if unit in {"兆", "t", "tn", "trillion"}:
+        if unit in {"兆"}:
             return int(value * 1_000_000_000_000)
-        if unit in {"億", "b", "bn", "billion"}:
+        if unit in {"t", "tn", "trillion"}:
+            return int(value * 1_000_000_000_000)
+        if unit in {"億"}:
+            return int(value * 100_000_000)
+        if unit in {"b", "bn", "billion"}:
             return int(value * 1_000_000_000)
         if unit in {"百万", "m", "mn", "million"}:
             return int(value * 1_000_000)
@@ -700,6 +727,96 @@ def driver_surfaces_for(facts: SourceFacts) -> tuple[DriverSurface, ...]:
         DriverSurface("Risk", "Scenario and sensitivity", "Scenarios / Sensitivity", "Downside and decision pressure", "model"),
         DriverSurface("Value", "Exit, SOTP, investor return", "Valuation / IC Memo", "Investment judgment", "model"),
     )
+
+
+def _mechanic_key(facts: SourceFacts) -> str:
+    lowered = f"{facts.mechanics} {' '.join(facts.segments)}".lower()
+    if any(token in lowered for token in ("marketplace", "transaction", "gmv")):
+        return "marketplace"
+    if any(token in lowered for token in ("hardware", "asset", "equipment", "robot")):
+        return "hardware_asset_heavy"
+    if any(token in lowered for token in ("fintech", "balance", "loan", "lending", "credit")):
+        return "fintech_balance_sheet"
+    if any(token in lowered for token in ("proof", "pre-revenue", "milestone")):
+        return "pre_revenue_milestone"
+    if any(token in lowered for token in ("software", "recurring", "saas", "subscription")):
+        return "recurring_software"
+    return "generic"
+
+
+def scenario_drivers_for(facts: SourceFacts) -> tuple[ScenarioDriver, ...]:
+    key = _mechanic_key(facts)
+    registry = {
+        "marketplace": (
+            ScenarioDriver("GMV / liquidity scale", "x", 0.65, 1.00, 1.35, "buyer/seller liquidity evidence is weakest", "net revenue and contribution margin", "liquidity or repeat rate misses plan", "tighten wedge, incentives, or funding plan"),
+            ScenarioDriver("Take-rate / pricing scale", "x", 0.85, 1.00, 1.12, "monetization may pressure marketplace liquidity", "net revenue and NRR quality", "take rate cannot hold without churn", "reprice, bundle, or change value capture"),
+            ScenarioDriver("Incentive / loss factor", "x", 1.30, 1.00, 0.80, "incentives, payment fees, or fraud can absorb gross profit", "gross margin and burn", "contribution margin turns negative", "validate unit economics by cohort"),
+            ScenarioDriver("Working-capital factor", "x", 1.20, 1.00, 0.85, "cash timing may diverge from GMV growth", "runway and funding gap", "cash conversion absorbs raise", "change settlement, advances, or debt plan"),
+        ),
+        "hardware_asset_heavy": (
+            ScenarioDriver("Deployment capacity scale", "x", 0.65, 1.00, 1.30, "manufacturing or field deployment constrains growth", "revenue, capex, and runway", "units ship below milestone", "phase rollout or add capacity financing"),
+            ScenarioDriver("Utilization / pricing scale", "x", 0.85, 1.00, 1.15, "asset ROI depends on utilization and price capture", "revenue and payback", "payback exceeds funding window", "validate customer ROI and pricing"),
+            ScenarioDriver("BOM / service cost factor", "x", 1.25, 1.00, 0.85, "hardware/service cost evidence is often thin", "gross margin and capex intensity", "margin falls below target", "lock BOM, warranty, and service data"),
+            ScenarioDriver("Lease/debt availability", "x", 0.70, 1.00, 1.25, "non-dilutive capacity may be unavailable in downside", "funding gap and dilution", "debt/lease headroom fails", "resize equity round or asset plan"),
+        ),
+        "fintech_balance_sheet": (
+            ScenarioDriver("Origination scale", "x", 0.70, 1.00, 1.25, "demand and underwriting capacity may diverge", "revenue and capital need", "origination below cost base", "tighten ICP and credit box"),
+            ScenarioDriver("Spread / pricing scale", "x", 0.85, 1.00, 1.10, "pricing may not offset funding cost", "gross profit and valuation", "spread compression", "reprice, hedge, or reduce growth"),
+            ScenarioDriver("Loss / collection factor", "x", 1.35, 1.00, 0.80, "loss and collection evidence drives survivability", "cash, runway, and covenants", "losses breach headroom", "validate cohorts before scaling"),
+            ScenarioDriver("Warehouse / debt headroom", "x", 0.70, 1.00, 1.20, "balance-sheet growth depends on committed funding", "funding gap and dilution", "warehouse capacity unavailable", "slow originations or raise equity"),
+        ),
+        "pre_revenue_milestone": (
+            ScenarioDriver("Milestone timing scale", "x", 0.65, 1.00, 1.20, "proof points may slip before commercial revenue", "cash-out date and next round", "milestone slips beyond runway", "reduce scope or raise bridge"),
+            ScenarioDriver("Prototype / program cost factor", "x", 1.30, 1.00, 0.85, "R&D and prototype cost evidence is thin", "burn and funding gap", "cost overrun consumes buffer", "add contingency and vendor proof"),
+            ScenarioDriver("Grant / non-dilutive coverage", "x", 0.70, 1.00, 1.25, "non-dilutive funding may not arrive on time", "equity need and dilution", "coverage below target", "replace with bridge or equity"),
+            ScenarioDriver("Hiring capacity scale", "x", 0.80, 1.00, 1.20, "execution depends on recruiting scarce talent", "milestone delivery and burn", "critical hires slip", "sequence hires to proof points"),
+        ),
+        "recurring_software": (
+            ScenarioDriver("New logo / conversion scale", "x", 0.70, 1.00, 1.30, "pipeline conversion drives ARR", "ARR, burn multiple, and runway", "sales capacity misses plan", "revise GTM capacity or spend"),
+            ScenarioDriver("ACV / expansion scale", "x", 0.85, 1.00, 1.15, "pricing and expansion quality drive NRR", "ARR and valuation quality", "expansion below benchmark", "validate packaging and customer ROI"),
+            ScenarioDriver("Churn / retention factor", "x", 1.30, 1.00, 0.80, "retention is often the hardest evidence gap", "NRR, LTV, and valuation", "churn breaks payback", "cohort retention DD before scaling"),
+            ScenarioDriver("CAC / sales capacity factor", "x", 1.20, 1.00, 0.85, "sales efficiency controls funding need", "burn multiple and payback", "payback exceeds cash window", "rebalance GTM mix"),
+        ),
+    }
+    return registry.get(key, registry["recurring_software"])
+
+
+def kpi_definitions_for(facts: SourceFacts) -> tuple[KPIDefinition, ...]:
+    common = [
+        KPIDefinition("Runway", "CF ending cash / burn", "cash survival matters", "cash forecast / financing terms", "below target runway", "round timing or burn reset"),
+        KPIDefinition("Burn multiple", "net burn / net new revenue", "funding efficiency matters", "cash flow and revenue ramp", "burn not justified by growth", "capital efficiency and round size"),
+        KPIDefinition("Funding coverage", "committed financing / cash need", "raise sizing is a decision", "capital stack and milestone plan", "coverage below target", "round size, bridge, or debt plan"),
+        KPIDefinition("Evidence coverage", "support status across material drivers", "source quality is uneven", "benchmark/source register", "material driver remains unknown", "prioritize DD before circulation"),
+    ]
+    key = _mechanic_key(facts)
+    registry = {
+        "marketplace": (
+            KPIDefinition("Take rate", "net revenue / GMV", "transaction monetization is central", "transaction and pricing proof", "take rate weakens liquidity", "pricing and incentive DD"),
+            KPIDefinition("Contribution margin", "gross profit after incentives/losses", "subsidies or fraud matter", "payment, incentive, fraud evidence", "contribution margin negative", "cohort unit economics DD"),
+            KPIDefinition("Repeat / liquidity quality", "repeat rate and GMV growth", "network health drives scale", "cohort behavior", "repeat behavior below threshold", "wedge or supply/demand focus"),
+        ),
+        "hardware_asset_heavy": (
+            KPIDefinition("Deployment capacity", "units deployed / capacity", "physical rollout drives revenue", "manufacturing/deployment evidence", "capacity below unit plan", "capacity financing or phasing"),
+            KPIDefinition("Asset payback", "capex per unit / unit gross profit", "assets consume cash", "BOM, service, utilization evidence", "payback beyond funding window", "lease/debt and pricing DD"),
+            KPIDefinition("Service burden", "support workload / Ops-CS capacity", "service quality affects margins", "ticket and field-service evidence", "coverage below 1.0x", "support model or warranty DD"),
+        ),
+        "fintech_balance_sheet": (
+            KPIDefinition("Loss / collection quality", "loss and collection assumptions", "credit risk drives value", "cohort loss evidence", "losses exceed spread", "credit and collections DD"),
+            KPIDefinition("Funding spread", "yield minus funding cost", "warehouse funding drives economics", "debt terms and origination data", "spread compression", "funding partner or pricing DD"),
+            KPIDefinition("Debt / warehouse headroom", "debt capacity / originations", "growth depends on balance sheet", "capital stack evidence", "capacity below plan", "slow growth or raise equity"),
+        ),
+        "pre_revenue_milestone": (
+            KPIDefinition("Milestone runway", "cash runway vs proof-point timing", "revenue proof is ahead", "technical roadmap and burn", "runway ends before proof", "scope, bridge, or hiring reset"),
+            KPIDefinition("Prototype cost variance", "selected cost vs implied cost", "R&D cost evidence is thin", "vendor and team estimates", "cost overrun consumes buffer", "contingency and vendor DD"),
+            KPIDefinition("Non-dilutive coverage", "grants/advances / milestone spend", "funding mix changes dilution", "grant/customer advance status", "coverage slips", "replace with equity or convert"),
+        ),
+        "recurring_software": (
+            KPIDefinition("Net retention", "opening ARR + expansion - churn", "recurring revenue quality matters", "cohort behavior", "NRR below target", "retention and expansion DD"),
+            KPIDefinition("CAC payback", "CAC / gross profit from new ARR", "GTM spend drives burn", "sales cycle and CAC evidence", "payback beyond cash window", "GTM mix or pricing reset"),
+            KPIDefinition("Sales efficiency", "new ARR / sales and marketing spend", "growth efficiency matters", "GTM capacity", "efficiency below benchmark", "quota and channel DD"),
+        ),
+    }
+    return tuple(common + list(registry.get(key, registry["recurring_software"])))
 
 
 def extract_source_facts(source_md: Path) -> SourceFacts:
