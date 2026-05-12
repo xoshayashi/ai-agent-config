@@ -14,6 +14,7 @@ from pathlib import Path
 from openpyxl import Workbook
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
+from openpyxl.utils import range_boundaries
 
 SKILL_DIR = Path(__file__).resolve().parents[2]
 REPO_ROOT = SKILL_DIR.parents[1]
@@ -32,6 +33,11 @@ SECOND_VALUE_COL = FIRST_VALUE_COL + 1
 FIRST_VALUE_LETTER = source_plan.get_column_letter(FIRST_VALUE_COL)
 SECOND_VALUE_LETTER = source_plan.get_column_letter(SECOND_VALUE_COL)
 UNIT_COL = source_plan.LAYOUT.unit_col
+
+
+def _column_width(ws, column_letter: str) -> float:
+    dimension = ws.column_dimensions.get(column_letter)
+    return dimension.width if dimension and dimension.width is not None else 0
 
 
 def test_skill_exposes_clean_build_route_only() -> None:
@@ -1100,17 +1106,56 @@ def test_source_plan_ib_design_rhythm_and_visibility() -> None:
             expected_title_cols = f"A:{source_plan.get_column_letter(source_plan.LAYOUT.unit_col)}"
             expected_title_cols_abs = f"$A:${source_plan.get_column_letter(source_plan.LAYOUT.unit_col)}"
             assert ws.print_title_cols in {expected_title_cols, expected_title_cols_abs}
-            assert (ws.column_dimensions["A"].width or 0) == ib.COL_MARGIN_WIDTH
-            assert (ws.column_dimensions[source_plan.get_column_letter(source_plan.LAYOUT.first_hierarchy_col)].width or 0) >= ib.COL_HIERARCHY_WIDTH
-            assert (ws.column_dimensions[source_plan.get_column_letter(source_plan.LAYOUT.label_col)].width or 0) >= ib.COL_LABEL_WIDTH
-            assert (ws.column_dimensions[source_plan.get_column_letter(source_plan.LAYOUT.source_col)].width or 0) >= ib.COL_SOURCE_WIDTH
-            assert (ws.column_dimensions[source_plan.get_column_letter(source_plan.LAYOUT.unit_col)].width or 0) >= ib.COL_UNIT_WIDTH
+            assert _column_width(ws, "A") == ib.COL_MARGIN_WIDTH
+            if ws.max_column >= source_plan.LAYOUT.first_hierarchy_col:
+                assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.first_hierarchy_col)) >= ib.COL_HIERARCHY_WIDTH
+            if ws.max_column >= source_plan.LAYOUT.label_col:
+                assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.label_col)) >= ib.COL_LABEL_WIDTH
+            if ws.max_column >= source_plan.LAYOUT.source_col:
+                assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.source_col)) >= ib.COL_SOURCE_WIDTH
+            if ws.max_column >= source_plan.LAYOUT.unit_col:
+                assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.unit_col)) >= ib.COL_UNIT_WIDTH
             assert (ws.row_dimensions[2].height or 0) <= 20
             assert (ws.row_dimensions[5].height or 0) <= 18
             if ws.cell(5, source_plan.START_PERIOD_COL).value is not None:
                 assert ws.freeze_panes == f"{source_plan.get_column_letter(source_plan.START_PERIOD_COL)}6"
-        assert wb["Assumptions"].column_dimensions["C"].width >= 54
-        assert wb["Assumptions"].column_dimensions["D"].width >= 54
+        assert _column_width(wb["Assumptions"], "C") >= 54
+        assert _column_width(wb["Assumptions"], "D") >= 54
+    finally:
+        tmp.cleanup()
+
+
+def _print_area_bounds(ws) -> tuple[int, int, int, int]:
+    area = str(ws.print_area).replace("'", "").replace("$", "")
+    if "!" in area:
+        area = area.split("!", 1)[1]
+    return range_boundaries(area)
+
+
+def test_source_plan_print_canvas_includes_rendered_used_range() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
+    )
+    try:
+        assert _styled_blank_cells(wb) == []
+        for ws in wb.worksheets:
+            rendered_row, rendered_col = ib.rendered_bounds(ws)
+            min_col, min_row, max_col, max_row = _print_area_bounds(ws)
+            assert (min_row, min_col) == (1, 1)
+            assert max_row >= rendered_row
+            assert max_col >= rendered_col
+            assert ws.max_row <= rendered_row
+            assert ws.max_column <= rendered_col
+            stray_dimensions = [
+                key
+                for key in ws.column_dimensions
+                if range_boundaries(f"{key}1:{key}1")[0] > rendered_col
+            ]
+            assert stray_dimensions == []
+
+        for ws in wb.worksheets:
+            ws.insert_rows(ws.max_row + 1)
+            assert ws.cell(ws.max_row + 1, 1).style_id == 0
     finally:
         tmp.cleanup()
 
@@ -1222,6 +1267,7 @@ if __name__ == "__main__":
     test_source_plan_has_no_excel_indent_or_clipped_role_columns()
     test_source_plan_has_no_long_centered_prose_headers()
     test_source_plan_ib_design_rhythm_and_visibility()
+    test_source_plan_print_canvas_includes_rendered_used_range()
     test_source_plan_custom_tables_keep_text_columns_readable()
     test_excluded_sheets_cannot_create_broken_references()
     test_ib_helpers_do_not_use_native_indent_for_hierarchy()

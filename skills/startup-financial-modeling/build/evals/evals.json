@@ -115,10 +115,13 @@
       "prompt": "既存のstartup financial model xlsxを監査して修正してください。文字が見切れる、空白セルがオーバーフローを止める、単位列の配置がバラバラ、ハイライトが多すぎる、ソースがfakeっぽい、KPI/IC memoが浅いです。",
       "expected_output": "Audit and repair report or patched workbook with concrete sheet/cell findings, visible readability fixes, source hygiene fixes, and deeper analysis guidance for KPI and memo surfaces.",
       "files": ["xlsx"],
-      "applicable_references": ["_layout_canonical", "_benchmark_protocol", "_kpi_analytics", "_ic_memo_depth", "_self_review_protocol"],
+      "applicable_references": ["_layout_canonical", "_ib_workbook_design_system", "_benchmark_protocol", "_kpi_analytics", "_ic_memo_depth", "_self_review_protocol"],
       "assertions": [
         { "id": "H1", "text": "Findings cite concrete sheet/cell locations and distinguish style blockers from formula/modeling issues", "type": "audit" },
         { "id": "H2", "text": "Blank cells intended for overflow remain genuinely blank and unstyled after repair", "type": "implementation" },
+        { "id": "H2b", "text": "Sheet canvases and print areas stop at the real used range, with no styled trailing rows or columns that create extra rendered pages", "type": "implementation" },
+        { "id": "H2c", "text": "Borders and background fills form a calm repeated design system instead of noisy isolated cell decoration", "type": "design" },
+        { "id": "H2d", "text": "Charts, drawings, and newly inserted rows or cells remain inside an editable rendered canvas without inheriting noisy blank styles", "type": "implementation" },
         { "id": "H3", "text": "Source fields use traceable sources or evidence status and avoid fake assumptions/analysis labels", "type": "evidence" },
         { "id": "H4", "text": "KPI and memo gaps are repaired or translated into explicit decision interpretation and DD questions", "type": "memo" }
       ]

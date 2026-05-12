@@ -240,13 +240,19 @@ def _disable_wrap_text(wb: Workbook) -> None:
 
 
 def _clear_blank_cell_styles(wb: Workbook) -> None:
-    for ws in wb.worksheets:
-        for row in ws.iter_rows():
-            for cell in row:
-                if cell.value not in (None, ""):
-                    continue
-                cell.value = None
-                cell._style = None
+    ib.clear_blank_cell_styles(wb)
+
+
+def _last_value_bounds(ws: Worksheet) -> tuple[int, int]:
+    return ib.last_value_bounds(ws)
+
+
+def _rendered_bounds(ws: Worksheet) -> tuple[int, int]:
+    return ib.rendered_bounds(ws)
+
+
+def _trim_blank_canvas(wb: Workbook) -> None:
+    ib.trim_blank_canvas(wb)
 
 
 def _setup_sheet(
@@ -579,6 +585,7 @@ def _write_decomposition_status(ws: Worksheet, row: int, label: str, values: lis
 def _apply_print(wb: Workbook) -> None:
     for ws in wb.worksheets:
         ws.sheet_view.zoomScale = 90
+        last_row, last_col = _rendered_bounds(ws)
         ib.setup_print_layout(
             ws,
             orientation="landscape",
@@ -587,7 +594,8 @@ def _apply_print(wb: Workbook) -> None:
             print_title_cols=f"A:{get_column_letter(LAYOUT.unit_col)}",
             footer_right="&P / &N",
         )
-        for row in range(1, ws.max_row + 1):
+        ws.print_area = f"A1:{get_column_letter(last_col)}{last_row}"
+        for row in range(1, last_row + 1):
             if ws.row_dimensions[row].height is None:
                 ws.row_dimensions[row].height = ib.ROW_HEIGHT_BASE
         ws.row_dimensions[2].height = 20
@@ -1489,9 +1497,10 @@ def build_source_plan_workbook_from_facts(facts: SourceFacts) -> Workbook:
     _apply_design_surface(wb)
     ib.normalize_workbook_fonts(wb)
     ib.set_workbook_default_font(wb)
-    _apply_print(wb)
     _disable_wrap_text(wb)
     _clear_blank_cell_styles(wb)
+    _trim_blank_canvas(wb)
+    _apply_print(wb)
     wb.defined_names.clear()
     for ws in wb.worksheets:
         ws.defined_names.clear()

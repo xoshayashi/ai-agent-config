@@ -17,6 +17,7 @@ License: internal (startup-financial-modeling skill)
 
 from __future__ import annotations
 
+from copy import copy
 from dataclasses import dataclass
 from typing import Iterable, Literal
 
@@ -25,7 +26,7 @@ from openpyxl.chart.shapes import GraphicalProperties
 from openpyxl.drawing.fill import ColorChoice
 from openpyxl.formatting.rule import ColorScaleRule, DataBarRule
 from openpyxl.styles import Alignment, Border, Font, NamedStyle, PatternFill, Side
-from openpyxl.utils import get_column_letter, range_boundaries
+from openpyxl.utils import coordinate_to_tuple, get_column_letter, range_boundaries
 from openpyxl.workbook.workbook import Workbook
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.worksheet.worksheet import Worksheet
@@ -214,6 +215,92 @@ def normalize_workbook_fonts(
                 )
                 touched += 1
     return touched
+
+
+def last_value_bounds(ws: Worksheet) -> tuple[int, int]:
+    """Return the last row/column that contains a real displayed value."""
+    last_row = 1
+    last_col = 1
+    for row in ws.iter_rows():
+        for cell in row:
+            if cell.value in (None, ""):
+                continue
+            last_row = max(last_row, cell.row)
+            last_col = max(last_col, cell.column)
+    return last_row, last_col
+
+
+def _chart_anchor_start(anchor: object) -> tuple[int, int] | None:
+    if isinstance(anchor, str):
+        try:
+            return coordinate_to_tuple(anchor)
+        except ValueError:
+            return None
+    marker = getattr(anchor, "_from", None)
+    if marker is not None:
+        return marker.row + 1, marker.col + 1
+    return None
+
+
+def rendered_bounds(ws: Worksheet) -> tuple[int, int]:
+    """Return the last row/column needed for values and rendered drawings."""
+    last_row, last_col = last_value_bounds(ws)
+    for chart in getattr(ws, "_charts", []):
+        anchor = getattr(chart, "anchor", None)
+        start = _chart_anchor_start(anchor)
+        if start is None:
+            continue
+        row, col = start
+        ext = getattr(anchor, "ext", None)
+        width = (float(ext.cx) / 360000) if ext and getattr(ext, "cx", None) else float(getattr(chart, "width", 15) or 15)
+        height = (float(ext.cy) / 360000) if ext and getattr(ext, "cy", None) else float(getattr(chart, "height", 7.5) or 7.5)
+        col_span = max(4, int(round(width / 1.8)) + 1)
+        row_span = max(10, int(round(height / 0.55)) + 1)
+        last_row = max(last_row, row + row_span)
+        last_col = max(last_col, col + col_span)
+    return last_row, last_col
+
+
+def clear_blank_cell_styles(wb: Workbook) -> None:
+    """Reset blank cells to the workbook default style.
+
+    This keeps empty cells available for Excel overflow and prevents trailing
+    blank regions from becoming visible canvas after fills, borders, or row
+    sizing were applied earlier in a builder.
+    """
+    default_style = copy(wb._cell_styles[0])
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.value not in (None, ""):
+                    continue
+                cell.value = None
+                cell._style = copy(default_style)
+
+
+def trim_blank_canvas(wb: Workbook, *, set_print_area: bool = True) -> None:
+    """Trim every sheet to its real used range and clear blank-cell styling."""
+    default_style = copy(wb._cell_styles[0])
+    for ws in wb.worksheets:
+        last_row, last_col = rendered_bounds(ws)
+        if ws.max_row > last_row:
+            ws.delete_rows(last_row + 1, ws.max_row - last_row)
+        if ws.max_column > last_col:
+            ws.delete_cols(last_col + 1, ws.max_column - last_col)
+        for key in list(ws.column_dimensions):
+            try:
+                col_idx = coordinate_to_tuple(f"{key}1")[1]
+            except ValueError:
+                continue
+            if col_idx > last_col:
+                del ws.column_dimensions[key]
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.value in (None, ""):
+                    cell.value = None
+                    cell._style = copy(default_style)
+        if set_print_area:
+            ws.print_area = f"A1:{get_column_letter(last_col)}{last_row}"
 
 FONT_HARD_INPUT = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, color=IB_HARD_INPUT)
 FONT_FORMULA = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, color=IB_FORMULA)
@@ -1391,6 +1478,7 @@ __all__ = [
     # Sheet-level helpers
     "setup_sheet_layout", "setup_print_layout", "write_cover", "set_tab_color",
     "validate_sheet_naming",
+    "last_value_bounds", "rendered_bounds", "clear_blank_cell_styles", "trim_blank_canvas",
     # Currency
     "MONEY_UNIT_BY_CCY",
     # Models

@@ -80,6 +80,12 @@ Design for the rendered sheet, not only the xlsx file:
 - Prose cells are left-aligned, while period headers are the main centered text.
 - Empty spacer cells remain truly empty and unstyled, preserving overflow.
 - Freeze panes keep row 5 and all metadata columns visible while values scroll.
+- The workbook canvas ends at the last rendered row and column on every sheet:
+  values, charts, and drawings stay inside the print area, while trailing blank
+  rows or columns do not carry fills, borders, or row-height styling.
+- Background fills appear on populated headers, sections, selected outputs, and
+  checks. Blank cells stay visually quiet, so filled regions feel intentional
+  rather than like a colored spreadsheet canvas.
 
 When screenshots show clipped labels, hidden notes, noisy color, or inconsistent
 alignment, repair the design system and rerun artifact inspection rather than
