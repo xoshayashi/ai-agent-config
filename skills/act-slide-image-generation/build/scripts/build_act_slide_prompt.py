@@ -36,6 +36,12 @@ PLACEHOLDER_BLOCKERS = [
     "viewpoint_crop",
     "specific_visual_details",
     "imageability_lock",
+    "visible_text_only_lock",
+    "render_contract_lock",
+    "prompt_order_lock",
+    "positive_quality_lock",
+    "edit_scope_lock",
+    "revised_prompt_review_lock",
     "exact_text_fidelity_lock",
     "chart_semantic_integrity_lock",
     "thumbnail_legibility_lock",
@@ -182,6 +188,12 @@ def canonical_planning_block(
   codex_image_artifact_rule: Codex built-in image generation returns the authoritative generated PNG artifact; use the Codex-provided artifact/download/attachment path to materialize approved outputs under slides_final/ when a filesystem path is needed for PPTX packaging
   local_env_non_blocker: local environment uncertainty is not a blocker and must not be reported as the reason PPTX is unfinished
   credential_setup_blocker: do not create, request, decrypt, configure, inspect, or wait for account credentials, local tokens, SDK setup, or environment variables; use Codex built-in image generation directly
+  visible_text_only_lock: list every on-slide string under exact_text before generation; render only those strings and no lock names, YAML keys, review statuses, or workflow instructions
+  render_contract_lock: keep non-rendered instructions, audit fields, lock names, and route/status metadata outside the visible slide content; if any appears in the PNG, repair or regenerate
+  prompt_order_lock: final prompts should lead with draw/edit action, visible text contract, canvas/layout, concrete visual anchor, semantic graphics, style system, source/footer behavior, then targeted blockers
+  positive_quality_lock: state the desired calm editorial slide quality before blockers; use hard blockers only for concrete failure modes and avoid broad aesthetic negation that weakens the desired composition
+  edit_scope_lock: repair prompts must name target region, preserve list, change list, and forbidden side effects before invoking edit
+  revised_prompt_review_lock: if the image tool exposes a revised_prompt or rewritten prompt, compare it against exact_text, source policy, header master, and visible/non-visible boundaries before approving the generated PNG
   generation_route_lock: PPTX is a delivery wrapper only; never use PPTX, PowerPoint export, screenshots, local rendering, HTML, SVG, canvas, or PIL to create final PNGs.
   pptx_first_blocker: do not create a presentation deck as the source of truth before image generation; generate and review slide PNGs first, then package approved PNGs into PPTX at the end
   image_generation_order: Correct order: generate gpt-image-2 PNGs, review and repair PNGs, then package approved PNGs into PPTX.
@@ -223,6 +235,7 @@ def canonical_planning_block(
   image_review_iteration: 0 before first review; increment after each regenerated or edited PNG
   image_review_status: pending / approved / repair_required / blocked
   image_review_findings: [blocker/major/minor findings from multimodal self-review]
+  revised_prompt_review_status: not_available / approved / repair_required
   image_repair_prompt: [concrete repair prompt if blockers or majors remain]
   image_repair_history: [iteration -> issue -> repair action -> regenerated PNG path -> re-audit result]
   repair_or_regenerate_decision: edit for localized text, source, header, color, spacing, or single-object defects; regenerate when composition, density, tone, reading path, semantic graphic structure, or visual anchor fails
@@ -281,6 +294,12 @@ def canonical_planning_block(
   illustration_consistency_status: pending / approved / repair_required
   visual_design_quality_traits: [design treatment only: near-white warm base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, intentional canvas occupancy, concrete visual anchor, crisp focal hierarchy; do not change slide count, message order, or storyline solely for this]
   imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation
+  visible_text_only_lock: exact_text is the only source of visible words; lock names, field names, route/status metadata, speaker notes, and audit instructions are non-rendered
+  render_contract_lock: image prompt receives drawing-relevant instructions only: canvas, visible text, layout, visual hierarchy, palette, typography, source rendering, and repair scope
+  prompt_order_lock: [draw/edit action -> canvas and brand system -> exact visible text -> fixed header/source components -> layout and reading path -> main visual/chart/table/illustration details -> optional Insight -> focused blockers]
+  positive_quality_lock: desired quality is calm editorial slide design with clear figure-ground separation, exact text, compact fixed header, one dominant structure, grouped evidence, stable line weight, restrained accent area, and a concrete visual anchor
+  edit_scope_lock: repair prompt includes issue_observed, change_only, preserve, and re_check; no global restyle unless explicitly required
+  revised_prompt_review_lock: revised_prompt_status checked when available; final approval still depends on actual PNG review
   exact_text_fidelity_lock: freeze every visible string before generation; after generation, compare H1, subtitle, labels, numbers, source text, and optional Insight against exact_text and repair missing, invented, garbled, or rewritten copy
   chart_semantic_integrity_lock: charts, tables, matrices, flows, maps, and evidence strips must be structurally meaningful, with legible labels, aligned rows/columns/arrows, plausible relationships, and no fake glyph texture or decorative data marks
   thumbnail_legibility_lock: the slide must preserve the main claim, focal structure, region boundaries, and key numbers when viewed as a slide-sorter thumbnail or contact-sheet tile; repair if it only works at full size
@@ -511,6 +530,10 @@ prompt_readiness: draft_scaffold_until_blocking_unresolved_items_none
 draft_image_prompt_scaffold:
 {prompt_lead}
   Use the embedded ACT design system in SKILL.md. Do not load an external ACT pattern file.
+  Apply prompt_order_lock: keep the final generation prompt ordered as draw/edit action, canvas and brand system, exact visible text, fixed header/source components, layout and reading path, main visual/chart/table/illustration details, optional Insight, then focused blockers.
+  Apply render_contract_lock: pass drawing-relevant instructions to image generation; keep PPTX packaging, file paths, manifests, credentials, contact sheets, speaker notes, and audit/status fields outside visible slide content.
+  Apply visible_text_only_lock: render only exact_text strings on the slide; do not render lock names, YAML keys, route/status fields, audit labels, speaker notes, file paths, or workflow instructions.
+  Apply positive_quality_lock: state the desired calm editorial slide quality before blockers: clear figure-ground separation, exact text, compact fixed header, one dominant structure, grouped evidence, stable line weight, restrained accent area, and a concrete visual anchor.
   PPTX is a delivery wrapper only. Never create final PNGs by exporting, rendering, or screenshotting a PPTX.
   Apply pptx_first_blocker: do not create a presentation deck as the source of truth before image generation; generate and review slide PNGs first, then package approved PNGs into PPTX at the end.
   Correct order: generate gpt-image-2 PNGs, review and repair PNGs, then package approved PNGs into PPTX.
@@ -533,6 +556,7 @@ draft_image_prompt_scaffold:
   Apply visual_design_quality_traits as design treatment: near-white warm base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, concrete visual anchor, crisp focal hierarchy, and deliberate canvas occupancy. Do not alter slide count, message order, or storyline solely for visual style.
   Apply near_white_slide_base_lock: use #FFFDFC as the default ACT slide canvas, optionally #FAFAF7 as only a barely visible warm off-white tint; the page should read closer to white than the previous cream/off-white background. Keep #F7FBF9 for panels/cards only, not the full slide background.
   Apply imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation.
+  Apply revised_prompt_review_lock: when Codex/image generation exposes a revised_prompt or rewritten prompt, verify it preserved exact_text, source behavior, header master, and visible/non-visible boundaries before approving the PNG; if no revised prompt is exposed, continue with actual PNG review.
   Apply exact_text_fidelity_lock: freeze H1, subtitle, labels, numbers, source text, and optional Insight as quoted exact_text before generation; after generation, compare the actual visible text to exact_text and repair any missing, invented, garbled, duplicated, or rewritten copy.
   Apply chart_semantic_integrity_lock: charts, tables, matrices, flows, maps, and evidence strips must read as real argument structures, not decorative texture; keep rows, columns, arrows, axes, legends, units, and comparisons aligned, labeled, and plausibly connected.
   Apply thumbnail_legibility_lock: design for both full-size review and slide-sorter/contact-sheet review; the main claim, focal structure, region boundaries, and key numbers should remain understandable at reduced scale without adding oversized hero typography.
@@ -605,7 +629,7 @@ draft_image_prompt_scaffold:
 negative_prompt_hard_blockers:
   local-rendered substitute, non-gpt-image output, missing or malformed header line, uncontrolled header accent protrusion, header accent floating near page top,
   oversized header, decorative header badge or right-side header ornament, H1/subtitle/source color drift, any gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline near Source/footer, body content invading header/footer, visible text above max_text_size_lock, unreadable body text below 18pt equivalent,
-  invented labels or sources, garbled or rewritten exact_text, decorative pseudo-chart/table/map glyphs, unreadable thumbnail-level hierarchy, broken reading path, placeholder Source footer such as brand assumptions or brand analysis, speaker notes visible on slide, thin or perfunctory PPT talk script, darker beige/cream page background, duplicate loose final PNG copies across output folders, parallel contact sheets for generated/package/pdf_render of the same slide set, unresolved grid, severe grid drift, hard-to-picture abstract visual,
+  invented labels or sources, garbled or rewritten exact_text, visible lock names, visible YAML keys, visible route/status fields, decorative pseudo-chart/table/map glyphs, unreadable thumbnail-level hierarchy, broken reading path, placeholder Source footer such as brand assumptions or brand analysis, speaker notes visible on slide, thin or perfunctory PPT talk script, darker beige/cream page background, duplicate loose final PNG copies across output folders, parallel contact sheets for generated/package/pdf_render of the same slide set, unresolved grid, severe grid drift, hard-to-picture abstract visual,
   title-only first slide or low-density opener without proof/tension points,
   patterned or textured message box, oversized message box, full-width banner-like Insight, message-box text competing with H1/subtitle,
   saturated yellow message box, deck tone drift, mixed illustration tone, inconsistent face detail or body proportion, inconsistent icon family, inconsistent card/table surface weight, decorative pseudo-3D depth, rough sketch aesthetic,
@@ -616,6 +640,11 @@ post_generation_audit:
   - generation_route is Codex built-in image generation, not local rendering or a local credential workaround
   - credential_setup_blocker is honored: no account credential, local token, SDK setup, or environment-variable workflow was attempted before generation
   - image_size {size} is valid for gpt-image-2, labeled as {size_label(size)}, and final delivery is resized only after generation if needed
+  - prompt_order_lock is fulfilled: the prompt led with draw/edit action, canvas/brand, exact visible text, fixed components, layout/reading path, visual details, optional Insight, then focused blockers
+  - render_contract_lock is fulfilled: operational metadata stayed out of visible slide content
+  - visible_text_only_lock is fulfilled: only exact_text strings appear on the slide
+  - positive_quality_lock is fulfilled: blockers did not replace the positive composition target
+  - revised_prompt_review_lock is fulfilled when revised_prompt is available; otherwise actual PNG review remains the source of truth
   - H1 and subtitle hierarchy is clear
   - near_white_slide_base_lock is honored: the slide canvas reads as #FFFDFC / very near white, with #FAFAF7 only as a subtle tint and no darker cream/beige page background
   - max_text_size_lock is honored: no visible text exceeds 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
@@ -712,6 +741,7 @@ pre_package_image_review:
   - Score post_generation_design_balance_check: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
   - Classify each finding as blocker, major, minor, or accepted.
   - If any blocker, major, deck-consistency, content-quality, design-quality, or deck-unity issue exists, create image_repair_prompt, add the slide to weak_slide_regeneration_queue, regenerate or edit the PNG, replace the output file, and repeat this review.
+  - Apply edit_scope_lock in every repair prompt: issue_observed, change_only, preserve, re_check, and no global restyle unless explicitly required.
   - Apply repair_or_regenerate_decision: edit localized defects; regenerate when the core composition, density, tone, reading path, semantic graphic structure, or visual anchor fails.
   - Continue until all_generated_images_reviewed is true, weak_slide_regeneration_queue is empty, final_image_quality_status is approved, and completion_ready_status is approved.
   - If generation or repair is blocked, set completion_ready_status: blocked, keep unresolved slides in the review_manifest, and do not package or report complete.

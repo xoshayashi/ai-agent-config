@@ -101,6 +101,12 @@ source_separator_lock: Source is text-only; no gray rule, separator line, divide
 density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting.
 structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation.
 imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation.
+visible_text_only_lock: render only exact_text; do not render lock names, field names, route/status metadata, speaker notes, file paths, or audit wording.
+render_contract_lock: image prompt payload contains drawing-relevant instructions only; workflow, packaging, manifest, credential, contact-sheet, and audit metadata stay outside visible content.
+prompt_order_lock: final prompt order is draw/edit action, canvas/brand, exact text, fixed components, layout/reading path, main visual details, optional Insight, focused blockers.
+positive_quality_lock: state desired calm editorial quality before hard blockers.
+edit_scope_lock: repair prompts use issue_observed, change_only, preserve, and re_check; do not global-restyle localized fixes.
+revised_prompt_review_lock: verify revised_prompt if available, then rely on actual PNG review for final approval.
 exact_text_fidelity_lock: freeze visible strings before generation, then compare the generated H1, subtitle, labels, numbers, source text, and optional Insight against exact_text.
 chart_semantic_integrity_lock: charts, tables, matrices, flows, maps, and evidence strips must be meaningful argument structures, not decorative pseudo-data.
 thumbnail_legibility_lock: the main claim, focal structure, region boundaries, and key numbers must remain understandable in slide-sorter/contact-sheet review.
@@ -122,6 +128,9 @@ Apply near_white_slide_base_lock: use #FFFDFC as the default ACT slide canvas, w
 Design information density before image generation. Density should answer more of the reader's decision question in one view through hierarchy, evidence, comparison, annotation, source cues, and context layers; do not use smaller type, extra decoration, or visual noise as density.
 Do not minimize numbers by default. Keep decision-relevant sourced or explicitly assumed numbers when they support comparison, sizing, prioritization, credibility, or decision-making.
 Apply exact_text_fidelity_lock: render only quoted exact_text strings; missing, invented, garbled, duplicated, or rewritten visible copy is repair_required.
+Apply visible_text_only_lock and render_contract_lock: only exact_text strings may appear visibly; workflow instructions, lock names, YAML keys, route/status fields, file paths, manifest language, audit labels, and speaker notes are non-rendered metadata.
+Apply prompt_order_lock: write final image prompts in this order: draw/edit action, canvas/brand, exact visible text, fixed header/source components, layout/reading path, main visual/chart/table/illustration details, optional Insight, focused blockers.
+Apply positive_quality_lock: express the intended calm editorial composition before any negative blockers so the image model has a clear quality target.
 Apply chart_semantic_integrity_lock: chart/table/matrix/flow/map rows, columns, arrows, axes, legends, units, and comparisons must be aligned, labeled, and plausibly connected; decorative pseudo-charts are major issues.
 Apply thumbnail_legibility_lock and reading_path_lock: the slide should still reveal the main claim and reading order at contact-sheet scale without oversized hero typography.
 Message boxes and Insight surfaces must use flat solid fills only; no patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
