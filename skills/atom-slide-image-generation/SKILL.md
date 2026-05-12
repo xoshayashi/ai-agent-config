@@ -18,6 +18,7 @@ Never make final PNGs from PPTX export, screenshots, local rendering, HTML, SVG,
 Design defaults: Noto Sans JP, 1672x941, Deep Blue `#0B2F5B`, Charcoal `#2D332E`, light gray `#DDE3EA`, quiet Honey `#F7EECF/#C49A2C`, one editorial illustration tone.
 
 Bias toward message-led structure and useful density when it clarifies the slide.
+Message boxes should give the main content area priority; lower, quieter boxes are welcome when the sentence remains legible and optically centered.
 
 Do not report complete while review has blockers, majors, tone drift, weak content/design, unreadable text, source/header issues, pending status, or non-empty `weak_slide_regeneration_queue`.
 

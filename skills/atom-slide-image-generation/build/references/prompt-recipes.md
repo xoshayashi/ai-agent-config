@@ -105,6 +105,7 @@ visual_subject_open_set: keep visual subject choices open; select the clearest c
 message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements.
 region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette.
 composition_fit_plan: set the main visual field, supporting regions, whitespace role, and Insight footprint before generation so the canvas has deliberate occupancy and breathing room.
+content_area_priority_lock: allocate height to the body, figure, table, or diagram first; size any optional Insight/message-box from the remaining calculated space so it supports rather than compresses the main content area.
 secondary_region_integrity_lock: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field.
 body_silhouette_lock: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions.
 No slide numbers, no title kicker, no numbered header badge.
@@ -116,9 +117,9 @@ Apply near_white_slide_base_lock: use #FCFBF8 as the default ATOM slide canvas, 
 Design information density before image generation. Density should answer more of the reader's decision question in one view through hierarchy, evidence, comparison, annotation, source cues, and context layers; do not use smaller type, extra decoration, or visual noise as density.
 Do not minimize numbers by default. Keep decision-relevant sourced or explicitly assumed numbers when they support comparison, sizing, prioritization, credibility, or decision-making.
 Message boxes and Insight surfaces must use flat solid fills only; no patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
-Apply message_box_scale_lock: message boxes are compact interpretation surfaces, not display surfaces; use one short judgment sentence, prefer one line, allow two lines maximum, and trim or move explanation to notes instead of increasing the box.
+Apply message_box_scale_lock: message boxes are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered; use one short judgment sentence, prefer one line, allow two lines maximum, and trim or move explanation to notes instead of increasing the box.
 Apply message_box_text_size_lock: Insight/message-box text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below subtitle, and must never become a second title.
-Apply message_box_compactness_blocker_lock: an Insight/message-box that dominates the slide, behaves like a banner, spans beyond the interpreted region, grows tall to carry prose, or compensates for layout imbalance is a blocker.
+Apply message_box_compactness_blocker_lock: an Insight/message-box that dominates the slide, behaves like a banner, spans beyond the interpreted region, grows tall to carry prose, or compensates for layout imbalance is a blocker; a lower, quieter box that returns space to the body, figure, table, or diagram is preferred when the sentence remains legible and optically centered.
 Apply message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface; plan line box, padding, and baseline so the sentence sits at the visual center.
 Apply insight_surface_placement_lock: when an Insight/message-box is kept, place it as a deliberate interpretation bridge tied to the body silhouette and footer baseline; bottom variants sit in the breathing space between body content and Source, centered to the interpreted region or full body block, with Source kept separate on its invisible baseline.
 Honey message boxes have one fixed treatment: #F7EECF flat pale fill, #C49A2C 4-5px full-height left accent line, #2D332E text. Avoid saturated yellow fills, dark yellow boxes, large yellow areas, and yellow title underlines.
@@ -261,7 +262,7 @@ header_footer_text_color_lock:
   subtitle: "#4D544E"
   footer_source_table_note: "#6E756E"
   forbidden_text_colors: Deep Blue, Honey, yellow, arbitrary gray
-message_box_scale_lock:
+message_box_scale_lock: compact interpretation surface sized after the main content area; lower height is welcome when it gives the body, figure, table, or diagram more useful room
 message_box_text_size_lock:
 message_box_compactness_blocker_lock:
 message_box_text_alignment_lock:
@@ -315,7 +316,7 @@ insight_decision:
   variant:
   deck_count_check:
   geometry:
-  height:
+  height: calculated after body and footer rhythm; use the lowest comfortable height when it helps the main content area
   radius:
   padding:
   left_accent:
@@ -409,7 +410,8 @@ ATOM slide contract:
 - use Insight component only if it adds interpretation or decision weight and is compatible with the embedded ATOM design system
 - if Honey is used in ATOM or compatible guidelines, use #F7EECF flat pale fill + #C49A2C 4-5px full-height left accent line + #2D332E text, one component maximum
 - keep all Insight/message boxes flat solid fill only; no patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations
-- apply message_box_scale_lock: keep Insight/message boxes compact, one short judgment sentence, one line preferred and two lines maximum; trim or move explanation to notes instead of growing the surface
+- apply content_area_priority_lock before sizing an Insight/message-box: give the body, figure, table, or diagram the needed height first, then use the remaining calculated space for the optional box
+- apply message_box_scale_lock: keep Insight/message boxes compact, one short judgment sentence, one line preferred and two lines maximum; move detail to notes instead of growing the surface
 - keep Insight/message-box text 20-24pt by default, 24-26pt only by exception, at least 6pt smaller than H1, visually below subtitle; it must not become a second title or second hero headline
 - keep Honey quiet: no saturated yellow fill, no dark yellow message box, no large yellow area, and no Honey color variation across a deck
 - Source: render only real traceable source names; when no real source exists, use source_line: none and do not show a Source footer. Never use brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, working assumptions, or other placeholder provenance as Source text.

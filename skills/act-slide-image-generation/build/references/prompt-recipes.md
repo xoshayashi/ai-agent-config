@@ -106,6 +106,7 @@ visual_subject_open_set: keep visual subject choices open; select the clearest c
 message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements.
 region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette.
 composition_fit_plan: set the main visual field, supporting regions, whitespace role, and Insight footprint before generation so the canvas has deliberate occupancy and breathing room.
+content_area_priority_lock: allocate height to the body, figure, table, or diagram first; size any optional Insight/message-box from the remaining calculated space so it supports rather than compresses the main content area.
 secondary_region_integrity_lock: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field.
 body_silhouette_lock: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions.
 No slide numbers, no title kicker, no numbered header badge.
@@ -117,9 +118,9 @@ Apply near_white_slide_base_lock: use #FFFDFC as the default ACT slide canvas, w
 Design information density before image generation. Density should answer more of the reader's decision question in one view through hierarchy, evidence, comparison, annotation, source cues, and context layers; do not use smaller type, extra decoration, or visual noise as density.
 Do not minimize numbers by default. Keep decision-relevant sourced or explicitly assumed numbers when they support comparison, sizing, prioritization, credibility, or decision-making.
 Message boxes and Insight surfaces must use flat solid fills only; no patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
-Apply message_box_scale_lock: message boxes are compact interpretation surfaces, not display surfaces; use one short judgment sentence, prefer one line, allow two lines maximum, and trim, move explanation to notes/body, or remove the component instead of increasing the box.
+Apply message_box_scale_lock: message boxes are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered; use one short judgment sentence, prefer one line, allow two lines maximum, and trim, move explanation to notes/body, or remove the component instead of increasing the box.
 Apply message_box_text_size_lock: Insight/message-box text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below subtitle, and must never become a second title.
-Apply message_box_compactness_blocker_lock: an Insight/message-box that dominates the slide, behaves like a banner, spans beyond the interpreted region, grows tall to carry prose, or compensates for layout imbalance is a blocker.
+Apply message_box_compactness_blocker_lock: an Insight/message-box that dominates the slide, behaves like a banner, spans beyond the interpreted region, grows tall to carry prose, or compensates for layout imbalance is a blocker; a lower, quieter box that returns space to the body, figure, table, or diagram is preferred when the sentence remains legible and optically centered.
 Honey message boxes have one fixed treatment: #F5E2A8 flat pale fill, #C49A2C 4-5px full-height left accent line, #2D332E text. Avoid saturated yellow fills, dark yellow boxes, large yellow areas, and yellow title underlines.
 Preserve distinct messages as distinct slides. Combine slides only when messages repeat, the same comparison must be seen together, or the user explicitly requests a shorter deck.
 Choose a concrete visual grammar per slide from the message and evidence. Select the projection, viewpoint, abstraction level, motif, and level of detail deliberately; the chosen visual can be a diagram, scene, system view, comparison, object detail, spatial view, sequence, or metaphor when it clarifies the argument.
@@ -261,7 +262,7 @@ header_footer_text_color_lock:
   subtitle: "#4D544E"
   footer_source_table_note: "#6E756E"
   forbidden_text_colors: Petrol, Honey, yellow, arbitrary gray
-message_box_scale_lock:
+message_box_scale_lock: compact interpretation surface sized after the main content area; lower height is welcome when it gives the body, figure, table, or diagram more useful room
 message_box_text_size_lock:
 max_text_size_lock:
 petrol_usage_lock:
@@ -312,7 +313,7 @@ insight_decision:
   variant:
   deck_count_check:
   geometry:
-  height:
+  height: calculated after body and footer rhythm; use the lowest comfortable height when it helps the main content area
   radius:
   padding:
   left_accent:
@@ -409,9 +410,10 @@ ACT slide contract:
 - use Insight component only if it adds interpretation or decision weight and is compatible with the embedded ACT design system
 - if Honey is used in ACT or compatible guidelines, use #F5E2A8 flat pale fill + #C49A2C 4-5px full-height left accent line + #2D332E text, one component maximum
 - keep all Insight/message boxes flat solid fill only; no patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations
-- apply message_box_scale_lock: keep Insight/message boxes compact, one short judgment sentence, one line preferred and two lines maximum; trim or move explanation to notes instead of growing the surface
+- apply content_area_priority_lock before sizing an Insight/message-box: give the body, figure, table, or diagram the needed height first, then use the remaining calculated space for the optional box
+- apply message_box_scale_lock: keep Insight/message boxes compact, one short judgment sentence, one line preferred and two lines maximum; move detail to notes instead of growing the surface
 - keep Insight/message-box text 20-24pt by default, 24-26pt only by exception, at least 6pt smaller than H1, visually below subtitle; it must not become a second title or second hero headline
-- keep Insight/message-box surfaces compact; if the surface starts to dominate, behave like a banner, or rescue weak layout, shorten text, narrow it, move detail to body/notes, or remove it
+- keep Insight/message-box surfaces compact and content-area-aware; if the surface starts to dominate, behave like a banner, grow tall, or rescue weak layout, shorten text, narrow it, move detail to body/notes, or remove it
 - keep Honey quiet: no saturated yellow fill, no dark yellow message box, no large yellow area, and no Honey color variation across a deck
 - Source: render only real traceable source names; when no real source exists, use source_line: none and do not show a Source footer. Never use brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, working assumptions, or other placeholder provenance as Source text.
 - Output files: keep `slides_final/` as the only loose-PNG master. Do not duplicate approved generated PNGs into `slides_package/` or `render_check/pdf_pages/`; package and render-check artifacts must reference the `slides_final/` master.
@@ -695,7 +697,7 @@ Layout:
 - Editorial polish repair has improved specificity, proportion, rhythm, and focal hierarchy
 - repeated elements are equalized
 - supporting region and Insight do not compete
-- Insight/message-box compactness passes: the surface does not dominate the slide, behave like a banner, grow tall for prose, or compensate for layout imbalance
+- Insight/message-box compactness passes: the surface stays compact and content-area-aware, does not dominate the slide, behave like a banner, grow tall for prose, or compensate for layout imbalance
 - Insight/message-box placement is integrated with the body silhouette and Source baseline rather than used as a patch for an empty corner
 - Insight/message-box text is optically centered horizontally and vertically within its surface
 

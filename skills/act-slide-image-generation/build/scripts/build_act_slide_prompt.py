@@ -286,6 +286,7 @@ def canonical_planning_block(
   message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements
   region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette
   composition_fit_plan: [main visual field, supporting regions, whitespace role, Insight footprint, and intended occupancy rhythm]
+  content_area_priority_lock: allocate height to the body, figure, table, or diagram first; size any optional Insight/message-box from the remaining calculated space so it supports rather than compresses the main content area
   secondary_region_integrity_lock: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field
   body_silhouette_lock: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions
   deck_header_master_lock:
@@ -346,7 +347,7 @@ def canonical_planning_block(
     upper_right_clear_zone: exact x/y/w/h copied from deck_header_master_lock and kept empty
   footer_anchor_baseline: 1672 basis x=44-56 baseline y=895-912, invisible alignment position only, planned even if source_line is none
   header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E; no Petrol/Honey/arbitrary gray in header or footer text
-  message_box_scale_lock: compact interpretation surface; oversize is a blocker, so trim text, move detail to body/notes, or remove Insight instead of enlarging the box
+  message_box_scale_lock: compact interpretation surface sized after the main content area; shorter height is welcome when it gives the body, figure, table, or diagram more useful room, while remaining legible; trim text, move detail to body/notes, or remove Insight instead of enlarging the box
   message_box_text_size_lock: message-box/Insight text default 20-24pt, 24-26pt only by exception; always at least 6pt smaller than selected H1, visually below subtitle, and never a second title
   message_box_compactness_blocker_lock: Insight/message-box surfaces that dominate the slide, behave like a banner, or compensate for layout imbalance are blockers
   message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface; plan line box, padding, and baseline so the sentence sits at the visual center
@@ -373,7 +374,7 @@ def canonical_planning_block(
     variant: none / bottom-main / top-thesis / side-context-wide / side-context-tall / inline-pill / outlined thesis / outlined bottom / brand surface / dark brand surface / Honey surface when ACT
     deck_count_check: [single slide or deck-level count]
     geometry: [x/y/w/h in 1672 basis if kept; choose the smallest legible width tied to the interpreted region, not full-canvas width by default]
-    height: [compact px; one-line surfaces should stay shallow]
+    height: [calculated after body and footer rhythm; use the lowest comfortable height when it helps the main content area]
     radius: 8px or 12px
     padding: [balanced px; enough for centered text but not a tall band]
     left_accent: [Honey uses #C49A2C 4-5px full-height left line; Petrol uses embedded ACT design system accent line spec]
@@ -528,6 +529,7 @@ draft_image_prompt_scaffold:
   Apply message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements.
   Apply region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette.
   Apply composition_fit_plan: set the main visual field, supporting regions, whitespace role, and Insight footprint before generation so the canvas has deliberate occupancy and breathing room.
+  Apply content_area_priority_lock: allocate height to the body, figure, table, or diagram first, then size any optional Insight/message-box from the remaining calculated space so it supports rather than compresses the main content area.
   Apply secondary_region_integrity_lock: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field.
   Apply body_silhouette_lock: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions.
   Apply layout_diversity_plan at deck level: choose layout families from full-field, asymmetric main/supporting-context, balanced diptych, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase patterns according to the slide message. Use layout_rotation_guard so neighboring slides do not fall into the same composition by habit; repeated families should make comparison easier.
@@ -567,9 +569,9 @@ draft_image_prompt_scaffold:
   Use Petrol structurally with a 6-12% visual area budget, and never for body text.
   Use Honey only for ACT or compatible guidelines where it is a decision signal: #F5E2A8 flat pale Honey fill, #C49A2C 4-5px full-height left accent line, #2D332E text, one component maximum.
   Use flat solid fills for all message boxes and Insight surfaces; do not add patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
-  Apply message_box_scale_lock: message boxes are compact interpretation surfaces, not display surfaces; keep copy to one short judgment sentence, prefer one line, max two lines, and do not enlarge the surface to rescue long prose.
+  Apply message_box_scale_lock: message boxes are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered. Keep copy to one short judgment sentence, prefer one line, max two lines, and do not enlarge the surface to rescue long prose.
   Apply message_box_text_size_lock: message-box/Insight text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below the subtitle, and never becomes a second title or second hero headline.
-  Apply message_box_compactness_blocker_lock: an Insight/message-box that dominates the slide, becomes a banner, spans more than the interpreted region needs, grows tall to carry prose, or compensates for layout imbalance is a blocker. Repair by shortening the sentence, narrowing the surface, moving detail into the body/notes, or removing the component.
+  Apply message_box_compactness_blocker_lock: an Insight/message-box that dominates the slide, becomes a banner, spans more than the interpreted region needs, grows tall to carry prose, or compensates for layout imbalance is a blocker. Prefer a lower, quieter box that returns space to the body, figure, table, or diagram; repair by shortening the sentence, narrowing the surface, moving detail into the body/notes, or removing the component.
   Apply message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface; use balanced padding and line-box placement so the sentence reads intentional, not baseline-drifted.
   Apply insight_surface_placement_lock: when kept, the Insight/message-box belongs to the body composition and footer rhythm; bottom variants sit in the breathing space between body content and Source, centered to the interpreted region or full body block, while Source remains a separate footer cue on its invisible baseline.
   Enforce max_text_size_lock across every visible string; do not use display typography, hero numerals, badges, or message-box text above the cap.
@@ -622,6 +624,7 @@ post_generation_audit:
   - message_led_composition_lock is fulfilled: one focal relationship carries the argument before supporting elements
   - region_balance_policy is fulfilled: region weight follows the slide message, evidence shape, reading path, and body silhouette rather than a fixed template
   - composition_fit_plan is fulfilled: the main visual field, supporting regions, whitespace role, and Insight footprint feel intentionally balanced
+  - content_area_priority_lock is fulfilled: the body, figure, table, or diagram gets the needed height first, and any optional Insight/message-box is sized from the remaining calculated space
   - secondary_region_integrity_lock is fulfilled: any split or auxiliary region reads as a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field
   - body_silhouette_lock is fulfilled: the body reads as one closed visual block with aligned outer edges, lower edges, and footer clearance
   - illustration_intensity is respected; illustration feels designer-authored, flat 2D, and does not overpower the slide
@@ -634,7 +637,7 @@ post_generation_audit:
   - density_levers improve the message through comparison, evidence, annotation, grouping, or source cues rather than decoration
   - decision-relevant numbers are preserved when legible; numbers are not minimized by default
   - message boxes and Insight surfaces use flat solid fills only, with no decorative patterns or motifs
-  - message_box_scale_lock is honored: message boxes stay compact and are not enlarged to carry long prose
+  - message_box_scale_lock is honored: message boxes stay compact, are sized from the remaining layout space after the main content area, and are not enlarged to carry long prose
   - message_box_compactness_blocker_lock is clear: no Insight/message-box dominates the slide, behaves like a banner, grows tall for prose, or compensates for layout imbalance
   - message_box_text_size_lock is honored: message-box/Insight text is smaller than H1 and subtitle and never reads as a second title
   - message_box_text_alignment_lock is honored: Insight/message-box text is optically centered horizontally and vertically inside the surface
