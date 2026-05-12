@@ -41,7 +41,11 @@
 - Use compact financial-model typography: Arial or compatible sans, clear
   section bands, frozen panes where useful, and readable number formats.
 
-## Color Semantics
+## Layout-Linked Visual Semantics
+
+`_ib_workbook_design_system.md` owns visual roles, colors, borders, highlights,
+and rendered appearance. This file only defines the layout implications of
+those roles.
 
 - Treat background color as a workbook-level design surface, not as isolated
   single-cell decoration. Generated sheets should keep the base grid quiet and
@@ -73,8 +77,8 @@
 - Cross-sheet link: green `#008000`.
 - External source or external-link style marker: red `#FF0000`.
 
-The formula-color rule is the canonical rule. Do not introduce a second
-conflicting formula color in helper scripts or docs.
+The formula-color rule is repeated here only as a layout audit cue; the
+canonical visual treatment lives in `_ib_workbook_design_system.md`.
 
 ## Model Design Bar
 

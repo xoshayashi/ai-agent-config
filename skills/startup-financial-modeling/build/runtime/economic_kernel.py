@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 DEFAULT_FORECAST_PERIODS = 5
-MAX_FORECAST_PERIODS = 24
+MAX_FORECAST_PERIODS = 60
 
 
 def forecast_years(start_year: int | None = None, periods: int = DEFAULT_FORECAST_PERIODS) -> list[int]:
@@ -731,17 +731,21 @@ def driver_surfaces_for(facts: SourceFacts) -> tuple[DriverSurface, ...]:
 
 def _mechanic_key(facts: SourceFacts) -> str:
     lowered = f"{facts.mechanics} {' '.join(facts.segments)}".lower()
-    if any(token in lowered for token in ("marketplace", "transaction", "gmv")):
-        return "marketplace"
-    if any(token in lowered for token in ("hardware", "asset", "equipment", "robot")):
-        return "hardware_asset_heavy"
-    if any(token in lowered for token in ("fintech", "balance", "loan", "lending", "credit")):
-        return "fintech_balance_sheet"
-    if any(token in lowered for token in ("proof", "pre-revenue", "milestone")):
-        return "pre_revenue_milestone"
-    if any(token in lowered for token in ("software", "recurring", "saas", "subscription")):
-        return "recurring_software"
-    return "generic"
+    signals = {
+        "marketplace": ("marketplace", "transaction", "gmv", "liquidity", "two-sided"),
+        "hardware_asset_heavy": ("hardware", "asset", "equipment", "robot", "lease", "deployed"),
+        "fintech_balance_sheet": ("fintech", "balance", "loan", "lending", "credit", "warehouse"),
+        "pre_revenue_milestone": ("proof", "pre-revenue", "milestone", "prototype", "grant"),
+        "recurring_software": ("software", "recurring", "saas", "subscription", "arr"),
+    }
+    scores = {key: sum(1 for token in tokens if token in lowered) for key, tokens in signals.items()}
+    strongest = max(scores.values())
+    if strongest <= 0:
+        return "generic"
+    winners = [key for key, score in scores.items() if score == strongest]
+    if len(winners) > 1:
+        return "generic"
+    return winners[0]
 
 
 def scenario_drivers_for(facts: SourceFacts) -> tuple[ScenarioDriver, ...]:
@@ -777,8 +781,14 @@ def scenario_drivers_for(facts: SourceFacts) -> tuple[ScenarioDriver, ...]:
             ScenarioDriver("Churn / retention factor", "x", 1.30, 1.00, 0.80, "retention is often the hardest evidence gap", "NRR, LTV, and valuation", "churn breaks payback", "cohort retention DD before scaling"),
             ScenarioDriver("CAC / sales capacity factor", "x", 1.20, 1.00, 0.85, "sales efficiency controls funding need", "burn multiple and payback", "payback exceeds cash window", "rebalance GTM mix"),
         ),
+        "generic": (
+            ScenarioDriver("Demand evidence scale", "x", 0.70, 1.00, 1.25, "demand proof is not yet tied to one mechanic", "revenue, burn, and runway", "demand evidence fails to support plan", "clarify economic unit before scaling spend"),
+            ScenarioDriver("Value capture scale", "x", 0.85, 1.00, 1.15, "pricing or monetization route remains uncertain", "gross profit and valuation support", "value capture lacks customer proof", "validate willingness-to-pay or monetization path"),
+            ScenarioDriver("Cost-to-serve factor", "x", 1.25, 1.00, 0.85, "delivery burden may be understated", "gross margin and burn", "unit economics fail under service load", "decompose cost stack and operating capacity"),
+            ScenarioDriver("Financing capacity scale", "x", 0.75, 1.00, 1.20, "capital availability depends on unresolved proof points", "funding gap and dilution", "financing need exceeds credible capacity", "reset milestone scope or capital plan"),
+        ),
     }
-    return registry.get(key, registry["recurring_software"])
+    return registry.get(key, registry["generic"])
 
 
 def kpi_definitions_for(facts: SourceFacts) -> tuple[KPIDefinition, ...]:
@@ -815,8 +825,13 @@ def kpi_definitions_for(facts: SourceFacts) -> tuple[KPIDefinition, ...]:
             KPIDefinition("CAC payback", "CAC / gross profit from new ARR", "GTM spend drives burn", "sales cycle and CAC evidence", "payback beyond cash window", "GTM mix or pricing reset"),
             KPIDefinition("Sales efficiency", "new ARR / sales and marketing spend", "growth efficiency matters", "GTM capacity", "efficiency below benchmark", "quota and channel DD"),
         ),
+        "generic": (
+            KPIDefinition("Economic unit clarity", "selected unit and value flow", "mechanic is ambiguous", "driver tree and source facts", "unit cannot be traced to cash", "model design or DD before forecast"),
+            KPIDefinition("Unit margin support", "price/value capture minus cost-to-serve", "unit economics must be credible", "pricing, cost, and support evidence", "margin depends on unsupported default", "decompose pricing and cost stack"),
+            KPIDefinition("Proof-point coverage", "runway and funding vs required evidence", "funding should buy evidence", "milestone and capital plan", "proof point slips beyond runway", "resize scope, round, or validation plan"),
+        ),
     }
-    return tuple(common + list(registry.get(key, registry["recurring_software"])))
+    return tuple(common + list(registry.get(key, registry["generic"])))
 
 
 def extract_source_facts(source_md: Path) -> SourceFacts:

@@ -1252,7 +1252,7 @@ def _build_scenarios(wb: Workbook, facts: SourceFacts) -> None:
         _label(ws, r, label, unit, fmt=ib.FMT_PERCENT if unit == "%" else ib.FMT_MONEY)
         for col in scenario_cols:
             c = get_column_letter(col)
-            ws.cell(r, col, _scenario_output_formula(facts, label, c))
+            ws.cell(r, col, _scenario_output_formula(facts, label, c, drivers))
             _apply_value_style(ws.cell(r, col), ib.FMT_PERCENT if unit == "%" else _money_format(facts))
     _section(ws, 23, "Scenario interpretation")
     _set_column_widths(ws, {2: 24, 3: 40, 4: 98, 5: 34, 6: 64})
@@ -1272,15 +1272,36 @@ def _build_scenarios(wb: Workbook, facts: SourceFacts) -> None:
     _add_bar_chart(ws, "Scenario EBITDA", Reference(ws, min_col=scenario_cols[0], max_col=scenario_cols[-1], min_row=16, max_row=16), Reference(ws, min_col=scenario_cols[0], max_col=scenario_cols[-1], min_row=5), "B33", _money_unit(facts))
 
 
-def _scenario_output_formula(facts: SourceFacts, label: str, col: str) -> str:
+def _scenario_driver_formula_terms(col: str, drivers: tuple[ScenarioDriver, ...]) -> tuple[str, str, str]:
+    revenue_rows: list[str] = []
+    cost_rows: list[str] = []
+    financing_rows: list[str] = []
+    for offset, driver in enumerate(drivers[:4], start=7):
+        row_ref = f"{col}${offset}"
+        label = driver.label.lower()
+        if any(token in label for token in ("cost", "loss", "incentive", "bom", "cac", "service", "prototype", "program")):
+            cost_rows.append(row_ref)
+        elif any(token in label for token in ("financing", "debt", "lease", "grant", "warehouse", "working-capital")):
+            financing_rows.append(row_ref)
+        else:
+            revenue_rows.append(row_ref)
+    return (
+        "*".join(revenue_rows) if revenue_rows else "1",
+        "*".join(cost_rows) if cost_rows else "1",
+        "*".join(financing_rows) if financing_rows else "1",
+    )
+
+
+def _scenario_output_formula(facts: SourceFacts, label: str, col: str, drivers: tuple[ScenarioDriver, ...]) -> str:
     final_col = _final_period_col(facts)
+    revenue_factor, cost_factor, financing_factor = _scenario_driver_formula_terms(col, drivers)
     formulas = {
-        "Revenue": f"='Revenue Build'!{final_col}18*{col}$7*{col}$8",
-        "Gross profit": f"={col}14-('Cost Build'!{final_col}12*{col}$7*{col}$9)",
-        "EBITDA": f"={col}15-('P&L'!{final_col}17*{col}$10)",
+        "Revenue": f"='Revenue Build'!{final_col}18*{revenue_factor}",
+        "Gross profit": f"={col}14-('Cost Build'!{final_col}12*{cost_factor})",
+        "EBITDA": f"={col}15-('P&L'!{final_col}17)",
         "Ending cash": f"='CF'!{final_col}31+{col}16-'P&L'!{final_col}18",
         "Exit EV": f"=MAX(0,{col}16*'Valuation'!{final_col}15)",
-        "Funding gap": f"=MAX(0,-{col}17)",
+        "Funding gap": f"=MAX(0,-{col}17*{financing_factor})",
         "Founder ownership": f"='Ownership'!{final_col}7/({col}$7^0.15)",
     }
     return formulas[label]
@@ -1301,6 +1322,9 @@ def _build_sensitivity(wb: Workbook, facts: SourceFacts) -> None:
     row_axis_col = get_column_letter(START_PERIOD_COL - 1)
     _label(ws, 7, x_axis.label, x_axis.unit)
     _label(ws, 8, y_axis.label, y_axis.unit)
+    cost_tokens = ("cost", "loss", "incentive", "bom", "cac", "service", "prototype", "program")
+    x_is_cost = any(token in x_axis.label.lower() for token in cost_tokens)
+    y_is_cost = any(token in y_axis.label.lower() for token in cost_tokens)
     for idx, scale in zip(matrix_cols, scales):
         ws.cell(7, idx, scale)
         ib.apply_hard_input(ws.cell(7, idx), ib.FMT_MULTIPLE)
@@ -1309,7 +1333,17 @@ def _build_sensitivity(wb: Workbook, facts: SourceFacts) -> None:
         ib.apply_hard_input(ws.cell(r, START_PERIOD_COL - 1), ib.FMT_MULTIPLE)
         for c in matrix_cols:
             col = get_column_letter(c)
-            ws.cell(r, c, f"=('Revenue Build'!{final_col}18*{col}$7*${row_axis_col}{r})-('Cost Build'!{final_col}12*{col}$7)-'P&L'!{final_col}17")
+            revenue_term = "1"
+            cost_term = "1"
+            if x_is_cost:
+                cost_term = f"{col}$7"
+            else:
+                revenue_term = f"{col}$7"
+            if y_is_cost:
+                cost_term = f"{cost_term}*${row_axis_col}{r}"
+            else:
+                revenue_term = f"{revenue_term}*${row_axis_col}{r}"
+            ws.cell(r, c, f"=('Revenue Build'!{final_col}18*{revenue_term})-('Cost Build'!{final_col}12*{cost_term})-'P&L'!{final_col}17")
             _apply_value_style(ws.cell(r, c), _money_format(facts))
     ib.apply_heatmap_3color(ws, f"{get_column_letter(matrix_cols[0])}8:{get_column_letter(matrix_cols[-1])}12")
     _section(ws, 15, "Founder ownership — valuation x round size")
@@ -1446,12 +1480,13 @@ def _build_benchmarks(wb: Workbook, facts: SourceFacts) -> None:
     headers = ["source_id", "Source type", "Date / period", "URL / file / owner", "Applicability limits", "Freshness status", "Linked assumption", "Refresh needed"]
     for col, header in enumerate(headers, start=2):
         _apply_text_header(ws.cell(5, col), header)
+    source_anchor = "; ".join(facts.source_names or facts.source_urls) if (facts.source_names or facts.source_urls) else "unknown"
     rows = [
-        ("SRC-01", facts.evidence_status, "source period", "provided source / owner", "company-specific evidence", "needs refresh", "pricing / demand", "yes"),
+        ("SRC-01", facts.evidence_status, "source period", source_anchor, "company-specific evidence", "needs refresh", "pricing / demand", "yes"),
         ("SRC-02", "estimate", "model date", "modeler estimate", "replace with actual or benchmark", "not externally sourced", "cost-to-serve", "yes"),
         ("SRC-03", "management target", "plan period", "management plan", "depends on execution capacity", "not externally sourced", "headcount / capacity", "yes"),
-        ("SRC-04", "benchmark", "refresh before use", "external benchmark TBD", "match geography, customer, margin definition", "needs refresh", "valuation support", "yes"),
-        ("SRC-05", "unknown", "TBD", "TBD", "do not treat as fact", "needs evidence", "financing terms", "yes"),
+        ("SRC-04", "benchmark", "needs refresh", "unresolved external benchmark", "match geography, customer, margin definition", "needs refresh", "valuation support", "yes"),
+        ("SRC-05", "unknown", "unknown", "unresolved evidence", "do not treat as fact", "needs evidence", "financing terms", "yes"),
     ]
     for r, row in enumerate(rows, start=6):
         for c, value in enumerate(row, start=2):

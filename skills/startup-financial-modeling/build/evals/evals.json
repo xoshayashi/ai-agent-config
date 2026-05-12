@@ -10,7 +10,7 @@
       "prompt": "現場向けAI機器を展開する資本集約型スタートアップのエクイティストーリーMarkdownを元に、資金調達向け5年収支計画をxlsxで作って。機器販売、利用料、保守、ソフトウェア、リース、製造原価、在庫、採用、資金調達、希薄化、KPI、投資家向けIC memoまで含めて。",
       "expected_output": "Evidence-grounded integrated xlsx that starts from economic kernel, model grain, source map, and driver tree. Workbook includes operating engine, asset/capex logic, working capital where relevant, capital stack, ownership, scenarios, sensitivity, valuation, KPI, and memo surfaces.",
       "files": ["source_md"],
-      "applicable_references": ["_modeling_kernel", "_coverage_universe", "_assumption_decomposition_patterns", "_kpi_analytics", "_scenario_sensitivity_playbook", "_valuation_and_return_logic", "_ic_memo_depth", "_benchmark_protocol", "_self_review_protocol", "_output_modes", "_layout_canonical", "_terminology"],
+      "applicable_references": ["_generic_composition_protocol", "_modeling_kernel", "_coverage_universe", "_assumption_decomposition_patterns", "_kpi_analytics", "_scenario_sensitivity_playbook", "_valuation_and_return_logic", "_ic_memo_depth", "_benchmark_protocol", "_self_review_protocol", "_output_modes", "_layout_canonical", "_terminology"],
       "assertions": [
         { "id": "A1", "text": "Model begins with decision, model grain, entity scope, source facts, assumptions, and unknowns before sheet selection", "type": "structure" },
         { "id": "A2", "text": "Driver tree links units, price, utilization, capacity, manufacturing cost, working capital, capex, financing, and ownership", "type": "logic" },
@@ -28,7 +28,7 @@
       "prompt": "研究開発中のディープテック会社です。まだ売上はありません。PoC、量産試作、初号機納入、規制対応、採用、助成金、転換社債、次回ラウンド必要額を含む24か月の資金計画と、創業者・従業員・投資家の希薄化をExcelで見たいです。",
       "expected_output": "Focused but integrated runway and financing workbook. Revenue metrics are not forced; milestone spend, hiring, grants, convertibles, cash runway, ownership waterfall, and next financing need are modeled explicitly.",
       "files": [],
-      "applicable_references": ["_modeling_kernel", "_coverage_universe", "_assumption_decomposition_patterns", "_scenario_sensitivity_playbook", "_ic_memo_depth", "_self_review_protocol", "_output_modes", "_layout_canonical", "_terminology"],
+      "applicable_references": ["_generic_composition_protocol", "_modeling_kernel", "_coverage_universe", "_assumption_decomposition_patterns", "_scenario_sensitivity_playbook", "_ic_memo_depth", "_self_review_protocol", "_output_modes", "_layout_canonical", "_terminology"],
       "assertions": [
         { "id": "B1", "text": "Pre-revenue plan omits or labels non-useful revenue KPIs instead of forcing ARR or LTV/CAC", "type": "logic" },
         { "id": "B2", "text": "Runway is linked to hiring, milestone spend, capex, grants, convertibles, and next-round timing", "type": "calculation" },
@@ -43,7 +43,7 @@
       "prompt": "Marketplaceスタートアップで、GMV、take rate、買い手/売り手コホート、決済手数料、販促費、チャーン、リピート率、営業人員、運転資本を含む3年モデルを作りたい。資金調達額の妥当性と投資家向け説明も含めて。",
       "expected_output": "Marketplace-specific mechanics emerge from the driver tree: GMV, take rate, two-sided cohorts, liquidity, contribution margin, working capital, CAC/payback where meaningful, funding need, scenarios, and memo.",
       "files": [],
-      "applicable_references": ["_modeling_kernel", "_coverage_universe", "_assumption_decomposition_patterns", "_kpi_analytics", "_scenario_sensitivity_playbook", "_benchmark_protocol", "_output_modes", "_layout_canonical", "_terminology"],
+      "applicable_references": ["_generic_composition_protocol", "_modeling_kernel", "_coverage_universe", "_assumption_decomposition_patterns", "_kpi_analytics", "_scenario_sensitivity_playbook", "_benchmark_protocol", "_output_modes", "_layout_canonical", "_terminology"],
       "assertions": [
         { "id": "C1", "text": "Revenue build derives net revenue from GMV and take rate, with buyer/seller cohorts and retention separated", "type": "calculation" },
         { "id": "C2", "text": "Contribution margin includes payment fees, incentives, support, fraud/loss assumptions where relevant, and sales/marketing efficiency", "type": "metric" },
@@ -58,7 +58,7 @@
       "prompt": "上場前のスタートアップで、国内SaaS、海外SaaS、ハードウェア、保守、金融子会社があり、連結PL/BS/CF、NCI、税金、NOL、借入、リース、セカンダリー、IPO前後の希薄化、SOTP valuation、投資家向けDD論点を整理したい。",
       "expected_output": "Late-private integrated workbook with multi-segment driver tree, consolidation logic, taxes, debt/lease/covenants, ownership, secondary, valuation, scenario, and DD memo surfaces.",
       "files": [],
-      "applicable_references": ["_modeling_kernel", "_coverage_universe", "_assumption_decomposition_patterns", "_kpi_analytics", "_scenario_sensitivity_playbook", "_valuation_and_return_logic", "_ic_memo_depth", "_benchmark_protocol", "_output_modes", "_layout_canonical", "_terminology"],
+      "applicable_references": ["_generic_composition_protocol", "_modeling_kernel", "_coverage_universe", "_assumption_decomposition_patterns", "_kpi_analytics", "_scenario_sensitivity_playbook", "_valuation_and_return_logic", "_ic_memo_depth", "_benchmark_protocol", "_output_modes", "_layout_canonical", "_terminology"],
       "assertions": [
         { "id": "D1", "text": "Segments are modeled as economic units and consolidated with clear intercompany/NCI/tax handling where needed", "type": "logic" },
         { "id": "D2", "text": "Capital stack includes debt, lease, equity, secondary, covenants, cash uses, and investor ownership effects", "type": "calculation" },
@@ -74,7 +74,7 @@
       "prompt": "新しいAIプロダクトの価格を決めたい。顧客ROI、導入工数、粗利、サポート負荷、従量課金、契約期間、解約リスク、営業サイクル、値上げ余地を含めて、価格帯と投資家向け説明をExcelで作って。",
       "expected_output": "Focused pricing workbook that stays compact but includes customer ROI, pricing ladder, gross margin, payback, capacity/load implications, revenue sensitivity, and investment narrative.",
       "files": [],
-      "applicable_references": ["_modeling_kernel", "_assumption_decomposition_patterns", "_kpi_analytics", "_scenario_sensitivity_playbook", "_ic_memo_depth", "_output_modes", "_layout_canonical", "_terminology"],
+      "applicable_references": ["_generic_composition_protocol", "_modeling_kernel", "_assumption_decomposition_patterns", "_kpi_analytics", "_scenario_sensitivity_playbook", "_ic_memo_depth", "_output_modes", "_layout_canonical", "_terminology"],
       "assertions": [
         { "id": "E1", "text": "Artifact remains focused on pricing while including the upstream/downstream calculations needed for the decision", "type": "structure" },
         { "id": "E2", "text": "Customer ROI, willingness-to-pay, cost-to-serve, support load, gross margin, selected price, and pricing support ratio are linked by formulas", "type": "calculation" },
@@ -89,7 +89,7 @@
       "prompt": "Fintech lending startupのモデルを作りたい。融資実行額、貸倒、回収、資金調達コスト、warehouse line、規制資本、営業人員、運転資本、希薄化、downside case、投資家向けKPIとIC memoを含めてください。",
       "expected_output": "Generic fintech/balance-sheet model whose assumptions start from origination, credit loss, collection, funding cost, capital constraints, and covenant or warehouse capacity rather than software ARR defaults.",
       "files": [],
-      "applicable_references": ["_modeling_kernel", "_coverage_universe", "_assumption_decomposition_patterns", "_kpi_analytics", "_scenario_sensitivity_playbook", "_valuation_and_return_logic", "_ic_memo_depth", "_benchmark_protocol"],
+      "applicable_references": ["_generic_composition_protocol", "_modeling_kernel", "_coverage_universe", "_assumption_decomposition_patterns", "_kpi_analytics", "_scenario_sensitivity_playbook", "_valuation_and_return_logic", "_ic_memo_depth", "_benchmark_protocol"],
       "assertions": [
         { "id": "F1", "text": "Where lending, regulatory, or warehouse mechanics are evidenced, the driver tree separates origination, loss rate, collection timing, funding cost, regulatory capital, and warehouse/debt capacity", "type": "logic" },
         { "id": "F2", "text": "KPI selection includes credit quality, funding spread, capital adequacy, runway, and covenant or warehouse headroom where relevant rather than importing software defaults", "type": "metric" },
@@ -103,7 +103,7 @@
       "prompt": "事業概要だけが曖昧なスタートアップメモから、まず投資判断に必要な収支モデルの設計とAssumption registerを作って。まだ業態は決め打ちしないで、必要ならxlsxではなくmd/csvでもよいです。",
       "expected_output": "Non-overfit model spec or assumption register that identifies decision, unknowns, candidate mechanics, independent drivers, evidence gaps, and validation plan before forcing a workbook.",
       "files": [],
-      "applicable_references": ["_modeling_kernel", "_coverage_universe", "_assumption_decomposition_patterns", "_output_modes", "_self_review_protocol"],
+      "applicable_references": ["_generic_composition_protocol", "_modeling_kernel", "_coverage_universe", "_assumption_decomposition_patterns", "_output_modes", "_self_review_protocol"],
       "assertions": [
         { "id": "G1", "text": "The response does not force hardware, SaaS, marketplace, or any other mechanic without evidence", "type": "consistency" },
         { "id": "G2", "text": "Variable selection ranks candidate drivers by decision relevance, impact, evidence weakness, controllability, time variability, and investor scrutiny", "type": "logic" },
@@ -134,7 +134,7 @@
       "prompt": "価格設定の根拠がまだ弱いAIサービスです。顧客ROI、業務削減時間、支払意思、サポート負荷、粗利、解約リスク、営業サイクルを使って、まずAssumption registerと検証計画を作ってください。",
       "expected_output": "Focused assumption register and validation plan that deepens weak pricing evidence without bloating into a full company workbook.",
       "files": [],
-      "applicable_references": ["_assumption_decomposition_patterns", "_kpi_analytics", "_scenario_sensitivity_playbook", "_output_modes", "_self_review_protocol"],
+      "applicable_references": ["_generic_composition_protocol", "_assumption_decomposition_patterns", "_kpi_analytics", "_scenario_sensitivity_playbook", "_output_modes", "_self_review_protocol"],
       "assertions": [
         { "id": "I1", "text": "Selected price is decomposed into independent value, willingness-to-pay, cost floor, margin, support load, and retention-risk primitives", "type": "logic" },
         { "id": "I2", "text": "Evidence strength controls decomposition depth and weak assumptions are carried into validation tests", "type": "evidence" },
@@ -148,7 +148,7 @@
       "prompt": "AI SaaSと呼んでいるが、実態はハードウェア導入、保守、リース、利用料が混ざるスタートアップです。資金調達向けモデルを作ってください。",
       "expected_output": "Hybrid driver model that composes recurring, asset, service, lease, and deployment-capacity mechanics from primitives rather than forcing a pure SaaS template.",
       "files": [],
-      "applicable_references": ["_modeling_kernel", "_assumption_decomposition_patterns", "_kpi_analytics", "_scenario_sensitivity_playbook", "_valuation_and_return_logic", "_ic_memo_depth", "_output_modes"],
+      "applicable_references": ["_generic_composition_protocol", "_modeling_kernel", "_assumption_decomposition_patterns", "_kpi_analytics", "_scenario_sensitivity_playbook", "_valuation_and_return_logic", "_ic_memo_depth", "_output_modes"],
       "assertions": [
         { "id": "J1", "text": "The model selects economic units from evidenced revenue/cost/capital flows instead of the SaaS label alone", "type": "consistency" },
         { "id": "J2", "text": "KPI and scenario axes include deployment capacity, utilization, service burden, capex or lease availability, and runway where relevant", "type": "metric" },

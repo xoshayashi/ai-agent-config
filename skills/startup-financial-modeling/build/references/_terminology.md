@@ -41,3 +41,7 @@
 - `Decision output`: a metric, scenario result, valuation, memo point, or DD
   question that changes a pricing, financing, hiring, valuation, ownership, or
   investment decision.
+- `Evidence status`: one of `actual`, `contracted`, `pipeline-backed`,
+  `benchmark`, `management target`, `estimate`, `placeholder`, or `unknown`.
+  Use this vocabulary consistently in source registers, assumption rows,
+  benchmark notes, scenarios, and memo evidence gaps.

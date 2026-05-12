@@ -154,6 +154,11 @@ def test_japanese_money_units_parse_at_correct_scale() -> None:
     assert kernel.money_yen([r"([0-9,.]+)\s*(m|bn|b)"], "12bn", 0) == 12_000_000_000
 
 
+def test_seed_to_pre_ipo_horizon_is_not_truncated_to_two_years() -> None:
+    assert kernel.extract_forecast_periods("5年のpre-IPO financial modelを月次で作る", "monthly") == 60
+    assert kernel.extract_forecast_periods("36か月のシード資金計画", "monthly") == 36
+
+
 def test_generated_workbook_contains_interpretive_analysis_surfaces() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "full.xlsx"
@@ -190,6 +195,36 @@ def test_mechanic_specific_kpi_and_scenario_axes_are_rendered() -> None:
             assert expected_driver in scenario_text
         finally:
             tmp.cleanup()
+
+
+def test_ambiguous_mechanics_use_generic_kpis_and_scenario_axes() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA new startup with unclear revenue mechanics and weak evidence. Source: management memo."
+    )
+    try:
+        kpi_text = "\n".join(str(cell.value) for row in wb["KPI"].iter_rows() for cell in row if cell.value is not None)
+        scenario_text = "\n".join(str(cell.value) for row in wb["Scenarios"].iter_rows() for cell in row if cell.value is not None)
+        assert "Economic unit clarity" in kpi_text
+        assert "Demand evidence scale" in scenario_text
+        assert "CAC payback" not in kpi_text
+        assert "New logo / conversion scale" not in scenario_text
+    finally:
+        tmp.cleanup()
+
+
+def test_cost_labeled_scenario_drivers_pressure_costs_not_revenue() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nPre-revenue prototype company with milestone, prototype, grant, and hiring risk. Source: management memo."
+    )
+    try:
+        ws = wb["Scenarios"]
+        assert ws.cell(8, source_plan.LAYOUT.label_col).value == "Prototype / program cost factor"
+        revenue_formula = ws.cell(14, FIRST_VALUE_COL).value
+        gross_profit_formula = ws.cell(15, FIRST_VALUE_COL).value
+        assert f"{FIRST_VALUE_LETTER}$8" not in revenue_formula
+        assert f"{FIRST_VALUE_LETTER}$8" in gross_profit_formula
+    finally:
+        tmp.cleanup()
 
 
 def test_cost_build_does_not_double_count_detailed_service_costs_in_variable_cogs() -> None:
@@ -322,14 +357,16 @@ def test_intra_sheet_formula_cells_are_black() -> None:
         assert violations == []
 
 
-def test_ic_memo_dependency_stays_compact_when_added_to_focused_bundle() -> None:
+def test_ic_memo_dependency_closure_matches_live_formula_readouts() -> None:
     bundle = build_model.resolve_bundle("market_sizing", additional_sheets=["IC Memo"])
 
     assert "IC Memo" in bundle
     assert "Kernel" in bundle
-    assert "KPI" not in bundle
-    assert "Scenarios" not in bundle
-    assert "Valuation" not in bundle
+    assert "KPI" in bundle
+    assert "Scenarios" in bundle
+    assert "Capital Stack" in bundle
+    assert "Ownership" in bundle
+    assert "Valuation" in bundle
 
 
 def test_cash_flow_runway_formula_floors_negative_cash_at_zero() -> None:
@@ -1039,7 +1076,7 @@ def test_source_plan_tables_do_not_overlap_metadata_columns() -> None:
         assert wb["Financing"].cell(16, FIRST_VALUE_COL).value == f"='Scenarios'!{FIRST_VALUE_LETTER}19"
         assert [wb["Sensitivity"].cell(7, c).value for c in range(FIRST_VALUE_COL, FIRST_VALUE_COL + 5)] == [0.60, 0.80, 1.00, 1.20, 1.40]
         assert wb["Sensitivity"].cell(8, FIRST_VALUE_COL - 1).value == 0.80
-        assert wb["Sensitivity"].cell(8, FIRST_VALUE_COL).value == f"=('Revenue Build'!J18*{FIRST_VALUE_LETTER}$7*$E8)-('Cost Build'!J12*{FIRST_VALUE_LETTER}$7)-'P&L'!J17"
+        assert wb["Sensitivity"].cell(8, FIRST_VALUE_COL).value == f"=('Revenue Build'!J18*{FIRST_VALUE_LETTER}$7*$E8)-('Cost Build'!J12*1)-'P&L'!J17"
     finally:
         tmp.cleanup()
 
@@ -1246,6 +1283,20 @@ def test_generic_kernel_does_not_promote_domain_specific_mentions_to_sources() -
     assert facts.source_names == ["management memo"]
 
 
+def test_benchmark_register_uses_evidence_status_not_fake_source_placeholders() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA generic startup plan. Source: management memo."
+    )
+    try:
+        text = "\n".join(str(cell.value) for row in wb["Benchmarks"].iter_rows() for cell in row if cell.value is not None)
+        forbidden = ["provided source / owner", "external benchmark TBD", "TBD"]
+        assert [term for term in forbidden if term in text] == []
+        assert "management memo" in text
+        assert "unresolved evidence" in text
+    finally:
+        tmp.cleanup()
+
+
 def test_scenario_formulas_are_not_built_with_fragile_substring_replacement() -> None:
     builder_text = (SCRIPTS_DIR / "source_plan_builder.py").read_text(encoding="utf-8")
 
@@ -1276,14 +1327,17 @@ if __name__ == "__main__":
     test_prompt_guidance_resists_fixed_template_routing()
     test_economic_kernel_is_separate_from_workbook_renderer()
     test_japanese_money_units_parse_at_correct_scale()
+    test_seed_to_pre_ipo_horizon_is_not_truncated_to_two_years()
     test_generated_workbook_contains_interpretive_analysis_surfaces()
     test_mechanic_specific_kpi_and_scenario_axes_are_rendered()
+    test_ambiguous_mechanics_use_generic_kpis_and_scenario_axes()
+    test_cost_labeled_scenario_drivers_pressure_costs_not_revenue()
     test_cost_build_does_not_double_count_detailed_service_costs_in_variable_cogs()
     test_orchestrator_no_longer_routes_through_legacy_saas_skeleton()
     test_focused_modes_use_generic_kernel_after_bundle_filter()
     test_full_model_uses_direct_formula_refs()
     test_intra_sheet_formula_cells_are_black()
-    test_ic_memo_dependency_stays_compact_when_added_to_focused_bundle()
+    test_ic_memo_dependency_closure_matches_live_formula_readouts()
     test_cash_flow_runway_formula_floors_negative_cash_at_zero()
     test_cross_sheet_formula_cells_are_green()
     test_pricing_bundle_is_intent_sized()
@@ -1313,5 +1367,6 @@ if __name__ == "__main__":
     test_excluded_sheets_cannot_create_broken_references()
     test_ib_helpers_do_not_use_native_indent_for_hierarchy()
     test_generic_kernel_does_not_promote_domain_specific_mentions_to_sources()
+    test_benchmark_register_uses_evidence_status_not_fake_source_placeholders()
     test_scenario_formulas_are_not_built_with_fragile_substring_replacement()
     test_build_model_routes_source_markdown_to_source_plan()
