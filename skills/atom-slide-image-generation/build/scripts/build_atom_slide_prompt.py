@@ -36,6 +36,10 @@ PLACEHOLDER_BLOCKERS = [
     "viewpoint_crop",
     "specific_visual_details",
     "imageability_lock",
+    "exact_text_fidelity_lock",
+    "chart_semantic_integrity_lock",
+    "thumbnail_legibility_lock",
+    "reading_path_lock",
     "editorial_polish_repair_loop",
     "visual_subject_open_set",
     "message_led_composition_lock",
@@ -224,6 +228,7 @@ def canonical_planning_block(
   image_review_findings: [blocker/major/minor findings from multimodal self-review]
   image_repair_prompt: [concrete repair prompt if blockers or majors remain]
   image_repair_history: [iteration -> issue -> repair action -> regenerated PNG path -> re-audit result]
+  repair_or_regenerate_decision: edit for localized text, source, header, color, spacing, or single-object defects; regenerate when composition, density, tone, reading path, semantic graphic structure, or visual anchor fails
   image_review_matrix: [slide_id -> iteration -> png_path -> blockers -> majors -> repair_prompt -> new_png_path -> status]
   weak_slide_regeneration_queue: [slide_id -> reason -> regenerate_or_edit_action -> new_png_path -> review_status]
   deck_consistency_matrix: [first_third -> middle_third -> last_third -> tone/layout/spacing/source consistency findings]
@@ -279,6 +284,10 @@ def canonical_planning_block(
   illustration_consistency_status: pending / approved / repair_required
   visual_design_quality_traits: [design treatment only: calm light base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, intentional canvas occupancy, concrete visual anchor, crisp focal hierarchy; do not change slide count, message order, or storyline solely for this]
   imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation
+  exact_text_fidelity_lock: freeze every visible string before generation; after generation, compare H1, subtitle, labels, numbers, source text, and optional Insight against exact_text and repair missing, invented, garbled, or rewritten copy
+  chart_semantic_integrity_lock: charts, tables, matrices, flows, maps, and evidence strips must be structurally meaningful, with legible labels, aligned rows/columns/arrows, plausible relationships, and no fake glyph texture or decorative data marks
+  thumbnail_legibility_lock: the slide must preserve the main claim, focal structure, region boundaries, and key numbers when viewed as a slide-sorter thumbnail or contact-sheet tile; repair if it only works at full size
+  reading_path_lock: plan a clear reading order from H1 to main visual, evidence/context, optional Insight, and Source; keep one primary focal point and at most two supporting focal points
   concrete_visual_anchor: [the one object, scene, interface, workflow moment, artifact, evidence strip, map detail, or operational motif the reader can picture]
   observable_scene_or_object: [specific visible subject, not an abstract noun]
   viewpoint_crop: [front-on / top-down / close crop / cutaway / over-the-shoulder / operating view / process lane view, chosen from the message]
@@ -523,6 +532,10 @@ draft_image_prompt_scaffold:
   Define illustration_style_sheet before generation and reuse it verbatim across the deck: flat 2D business and healthcare workflow illustration; simplified people with consistent face detail and body proportions; tablet, laptop, document stack, CRM panel, report card, timeline, handoff arrow, and small icon badge objects; soft pale blue-gray or warm gray fills; Deep Blue and charcoal linework; restrained Honey highlights; consistent 2-3px stroke, crop, shadow softness, and fill opacity.
   Apply visual_design_quality_traits as design treatment: calm light base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, concrete visual anchor, crisp focal hierarchy, and deliberate canvas occupancy. Do not alter slide count, message order, or storyline solely for visual style.
   Apply imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation.
+  Apply exact_text_fidelity_lock: freeze H1, subtitle, labels, numbers, source text, and optional Insight as quoted exact_text before generation; after generation, compare the actual visible text to exact_text and repair any missing, invented, garbled, duplicated, or rewritten copy.
+  Apply chart_semantic_integrity_lock: charts, tables, matrices, flows, maps, and evidence strips must read as real argument structures, not decorative texture; keep rows, columns, arrows, axes, legends, units, and comparisons aligned, labeled, and plausibly connected.
+  Apply thumbnail_legibility_lock: design for both full-size review and slide-sorter/contact-sheet review; the main claim, focal structure, region boundaries, and key numbers should remain understandable at reduced scale without adding oversized hero typography.
+  Apply reading_path_lock: make the visual path traceable from H1 to main visual, evidence/context, optional Insight, and Source; keep one primary focal point and at most two supporting focal points.
   Apply editorial_polish_repair_loop: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm.
   Apply visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide message, evidence, and audience context.
   Apply message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements.
@@ -579,6 +592,7 @@ draft_image_prompt_scaffold:
   Use illustrations/icons when they help understanding, memory, comparison, or navigation; do not add them by quota. A slide with no icon or illustration is acceptable when the structure already carries the message.
   Do not minimize numbers by default. Keep sourced or explicitly assumed numbers when they help comparison, sizing, prioritization, credibility, or decision-making; remove only unsupported, redundant, unreadable, or decorative numbers.
   Render ONLY the exact text strings listed in the planning block or final prompt; do not invent extra labels.
+  Keep diagram, chart, table, matrix, map, and flow text simple enough to audit after generation; if the visual needs many tiny labels, group or move detail to speaker notes instead of relying on illegible microtext.
   Keep footer_anchor_baseline planned as an invisible alignment position even when source_line is none.
   Apply source_real_only_lock: render Source footer only for real traceable external/provided sources; if no real source exists, set source_line: none and draw no Source footer text.
   Apply source_placeholder_blocklist: never use placeholder provenance labels such as brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions as Source text.
@@ -591,7 +605,7 @@ draft_image_prompt_scaffold:
 negative_prompt_hard_blockers:
   local-rendered substitute, non-gpt-image output, missing or malformed header line, uncontrolled header accent protrusion, header accent floating near page top,
   oversized header, decorative header badge or right-side header ornament, H1/subtitle/source color drift, any gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline near Source/footer, body content invading header/footer, visible text above max_text_size_lock, unreadable body text below 18pt equivalent,
-  invented labels or sources, placeholder Source footer such as brand assumptions or brand analysis, speaker notes visible on slide, thin or perfunctory PPT talk script, darker beige/cream page background, duplicate loose final PNG copies across output folders, parallel contact sheets for generated/package/pdf_render of the same slide set, unresolved grid, severe grid drift, hard-to-picture abstract visual,
+  invented labels or sources, garbled or rewritten exact_text, decorative pseudo-chart/table/map glyphs, unreadable thumbnail-level hierarchy, broken reading path, placeholder Source footer such as brand assumptions or brand analysis, speaker notes visible on slide, thin or perfunctory PPT talk script, darker beige/cream page background, duplicate loose final PNG copies across output folders, parallel contact sheets for generated/package/pdf_render of the same slide set, unresolved grid, severe grid drift, hard-to-picture abstract visual,
   title-only first slide or low-density opener without proof/tension points,
   patterned or textured message box, oversized message box, full-width banner-like Insight, message-box text competing with H1/subtitle,
   saturated yellow message box, deck tone drift, mixed illustration tone, inconsistent face detail or body proportion, inconsistent icon family, inconsistent card/table surface weight, decorative pseudo-3D depth, rough sketch aesthetic,
@@ -619,6 +633,10 @@ post_generation_audit:
   - illustration_consistency_status is approved after comparing first, middle, and last thirds for stroke weight, fill opacity, face/detail level, object treatment, and illustration density
   - visual_richness_role is fulfilled; planned illustration or visual motif is present when required
   - imageability_lock is fulfilled: a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details are present
+  - exact_text_fidelity_lock is fulfilled: every visible H1, subtitle, label, number, source string, and optional Insight matches exact_text; missing, invented, garbled, duplicated, or rewritten copy is a repair_required issue
+  - chart_semantic_integrity_lock is fulfilled: any chart, table, matrix, flow, map, or evidence strip has meaningful structure, aligned rows/columns/arrows, legible labels, and no decorative fake data texture
+  - thumbnail_legibility_lock is fulfilled: the slide still communicates its main claim, focal structure, region boundaries, and key numbers when reviewed as a slide-sorter thumbnail or contact-sheet tile
+  - reading_path_lock is fulfilled: the eye can move from H1 to main visual, evidence/context, optional Insight, and Source without competing primary focal points
   - editorial_polish_repair_loop has improved specificity, proportion, rhythm, and focal hierarchy
   - visual_subject_open_set is fulfilled: the selected visual subject comes from the slide message, evidence, and audience context rather than a fixed asset menu
   - message_led_composition_lock is fulfilled: one focal relationship carries the argument before supporting elements
@@ -694,6 +712,7 @@ pre_package_image_review:
   - Score post_generation_design_balance_check: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
   - Classify each finding as blocker, major, minor, or accepted.
   - If any blocker, major, deck-consistency, content-quality, design-quality, or deck-unity issue exists, create image_repair_prompt, add the slide to weak_slide_regeneration_queue, regenerate or edit the PNG, replace the output file, and repeat this review.
+  - Apply repair_or_regenerate_decision: edit localized defects; regenerate when the core composition, density, tone, reading path, semantic graphic structure, or visual anchor fails.
   - Continue until all_generated_images_reviewed is true, weak_slide_regeneration_queue is empty, final_image_quality_status is approved, and completion_ready_status is approved.
   - If generation or repair is blocked, set completion_ready_status: blocked, keep unresolved slides in the review_manifest, and do not package or report complete.
   - PPTX package gate requires an approved review manifest; run validate_review_manifest before packaging.

@@ -101,6 +101,10 @@ source_separator_lock: Source is text-only; no gray rule, separator line, divide
 density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting.
 structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation.
 imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation.
+exact_text_fidelity_lock: freeze visible strings before generation, then compare the generated H1, subtitle, labels, numbers, source text, and optional Insight against exact_text.
+chart_semantic_integrity_lock: charts, tables, matrices, flows, maps, and evidence strips must be meaningful argument structures, not decorative pseudo-data.
+thumbnail_legibility_lock: the main claim, focal structure, region boundaries, and key numbers must remain understandable in slide-sorter/contact-sheet review.
+reading_path_lock: plan one primary focal point and a clear path from H1 to main visual, evidence/context, optional Insight, and Source.
 editorial_polish_repair_loop: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm.
 visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide message, evidence, and audience context.
 message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements.
@@ -117,6 +121,9 @@ Use calm operating-deck visual quality traits: near-white warm base, compact fix
 Apply near_white_slide_base_lock: use #FFFDFC as the default ACT slide canvas, with #FAFAF7 only as a subtle warm off-white tint; keep #F7FBF9 for panels/cards, not the page background, and avoid darker cream/beige page bases.
 Design information density before image generation. Density should answer more of the reader's decision question in one view through hierarchy, evidence, comparison, annotation, source cues, and context layers; do not use smaller type, extra decoration, or visual noise as density.
 Do not minimize numbers by default. Keep decision-relevant sourced or explicitly assumed numbers when they support comparison, sizing, prioritization, credibility, or decision-making.
+Apply exact_text_fidelity_lock: render only quoted exact_text strings; missing, invented, garbled, duplicated, or rewritten visible copy is repair_required.
+Apply chart_semantic_integrity_lock: chart/table/matrix/flow/map rows, columns, arrows, axes, legends, units, and comparisons must be aligned, labeled, and plausibly connected; decorative pseudo-charts are major issues.
+Apply thumbnail_legibility_lock and reading_path_lock: the slide should still reveal the main claim and reading order at contact-sheet scale without oversized hero typography.
 Message boxes and Insight surfaces must use flat solid fills only; no patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
 Apply message_box_scale_lock: message boxes are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered; use one short judgment sentence, prefer one line, allow two lines maximum, and trim, move explanation to notes/body, or remove the component instead of increasing the box.
 Apply message_box_text_size_lock: Insight/message-box text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below subtitle, and must never become a second title.

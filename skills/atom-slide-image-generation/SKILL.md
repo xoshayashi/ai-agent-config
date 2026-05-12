@@ -19,6 +19,7 @@ Design defaults: Noto Sans JP, 1672x941, Deep Blue `#0B2F5B`, Charcoal `#2D332E`
 
 Bias toward message-led structure and useful density when it clarifies the slide.
 Message boxes should give the main content area priority; lower, quieter boxes are welcome when the sentence remains legible and optically centered.
+Review actual PNGs for exact text fidelity, meaningful chart/table/flow structure, thumbnail legibility, and a clear reading path before approving.
 
 Do not report complete while review has blockers, majors, tone drift, weak content/design, unreadable text, source/header issues, pending status, or non-empty `weak_slide_regeneration_queue`.
 
