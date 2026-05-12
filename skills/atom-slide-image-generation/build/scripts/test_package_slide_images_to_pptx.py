@@ -136,6 +136,19 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 pptx_packager.collect_images([str(image)])
 
+    def test_rejects_traversal_out_of_slides_final(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "slides_final").mkdir()
+            outside = root / "outside"
+            outside.mkdir()
+            image = outside / "slide01.png"
+            image.write_bytes(png_bytes())
+            traversal_path = root / "slides_final" / ".." / "outside" / "slide01.png"
+
+            with self.assertRaises(SystemExit):
+                pptx_packager.collect_images([str(traversal_path)])
+
     def test_rejects_non_slide_sized_images(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

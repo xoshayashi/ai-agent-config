@@ -90,7 +90,7 @@ def validate_image_file(path: Path) -> None:
 
 
 def validate_master_image_path(path: Path) -> None:
-    parts = tuple(part.lower() for part in path.parts)
+    parts = tuple(part.lower() for part in path.expanduser().resolve().parts)
     if "slides_package" in parts:
         raise SystemExit(f"{path} is under slides_package/. Use the approved slides_final/ PNG master instead.")
     for idx, part in enumerate(parts[:-1]):

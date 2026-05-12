@@ -394,6 +394,8 @@ def run_pdf_package_check() -> Result:
             return Result("pdf_package_check", False, combined[:2000])
         if "pdf_package_status: created" not in combined or "pdf_slide_count: 2" not in combined:
             return Result("pdf_package_check", False, combined[:2000])
+        if "pdf_output_path:" not in combined:
+            return Result("pdf_package_check", False, combined[:2000])
         if "pdf_image_mapping:" not in combined:
             return Result("pdf_package_check", False, combined[:2000])
         if not output.exists() or output.stat().st_size <= 0:
