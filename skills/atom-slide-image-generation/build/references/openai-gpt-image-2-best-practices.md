@@ -20,9 +20,10 @@ Official sources checked:
 
 ## Generation Route
 
-- For Codex skill use, final slide images should be generated with Codex's built-in image generation capability, not with a user-key implementation.
+- For Codex skill use, final slide images should be generated with Codex's built-in image generation capability, not with a local credential implementation.
 - Treat the built-in image generation capability as the correct `gpt-image-2` route when the user requests `gpt-image-2` inside Codex.
-- Official documentation examples are reference material for prompt/settings semantics only. Do not require `OPENAI_API_KEY` or add a user-key execution route in this skill.
+- Official documentation examples are reference material for prompt/settings semantics only. Do not require local credential setup or add a local credential execution route in this skill.
+- Do not pause slide generation to inspect local environment state; in Codex, start from the built-in image generation route.
 - If the built-in image tool does not expose model selection, do not invent an API blocker; use the built-in generation route and report `generation_route: Codex built-in image generation`.
 
 ## Hard Delivery Rule
@@ -32,7 +33,7 @@ If the user asks for slide image generation, final images must come from `gpt-im
 - Do not replace image generation with PIL, SVG, web-rendered screenshots, canvas, matplotlib, PowerPoint exports, or other deterministic rendering.
 - Use Codex's built-in image generation function for final images.
 - Prompt packs and local mockups are planning artifacts, not generated image deliverables.
-- If Codex built-in image generation is unavailable, stop with a blocker. Do not ask for `OPENAI_API_KEY` as the default fix and do not create substitute "final" images.
+- If Codex built-in image generation is unavailable, stop with a blocker. Do not ask for local API credentials as the default fix and do not create substitute "final" images.
 - For decks over 3 slides, generate 1-2 pilot slides first and inspect them before batch generation.
 
 ## Required GPT Image 2 Settings
@@ -128,7 +129,7 @@ QA:
 - Put every literal on-slide string in quotes.
 - Use `Render ONLY these text strings, verbatim:` to reduce extra text.
 - Keep text short; reduce labels before asking the model to render many small words.
-- Convert abstract claims into a concrete visual anchor before generation: name the observable scene or object, viewpoint/crop, and 2-4 specific visual details.
+- Convert abstract messages into a concrete visual anchor before generation: name the observable scene or object, viewpoint/crop, and 2-4 specific visual details.
 - Specify font style, size, color, and placement for text.
 - Apply max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
 - For brand names or unusual words, spell them letter-by-letter.

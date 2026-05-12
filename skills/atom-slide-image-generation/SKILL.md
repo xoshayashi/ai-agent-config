@@ -5,18 +5,22 @@ description: "Use when generating, reviewing, repairing, or PPTX-packaging ATOM 
 
 # ATOM Slide Image Generation
 
-Use `scripts/build_atom_slide_prompt.py` for deck or single-slide prompt scaffolds; it loads the full rules from `build/references`.
+Use `scripts/build_atom_slide_prompt.py`; full rules live in `build/references`.
 
-Route: scaffold -> gpt-image-2 PNG -> full-deck review/repair -> approved manifest -> PPTX roll-up. Never make final PNGs from PPTX export, screenshots, local rendering, HTML, SVG, canvas, or PIL.
+Route: scaffold -> Codex built-in gpt-image-2 PNGs -> review/repair -> approved manifest -> PPTX roll-up.
+
+Start Codex built-in image generation directly. Do not run local preflight, artifact-route probing, account setup, credential setup, token setup, SDK setup, or environment-variable setup. Only the image tool itself can block generation.
+
+Returned image artifacts are the authoritative PNGs. Materialize approved artifacts under `slides_final/` only when a filesystem path is needed.
+
+Never make final PNGs from PPTX export, screenshots, local rendering, HTML, SVG, canvas, or PIL. PPTX is only the final wrapper.
 
 Design defaults: Noto Sans JP, 1672x941, Deep Blue `#0B2F5B`, Charcoal `#2D332E`, light gray `#DDE3EA`, quiet Honey `#F7EECF/#C49A2C`, one editorial illustration tone.
 
-Bias toward claim-led consulting structure and useful density when it clarifies the slide.
+Bias toward message-led structure and useful density when it clarifies the slide.
 
-Do not report complete while review has blockers, majors, tone drift, weak content/design, unreadable text, source/header issues, mixed illustration tone, pending status, or non-empty `weak_slide_regeneration_queue`.
+Do not report complete while review has blockers, majors, tone drift, weak content/design, unreadable text, source/header issues, pending status, or non-empty `weak_slide_regeneration_queue`.
 
 Source footer appears only for real traceable sources; otherwise use source_line: none.
 
-Keep `slides_final/` as the only loose-PNG master. `slides_package/` holds PPTX, notes, manifest, metadata; `render_check/pdf_pages/` is disposable QA.
-
-Package with `scripts/package_slide_images_to_pptx.py` only after `validate_review_manifest` approves every PNG. Speaker notes are required unless explicitly disabled.
+Package with `scripts/package_slide_images_to_pptx.py` after the Codex-generated PNG artifacts are approved and materialized under `slides_final/`. Speaker notes are required unless explicitly disabled.
