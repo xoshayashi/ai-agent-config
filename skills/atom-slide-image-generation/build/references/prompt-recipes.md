@@ -96,7 +96,7 @@ Lock header/footer text colors as one Ink-family hierarchy: H1 #2D332E, subtitle
 source_real_only_lock: render Source footer only for real traceable external/provided sources; if no real source exists, set source_line: none and draw no Source footer text.
 source_placeholder_blocklist: never use placeholder provenance labels such as brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions as Source text.
 source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists. Do not drop real source names to reduce visual density; shorten or group source names instead.
-source_separator_lock: no horizontal divider, rule, underline, or hairline above Source. Treat the footer/source baseline as an invisible alignment position, not a visible stroke.
+source_separator_lock: Source is text-only; no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline may appear above, below, behind, or adjacent to Source. Treat the footer/source baseline as an invisible alignment position, not a visible stroke.
 density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting.
 structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation.
 imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation.
@@ -374,7 +374,7 @@ ATOM slide contract:
 - source_real_only_lock: render Source only for real traceable external/provided sources; otherwise source_line none and no Source footer
 - source_placeholder_blocklist: no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions as Source
 - source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
-- source_separator_lock: no horizontal divider, rule, underline, or hairline above Source
+- source_separator_lock: Source is text-only; no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline may appear above, below, behind, or adjacent to Source
 - output_artifact_mastering_lock: slides_final/ is the only loose-PNG master; package and render-check folders hold only derivative artifacts
 - no_duplicate_png_output_lock: no duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/
 - contact_sheet_mastering_lock: one retained contact_sheet_review.png by default; comparison sheet only when delivery QA requires it
@@ -716,7 +716,7 @@ Content:
 - output_artifact_mastering_lock passes: `slides_final/` is the only loose-PNG master and package/render-check artifacts reference it
 - no_duplicate_png_output_lock passes: no duplicate loose final PNG copies remain across `slides_final/`, `slides_package/`, and `render_check/pdf_pages/`
 - contact_sheet_mastering_lock passes: only one retained contact sheet exists by default, unless one explicit delivery comparison sheet or render diff report is needed
-- source_separator_lock passes: no horizontal divider, rule, underline, or hairline appears above Source
+- source_separator_lock passes: Source is text-only, with no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline above, below, behind, or adjacent to Source
 - no unsupported facts
 
 Model:

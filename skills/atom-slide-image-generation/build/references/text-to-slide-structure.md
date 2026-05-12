@@ -82,7 +82,7 @@ Use this reference when the input is a long memo, equity story, research note, t
    - Apply `output_artifact_mastering_lock`: approved generated PNGs live once in `slides_final/`; `slides_package/` holds PPTX, notes, manifest, and metadata only; `render_check/pdf_pages/` is disposable render QA output.
    - Apply `contact_sheet_mastering_lock`: keep one retained `render_check/contact_sheet_review.png` by default; use one comparison sheet or render diff report only when delivery/render QA needs it.
    - Apply `source_line_lock`: render `Source: ...` when traceable sources exist; use `source_line: none` only when no traceable source exists.
-   - Apply `source_separator_lock`: no horizontal divider, rule, underline, or hairline above Source.
+   - Apply `source_separator_lock`: Source is text-only; no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline may appear above, below, behind, or adjacent to Source.
    - Split the input into chapters, paragraphs, data points, quotes, assumptions, and uncertainties. Assign stable `source_span_id` values when source tracing matters.
 
 2. **Storyline Frame**
@@ -368,7 +368,7 @@ unresolved_items:
 These practices synthesize common professional-presentation guidance:
 
 - Source footers are part of credibility, not decoration. Render `Source: ...` only when traceable real external/provided sources exist; use `source_line: none` and draw no Source footer when no traceable source exists. Never render brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, working assumptions, upload names, or draft provenance as Source.
-- Source footers sit on an invisible alignment baseline. Do not draw a horizontal divider, rule, underline, or hairline above Source.
+- Source footers sit on an invisible alignment baseline. Do not draw a gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline above, below, behind, or adjacent to Source.
 
 ## Output Artifact Notes
 

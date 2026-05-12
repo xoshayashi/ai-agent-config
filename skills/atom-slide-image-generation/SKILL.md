@@ -22,5 +22,6 @@ Bias toward message-led structure and useful density when it clarifies the slide
 Do not report complete while review has blockers, majors, tone drift, weak content/design, unreadable text, source/header issues, pending status, or non-empty `weak_slide_regeneration_queue`.
 
 Source footer appears only for real traceable sources; otherwise use source_line: none.
+Source is text-only: never draw gray rules, separator lines, underlines, baselines, or hairlines above, below, behind, or adjacent to Source.
 
 Package with `scripts/package_slide_images_to_pptx.py` after the Codex-generated PNG artifacts are approved and materialized under `slides_final/`. Speaker notes are required unless explicitly disabled.

@@ -352,11 +352,11 @@ def canonical_planning_block(
   message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface; plan line box, padding, and baseline so the sentence sits at the visual center
   insight_surface_placement_lock: when an Insight/message-box is kept, place it as a deliberate interpretation bridge tied to the body silhouette and footer baseline; bottom variants sit in the breathing space between body content and Source, centered to the interpreted region or full body block, with Source kept separate on its invisible baseline
   max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
-  table_note_microline: none / [one text note line above source text; not a horizontal rule]
+  table_note_microline: none / [one text note line above source text; text only, never drawn as a horizontal rule]
   source_real_only_lock: render Source footer only for real traceable external/provided sources; if no real source exists, set source_line: none and draw no Source footer text
   source_placeholder_blocklist: never use placeholder provenance labels such as brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions as Source text
   source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
-  source_separator_lock: no horizontal divider, rule, underline, or hairline above Source
+  source_separator_lock: Source is text-only; no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline may appear above, below, behind, or adjacent to Source
   source_line: Source: [traceable source names copied from provided or researched sources only] / none only when no traceable source exists
   source_policy: real traceable sources only; no draft, upload, internal-note, or production-route wording
   source_density_rule: Do not drop real source names to reduce visual density; shorten or group source names instead.
@@ -581,14 +581,14 @@ draft_image_prompt_scaffold:
   Apply source_real_only_lock: render Source footer only for real traceable external/provided sources; if no real source exists, set source_line: none and draw no Source footer text.
   Apply source_placeholder_blocklist: never use placeholder provenance labels such as brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions as Source text.
   Apply source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists.
-  Apply source_separator_lock: no horizontal divider, rule, underline, or hairline above Source.
+  Apply source_separator_lock: Source is text-only; do not draw any gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline above, below, behind, or adjacent to Source.
   Do not drop real source names to reduce visual density; shorten or group source names instead.
   Do not include slide numbers, title kickers, numbered header badges, KEY INSIGHT labels, invented sources, placeholder source labels, or production-route source wording.
   Make the composition feel human-crafted through visible priority, breathing room, and editorial rhythm.
 
 negative_prompt_hard_blockers:
   local-rendered substitute, non-gpt-image output, missing or malformed header line, uncontrolled header accent protrusion, header accent floating near page top,
-  oversized header, decorative header badge or right-side header ornament, H1/subtitle/source color drift, horizontal divider above Source, body content invading header/footer, visible text above max_text_size_lock, unreadable body text below 18pt equivalent,
+  oversized header, decorative header badge or right-side header ornament, H1/subtitle/source color drift, any gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline near Source/footer, body content invading header/footer, visible text above max_text_size_lock, unreadable body text below 18pt equivalent,
   invented labels or sources, placeholder Source footer such as brand assumptions or brand analysis, speaker notes visible on slide, thin or perfunctory PPT talk script, darker beige/cream page background, duplicate loose final PNG copies across output folders, parallel contact sheets for generated/package/pdf_render of the same slide set, unresolved grid, severe grid drift, hard-to-picture abstract visual,
   title-only first slide or low-density opener without proof/tension points,
   patterned or textured message box, oversized message box, full-width banner-like Insight, message-box text competing with H1/subtitle,
@@ -656,7 +656,7 @@ post_generation_audit:
   - single_contact_sheet_policy is honored: no parallel contact_sheet_generated*, contact_sheet_package*, and contact_sheet_pdf_render* files are retained for the same slide set
   - Source footer follows source_real_only_lock: Source appears only for real traceable external/provided sources; no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions appear as Source text
   - Source footer follows source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
-  - Source footer follows source_separator_lock: no horizontal divider, rule, underline, or hairline above Source
+  - Source footer follows source_separator_lock: Source is text-only, with no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline above, below, behind, or adjacent to Source
   - footer/source/table-note text uses #6E756E consistently when present
   - speaker_notes_depth_lock is honored: speaker_notes_text exists for deck slides, is substantial enough for PPT presentation delivery, and does not appear on the slide image
   - post_generation_full_deck_review_loop is complete: after generating slide PNGs, every actual image has been opened, compared against the deck, and reviewed before claiming completion
@@ -743,7 +743,7 @@ def deck_plan_tail() -> str:
         source_real_only_lock: render Source only for real traceable external/provided sources; otherwise source_line none and no Source footer
         source_placeholder_blocklist: no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions as Source
         source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
-        source_separator_lock: no horizontal divider, rule, underline, or hairline above Source
+        source_separator_lock: Source is text-only; no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline may appear above, below, behind, or adjacent to Source
         source_policy:
         source_line:
         density_risk:
@@ -895,7 +895,7 @@ def text_structure_tail() -> str:
       source_real_only_lock: render Source only for real traceable external/provided sources; otherwise source_line none and no Source footer
       source_placeholder_blocklist: no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions as Source
       source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
-      source_separator_lock: no horizontal divider, rule, underline, or hairline above Source
+      source_separator_lock: Source is text-only; no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline may appear above, below, behind, or adjacent to Source
       source_line: Source: [traceable source names copied from provided or researched sources only] / none only when no traceable source exists
       source_urls:
       assumptions:
