@@ -1,0 +1,1207 @@
+"""Smoke tests for the startup-financial-modeling xlsx orchestrator.
+
+Run directly:
+    PYTHONPYCACHEPREFIX=$(mktemp -d) python3 skills/startup-financial-modeling/build/tests/test_build_model.py
+"""
+
+from __future__ import annotations
+
+import sys
+import tempfile
+import re
+from pathlib import Path
+
+from openpyxl import Workbook
+from openpyxl import load_workbook
+from openpyxl.styles import PatternFill
+
+SKILL_DIR = Path(__file__).resolve().parents[2]
+REPO_ROOT = SKILL_DIR.parents[1]
+RUNTIME_DIR = SKILL_DIR / "build" / "runtime"
+SCRIPTS_DIR = RUNTIME_DIR
+sys.path.insert(0, str(RUNTIME_DIR))
+
+import build_model  # noqa: E402
+import cap_table_builder as cap_table  # noqa: E402
+import economic_kernel as kernel  # noqa: E402
+import ib_format as ib  # noqa: E402
+import source_plan_builder as source_plan  # noqa: E402
+
+FIRST_VALUE_COL = source_plan.START_PERIOD_COL
+SECOND_VALUE_COL = FIRST_VALUE_COL + 1
+FIRST_VALUE_LETTER = source_plan.get_column_letter(FIRST_VALUE_COL)
+SECOND_VALUE_LETTER = source_plan.get_column_letter(SECOND_VALUE_COL)
+UNIT_COL = source_plan.LAYOUT.unit_col
+
+
+def test_skill_exposes_clean_build_route_only() -> None:
+    scanned_paths = [
+        SKILL_DIR / "SKILL.md",
+        SKILL_DIR / "build" / "evals" / "evals.json",
+        SKILL_DIR / "scripts" / "build_model.py",
+    ]
+    scanned_paths.extend((SKILL_DIR / "build" / "references").glob("*.md"))
+    text = "\n".join(path.read_text(encoding="utf-8") for path in scanned_paths if path.exists())
+    forbidden = [
+        "workbook_" + "quality_" + "review",
+        "quality " + "review",
+        "review " + "score",
+        "hard_" + "failures",
+    ]
+    required_references = [
+        "_generic_composition_protocol.md",
+        "_ib_workbook_design_system.md",
+        "_self_review_protocol.md",
+        "_benchmark_protocol.md",
+        "_kpi_analytics.md",
+        "_scenario_sensitivity_playbook.md",
+        "_valuation_and_return_logic.md",
+        "_ic_memo_depth.md",
+    ]
+
+    assert not (SCRIPTS_DIR / ("workbook_" + "quality_" + "review.py")).exists()
+    assert [(SKILL_DIR / "build" / "references" / name).exists() for name in required_references] == [True] * len(required_references)
+    skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    assert [name for name in required_references if name not in skill_text] == []
+    assert [term for term in forbidden if term in text] == []
+
+
+def test_skill_uses_generic_economic_kernel_not_stage_matrix() -> None:
+    scanned_paths = [
+        SKILL_DIR / "SKILL.md",
+        SKILL_DIR / "build" / "evals" / "evals.json",
+        SKILL_DIR / "scripts" / "build_model.py",
+    ]
+    scanned_paths.extend((SKILL_DIR / "build" / "references").glob("*.md"))
+    text = "\n".join(path.read_text(encoding="utf-8") for path in scanned_paths if path.exists())
+    normalized = text.lower()
+    forbidden = [
+        "ステージ × 業態 × 資金調達目的",
+        "stage × business",
+        "stage x business",
+        "stage applicability",
+        "applicability matrix",
+        "source-backed investor plan",
+        "mode-based monthly template",
+        "monthly template",
+    ]
+    required_files = [
+        SKILL_DIR / "build" / "references" / "_modeling_kernel.md",
+        SKILL_DIR / "build" / "references" / "_coverage_universe.md",
+    ]
+    required_terms = [
+        "economic kernel",
+        "model grain",
+        "driver tree",
+        "operating engine",
+        "capital stack",
+        "ownership",
+        "scenario",
+        "valuation",
+        "seed to pre-ipo",
+    ]
+
+    assert [path for path in required_files if not path.exists()] == []
+    assert [term for term in forbidden if term in normalized] == []
+    assert [term for term in required_terms if term not in normalized] == []
+
+
+def test_prompt_guidance_resists_fixed_template_routing() -> None:
+    skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    generic_text = (SKILL_DIR / "build" / "references" / "_generic_composition_protocol.md").read_text(encoding="utf-8")
+    output_modes_text = (SKILL_DIR / "build" / "references" / "_output_modes.md").read_text(encoding="utf-8")
+    kpi_text = (SKILL_DIR / "build" / "references" / "_kpi_analytics.md").read_text(encoding="utf-8")
+    skill_flat = " ".join(skill_text.lower().split())
+    generic_flat = " ".join(generic_text.split())
+
+    assert "examples, maturity cues, sectors, and modes are prompts for reasoning, not templates" in skill_flat
+    assert "Choose tabs, KPIs, scenarios, valuation methods, colors, and cell positions from the decision" in generic_flat
+    assert "These are not mandatory bundles" in output_modes_text
+    assert "Maturity and mechanics are signals for selecting metrics, not metric packs" in kpi_text
+
+
+def test_economic_kernel_is_separate_from_workbook_renderer() -> None:
+    builder_text = (SCRIPTS_DIR / "source_plan_builder.py").read_text(encoding="utf-8")
+    required_profile_keys = {
+        "marketplace",
+        "hardware_asset_heavy",
+        "pre_revenue_milestone",
+        "recurring_software",
+        "fintech_balance_sheet",
+        "generic",
+    }
+
+    assert {profile.key for profile in kernel.MECHANIC_PROFILES} == required_profile_keys
+    assert kernel.SourceFacts.__module__ == "economic_kernel"
+    assert "class SourceFacts" not in builder_text
+    assert "def _detect_mechanics" not in builder_text
+    assert "def _money_yen" not in builder_text
+    assert "def assumption_decomposition_for" not in builder_text
+    assert "assumption_decomposition_for(facts)" in builder_text
+    assert "from economic_kernel import" in builder_text
+
+
+def test_generated_workbook_contains_interpretive_analysis_surfaces() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "full.xlsx"
+        build_model.build_model(None, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+
+        assert wb["KPI"]["B62"].value == "KPI interpretation register"
+        assert wb["Scenarios"]["B23"].value == "Scenario interpretation"
+        assert wb["Sensitivity"]["B25"].value == "Sensitivity rationale"
+        assert wb["Valuation"]["B30"].value == "Method credibility"
+        assert wb["Benchmarks"]["B5"].value == "source_id"
+        assert wb["IC Memo"]["B10"].value == "KPI readout"
+
+        formulas = [formula for _, _, formula in _formula_cells(wb)]
+        assert not any("AVERAGE(" in formula and "'Valuation'" not in formula for formula in formulas)
+        assert "Primary-method EV" in "\n".join(str(cell.value) for cell in wb["Valuation"]["C"] if cell.value)
+
+
+def test_orchestrator_no_longer_routes_through_legacy_saas_skeleton() -> None:
+    orchestrator_text = (SCRIPTS_DIR / "build_model.py").read_text(encoding="utf-8")
+
+    assert "three_statement_builder" not in orchestrator_text
+    assert "SaaS Series A defaults" not in orchestrator_text
+    assert "00_Cover" not in orchestrator_text
+    assert build_model.resolve_bundle("full") == source_plan.SOURCE_PLAN_SHEETS
+
+
+def test_focused_modes_use_generic_kernel_after_bundle_filter() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        for mode in ("unit_economics", "three_statement"):
+            out = Path(tmp) / f"{mode}.xlsx"
+            build_model.build_model(None, out, mode=mode)
+            wb = load_workbook(out, data_only=False)
+            all_text = "\n".join(
+                str(cell.value)
+                for ws in wb.worksheets
+                for row in ws.iter_rows()
+                for cell in row
+                if cell.value is not None
+            )
+
+            assert wb.sheetnames == build_model.resolve_bundle(mode)
+            assert "Guide" in wb.sheetnames
+            assert "Kernel" in wb.sheetnames
+            assert "12_SanityChecks" not in wb.sheetnames
+            assert "Demo SaaS" not in all_text
+            assert "SaaS Series A" not in all_text
+
+
+def _formula_cells(wb) -> list[tuple[str, str, str]]:
+    formulas: list[tuple[str, str, str]] = []
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                if isinstance(cell.value, str) and cell.value.startswith("="):
+                    formulas.append((ws.title, cell.coordinate, cell.value))
+    return formulas
+
+
+def _defined_name_count(wb) -> int:
+    count = len(wb.defined_names)
+    for ws in wb.worksheets:
+        count += len(ws.defined_names)
+    return count
+
+
+def _font_rgb(cell) -> str | None:
+    color = cell.font.color
+    if color is None or getattr(color, "type", None) != "rgb":
+        return None
+    value = getattr(color, "rgb", None) or getattr(color, "value", None)
+    if not isinstance(value, str):
+        return None
+    return value[-6:].upper()
+
+
+def _chart_axis_title_text(chart) -> str:
+    title = getattr(getattr(chart, "y_axis", None), "title", None)
+    if title is None:
+        return ""
+    try:
+        paragraphs = title.tx.rich.p
+        return "".join(run.t for paragraph in paragraphs for run in (paragraph.r or []) if run.t)
+    except AttributeError:
+        return str(title)
+
+
+def _tab_rgb(ws) -> str | None:
+    color = ws.sheet_properties.tabColor
+    if color is None or getattr(color, "type", None) != "rgb":
+        return None
+    value = getattr(color, "rgb", None)
+    return value[-6:].upper() if isinstance(value, str) else None
+
+
+def _sample_source_workbook(source_text: str):
+    tmp = tempfile.TemporaryDirectory()
+    source_md = Path(tmp.name) / "source.md"
+    out = Path(tmp.name) / "source_plan.xlsx"
+    source_md.write_text(source_text, encoding="utf-8")
+    source_plan.build_source_plan_workbook(source_md, out)
+    return tmp, load_workbook(out, data_only=False)
+
+
+def test_full_model_uses_direct_formula_refs() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "full.xlsx"
+        build_model.build_model(None, out, mode="full")
+
+        wb = load_workbook(out, data_only=False)
+        assert wb.sheetnames == build_model.resolve_bundle("full")
+        assert _defined_name_count(wb) == 0
+
+        alias_formulas = [
+            f"{sheet}!{cell}: {formula}"
+            for sheet, cell, formula in _formula_cells(wb)
+            if "INDEX(" in formula
+        ]
+        assert alias_formulas == []
+
+
+def test_intra_sheet_formula_cells_are_black() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "full.xlsx"
+        build_model.build_model(None, out, mode="full")
+
+        wb = load_workbook(out, data_only=False)
+        violations = [
+            f"{sheet}!{cell}: {formula} color={color}"
+            for sheet, cell, formula in _formula_cells(wb)
+            if "!" not in formula
+            for color in [_font_rgb(wb[sheet][cell])]
+            if color != ib.IB_FORMULA
+        ]
+        assert violations == []
+
+
+def test_cross_sheet_formula_cells_are_green() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "full.xlsx"
+        build_model.build_model(None, out, mode="full")
+
+        wb = load_workbook(out, data_only=False)
+        violations = [
+            f"{sheet}!{cell}: {formula} color={color}"
+            for sheet, cell, formula in _formula_cells(wb)
+            if "!" in formula
+            for color in [_font_rgb(wb[sheet][cell])]
+            if color != ib.IB_LINK_INTRA
+        ]
+        assert violations == []
+
+
+def test_pricing_bundle_is_intent_sized() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "pricing.xlsx"
+        build_model.build_model(None, out, mode="pricing")
+
+        wb = load_workbook(out, data_only=False)
+        assert wb.sheetnames == build_model.resolve_bundle("pricing")
+        assert _defined_name_count(wb) == 0
+
+
+def test_all_modes_produce_expected_bundles() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        for mode in build_model.VALID_MODES:
+            out = Path(tmp) / f"{mode}.xlsx"
+            build_model.build_model(None, out, mode=mode)
+
+            wb = load_workbook(out, data_only=False)
+            assert wb.sheetnames == build_model.resolve_bundle(mode)
+            assert _defined_name_count(wb) == 0
+
+
+def test_generated_modes_do_not_reference_removed_sheets() -> None:
+    sheet_ref = re.compile(r"'([^']+)'!")
+    with tempfile.TemporaryDirectory() as tmp:
+        for mode in build_model.VALID_MODES:
+            out = Path(tmp) / f"{mode}.xlsx"
+            build_model.build_model(None, out, mode=mode)
+            wb = load_workbook(out, data_only=False)
+            missing_refs = []
+            neutralized_cells = []
+            for sheet, cell, formula in _formula_cells(wb):
+                for target in sheet_ref.findall(formula):
+                    if target not in wb.sheetnames:
+                        missing_refs.append(f"{mode}:{sheet}!{cell}->{target}")
+            for ws in wb.worksheets:
+                for row in ws.iter_rows():
+                    for cell in row:
+                        if cell.value == "not in bundle":
+                            neutralized_cells.append(f"{mode}:{ws.title}!{cell.coordinate}")
+            assert missing_refs == []
+            assert neutralized_cells == []
+
+
+def test_structured_yaml_controls_grain_periods_and_drivers() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        input_path = Path(tmp) / "model.yaml"
+        out = Path(tmp) / "structured.xlsx"
+        input_path.write_text(
+            "\n".join(
+                [
+                    "company: KernelCo",
+                    "grain: monthly",
+                    "periods: 6",
+                    "start_year: 2026",
+                    "segments: [Japan SaaS, Hardware]",
+                    "new_units: [10, 20, 30, 40, 50, 60]",
+                    "monthly_price_yen: [100000, 110000, 120000, 130000, 140000, 150000]",
+                    "value_capture_share: [30%, 30%, 28%, 28%, 25%, 25%]",
+                    "target_gross_margin: [65%, 65%, 68%, 68%, 70%, 70%]",
+                    "support_tickets_per_customer: [10, 9, 8, 7, 6, 5]",
+                    "evidence_status: pipeline-backed estimate",
+                    "grants_yen: [10000000, 0, 0, 0, 0, 0]",
+                    "convertibles_yen: [0, 50000000, 0, 0, 0, 0]",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        build_model.build_model(input_path, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+
+        first_col = FIRST_VALUE_COL
+        assert [wb["Assumptions"].cell(5, c).value for c in range(first_col, first_col + 6)] == ["M1", "M2", "M3", "M4", "M5", "M6"]
+        assert wb["Guide"]["B7"].value == "Purpose"
+        assert wb["Assumptions"].cell(7, first_col).value == 10
+        assert wb["Assumptions"].cell(11, first_col + 5).value == 150000
+        assert wb["Financing"].cell(7, first_col).value == 10000000
+        assert wb["Financing"].cell(8, first_col + 1).value == 50000000
+        assert wb["Segments"]["B6"].value == "Japan SaaS"
+        assert wb["Assumptions"].cell(_row_for_label(wb, "Assumptions", "Value capture share"), first_col).value == 0.30
+        assert wb["Assumptions"].cell(_row_for_label(wb, "Assumptions", "Target gross margin"), first_col).value == 0.65
+        assert wb["Assumptions"].cell(_row_for_label(wb, "Assumptions", "Support tickets / customer / year"), first_col).value == 10
+        assert wb["Assumptions"].cell(_row_for_label(wb, "Assumptions", "Pricing evidence status"), first_col).value == "pipeline-backed"
+
+
+def test_balance_sheet_has_opening_capital_counterpart() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "full.xlsx"
+        build_model.build_model(None, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+
+        first_col = FIRST_VALUE_COL
+        first_letter = FIRST_VALUE_LETTER
+        assert wb["Assumptions"].cell(57, source_plan.LAYOUT.label_col).value == "Opening equity / prior capital"
+        assert wb["BS"].cell(23, first_col).value == f"='Assumptions'!{first_letter}57+'Capital Stack'!{first_letter}7+'Financing'!{first_letter}7-'Financing'!{first_letter}13"
+        assert wb["BS"].cell(27, first_col).value == f"={first_letter}15-{first_letter}21-{first_letter}25"
+
+
+def test_mfn_applied_only_for_changed_safe_terms() -> None:
+    inp = cap_table.CapTableInput(
+        company_name="MFN Test",
+        safes=[
+            cap_table.SAFEInstrument(
+                name="Best terms SAFE",
+                type="j_kiss_v2",
+                principal_money_m=20,
+                cap_money_m=1_000,
+                discount=0.20,
+                mfn=True,
+            ),
+            cap_table.SAFEInstrument(
+                name="Changed SAFE",
+                type="j_kiss_v2",
+                principal_money_m=20,
+                cap_money_m=1_400,
+                discount=0.10,
+                mfn=True,
+            ),
+        ],
+        round_pre_money_money_m=2_000,
+        round_investment_money_m=500,
+        round_target_pool_pct=0.10,
+    )
+
+    result = cap_table.run_round_state_machine(inp)
+    mfn_flags = {safe.name: safe.mfn_applied for safe in result.safe_conversions}
+
+    assert mfn_flags == {
+        "Best terms SAFE": False,
+        "Changed SAFE": True,
+    }
+
+
+def test_cap_table_rebuild_clears_prior_sheet_fills() -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Ownership"
+    ws["A1"].fill = PatternFill(fill_type="solid", fgColor="FFFF00")
+
+    cap_table.build_cap_table_sheet(wb, cap_table.CapTableInput(company_name="Fill Test"))
+
+    assert wb["Ownership"]["A1"].fill.fill_type in (None, "none")
+
+
+def _chart_count(wb) -> int:
+    return sum(len(getattr(ws, "_charts", [])) for ws in wb.worksheets)
+
+
+def _merged_count(wb) -> int:
+    return sum(len(ws.merged_cells.ranges) for ws in wb.worksheets)
+
+
+def _formula_count(wb) -> int:
+    return len(_formula_cells(wb))
+
+
+def _wrapped_cells(wb) -> list[str]:
+    return [
+        f"{ws.title}!{cell.coordinate}"
+        for ws in wb.worksheets
+        for row in ws.iter_rows()
+        for cell in row
+        if cell.alignment is not None and cell.alignment.wrap_text is True
+    ]
+
+
+def _unit_label_violations(wb) -> list[str]:
+    bad_fragments = ("単位:", "単位：", "Unit:", "JPY M", "JPY B")
+    return [
+        f"{ws.title}!{cell.coordinate}: {cell.value}"
+        for ws in wb.worksheets
+        for row in ws.iter_rows()
+        for cell in row
+        if isinstance(cell.value, str) and any(fragment in cell.value for fragment in bad_fragments)
+    ]
+
+
+def _legacy_money_scale_formulas(wb) -> list[str]:
+    return [
+        f"{ws.title}!{cell.coordinate}: {cell.value}"
+        for ws in wb.worksheets
+        for row in ws.iter_rows()
+        for cell in row
+        if isinstance(cell.value, str)
+        and cell.value.startswith("=")
+        and ("/1000000" in cell.value or "*1000000" in cell.value)
+    ]
+
+
+def _numbered_section_labels(wb) -> list[str]:
+    import re
+
+    pattern = re.compile(r"^\d+\.\s+\D")
+    return [
+        f"{ws.title}!{cell.coordinate}: {cell.value}"
+        for ws in wb.worksheets
+        for row in ws.iter_rows()
+        for cell in row
+        if isinstance(cell.value, str) and pattern.match(cell.value.strip())
+    ]
+
+
+def _leading_space_labels(wb) -> list[str]:
+    return [
+        f"{ws.title}!{cell.coordinate}: {cell.value!r}"
+        for ws in wb.worksheets
+        for row in ws.iter_rows()
+        for cell in row
+        if isinstance(cell.value, str) and cell.value.startswith((" ", "\t"))
+    ]
+
+
+def _missing_section_band_fills(wb) -> list[str]:
+    missing = []
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            label = row[1].value if len(row) > 1 else None
+            if not isinstance(label, str):
+                continue
+            fill = row[1].fill
+            font = row[1].font
+            is_section = fill.fill_type == "solid" and (fill.fgColor.rgb or "").endswith(ib.BG_HEADER_BAND)
+            if is_section and (font.color is None or not str(font.color.rgb).endswith("FFFFFF")):
+                missing.append(f"{ws.title}!B{row[1].row}")
+    return missing
+
+
+def _styled_blank_cells(wb) -> list[str]:
+    return [
+        f"{ws.title}!{cell.coordinate}: style_id={cell.style_id}"
+        for ws in wb.worksheets
+        for row in ws.iter_rows()
+        for cell in row
+        if cell.value is None
+        and cell.style_id != 0
+    ]
+
+
+def _design_band_span_violations(wb) -> list[str]:
+    violations = []
+    band_colors = {ib.BG_TABLE_HEADER, ib.BG_WORKING}
+    for ws in wb.worksheets:
+        max_col = max(ws.max_column, 9)
+        for row_idx in range(1, ws.max_row + 1):
+            row = [ws.cell(row=row_idx, column=col) for col in range(2, max_col + 1)]
+            populated = [cell for cell in row if cell.value is not None]
+            colors = [_fill_rgb(cell) for cell in populated]
+            row_band = next((color for color in colors if color in band_colors), None)
+            if row_band is None:
+                continue
+            if row_band == ib.BG_WORKING:
+                # Working highlights may intentionally stop before note columns.
+                last = max(cell.column for cell in populated if _fill_rgb(cell) == row_band)
+                check_cells = [ws.cell(row=row_idx, column=col) for col in range(2, last + 1)]
+            else:
+                check_cells = populated
+            for cell in check_cells:
+                if cell.value is None:
+                    continue
+                if _fill_rgb(cell) != row_band:
+                    violations.append(f"{ws.title}!{cell.coordinate}: expected row band {row_band}")
+    return violations
+
+
+def _border_surface_violations(wb) -> list[str]:
+    missing = []
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.value is None:
+                    continue
+                if not (getattr(cell.border.top, "style", None) or getattr(cell.border.bottom, "style", None)):
+                    missing.append(f"{ws.title}!{cell.coordinate}: no structural border")
+    return missing
+
+
+def _money_unit_format_mismatches(wb) -> list[str]:
+    expected = {
+        "円": {ib.FMT_JPY_YEN},
+        "千円": {ib.FMT_JPY_THOUSAND},
+        "百万円": {ib.FMT_MONEY, ib.FMT_MONEY_DECIMAL, ib.FMT_JPY_MILLION},
+        "億円": {ib.FMT_JPY_HUNDRED_MILLION},
+        "$": {ib.FMT_USD_DOLLAR},
+        "$K": {ib.FMT_USD_THOUSAND},
+        "$M": {ib.FMT_USD_MILLION},
+    }
+    mismatches = []
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            unit = ws.cell(row=row[0].row, column=UNIT_COL).value
+            if unit not in expected:
+                continue
+            for cell in row[FIRST_VALUE_COL - 1:]:
+                if cell.value is None:
+                    continue
+                if not (
+                    isinstance(cell.value, (int, float))
+                    or (isinstance(cell.value, str) and cell.value.startswith("="))
+                ):
+                    continue
+                if cell.number_format not in expected[unit]:
+                    mismatches.append(
+                        f"{ws.title}!{cell.coordinate}: unit={unit} fmt={cell.number_format}"
+                    )
+    return mismatches
+
+
+def _fill_rgb(cell) -> str | None:
+    fill = cell.fill
+    if fill is None or fill.fill_type != "solid":
+        return None
+    value = getattr(fill.fgColor, "rgb", None)
+    return value[-6:].upper() if isinstance(value, str) else None
+
+
+def _row_for_label(wb, sheet_name: str, label: str) -> int:
+    ws = wb[sheet_name]
+    for row in ws.iter_rows():
+        for cell in row:
+            if cell.value == label:
+                return cell.row
+    raise AssertionError(f"{sheet_name}: label not found: {label}")
+
+
+def _unit_for_label(wb, sheet_name: str, label: str) -> object:
+    return wb[sheet_name].cell(_row_for_label(wb, sheet_name, label), UNIT_COL).value
+
+
+def _first_year_cell_for_label(wb, sheet_name: str, label: str):
+    return wb[sheet_name].cell(_row_for_label(wb, sheet_name, label), FIRST_VALUE_COL)
+
+
+def test_source_backed_plan_reaches_generic_kernel_shape() -> None:
+    source_text = """# Asset deployment equity story
+
+The company is an asset-heavy AI startup deploying specialized field devices
+into operational sites. The model combines recurring lease fees, services, and
+software. Unit pricing is 月額32万円. Phase 1 targets cumulative deployments of
+3,000 units in three years and about 25,000 operating units at maturity, equal
+to roughly ¥900億 ARR. Hardware cost starts around ¥8m per unit and declines with scale. The story
+requires market sizing, competitive funding benchmarks, hiring, lease strategy,
+scenario analysis, sensitivity analysis, and an investor-use funding plan.
+Source: customer discovery memo, market sizing memo, lender discussion notes.
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        source_md = Path(tmp) / "asset_deployment_story.md"
+        out = Path(tmp) / "source_plan.xlsx"
+        source_md.write_text(source_text, encoding="utf-8")
+
+        source_plan.build_source_plan_workbook(source_md, out)
+        wb = load_workbook(out, data_only=False)
+
+        assert wb.sheetnames == source_plan.SOURCE_PLAN_SHEETS
+        for sheet_name in [
+            "Kernel",
+            "Driver Tree",
+            "Cost Build",
+            "People Plan",
+            "Capital Stack",
+            "Ownership",
+            "Market Support",
+        ]:
+            assert sheet_name in wb.sheetnames
+        assert _defined_name_count(wb) == 0
+        assert _merged_count(wb) == 0
+        assert _formula_count(wb) >= 600
+        assert _chart_count(wb) >= 5
+        years = kernel.forecast_years(kernel.extract_start_year(source_text))
+        assert wb["Assumptions"].cell(5, FIRST_VALUE_COL).value == f"FY{years[0]}"
+        assert wb["Assumptions"].cell(5, FIRST_VALUE_COL + len(years) - 1).value == f"FY{years[-1]}"
+        assert "Economic kernel" in str(wb["Kernel"]["B2"].value)
+        assert "Monthly price" in str(wb["Guide"]["C8"].value)
+        assert "customer discovery memo" in str(wb["Market Support"]["B8"].value)
+        assert _wrapped_cells(wb) == []
+        assert _unit_label_violations(wb) == []
+        assert _legacy_money_scale_formulas(wb) == []
+        assert _numbered_section_labels(wb) == []
+        assert _leading_space_labels(wb) == []
+        assert _missing_section_band_fills(wb) == []
+        assert _styled_blank_cells(wb) == []
+        assert _design_band_span_violations(wb) == []
+        assert _border_surface_violations(wb) == []
+        assert _money_unit_format_mismatches(wb) == []
+        assert _unit_for_label(wb, "Assumptions", "New primary units") == "units"
+        assert _unit_for_label(wb, "Assumptions", "Ending primary units") == "units"
+        assert _unit_for_label(wb, "Assumptions", "Total customers") == "customers"
+        assert _unit_for_label(wb, "Assumptions", "Monthly price / unit") == "円"
+        assert _unit_for_label(wb, "Assumptions", "CapEx / primary unit") == "円"
+        assert _unit_for_label(wb, "Assumptions", "Total headcount") == "FTE"
+        assert _unit_for_label(wb, "Assumptions", "Avg loaded comp / FTE") == "円"
+        assert source_plan._display_unit("JPY") == "円"
+        assert source_plan._display_unit("JPY", ib.FMT_MONEY) == "百万円"
+        assert source_plan._display_unit("JPY", ib.FMT_JPY_THOUSAND) == "千円"
+        assert source_plan._display_unit("JPY K") == "千円"
+        assert _unit_for_label(wb, "Capital Stack", "Equity financing") == "百万円"
+        assert _unit_for_label(wb, "Ownership", "Founder ownership") == "%"
+        assert _unit_for_label(wb, "Revenue Build", "Total customers") == "count"
+        assert _unit_for_label(wb, "KPI", "Ending primary units") == "units"
+        assert _unit_for_label(wb, "KPI", "Runway") == "months"
+        assert _unit_for_label(wb, "People Plan", "Total headcount") == "FTE"
+        assert _unit_for_label(wb, "Market Support", "TAM") == "百万円"
+        for label in [
+            "Demand support coverage",
+            "Pricing support ratio",
+            "COGS support ratio",
+            "Ops-CS capacity coverage",
+            "Runway support coverage",
+        ]:
+            assert _unit_for_label(wb, "Assumptions", label) == "x"
+        for label in [
+            "Demand evidence status",
+            "Pricing evidence status",
+            "COGS evidence status",
+            "People evidence status",
+            "Capital evidence status",
+        ]:
+            assert _unit_for_label(wb, "Assumptions", label) == "status"
+            assert _first_year_cell_for_label(wb, "Assumptions", label).value == "estimate"
+        assert _first_year_cell_for_label(wb, "Assumptions", "Implied variable COGS %").value == f"=IF({FIRST_VALUE_LETTER}11=0,0,{FIRST_VALUE_LETTER}88/({FIRST_VALUE_LETTER}11*12))"
+        assert _first_year_cell_for_label(wb, "Assumptions", "Required Ops-CS FTE from ticket load").value == f"=IF({FIRST_VALUE_LETTER}86=0,0,{FIRST_VALUE_LETTER}13*{FIRST_VALUE_LETTER}84/{FIRST_VALUE_LETTER}86)"
+        assert _first_year_cell_for_label(wb, "Assumptions", "New primary units").value > 0
+        assert _first_year_cell_for_label(wb, "Assumptions", "New primary units").number_format == ib.FMT_INTEGER
+        assert _first_year_cell_for_label(wb, "Assumptions", "CapEx / primary unit").value > 0
+        assert _first_year_cell_for_label(wb, "Assumptions", "Avg loaded comp / FTE").value > 0
+        assert _first_year_cell_for_label(wb, "Capital Stack", "Equity financing").value > 0
+        assert _first_year_cell_for_label(wb, "KPI", "Runway").number_format == ib.FMT_NUM
+        assert _first_year_cell_for_label(wb, "Market Support", "TAM").value >= 1_000_000_000_000
+        assert _first_year_cell_for_label(wb, "Revenue Build", "Recurring revenue").value == f"={FIRST_VALUE_LETTER}9*{FIRST_VALUE_LETTER}11*12"
+        assert _first_year_cell_for_label(wb, "KPI", "Unit payback").value == f'=IF({FIRST_VALUE_LETTER}9<=0,"N/A",\'Assumptions\'!{FIRST_VALUE_LETTER}38/{FIRST_VALUE_LETTER}9)'
+        assert _fill_rgb(wb["BS"].cell(_row_for_label(wb, "BS", "Balance check"), FIRST_VALUE_COL)) == ib.BG_WORKING
+        assert _fill_rgb(wb["Ownership"].cell(_row_for_label(wb, "Ownership", "Ownership check"), FIRST_VALUE_COL)) == ib.BG_WORKING
+        assert _fill_rgb(wb["Valuation"].cell(_row_for_label(wb, "Valuation", "Selected EV"), FIRST_VALUE_COL)) == ib.BG_WORKING
+
+
+def test_structured_yaml_currency_and_display_scale_are_generic() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        input_path = Path(tmp) / "model.yaml"
+        out = Path(tmp) / "usd_thousand.xlsx"
+        input_path.write_text(
+            "\n".join(
+                [
+                    "company: CurrencyCo",
+                    "currency: USD",
+                    "display_scale: thousand",
+                    "periods: 3",
+                    "new_units: [1, 2, 3]",
+                    "gmv_yen: [1000000, 2000000, 3000000]",
+                    "monthly_price_yen: [10000, 12000, 14000]",
+                ]
+            ),
+            encoding="utf-8",
+        )
+
+        build_model.build_model(input_path, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+
+        assert _unit_for_label(wb, "Assumptions", "Gross merchandise value") == "$K"
+        assert _first_year_cell_for_label(wb, "Assumptions", "Gross merchandise value").number_format == ib.FMT_USD_THOUSAND
+        assert _unit_for_label(wb, "Assumptions", "Monthly price / unit") == "$"
+        assert _first_year_cell_for_label(wb, "Assumptions", "Monthly price / unit").number_format == ib.FMT_USD_DOLLAR
+        assert _unit_for_label(wb, "Assumptions", "New primary units") == "units"
+        assert _unit_for_label(wb, "People Plan", "Total headcount") == "FTE"
+        assert _money_unit_format_mismatches(wb) == []
+
+
+def test_marketplace_source_does_not_emit_unrelated_asset_heavy_template() -> None:
+    source_text = """# Marketplace plan
+
+The company is a marketplace startup. GMV is ¥10B, take rate is 12%, buyer and
+seller cohorts are tracked separately, and the plan needs pricing, working
+capital, funding need, ownership, scenario, sensitivity, valuation, and IC memo.
+Source: management memo.
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        source_md = Path(tmp) / "marketplace.md"
+        out = Path(tmp) / "marketplace_plan.xlsx"
+        source_md.write_text(source_text, encoding="utf-8")
+
+        source_plan.build_source_plan_workbook(source_md, out)
+        wb = load_workbook(out, data_only=False)
+        all_text = "\n".join(
+            str(cell.value)
+            for ws in wb.worksheets
+            for row in ws.iter_rows()
+            for cell in row
+            if cell.value is not None
+        )
+
+        assert wb["Kernel"]["C9"].value == "Marketplace / transaction"
+        assert _unit_for_label(wb, "Assumptions", "Gross merchandise value") == "百万円"
+        assert _unit_for_label(wb, "Assumptions", "Take rate") == "%"
+        assert _first_year_cell_for_label(wb, "Revenue Build", "Transaction revenue").value == f"={FIRST_VALUE_LETTER}7*{FIRST_VALUE_LETTER}10"
+        assert [term for term in ["fleet", "hardware", "field devices"] if term.lower() in all_text.lower()] == []
+
+
+def test_hardware_source_ignores_low_usd_competitor_price_noise() -> None:
+    source_text = """# Asset-heavy plan
+
+The company is a hardware startup. The source includes competitor context:
+consumer device monthly rental $499, but the company has not finalized its own
+yen price. The plan should still use a local hardware default rather than
+treating the competitor USD number as the company's price.
+"""
+    with tempfile.TemporaryDirectory() as tmp:
+        source_md = Path(tmp) / "hardware.md"
+        source_md.write_text(source_text, encoding="utf-8")
+        facts = source_plan.extract_source_facts(source_md)
+
+        assert facts.mechanics == "Hardware / asset-heavy"
+        assert facts.monthly_price_yen[0] == 300_000
+
+
+def test_source_plan_starting_cash_is_hard_input_blue() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
+    )
+    try:
+        assert _font_rgb(wb["Assumptions"].cell(47, FIRST_VALUE_COL)) == ib.IB_HARD_INPUT
+        assert _font_rgb(wb["Assumptions"].cell(47, SECOND_VALUE_COL)) == ib.IB_LINK_INTRA
+    finally:
+        tmp.cleanup()
+
+
+def test_source_plan_ownership_waterfall_dilutes_prior_holders_symmetrically() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
+    )
+    try:
+        ws = wb["Ownership"]
+        f = FIRST_VALUE_LETTER
+        g = SECOND_VALUE_LETTER
+        h = source_plan.get_column_letter(FIRST_VALUE_COL + 2)
+        i = source_plan.get_column_letter(FIRST_VALUE_COL + 3)
+        for row in (7, 8, 9, 10, 13, 14):
+            assert _font_rgb(ws.cell(row, FIRST_VALUE_COL)) == ib.IB_HARD_INPUT
+        for row in (7, 8, 9, 10):
+            assert _font_rgb(ws.cell(row, SECOND_VALUE_COL)) == ib.IB_FORMULA
+        assert ws[f"{g}8"].value == f"={f}8*(1-{g}12-{g}13-{g}14)+{g}13"
+        assert ws[f"{h}8"].value == f"={g}8*(1-{h}12-{h}13-{h}14)+{h}13"
+        assert ws[f"{i}8"].value == f"={h}8*(1-{i}12-{i}13-{i}14)+{i}13"
+        assert ws[f"{g}9"].value == f"={f}9*(1-{g}12-{g}13-{g}14)+{g}12"
+        assert ws[f"{h}9"].value == f"={g}9*(1-{h}12-{h}13-{h}14)+{h}12"
+        assert ws[f"{i}9"].value == f"={h}9*(1-{i}12-{i}13-{i}14)+{i}12"
+        assert ws[f"{g}10"].value == f"={f}10*(1-{g}12-{g}13-{g}14)+{g}14"
+        assert ws[f"{h}10"].value == f"={g}10*(1-{h}12-{h}13-{h}14)+{h}14"
+        assert ws[f"{i}10"].value == f"={h}10*(1-{i}12-{i}13-{i}14)+{i}14"
+    finally:
+        tmp.cleanup()
+
+
+def test_source_plan_bold_rows_preserve_ib_cell_colors() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
+    )
+    try:
+        assert _font_rgb(wb["Capital Stack"].cell(7, FIRST_VALUE_COL)) == ib.IB_HARD_INPUT
+        assert _font_rgb(wb["Capital Stack"].cell(12, FIRST_VALUE_COL)) == ib.IB_LINK_INTRA
+        assert _font_rgb(wb["Capital Stack"].cell(13, FIRST_VALUE_COL)) == ib.IB_LINK_INTRA
+        assert _font_rgb(wb["Cost Build"].cell(16, FIRST_VALUE_COL)) == ib.IB_LINK_INTRA
+        assert _font_rgb(wb["People Plan"].cell(11, FIRST_VALUE_COL)) == ib.IB_LINK_INTRA
+    finally:
+        tmp.cleanup()
+
+
+def test_source_plan_uses_column_based_hierarchy_layout() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
+    )
+    try:
+        ws = wb["Assumptions"]
+        layout = source_plan.LAYOUT
+        assert source_plan.START_PERIOD_COL == layout.unit_col + 1
+        assert ws.column_dimensions["A"].width == layout.hierarchy_width - 17
+        assert ws.column_dimensions["B"].width == layout.hierarchy_width
+        assert ws.column_dimensions["C"].width == layout.label_width
+        assert ws.column_dimensions["D"].width == layout.source_width
+        assert ws.column_dimensions["E"].width == layout.unit_width
+        assert ws.column_dimensions[FIRST_VALUE_LETTER].width == layout.period_width
+        assert ws.freeze_panes == f"{FIRST_VALUE_LETTER}6"
+        assert [ws.cell(5, c).value for c in range(2, FIRST_VALUE_COL + 1)] == [
+            "Section",
+            "Line item",
+            "Source / driver",
+            "Unit",
+            "FY2026",
+        ]
+        assert ws["B6"].value == "Volume and demand"
+        assert ws["C7"].value == "New primary units"
+        assert ws["B7"].value is None
+        assert wb["Guide"]["B8"].value == "Source story signals"
+        assert ws["E7"].value == "units"
+        assert ws["F7"].value is not None
+        assert ws["C7"].alignment.horizontal == "left"
+        assert ws["D7"].alignment.horizontal == "left"
+        assert ws["E7"].alignment.horizontal == "right"
+        assert ws["F7"].alignment.horizontal == "right"
+    finally:
+        tmp.cleanup()
+
+
+def test_source_plan_chart_axes_and_tabs_follow_currency_and_semantic_roles() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        input_path = Path(tmp) / "usd.yaml"
+        out = Path(tmp) / "usd.xlsx"
+        input_path.write_text(
+            "\n".join(
+                [
+                    "company: Generic USD Co",
+                    "currency: USD",
+                    "display_scale: thousand",
+                    "grain: monthly",
+                    "periods: 6",
+                    "start_year: 2027",
+                    "new_units: [10, 15, 20, 25, 30, 35]",
+                    "monthly_price_yen: [20000, 20000, 21000, 21000, 22000, 22000]",
+                    "equity_raise_yen: [1000000, 0, 0, 0, 0, 0]",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        build_model.build_model(input_path, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+
+        axis_titles = [
+            _chart_axis_title_text(chart)
+            for ws in wb.worksheets
+            for chart in getattr(ws, "_charts", [])
+        ]
+        assert "円" not in " ".join(axis_titles)
+        assert "$K" in axis_titles
+        assert "months" in axis_titles
+        assert "$K / months" not in axis_titles
+        assert "units" in axis_titles
+        assert "units / $K" not in axis_titles
+        assert _tab_rgb(wb["Market Support"]) == ib.BRAND_SLATE
+        assert _tab_rgb(wb["Benchmarks"]) == ib.BRAND_WARNING
+        assert _tab_rgb(wb["IC Memo"]) == ib.BRAND_ACCENT
+
+
+def test_segment_lens_handles_long_generic_segment_names_without_clipping() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        input_path = Path(tmp) / "long_segments.yaml"
+        out = Path(tmp) / "long_segments.xlsx"
+        input_path.write_text(
+            "\n".join(
+                [
+                    "company: Generic Segment Co",
+                    "segments:",
+                    "  - Enterprise expansion segment with regulated deployment partners",
+                    "  - Embedded platform segment with long-cycle integration partners",
+                    "  - International distributor segment with multi-entity reporting",
+                ]
+            ),
+            encoding="utf-8",
+        )
+        build_model.build_model(input_path, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+        ws = wb["Segments"]
+        width = ws.column_dimensions["B"].width or 0
+        clipped = [
+            f"{cell.coordinate}: width={width} value={cell.value}"
+            for cell in ws["B"]
+            if isinstance(cell.value, str)
+            and cell.row >= 6
+            and len(cell.value) > width * 1.15
+        ]
+
+        assert clipped == []
+
+
+def test_source_plan_tables_do_not_overlap_metadata_columns() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
+    )
+    try:
+        assert [wb["Scenarios"].cell(7, c).value for c in range(FIRST_VALUE_COL, FIRST_VALUE_COL + 3)] == [0.70, 1.00, 1.30]
+        assert wb["Scenarios"].cell(7, source_plan.LAYOUT.label_col).value == "Volume scale"
+        assert wb["Scenarios"].cell(7, source_plan.LAYOUT.unit_col).value == "x"
+        assert wb["Financing"].cell(16, FIRST_VALUE_COL).value == f"='Scenarios'!{FIRST_VALUE_LETTER}19"
+        assert [wb["Sensitivity"].cell(7, c).value for c in range(FIRST_VALUE_COL, FIRST_VALUE_COL + 5)] == [0.60, 0.80, 1.00, 1.20, 1.40]
+        assert wb["Sensitivity"].cell(8, FIRST_VALUE_COL - 1).value == 0.80
+        assert wb["Sensitivity"].cell(8, FIRST_VALUE_COL).value == f"=('Revenue Build'!J18*{FIRST_VALUE_LETTER}$7*$E8)-('Cost Build'!J12*{FIRST_VALUE_LETTER}$7)-'P&L'!J17"
+    finally:
+        tmp.cleanup()
+
+
+def test_source_plan_design_surface_uses_generic_blue_palette() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
+    )
+    try:
+        allowed = {ib.BG_CANVAS, ib.BG_TABLE_HEADER, ib.BG_TOTAL_BAND, ib.BG_HEADER_BAND, ib.BG_WORKING}
+        observed = {
+            _fill_rgb(cell)
+            for ws in wb.worksheets
+            for row in ws.iter_rows()
+            for cell in row
+            if _fill_rgb(cell) is not None
+        }
+        assert observed <= allowed
+        assert ib.BG_TABLE_HEADER in observed
+        assert _styled_blank_cells(wb) == []
+        total_populated = sum(
+            1
+            for ws in wb.worksheets
+            for row in ws.iter_rows()
+            for cell in row
+            if cell.value is not None
+        )
+        highlighted = sum(
+            1
+            for ws in wb.worksheets
+            for row in ws.iter_rows()
+            for cell in row
+            if cell.value is not None and _fill_rgb(cell) == ib.BG_WORKING
+        )
+        assert highlighted / total_populated < 0.08
+    finally:
+        tmp.cleanup()
+
+
+def test_source_plan_has_no_excel_indent_or_clipped_role_columns() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
+    )
+    try:
+        indent_violations = []
+        clipped = []
+        role_cols = (source_plan.LAYOUT.label_col, source_plan.LAYOUT.source_col)
+        for ws in wb.worksheets:
+            for row in ws.iter_rows():
+                for cell in row:
+                    if getattr(cell.alignment, "indent", 0):
+                        indent_violations.append(f"{ws.title}!{cell.coordinate}")
+            for col in role_cols:
+                width = ws.column_dimensions[source_plan.get_column_letter(col)].width or 0
+                for row_idx in range(5, ws.max_row + 1):
+                    cell = ws.cell(row_idx, col)
+                    if not isinstance(cell.value, str):
+                        continue
+                    if cell.value.startswith("="):
+                        continue
+                    if ws.cell(row_idx, col + 1).value is None:
+                        continue
+                    if len(cell.value) > width * 1.15:
+                        clipped.append(f"{ws.title}!{cell.coordinate}: width={width} value={cell.value}")
+        assert indent_violations == []
+        assert clipped == []
+    finally:
+        tmp.cleanup()
+
+
+def test_source_plan_has_no_long_centered_prose_headers() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
+    )
+    try:
+        centered = []
+        for ws in wb.worksheets:
+            for row in ws.iter_rows():
+                for cell in row:
+                    if (
+                        isinstance(cell.value, str)
+                        and len(cell.value) > 18
+                        and cell.alignment.horizontal == "center"
+                    ):
+                        centered.append(f"{ws.title}!{cell.coordinate}: {cell.value}")
+        assert centered == []
+    finally:
+        tmp.cleanup()
+
+
+def test_source_plan_ib_design_rhythm_and_visibility() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
+    )
+    try:
+        for ws in wb.worksheets:
+            assert ws.sheet_view.showGridLines is False
+            assert ws.sheet_view.zoomScale == 90
+            assert ws.page_setup.orientation == "landscape"
+            assert ws.page_setup.fitToWidth == 1
+            assert ws.print_title_rows in {"1:5", "$1:$5"}
+            expected_title_cols = f"A:{source_plan.get_column_letter(source_plan.LAYOUT.unit_col)}"
+            expected_title_cols_abs = f"$A:${source_plan.get_column_letter(source_plan.LAYOUT.unit_col)}"
+            assert ws.print_title_cols in {expected_title_cols, expected_title_cols_abs}
+            assert (ws.column_dimensions["A"].width or 0) == ib.COL_MARGIN_WIDTH
+            assert (ws.column_dimensions[source_plan.get_column_letter(source_plan.LAYOUT.first_hierarchy_col)].width or 0) >= ib.COL_HIERARCHY_WIDTH
+            assert (ws.column_dimensions[source_plan.get_column_letter(source_plan.LAYOUT.label_col)].width or 0) >= ib.COL_LABEL_WIDTH
+            assert (ws.column_dimensions[source_plan.get_column_letter(source_plan.LAYOUT.source_col)].width or 0) >= ib.COL_SOURCE_WIDTH
+            assert (ws.column_dimensions[source_plan.get_column_letter(source_plan.LAYOUT.unit_col)].width or 0) >= ib.COL_UNIT_WIDTH
+            assert (ws.row_dimensions[2].height or 0) <= 20
+            assert (ws.row_dimensions[5].height or 0) <= 18
+            if ws.cell(5, source_plan.START_PERIOD_COL).value is not None:
+                assert ws.freeze_panes == f"{source_plan.get_column_letter(source_plan.START_PERIOD_COL)}6"
+        assert wb["Assumptions"].column_dimensions["C"].width >= 54
+        assert wb["Assumptions"].column_dimensions["D"].width >= 54
+    finally:
+        tmp.cleanup()
+
+
+def test_source_plan_custom_tables_keep_text_columns_readable() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
+    )
+    try:
+        clipped = []
+        for sheet_name in ["KPI", "Scenarios", "Sensitivity", "Valuation", "Benchmarks", "IC Memo"]:
+            ws = wb[sheet_name]
+            for row in ws.iter_rows():
+                for cell in row:
+                    if not isinstance(cell.value, str) or cell.value.startswith("="):
+                        continue
+                    width = ws.column_dimensions[source_plan.get_column_letter(cell.column)].width or 0
+                    if ws.cell(cell.row, cell.column + 1).value is not None and len(cell.value) > width * 1.15:
+                        clipped.append(f"{ws.title}!{cell.coordinate}: width={width} value={cell.value}")
+        assert clipped == []
+    finally:
+        tmp.cleanup()
+
+
+def test_excluded_sheets_cannot_create_broken_references() -> None:
+    for excluded in (["Valuation"], ["Assumptions"], ["CF"]):
+        try:
+            build_model.resolve_bundle("full", excluded_sheets=excluded)
+        except ValueError as exc:
+            assert "broken workbook references" in str(exc)
+        else:
+            raise AssertionError(f"excluded_sheets accepted unsafe bundle: {excluded}")
+
+
+def test_ib_helpers_do_not_use_native_indent_for_hierarchy() -> None:
+    wb = Workbook()
+    ws = wb.active
+    ib.apply_label(ws["B2"])
+    ib.write_hierarchical_line_item(ws, 3, 2, "Child line")
+
+    assert ws["B2"].alignment.indent == 0
+    assert ws["D3"].alignment.indent == 0
+
+
+def test_generic_kernel_does_not_promote_domain_specific_mentions_to_sources() -> None:
+    facts = kernel.derive_source_facts(
+        "# Marketplace\nThe plan mentions a public company only as a comparison. Source: management memo."
+    )
+
+    assert facts.source_names == ["management memo"]
+
+
+def test_scenario_formulas_are_not_built_with_fragile_substring_replacement() -> None:
+    builder_text = (SCRIPTS_DIR / "source_plan_builder.py").read_text(encoding="utf-8")
+
+    assert ".replace(\"C14\"" not in builder_text
+    assert ".replace(\"C15\"" not in builder_text
+    assert ".replace(\"C16\"" not in builder_text
+
+
+def test_build_model_routes_source_markdown_to_source_plan() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        source_md = Path(tmp) / "story.md"
+        out = Path(tmp) / "routed.xlsx"
+        source_md.write_text(
+            "Asset-heavy deployment company with 月額32万円 pricing and 25,000 operating units at maturity.",
+            encoding="utf-8",
+        )
+
+        build_model.build_model(None, out, source_md=source_md)
+        wb = load_workbook(out, data_only=False)
+
+        assert wb.sheetnames == source_plan.SOURCE_PLAN_SHEETS
+        assert _chart_count(wb) >= 4
+
+
+if __name__ == "__main__":
+    test_skill_exposes_clean_build_route_only()
+    test_skill_uses_generic_economic_kernel_not_stage_matrix()
+    test_prompt_guidance_resists_fixed_template_routing()
+    test_economic_kernel_is_separate_from_workbook_renderer()
+    test_generated_workbook_contains_interpretive_analysis_surfaces()
+    test_orchestrator_no_longer_routes_through_legacy_saas_skeleton()
+    test_focused_modes_use_generic_kernel_after_bundle_filter()
+    test_full_model_uses_direct_formula_refs()
+    test_intra_sheet_formula_cells_are_black()
+    test_cross_sheet_formula_cells_are_green()
+    test_pricing_bundle_is_intent_sized()
+    test_all_modes_produce_expected_bundles()
+    test_generated_modes_do_not_reference_removed_sheets()
+    test_structured_yaml_controls_grain_periods_and_drivers()
+    test_balance_sheet_has_opening_capital_counterpart()
+    test_mfn_applied_only_for_changed_safe_terms()
+    test_cap_table_rebuild_clears_prior_sheet_fills()
+    test_source_backed_plan_reaches_generic_kernel_shape()
+    test_structured_yaml_currency_and_display_scale_are_generic()
+    test_marketplace_source_does_not_emit_unrelated_asset_heavy_template()
+    test_hardware_source_ignores_low_usd_competitor_price_noise()
+    test_source_plan_starting_cash_is_hard_input_blue()
+    test_source_plan_ownership_waterfall_dilutes_prior_holders_symmetrically()
+    test_source_plan_bold_rows_preserve_ib_cell_colors()
+    test_source_plan_uses_column_based_hierarchy_layout()
+    test_source_plan_chart_axes_and_tabs_follow_currency_and_semantic_roles()
+    test_segment_lens_handles_long_generic_segment_names_without_clipping()
+    test_source_plan_tables_do_not_overlap_metadata_columns()
+    test_source_plan_design_surface_uses_generic_blue_palette()
+    test_source_plan_has_no_excel_indent_or_clipped_role_columns()
+    test_source_plan_has_no_long_centered_prose_headers()
+    test_source_plan_ib_design_rhythm_and_visibility()
+    test_source_plan_custom_tables_keep_text_columns_readable()
+    test_excluded_sheets_cannot_create_broken_references()
+    test_ib_helpers_do_not_use_native_indent_for_hierarchy()
+    test_generic_kernel_does_not_promote_domain_specific_mentions_to_sources()
+    test_scenario_formulas_are_not_built_with_fragile_substring_replacement()
+    test_build_model_routes_source_markdown_to_source_plan()
