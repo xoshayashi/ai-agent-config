@@ -1,11 +1,10 @@
 """
 ib_format.py — IB Design Language を openpyxl で適用するヘルパー集
 
-Source of truth: references/00_design_guidelines.md §付録 B
+Source of truth: build/references/_ib_workbook_design_system.md
 Related references:
-  - 00_design_guidelines.md (visual design canonical)
-  - 01a_modeling_standards.md §4-5 (規範)
-  - _terminology.md §1-3 (functional color / brand color / sheet naming SSoT)
+  - build/references/_layout_canonical.md
+  - build/references/_terminology.md
 
 Usage:
     from ib_format import apply_hard_input, apply_formula, IB_PALETTE, ...
@@ -92,8 +91,7 @@ BG_WORKING = "FFF9C4"           # WIP / TODO セル (yellow highlight)
 LINK_COLOR = "0563C1"           # internal/external hyperlink (matches Excel default)
 
 # ----------------------------------------------------------------------------
-# Chart palettes (Phase 6 Fix #8 — IB-compliant palette for openpyxl charts)
-# Source of truth: _terminology.md §1-2 (functional + brand colors)
+# Chart palettes for calm, IB-style workbook charts.
 # ----------------------------------------------------------------------------
 
 # Football field (Low / Mid / High) — navy / teal / accent
@@ -166,7 +164,7 @@ def set_workbook_default_font(wb, name: str = FONT_FAMILY, size: int = FONT_SIZE
     try:
         wb._fonts[0] = new_font
     except (AttributeError, IndexError, TypeError):
-        pass  # Older openpyxl — fall back to Normal-only override.
+        pass  # If the private font slot is unavailable, use Normal style only.
     # 2. Named "Normal" style (the path Excel's named-style consumers use).
     try:
         wb._named_styles["Normal"].font = Font(name=name, size=size, color=IB_INK)
@@ -321,7 +319,7 @@ FONT_SUBSECTION = FONT_BODY_BOLD
 FONT_TOTAL = FONT_SUBTOTAL
 
 # ============================================================================
-# 5. Number Formats  (Phase 6 補強: 厳格な単位/通貨/負数表示)
+# 5. Number Formats
 # ============================================================================
 # User spec rules:
 #   - 基本単位 = 円 (cell value は必ず円単位の生数値で保存)
@@ -466,7 +464,6 @@ PRINT_ORIENTATION_PORTRAIT = "portrait"
 # 9. Sheet Naming
 # ============================================================================
 
-# Canonical source-plan workbook order. Focused modes are ordered subsets.
 CANONICAL_SHEET_ORDER: tuple[str, ...] = (
     "Guide",
     "Kernel",
@@ -480,6 +477,10 @@ CANONICAL_SHEET_ORDER: tuple[str, ...] = (
     "CF",
     "Capital Stack",
     "Ownership",
+    "Pricing",
+    "Financing",
+    "Exit Waterfall",
+    "Segments",
     "KPI",
     "Scenarios",
     "Sensitivity",
@@ -500,10 +501,10 @@ def apply_hard_input(
     cell,
     fmt: str = FMT_JPY_MILLION,
 ) -> None:
-    """Hard input セルに IB blue + 数値書式を適用 (wrap_text=False, Phase 6 Fix #1).
+    """Hard input セルに IB blue + 数値書式を適用する。
 
-    Phase 6 補強: default を `FMT_JPY_MILLION` (¥ 百万円表示、円単位生 value、負数 赤)
-    に変更。USD ベースのモデルでは呼び出し側で fmt=FMT_USD_MILLION を明示指定する。
+    Default は `FMT_JPY_MILLION`。USD ベースのモデルでは呼び出し側で
+    fmt=FMT_USD_MILLION を明示指定する。
 
     Args:
         cell: openpyxl Cell
@@ -520,7 +521,7 @@ def apply_formula(
 ) -> None:
     """Formula セルに black + 数値書式を適用 (wrap_text=False).
 
-    Phase 6 補強: default を `FMT_JPY_MILLION` に変更。
+    Default は `FMT_JPY_MILLION`。
     """
     cell.font = FONT_FORMULA
     cell.number_format = fmt
@@ -533,7 +534,7 @@ def apply_link_intra(
 ) -> None:
     """Cross-sheet link セル (=03_Revenue!B5 等) に green を適用 (wrap_text=False).
 
-    Phase 6 補強: default を `FMT_JPY_MILLION` に変更。
+    Default は `FMT_JPY_MILLION`。
     """
     cell.font = FONT_LINK_INTRA
     cell.number_format = fmt
@@ -546,7 +547,7 @@ def apply_link_external(
 ) -> None:
     """External link (別 file 参照) に red を適用 (wrap_text=False).
 
-    Phase 6 補強: default を `FMT_JPY_MILLION` に変更。
+    Default は `FMT_JPY_MILLION`。
     """
     cell.font = FONT_LINK_EXTERNAL
     cell.number_format = fmt
@@ -575,7 +576,7 @@ def write_hierarchical_line_item(
     value_start_col: int = 4,
     bold: bool = False,
 ) -> int:
-    """階層 line item を書き込む helper. Phase 6 Fix #3.
+    """階層 line item を書き込む helper.
 
     親項目 (level=0) → B 列 (col 2)
     子項目 (level=1) → C 列 (col 3)
@@ -605,7 +606,7 @@ def write_hierarchical_line_item(
 def set_uniform_column_width(
     ws: Worksheet, columns: Iterable[str], width: float
 ) -> None:
-    """指定列を一律 width に設定. Phase 6 Fix #4.
+    """指定列を一律 width に設定.
 
     Args:
         ws: Worksheet
@@ -639,7 +640,7 @@ def apply_section_header_band(
     end_col: int,
     label: str,
 ) -> None:
-    """Section header band (No-Merge variant, Phase 6 補強).
+    """Section header band without merged cells.
 
     `apply_section_header` を leftmost cell に適用し、navy fill を
     end_col まで propagate する (merge_cells を使わずに 1 行分の band を表現)。
@@ -715,8 +716,8 @@ def apply_grand_total(
 def apply_comment(cell, wrap_text: bool = False) -> None:
     """注記セル (gray + italic).
 
-    Phase 6 Fix #1: wrap_text=False が default。長文は隣接の空きセルにはみ出して
-    表示するのが IB 慣習。明示的に折り返したい場合は wrap_text=True を渡す。
+    wrap_text=False が default。長文は隣接の空きセルにはみ出して表示する。
+    明示的に折り返したい場合は wrap_text=True を渡す。
     """
     cell.font = FONT_COMMENT
     cell.alignment = Alignment(
@@ -730,7 +731,7 @@ def apply_working_highlight(cell) -> None:
 
 
 def apply_chart_palette(chart, palette: list[str]) -> None:
-    """各 series に palette の色を順に循環適用. Phase 6 Fix #8.
+    """各 series に palette の色を順に循環適用.
 
     palette 例: IB_CHART_COLORS_BAR, IB_CHART_COLORS_LINE 等。
     series 数 > palette 長さなら modulo で循環。
@@ -750,7 +751,7 @@ def apply_chart_palette(chart, palette: list[str]) -> None:
 
 
 # ----------------------------------------------------------------------------
-# 10b. Unit label / currency helpers  (Phase 6 補強)
+# 10b. Unit label / currency helpers
 # ----------------------------------------------------------------------------
 
 
@@ -808,7 +809,7 @@ def apply_unit_label(cell, currency: str = "JPY", scale: str = "million") -> Non
 
 
 # ----------------------------------------------------------------------------
-# 10c. Border helpers  (Phase 6 補強: section / box / table 共通枠線)
+# 10c. Border helpers
 # ----------------------------------------------------------------------------
 
 
@@ -872,7 +873,7 @@ def apply_box_border(
 
 
 # ----------------------------------------------------------------------------
-# 10d. Conditional formatting helpers  (Phase 6 補強)
+# 10d. Conditional formatting helpers
 # ----------------------------------------------------------------------------
 # 用途: sensitivity matrix / cohort retention / KPI heatmap 等
 # 色は IB convention に寄せる (red→yellow→green or 中立 grayscale)
@@ -933,7 +934,7 @@ def apply_data_bar(ws: Worksheet, range_str: str, *, color: str = BRAND_PRIMARY)
 
 
 # ----------------------------------------------------------------------------
-# 10e. Data validation  (Phase 6 補強: dropdown / numeric range)
+# 10e. Data validation
 # ----------------------------------------------------------------------------
 
 
@@ -1023,7 +1024,7 @@ def apply_numeric_validation(
 
 
 # ----------------------------------------------------------------------------
-# 10f. Hyperlink helpers  (Phase 6 補強: Cover sheet ToC navigation)
+# 10f. Hyperlink helpers
 # ----------------------------------------------------------------------------
 
 
@@ -1083,7 +1084,7 @@ def write_toc(
 
 
 # ----------------------------------------------------------------------------
-# 10g. Row-height helper  (Phase 6 補強: T-shirt size mapping)
+# 10g. Row-height helper
 # ----------------------------------------------------------------------------
 
 
@@ -1158,8 +1159,8 @@ def setup_print_layout(
 ) -> None:
     """印刷設定 (landscape default + fit-to-width).
 
-    Phase 6 補強: print title rows / cols (各ページに repeat する header) と、
-    header / footer (page number, document title, date) を任意で受け取る。
+    Print title rows / cols and optional header / footer settings are applied
+    together.
 
     Args:
         ws: Worksheet
@@ -1257,8 +1258,7 @@ def write_cover(
 
 
 # ----------------------------------------------------------------------------
-# Sheet Tab Color — canonical 6 role × 14 sheet mapping
-# Source of truth: references/00_design_guidelines.md and _terminology.md
+# Sheet Tab Color
 # ----------------------------------------------------------------------------
 
 # 6 canonical role → tab color (hex, no leading #)
@@ -1285,6 +1285,10 @@ SHEET_ROLE_MAPPING: dict[str, str] = {
     "CF":               "output",
     "Capital Stack":    "output",
     "Ownership":        "output",
+    "Pricing":          "driver",
+    "Financing":        "output",
+    "Exit Waterfall":   "output",
+    "Segments":         "driver",
     "KPI":              "driver",
     "Scenarios":        "check",
     "Sensitivity":      "check",
@@ -1320,8 +1324,7 @@ def set_tab_color(ws: Worksheet, role: str | None = None) -> None:
         role: 明示 role (cover/input/driver/output/check/memo)。
             ``None`` のとき ``ws.title`` から ``SHEET_ROLE_MAPPING`` で推論。
 
-    sheet name から推論できないとき (= 17 canonical 外の optional sheet で
-    role 未指定) は no-op。
+    sheet name から推論できないときは no-op。
     """
     resolved = role
     if resolved is None:
@@ -1411,7 +1414,7 @@ __all__ = [
     "BRAND_NAVY", "BRAND_GS_NAVY", "BRAND_MS_BLUE", "BRAND_LAZARD_ORANGE",
     "BRAND_EVERCORE_NAVY",
     "BRAND_WARNING", "BRAND_DANGER", "BRAND_SUCCESS", "BRAND_SLATE",
-    # Sheet tab color canonical mapping (Phase 6 補強 §2.X)
+    # Sheet tab color canonical mapping
     "TAB_COLOR_BY_ROLE", "SHEET_ROLE_MAPPING", "get_sheet_role",
     "apply_canonical_tab_colors",
     "BG_WHITE", "BG_CANVAS", "BG_TABLE_HEADER", "BG_TOTAL_BAND", "BG_HEADER_BAND", "BG_WORKING",
@@ -1419,7 +1422,7 @@ __all__ = [
     # Heatmap palettes
     "HEATMAP_LOW_COOL", "HEATMAP_MID_NEUTRAL", "HEATMAP_HIGH_WARM",
     "HEATMAP_GREEN", "HEATMAP_YELLOW", "HEATMAP_RED",
-    # Chart palettes (Phase 6 Fix #8)
+    # Chart palettes
     "IB_CHART_COLORS_FOOTBALL", "IB_CHART_COLORS_BAR", "IB_CHART_COLORS_LINE",
     "IB_CHART_COLORS_WATERFALL_POS", "IB_CHART_COLORS_WATERFALL_NEG",
     "IB_CHART_COLORS_WATERFALL_TOTAL",
@@ -1432,7 +1435,7 @@ __all__ = [
     "FONT_YEAR_HEADER", "FONT_SUBTOTAL", "FONT_GRAND_TOTAL", "FONT_COVER_TITLE",
     # Font semantic aliases
     "FONT_SECTION", "FONT_SUBSECTION", "FONT_TOTAL",
-    # Number formats (Phase 6 補強: 通貨×scale 厳格化、負数 赤)
+    # Number formats
     "FMT_JPY_YEN", "FMT_JPY_THOUSAND", "FMT_JPY_MILLION", "FMT_JPY_HUNDRED_MILLION",
     "FMT_USD_DOLLAR", "FMT_USD_THOUSAND", "FMT_USD_MILLION",
     "FMT_NUM", "FMT_NUM_THOUSAND", "FMT_NUM_MILLION",
@@ -1455,7 +1458,7 @@ __all__ = [
     "BORDER_SECTION_END_MEDIUM", "BORDER_TOP_THIN", "BORDER_BOTTOM_THIN",
     "BORDER_BOTTOM_DOUBLE", "BORDER_BOX_THIN", "BORDER_BOX_MEDIUM", "BORDER_BOX_THICK",
     "THIN_LINE", "MEDIUM_LINE", "THICK_LINE", "DOUBLE_LINE", "HAIRLINE_GRAY", "THIN_GRAY",
-    # Sheet naming (Phase 6 Stage A 14-sheet canonical)
+    # Sheet naming
     "CANONICAL_SHEET_ORDER", "OPTIONAL_SHEETS",
     # Cell-level helpers
     "apply_hard_input", "apply_formula", "apply_link_intra", "apply_link_external",
@@ -1463,17 +1466,17 @@ __all__ = [
     "set_uniform_column_width", "apply_chart_palette",
     "apply_section_header", "apply_year_header",
     "apply_subtotal", "apply_grand_total", "apply_comment", "apply_working_highlight",
-    # Unit / currency helpers (Phase 6 補強)
+    # Unit / currency helpers
     "apply_unit_label", "fmt_for_currency",
-    # Border helpers (Phase 6 補強)
+    # Border helpers
     "apply_section_bottom_border", "apply_box_border",
-    # Conditional formatting (Phase 6 補強)
+    # Conditional formatting
     "apply_heatmap_3color", "apply_data_bar",
-    # Data validation (Phase 6 補強)
+    # Data validation
     "apply_dropdown", "apply_numeric_validation",
-    # Hyperlink (Phase 6 補強)
+    # Hyperlink
     "apply_internal_link", "write_toc",
-    # Row height (Phase 6 補強)
+    # Row height
     "apply_row_heights",
     # Sheet-level helpers
     "setup_sheet_layout", "setup_print_layout", "write_cover", "set_tab_color",

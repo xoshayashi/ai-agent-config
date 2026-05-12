@@ -38,7 +38,7 @@
 - Section headers are unnumbered descriptive labels.
 - Use direct cell references in formulas so model logic can be audited without
   hidden aliases.
-- Use compact financial-model typography: Arial or compatible sans, clear
+- Use the workbook font defined in `_ib_workbook_design_system.md`, clear
   section bands, frozen panes where useful, and readable number formats.
 
 ## Layout-Linked Visual Semantics
@@ -59,8 +59,6 @@ those roles.
   accents may be used when their role is explicit and repeated consistently.
   The base grid stays quiet, with structural palette roles repeated
   consistently so important accents stay immediately visible.
-- Background highlights must be selected from an explicit semantic role
-  palette and must not conflict with the workbook's font-color semantics.
 - Alignment is semantic: source / memo text is left-aligned gray italic, units
   are right-aligned gray, period headers are centered, numeric values are
   right-aligned, and prose is never centered just because it sits in a table.
@@ -72,13 +70,7 @@ those roles.
   months, percentages, and money are charted separately or converted into a
   clearly labeled indexed view.
 
-- Hard-coded input / assumption: blue `#0000FF`.
-- Formula: black `#000000`.
-- Cross-sheet link: green `#008000`.
-- External source or external-link style marker: red `#FF0000`.
-
-The formula-color rule is repeated here only as a layout audit cue; the
-canonical visual treatment lives in `_ib_workbook_design_system.md`.
+Font colors and highlight colors are owned by `_ib_workbook_design_system.md`.
 
 ## Model Design Bar
 

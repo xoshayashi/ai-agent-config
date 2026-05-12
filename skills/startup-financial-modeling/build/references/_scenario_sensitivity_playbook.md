@@ -55,8 +55,8 @@ understand the judgment:
 | Decision implication | What management or investor should do differently |
 | DD action | Evidence needed to confirm or retire the risk |
 
-If a workbook helper uses a generic starter case, rewrite or annotate the case
-so it maps to evidenced drivers before presenting it as decision support.
+Every scenario axis must map to evidenced drivers before it is presented as
+decision support.
 
 Avoid mechanically using volume x price for every model. A pricing decision may
 need price x churn, a runway decision may need burn x financing timing, a debt
@@ -79,8 +79,8 @@ label:
 - proof-before-revenue: milestone timing, prototype or trial cost, grant/advance
   coverage, hiring capacity.
 
-When a workbook helper emits starter cases, rename and annotate the axes so the
-reader sees which evidenced weakness each case is pressuring.
+Name and annotate each axis so the reader sees which evidenced weakness the
+case is pressuring.
 
 ## Breakpoints
 

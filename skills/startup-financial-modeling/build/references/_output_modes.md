@@ -42,17 +42,13 @@ python3 skills/startup-financial-modeling/scripts/build_model.py \
   --mode <mode> --input model.yaml --output model_output.xlsx
 ```
 
-Keep the artifact as small as the decision allows, while preserving dependency
-closure. If a focused sheet contains live formulas, include the upstream or
-downstream sheets needed to audit those formulas; if the user needs a truly lean
-artifact, replace live workbook links with a compact standalone spec or register
-instead of leaving broken references. A pricing model may need customer ROI and
+Keep the artifact as small as the decision allows and dependency-complete. If a
+focused sheet contains live formulas, include the upstream or downstream sheets
+needed to audit those formulas. If the user needs a standalone artifact, compose
+or rewire the logic as a compact spec or register so no remaining surface
+depends on omitted sheets. A pricing model may need customer ROI and
 contribution margin; a cap table may need option pool, secondary, tax, and
-financing round mechanics. A focused bundle must not contain broken sheet
-references after filtering.
-If a user asks to remove sheets, reject exclusions that would leave remaining
-formulas pointing to missing sheets unless the dependent sheets are removed or
-rewired in the same pass.
+financing round mechanics.
 
 Structured inputs should be accepted as first-class model facts, not only as
 free-text narrative. In particular, `currency`, `display_scale`, `grain`,

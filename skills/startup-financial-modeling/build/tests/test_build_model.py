@@ -238,7 +238,7 @@ def test_cost_build_does_not_double_count_detailed_service_costs_in_variable_cog
         assert "SUM('Assumptions'!" not in formula
 
 
-def test_orchestrator_no_longer_routes_through_legacy_saas_skeleton() -> None:
+def test_orchestrator_routes_through_generic_source_plan_builder() -> None:
     orchestrator_text = (SCRIPTS_DIR / "build_model.py").read_text(encoding="utf-8")
 
     assert "three_statement_builder" not in orchestrator_text
@@ -572,7 +572,7 @@ def _unit_label_violations(wb) -> list[str]:
     ]
 
 
-def _legacy_money_scale_formulas(wb) -> list[str]:
+def _raw_money_scale_formula_violations(wb) -> list[str]:
     return [
         f"{ws.title}!{cell.coordinate}: {cell.value}"
         for ws in wb.worksheets
@@ -770,7 +770,7 @@ Source: customer discovery memo, market sizing memo, lender discussion notes.
         assert "customer discovery memo" in str(wb["Market Support"]["B8"].value)
         assert _wrapped_cells(wb) == []
         assert _unit_label_violations(wb) == []
-        assert _legacy_money_scale_formulas(wb) == []
+        assert _raw_money_scale_formula_violations(wb) == []
         assert _numbered_section_labels(wb) == []
         assert _leading_space_labels(wb) == []
         assert _missing_section_band_fills(wb) == []
@@ -1029,6 +1029,8 @@ def test_source_plan_chart_axes_and_tabs_follow_currency_and_semantic_roles() ->
         assert "$K / months" not in axis_titles
         assert "units" in axis_titles
         assert "units / $K" not in axis_titles
+        assert ib.validate_sheet_naming(source_plan.SOURCE_PLAN_SHEETS) == []
+        assert [name for name in source_plan.SOURCE_PLAN_SHEETS if name not in ib.SHEET_ROLE_MAPPING] == []
         assert _tab_rgb(wb["Market Support"]) == ib.BRAND_SLATE
         assert _tab_rgb(wb["Benchmarks"]) == ib.BRAND_WARNING
         assert _tab_rgb(wb["IC Memo"]) == ib.BRAND_ACCENT
@@ -1333,7 +1335,7 @@ if __name__ == "__main__":
     test_ambiguous_mechanics_use_generic_kpis_and_scenario_axes()
     test_cost_labeled_scenario_drivers_pressure_costs_not_revenue()
     test_cost_build_does_not_double_count_detailed_service_costs_in_variable_cogs()
-    test_orchestrator_no_longer_routes_through_legacy_saas_skeleton()
+    test_orchestrator_routes_through_generic_source_plan_builder()
     test_focused_modes_use_generic_kernel_after_bundle_filter()
     test_full_model_uses_direct_formula_refs()
     test_intra_sheet_formula_cells_are_black()
