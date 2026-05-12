@@ -13,8 +13,8 @@ IMAGE_MODEL = "gpt-image-2"
 ALLOWED_16_9_SIZES = {"1536x864", "2048x1152", "2560x1440", "3840x2160"}
 SIZE_LABELS = {
     "1536x864": "fast draft 16:9 image-generation size",
-    "2048x1152": "practical 16:9 2K-width image-generation size for working review",
-    "2560x1440": "QHD/1440p 16:9 image-generation size for high-fidelity final",
+    "2048x1152": "default 16:9 2K-width image-generation output size",
+    "2560x1440": "optional QHD/1440p 16:9 image-generation size; explicit high-detail request only",
     "3840x2160": "4K UHD 16:9 image-generation size; explicit request only",
 }
 PLACEHOLDER_BLOCKERS = [
@@ -36,6 +36,8 @@ PLACEHOLDER_BLOCKERS = [
     "viewpoint_crop",
     "specific_visual_details",
     "imageability_lock",
+    "default_2k_generation_lock",
+    "pdf_export_source_lock",
     "visible_text_only_lock",
     "render_contract_lock",
     "prompt_order_lock",
@@ -183,6 +185,8 @@ def canonical_planning_block(
   image_n: 1
   image_streaming: optional for exploration, final QA uses completed image
   image_delivery_size: 1920x1080 after resize if exact ACT delivery size is required
+  default_2k_generation_lock: use image_size 2048x1152 as the default generated slide output; 1536x864 is draft-only by explicit request, and 2560x1440 or 3840x2160 require explicit high-detail/large-output instruction
+  pdf_export_source_lock: create PDF outputs from the approved slides_final/ PNG masters; do not copy final PNGs into render_check/pdf_pages/ as a second source of truth
   generation_route: Codex built-in image generation
   builtin_generation_lock: when slide images are requested in Codex, invoke Codex built-in image generation directly and start generating; do not pause for local environment preflight or local artifact-route probing before generation
   codex_image_artifact_rule: Codex built-in image generation returns the authoritative generated PNG artifact; use the Codex-provided artifact/download/attachment path to materialize approved outputs under slides_final/ when a filesystem path is needed for PPTX packaging
@@ -204,6 +208,7 @@ def canonical_planning_block(
   single_final_png_master_lock: keep each approved final PNG in exactly one master path under slides_final/ and record that path in review_manifest, pptx_image_mapping, and external_slide_image_mapping when requested
   slides_package_policy: slides_package/ contains PPTX, speaker notes, review_manifest, and metadata only; do not copy final PNG files into slides_package/
   render_check_policy: render_check/pdf_pages/ is optional disposable QA output from PDF/PPT render checks, not a second source of truth; do not copy slides_final/ PNGs there, and overwrite or ignore stale render_check artifacts between checks
+  pdf_export_source_lock: PDF outputs reference slides_final/ master PNGs; render_check/pdf_pages/ may contain only disposable pages rendered back from a PDF/PPT for QA, not source images for PDF creation
   no_duplicate_png_output_lock: do not keep duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/; when duplication appears, preserve slides_final/ as master and update manifests/mappings to reference it
   contact_sheet_mastering_lock: keep one retained contact sheet by default, render_check/contact_sheet_review.png, built from slides_final/ master PNGs
   single_contact_sheet_policy: do not retain parallel contact_sheet_generated*, contact_sheet_package*, and contact_sheet_pdf_render* files for the same slide set; if delivery QA requires comparison, create one render_check/contact_sheet_delivery_compare.png or render_check/render_diff_report.json and remove or ignore intermediate contact sheets
@@ -290,10 +295,12 @@ def canonical_planning_block(
   deck_tone_signature_lock: preserve one material system across the deck for base, typography, rules, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior while varying only message-led layouts
   near_white_slide_base_lock: use #FFFDFC as the default ACT slide canvas, with optional #FAFAF7 only as a barely visible warm off-white tint; keep #F7FBF9 for panels/cards, not the page background; avoid darker cream/beige page bases
   illustration_tone_lock: keep all illustrations in one deck on the same editorial vector system
-  illustration_style_sheet: flat 2D business and healthcare workflow illustration with simplified people, devices, document stacks, CRM panels, rounded UI cards, small icon badges, soft pale mint or warm gray fills, Petrol and charcoal linework, restrained Honey highlights, consistent 2-3px stroke, face detail, body proportion, crop, and fill opacity
+  illustration_style_sheet: domain-matched flat 2D editorial/vector illustration; choose objects from the brief, audience context, and slide message; optional motifs include people, devices, documents, evidence artifacts, UI panels, operational objects, handoff points, map routes, and small icon badges; keep soft pale mint or warm gray fills, Petrol and charcoal linework, restrained Honey highlights, consistent 2-3px stroke, face detail, body proportion, crop, and fill opacity
   illustration_consistency_status: pending / approved / repair_required
   visual_design_quality_traits: [design treatment only: near-white warm base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, intentional canvas occupancy, concrete visual anchor, crisp focal hierarchy; do not change slide count, message order, or storyline solely for this]
   imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation
+  default_2k_generation_lock: 2048x1152 is the standard generated PNG size for both working review and final slide image output unless the user explicitly requests a different valid 16:9 size
+  pdf_export_source_lock: PDF export, when requested, references approved slides_final/ PNG masters; render_check/pdf_pages/ is disposable render QA only and not a storage location for final PNGs
   visible_text_only_lock: exact_text is the only source of visible words; lock names, field names, route/status metadata, speaker notes, and audit instructions are non-rendered
   render_contract_lock: image prompt receives drawing-relevant instructions only: canvas, visible text, layout, visual hierarchy, palette, typography, source rendering, and repair scope
   prompt_order_lock: [draw/edit action -> canvas and brand system -> exact visible text -> fixed header/source components -> layout and reading path -> main visual/chart/table/illustration details -> optional Insight -> focused blockers]
@@ -527,8 +534,20 @@ builtin_generation_lock: invoke Codex built-in image generation directly; do not
 credential_setup_blocker: do not create, request, decrypt, configure, inspect, or wait for account credentials, local tokens, SDK setup, or environment variables; use Codex built-in image generation directly
 prompt_readiness: draft_scaffold_until_blocking_unresolved_items_none
 
-draft_image_prompt_scaffold:
+final_generation_prompt_payload:
 {prompt_lead}
+  canvas_and_brand: use the embedded ACT design system, 1672x941 layout basis, 2048x1152 generated output, near-white slide base, fixed compact header, Noto Sans JP, and ACT palette.
+  exact_visible_text: render only the strings listed under exact_text; no lock names, field names, file paths, audit labels, route/status fields, manifests, or speaker notes.
+  layout_and_reading_path: use selected layout_family, 12-column grid, fixed header/source anchors, one primary focal point, and a clear path from H1 to main structure to evidence/context to optional Insight to Source.
+  visual_structure: choose the message-led chart, table, matrix, map, flow, evidence strip, or domain-matched editorial illustration that makes the argument observable.
+  source_rendering: render Source only when source_line contains real traceable sources; if source_line is none, leave the footer source area blank and draw no separator.
+  focused_blockers: wrong image size, missing/malformed header, invented/garbled text, invented Source, Source separator line, broken chart semantics, unreadable body text, visible workflow metadata, or out-of-scope repair.
+
+non_rendered_workflow_qa:
+  Use the fields below only for planning, review, packaging, and QA. Do not include them as visible slide content or in the final image prompt payload.
+
+draft_image_prompt_scaffold:
+  Distill the final image prompt from final_generation_prompt_payload; keep non_rendered_workflow_qa, PPTX packaging, manifests, credential blockers, contact sheets, and audit statuses outside the image prompt payload.
   Use the embedded ACT design system in SKILL.md. Do not load an external ACT pattern file.
   Apply prompt_order_lock: keep the final generation prompt ordered as draw/edit action, canvas and brand system, exact visible text, fixed header/source components, layout and reading path, main visual/chart/table/illustration details, optional Insight, then focused blockers.
   Apply render_contract_lock: pass drawing-relevant instructions to image generation; keep PPTX packaging, file paths, manifests, credentials, contact sheets, speaker notes, and audit/status fields outside visible slide content.
@@ -542,17 +561,20 @@ draft_image_prompt_scaffold:
   Apply single_final_png_master_lock: review_manifest, pptx_image_mapping, and any external slide-hosting mapping must reference the slides_final/ master path rather than copied PNGs.
   Apply slides_package_policy: slides_package/ contains PPTX, speaker notes, review_manifest, and metadata only; do not copy final PNG files into slides_package/.
   Apply render_check_policy: render_check/pdf_pages/ is optional disposable QA output from rendered PDF/PPT checks only, not another copy of final PNGs.
+  Apply pdf_export_source_lock: create PDFs from slides_final/ master PNGs and keep render_check/pdf_pages/ limited to disposable rendered-back QA pages.
   Apply no_duplicate_png_output_lock: do not keep duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/.
   Apply contact_sheet_mastering_lock: keep one retained contact sheet by default, render_check/contact_sheet_review.png, built from slides_final/ master PNGs.
   Apply single_contact_sheet_policy: do not retain parallel contact_sheet_generated*, contact_sheet_package*, and contact_sheet_pdf_render* files for the same slide set; if package/PDF render QA needs comparison, create one contact_sheet_delivery_compare.png or render_diff_report.json instead.
 
   Plan coordinates on a 1672x941 basis with ACT delivery target 1920x1080 after resize if required.
-  Use size terminology consistently: 1920x1080 is FHD/1080p delivery, 2048x1152 is 16:9 2K-width generation, 2560x1440 is QHD/1440p generation, and 3840x2160 is 4K UHD generation.
+  Apply default_2k_generation_lock: use 2048x1152 as the default generated slide output size for review and final PNGs; use 1536x864 only for explicit quick drafts, 2560x1440 only for explicit QHD/high-detail requests, and 3840x2160 only for explicit 4K requests.
+  Apply pdf_export_source_lock: build PDF outputs from approved slides_final/ master PNGs; never duplicate final PNG masters into render_check/pdf_pages/ for PDF creation.
+  Use size terminology consistently: 1920x1080 is FHD/1080p delivery, 2048x1152 is the default 16:9 2K-width generation output, 2560x1440 is optional QHD/1440p generation by explicit request, and 3840x2160 is 4K UHD generation by explicit request.
   Use a 12-column grid, 8px spacing rhythm, precise shared edges, and fixed header/footer anchors.
   Define deck_tone_master_lock before slide-level prompting and preserve it through the whole deck: slide base, typography scale, header/footer, Petrol role, Honey treatment, illustration style, icon family, density rhythm, whitespace/occupancy rhythm, card/table geometry, outer padding, invisible source alignment baseline, and negative prompt. Later slides must feel like the same deck as the first approved pilot slides.
   Apply deck_tone_signature_lock: preserve one material system across the deck for base, typography, rule weight, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior. Vary layout families from the message, not from random changes in palette, header, surface weight, icon style, or illustration finish.
   Apply illustration_tone_lock: keep all illustrations in one deck on the same editorial vector system.
-  Define illustration_style_sheet before generation and reuse it verbatim across the deck: flat 2D business and healthcare workflow illustration; simplified people with consistent face detail and body proportions; tablet, laptop, document stack, CRM panel, report card, timeline, handoff arrow, and small icon badge objects; soft pale mint or warm gray fills; Petrol and charcoal linework; restrained Honey highlights; consistent 2-3px stroke, crop, shadow softness, and fill opacity.
+  Define illustration_style_sheet before generation and reuse it verbatim across the deck: domain-matched flat 2D editorial/vector illustration; choose objects from the brief, audience context, and slide message; optional examples include simplified people, devices, documents, evidence artifacts, UI panels, operational objects, handoff points, map routes, and small icon badge objects; soft pale mint or warm gray fills; Petrol and charcoal linework; restrained Honey highlights; consistent 2-3px stroke, crop, shadow softness, and fill opacity.
   Apply visual_design_quality_traits as design treatment: near-white warm base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, concrete visual anchor, crisp focal hierarchy, and deliberate canvas occupancy. Do not alter slide count, message order, or storyline solely for visual style.
   Apply near_white_slide_base_lock: use #FFFDFC as the default ACT slide canvas, optionally #FAFAF7 as only a barely visible warm off-white tint; the page should read closer to white than the previous cream/off-white background. Keep #F7FBF9 for panels/cards only, not the full slide background.
   Apply imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation.
@@ -640,6 +662,7 @@ post_generation_audit:
   - generation_route is Codex built-in image generation, not local rendering or a local credential workaround
   - credential_setup_blocker is honored: no account credential, local token, SDK setup, or environment-variable workflow was attempted before generation
   - image_size {size} is valid for gpt-image-2, labeled as {size_label(size)}, and final delivery is resized only after generation if needed
+  - default_2k_generation_lock is honored: generated slide PNGs use 2048x1152 unless the user explicitly requested another valid 16:9 size
   - prompt_order_lock is fulfilled: the prompt led with draw/edit action, canvas/brand, exact visible text, fixed components, layout/reading path, visual details, optional Insight, then focused blockers
   - render_contract_lock is fulfilled: operational metadata stayed out of visible slide content
   - visible_text_only_lock is fulfilled: only exact_text strings appear on the slide
@@ -658,7 +681,7 @@ post_generation_audit:
   - header/footer text does not use Petrol, Honey, yellow, or arbitrary gray
   - deck_tone_signature_lock is honored: base, typography, rule weight, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior feel like one material system
   - illustration_tone_lock is honored: all illustrations share one flat 2D editorial vector system across the generated PNG set
-  - illustration_style_sheet is visible: people, devices, documents, CRM/report panels, rounded UI cards, icon badges, fills, stroke, crop, and facial detail match the declared style sheet
+  - illustration_style_sheet is visible when illustration is used: selected people, devices, documents, UI panels, operational objects, icon badges, fills, stroke, crop, and detail level match the declared domain-matched style sheet
   - illustration_consistency_status is approved after comparing first, middle, and last thirds for stroke weight, fill opacity, face/detail level, object treatment, and illustration density
   - visual_richness_role is fulfilled; planned illustration or visual motif is present when required
   - imageability_lock is fulfilled: a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details are present
@@ -701,6 +724,7 @@ post_generation_audit:
   - Insight component is selective, compatible with the embedded ACT design system, and not decorative
   - invisible footer alignment baseline is preserved without drawing a line
   - output_artifact_mastering_lock is honored: slides_final/ is the single loose-PNG master, slides_package/ contains package artifacts only, and render_check/pdf_pages/ is disposable QA output only
+  - pdf_export_source_lock is honored: PDF outputs are built from slides_final/ master PNGs, and render_check/pdf_pages/ is not used as a source image folder
   - no_duplicate_png_output_lock is honored: no duplicate loose final PNG copies are retained across slides_final/, slides_package/, and render_check/pdf_pages/
   - contact_sheet_mastering_lock is honored: the retained contact sheet is a single render_check/contact_sheet_review.png from slides_final/ unless one explicit delivery comparison sheet or render_diff_report is needed
   - single_contact_sheet_policy is honored: no parallel contact_sheet_generated*, contact_sheet_package*, and contact_sheet_pdf_render* files are retained for the same slide set
@@ -1123,7 +1147,7 @@ def main() -> None:
     parser.add_argument("--archetype", default=UNRESOLVED_ARCHETYPE)
     parser.add_argument("--grid-mode", default=UNRESOLVED_GRID_MODE)
     parser.add_argument("--language", default="Japanese")
-    parser.add_argument("--size", default="2560x1440")
+    parser.add_argument("--size", default="2048x1152")
     parser.add_argument("--quality", default="high", choices=["low", "medium", "high", "auto"])
     parser.add_argument(
         "--primary-guideline",

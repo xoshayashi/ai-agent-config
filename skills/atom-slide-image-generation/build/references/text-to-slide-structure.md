@@ -46,7 +46,7 @@ Use this reference when the input is a long memo, equity story, research note, t
 - Apply `near_white_slide_base_lock`: use `#FCFBF8` as the default ATOM slide canvas, with `#F4F3EF` only as a subtle warm light-neutral tint; keep `#DDE3EA/#D6E1EE` for panels/cards, not the full slide background, and avoid darker cream/beige page bases.
 - Apply `deck_tone_signature_lock`: keep one material system across the deck for base, typography, rule weight, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior. Vary message-led layouts without changing the deck's visual language.
 - Apply `illustration_tone_lock`: keep all illustrations in one deck on the same editorial vector system.
-- Define `illustration_style_sheet` before prompt writing and reuse it across the deck: flat 2D business/healthcare workflow scenes, simplified people, tablets/laptops, document stacks, CRM/report panels, rounded UI cards, small icon badges, soft pale blue-gray or warm gray fills, Deep Blue and charcoal linework, restrained Honey highlights, consistent 2-3px stroke, crop, facial detail, body proportion, and fill opacity.
+- Define `illustration_style_sheet` before prompt writing and reuse it across the deck: domain-matched flat 2D editorial/vector scenes, with objects selected from the brief, audience context, and slide message. Optional motifs include people, devices, documents, evidence artifacts, UI panels, operational objects, handoff points, map routes, and small icon badges; keep soft pale blue-gray or warm gray fills, Deep Blue and charcoal linework, restrained Honey highlights, consistent 2-3px stroke, crop, facial detail, body proportion, and fill opacity.
 - Set illustration intensity before prompt writing: `0_none`, `1_marginal`, `2_integrated`, or `3_restrained_signature`. Use `3_restrained_signature` sparingly. Most slides should use `1_marginal` or `2_integrated`, where the chart, table, matrix, or roadmap remains primary.
 - Set `creative_variance` before prompt writing when the user asks for higher temperature, freshness, or surprise. Use `low`, `medium`, or `high`. High variance changes composition choices, viewpoint, crop, visual metaphor, and layout rhythm; it does not relax brand rules, exact text, source policy, header master, or readability.
 - Prefer human-designed editorial/vector illustration over generated-looking concept art or rough hand-drawn sketch: clean controlled strokes, crisp silhouettes, intentional simplification, restrained fills, clear figure-ground separation, a clear focal motif, and only useful supporting details. Keep the projection, viewpoint, abstraction level, and motif message-led.
@@ -88,6 +88,7 @@ Use this reference when the input is a long memo, equity story, research note, t
    - Apply `source_real_only_lock`: render Source only for real traceable external/provided sources; if no real source exists, set `source_line: none` and draw no Source footer.
    - Apply `source_placeholder_blocklist`: never use brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, working assumptions, upload names, or draft provenance as Source text.
    - Apply `output_artifact_mastering_lock`: approved generated PNGs live once in `slides_final/`; `slides_package/` holds PPTX, notes, manifest, and metadata only; `render_check/pdf_pages/` is disposable render QA output.
+   - Apply `pdf_export_source_lock`: create PDF outputs from `slides_final/` master PNGs; do not use `render_check/pdf_pages/` as a source image folder.
    - Apply `contact_sheet_mastering_lock`: keep one retained `render_check/contact_sheet_review.png` by default; use one comparison sheet or render diff report only when delivery/render QA needs it.
    - Apply `source_line_lock`: render `Source: ...` when traceable sources exist; use `source_line: none` only when no traceable source exists.
    - Apply `source_separator_lock`: Source is text-only; no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline may appear above, below, behind, or adjacent to Source.
@@ -115,7 +116,7 @@ Use this reference when the input is a long memo, equity story, research note, t
    - Decide `source_line`: `Source: ...` with real traceable source names / `none` only when no traceable source exists / research needed.
    - Do not drop real source names to reduce visual density; shorten or group source names instead.
    - Do not place internal process notes, upload filenames, draft provenance, brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions in Source.
-   - Keep package and render-check artifacts pointing at `slides_final/` master PNGs; do not duplicate the same final PNG set into `slides_package/` or `render_check/pdf_pages/`.
+   - Keep package and render-check artifacts pointing at `slides_final/` master PNGs; do not duplicate the same final PNG set into `slides_package/` or `render_check/pdf_pages/`. PDF creation also references `slides_final/` directly.
 
 5. **Visual Structure Assignment**
    - Pick one dominant structure per slide:
@@ -366,6 +367,7 @@ validate_review_manifest:
 slides_final_master_path:
 slides_package_policy:
 render_check_policy:
+pdf_export_source_lock:
 contact_sheet_review_path:
 render_diff_report:
 unresolved_items:
@@ -383,6 +385,7 @@ These practices synthesize common professional-presentation guidance:
 - `slides_final/` is the single loose-PNG master for approved generated slide images.
 - `slides_package/` should contain PPTX, speaker notes, review manifest, and metadata only. It should not contain copied slide PNGs.
 - `render_check/pdf_pages/` is disposable QA output from a rendered PDF/PPT check. It is not a source of truth and can be regenerated.
+- PDF outputs should be created from `slides_final/` master PNGs, not from copied PNGs under `render_check/pdf_pages/`.
 - Keep one retained contact sheet by default: `render_check/contact_sheet_review.png` from `slides_final/`.
 - If delivery QA needs generated-vs-package-vs-PDF comparison, create one `render_check/contact_sheet_delivery_compare.png` or `render_check/render_diff_report.json`; do not retain parallel `contact_sheet_generated*`, `contact_sheet_package*`, and `contact_sheet_pdf_render*` files for the same slide set.
 

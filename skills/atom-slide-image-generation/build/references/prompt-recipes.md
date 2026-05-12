@@ -26,7 +26,7 @@ Quality anchor vocabulary for evaluation and prompt consistency:
 ```text
 generation_mode: new_image / image_edit
 image_model: gpt-image-2
-image_size: 1536x864 for draft, 2048x1152 for working review, or 2560x1440 for final 16:9
+image_size: 2048x1152 by default for generated slide output; 1536x864 for explicit drafts only; 2560x1440 for explicit QHD/high-detail requests only
 image_size_label: 1920x1080 is FHD delivery only; 2048x1152 is 16:9 2K-width; 3840x2160 is 4K UHD
 image_quality: low for draft, medium/high for final or text-heavy slides
 image_background: opaque or auto
@@ -60,6 +60,7 @@ review_manifest_status: approved
 validate_review_manifest: run before PPTX packaging
 output_artifact_mastering_lock: slides_final/ is the only loose-PNG master for approved generated slide images
 single_final_png_master_lock: review manifests and package mappings reference the slides_final/ master path
+pdf_export_source_lock: PDF outputs reference slides_final/ master PNGs; render_check/pdf_pages/ is disposable rendered-back QA output only, not a source image folder for PDF creation
 no_duplicate_png_output_lock: do not keep duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/
 contact_sheet_mastering_lock: keep one retained contact sheet by default, render_check/contact_sheet_review.png, built from slides_final/
 single_contact_sheet_policy: do not retain parallel contact_sheet_generated*, contact_sheet_package*, and contact_sheet_pdf_render* files for the same slide set
@@ -73,16 +74,17 @@ Correct order: gpt-image-2 PNG generation -> PNG review/repair -> PPTX roll-up.
 Only mark image generation blocked after invoking Codex built-in image generation and the image tool itself fails, is unavailable, or refuses the request. Local environment uncertainty is not a blocker.
 completion_blocker: do not report complete while any generated slide has blocker, major, deck-consistency, content-quality, or design-quality issues.
 PPTX package gate requires an approved review manifest.
-Output artifact gate: keep approved generated PNGs only under `slides_final/`; `slides_package/` contains PPTX, speaker notes, review manifest, and metadata only; `render_check/pdf_pages/` is disposable render QA output only.
+Output artifact gate: keep approved generated PNGs only under `slides_final/`; `slides_package/` contains PPTX, speaker notes, review manifest, and metadata only; `render_check/pdf_pages/` is disposable render QA output only. PDF outputs are created from `slides_final/` master PNGs, not from copied PNGs under `render_check/pdf_pages/`.
 Contact sheet gate: keep one retained `render_check/contact_sheet_review.png` by default. If package/PDF render QA needs comparison, create one `render_check/contact_sheet_delivery_compare.png` or `render_check/render_diff_report.json`, not parallel generated/package/pdf_render contact sheets.
 
 ## Base Image Contract
 
 ```text
 Draw a 16:9 strategy slide image with gpt-image-2.
-Generate at 1536x864 for drafts, 2048x1152 for 16:9 2K-width working review, or 2560x1440 for final output.
+Generate at 2048x1152 by default for both working review and final generated slide PNG output. Use 1536x864 only for explicit quick drafts, and 2560x1440 only when the user explicitly asks for QHD/high-detail output.
 Plan all layout using a 1672x941 coordinate basis, with ATOM delivery target 1920x1080 after resize if required.
-Treat 1920x1080 as FHD/1080p delivery, 2048x1152 as practical 16:9 2K-width generation, and 3840x2160 as 4K UHD generation.
+Treat 1920x1080 as FHD/1080p delivery, 2048x1152 as the default 16:9 2K-width generation output, and 3840x2160 as 4K UHD generation.
+default_2k_generation_lock: 2048x1152 is the standard generated output size unless the user explicitly requests another valid 16:9 generation size.
 Use a shared 12-column grid, 8px spacing rhythm, and precise header/footer anchors.
 For decks, define and reuse one deck header master. Treat the header as the lowest-freedom component: repeat the same left accent, H1, subtitle, visual alignment rule, body-start y, header safe area, and clear zone in every slide prompt. no_header_ranges_in_final_prompts: final prompts must use exact selected x/y/w/h/color/font_family/font values for the header, not ranges. Apply header_identity_lock: header is always the same compact left vertical line + H1 + subtitle system, never a slide-specific decoration surface. Apply header_left_accent_master_lock: the accent is a fixed header-block anchor tied to the H1/subtitle stack and copied verbatim across the deck, not a page-edge rail, tall sidebar, body marker, chapter stripe, or ornament. Apply header_left_accent_reference_lock: match the approved 1672x941 reference geometry x=50 y=40 w=10 h=120 color #0B2F5B unless a newer embedded master is supplied. Apply header_left_accent_shape_lock: one solid 10px vertical rectangle, square or 0-2px radius ends, no pill caps, glow, shadow, gradient, split segments, or duplicate marks. Apply header_left_accent_no_protrusion_rule: the accent top aligns with the first visible H1 glyph/title top or sits 0-6px below it; any upward protrusion above H1 is a blocker. Apply header_left_accent_top_protrusion_blocker: any visible accent pixel above H1, page-top floating, clipping outside header_safe_area, detachment from H1/subtitle, or body intrusion is a blocker. Apply header_integrity_blocker_lock: malformed, missing, oversized, recolored, right-decorated, or intruded header is a blocker and must be repaired before other polish.
 For decks, apply deck_tone_signature_lock: preserve one material system for base, typography, rule weight, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior while varying only message-led layouts.
@@ -367,7 +369,7 @@ ATOM slide contract:
 - use embedded ATOM design mechanics
 - use image_model gpt-image-2
 - use generation_mode new_image for new single-slide images or image_edit for screenshot/reference repair
-- use image_size 1536x864 for drafts, 2048x1152 for 16:9 2K-width working review, or 2560x1440 for final output; resize to 1920x1080 after generation if exact FHD/1080p delivery size is required
+- use image_size 2048x1152 by default for generated slide output; use 1536x864 only for explicit quick drafts, 2560x1440 only for explicit QHD/high-detail requests, and resize to 1920x1080 after generation if exact FHD/1080p delivery size is required
 - treat strict DCI 2K 2048x1080 and DCI 4K 4096x2160 as non-target cinema sizes, not ATOM 16:9 slide generation sizes
 - use image_background opaque or auto, never transparent
 - use png for slide fidelity unless latency or file size matters
@@ -431,7 +433,7 @@ ATOM slide contract:
 - keep Insight/message-box text 20-24pt by default, 24-26pt only by exception, at least 6pt smaller than H1, visually below subtitle; it must not become a second title or second hero headline
 - keep Honey quiet: no saturated yellow fill, no dark yellow message box, no large yellow area, and no Honey color variation across a deck
 - Source: render only real traceable source names; when no real source exists, use source_line: none and do not show a Source footer. Never use brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, working assumptions, or other placeholder provenance as Source text.
-- Output files: keep `slides_final/` as the only loose-PNG master. Do not duplicate approved generated PNGs into `slides_package/` or `render_check/pdf_pages/`; package and render-check artifacts must reference the `slides_final/` master.
+- Output files: keep `slides_final/` as the only loose-PNG master. Do not duplicate approved generated PNGs into `slides_package/` or `render_check/pdf_pages/`; package and render-check artifacts must reference the `slides_final/` master. PDF creation also references `slides_final/` masters directly.
 - Keep only one retained contact sheet by default: `render_check/contact_sheet_review.png`. Use one comparison contact sheet or a render diff JSON only when delivery/render QA needs it.
 - final bitmap generation must use gpt-image-2
 - if actual Codex built-in image generation is blocked by the image tool after invocation, stop and report that tool-level blocker; missing local environment uncertainty is not a blocker and must not be used to leave the PPTX unfinished
@@ -732,6 +734,7 @@ Content:
 - source_real_only_lock passes: Source footer is shown only for real traceable external/provided sources
 - source_placeholder_blocklist passes: no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions appears as Source text
 - output_artifact_mastering_lock passes: `slides_final/` is the only loose-PNG master and package/render-check artifacts reference it
+- pdf_export_source_lock passes: PDF outputs are created from `slides_final/` master PNGs; `render_check/pdf_pages/` is rendered-back QA only
 - no_duplicate_png_output_lock passes: no duplicate loose final PNG copies remain across `slides_final/`, `slides_package/`, and `render_check/pdf_pages/`
 - contact_sheet_mastering_lock passes: only one retained contact sheet exists by default, unless one explicit delivery comparison sheet or render diff report is needed
 - source_separator_lock passes: Source is text-only, with no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline above, below, behind, or adjacent to Source

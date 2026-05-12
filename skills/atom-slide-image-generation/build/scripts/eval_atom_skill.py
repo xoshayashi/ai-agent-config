@@ -102,6 +102,7 @@ def check_entrypoint_symlinks() -> list[Result]:
     expected = {
         "scripts/build_atom_slide_prompt.py": "../build/scripts/build_atom_slide_prompt.py",
         "scripts/eval_atom_skill.py": "../build/scripts/eval_atom_skill.py",
+        "scripts/package_slide_images_to_pdf.py": "../build/scripts/package_slide_images_to_pdf.py",
         "scripts/package_slide_images_to_pptx.py": "../build/scripts/package_slide_images_to_pptx.py",
         "scripts/test_package_slide_images_to_pptx.py": "../build/scripts/test_package_slide_images_to_pptx.py",
     }
@@ -143,6 +144,53 @@ def run_helper_check(check: dict) -> Result:
         if needle in combined:
             return Result(check["name"], False, f"forbidden output: {needle}\n{combined[:2000]}")
     return Result(check["name"], True)
+
+
+def check_final_generation_prompt_hygiene() -> Result:
+    script = ROOT / "build" / "scripts" / "build_atom_slide_prompt.py"
+    env = os.environ.copy()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--mode",
+            "single-slide-image",
+            "--archetype",
+            "market-table + supporting-context",
+            "--grid-mode",
+            "message-led split",
+        ],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    combined = proc.stdout + proc.stderr
+    if proc.returncode != 0:
+        return Result("final_generation_prompt_hygiene", False, combined[:2000])
+    start = combined.find("final_generation_prompt_payload:")
+    end = combined.find("\n\nnon_rendered_workflow_qa:", start)
+    if start < 0 or end < 0:
+        return Result("final_generation_prompt_hygiene", False, "missing final_generation_prompt_payload boundary")
+    payload = combined[start:end]
+    forbidden = [
+        "review_manifest",
+        "weak_slide_regeneration_queue",
+        "slides_final/",
+        "PPTX package gate",
+        "credential_setup_blocker",
+        "slides_package/",
+        "render_check/",
+    ]
+    hits = [needle for needle in forbidden if needle in payload]
+    if hits:
+        return Result("final_generation_prompt_hygiene", False, "forbidden generation-prompt terms: " + ", ".join(hits))
+    if "image_size 2048x1152" not in payload:
+        return Result("final_generation_prompt_hygiene", False, "default 2048x1152 image size missing from generation prompt payload")
+    return Result("final_generation_prompt_hygiene", True)
 
 
 def valid_png_bytes(rgb: tuple[int, int, int] = (255, 255, 255)) -> bytes:
@@ -289,6 +337,7 @@ def main() -> int:
     results.extend(check_entrypoint_symlinks())
     for check in config["helper_checks"]:
         results.append(run_helper_check(check))
+    results.append(check_final_generation_prompt_hygiene())
     results.append(run_pptx_package_check())
 
     failed = [r for r in results if not r.passed]
