@@ -68,7 +68,7 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Apply `header_line_top_rule`: the left vertical line is the approved header-block anchor, not a short title tick. On the 1672x941 basis, use `vertical_line x=50 y=40 w=10 h=120 #0B2F5B` unless a newer embedded master is supplied. Its top must never sit above the first visible H1 glyph/title top; align it with the title top or place it 0-6px below. Any upward protrusion, page-top floating, clipping outside `header_safe_area`, detachment from H1/subtitle, or body intrusion is a blocker. If it fails, repair the line x/y/h before touching H1.
 - Apply `header_integrity_blocker_lock`: malformed, missing, oversized, recolored, right-decorated, or intruded headers are blockers; repair header identity before other visual polish.
 - Apply `header_footer_text_color_lock`: H1 `#2D332E`, subtitle `#4D544E`, footer/source/table-note text `#6E756E`. Do not use Deep Blue, Honey, yellow, or arbitrary gray for header/footer text.
-- Define `deck_tone_master_lock` before image generation and check generated images for whole-deck tone consistency before PPTX roll-up.
+- Define `deck_tone_master_lock` before image generation and check generated images for whole-deck tone consistency before PPTX/PDF packaging.
 - Check `illustration_consistency_status` after image generation by comparing first, middle, and last thirds for stroke weight, fill opacity, face/detail level, object treatment, and illustration density.
 - After image generation, run `post_generation_design_balance_check` on actual PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
 - Use `visual_asset_judgment`: add illustration/icons only when they help understanding, memory, comparison, or navigation; do not add them by quota.
@@ -160,7 +160,7 @@ Use this reference when the input is a long memo, strategy narrative, research n
    - Draft `speaker_notes_text` for every deck slide before image prompting, with `speaker_notes_depth_lock` so PPT notes are substantial enough to present from.
    - Use the deck language unless the user specifies otherwise.
    - Notes should include: the spoken message in plain language, the evidence or assumption to mention, source caveat or confidence level when relevant, and a transition to the next slide.
-   - Keep notes out of `exact_text` and out of the image prompt's on-slide text. Speaker notes belong in PPTX or external slide-hosting notes pages after image generation.
+   - Keep notes out of `exact_text` and out of the image prompt's on-slide text. Speaker notes belong in PPTX or PPTX speaker notes after image generation.
    - Do not add unsupported facts, invented sources, internal prompt notes, file paths, or production-route language to speaker notes.
 
 9. **Image Prompt Handoff**

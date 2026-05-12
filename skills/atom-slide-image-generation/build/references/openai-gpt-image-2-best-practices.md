@@ -48,7 +48,7 @@ image_size_label: 1920x1080 is FHD delivery only; 2048x1152 is 16:9 2K-width; 38
 image_quality: low for fast layout drafts, medium/high for dense text or final slides
 image_background: opaque or auto
 image_output_format: png
-image_output_compression: only when output_format is jpeg or webp
+image_output_compression: none for PNG slide masters
 image_moderation: auto
 image_n: 1 for final text-heavy slides; multiple variations only for drafts
 image_streaming: optional for exploration, final QA uses completed image
@@ -73,7 +73,7 @@ Other model constraints from the official references:
 - `n` can be used for variations when exploring, but generate one final text-heavy slide at a time for easier QA.
 - `gpt-image-2` does not support transparent background. Requests with `background: "transparent"` fail.
 - Omit `input_fidelity` for `gpt-image-2`; image inputs are processed at high fidelity automatically.
-- `png` is the fidelity-safe default. `jpeg` is faster; `webp` or `jpeg` may use `output_compression`.
+- `png` is the required slide-master format for this skill; do not use non-PNG masters.
 - `moderation: "auto"` is the default and should remain the default for slide workflows.
 - Streaming and partial images can provide earlier visual feedback during exploration; final decisions must use the completed image.
 - Complex prompts and final-quality images may take up to about two minutes.

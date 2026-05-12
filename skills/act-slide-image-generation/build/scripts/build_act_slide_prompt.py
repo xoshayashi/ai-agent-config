@@ -185,7 +185,7 @@ def canonical_planning_block(
   image_moderation: auto
   image_n: 1
   image_streaming: optional for exploration, final QA uses completed image
-  image_delivery_size: 1920x1080 after resize if exact ACT delivery size is required
+  image_delivery_size: same as approved generated PNG unless the user explicitly requests another valid 16:9 output size
   default_2k_generation_lock: use image_size 2048x1152 as the default generated slide output; 1536x864 is draft-only by explicit request, and 2560x1440 or 3840x2160 require explicit high-detail/large-output instruction
   pdf_export_source_lock: create PDF outputs from the approved slides_final/ PNG masters; do not copy final PNGs into render_check/pdf_pages/ as a second source of truth
   generation_route: Codex built-in image generation
@@ -206,24 +206,15 @@ def canonical_planning_block(
   generation_status: pending_builtin_generation
   output_files: [filled after Codex image generation]
   output_artifact_mastering_lock: slides_final/ is the only loose-PNG master for approved generated slide images; package and review artifacts reference it instead of making additional loose PNG copies
-  single_final_png_master_lock: keep each approved final PNG in exactly one master path under slides_final/ and record that path in review_manifest, package_image_mapping, pptx_image_mapping, pdf_image_mapping, and external_slide_image_mapping when requested
+  single_final_png_master_lock: keep each approved final PNG in exactly one master path under slides_final/ and record that path in review_manifest, package_image_mapping, pptx_image_mapping, pdf_image_mapping
   slides_package_policy: slides_package/ contains PPTX, speaker notes, review_manifest, and metadata only; do not copy final PNG files into slides_package/
   render_check_policy: render_check/pdf_pages/ is optional disposable QA output from PDF/PPT render checks, not a second source of truth; do not copy slides_final/ PNGs there, and overwrite or ignore stale render_check artifacts between checks
   pdf_export_source_lock: PDF outputs reference slides_final/ master PNGs; render_check/pdf_pages/ may contain only disposable pages rendered back from a PDF/PPT for QA, not source images for PDF creation
   no_duplicate_png_output_lock: do not keep duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/; when duplication appears, preserve slides_final/ as master and update manifests/mappings to reference it
   contact_sheet_mastering_lock: keep one retained contact sheet by default, render_check/contact_sheet_review.png, built from slides_final/ master PNGs
   single_contact_sheet_policy: do not retain parallel contact_sheet_generated*, contact_sheet_package*, and contact_sheet_pdf_render* files for the same slide set; if delivery QA requires comparison, create one render_check/contact_sheet_delivery_compare.png or render_check/render_diff_report.json and remove or ignore intermediate contact sheets
-  external_slide_delivery: optional only when explicitly requested; otherwise not_requested
-  external_slide_status: not_requested / pending_generated_images_and_pre_external_slide_image_review / inserted / blocked
-  external_slide_title: N/A unless explicitly requested
-  external_slide_file_id: N/A unless explicitly requested
-  external_slide_url: N/A unless explicitly requested
-  external_slide_count: N/A unless explicitly requested; if requested, must match generated image count
-  external_slide_route: N/A unless explicitly requested / external_slide_import / packaging_pptx_import / blocked
-  external_slide_image_mapping: N/A unless explicitly requested; if requested, [slide_id -> generated PNG path -> external slide objectId]
-  external_slide_speaker_notes_mapping: N/A unless explicitly requested; if requested, [slide_id -> speakerNotesObjectId -> inserted note status]
   package_delivery: requested outputs only after all generated PNGs pass QA; PPTX and PDF are delivery wrappers from slides_final/ masters
-  pptx_delivery: default image-only roll-up after all generated PNGs pass QA, unless user asks for image files/PDF only
+  pptx_delivery: requested PPTX wrapper after all generated PNGs pass QA
   pptx_status: pending_generated_images_and_pre_package_image_review
   pdf_delivery: optional delivery wrapper when requested, built directly from approved slides_final/ PNG masters
   pdf_status: not_requested / pending_generated_images_and_pre_package_image_review / created / blocked
@@ -233,18 +224,17 @@ def canonical_planning_block(
   pdf_output_path: [filled after PDF creation]
   pptx_slide_count: [must match generated image count]
   pdf_slide_count: [must match generated image count]
-  pptx_packaging_route: scripts/package_slide_images_to_pptx.py / presentation_app_import / blocked
+  pptx_packaging_route: scripts/package_slide_images_to_pptx.py / blocked
   pdf_packaging_route: scripts/package_slide_images_to_pdf.py / blocked
   package_image_mapping: [slide_id -> slides_final PNG path -> requested output index]
   pptx_image_mapping: [slide_id -> generated PNG path -> PPTX slide index]
   pdf_image_mapping: [slide_id -> generated PNG path -> PDF page index]
   pptx_speaker_notes_mapping: [slide_id -> note source -> inserted / sidecar / blocked]
-  speaker_notes_plan: one substantial note per deck slide, drafted before image generation and inserted into PPTX or external slide-hosting notes page after image roll-up when the packaging route supports notes
+  speaker_notes_plan: one substantial note per deck slide, drafted before image generation and inserted into PPTX after image roll-up when the packaging route supports notes
   speaker_notes_status: drafted / inserted / blocked
   speaker_notes_depth_lock: [PPT talk script should be 4-7 substantive Japanese sentences or roughly 180-320 Japanese chars per slide unless the user requests brief notes; include opening framing, 2-3 evidence/assumption talking points, implication, caveat when relevant, and transition; do not invent facts]
   speaker_notes_text: [substantial PPT talk script + evidence/assumption cue + source caveat if relevant + transition cue; keep off slide image]
-  pre_external_slide_image_review: required on actual generated PNG before any external slide-hosting insertion
-  pre_package_image_review: required on actual generated PNG before any PPTX/PDF roll-up or external slide insertion
+  pre_package_image_review: required on actual generated PNG before any PPTX/PDF roll-up or completion
   post_generation_full_deck_review_loop: after generating slide PNGs, review every actual image before claiming completion
   all_generated_images_reviewed: false until every output PNG path has been opened and reviewed
   image_review_iteration: 0 before first review; increment after each regenerated or edited PNG
@@ -271,7 +261,7 @@ def canonical_planning_block(
   deck_tone_consistency_review: [first third vs middle third vs last third tone comparison after generation]
   deck_tone_consistency_status: pending / approved / repair_required
   deck_tone_repair_plan: [slides to regenerate or edit if tone drift appears]
-  post_generation_design_balance_check: required on actual generated PNGs before PPTX/PDF roll-up or external slide insertion; checks whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity
+  post_generation_design_balance_check: required on actual generated PNGs before PPTX/PDF packaging; checks whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity
   whitespace_occupancy_balance_status: pending / approved / repair_required
   typography_balance_status: pending / approved / repair_required
   color_consistency_status: pending / approved / repair_required
@@ -446,7 +436,7 @@ def mode_guidance(mode: str) -> str:
   - Build layout_diversity_plan: assign layout_family for each slide across full-field, asymmetric main/supporting-context, balanced comparison, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase families when the argument benefits.
   - Use layout_rotation_guard to keep repeated structures purposeful: repeat a family for like-for-like comparison, and change family when message type, evidence type, or decision question changes.
   - Draft speaker_notes_text for every slide with speaker_notes_depth_lock: substantial Japanese PPT talk script, 4-7 sentences or roughly 180-320 Japanese chars, with framing, evidence/assumption cues, implication, caveat if relevant, and transition.
-  - Add pre_package_image_review, pre_external_slide_image_review, post_generation_full_deck_review_loop, all_generated_images_reviewed, weak_slide_regeneration_queue, content_quality_status, design_quality_status, deck_unity_status, completion_ready_status, and regenerate_until_quality_approved fields so generated PNGs are reviewed, repaired, and re-reviewed before PPTX, external slide insertion, or completion.
+  - Add pre_package_image_review, post_generation_full_deck_review_loop, all_generated_images_reviewed, weak_slide_regeneration_queue, content_quality_status, design_quality_status, deck_unity_status, completion_ready_status, and regenerate_until_quality_approved fields so generated PNGs are reviewed, repaired, and re-reviewed before PPTX, or completion.
   - Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide before image prompting.
   - Run density_design for every slide: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
   - Apply density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting.
@@ -489,7 +479,7 @@ def mode_guidance(mode: str) -> str:
   - Preserve distinct messages as separate slides; combine only repeated messages or evidence that must be compared in one view.
   - Define deck master refs for header, invisible footer alignment baseline, Insight surfaces, tables, cards, and icon circles.
   - Allocate Insight components selectively across the deck and avoid mechanical card-only repetition; apply message_box_compactness_blocker_lock so oversized banner-like Insight surfaces are repaired before generation.
-  - Draft speaker_notes_text for every slide with speaker_notes_depth_lock and plan PPTX/PDF roll-up with one full-bleed generated PNG plus corresponding substantial speaker notes per slide. Plan external slide-hosting only when explicitly requested.
+  - Draft speaker_notes_text for every slide with speaker_notes_depth_lock and plan PPTX/PDF roll-up with one full-bleed generated PNG plus corresponding substantial speaker notes per slide.
   - Plan post_generation_full_deck_review_loop: after generating slide PNGs, review every actual image before claiming completion, classify blocker/major/minor issues, fill weak_slide_regeneration_queue, repair/regenerate, and continue until all_generated_images_reviewed is true, the queue is empty, and completion_ready_status is approved.
   - Apply completion_blocker: do not report complete while any generated slide has blocker, major, deck-consistency, content-quality, or design-quality issues.
   - Do not generate final images until each slide has its own canonical planning block."""
@@ -508,7 +498,7 @@ def mode_guidance(mode: str) -> str:
   - Re-audit after proposed changes."""
     return """mode_guidance:
   - Produce one slide planning block, then image_model, draft_image_prompt_scaffold, negative_prompt_hard_blockers, and post_generation_audit.
-  - Include pre_package_image_review, pre_external_slide_image_review, post_generation_full_deck_review_loop, all_generated_images_reviewed, weak_slide_regeneration_queue, content_quality_status, design_quality_status, deck_unity_status, completion_ready_status, regenerate_until_quality_approved, and repair_iteration_plan; do not treat first generation as final without inspecting the actual PNG.
+  - Include pre_package_image_review, post_generation_full_deck_review_loop, all_generated_images_reviewed, weak_slide_regeneration_queue, content_quality_status, design_quality_status, deck_unity_status, completion_ready_status, regenerate_until_quality_approved, and repair_iteration_plan; do not treat first generation as final without inspecting the actual PNG.
   - Apply completion_blocker: do not report complete while any generated slide has blocker, major, deck-consistency, content-quality, or design-quality issues.
   - Treat unresolved layout_archetype or grid_mode as blockers before final generation."""
 
@@ -569,7 +559,7 @@ draft_image_prompt_scaffold:
   Correct order: generate gpt-image-2 PNGs, review and repair PNGs, then package approved PNGs into requested PPTX/PDF outputs.
   Only mark image generation blocked after invoking Codex built-in image generation and the image tool itself fails, is unavailable, or refuses the request. Local environment uncertainty is not a blocker.
   Apply output_artifact_mastering_lock: write approved generated PNGs once under slides_final/ and treat that path as the sole loose-PNG master.
-  Apply single_final_png_master_lock: review_manifest, package_image_mapping, pptx_image_mapping, pdf_image_mapping, and any external slide-hosting mapping must reference the slides_final/ master path rather than copied PNGs.
+  Apply single_final_png_master_lock: review_manifest, package_image_mapping, pptx_image_mapping, pdf_image_mapping must reference the slides_final/ master path rather than copied PNGs.
   Apply slides_package_policy: slides_package/ contains PPTX, speaker notes, review_manifest, and metadata only; do not copy final PNG files into slides_package/.
   Apply render_check_policy: render_check/pdf_pages/ is optional disposable QA output from rendered PDF/PPT checks only, not another copy of final PNGs.
   Apply pdf_export_source_lock: create PDFs from slides_final/ master PNGs and keep render_check/pdf_pages/ limited to disposable rendered-back QA pages.
@@ -577,7 +567,7 @@ draft_image_prompt_scaffold:
   Apply contact_sheet_mastering_lock: keep one retained contact sheet by default, render_check/contact_sheet_review.png, built from slides_final/ master PNGs.
   Apply single_contact_sheet_policy: do not retain parallel contact_sheet_generated*, contact_sheet_package*, and contact_sheet_pdf_render* files for the same slide set; if package/PDF render QA needs comparison, create one contact_sheet_delivery_compare.png or render_diff_report.json instead.
 
-  Plan coordinates on a 1672x941 basis with ACT delivery target 1920x1080 after resize if required.
+  Plan coordinates on a 1672x941 basis and generate approved PNG masters at the requested valid 16:9 size.
   Apply default_2k_generation_lock: use 2048x1152 as the default generated slide output size for review and final PNGs; use 1536x864 only for explicit quick drafts, 2560x1440 only for explicit QHD/high-detail requests, and 3840x2160 only for explicit 4K requests.
   Apply pdf_export_source_lock: build PDF outputs from approved slides_final/ master PNGs; never duplicate final PNG masters into render_check/pdf_pages/ for PDF creation.
   Use size terminology consistently: 1920x1080 is FHD/1080p delivery, 2048x1152 is the default 16:9 2K-width generation output, 2560x1440 is optional QHD/1440p generation by explicit request, and 3840x2160 is 4K UHD generation by explicit request.
@@ -632,7 +622,7 @@ draft_image_prompt_scaffold:
   Let the planned chart/table/matrix/roadmap carry the argument where it is the clearest reader path; illustration adds memory, wayfinding, and selective emphasis through a clear focal motif, useful supporting details, clean controlled linework, crisp silhouettes, restrained fills, rounded UI panels, small icon badges, and short annotations.
   Make abstract messages imageable by naming the concrete visual anchor and visible details: an operating view, workflow handoff, document stack, data row, map route, queue, machine cell, screen state, evidence artifact, or customer moment that fits the message.
   Apply speaker_notes_depth_lock: for PPTX decks, write speaker notes as a substantial Japanese talk script, normally 4-7 sentences or roughly 180-320 Japanese characters per slide unless the user requests brief notes. Include opening framing, 2-3 evidence or assumption talking points, the implication to say aloud, caveat/source context when relevant, and a transition to the next slide.
-  Keep speaker notes out of the slide image. Speaker notes are inserted later into PPTX or external slide-hosting notes pages and should not appear as visible on-slide text.
+  Keep speaker notes out of the slide image. Speaker notes are inserted later into PPTXs and should not appear as visible on-slide text.
   Do not hard-code one visual grammar across slides. Select the projection, viewpoint, abstraction level, motif, and level of detail from the slide message; use depth or spatial perspective only when it carries meaning. Do not use decorative trapezoid planes, fake perspective floors, isometric boxes, tilted architectural slabs, vanishing points, or pseudo-3D depth as a shortcut for freshness.
   Keep visual subject selection open and message-led; use the subject that makes the argument most observable through scale, interaction, place, evidence, or operating context.
   Create freshness through viewpoint, asymmetric composition, designed margin vignettes, evidence strips, partial cutaways, and magnified details, not decoration or glossy concept art.
@@ -759,14 +749,12 @@ post_generation_audit:
   - review_manifest_status: approved after validate_review_manifest covers every generated PNG path, confirms slides_final/ master paths are used, confirms weak_slide_regeneration_queue is empty, and confirms all final/content/design/deck-unity/completion statuses are approved
   - post_generation_design_balance_check is approved on actual generated PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, header integrity, card/table height equalization, line-weight consistency, icon-family consistency, Petrol scatter, Honey strength, and human-designed operational diagram feel
   - pre_package_image_review has inspected the actual generated PNG, not only the prompt
-  - pre_external_slide_image_review is also approved when external slide-hosting roll-up is requested
   - image_review_status is approved only when there are no blocker or major issues
   - PPTX/PDF roll-up starts only after final_image_quality_status is approved for every generated PNG
   - PPTX/PDF roll-up contains one full-bleed generated PNG per slide in order, with speaker notes inserted when packaging supports notes
-  - external slide-hosting roll-up, when requested, contains one full-bleed generated PNG per slide and speaker notes inserted on every corresponding slide
 
 pre_package_image_review:
-  - Inspect the actual generated PNG with multimodal review before any PPTX/PDF roll-up or external slide insertion.
+  - Inspect the actual generated PNG with multimodal review before any PPTX/PDF roll-up or completion.
   - Review every actual generated image in the deck as a set before claiming completion.
   - Score model route, exact text, header lock, grid/shared edges, typography, density, illustration clarity, human-designed feel, source hygiene, and speaker-notes separation.
   - Score layout_family fit and layout_rotation_guard across the generated image set.
@@ -780,7 +768,7 @@ pre_package_image_review:
   - Apply repair_or_regenerate_decision: edit localized defects; regenerate when the core composition, density, tone, reading path, semantic graphic structure, or visual anchor fails.
   - Continue until all_generated_images_reviewed is true, weak_slide_regeneration_queue is empty, final_image_quality_status is approved, and completion_ready_status is approved.
   - If generation or repair is blocked, set completion_ready_status: blocked, keep unresolved slides in the review_manifest, and do not package or report complete.
-  - PPTX package gate requires an approved review manifest; run validate_review_manifest before packaging.
+  - PPTX/PDF package gate requires an approved review manifest; run validate_review_manifest before packaging.
 
 repair_iteration_plan:
   - iteration_0: first generated PNG review
@@ -902,7 +890,6 @@ def deck_plan_tail() -> str:
   - source_collection_needs:
   - speaker_notes_plan:
   - speaker_notes_depth_lock: substantial Japanese PPT talk script, 4-7 sentences or roughly 180-320 Japanese chars per slide unless user requests brief notes
-  - pre_external_slide_review_plan:
   - pre_package_image_review_plan:
   - post_generation_full_deck_review_loop: after generating slide PNGs, review every actual image before claiming completion
   - all_generated_images_reviewed:
@@ -934,7 +921,7 @@ def deck_plan_tail() -> str:
   - generation_block_rule: only if Codex built-in generation or repair is actually blocked by the image tool, mark completion_ready_status: blocked and do not package or report complete; do not use local environment uncertainty as the blocker
   - review_manifest:
   - review_manifest_status: approved
-  - pptx_package_gate: PPTX package gate requires an approved review manifest
+  - package_gate: PPTX/PDF package gate requires an approved review manifest
   - validate_review_manifest:
   - package_delivery:
   - pdf_delivery:
@@ -944,7 +931,6 @@ def deck_plan_tail() -> str:
   - package_image_mapping:
   - pdf_image_mapping:
   - pptx_rollup_plan:
-  - external_slide_rollup_plan: optional only when explicitly requested
   - slides_requiring_full_planning_block:
   - blocking_unresolved_items: all slide-level planning blocks remain required before image generation
 """
@@ -1001,7 +987,6 @@ def text_structure_tail() -> str:
       speaker_notes_text:
       speaker_notes_source_cues:
       speaker_notes_transition:
-      pre_external_slide_image_review:
       pre_package_image_review:
       post_generation_full_deck_review_loop: after generating slide PNGs, review every actual image before claiming completion
       all_generated_images_reviewed:
@@ -1124,8 +1109,7 @@ def text_structure_tail() -> str:
   layout_sequence_table:
   unresolved_items:
   pptx_rollup_plan:
-  external_slide_rollup_plan: optional only when explicitly requested
-  next_step: create canonical planning blocks for image_prompt_ready slides, run Codex built-in image generation pilot, then run pre_package_image_review before any PPTX/PDF roll-up or external slide insertion."""
+  next_step: create canonical planning blocks for image_prompt_ready slides, run Codex built-in image generation pilot, then run pre_package_image_review before any PPTX/PDF roll-up or completion."""
 
 
 def audit_tail() -> str:

@@ -147,6 +147,33 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 pptx_packager.collect_images([str(image)])
 
+    def test_rejects_legacy_manifest_path_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
+            manifest = root / "review.json"
+            image.write_bytes(png_bytes())
+            data = approved_manifest([image])
+            data["slides"][0]["image_path"] = data["slides"][0].pop("png_path")
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+            images = pptx_packager.collect_images([str(image)])
+
+            with self.assertRaises(SystemExit):
+                pptx_packager.validate_review_manifest(str(manifest), images)
+
+    def test_rejects_non_png_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.jpg"
+            image.write_bytes(b"\xff\xd8\xff\xd9")
+
+            with self.assertRaises(SystemExit):
+                pptx_packager.collect_images([str(image)])
+
 
 if __name__ == "__main__":
     unittest.main()
