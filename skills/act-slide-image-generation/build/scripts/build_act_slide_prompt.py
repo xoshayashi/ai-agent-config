@@ -17,7 +17,7 @@ SIZE_LABELS = {
     "2560x1440": "optional QHD/1440p 16:9 image-generation size; explicit high-detail request only",
     "3840x2160": "4K UHD 16:9 image-generation size; explicit request only",
 }
-PLACEHOLDER_BLOCKERS = [
+REQUIRED_PROMPT_FIELDS = [
     "slide_message",
     "column_spans",
     "row_tracks",
@@ -151,7 +151,7 @@ def size_label(size: str) -> str:
 
 
 def unresolved_items(archetype: str, grid_mode: str) -> list[str]:
-    unresolved = PLACEHOLDER_BLOCKERS.copy()
+    unresolved = REQUIRED_PROMPT_FIELDS.copy()
     if archetype.startswith("UNRESOLVED"):
         unresolved.insert(1, "layout_archetype")
     if grid_mode.startswith("UNRESOLVED"):

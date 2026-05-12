@@ -396,7 +396,7 @@ def run_pdf_package_check() -> Result:
             return Result("pdf_package_check", False, combined[:2000])
         if "pdf_output_path:" not in combined:
             return Result("pdf_package_check", False, combined[:2000])
-        if "pdf_image_mapping:" not in combined:
+        if "pdf_image_mapping: {" not in combined:
             return Result("pdf_package_check", False, combined[:2000])
         if not output.exists() or output.stat().st_size <= 0:
             return Result("pdf_package_check", False, "PDF output was not created")

@@ -73,7 +73,7 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             manifest.write_text(json.dumps(approved_manifest([image])), encoding="utf-8")
 
             images = pptx_packager.collect_images([str(image)])
-            slide_notes = pptx_packager.load_notes(str(notes), None, 1, images)
+            slide_notes = pptx_packager.load_notes(notes_json=str(notes), notes_file=None, slide_count=1, images=images)
             pptx_packager.validate_review_manifest(str(manifest), images)
             pptx_packager.build_pptx(output, images, slide_notes)
             pptx_packager.validate_pptx(output, images, slide_notes)

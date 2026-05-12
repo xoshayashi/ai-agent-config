@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 import struct
 import sys
 import zlib
@@ -57,6 +58,7 @@ def unfilter_scanlines(data: bytes, width: int, height: int, bytes_per_pixel: in
 
 
 def png_rgb_payload(path: Path) -> tuple[int, int, bytes]:
+    # CRC validation is delegated to validate_png_bytes() through collect_images().
     data = path.read_bytes()
     if not data.startswith(b"\x89PNG\r\n\x1a\n"):
         raise SystemExit(f"{path} is not a PNG file.")
@@ -100,6 +102,7 @@ def build_pdf(output: Path, images: list[Path]) -> None:
     objects: list[bytes] = []
     page_object_ids: list[int] = []
     for width, height, compressed_rgb in payloads:
+        # Catalog and Pages are prepended after this loop, so image objects start at ID 3.
         image_id = len(objects) + 3
         content_id = image_id + 1
         page_id = image_id + 2
@@ -143,6 +146,10 @@ def build_pdf(output: Path, images: list[Path]) -> None:
     output.write_bytes(content)
 
 
+def image_mapping(images: list[Path]) -> dict[str, dict[str, str | int]]:
+    return {str(idx): {"png_path": str(image), "pdf_page": idx} for idx, image in enumerate(images, 1)}
+
+
 def parse_args(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(description="Package slides_final PNG masters into a PDF deck.")
     parser.add_argument("images", nargs="+", help="Approved slides_final PNG files or directories.")
@@ -161,12 +168,10 @@ def main(argv: list[str] | None = None) -> int:
         raise SystemExit(f"PDF was not created: {output}")
     if not output.read_bytes().startswith(b"%PDF"):
         raise SystemExit(f"PDF output is malformed: {output}")
-    print("pdf_package_status: created")
     print(f"pdf_output_path: {output}")
     print(f"pdf_slide_count: {len(images)}")
-    print("pdf_image_mapping:")
-    for idx, image in enumerate(images, 1):
-        print(f"  {idx}: {image}")
+    print("pdf_image_mapping: " + json.dumps(image_mapping(images), ensure_ascii=False, sort_keys=True))
+    print("pdf_package_status: created")
     return 0
 
 
