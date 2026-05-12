@@ -987,7 +987,7 @@ def _build_cf(wb: Workbook, facts: SourceFacts) -> None:
         (23, "Net cash flow", "JPY", [f"={get_column_letter(c)}16+SUM({get_column_letter(c)}19:{get_column_letter(c)}22)" for c in cols]),
         (30, "Beginning cash", "JPY", [f"='Assumptions'!{get_column_letter(c)}47" for c in cols]),
         (31, "Ending cash", "JPY", [f"={get_column_letter(c)}30+{get_column_letter(c)}23" for c in cols]),
-        (32, "Runway months", "months", [f"=IF({get_column_letter(c)}16>=0,99,{get_column_letter(c)}31/ABS({get_column_letter(c)}16/12))" for c in cols]),
+        (32, "Runway months", "months", [f"=IF({get_column_letter(c)}16>=0,99,MAX(0,{get_column_letter(c)}31)/ABS({get_column_letter(c)}16/12))" for c in cols]),
     ]
     for row, label, unit, values in rows:
         fmt = ib.FMT_NUM if unit == "months" else ib.FMT_MONEY

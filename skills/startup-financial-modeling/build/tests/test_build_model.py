@@ -273,9 +273,30 @@ def test_intra_sheet_formula_cells_are_black() -> None:
             for sheet, cell, formula in _formula_cells(wb)
             if "!" not in formula
             for color in [_font_rgb(wb[sheet][cell])]
-            if color != ib.IB_FORMULA
+            if color is not None and color != ib.IB_FORMULA
         ]
         assert violations == []
+
+
+def test_ic_memo_dependency_stays_compact_when_added_to_focused_bundle() -> None:
+    bundle = build_model.resolve_bundle("market_sizing", additional_sheets=["IC Memo"])
+
+    assert "IC Memo" in bundle
+    assert "Kernel" in bundle
+    assert "KPI" not in bundle
+    assert "Scenarios" not in bundle
+    assert "Valuation" not in bundle
+
+
+def test_cash_flow_runway_formula_floors_negative_cash_at_zero() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "full.xlsx"
+        build_model.build_model(None, out, mode="full")
+
+        wb = load_workbook(out, data_only=False)
+        formula = wb["CF"].cell(32, FIRST_VALUE_COL).value
+
+        assert formula == f"=IF({FIRST_VALUE_LETTER}16>=0,99,MAX(0,{FIRST_VALUE_LETTER}31)/ABS({FIRST_VALUE_LETTER}16/12))"
 
 
 def test_cross_sheet_formula_cells_are_green() -> None:
@@ -1176,6 +1197,8 @@ if __name__ == "__main__":
     test_focused_modes_use_generic_kernel_after_bundle_filter()
     test_full_model_uses_direct_formula_refs()
     test_intra_sheet_formula_cells_are_black()
+    test_ic_memo_dependency_stays_compact_when_added_to_focused_bundle()
+    test_cash_flow_runway_formula_floors_negative_cash_at_zero()
     test_cross_sheet_formula_cells_are_green()
     test_pricing_bundle_is_intent_sized()
     test_all_modes_produce_expected_bundles()
