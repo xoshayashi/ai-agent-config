@@ -1,0 +1,1164 @@
+"""Economic-kernel extraction and driver composition for startup models."""
+
+from __future__ import annotations
+
+import re
+from dataclasses import dataclass
+from datetime import date
+from pathlib import Path
+from typing import Any, Iterable
+
+DEFAULT_FORECAST_PERIODS = 5
+MAX_FORECAST_PERIODS = 24
+
+
+def forecast_years(start_year: int | None = None, periods: int = DEFAULT_FORECAST_PERIODS) -> list[int]:
+    """Return the model forecast years without baking a calendar year into code."""
+    base_year = start_year if start_year is not None else date.today().year
+    return [base_year + idx for idx in range(periods)]
+
+
+def forecast_axis(start_year: int | None = None, periods: int = DEFAULT_FORECAST_PERIODS, grain: str = "annual") -> tuple[list[int], list[str]]:
+    """Return period years plus display labels for annual, quarterly, or monthly models."""
+    base_year = start_year if start_year is not None else date.today().year
+    normalized = grain.lower()
+    if normalized.startswith("month"):
+        years = [base_year + idx // 12 for idx in range(periods)]
+        labels = [f"M{idx + 1}" for idx in range(periods)]
+    elif normalized.startswith("quarter"):
+        years = [base_year + idx // 4 for idx in range(periods)]
+        labels = [f"Q{idx + 1}" for idx in range(periods)]
+    else:
+        years = forecast_years(base_year, periods)
+        labels = [f"FY{year}" for year in years]
+    return years, labels
+
+
+@dataclass(frozen=True)
+class KeywordSignal:
+    term: str
+    weight: int = 1
+
+
+@dataclass(frozen=True)
+class MechanicProfile:
+    key: str
+    label: str
+    product: str
+    primary_unit_name: str
+    keywords: tuple[KeywordSignal, ...]
+    default_target_units: int
+    first_units: int
+    customers: tuple[int, int, int, int, int]
+    variable_cogs_pct: tuple[float, float, float, float, float]
+    capex_per_unit_yen: tuple[int, int, int, int, int]
+    tam_yen: int
+    default_monthly_price_yen: int
+    default_gmv_yen: int = 0
+
+
+@dataclass(frozen=True)
+class DriverSurface:
+    layer: str
+    driver: str
+    workbook_owner: str
+    decision_relevance: str
+    source_status: str
+
+
+@dataclass(frozen=True)
+class AssumptionLine:
+    label: str
+    unit: str
+    values: list[Any] | str | int | float
+    source: str = ""
+    kind: str = "input"
+    fmt_key: str = "money"
+    bold: bool = False
+    note: str = ""
+
+
+@dataclass(frozen=True)
+class AssumptionGroup:
+    title: str
+    lines: tuple[AssumptionLine, ...]
+
+
+@dataclass(frozen=True)
+class SourceFacts:
+    years: list[int]
+    period_labels: list[str]
+    grain: str
+    currency: str
+    display_scale: str
+    company: str
+    product: str
+    mechanics: str
+    primary_unit_name: str
+    source_summary: str
+    source_names: list[str]
+    source_urls: list[str]
+    market_lines: list[str]
+    segments: list[str]
+    source_unknowns: list[str]
+    new_units: list[int]
+    gmv_yen: list[int]
+    monthly_price_yen: list[int]
+    take_rate: list[float]
+    customers: list[int]
+    variable_cogs_pct: list[float]
+    delivery_cost_yen: list[int]
+    cloud_cost_yen: list[int]
+    support_cost_yen: list[int]
+    capex_per_unit_yen: list[int]
+    avg_comp_yen: list[int]
+    equity_raise_yen: list[int]
+    debt_raise_yen: list[int]
+    debt_interest_rate: list[float]
+    post_money_yen: list[int]
+    founder_ownership: float
+    option_pool: float
+    existing_investors: float
+    strategic_warrant: float
+    option_pool_refresh: list[float]
+    secondary_warrant_dilution: list[float]
+    product_headcount: list[int]
+    gtm_headcount: list[int]
+    operations_headcount: list[int]
+    ga_headcount: list[int]
+    net_retention: list[float]
+    utilization_conversion: list[float]
+    other_revenue_share: list[float]
+    deferred_revenue_share: list[float]
+    revenue_productivity_factor: list[float]
+    depreciation_life_months: list[int]
+    other_capex_yen: list[int]
+    ar_days: list[int]
+    ap_days: list[int]
+    tax_rate: list[float]
+    beginning_cash_yen: int
+    sm_pct_revenue: list[float]
+    rd_program_per_product_fte_yen: list[int]
+    rd_program_floor_yen: list[int]
+    ga_pct_revenue: list[float]
+    fixed_ga_yen: list[int]
+    inventory_wip_pct_capex: list[float]
+    grants_yen: list[int]
+    convertibles_yen: list[int]
+    lease_financing_yen: list[int]
+    customer_advances_yen: list[int]
+    secondary_yen: list[int]
+    nol_yen: list[int]
+    revenue_multiple: list[float]
+    gross_profit_multiple: list[float]
+    ebitda_multiple: list[float]
+    discount_rate: float
+    terminal_growth_rate: float
+    customer_roi_yen: int
+    implementation_cost_yen: int
+    sales_cycle_months: int
+    churn_rate: float
+    repeat_rate: float
+    payment_fee_pct: float
+    incentive_pct_gmv: float
+    fraud_loss_pct_gmv: float
+    value_capture_share: list[float]
+    target_gross_margin: list[float]
+    support_tickets_per_customer: list[int]
+    minutes_per_support_ticket: list[int]
+    support_fte_capacity_tickets: list[int]
+    product_squad_size: list[int]
+    target_min_runway_months: list[int]
+    evidence_status: str
+    tam_yen: int
+    sam_yen: int
+    som_yen: int
+
+
+MECHANIC_PROFILES: tuple[MechanicProfile, ...] = (
+    MechanicProfile(
+        key="marketplace",
+        label="Marketplace / transaction",
+        product="Marketplace product",
+        primary_unit_name="GMV",
+        keywords=(
+            KeywordSignal("marketplace", 4),
+            KeywordSignal("gmv", 4),
+            KeywordSignal("take rate", 4),
+            KeywordSignal("buyer", 2),
+            KeywordSignal("seller", 2),
+            KeywordSignal("流通総額", 4),
+        ),
+        default_target_units=0,
+        first_units=2_000,
+        customers=(2_000, 4_500, 9_000, 16_000, 26_000),
+        variable_cogs_pct=(0.30, 0.28, 0.25, 0.23, 0.22),
+        capex_per_unit_yen=(0, 0, 0, 0, 0),
+        tam_yen=1_000_000_000_000,
+        default_monthly_price_yen=0,
+        default_gmv_yen=10_000_000_000,
+    ),
+    MechanicProfile(
+        key="fintech_balance_sheet",
+        label="Fintech / balance-sheet",
+        product="Fintech product",
+        primary_unit_name="Loan book / accounts",
+        keywords=(
+            KeywordSignal("lending", 4),
+            KeywordSignal("loan", 3),
+            KeywordSignal("credit", 3),
+            KeywordSignal("fintech", 3),
+            KeywordSignal("貸金", 4),
+            KeywordSignal("融資", 4),
+        ),
+        default_target_units=25_000,
+        first_units=500,
+        customers=(500, 1_500, 4_500, 11_000, 25_000),
+        variable_cogs_pct=(0.42, 0.38, 0.34, 0.31, 0.30),
+        capex_per_unit_yen=(500_000, 400_000, 320_000, 260_000, 220_000),
+        tam_yen=2_000_000_000_000,
+        default_monthly_price_yen=120_000,
+    ),
+    MechanicProfile(
+        key="hardware_asset_heavy",
+        label="Hardware / asset-heavy",
+        product="Hardware / AI product",
+        primary_unit_name="Deployed units",
+        keywords=(
+            KeywordSignal("hardware", 3),
+            KeywordSignal("robot", 4),
+            KeywordSignal("humanoid", 4),
+            KeywordSignal("raas", 4),
+            KeywordSignal("manufacturing", 3),
+            KeywordSignal("フィジカルai", 4),
+            KeywordSignal("ヒューマノイド", 4),
+        ),
+        default_target_units=25_000,
+        first_units=50,
+        customers=(25, 85, 250, 520, 900),
+        variable_cogs_pct=(0.48, 0.42, 0.36, 0.31, 0.28),
+        capex_per_unit_yen=(8_000_000, 6_400_000, 5_120_000, 4_096_000, 3_277_000),
+        tam_yen=36_500_000_000_000,
+        default_monthly_price_yen=300_000,
+    ),
+    MechanicProfile(
+        key="pre_revenue_milestone",
+        label="Pre-revenue / milestone",
+        product="Deeptech product",
+        primary_unit_name="Milestones",
+        keywords=(
+            KeywordSignal("no revenue", 3),
+            KeywordSignal("pre-revenue", 4),
+            KeywordSignal("poc", 2),
+            KeywordSignal("deeptech", 3),
+            KeywordSignal("研究開発", 4),
+            KeywordSignal("助成金", 3),
+        ),
+        default_target_units=18,
+        first_units=25,
+        customers=(0, 1, 3, 8, 18),
+        variable_cogs_pct=(0.15, 0.18, 0.24, 0.30, 0.35),
+        capex_per_unit_yen=(30_000_000, 28_000_000, 24_000_000, 20_000_000, 18_000_000),
+        tam_yen=1_500_000_000_000,
+        default_monthly_price_yen=120_000,
+    ),
+    MechanicProfile(
+        key="recurring_software",
+        label="Recurring software",
+        product="Recurring software product",
+        primary_unit_name="Active accounts",
+        keywords=(
+            KeywordSignal("saas", 4),
+            KeywordSignal("arr", 3),
+            KeywordSignal("mrr", 3),
+            KeywordSignal("subscription", 3),
+            KeywordSignal("nrr", 2),
+        ),
+        default_target_units=5_000,
+        first_units=100,
+        customers=(80, 220, 520, 1_050, 1_900),
+        variable_cogs_pct=(0.22, 0.20, 0.18, 0.17, 0.16),
+        capex_per_unit_yen=(100_000, 90_000, 80_000, 75_000, 70_000),
+        tam_yen=1_200_000_000_000,
+        default_monthly_price_yen=120_000,
+    ),
+    MechanicProfile(
+        key="generic",
+        label="Generic startup",
+        product="Startup product",
+        primary_unit_name="Economic units",
+        keywords=(),
+        default_target_units=3_500,
+        first_units=100,
+        customers=(100, 300, 850, 1_800, 3_500),
+        variable_cogs_pct=(0.40, 0.36, 0.32, 0.29, 0.27),
+        capex_per_unit_yen=(1_000_000, 850_000, 720_000, 610_000, 520_000),
+        tam_yen=1_000_000_000_000,
+        default_monthly_price_yen=120_000,
+    ),
+)
+
+
+def read_source(source_md: Path) -> str:
+    return source_md.read_text(encoding="utf-8")
+
+
+def score_mechanics(text: str) -> dict[str, int]:
+    lowered = text.lower()
+    scores: dict[str, int] = {}
+    for profile in MECHANIC_PROFILES:
+        score = 0
+        for signal in profile.keywords:
+            if signal.term.lower() in lowered:
+                score += signal.weight
+        scores[profile.key] = score
+    return scores
+
+
+def profile_for_text(text: str) -> MechanicProfile:
+    scores = score_mechanics(text)
+    best = max(MECHANIC_PROFILES, key=lambda profile: scores[profile.key])
+    if scores[best.key] <= 0:
+        return _profile("generic")
+    return best
+
+
+def _profile(key: str) -> MechanicProfile:
+    for profile in MECHANIC_PROFILES:
+        if profile.key == key:
+            return profile
+    raise KeyError(key)
+
+
+def extract_start_year(text: str) -> int:
+    """Infer forecast start year only from explicit model/fiscal-year signals."""
+    patterns = [
+        r"(?:model|forecast|plan|fiscal|FY|開始|初年度|計画)[^\n]{0,24}(20\d{2})",
+        r"(20\d{2})\s*(?:forecast|plan|model|年度開始|開始)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            return int(match.group(1))
+    return date.today().year
+
+
+def extract_model_grain(text: str) -> str:
+    lowered = text.lower()
+    if any(token in lowered for token in ("monthly", "month-by-month", "月次", "か月", "ヶ月")):
+        return "monthly"
+    if any(token in lowered for token in ("quarterly", "quarter", "四半期", "qoq")):
+        return "quarterly"
+    return "annual"
+
+
+def extract_forecast_periods(text: str, grain: str) -> int:
+    lowered = text.lower()
+    patterns = [
+        r"([0-9]{1,2})\s*(?:months|month|か月|ヶ月)",
+        r"([0-9]{1,2})\s*(?:quarters|quarter|四半期)",
+        r"([0-9]{1,2})\s*(?:years|year|年)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, lowered, flags=re.IGNORECASE)
+        if match:
+            value = int(match.group(1))
+            if "quarter" in pattern or "四半期" in pattern:
+                return min(max(value, 1), MAX_FORECAST_PERIODS)
+            if "month" in pattern or "か月" in pattern or "ヶ月" in pattern:
+                return min(max(value, 1), MAX_FORECAST_PERIODS)
+            if grain == "monthly":
+                return min(max(value * 12, 1), MAX_FORECAST_PERIODS)
+            if grain == "quarterly":
+                return min(max(value * 4, 1), MAX_FORECAST_PERIODS)
+            return min(max(value, 1), MAX_FORECAST_PERIODS)
+    if grain == "monthly":
+        return 24 if any(token in lowered for token in ("seed", "pre-revenue", "シード", "売上はありません", "まだ売上")) else 12
+    if grain == "quarterly":
+        return 12
+    return DEFAULT_FORECAST_PERIODS
+
+
+def _pad_series(values: Iterable[int | float], periods: int, default: int | float = 0) -> list:
+    series = list(values)
+    if not series:
+        series = [default]
+    while len(series) < periods:
+        series.append(series[-1])
+    return series[:periods]
+
+
+def _as_list(value: Any) -> list[Any]:
+    if value is None:
+        return []
+    if isinstance(value, list):
+        return value
+    if isinstance(value, tuple):
+        return list(value)
+    return [value]
+
+
+def _coerce_int_series(raw: Any, periods: int, default: list[int]) -> list[int]:
+    values = []
+    for item in _as_list(raw):
+        if isinstance(item, str):
+            parsed = money_yen([r"([0-9,.]+)\s*(兆|億|百万|万|t|T|bn|b|B|m|M)?"], item, 0)
+            values.append(parsed)
+        elif isinstance(item, (int, float)) and not isinstance(item, bool):
+            values.append(int(item))
+    if not values:
+        values = list(default)
+    return [int(v) for v in _pad_series(values, periods, default[-1] if default else 0)]
+
+
+def _coerce_float_series(raw: Any, periods: int, default: list[float], percent: bool = False) -> list[float]:
+    values = []
+    for item in _as_list(raw):
+        if isinstance(item, str):
+            cleaned = item.strip().replace("%", "")
+            try:
+                number = float(cleaned)
+                values.append(number / 100 if percent or "%" in item else number)
+            except ValueError:
+                continue
+        elif isinstance(item, (int, float)) and not isinstance(item, bool):
+            number = float(item)
+            values.append(number / 100 if percent and number > 1 else number)
+    if not values:
+        values = list(default)
+    return [float(v) for v in _pad_series(values, periods, default[-1] if default else 0.0)]
+
+
+def _first_present(raw: dict[str, Any], keys: Iterable[str]) -> Any:
+    for key in keys:
+        if key in raw:
+            return raw[key]
+    return None
+
+
+def _round_to(value: float, unit: int) -> int:
+    if value <= 0:
+        return 0
+    return int(round(value / unit) * unit)
+
+
+def _curve(start: float, end: float, periods: int) -> list[float]:
+    if periods <= 1:
+        return [end]
+    return [start + (end - start) * idx / (periods - 1) for idx in range(periods)]
+
+
+def _price_series(price: int, periods: int) -> list[int]:
+    return [int(price * (1.0 + 0.03 * idx)) for idx in range(periods)]
+
+
+def _take_rate_series(take: float, periods: int) -> list[float]:
+    return [min(take + 0.004 * idx, 0.25) for idx in range(periods)]
+
+
+def _headcount_plan(profile: MechanicProfile, ending: list[int], revenue: list[int]) -> tuple[list[int], list[int], list[int], list[int]]:
+    """Create editable staffing assumptions from scale, not a company example."""
+    asset_heavy = profile.key in {"hardware_asset_heavy", "fintech_balance_sheet"}
+    marketplace = profile.key == "marketplace"
+    product: list[int] = []
+    gtm: list[int] = []
+    operations: list[int] = []
+    ga: list[int] = []
+    for idx, (units, revenue_yen) in enumerate(zip(ending, revenue)):
+        revenue_b = max(revenue_yen / 1_000_000_000, 0)
+        scale = max(units, 1)
+        product_base = 4 + idx * 2 + revenue_b * (2.2 if asset_heavy else 1.2)
+        gtm_base = 2 + revenue_b * (1.4 if marketplace else 1.8)
+        ops_divisor = 80 if asset_heavy else 350 if marketplace else 220
+        ops_base = 1 + scale / ops_divisor + revenue_b * (0.7 if asset_heavy else 0.35)
+        product.append(max(2, int(round(product_base))))
+        gtm.append(max(1, int(round(gtm_base))))
+        operations.append(max(1, int(round(ops_base))))
+        ga.append(max(1, int(round((product[-1] + gtm[-1] + operations[-1]) * 0.16))))
+    return product, gtm, operations, ga
+
+
+def _operating_assumption_curves(profile: MechanicProfile, periods: int) -> dict[str, list]:
+    asset_heavy = profile.key in {"hardware_asset_heavy", "fintech_balance_sheet"}
+    marketplace = profile.key == "marketplace"
+    return {
+        "net_retention": _curve(1.00, 1.10 if not marketplace else 1.04, periods),
+        "utilization_conversion": _curve(0.35, 0.72 if asset_heavy else 0.64, periods),
+        "other_revenue_share": _curve(0.00, 0.10 if not marketplace else 0.06, periods),
+        "deferred_revenue_share": _curve(0.08, 0.12 if not marketplace else 0.04, periods),
+        "revenue_productivity_factor": _curve(0.45, 1.35 if not asset_heavy else 1.10, periods),
+        "depreciation_life_months": [48 if asset_heavy else 60 for _ in range(periods)],
+        "ar_days": [45 for _ in range(periods)],
+        "ap_days": [45 + min(idx * 4, 15) for idx in range(periods)],
+        "tax_rate": _curve(0.00, 0.30, periods),
+        "sm_pct_revenue": _curve(0.18, 0.10 if marketplace else 0.14, periods),
+        "ga_pct_revenue": _curve(0.10, 0.06, periods),
+        "inventory_wip_pct_capex": [0.18 if asset_heavy else 0.04 if marketplace else 0.08 for _ in range(periods)],
+        "debt_interest_rate": _curve(0.05, 0.06, periods),
+        "option_pool_refresh": [0.00] + [0.02 for _ in range(max(0, periods - 1))],
+        "secondary_warrant_dilution": [0.00] + [0.005 if asset_heavy else 0.00 for _ in range(max(0, periods - 1))],
+    }
+
+
+def _capital_plan(
+    profile: MechanicProfile,
+    revenue: list[int],
+    new_units: list[int],
+    capex_per_unit: list[int],
+    other_capex: list[int],
+    total_headcount: list[int],
+    avg_comp: list[int],
+) -> tuple[list[int], list[int], list[int]]:
+    equity: list[int] = []
+    debt: list[int] = []
+    post_money: list[int] = []
+    ownership_targets = _curve(0.22, 0.10, len(revenue))
+    asset_debt_share = 0.35 if profile.key == "hardware_asset_heavy" else 0.20 if profile.key == "fintech_balance_sheet" else 0.05
+    for idx, revenue_yen in enumerate(revenue):
+        people_build = total_headcount[idx] * avg_comp[idx] * (0.55 if idx == 0 else 0.35)
+        growth_investment = max(0, new_units[idx] * capex_per_unit[idx]) + other_capex[idx]
+        cash_need = people_build + growth_investment + max(0, revenue_yen * (0.10 if idx < 3 else 0.04))
+        eq = _round_to(cash_need * (0.80 if idx < len(revenue) - 1 else 0.25), 100_000_000)
+        de = _round_to(growth_investment * asset_debt_share, 100_000_000)
+        equity.append(eq)
+        debt.append(de)
+        post_money.append(_round_to(eq / ownership_targets[idx], 100_000_000) if eq else 0)
+    return equity, debt, post_money
+
+
+def first_match_float(patterns: Iterable[str], text: str, default: float) -> float:
+    for pattern in patterns:
+        m = re.search(pattern, text, flags=re.IGNORECASE)
+        if not m:
+            continue
+        raw = m.group(1).replace(",", "").replace("，", "")
+        try:
+            return float(raw)
+        except ValueError:
+            continue
+    return default
+
+
+def money_yen(patterns: Iterable[str], text: str, default: int) -> int:
+    for pattern in patterns:
+        m = re.search(pattern, text, flags=re.IGNORECASE)
+        if not m:
+            continue
+        raw = m.group(1).replace(",", "").replace("，", "")
+        unit_raw = m.group(2) if len(m.groups()) >= 2 else ""
+        unit = (unit_raw or "").lower()
+        try:
+            value = float(raw)
+        except ValueError:
+            continue
+        if unit in {"兆", "t", "tn", "trillion"}:
+            return int(value * 1_000_000_000_000)
+        if unit in {"億", "b", "bn", "billion"}:
+            return int(value * 1_000_000_000)
+        if unit in {"百万", "m", "mn", "million"}:
+            return int(value * 1_000_000)
+        if unit in {"万"}:
+            return int(value * 10_000)
+        return int(value)
+    return default
+
+
+def extract_company(text: str) -> str:
+    heading = re.search(r"^#\s+(.+)$", text, flags=re.MULTILINE)
+    if heading:
+        caps = re.search(r"\b([A-Z][A-Z0-9]{2,16})\b", heading.group(1))
+        if caps:
+            return caps.group(1)
+        return heading.group(1).strip()[:32]
+    caps = re.search(r"\b([A-Z][A-Z0-9]{2,16})\b", text)
+    return caps.group(1) if caps else "Startup"
+
+
+def extract_sources(text: str) -> tuple[list[str], list[str]]:
+    names: list[str] = []
+    for line in text.splitlines():
+        source_match = re.search(r"(?:^|\b)source\s*[:：]\s*(.+)$", line, flags=re.IGNORECASE)
+        if source_match:
+            payload = source_match.group(1)
+            for part in re.split(r"[;,、]", payload):
+                cleaned = part.strip(" .")
+                if cleaned and cleaned not in names:
+                    names.append(cleaned)
+    urls = []
+    for url in re.findall(r"https?://[^\s)）]+", text):
+        cleaned = url.rstrip("。.,)")
+        if cleaned not in urls:
+            urls.append(cleaned)
+    return names[:16], urls[:12]
+
+
+def extract_market_lines(text: str) -> list[str]:
+    keywords = ("TAM", "SAM", "SOM", "market", "市場", "GMV", "ARR", "revenue", "売上", "資金")
+    lines = []
+    for line in text.splitlines():
+        clean = line.strip(" -*|")
+        has_metric = any(k in clean for k in keywords) or re.search(r"\b20\d{2}\b", clean)
+        if 16 <= len(clean) <= 180 and has_metric:
+            lines.append(clean)
+        if len(lines) >= 10:
+            break
+    return lines
+
+
+def extract_price(text: str, profile: MechanicProfile) -> int:
+    if profile.key == "marketplace":
+        return 0
+    patterns = [
+        r"月額\s*([0-9,.]+)\s*(万|億|百万|m|M|b|B)?\s*円?",
+        r"(?:price|pricing|fee|subscription|lease|rental|unit price|単価|価格|利用料)[^0-9¥$]{0,32}¥?\s*([0-9,.]+)\s*(万|億|百万|m|M|b|B)?",
+    ]
+    if profile.key != "hardware_asset_heavy":
+        patterns.extend(
+            [
+                r"ACV[^0-9¥$]{0,24}¥?\s*([0-9,.]+)\s*(万|億|百万|m|M|b|B)?",
+            ]
+        )
+    price = money_yen(patterns, text, profile.default_monthly_price_yen)
+    if price < max(10_000, profile.default_monthly_price_yen * 0.05):
+        return profile.default_monthly_price_yen
+    return price
+
+
+def extract_target_units(text: str, profile: MechanicProfile) -> int:
+    if profile.key == "marketplace":
+        return 0
+    value = int(
+        first_match_float(
+            [
+                r"([0-9,.]+)\s*万?\s*台",
+                r"([0-9,.]+)\s*operating",
+                r"([0-9,.]+)\s*customers",
+                r"([0-9,.]+)\s*units",
+            ],
+            text,
+            profile.default_target_units,
+        )
+    )
+    if re.search(r"([0-9,.]+)\s*万\s*台", text):
+        value *= 10_000
+    return value
+
+
+def ramp_to_target(target: int, first: int, periods: int = DEFAULT_FORECAST_PERIODS) -> list[int]:
+    if periods <= 1:
+        return [max(target, 0)]
+    if target <= 0:
+        return [0 for _ in range(periods)]
+    early = [first, max(first * 5, int(target * 0.04)), int(target * 0.10), int(target * 0.25)]
+    ramp = _pad_series(early, periods - 1, early[-1])[: periods - 1]
+    ramp.append(0)
+    ramp[-1] = max(0, target - sum(ramp[:-1]))
+    return ramp
+
+
+def gmv_ramp(text: str, profile: MechanicProfile, periods: int = DEFAULT_FORECAST_PERIODS) -> list[int]:
+    base = money_yen(
+        [
+            r"GMV[^0-9¥$]{0,24}¥?\s*([0-9,.]+)\s*(兆|億|百万|万|t|T|bn|b|B|m|M)?",
+            r"流通総額[^0-9¥$]{0,24}¥?\s*([0-9,.]+)\s*(兆|億|百万|万|t|T|bn|b|B|m|M)?",
+        ],
+        text,
+        profile.default_gmv_yen,
+    )
+    if base <= 0:
+        return [0 for _ in range(periods)]
+    multipliers = _curve(1.0, 8.5, periods)
+    return [int(base * multiple) for multiple in multipliers]
+
+
+def ending_units(new_units: list[int]) -> list[int]:
+    ending: list[int] = []
+    running = 0
+    for idx, value in enumerate(new_units):
+        churn = int(running * (0.02 + idx * 0.005))
+        running = max(0, running + value - churn)
+        ending.append(running)
+    return ending
+
+
+def average_units(ending: list[int]) -> list[int]:
+    avg: list[int] = []
+    prior = 0
+    for value in ending:
+        avg.append(int((prior + value) / 2))
+        prior = value
+    return avg
+
+
+def driver_surfaces_for(facts: SourceFacts) -> tuple[DriverSurface, ...]:
+    return (
+        DriverSurface("Demand", facts.primary_unit_name, "Assumptions / Revenue Build", "Volume, pricing, capital need", "source + assumption"),
+        DriverSurface("Monetization", "Price / take rate / other revenue", "Assumptions / Revenue Build", "Revenue and customer ROI", "source + assumption"),
+        DriverSurface("Delivery", "Variable COGS and support load", "Cost Build", "Gross margin and payback", "assumption"),
+        DriverSurface("Capacity", "People, capex, working capital", "People Plan / BS / CF", "Runway and operational bottlenecks", "assumption"),
+        DriverSurface("Financing", "Equity, debt, cash, ownership", "Capital Stack / Ownership", "Dilution and survivability", "assumption"),
+        DriverSurface("Risk", "Scenario and sensitivity", "Scenarios / Sensitivity", "Downside and decision pressure", "model"),
+        DriverSurface("Value", "Exit, SOTP, investor return", "Valuation / IC Memo", "Investment judgment", "model"),
+    )
+
+
+def extract_source_facts(source_md: Path) -> SourceFacts:
+    return derive_source_facts(read_source(source_md))
+
+
+def derive_source_facts(text: str) -> SourceFacts:
+    grain = extract_model_grain(text)
+    periods = extract_forecast_periods(text, grain)
+    years, period_labels = forecast_axis(extract_start_year(text), periods, grain)
+    periods = len(years)
+    profile = profile_for_text(text)
+    company = extract_company(text)
+    source_names, source_urls = extract_sources(text)
+    market_lines = extract_market_lines(text)
+    segments = extract_segments(text)
+    if profile.key == "hardware_asset_heavy":
+        target_units = extract_target_units(text, profile)
+        new_units = ramp_to_target(target_units, profile.first_units, periods)
+    else:
+        new_units = ramp_to_target(profile.customers[-1], max(25, profile.customers[0]), periods)
+    gmv = gmv_ramp(text, profile, periods)
+    price = extract_price(text, profile)
+    take = first_match_float(
+        [r"take rate[^0-9]{0,12}([0-9.]+)%", r"手数料率[^0-9]{0,12}([0-9.]+)%"],
+        text,
+        12.0,
+    ) / 100
+    if profile.key != "marketplace":
+        take = 0.0
+
+    if profile.key != "marketplace":
+        gmv = [units * price * 12 for units in ending_units(new_units)]
+
+    new_units = _pad_series(new_units, periods, 0)
+    ending = ending_units(new_units)
+    gmv = _pad_series(gmv, periods, 0)
+    monthly_price = _price_series(price, periods)
+    take_rate = _take_rate_series(take, periods)
+    customers = _pad_series(profile.customers, periods, 0)
+    variable_cogs_pct = _pad_series(profile.variable_cogs_pct, periods, 0.30)
+    capex_per_unit = _pad_series(profile.capex_per_unit_yen, periods, 0)
+    tam = max(profile.tam_yen, gmv[-1] * 10 if profile.key == "marketplace" else profile.tam_yen)
+    sam = max(int(tam * 0.18), 1_000_000_000)
+    som = max(max(gmv[-1], ending_units(new_units)[-1] * monthly_price[-1] * 12), 1_000_000_000)
+    product_hc, gtm_hc, ops_hc, ga_hc = _headcount_plan(profile, ending, gmv)
+    total_hc = [a + b + c + d for a, b, c, d in zip(product_hc, gtm_hc, ops_hc, ga_hc)]
+    curves = _operating_assumption_curves(profile, periods)
+    avg_comp = [int(value) for value in _curve(16_000_000, 14_500_000, periods)]
+    delivery_cost = [int(value) for value in _curve(90_000 if profile.key != "marketplace" else 0, 32_000 if profile.key != "marketplace" else 0, periods)]
+    cloud_cost = [int(value) for value in _curve(18_000, 26_000, periods)]
+    support_cost = [int(value) for value in _curve(24_000, 16_000, periods)]
+    other_capex = [
+        _round_to(
+            max(
+                gmv[idx] * (0.025 if profile.key != "marketplace" else 0.010),
+                total_hc[idx] * 1_500_000,
+            ),
+            10_000_000,
+        )
+        for idx in range(periods)
+    ]
+    equity_raise, debt_raise, post_money = _capital_plan(
+        profile,
+        gmv,
+        new_units,
+        capex_per_unit,
+        other_capex,
+        total_hc,
+        avg_comp,
+    )
+    summary_bits = [
+        profile.label,
+        f"{profile.primary_unit_name}: {ending[-1]:,}",
+        f"FY{years[-1]} revenue basis: ¥{som:,.0f}",
+    ]
+    if price > 0:
+        summary_bits.append(f"Monthly price: ¥{price:,.0f}")
+
+    return SourceFacts(
+        years=years,
+        period_labels=period_labels,
+        grain=grain,
+        currency="JPY",
+        display_scale="million",
+        company=company,
+        product=profile.product,
+        mechanics=profile.label,
+        primary_unit_name=profile.primary_unit_name,
+        source_summary="; ".join(summary_bits),
+        source_names=source_names,
+        source_urls=source_urls,
+        market_lines=market_lines,
+        segments=segments,
+        source_unknowns=extract_unknowns(text),
+        new_units=new_units,
+        gmv_yen=gmv,
+        monthly_price_yen=monthly_price,
+        take_rate=take_rate,
+        customers=customers,
+        variable_cogs_pct=variable_cogs_pct,
+        delivery_cost_yen=delivery_cost,
+        cloud_cost_yen=cloud_cost,
+        support_cost_yen=support_cost,
+        capex_per_unit_yen=capex_per_unit,
+        avg_comp_yen=avg_comp,
+        equity_raise_yen=equity_raise,
+        debt_raise_yen=debt_raise,
+        debt_interest_rate=[float(value) for value in curves["debt_interest_rate"]],
+        post_money_yen=post_money,
+        founder_ownership=0.75,
+        option_pool=0.15,
+        existing_investors=0.10,
+        strategic_warrant=0.00,
+        option_pool_refresh=[float(value) for value in curves["option_pool_refresh"]],
+        secondary_warrant_dilution=[float(value) for value in curves["secondary_warrant_dilution"]],
+        product_headcount=product_hc,
+        gtm_headcount=gtm_hc,
+        operations_headcount=ops_hc,
+        ga_headcount=ga_hc,
+        net_retention=[float(value) for value in curves["net_retention"]],
+        utilization_conversion=[float(value) for value in curves["utilization_conversion"]],
+        other_revenue_share=[float(value) for value in curves["other_revenue_share"]],
+        deferred_revenue_share=[float(value) for value in curves["deferred_revenue_share"]],
+        revenue_productivity_factor=[float(value) for value in curves["revenue_productivity_factor"]],
+        depreciation_life_months=[int(value) for value in curves["depreciation_life_months"]],
+        other_capex_yen=other_capex,
+        ar_days=[int(value) for value in curves["ar_days"]],
+        ap_days=[int(value) for value in curves["ap_days"]],
+        tax_rate=[float(value) for value in curves["tax_rate"]],
+        beginning_cash_yen=max(500_000_000, _round_to(max(equity_raise[0] * 0.15, avg_comp[0] * max(total_hc[0], 1) * 0.50), 100_000_000)),
+        sm_pct_revenue=[float(value) for value in curves["sm_pct_revenue"]],
+        rd_program_per_product_fte_yen=[4_500_000 for _ in range(periods)],
+        rd_program_floor_yen=[_round_to(max(gmv[idx] * 0.015, 60_000_000), 10_000_000) for idx in range(periods)],
+        ga_pct_revenue=[float(value) for value in curves["ga_pct_revenue"]],
+        fixed_ga_yen=[_round_to(max(total_hc[idx] * 1_200_000, 50_000_000), 10_000_000) for idx in range(periods)],
+        inventory_wip_pct_capex=[float(value) for value in curves["inventory_wip_pct_capex"]],
+        grants_yen=[0 for _ in range(periods)],
+        convertibles_yen=[0 for _ in range(periods)],
+        lease_financing_yen=[0 for _ in range(periods)],
+        customer_advances_yen=[0 for _ in range(periods)],
+        secondary_yen=[0 for _ in range(periods)],
+        nol_yen=[0 for _ in range(periods)],
+        revenue_multiple=[round(value, 1) for value in _curve(4, 12, periods)],
+        gross_profit_multiple=[round(value, 1) for value in _curve(8, 16, periods)],
+        ebitda_multiple=[round(value, 1) for value in _curve(12, 28, periods)],
+        discount_rate=0.18,
+        terminal_growth_rate=0.025,
+        customer_roi_yen=max(price * 18, 3_000_000),
+        implementation_cost_yen=max(price * 2, 300_000),
+        sales_cycle_months=4 if profile.key in {"recurring_software", "marketplace"} else 6,
+        churn_rate=0.08 if profile.key != "marketplace" else 0.18,
+        repeat_rate=0.40 if profile.key == "marketplace" else 0.75,
+        payment_fee_pct=0.025 if profile.key == "marketplace" else 0.0,
+        incentive_pct_gmv=0.025 if profile.key == "marketplace" else 0.0,
+        fraud_loss_pct_gmv=0.004 if profile.key == "marketplace" else 0.0,
+        value_capture_share=[0.18 if profile.key == "marketplace" else 0.25 for _ in range(periods)],
+        target_gross_margin=[0.55 if profile.key == "hardware_asset_heavy" else 0.72 if profile.key == "recurring_software" else 0.60 for _ in range(periods)],
+        support_tickets_per_customer=[18 if profile.key == "hardware_asset_heavy" else 12 for _ in range(periods)],
+        minutes_per_support_ticket=[45 if profile.key == "hardware_asset_heavy" else 25 for _ in range(periods)],
+        support_fte_capacity_tickets=[5_000 if profile.key == "hardware_asset_heavy" else 7_500 for _ in range(periods)],
+        product_squad_size=[6 for _ in range(periods)],
+        target_min_runway_months=[18 for _ in range(periods)],
+        evidence_status="estimate / needs validation",
+        tam_yen=tam,
+        sam_yen=sam,
+        som_yen=som,
+    )
+
+
+def extract_segments(text: str) -> list[str]:
+    candidates: list[str] = []
+    segment_line = re.search(r"(?:segments?|セグメント|事業)[：:\s]+(.+)", text, flags=re.IGNORECASE)
+    if segment_line:
+        for part in re.split(r"[,、/／;；]", segment_line.group(1)):
+            cleaned = part.strip(" 。.")
+            if 1 < len(cleaned) <= 40 and cleaned not in candidates:
+                candidates.append(cleaned)
+    keywords = [
+        ("SaaS", ("saas", "arr", "subscription")),
+        ("Marketplace", ("marketplace", "gmv", "take rate")),
+        ("Hardware", ("hardware", "robot", "manufacturing", "humanoid", "raas")),
+        ("Financial services", ("fintech", "loan", "lending", "credit")),
+        ("Services", ("service", "implementation", "maintenance", "保守")),
+    ]
+    lowered = text.lower()
+    for label, terms in keywords:
+        if any(term in lowered for term in terms) and label not in candidates:
+            candidates.append(label)
+    return candidates[:8] or ["Core business"]
+
+
+def assumption_decomposition_for(facts: SourceFacts) -> tuple[AssumptionGroup, ...]:
+    """Return driver-decomposition patterns for the assumptions sheet.
+
+    This registry owns assumption depth. The workbook renderer should only
+    place rows and resolve row references; it should not decide which
+    explanatory variables make an assumption credible.
+    """
+    periods = len(facts.period_labels)
+    qualified_pool = [
+        max(int(facts.new_units[idx] / max(facts.utilization_conversion[idx], 0.01)), facts.customers[idx])
+        for idx in range(periods)
+    ]
+    committed_financing = [
+        facts.equity_raise_yen[idx]
+        + facts.debt_raise_yen[idx]
+        + facts.grants_yen[idx]
+        + facts.convertibles_yen[idx]
+        + facts.lease_financing_yen[idx]
+        + facts.customer_advances_yen[idx]
+        for idx in range(periods)
+    ]
+    evidence = [facts.evidence_status for _ in range(periods)]
+    pricing_source = "take-rate / liquidity proof" if "Marketplace" in facts.mechanics else "customer ROI and cost floor"
+    cost_source = "BOM / service / support workload" if "Hardware" in facts.mechanics else "hosting / delivery / support workload"
+    return (
+        AssumptionGroup(
+            "Demand support",
+            (
+                AssumptionLine("Qualified demand pool", "count", qualified_pool, "funnel / addressable accounts", fmt_key="integer", note="Use when source support for new units is thin."),
+                AssumptionLine("Demand conversion to units", "%", facts.utilization_conversion, "conversion evidence", fmt_key="percent"),
+                AssumptionLine("Implied new units from funnel", "units", "={c}{row:Qualified demand pool}*{c}{row:Demand conversion to units}", kind="formula", fmt_key="integer"),
+                AssumptionLine("Selected new units", "units", "={c}7", kind="formula", fmt_key="integer"),
+                AssumptionLine("Demand support coverage", "x", "=IF({c}{row:Selected new units}=0,0,{c}{row:Implied new units from funnel}/{c}{row:Selected new units})", kind="formula", fmt_key="multiple", bold=True),
+                AssumptionLine("Demand evidence status", "status", evidence, "source / management / estimate", fmt_key="text"),
+            ),
+        ),
+        AssumptionGroup(
+            "Pricing support",
+            (
+                AssumptionLine("Customer annual value / ROI", "JPY", [facts.customer_roi_yen for _ in range(periods)], "customer value proof", fmt_key="money"),
+                AssumptionLine("Value capture share", "%", facts.value_capture_share, pricing_source, fmt_key="percent"),
+                AssumptionLine("Value-based monthly price", "JPY", "={c}{row:Customer annual value / ROI}*{c}{row:Value capture share}/12", kind="formula", fmt_key="jpy_yen"),
+                AssumptionLine("Target gross margin", "%", facts.target_gross_margin, "margin policy / benchmark", fmt_key="percent"),
+                AssumptionLine("Cost-plus monthly floor", "JPY", "=({c}25+{c}26+{c}27)/(1-MAX(0.01,{c}{row:Target gross margin}))", kind="formula", fmt_key="jpy_yen"),
+                AssumptionLine("Selected monthly price", "JPY", "={c}11", kind="formula", fmt_key="jpy_yen"),
+                AssumptionLine("Pricing support ratio", "x", "=IF(MAX({c}{row:Value-based monthly price},{c}{row:Cost-plus monthly floor})=0,0,{c}{row:Selected monthly price}/MAX({c}{row:Value-based monthly price},{c}{row:Cost-plus monthly floor}))", kind="formula", fmt_key="multiple", bold=True),
+                AssumptionLine("Pricing evidence status", "status", evidence, "source / management / estimate", fmt_key="text"),
+            ),
+        ),
+        AssumptionGroup(
+            "Cost-to-serve support",
+            (
+                AssumptionLine("Direct delivery cost / unit", "JPY", "={c}25", kind="formula", fmt_key="jpy_yen"),
+                AssumptionLine("Cloud / platform cost / unit", "JPY", "={c}26", kind="formula", fmt_key="jpy_yen"),
+                AssumptionLine("Support tickets / customer / year", "count", facts.support_tickets_per_customer, cost_source, fmt_key="integer"),
+                AssumptionLine("Minutes / support ticket", "count", facts.minutes_per_support_ticket, "support workload", fmt_key="integer"),
+                AssumptionLine("Support FTE ticket capacity", "count", facts.support_fte_capacity_tickets, "support capacity", fmt_key="integer"),
+                AssumptionLine("Cost / support ticket", "JPY", "=IF({c}{row:Support tickets / customer / year}=0,0,{c}27*12/{c}{row:Support tickets / customer / year})", kind="formula", fmt_key="jpy_yen"),
+                AssumptionLine("Implied annual service cost / customer", "JPY", "={c}{row:Direct delivery cost / unit}*12+{c}{row:Cloud / platform cost / unit}*12+{c}{row:Cost / support ticket}*{c}{row:Support tickets / customer / year}", kind="formula", fmt_key="money"),
+                AssumptionLine("Implied variable COGS %", "%", "=IF({c}11=0,0,{c}{row:Implied annual service cost / customer}/({c}11*12))", kind="formula", fmt_key="percent"),
+                AssumptionLine("Selected variable COGS %", "%", "={c}24", kind="formula", fmt_key="percent"),
+                AssumptionLine("COGS support ratio", "x", "=IF({c}{row:Selected variable COGS %}=0,0,{c}{row:Implied variable COGS %}/{c}{row:Selected variable COGS %})", kind="formula", fmt_key="multiple", bold=True),
+                AssumptionLine("COGS evidence status", "status", evidence, "source / management / estimate", fmt_key="text"),
+            ),
+        ),
+        AssumptionGroup(
+            "People capacity support",
+            (
+                AssumptionLine("Product squad size", "FTE", facts.product_squad_size, "team design", fmt_key="integer"),
+                AssumptionLine("Required product squads", "count", "=IF({c}{row:Product squad size}=0,0,{c}31/{c}{row:Product squad size})", kind="formula", fmt_key="num"),
+                AssumptionLine("Revenue / GTM FTE", "JPY", "=IF({c}32=0,0,'Revenue Build'!{c}18/{c}32)", kind="formula", fmt_key="money"),
+                AssumptionLine("Customers / Ops-CS FTE", "count", "=IF({c}33=0,0,{c}13/{c}33)", kind="formula", fmt_key="num"),
+                AssumptionLine("Required Ops-CS FTE from ticket load", "FTE", "=IF({c}{row:Support FTE ticket capacity}=0,0,{c}13*{c}{row:Support tickets / customer / year}/{c}{row:Support FTE ticket capacity})", kind="formula", fmt_key="num"),
+                AssumptionLine("Ops-CS capacity coverage", "x", "=IF({c}{row:Required Ops-CS FTE from ticket load}=0,0,{c}33/{c}{row:Required Ops-CS FTE from ticket load})", kind="formula", fmt_key="multiple", bold=True),
+                AssumptionLine("People evidence status", "status", evidence, "source / management / estimate", fmt_key="text"),
+            ),
+        ),
+        AssumptionGroup(
+            "Capital and runway support",
+            (
+                AssumptionLine("CapEx / unit selected", "JPY", "={c}38", kind="formula", fmt_key="jpy_yen"),
+                AssumptionLine("Other CapEx selected", "JPY", "={c}40", kind="formula", fmt_key="money"),
+                AssumptionLine("CapEx intensity vs revenue", "%", "=IF('Revenue Build'!{c}18=0,0,'Cost Build'!{c}16/'Revenue Build'!{c}18)", kind="formula", fmt_key="percent"),
+                AssumptionLine("Target minimum runway", "months", facts.target_min_runway_months, "financing policy", fmt_key="num"),
+                AssumptionLine("Committed financing", "JPY", committed_financing, "equity / debt / grants / advances", fmt_key="money"),
+                AssumptionLine("Cash need coverage by committed financing", "x", "=IF(ABS('CF'!{c}16)=0,0,{c}{row:Committed financing}/ABS('CF'!{c}16))", kind="formula", fmt_key="multiple"),
+                AssumptionLine("Runway support coverage", "x", "=IF({c}{row:Target minimum runway}=0,0,'CF'!{c}32/{c}{row:Target minimum runway})", kind="formula", fmt_key="multiple", bold=True),
+                AssumptionLine("Capital evidence status", "status", evidence, "source / management / estimate", fmt_key="text"),
+            ),
+        ),
+    )
+
+
+def extract_unknowns(text: str) -> list[str]:
+    unknowns = []
+    for label, terms in [
+        ("pricing validation", ("price", "pricing", "価格", "料金")),
+        ("customer ROI proof", ("roi", "payback", "導入効果")),
+        ("cost-to-serve evidence", ("cogs", "gross margin", "原価")),
+        ("financing terms", ("debt", "convertible", "safe", "jkiss", "借入", "転換")),
+        ("market benchmark refresh", ("tam", "sam", "som", "market", "市場")),
+    ]:
+        if any(term in text.lower() for term in terms):
+            unknowns.append(label)
+    return unknowns or ["pricing validation", "cost-to-serve evidence", "financing terms"]
+
+
+def derive_source_facts_from_mapping(raw: dict[str, Any]) -> SourceFacts:
+    """Build facts from structured YAML, falling back to narrative inference."""
+    narrative = ""
+    for key in ("source_text", "narrative", "story", "memo", "description"):
+        value = raw.get(key)
+        if isinstance(value, str) and value.strip():
+            narrative = value
+            break
+    company = raw.get("company") or raw.get("company_name") or "Startup"
+    mechanics = raw.get("mechanics") or raw.get("business_model") or raw.get("model_type") or "generic startup"
+    if not narrative:
+        narrative = f"# {company}\nGeneric financial model for a {mechanics}."
+
+    facts = derive_source_facts(narrative)
+    periods_raw = raw.get("periods") or raw.get("horizon_periods") or raw.get("horizon")
+    grain = str(raw.get("grain") or raw.get("model_grain") or facts.grain).lower()
+    if isinstance(periods_raw, str):
+        period_match = re.search(r"([0-9]{1,2})", periods_raw)
+        periods = int(period_match.group(1)) if period_match else len(facts.years)
+        if "year" in periods_raw.lower() or "年" in periods_raw:
+            periods = periods * (12 if grain.startswith("month") else 4 if grain.startswith("quarter") else 1)
+    elif isinstance(periods_raw, (int, float)) and not isinstance(periods_raw, bool):
+        periods = int(periods_raw)
+    else:
+        periods = len(facts.years)
+    periods = min(max(periods, 1), MAX_FORECAST_PERIODS)
+    start_year = int(raw.get("start_year") or raw.get("fiscal_year") or facts.years[0])
+    years, labels = forecast_axis(start_year, periods, grain)
+
+    overrides = dict(
+        years=years,
+        period_labels=_as_list(raw.get("period_labels"))[:periods] or labels,
+        grain=grain,
+        currency=str(raw.get("currency") or "JPY").upper(),
+        display_scale=str(raw.get("display_scale") or raw.get("scale") or "million").lower(),
+        company=str(company),
+        mechanics=str(mechanics),
+        product=str(raw.get("product") or facts.product),
+        primary_unit_name=str(raw.get("primary_unit_name") or raw.get("unit_name") or facts.primary_unit_name),
+        segments=[str(v) for v in _as_list(raw.get("segments")) if str(v).strip()] or facts.segments,
+        source_unknowns=[str(v) for v in _as_list(raw.get("unknowns")) if str(v).strip()] or facts.source_unknowns,
+    )
+
+    series_map = {
+        "new_units": ("new_units", "units"),
+        "gmv_yen": ("gmv_yen", "money"),
+        "monthly_price_yen": ("monthly_price_yen", "money"),
+        "customers": ("customers", "units"),
+        "delivery_cost_yen": ("delivery_cost_yen", "money"),
+        "cloud_cost_yen": ("cloud_cost_yen", "money"),
+        "support_cost_yen": ("support_cost_yen", "money"),
+        "capex_per_unit_yen": ("capex_per_unit_yen", "money"),
+        "avg_comp_yen": ("avg_comp_yen", "money"),
+        "equity_raise_yen": ("equity_raise_yen", "money"),
+        "debt_raise_yen": ("debt_raise_yen", "money"),
+        "grants_yen": ("grants_yen", "money"),
+        "convertibles_yen": ("convertibles_yen", "money"),
+        "lease_financing_yen": ("lease_financing_yen", "money"),
+        "customer_advances_yen": ("customer_advances_yen", "money"),
+        "secondary_yen": ("secondary_yen", "money"),
+        "nol_yen": ("nol_yen", "money"),
+        "product_headcount": ("product_headcount", "units"),
+        "gtm_headcount": ("gtm_headcount", "units"),
+        "operations_headcount": ("operations_headcount", "units"),
+        "ga_headcount": ("ga_headcount", "units"),
+        "other_capex_yen": ("other_capex_yen", "money"),
+        "fixed_ga_yen": ("fixed_ga_yen", "money"),
+        "rd_program_floor_yen": ("rd_program_floor_yen", "money"),
+        "rd_program_per_product_fte_yen": ("rd_program_per_product_fte_yen", "money"),
+    }
+    pct_map = {
+        "take_rate": True,
+        "variable_cogs_pct": True,
+        "value_capture_share": True,
+        "target_gross_margin": True,
+        "debt_interest_rate": True,
+        "option_pool_refresh": True,
+        "secondary_warrant_dilution": True,
+        "net_retention": False,
+        "utilization_conversion": True,
+        "other_revenue_share": True,
+        "deferred_revenue_share": True,
+        "revenue_productivity_factor": False,
+        "tax_rate": True,
+        "sm_pct_revenue": True,
+        "ga_pct_revenue": True,
+        "inventory_wip_pct_capex": True,
+        "revenue_multiple": False,
+        "gross_profit_multiple": False,
+        "ebitda_multiple": False,
+    }
+    for field, (_, kind) in series_map.items():
+        raw_value = _first_present(raw, (field, field.replace("_yen", ""), field.replace("_pct", "")))
+        default = getattr(facts, field)
+        overrides[field] = _coerce_int_series(raw_value, periods, default) if kind == "money" or kind == "units" else default
+    for field, is_percent in pct_map.items():
+        raw_value = _first_present(raw, (field, field.replace("_pct", ""), field.replace("_rate", "")))
+        overrides[field] = _coerce_float_series(raw_value, periods, getattr(facts, field), percent=is_percent)
+    for field in ("depreciation_life_months", "ar_days", "ap_days"):
+        overrides[field] = _coerce_int_series(raw.get(field), periods, getattr(facts, field))
+    for field in ("support_tickets_per_customer", "minutes_per_support_ticket", "support_fte_capacity_tickets", "product_squad_size", "target_min_runway_months"):
+        overrides[field] = _coerce_int_series(raw.get(field), periods, getattr(facts, field))
+    if raw.get("evidence_status") is not None:
+        overrides["evidence_status"] = str(raw.get("evidence_status"))
+
+    scalar_overrides = {
+        "beginning_cash_yen": "beginning_cash",
+        "founder_ownership": "founder_ownership",
+        "option_pool": "option_pool",
+        "existing_investors": "existing_investors",
+        "strategic_warrant": "strategic_warrant",
+        "discount_rate": "discount_rate",
+        "terminal_growth_rate": "terminal_growth_rate",
+        "customer_roi_yen": "customer_roi",
+        "implementation_cost_yen": "implementation_cost",
+        "sales_cycle_months": "sales_cycle_months",
+        "churn_rate": "churn_rate",
+        "repeat_rate": "repeat_rate",
+        "payment_fee_pct": "payment_fee_pct",
+        "incentive_pct_gmv": "incentive_pct_gmv",
+        "fraud_loss_pct_gmv": "fraud_loss_pct_gmv",
+        "tam_yen": "tam",
+        "sam_yen": "sam",
+        "som_yen": "som",
+    }
+    for field, alt in scalar_overrides.items():
+        value = _first_present(raw, (field, alt))
+        if value is None:
+            continue
+        if field.endswith("_yen"):
+            overrides[field] = _coerce_int_series(value, 1, [getattr(facts, field)])[0]
+        elif field.endswith("_pct") or field.endswith("_rate") or field in {"founder_ownership", "option_pool", "existing_investors", "strategic_warrant", "terminal_growth_rate"}:
+            overrides[field] = _coerce_float_series(value, 1, [float(getattr(facts, field))], percent=True)[0]
+        elif field == "sales_cycle_months":
+            overrides[field] = int(float(value))
+        else:
+            overrides[field] = float(value)
+
+    return SourceFacts(**{**facts.__dict__, **overrides})
+
+
+__all__ = [
+    "AssumptionGroup",
+    "AssumptionLine",
+    "DriverSurface",
+    "DEFAULT_FORECAST_PERIODS",
+    "MECHANIC_PROFILES",
+    "MechanicProfile",
+    "SourceFacts",
+    "average_units",
+    "derive_source_facts",
+    "derive_source_facts_from_mapping",
+    "driver_surfaces_for",
+    "assumption_decomposition_for",
+    "ending_units",
+    "extract_forecast_periods",
+    "extract_model_grain",
+    "extract_start_year",
+    "extract_source_facts",
+    "forecast_years",
+    "profile_for_text",
+    "score_mechanics",
+]
