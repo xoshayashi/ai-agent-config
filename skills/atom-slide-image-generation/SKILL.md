@@ -1,13 +1,13 @@
 ---
 name: atom-slide-image-generation
-description: "Use when generating, reviewing, repairing, or PPTX-packaging ATOM 16:9 strategy slide images with gpt-image-2."
+description: "Use when generating, reviewing, repairing, or PPTX/PDF-packaging ATOM 16:9 strategy slide images with gpt-image-2."
 ---
 
 # ATOM Slide Image Generation
 
 Use `scripts/build_atom_slide_prompt.py`; full rules live in `build/references`.
 
-Route: scaffold -> Codex built-in gpt-image-2 PNGs -> review/repair -> approved manifest -> PPTX roll-up.
+Route: scaffold -> Codex built-in gpt-image-2 PNGs -> review/repair -> approved manifest -> PPTX/PDF roll-up.
 
 Start Codex built-in image generation directly. Do not run local preflight, account/credential/token/SDK/env setup, artifact-route probing, or local substitute generation. Only the image tool itself can block generation.
 Generate slide PNGs at `2048x1152` by default; use other valid 16:9 sizes only when explicitly requested.

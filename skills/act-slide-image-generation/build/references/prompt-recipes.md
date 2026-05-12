@@ -26,7 +26,7 @@ Quality anchor vocabulary for evaluation and prompt consistency:
 ```text
 generation_mode: new_image / image_edit
 image_model: gpt-image-2
-image_size: 2048x1152 by default for generated slide output; 1536x864 for explicit drafts only; 2560x1440 for explicit QHD/high-detail requests only
+image_size: 2048x1152 by default for generated slide output; 1536x864 for explicit drafts only; 2560x1440 for explicit QHD/high-detail requests only; 3840x2160 for explicit 4K requests only
 image_size_label: 1920x1080 is FHD delivery only; 2048x1152 is 16:9 2K-width; 3840x2160 is 4K UHD
 image_quality: low for draft, medium/high for final or text-heavy slides
 image_background: opaque or auto
@@ -81,7 +81,7 @@ Contact sheet gate: keep one retained `render_check/contact_sheet_review.png` by
 
 ```text
 Draw a 16:9 strategy slide image with gpt-image-2.
-Generate at 2048x1152 by default for both working review and final generated slide PNG output. Use 1536x864 only for explicit quick drafts, and 2560x1440 only when the user explicitly asks for QHD/high-detail output.
+Generate at 2048x1152 by default for both working review and final generated slide PNG output. Use 1536x864 only for explicit quick drafts, 2560x1440 only when the user explicitly asks for QHD/high-detail output, and 3840x2160 only when the user explicitly asks for 4K output.
 Plan all layout using a 1672x941 coordinate basis, with ACT delivery target 1920x1080 after resize if required.
 Treat 1920x1080 as FHD/1080p delivery, 2048x1152 as the default 16:9 2K-width generation output, and 3840x2160 as 4K UHD generation.
 default_2k_generation_lock: 2048x1152 is the standard generated output size unless the user explicitly requests another valid 16:9 generation size.
@@ -139,6 +139,8 @@ Message boxes and Insight surfaces must use flat solid fills only; no patterns, 
 Apply message_box_scale_lock: message boxes are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered; use one short judgment sentence, prefer one line, allow two lines maximum, and trim, move explanation to notes/body, or remove the component instead of increasing the box.
 Apply message_box_text_size_lock: Insight/message-box text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below subtitle, and must never become a second title.
 Apply message_box_compactness_blocker_lock: an Insight/message-box that dominates the slide, behaves like a banner, spans beyond the interpreted region, grows tall to carry prose, or compensates for layout imbalance is a blocker; a lower, quieter box that returns space to the body, figure, table, or diagram is preferred when the sentence remains legible and optically centered.
+Apply message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface; plan line box, padding, and baseline so the sentence sits at the visual center.
+Apply insight_surface_placement_lock: when an Insight/message-box is kept, place it as a deliberate interpretation bridge tied to the body silhouette and footer baseline; bottom variants sit in the breathing space between body content and Source, centered to the interpreted region or full body block, with Source kept separate on its invisible baseline.
 Honey message boxes have one fixed treatment: #F5E2A8 flat pale fill, #C49A2C 4-5px full-height left accent line, #2D332E text. Avoid saturated yellow fills, dark yellow boxes, large yellow areas, and yellow title underlines.
 Preserve distinct messages as distinct slides. Combine slides only when messages repeat, the same comparison must be seen together, or the user explicitly requests a shorter deck.
 Choose a concrete visual grammar per slide from the message and evidence. Select the projection, viewpoint, abstraction level, motif, and level of detail deliberately; the chosen visual can be a diagram, scene, system view, comparison, object detail, spatial view, sequence, or metaphor when it clarifies the argument.

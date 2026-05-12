@@ -26,7 +26,7 @@ Quality anchor vocabulary for evaluation and prompt consistency:
 ```text
 generation_mode: new_image / image_edit
 image_model: gpt-image-2
-image_size: 2048x1152 by default for generated slide output; 1536x864 for explicit drafts only; 2560x1440 for explicit QHD/high-detail requests only
+image_size: 2048x1152 by default for generated slide output; 1536x864 for explicit drafts only; 2560x1440 for explicit QHD/high-detail requests only; 3840x2160 for explicit 4K requests only
 image_size_label: 1920x1080 is FHD delivery only; 2048x1152 is 16:9 2K-width; 3840x2160 is 4K UHD
 image_quality: low for draft, medium/high for final or text-heavy slides
 image_background: opaque or auto
@@ -81,7 +81,7 @@ Contact sheet gate: keep one retained `render_check/contact_sheet_review.png` by
 
 ```text
 Draw a 16:9 strategy slide image with gpt-image-2.
-Generate at 2048x1152 by default for both working review and final generated slide PNG output. Use 1536x864 only for explicit quick drafts, and 2560x1440 only when the user explicitly asks for QHD/high-detail output.
+Generate at 2048x1152 by default for both working review and final generated slide PNG output. Use 1536x864 only for explicit quick drafts, 2560x1440 only when the user explicitly asks for QHD/high-detail output, and 3840x2160 only when the user explicitly asks for 4K output.
 Plan all layout using a 1672x941 coordinate basis, with ATOM delivery target 1920x1080 after resize if required.
 Treat 1920x1080 as FHD/1080p delivery, 2048x1152 as the default 16:9 2K-width generation output, and 3840x2160 as 4K UHD generation.
 default_2k_generation_lock: 2048x1152 is the standard generated output size unless the user explicitly requests another valid 16:9 generation size.

@@ -21,7 +21,7 @@ Official sources checked:
 ## Generation Route
 
 - For Codex skill use, final slide images should be generated with Codex's built-in image generation capability, not with a local credential implementation.
-- Treat the built-in image generation capability as the correct `gpt-image-2` route when the user requests `gpt-image-2` inside Codex.
+- Treat the built-in image generation capability as the correct `gpt-image-2` route when the user requests `gpt-image-2` inside Codex. Record `model_route_assumption: Codex built-in image generation is the gpt-image-2 route for this skill unless image metadata proves otherwise`.
 - Official documentation examples are reference material for prompt/settings semantics only. Do not require local credential setup or add a local credential execution route in this skill.
 - Do not pause slide generation to inspect local environment state; in Codex, start from the built-in image generation route.
 - If the built-in image tool does not expose model selection, do not invent an API blocker; use the built-in generation route and report `generation_route: Codex built-in image generation`.
@@ -43,7 +43,7 @@ Use these defaults for ACT slide images:
 ```text
 generation_mode: new_image / image_edit
 image_model: gpt-image-2
-image_size: 2048x1152 by default for generated slide output; 1536x864 for explicit drafts only; 2560x1440 for explicit QHD/high-detail requests only
+image_size: 2048x1152 by default for generated slide output; 1536x864 for explicit drafts only; 2560x1440 for explicit QHD/high-detail requests only; 3840x2160 for explicit 4K requests only
 image_size_label: 1920x1080 is FHD delivery only; 2048x1152 is 16:9 2K-width; 3840x2160 is 4K UHD
 image_quality: low for fast layout drafts, medium/high for dense text or final slides
 image_background: opaque or auto

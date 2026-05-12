@@ -1,6 +1,6 @@
 # Text To Slide Structure
 
-Use this reference when the input is a long memo, equity story, research note, transcript, or dense bullet dump. Do not send long prose directly to image generation. Convert it into a deck structure first.
+Use this reference when the input is a long memo, strategy narrative, research note, transcript, operating brief, policy note, technical explainer, education material, internal report, or dense bullet dump. Do not send long prose directly to image generation. Convert it into a deck structure first.
 
 ## Contents
 
@@ -18,7 +18,7 @@ Use this reference when the input is a long memo, equity story, research note, t
 - Build the storyline before designing slides. Read only the action titles in order; they should form the deck's argument without body text.
 - Start with a high-signal opening thesis, not a title-only first slide. The opener can use the deck's main phrase, but it should also carry the core thesis, 2-4 proof/tension points, a visible market-shift / matrix / causal-map / wedge structure, and a bridge into the next section.
 - Put the conclusion or recommendation early enough for an intended decision-maker to understand the point before details.
-- Every slide needs a role in the story: set context, prove urgency, explain solution, show differentiation, size market, prove traction/plan, handle risk, or close the thesis.
+- Every slide needs a role in the story: set context, prove urgency, explain a solution, compare options, show differentiation, summarize evidence, explain operations, teach a concept, size impact, prove traction/plan, handle risk, or close the thesis.
 - Treat message, evidence, visual, and source as separate jobs: message says `so what`, evidence says `why believe`, visual says `how to see`, and source says `can we trust it`.
 - Map each message to evidence and source policy before image prompting. Unsupported facts are either removed from the slide or marked as research/source needs.
 - Convert prose into visual grammar: comparison, table, flow, roadmap, loop, matrix, KPI strip, architecture stack, or signature visual. Avoid prose boxes as the default.
@@ -123,7 +123,7 @@ Use this reference when the input is a long memo, equity story, research note, t
      - chronological shift -> timeline / sequence / staged flow
      - market or labor statistics -> KPI strip / trend table
      - competing options -> comparison table / 2x2 matrix
-     - product/strategy system -> architecture flow / stack
+     - system, solution, workflow, or technical architecture -> architecture flow / stack
      - compounding asset -> loop
      - rollout plan -> phase roadmap
      - use cases -> grid/table

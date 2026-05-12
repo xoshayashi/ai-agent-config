@@ -22,6 +22,13 @@ SLIDE_CY = 6_858_000
 NOTES_CX = 6_858_000
 NOTES_CY = 9_144_000
 IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
+APPROVED_SLIDE_IMAGE_SIZES = {
+    (1536, 864),
+    (1920, 1080),
+    (2048, 1152),
+    (2560, 1440),
+    (3840, 2160),
+}
 CONTENT_TYPES = {
     ".png": "image/png",
     ".jpg": "image/jpeg",
@@ -33,12 +40,13 @@ A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
 CT_NS = "http://schemas.openxmlformats.org/package/2006/content-types"
 
 
-def validate_png_bytes(data: bytes, label: str) -> None:
+def validate_png_bytes(data: bytes, label: str) -> tuple[int, int]:
     if not data.startswith(b"\x89PNG\r\n\x1a\n"):
         raise SystemExit(f"{label} is not a valid PNG: missing PNG signature")
     offset = 8
     seen_ihdr = False
     seen_iend = False
+    dimensions: tuple[int, int] | None = None
     while offset + 12 <= len(data):
         length = struct.unpack(">I", data[offset : offset + 4])[0]
         kind = data[offset + 4 : offset + 8]
@@ -53,6 +61,8 @@ def validate_png_bytes(data: bytes, label: str) -> None:
             raise SystemExit(f"{label} is not a valid PNG: CRC mismatch in {kind.decode('latin1', errors='replace')}")
         if kind == b"IHDR":
             seen_ihdr = True
+            width, height = struct.unpack(">II", data[start : start + 8])
+            dimensions = (width, height)
         if kind == b"IEND":
             seen_iend = True
             if crc_end != len(data):
@@ -61,21 +71,51 @@ def validate_png_bytes(data: bytes, label: str) -> None:
         offset = crc_end
     if not seen_ihdr or not seen_iend:
         raise SystemExit(f"{label} is not a valid PNG: missing IHDR or IEND")
+    if dimensions is None:
+        raise SystemExit(f"{label} is not a valid PNG: missing dimensions")
+    return dimensions
 
 
-def validate_image_bytes(data: bytes, suffix: str, label: str) -> None:
+def jpeg_dimensions(data: bytes, label: str) -> tuple[int, int]:
+    offset = 2
+    while offset + 9 <= len(data):
+        if data[offset] != 0xFF:
+            raise SystemExit(f"{label} is not a valid JPEG: malformed marker")
+        marker = data[offset + 1]
+        offset += 2
+        if marker in {0xD8, 0xD9}:
+            continue
+        if offset + 2 > len(data):
+            break
+        length = struct.unpack(">H", data[offset : offset + 2])[0]
+        if length < 2 or offset + length > len(data):
+            raise SystemExit(f"{label} is not a valid JPEG: truncated segment")
+        if 0xC0 <= marker <= 0xC3:
+            if length < 7:
+                raise SystemExit(f"{label} is not a valid JPEG: malformed SOF segment")
+            height, width = struct.unpack(">HH", data[offset + 3 : offset + 7])
+            return (width, height)
+        offset += length
+    raise SystemExit(f"{label} is not a valid JPEG: missing dimensions")
+
+
+def validate_image_bytes(data: bytes, suffix: str, label: str) -> tuple[int, int]:
     ext = suffix.lower()
     if ext == ".png":
-        validate_png_bytes(data, label)
+        return validate_png_bytes(data, label)
     elif ext in {".jpg", ".jpeg"}:
         if not (data.startswith(b"\xff\xd8") and data.endswith(b"\xff\xd9")):
             raise SystemExit(f"{label} is not a valid JPEG: missing SOI/EOI markers")
+        return jpeg_dimensions(data, label)
     else:
         raise SystemExit(f"{label} has unsupported image extension: {suffix}")
 
 
 def validate_image_file(path: Path) -> None:
-    validate_image_bytes(path.read_bytes(), path.suffix, str(path))
+    width, height = validate_image_bytes(path.read_bytes(), path.suffix, str(path))
+    if (width, height) not in APPROVED_SLIDE_IMAGE_SIZES:
+        allowed = ", ".join(f"{w}x{h}" for w, h in sorted(APPROVED_SLIDE_IMAGE_SIZES))
+        raise SystemExit(f"{path} must be an approved 16:9 slide image size; found {width}x{height}. Allowed: {allowed}.")
 
 
 def validate_master_image_path(path: Path) -> None:
@@ -85,6 +125,8 @@ def validate_master_image_path(path: Path) -> None:
     for idx, part in enumerate(parts[:-1]):
         if part == "render_check" and parts[idx + 1] == "pdf_pages":
             raise SystemExit(f"{path} is under render_check/pdf_pages/. Use the approved slides_final/ PNG master instead.")
+    if "slides_final" not in parts:
+        raise SystemExit(f"{path} is not under slides_final/. Use the approved slides_final/ PNG master instead.")
 
 
 def natural_key(path: Path) -> list[object]:
