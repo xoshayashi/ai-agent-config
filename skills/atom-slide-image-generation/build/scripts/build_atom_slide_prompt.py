@@ -18,7 +18,7 @@ SIZE_LABELS = {
     "3840x2160": "4K UHD 16:9 image-generation size; explicit request only",
 }
 PLACEHOLDER_BLOCKERS = [
-    "slide_claim",
+    "slide_message",
     "column_spans",
     "row_tracks",
     "column_tracks",
@@ -38,7 +38,7 @@ PLACEHOLDER_BLOCKERS = [
     "imageability_lock",
     "editorial_polish_repair_loop",
     "visual_subject_open_set",
-    "claim_led_composition_lock",
+    "message_led_composition_lock",
     "region_balance_policy",
     "composition_fit_plan",
     "secondary_region_integrity_lock",
@@ -71,19 +71,17 @@ PLACEHOLDER_BLOCKERS = [
     "density_levers",
     "density_guardrails",
     "overload_controls",
+    "near_white_slide_base_lock",
     "header_anchor",
     "header_left_accent_master_lock",
     "header_left_accent_reference_lock",
     "header_left_accent_shape_lock",
-    "header_left_accent_controlled_overhang_rule",
+    "header_left_accent_no_protrusion_rule",
     "header_left_accent_top_protrusion_blocker",
     "footer_anchor_baseline",
     "header_footer_text_color_lock",
     "message_box_scale_lock",
     "message_box_text_size_lock",
-    "message_box_compactness_blocker_lock",
-    "message_box_text_alignment_lock",
-    "insight_surface_placement_lock",
     "post_generation_design_balance_check",
     "source_policy",
     "source_real_only_lock",
@@ -161,7 +159,7 @@ def canonical_planning_block(
     unresolved_text = ", ".join(unresolved) if unresolved else "none"
 
     return f"""planning_block:
-  slide_claim: [one sentence]
+  slide_message: [one sentence]
   primary_guideline: {primary_guideline}
   guideline_priority: embedded ATOM design system in SKILL.md is the default source of truth
   generation_mode: {"image_edit" if mode == "repair" else "new_image"}
@@ -176,27 +174,32 @@ def canonical_planning_block(
   image_streaming: optional for exploration, final QA uses completed image
   image_delivery_size: 1920x1080 after resize if exact ATOM delivery size is required
   generation_route: Codex built-in image generation
+  builtin_generation_lock: when slide images are requested in Codex, invoke Codex built-in image generation directly and start generating; do not pause for local environment preflight or local artifact-route probing before generation
+  codex_image_artifact_rule: Codex built-in image generation returns the authoritative generated PNG artifact; use the Codex-provided artifact/download/attachment path to materialize approved outputs under slides_final/ when a filesystem path is needed for PPTX packaging
+  local_env_non_blocker: local environment uncertainty is not a blocker and must not be reported as the reason PPTX is unfinished
+  credential_setup_blocker: do not create, request, decrypt, configure, inspect, or wait for account credentials, local tokens, SDK setup, or environment variables; use Codex built-in image generation directly
   generation_route_lock: PPTX is a delivery wrapper only; never use PPTX, PowerPoint export, screenshots, local rendering, HTML, SVG, canvas, or PIL to create final PNGs.
+  pptx_first_blocker: do not create a presentation deck as the source of truth before image generation; generate and review slide PNGs first, then package approved PNGs into PPTX at the end
   image_generation_order: Correct order: generate gpt-image-2 PNGs, review and repair PNGs, then package approved PNGs into PPTX.
-  blocked_generation_rule: If gpt-image-2 image generation is blocked, stop rather than manufacturing final PNGs through PPTX or local rendering.
+  blocked_generation_rule: only mark blocked after invoking Codex built-in image generation and the tool itself fails, is unavailable, or refuses the request; local environment uncertainty is not a generation blocker
   generation_status: pending_builtin_generation
   output_files: [filled after Codex image generation]
   output_artifact_mastering_lock: slides_final/ is the only loose-PNG master for approved generated slide images; package and review artifacts reference it instead of making additional loose PNG copies
-  single_final_png_master_lock: keep each approved final PNG in exactly one master path under slides_final/ and record that path in review_manifest, pptx_image_mapping, and google_slides_image_mapping when requested
+  single_final_png_master_lock: keep each approved final PNG in exactly one master path under slides_final/ and record that path in review_manifest, pptx_image_mapping, and external_slide_image_mapping when requested
   slides_package_policy: slides_package/ contains PPTX, speaker notes, review_manifest, and metadata only; do not copy final PNG files into slides_package/
   render_check_policy: render_check/pdf_pages/ is optional disposable QA output from PDF/PPT render checks, not a second source of truth; do not copy slides_final/ PNGs there, and overwrite or ignore stale render_check artifacts between checks
   no_duplicate_png_output_lock: do not keep duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/; when duplication appears, preserve slides_final/ as master and update manifests/mappings to reference it
   contact_sheet_mastering_lock: keep one retained contact sheet by default, render_check/contact_sheet_review.png, built from slides_final/ master PNGs
   single_contact_sheet_policy: do not retain parallel contact_sheet_generated*, contact_sheet_package*, and contact_sheet_pdf_render* files for the same slide set; if delivery QA requires comparison, create one render_check/contact_sheet_delivery_compare.png or render_check/render_diff_report.json and remove or ignore intermediate contact sheets
-  google_slides_delivery: optional only when explicitly requested; otherwise not_requested
-  google_slides_status: not_requested / pending_generated_images_and_pre_google_slides_image_review / inserted / blocked
-  google_slides_title: N/A unless explicitly requested
-  google_slides_file_id: N/A unless explicitly requested
-  google_slides_url: N/A unless explicitly requested
-  google_slides_slide_count: N/A unless explicitly requested; if requested, must match generated image count
-  google_slides_route: N/A unless explicitly requested / direct_native_slides_batch_update / packaging_pptx_import / blocked
-  google_slides_image_mapping: N/A unless explicitly requested; if requested, [slide_id -> generated PNG path -> Google slide objectId]
-  google_slides_speaker_notes_mapping: N/A unless explicitly requested; if requested, [slide_id -> speakerNotesObjectId -> inserted note status]
+  external_slide_delivery: optional only when explicitly requested; otherwise not_requested
+  external_slide_status: not_requested / pending_generated_images_and_pre_external_slide_image_review / inserted / blocked
+  external_slide_title: N/A unless explicitly requested
+  external_slide_file_id: N/A unless explicitly requested
+  external_slide_url: N/A unless explicitly requested
+  external_slide_count: N/A unless explicitly requested; if requested, must match generated image count
+  external_slide_route: N/A unless explicitly requested / external_slide_import / packaging_pptx_import / blocked
+  external_slide_image_mapping: N/A unless explicitly requested; if requested, [slide_id -> generated PNG path -> external slide objectId]
+  external_slide_speaker_notes_mapping: N/A unless explicitly requested; if requested, [slide_id -> speakerNotesObjectId -> inserted note status]
   pptx_delivery: default image-only roll-up after all generated PNGs pass QA, unless user asks for image files only
   pptx_status: pending_generated_images_and_pre_package_image_review
   pptx_title: [filled when creating PPTX deck]
@@ -205,15 +208,15 @@ def canonical_planning_block(
   pptx_packaging_route: scripts/package_slide_images_to_pptx.py / presentation_app_import / blocked
   pptx_image_mapping: [slide_id -> generated PNG path -> PPTX slide index]
   pptx_speaker_notes_mapping: [slide_id -> note source -> inserted / sidecar / blocked]
-  speaker_notes_plan: one substantial note per deck slide, drafted before image generation and inserted into PPTX or Google Slides notes page after image roll-up when the packaging route supports notes
+  speaker_notes_plan: one substantial note per deck slide, drafted before image generation and inserted into PPTX or external slide-hosting notes page after image roll-up when the packaging route supports notes
   speaker_notes_status: drafted / inserted / blocked
   speaker_notes_depth_lock: [PPT talk script should be 4-7 substantive Japanese sentences or roughly 180-320 Japanese chars per slide unless the user requests brief notes; include opening framing, 2-3 evidence/assumption talking points, implication, caveat when relevant, and transition; do not invent facts]
   speaker_notes_text: [substantial PPT talk script + evidence/assumption cue + source caveat if relevant + transition cue; keep off slide image]
   opening_slide_role: opening_thesis_slide / standard_story_slide
   first_slide_not_title_only: true / N/A
   opening_density_gate: slide 1 has core thesis, 2-4 proof/tension points, visible market-shift/matrix/causal-map/wedge structure, and bridge
-  pre_google_slides_image_review: required on actual generated PNG before any Google Slides insertion
-  pre_package_image_review: required on actual generated PNG before any PPTX or Google Slides insertion
+  pre_external_slide_image_review: required on actual generated PNG before any external slide-hosting insertion
+  pre_package_image_review: required on actual generated PNG before any PPTX roll-up or external slide insertion
   post_generation_full_deck_review_loop: after generating slide PNGs, review every actual image before claiming completion
   all_generated_images_reviewed: false until every output PNG path has been opened and reviewed
   image_review_iteration: 0 before first review; increment after each regenerated or edited PNG
@@ -231,25 +234,27 @@ def canonical_planning_block(
   completion_ready_status: blocked until all_generated_images_reviewed is true, weak_slide_regeneration_queue is empty, and all image/content/design/deck-unity statuses are approved
   regenerate_until_quality_approved: keep regenerating or editing weak slides until completion_ready_status is approved
   completion_blocker: do not report complete while any generated slide has blocker, major, deck-consistency, content-quality, or design-quality issues
-  generation_block_rule: if generation or repair is blocked, mark completion_ready_status: blocked and do not package or report complete
+  generation_block_rule: if Codex built-in generation or repair is actually blocked by the image tool, mark completion_ready_status: blocked and do not package or report complete; do not use local environment uncertainty as the blocker
   review_manifest: required JSON record covering every generated PNG before PPTX packaging
   review_manifest_status: approved only when every image path is covered and all quality statuses are approved
   validate_review_manifest: run before PPTX packaging; reject missing, partial, pending, blocked, weak-slide, or duplicate-loose-PNG manifests
   deck_tone_consistency_review: [first third vs middle third vs last third tone comparison after generation]
   deck_tone_consistency_status: pending / approved / repair_required
   deck_tone_repair_plan: [slides to regenerate or edit if tone drift appears]
-  post_generation_design_balance_check: required on actual generated PNGs before PPTX or Google Slides insertion; checks whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity
+  post_generation_design_balance_check: required on actual generated PNGs before PPTX roll-up or external slide insertion; checks whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity
   whitespace_occupancy_balance_status: pending / approved / repair_required
   typography_balance_status: pending / approved / repair_required
   color_consistency_status: pending / approved / repair_required
   outer_padding_consistency_status: pending / approved / repair_required
+  header_identity_lock: header is always the same compact left vertical line + H1 + subtitle system, never a slide-specific decoration surface
+  header_integrity_blocker_lock: malformed, missing, oversized, recolored, right-decorated, or intruded header is a blocker and must be repaired before other polish
   header_integrity_status: pending / approved / repair_required
   layout_archetype: {archetype}
   layout_family: full-field / asymmetric-main-supporting-context / balanced-diptych / top-bottom / center-hub / process / matrix / small-multiple / swimlane / staircase
   composition_family: [same family label used for deck-level rhythm review]
-  layout_diversity_plan: [deck-level plan for rotating compatible layout families according to claim type, evidence type, and decision question]
+  layout_diversity_plan: [deck-level plan for rotating compatible layout families according to message type, evidence type, and decision question]
   layout_rotation_guard: [review neighboring slides for mechanical repetition; repeated families must serve comparison or deliberate rhythm]
-  layout_sequence_table: [slide_number -> section_role -> claim_type -> layout_family -> composition_family -> previous_family -> repeat_or_change_reason]
+  layout_sequence_table: [slide_number -> section_role -> message_type -> layout_family -> composition_family -> previous_family -> repeat_or_change_reason]
   recent_layout_memory: [previous 3-5 slide layout families and why this slide repeats or changes]
   grid_mode: {grid_mode}
   column_spans: [12-column spans, integer columns only]
@@ -267,21 +272,22 @@ def canonical_planning_block(
   master_components: [header, invisible footer alignment baseline, card/table/insight/icon masters]
   deck_master_refs: [reuse refs for header/footer/insight/table/card if deck-level]
   deck_tone_master_lock: [slide base, typography scale, header/footer, Deep Blue use, Honey use, illustration style, icon family, density rhythm, whitespace/occupancy rhythm, card/table geometry, outer padding, invisible source alignment baseline, negative prompt]
-  deck_tone_signature_lock: preserve one material system across the deck for base, typography, rules, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior while varying only claim-led layouts
+  deck_tone_signature_lock: preserve one material system across the deck for base, typography, rules, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior while varying only message-led layouts
+  near_white_slide_base_lock: use #FCFBF8 as the default ATOM slide canvas, with optional #F4F3EF only as a barely visible warm light-neutral tint; keep #DDE3EA/#D6E1EE for panels/cards, not the page background; avoid darker cream/beige page bases
   illustration_tone_lock: keep all illustrations in one deck on the same editorial vector system
   illustration_style_sheet: flat 2D business and healthcare workflow illustration with simplified people, devices, document stacks, CRM panels, rounded UI cards, small icon badges, soft pale blue-gray or warm gray fills, Deep Blue and charcoal linework, restrained Honey highlights, consistent 2-3px stroke, face detail, body proportion, crop, and fill opacity
   illustration_consistency_status: pending / approved / repair_required
-  visual_design_quality_traits: [design treatment only: calm light base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, intentional canvas occupancy, concrete visual anchor, crisp focal hierarchy; do not change slide count, claim order, or storyline solely for this]
+  visual_design_quality_traits: [design treatment only: calm light base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, intentional canvas occupancy, concrete visual anchor, crisp focal hierarchy; do not change slide count, message order, or storyline solely for this]
   imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation
   concrete_visual_anchor: [the one object, scene, interface, workflow moment, artifact, evidence strip, map detail, or operational motif the reader can picture]
   observable_scene_or_object: [specific visible subject, not an abstract noun]
-  viewpoint_crop: [front-on / top-down / close crop / cutaway / over-the-shoulder / operating view / process lane view, chosen from the claim]
+  viewpoint_crop: [front-on / top-down / close crop / cutaway / over-the-shoulder / operating view / process lane view, chosen from the message]
   specific_visual_details: [2-4 concrete details such as rows, screens, gauges, handoff points, document snippets, machine cells, routes, timestamps, labels, annotations, or evidence artifacts]
-  visual_specificity_plan: [how the concrete anchor, chart/table/matrix/flow, and details make the claim imaginable]
+  visual_specificity_plan: [how the concrete anchor, chart/table/matrix/flow, and details make the message imaginable]
   editorial_polish_repair_loop: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm
-  visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide claim, evidence, and audience context
-  claim_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide claim before adding supporting elements
-  region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide claim, evidence shape, reading path, and body silhouette
+  visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide message, evidence, and audience context
+  message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements
+  region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette
   composition_fit_plan: [main visual field, supporting regions, whitespace role, Insight footprint, and intended occupancy rhythm]
   secondary_region_integrity_lock: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field
   body_silhouette_lock: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions
@@ -290,18 +296,18 @@ def canonical_planning_block(
     status: exact_required_before_generation
     header_safe_area: [x/y/w/h exact selected values; ATOM default x=44 y=24 w=1584 h=136]
     vertical_line: [x/y/w/h/color exact selected values; ATOM default x=50 y=40 w=10 h=120 color #0B2F5B]
-    header_line_top_rule: [accent top may sit 8-16px above first visible H1 glyph top as a header-block anchor; never more than 18px above H1, outside header_safe_area, or detached from H1/subtitle]
+    header_line_top_rule: [accent top must never sit above the first visible H1 glyph/title top; align it to the title top or place it 0-6px below]
     header_left_accent_master_lock: [single header-block left accent copied verbatim on every slide; it spans the H1 + subtitle stack; it is not a page-edge rail, sidebar, body marker, chapter stripe, or slide-specific decoration]
     header_left_accent_reference_lock: [match approved reference geometry on a 1672x941 basis: x=50 y=40 w=10 h=120 color #0B2F5B]
     header_left_accent_shape_lock: [single solid vertical rectangle, 10px wide, 0-2px radius, no pill caps, shadow, glow, gradient, split segments, or duplicate accent]
-    header_left_accent_controlled_overhang_rule: [controlled 8-16px top overhang above the H1 glyph top is correct; uncontrolled page-top protrusion is not]
-    header_left_accent_top_protrusion_blocker: [any accent top more than 18px above the first visible H1 glyph top, clipped/floating near page top, detached from H1/subtitle, or extending into body_start_y is a blocker]
-    h1: [x/y/w/max_lines/font_family/font_size/weight/line_height/color exact selected values; ATOM default x=88 y=34 w=1332 max_lines=1 font_family=Noto Sans JP size=32pt weight=700 line_height=1.10 color #2D332E]
-    subtitle: [x/y/w/max_lines/font_family/font_size/weight/line_height/color exact selected values; ATOM default x=88 y=78 w=1332 max_lines=1 font_family=Noto Sans JP size=28pt weight=400 line_height=1.18 color #4D544E]
-    visual_alignment: [visible accent top uses controlled 8-16px header-block overhang above H1 glyph top; visible accent bottom lands 4-10px below subtitle lower visual edge; no uncontrolled upward protrusion]
-    body_start_y: [exact selected value; ATOM default 190, or 224 only if explicit two-line H1 fallback is declared]
+    header_left_accent_no_protrusion_rule: [the accent top aligns with the H1 glyph/title top or sits 0-6px below it; any upward protrusion above H1 is a blocker]
+    header_left_accent_top_protrusion_blocker: [any visible accent pixel above the first visible H1 glyph/title top, clipped/floating near page top, detached from H1/subtitle, or extending into body_start_y is a blocker]
+    h1: [x/y/w/max_lines/font_family/font_size/weight/line_height/color exact selected values; ATOM default x=88 y=34 w=1332 max_lines=1 font_family=Noto Sans JP size=32pt weight=700 line_height=1.14 color #2D332E]
+    subtitle: [x/y/w/max_lines/font_family/font_size/weight/line_height/color exact selected values; ATOM default x=88 y=82 w=1332 max_lines=1 font_family=Noto Sans JP size=22pt weight=400 line_height=1.18 color #4D544E]
+    visual_alignment: [visible accent top aligns with the H1 glyph/title top or sits 0-6px below it; visible accent bottom lands 4-10px below subtitle lower visual edge; no upward protrusion]
+    body_start_y: [exact selected value; ATOM default 180, or 218 only if explicit two-line H1 fallback is declared]
     upper_right_clear_zone: [x/y/w/h exact selected values and empty; ATOM default x=1420 y=24 w=208 h=88]
-    forbidden_header_elements: [slide number, title kicker, header badge, logo/right object unless guideline requires it, body objects above body_start_y]
+    forbidden_header_elements: [slide number, title kicker, header badge, logo/right object unless guideline requires it, right-side header decoration, body objects above body_start_y]
   component_inventory: [master components and coordinates]
   equalized_groups: [cards, rows, phase cards, icons]
   shared_edges: [header, main structure, supporting region, insight, source alignment baseline; no visible Source separator]
@@ -310,32 +316,32 @@ def canonical_planning_block(
   signature_visual_plan: [main motif, supporting motifs, style, and why this slide deserves a memorable but restrained visual]
   illustration_region: [x/y/w/h in 1672 basis, or none for quiet table]
   illustration_intensity: 0_none / 1_marginal / 2_integrated / 3_restrained_signature
-  human_designed_illustration_style: clean controlled flat 2D editorial/vector illustration, crisp silhouette, intentional simplification, restrained fills, clear focal motif, only useful supporting details, projection/viewpoint chosen from the slide claim, no rough sketch, no arbitrary pseudo-depth, and no glossy AI concept-art finish
+  human_designed_illustration_style: clean controlled flat 2D editorial/vector illustration, crisp silhouette, intentional simplification, restrained fills, clear focal motif, only useful supporting details, projection/viewpoint chosen from the slide message, no rough sketch, no arbitrary pseudo-depth, and no glossy AI concept-art finish
   creative_variance: low / medium / high; high acts like the requested higher temperature for composition, crop, viewpoint, and layout rhythm while locking brand/header/text/source rules
   density_tier: T1_sparse / T2_balanced / T3_dense / T4_appendix_dense
   density_layers: [main figure/table, evidence strip, context panel/legend, optional Insight]
   density_design:
     reader_mode: scan / read / reference
     decision_question: [what the reader can answer without narration]
-    information_units: [claim, context, comparison, trend, mechanism, risk, implication, assumption, source]
+    information_units: [message, context, comparison, trend, mechanism, risk, implication, assumption, source]
     density_levers: [KPI strip, supporting context region, evidence strip, small multiples, annotation, benchmark/context column, source cue]
     overload_controls: [one dominant structure, max three major regions, body >=18pt equivalent, grouped labels, no decorative density]
   density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
-  consulting_structure_bias: gently prefer strategy-consulting style structure when it clarifies the claim, without forcing it on every slide
+  structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
   structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
-  consulting_structure_status: not_applicable / applied / intentionally_skipped / repair_required
+  structure_choice_status: not_applicable / applied / intentionally_skipped / repair_required
   structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation
   useful_density_plan: [2-4 proof/context/comparison points, units/denominators where relevant, source cue when traceable, and one clear reading path]
   information_unit_budget: [H1, subtitle, grouped body labels, decision-relevant data labels or rows, optional one-sentence Insight, required source when traceable; no default cap on decision-relevant numbers]
-  density_guardrails: [preserve distinct claims, combine only repeated or shared-comparison slides, no smaller body text, no decorative illustration detail]
+  density_guardrails: [preserve distinct messages, combine only repeated or shared-comparison slides, no smaller body text, no decorative illustration detail]
   header_anchor:
     vertical_line: exact x/y/w/h/color copied from deck_header_master_lock
     header_line_top_rule: copied from deck_header_master_lock and checked after generation
     header_left_accent_master_lock: exact header-block left accent spanning H1 + subtitle; not a page-edge rail, sidebar, body marker, or decoration
     header_left_accent_reference_lock: exact reference geometry x=50 y=40 w=10 h=120 on 1672x941 basis unless a newer embedded master is supplied
     header_left_accent_shape_lock: single solid vertical rectangle, 10px wide, 0-2px radius, no cap/glow/shadow/gradient/split
-    header_left_accent_controlled_overhang_rule: controlled 8-16px top overhang above H1 glyph top is correct
-    header_left_accent_top_protrusion_blocker: top more than 18px above H1 glyph top, page-top floating, clipping, detachment from H1/subtitle, or body intrusion is a blocker; repair x/y/h before any other polish
+    header_left_accent_no_protrusion_rule: accent top aligns with H1 glyph/title top or sits 0-6px below it; any upward protrusion above H1 is a blocker
+    header_left_accent_top_protrusion_blocker: any visible accent pixel above H1 glyph/title top, page-top floating, clipping, detachment from H1/subtitle, or body intrusion is a blocker; repair x/y/h before any other polish
     h1: exact x/y/w/max_lines/font_family/font_size/weight/line_height/color copied from deck_header_master_lock
     subtitle: exact x/y/w/max_lines/font_family/font_size/weight/line_height/color copied from deck_header_master_lock
     visual_alignment: exact visual alignment rule copied from deck_header_master_lock
@@ -343,11 +349,11 @@ def canonical_planning_block(
     upper_right_clear_zone: exact x/y/w/h copied from deck_header_master_lock and kept empty
   footer_anchor_baseline: 1672 basis x=44-56 baseline y=895-912, invisible alignment position only, planned even if source_line is none
   header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E; no Deep Blue/Honey/arbitrary gray in header or footer text
-  message_box_scale_lock: compact interpretation surface; use the smallest legible variant; do not enlarge the box to carry long prose
+  message_box_scale_lock: compact interpretation surface; oversize is a blocker, so trim text, move detail to body/notes, or remove Insight instead of enlarging the box
   message_box_text_size_lock: message-box/Insight text default 20-24pt, 24-26pt only by exception; always at least 6pt smaller than selected H1, visually below subtitle, and never a second title
   message_box_compactness_blocker_lock: Insight/message-box surfaces that dominate the slide, behave like a banner, or compensate for layout imbalance are blockers
-  message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface
-  insight_surface_placement_lock: when an Insight/message-box is kept, place it as a deliberate interpretation bridge tied to the body silhouette and footer baseline
+  message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface; plan line box, padding, and baseline so the sentence sits at the visual center
+  insight_surface_placement_lock: when an Insight/message-box is kept, place it as a deliberate interpretation bridge tied to the body silhouette and footer baseline; bottom variants sit in the breathing space between body content and Source, centered to the interpreted region or full body block, with Source kept separate on its invisible baseline
   max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
   table_note_microline: none / [one text note line above source text; not a horizontal rule]
   source_real_only_lock: render Source footer only for real traceable external/provided sources; if no real source exists, set source_line: none and draw no Source footer text
@@ -386,35 +392,38 @@ def mode_guidance(mode: str) -> str:
         return """mode_guidance:
   - Convert the long text into a slide-image deck structure before writing image prompts.
   - Use the embedded ATOM design system in SKILL.md; do not load an external ATOM pattern file.
-  - Define deck_thesis, audience_decision, storyline_frame, section_map, and slide-level action_title claims.
+  - Define deck_thesis, audience_decision, storyline_frame, section_map, and slide-level action_title messages.
   - Plan slide 1 as opening_thesis_slide, not a title-only opener: include the core thesis, 2-4 proof/tension points, a real visual structure, and a narrative bridge.
-  - Map every claim to evidence, source_policy, visual_structure, layout_archetype, grid_mode, exact_text_budget, and split_merge_decision.
+  - Map every message to evidence, source_policy, visual_structure, layout_archetype, grid_mode, exact_text_budget, and split_merge_decision.
   - Apply source_real_only_lock and source_line_lock: render Source: ... only for real traceable external/provided sources; use source_line: none and draw no Source footer when no real source exists.
   - Apply output_artifact_mastering_lock, single_final_png_master_lock, and no_duplicate_png_output_lock: use slides_final/ as the single loose-PNG master; slides_package/ stores PPTX/notes/manifest only; render_check/pdf_pages/ is disposable QA output only.
   - Apply contact_sheet_mastering_lock and single_contact_sheet_policy: keep one retained contact sheet from slides_final/ by default; generate a comparison contact sheet only when delivery/render QA needs it.
   - Build layout_diversity_plan: assign layout_family for each slide across full-field, asymmetric main/supporting-context, balanced comparison, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase families when the argument benefits.
-  - Use layout_rotation_guard to keep repeated structures purposeful: repeat a family for like-for-like comparison, and change family when claim type, evidence type, or decision question changes.
+  - Use layout_rotation_guard to keep repeated structures purposeful: repeat a family for like-for-like comparison, and change family when message type, evidence type, or decision question changes.
   - Draft speaker_notes_text for every slide with speaker_notes_depth_lock: substantial Japanese PPT talk script, 4-7 sentences or roughly 180-320 Japanese chars, with framing, evidence/assumption cues, implication, caveat if relevant, and transition.
-  - Add pre_package_image_review, pre_google_slides_image_review, post_generation_full_deck_review_loop, all_generated_images_reviewed, weak_slide_regeneration_queue, content_quality_status, design_quality_status, deck_unity_status, completion_ready_status, and regenerate_until_quality_approved fields so generated PNGs are reviewed, repaired, and re-reviewed before PPTX, Slides insertion, or completion.
+  - Add pre_package_image_review, pre_external_slide_image_review, post_generation_full_deck_review_loop, all_generated_images_reviewed, weak_slide_regeneration_queue, content_quality_status, design_quality_status, deck_unity_status, completion_ready_status, and regenerate_until_quality_approved fields so generated PNGs are reviewed, repaired, and re-reviewed before PPTX, external slide insertion, or completion.
   - Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide before image prompting.
   - Apply illustration_tone_lock and illustration_style_sheet before image prompting so people, devices, UI panels, document objects, icon badges, linework, fills, and crop stay consistent across the deck.
   - Run density_design for every slide: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
   - Apply density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting.
-  - Apply consulting_structure_bias and structured_density_bias as a gentle direction: use issue trees, driver trees, 2x2 matrices, value chains, waterfalls, KPI bridges, decision tables, or hypothesis-evidence-implication rows when they clarify the claim; intentionally skip them when a simpler visual is stronger.
+  - Apply structure_choice_bias and structured_density_bias as a gentle direction: use issue trees, driver trees, 2x2 matrices, value chains, waterfalls, KPI bridges, decision tables, or hypothesis-evidence-implication rows when they clarify the message; intentionally skip them when a simpler visual is stronger.
   - Apply structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation.
   - Apply max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
   - Apply imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation.
   - Apply editorial_polish_repair_loop: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm.
-  - Apply visual_subject_open_set, claim_led_composition_lock, region_balance_policy, composition_fit_plan, secondary_region_integrity_lock, and body_silhouette_lock so the visual subject, region balance, focal relationship, canvas occupancy, secondary region, and body outline are chosen from the argument before image prompting.
+  - Apply visual_subject_open_set, message_led_composition_lock, region_balance_policy, composition_fit_plan, secondary_region_integrity_lock, and body_silhouette_lock so the visual subject, region balance, focal relationship, canvas occupancy, secondary region, and body outline are chosen from the argument before image prompting.
   - Add useful density through comparison, benchmarks, denominators, assumptions, annotations, evidence strips, supporting context regions, small multiples, and source cues; do not add density through smaller type or decorative illustration detail.
-  - Preserve distinct claims as separate slides; combine only repeated claims or evidence that must be compared in one view.
+  - Preserve distinct messages as separate slides; combine only repeated messages or evidence that must be compared in one view.
   - Define deck_header_master_lock with exact x/y/w/h/color/font values, then repeat it verbatim in every slide prompt.
   - Read only the action titles in order; repair gaps before image generation.
   - Do not generate final images until every selected slide has a canonical planning block."""
     if mode == "deck-plan":
         return """mode_guidance:
-  - Define deck thesis and one claim per slide.
+  - Define deck thesis and one primary message per slide.
   - Use the embedded ATOM design system in SKILL.md; do not load an external ATOM pattern file.
+  - Apply builtin_generation_lock: invoke Codex built-in image generation directly for gpt-image-2 slide PNGs, without local environment preflight or local artifact-route probing before generation.
+  - Apply credential_setup_blocker: do not create, request, decrypt, configure, inspect, or wait for account credentials, local tokens, SDK setup, or environment variables; start Codex built-in image generation instead.
+  - Apply pptx_first_blocker: do not create a presentation deck as the source of truth before image generation; generate and review slide PNGs first, then package approved PNGs into PPTX at the end.
   - Start with opening_thesis_slide rather than a title-only first slide: the opener should make the main phrase memorable while also showing the thesis, tension/proof points, structure, and bridge.
   - Select layout_archetype and grid_mode for every slide.
   - Apply source_real_only_lock and source_line_lock: render Source: ... only for real traceable external/provided sources; use source_line: none and draw no Source footer when no real source exists.
@@ -426,16 +435,16 @@ def mode_guidance(mode: str) -> str:
   - Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide; use the same flat 2D editorial workflow illustration style on chapter openers, turning points, complex systems, and final vision slides.
   - Assign density_design for every slide: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
   - Apply density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting.
-  - Apply consulting_structure_bias and structured_density_bias as a gentle direction: use issue trees, driver trees, 2x2 matrices, value chains, waterfalls, KPI bridges, decision tables, or hypothesis-evidence-implication rows when they clarify the claim; intentionally skip them when a simpler visual is stronger.
+  - Apply structure_choice_bias and structured_density_bias as a gentle direction: use issue trees, driver trees, 2x2 matrices, value chains, waterfalls, KPI bridges, decision tables, or hypothesis-evidence-implication rows when they clarify the message; intentionally skip them when a simpler visual is stronger.
   - Apply structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation.
   - Apply max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
   - Apply imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation.
   - Apply editorial_polish_repair_loop: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm.
-  - Apply visual_subject_open_set, claim_led_composition_lock, region_balance_policy, composition_fit_plan, secondary_region_integrity_lock, and body_silhouette_lock so the visual subject, region balance, focal relationship, canvas occupancy, secondary region, and body outline are chosen from the argument before image prompting.
-  - Preserve distinct claims as separate slides; combine only repeated claims or evidence that must be compared in one view.
+  - Apply visual_subject_open_set, message_led_composition_lock, region_balance_policy, composition_fit_plan, secondary_region_integrity_lock, and body_silhouette_lock so the visual subject, region balance, focal relationship, canvas occupancy, secondary region, and body outline are chosen from the argument before image prompting.
+  - Preserve distinct messages as separate slides; combine only repeated messages or evidence that must be compared in one view.
   - Define deck master refs for header, invisible footer alignment baseline, Insight surfaces, tables, cards, and icon circles.
   - Allocate Insight components selectively across the deck and avoid mechanical card-only repetition.
-  - Draft speaker_notes_text for every slide with speaker_notes_depth_lock and plan PPTX roll-up with one full-bleed generated PNG plus corresponding substantial speaker notes per slide. Plan Google Slides only when explicitly requested.
+  - Draft speaker_notes_text for every slide with speaker_notes_depth_lock and plan PPTX roll-up with one full-bleed generated PNG plus corresponding substantial speaker notes per slide. Plan external slide-hosting only when explicitly requested.
   - Plan post_generation_full_deck_review_loop: after generating slide PNGs, review every actual image before claiming completion, classify blocker/major/minor issues, fill weak_slide_regeneration_queue, repair/regenerate, and continue until all_generated_images_reviewed is true, the queue is empty, and completion_ready_status is approved.
   - Apply completion_blocker: do not report complete while any generated slide has blocker, major, deck-consistency, content-quality, or design-quality issues.
   - Do not generate final images until each slide has its own canonical planning block."""
@@ -454,7 +463,7 @@ def mode_guidance(mode: str) -> str:
   - Re-audit after proposed changes."""
     return """mode_guidance:
   - Produce one slide planning block, then image_model, draft_image_prompt_scaffold, negative_prompt_hard_blockers, and post_generation_audit.
-  - Include pre_package_image_review, pre_google_slides_image_review, post_generation_full_deck_review_loop, all_generated_images_reviewed, weak_slide_regeneration_queue, content_quality_status, design_quality_status, deck_unity_status, completion_ready_status, regenerate_until_quality_approved, and repair_iteration_plan; do not treat first generation as final without inspecting the actual PNG.
+  - Include pre_package_image_review, pre_external_slide_image_review, post_generation_full_deck_review_loop, all_generated_images_reviewed, weak_slide_regeneration_queue, content_quality_status, design_quality_status, deck_unity_status, completion_ready_status, regenerate_until_quality_approved, and repair_iteration_plan; do not treat first generation as final without inspecting the actual PNG.
   - Apply completion_blocker: do not report complete while any generated slide has blocker, major, deck-consistency, content-quality, or design-quality issues.
   - Treat unresolved layout_archetype or grid_mode as blockers before final generation."""
 
@@ -486,16 +495,19 @@ def image_prompt_tail(size: str, quality: str, mode: str, primary_guideline: str
         prompt_lead = f"""  Draw a 16:9 strategy slide image with {IMAGE_MODEL}, image_size {size}, image_quality {quality}, background opaque, output_format png, moderation auto, n=1."""
     return f"""image_model: {IMAGE_MODEL}
 generation_route: Codex built-in image generation
+builtin_generation_lock: invoke Codex built-in image generation directly; do not pause for local environment preflight or local artifact-route probing before generation
+credential_setup_blocker: do not create, request, decrypt, configure, inspect, or wait for account credentials, local tokens, SDK setup, or environment variables; use Codex built-in image generation directly
 prompt_readiness: draft_scaffold_until_blocking_unresolved_items_none
 
 draft_image_prompt_scaffold:
 {prompt_lead}
   Use the embedded ATOM design system in SKILL.md. Do not load an external ATOM pattern file.
   PPTX is a delivery wrapper only. Never create final PNGs by exporting, rendering, or screenshotting a PPTX.
+  Apply pptx_first_blocker: do not create a presentation deck as the source of truth before image generation; generate and review slide PNGs first, then package approved PNGs into PPTX at the end.
   Correct order: generate gpt-image-2 PNGs, review and repair PNGs, then package approved PNGs into PPTX.
-  If gpt-image-2 image generation is blocked, stop rather than manufacturing final PNGs through PPTX or local rendering.
+  Only mark image generation blocked after invoking Codex built-in image generation and the image tool itself fails, is unavailable, or refuses the request. Local environment uncertainty is not a blocker.
   Apply output_artifact_mastering_lock: write approved generated PNGs once under slides_final/ and treat that path as the sole loose-PNG master.
-  Apply single_final_png_master_lock: review_manifest, pptx_image_mapping, and any Google Slides mapping must reference the slides_final/ master path rather than copied PNGs.
+  Apply single_final_png_master_lock: review_manifest, pptx_image_mapping, and any external slide-hosting mapping must reference the slides_final/ master path rather than copied PNGs.
   Apply slides_package_policy: slides_package/ contains PPTX, speaker notes, review_manifest, and metadata only; do not copy final PNG files into slides_package/.
   Apply render_check_policy: render_check/pdf_pages/ is optional disposable QA output from rendered PDF/PPT checks only, not another copy of final PNGs.
   Apply no_duplicate_png_output_lock: do not keep duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/.
@@ -508,55 +520,61 @@ draft_image_prompt_scaffold:
   Define deck_tone_master_lock and deck_tone_signature_lock before slide-level prompting and preserve them through the whole deck: slide base, typography scale, header/footer, Deep Blue role, Honey treatment, illustration style, icon family, density rhythm, whitespace/occupancy rhythm, card/table geometry, outer padding, invisible source alignment baseline, and negative prompt. Later slides must feel like the same deck as the first approved pilot slides.
   Apply illustration_tone_lock: keep all illustrations in one deck on the same editorial vector system.
   Define illustration_style_sheet before generation and reuse it verbatim across the deck: flat 2D business and healthcare workflow illustration; simplified people with consistent face detail and body proportions; tablet, laptop, document stack, CRM panel, report card, timeline, handoff arrow, and small icon badge objects; soft pale blue-gray or warm gray fills; Deep Blue and charcoal linework; restrained Honey highlights; consistent 2-3px stroke, crop, shadow softness, and fill opacity.
-  Apply visual_design_quality_traits as design treatment: calm light base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, concrete visual anchor, crisp focal hierarchy, and deliberate canvas occupancy. Do not alter slide count, claim order, or storyline solely for visual style.
+  Apply visual_design_quality_traits as design treatment: calm light base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, concrete visual anchor, crisp focal hierarchy, and deliberate canvas occupancy. Do not alter slide count, message order, or storyline solely for visual style.
   Apply imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation.
   Apply editorial_polish_repair_loop: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm.
-  Apply visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide claim, evidence, and audience context.
-  Apply claim_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide claim before adding supporting elements.
-  Apply region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide claim, evidence shape, reading path, and body silhouette.
+  Apply visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide message, evidence, and audience context.
+  Apply message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements.
+  Apply region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette.
   Apply composition_fit_plan: set the main visual field, supporting regions, whitespace role, and Insight footprint before generation so the canvas has deliberate occupancy and breathing room.
   Apply secondary_region_integrity_lock: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field.
   Apply body_silhouette_lock: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions.
-  Apply layout_diversity_plan at deck level: choose layout families from full-field, asymmetric main/supporting-context, balanced diptych, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase patterns according to the slide claim. Use layout_rotation_guard so neighboring slides do not fall into the same composition by habit; repeated families should make comparison easier.
+  Apply layout_diversity_plan at deck level: choose layout families from full-field, asymmetric main/supporting-context, balanced diptych, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase patterns according to the slide message. Use layout_rotation_guard so neighboring slides do not fall into the same composition by habit; repeated families should make comparison easier.
+  Apply credential_setup_blocker: do not create, request, decrypt, configure, inspect, or wait for account credentials, local tokens, SDK setup, or environment variables. The next action after an image-ready prompt is Codex built-in image generation.
+  Apply codex_image_artifact_rule before generation: call Codex built-in image generation for each final slide prompt, treat the returned image as the generated PNG artifact, and materialize approved artifacts into slides_final/ through the Codex-provided artifact/download/attachment path before PPTX packaging. Do not inspect or mention local environment setup as a reason to stop.
+  Apply header_identity_lock: the header is always the same compact left vertical line + H1 + subtitle system, never a slide-specific decoration surface.
   Apply header_left_accent_master_lock: the left accent is a fixed header-block anchor tied to the H1/subtitle stack and copied verbatim on every slide; it is not a page-edge rail, tall sidebar, body marker, chapter stripe, or slide-specific ornament.
   Apply header_left_accent_reference_lock: match the approved reference geometry on a 1672x941 basis unless a newer embedded master is explicitly supplied: x=50 y=40 w=10 h=120, color #0B2F5B.
   Apply header_left_accent_shape_lock: draw one solid vertical rectangle only, 10px wide, with square or 0-2px radius ends and no pill caps, shadow, glow, gradient, split segments, duplicate marks, or decorative extension.
-  Apply header_left_accent_controlled_overhang_rule: a controlled 8-16px top overhang above the first visible H1 glyph top is correct because the accent anchors the whole H1 + subtitle header block.
-  Apply header_left_accent_top_protrusion_blocker: if the accent top is more than 18px above the first visible H1 glyph top, floats near the page top, clips outside the header safe area, detaches from the H1/subtitle stack, or enters body_start_y, mark the slide repair_required and fix the accent x/y/h before any other polish.
-  Define and preserve one deck_header_master_lock with exact selected values, not ranges: coordinate_basis, header_safe_area, vertical_line x/y/w/h/color, header_line_top_rule, header_left_accent_master_lock, header_left_accent_reference_lock, header_left_accent_controlled_overhang_rule, H1 x/y/w/max_lines/font_size/weight/line_height/color, subtitle x/y/w/max_lines/font_size/weight/line_height/color, visual_alignment, body_start_y, and upper_right_clear_zone. Repeat it verbatim across the deck. Treat the header as the lowest-freedom component; no_header_ranges_in_final_prompts.
+  Apply header_left_accent_no_protrusion_rule: the accent top must align with the first visible H1 glyph/title top or sit 0-6px below it; any upward protrusion above H1 is a blocker because the accent should start with the title, not above it.
+  Apply header_left_accent_top_protrusion_blocker: if any visible accent pixel sits above the first visible H1 glyph/title top, floats near the page top, clips outside the header safe area, detaches from the H1/subtitle stack, or enters body_start_y, mark the slide repair_required and fix the accent x/y/h before any other polish.
+  Define and preserve one deck_header_master_lock with exact selected values, not ranges: coordinate_basis, header_safe_area, vertical_line x/y/w/h/color, header_line_top_rule, header_left_accent_master_lock, header_left_accent_reference_lock, header_left_accent_no_protrusion_rule, H1 x/y/w/max_lines/font_size/weight/line_height/color, subtitle x/y/w/max_lines/font_size/weight/line_height/color, visual_alignment, body_start_y, and upper_right_clear_zone. Repeat it verbatim across the deck. Treat the header as the lowest-freedom component; no_header_ranges_in_final_prompts.
   Include coordinate_inventory_1672 and reuse master_components before generating repeated objects.
   Use Noto Sans JP for every visible text string, including Latin/English letters, numbers, symbols, and Japanese. Do not mix in any other typeface; if exact font rendering is unavailable in image generation, use the closest Noto Sans JP-like rendering without changing the font family intent.
   Apply max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
-  For ATOM work, use #FCFBF8 to #F4F3EF slide base, #2D332E text, #4D544E subtitle, #6E756E footer/source/table-note text, and #0B2F5B Deep Blue structure.
-  H1 30-34pt weight 700 #2D332E, subtitle 26-30pt weight 400 #4D544E, body 18pt equivalent. Use the exact default ATOM header: 1672 basis header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=40 w=10 h=120 #0B2F5B; header_line_top_rule accent top may sit 8-16px above the first visible H1 glyph top and never more than 18px above it; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.10 #2D332E; subtitle x=88 y=78 w=1332 max_lines=1 size=28pt weight=400 line_height=1.18 #4D544E; visual_alignment accent spans the H1 + subtitle block with controlled top overhang and bottom 4-10px below subtitle lower visual edge; body_start_y=190; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty. Two-line H1 fallback: vertical_line y=40 with h recalculated to end 6-10px below subtitle lower visual edge, subtitle y=112, body_start_y=224. No Deep Blue H1.
+  Apply near_white_slide_base_lock: use #FCFBF8 as the default ATOM slide canvas, optionally #F4F3EF as only a barely visible warm light-neutral tint; the page should read closer to white than beige. Keep #DDE3EA/#D6E1EE for panels/cards only, not the full slide background.
+  For ATOM work, use #FCFBF8 primary slide base and optional #F4F3EF subtle warm light-neutral tint, #2D332E text, #4D544E subtitle, #6E756E footer/source/table-note text, and #0B2F5B Deep Blue structure. Avoid darker cream/beige page backgrounds; #DDE3EA/#D6E1EE are reserved for panels/cards, not the full slide canvas.
+  H1 30-34pt weight 700 #2D332E, subtitle 21-23pt weight 400 #4D544E, body 18pt equivalent. Use the exact compact ATOM header: 1672 basis header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=40 w=10 h=120 #0B2F5B; header_line_top_rule accent top must not sit above the first visible H1 glyph/title top and should align with it or sit 0-6px below it; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.14 #2D332E; subtitle x=88 y=82 w=1332 max_lines=1 size=22pt weight=400 line_height=1.18 #4D544E; visual_alignment accent spans the H1 + subtitle block with no upward protrusion and bottom 4-10px below subtitle lower visual edge; body_start_y=180; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty. Two-line H1 fallback: vertical_line y=40 with h recalculated to end 6-10px below subtitle lower visual edge, subtitle y=118, body_start_y=218. No Deep Blue H1. No right-side header decoration, logo, badge, or body object in the header safe area.
   Lock header and footer text colors as one Ink-family hierarchy: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E. Do not use Deep Blue, Honey, yellow, or arbitrary gray for header/footer text.
+  Apply header_integrity_blocker_lock: malformed, missing, oversized, recolored, right-decorated, or intruded headers are blockers; repair header identity before any other visual polish.
   Let structure, numbers, rules, spacing, and typography carry the hierarchy.
   Use small Lucide-style line icons as quiet wayfinding only when they clarify reading order, evidence, or interaction.
   Include visual_richness_role, illustration_intensity, creative_variance, and density_tier in the prompt. Use flat 2D human-designed editorial/vector workflow illustrations and purpose-built motifs where they add memory, scanning help, or navigation.
+  For deck openers, apply opening_density_gate: first slide role is opening_thesis_slide, first_slide_not_title_only is true, and the slide includes a core thesis, 2-4 proof/tension points, one visible market-shift/matrix/causal-map/wedge structure, and a bridge to the next section.
   Include density_design in the prompt. Density should answer the reader's decision_question through grouped information units, comparison baselines, evidence strips, supporting context regions, small multiples, annotations, units, assumptions, and source cues. Do not solve density with smaller body text, extra decorative cards, or illustration detail.
   Apply density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting. Prefer adding decision-relevant comparison, benchmark, denominator, unit, assumption, source cue, or annotation before adding decorative space.
-  Apply consulting_structure_bias: gently prefer strategy-consulting style structure when it clarifies the claim, without forcing it on every slide. Good candidates include issue tree, driver tree, 2x2 matrix, value chain, funnel, waterfall, KPI bridge, decision table, before/after bridge, and hypothesis-evidence-implication rows.
-  Apply structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits; keep hierarchy readable and intentionally skip the added structure when it would dilute the focal claim.
+  Apply structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide. Good candidates include issue tree, driver tree, 2x2 matrix, value chain, funnel, waterfall, KPI bridge, decision table, before/after bridge, and hypothesis-evidence-implication rows.
+  Apply structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits; keep hierarchy readable and intentionally skip the added structure when it would dilute the focal message.
   Apply structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation.
   When creative_variance is high, vary composition, viewpoint, crop, asymmetric region balance, visual metaphor, and layout rhythm; keep brand, header, exact text, grid, and source policy locked.
   Let the planned chart/table/matrix/roadmap carry the argument where it is the clearest reader path; illustration adds memory, wayfinding, and selective emphasis through a clear focal motif, useful supporting details, clean controlled linework, crisp silhouettes, restrained fills, rounded UI panels, small icon badges, and short annotations.
-  Make abstract claims imageable by naming the concrete visual anchor and visible details: an operating view, workflow handoff, document stack, data row, map route, queue, machine cell, screen state, evidence artifact, or customer moment that fits the claim.
+  Make abstract messages imageable by naming the concrete visual anchor and visible details: an operating view, workflow handoff, document stack, data row, map route, queue, machine cell, screen state, evidence artifact, or customer moment that fits the message.
   Apply speaker_notes_depth_lock: for PPTX decks, write speaker notes as a substantial Japanese talk script, normally 4-7 sentences or roughly 180-320 Japanese characters per slide unless the user requests brief notes. Include opening framing, 2-3 evidence or assumption talking points, the implication to say aloud, caveat/source context when relevant, and a transition to the next slide.
-  Keep speaker notes out of the slide image. Speaker notes are inserted later into PPTX or Google Slides notes pages and should not appear as visible on-slide text.
-  Do not hard-code one visual grammar across slides. Select the projection, viewpoint, abstraction level, motif, and level of detail from the slide claim; use depth or spatial perspective only when it carries meaning. Do not use decorative trapezoid planes, fake perspective floors, isometric boxes, tilted architectural slabs, vanishing points, or pseudo-3D depth as a shortcut for freshness.
-  Keep visual subject selection open and claim-led; use the subject that makes the argument most observable through scale, interaction, place, evidence, or operating context.
+  Keep speaker notes out of the slide image. Speaker notes are inserted later into PPTX or external slide-hosting notes pages and should not appear as visible on-slide text.
+  Do not hard-code one visual grammar across slides. Select the projection, viewpoint, abstraction level, motif, and level of detail from the slide message; use depth or spatial perspective only when it carries meaning. Do not use decorative trapezoid planes, fake perspective floors, isometric boxes, tilted architectural slabs, vanishing points, or pseudo-3D depth as a shortcut for freshness.
+  Keep visual subject selection open and message-led; use the subject that makes the argument most observable through scale, interaction, place, evidence, or operating context.
   Create freshness through viewpoint, asymmetric composition, designed margin vignettes, evidence strips, partial cutaways, and magnified details, not decoration or glossy concept art.
   Use Deep Blue structurally with a 4-8% visual area budget, up to 12% only for strong closing slides, and never for body text.
   Use Honey only for ATOM or compatible guidelines where it is a decision signal: #F7EECF flat pale Honey fill, #C49A2C 4-5px full-height left accent line, #2D332E text, one component maximum.
   Use flat solid fills for all message boxes and Insight surfaces; do not add patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
   Apply message_box_scale_lock: message boxes are compact interpretation surfaces, not display surfaces; keep copy to one short judgment sentence, prefer one line, max two lines, and do not enlarge the surface to rescue long prose.
   Apply message_box_text_size_lock: message-box/Insight text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below the subtitle, and never becomes a second title or second hero headline.
-  Apply message_box_compactness_blocker_lock: Insight/message-box surfaces that dominate the slide, behave like a banner, or compensate for layout imbalance are blockers.
-  Apply message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface.
-  Apply insight_surface_placement_lock: when an Insight/message-box is kept, place it as a deliberate interpretation bridge tied to the body silhouette and footer baseline.
+  Apply message_box_compactness_blocker_lock: an Insight/message-box that dominates the slide, becomes a banner, spans more than the interpreted region needs, grows tall to carry prose, or compensates for layout imbalance is a blocker. Repair by shortening the sentence, narrowing the surface, moving detail into the body/notes, or removing the component.
+  Apply message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface; use balanced padding and line-box placement so the sentence reads intentional, not baseline-drifted.
+  Apply insight_surface_placement_lock: when kept, the Insight/message-box belongs to the body composition and footer rhythm; bottom variants sit in the breathing space between body content and Source, centered to the interpreted region or full body block, while Source remains a separate footer cue on its invisible baseline.
   Enforce max_text_size_lock across every visible string; do not use display typography, hero numerals, badges, or message-box text above the cap.
   Keep Honey quiet and consistent: no saturated yellow fills, no dark yellow message boxes, no large yellow areas, no yellow title underline, and no Honey color variation across a deck.
-  Use illustrations/icons when they help understanding, memory, comparison, or navigation; do not add them by quota. A slide with no icon or illustration is acceptable when the structure already carries the claim.
+  Use illustrations/icons when they help understanding, memory, comparison, or navigation; do not add them by quota. A slide with no icon or illustration is acceptable when the structure already carries the message.
   Do not minimize numbers by default. Keep sourced or explicitly assumed numbers when they help comparison, sizing, prioritization, credibility, or decision-making; remove only unsupported, redundant, unreadable, or decorative numbers.
   Render ONLY the exact text strings listed in the planning block or final prompt; do not invent extra labels.
   Keep footer_anchor_baseline planned as an invisible alignment position even when source_line is none.
@@ -570,44 +588,50 @@ draft_image_prompt_scaffold:
 
 negative_prompt_hard_blockers:
   local-rendered substitute, non-gpt-image output, missing or malformed header line, uncontrolled header accent protrusion, header accent floating near page top,
-  H1/subtitle/source color drift, horizontal divider above Source, body content invading header/footer, visible text above max_text_size_lock, unreadable body text below 18pt equivalent,
-  invented labels or sources, placeholder Source footer such as brand assumptions or brand analysis, speaker notes visible on slide, duplicate loose final PNG copies across output folders, parallel contact sheets for generated/package/pdf_render of the same slide set, unresolved grid, severe grid drift, hard-to-picture abstract visual,
-  patterned or textured message box, oversized message box, message-box text competing with H1/subtitle,
-  saturated yellow message box, mixed illustration tone, inconsistent face detail or body proportion, decorative pseudo-3D depth, rough sketch aesthetic,
+  oversized header, decorative header badge or right-side header ornament, H1/subtitle/source color drift, horizontal divider above Source, body content invading header/footer, visible text above max_text_size_lock, unreadable body text below 18pt equivalent,
+  invented labels or sources, placeholder Source footer such as brand assumptions or brand analysis, speaker notes visible on slide, thin or perfunctory PPT talk script, darker beige/cream page background, duplicate loose final PNG copies across output folders, parallel contact sheets for generated/package/pdf_render of the same slide set, unresolved grid, severe grid drift, hard-to-picture abstract visual,
+  title-only first slide or low-density opener without proof/tension points,
+  patterned or textured message box, oversized message box, full-width banner-like Insight, message-box text competing with H1/subtitle,
+  saturated yellow message box, deck tone drift, mixed illustration tone, inconsistent face detail or body proportion, inconsistent icon family, inconsistent card/table surface weight, decorative pseudo-3D depth, rough sketch aesthetic,
   mechanical repeated composition without narrative or comparison purpose, generic icon-only composition, dated template composition, slide number, title kicker, logo in upper-right clear zone
 
 post_generation_audit:
   - image model is {IMAGE_MODEL}
-  - generation_route is Codex built-in image generation, not local rendering or a user-key workaround
+  - generation_route is Codex built-in image generation, not local rendering or a local credential workaround
+  - credential_setup_blocker is honored: no account credential, local token, SDK setup, or environment-variable workflow was attempted before generation
   - image_size {size} is valid for gpt-image-2, labeled as {size_label(size)}, and final delivery is resized only after generation if needed
   - H1 and subtitle hierarchy is clear
+  - near_white_slide_base_lock is honored: the slide canvas reads as #FCFBF8 / very near white, with #F4F3EF only as a subtle tint and no darker cream/beige page background
   - max_text_size_lock is honored: no visible text exceeds 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
+  - header_identity_lock is honored: the header remains the compact left vertical line + H1 + subtitle system, with no slide-specific decoration surface
   - deck_header_master_lock is visible and consistent; left header accent is present, matches header_left_accent_reference_lock unless superseded by a newer embedded master, obeys header_line_top_rule and header_left_accent_master_lock, anchors the H1 + subtitle stack, is not a page-edge rail/sidebar/body marker, and H1 color follows the embedded ATOM design system
   - header_left_accent_shape_lock passes: the accent is one solid 10px vertical rectangle with no pill cap, glow, shadow, gradient, duplicate mark, or decorative extension
-  - header_left_accent_controlled_overhang_rule passes: the accent has the approved controlled top overhang above H1, not a clipped or floating page-top protrusion
-  - header_left_accent_top_protrusion_blocker passes: no visible accent pixel sits more than 18px above the first visible H1 glyph top, outside header_safe_area, detached from H1/subtitle, or inside body_start_y
+  - header_left_accent_no_protrusion_rule passes: the accent starts at the first visible H1 glyph/title top or 0-6px below it, with no upward protrusion
+  - header_left_accent_top_protrusion_blocker passes: no visible accent pixel sits above the first visible H1 glyph/title top, outside header_safe_area, detached from H1/subtitle, or inside body_start_y
+  - header_integrity_blocker_lock is clear: no malformed, missing, oversized, recolored, right-decorated, or intruded header remains
   - header_footer_text_color_lock is honored: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E
   - header/footer text does not use Deep Blue, Honey, yellow, or arbitrary gray
+  - deck_tone_signature_lock is honored: base, typography, rule weight, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior feel like one material system
   - illustration_tone_lock is honored: all illustrations share one flat 2D editorial vector system across the generated PNG set
   - illustration_style_sheet is visible: people, devices, documents, CRM/report panels, rounded UI cards, icon badges, fills, stroke, crop, and facial detail match the declared style sheet
   - illustration_consistency_status is approved after comparing first, middle, and last thirds for stroke weight, fill opacity, face/detail level, object treatment, and illustration density
   - visual_richness_role is fulfilled; planned illustration or visual motif is present when required
   - imageability_lock is fulfilled: a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details are present
   - editorial_polish_repair_loop has improved specificity, proportion, rhythm, and focal hierarchy
-  - visual_subject_open_set is fulfilled: the selected visual subject comes from the slide claim, evidence, and audience context rather than a fixed asset menu
-  - claim_led_composition_lock is fulfilled: one focal relationship carries the argument before supporting elements
-  - region_balance_policy is fulfilled: region weight follows the slide claim, evidence shape, reading path, and body silhouette rather than a fixed template
+  - visual_subject_open_set is fulfilled: the selected visual subject comes from the slide message, evidence, and audience context rather than a fixed asset menu
+  - message_led_composition_lock is fulfilled: one focal relationship carries the argument before supporting elements
+  - region_balance_policy is fulfilled: region weight follows the slide message, evidence shape, reading path, and body silhouette rather than a fixed template
   - composition_fit_plan is fulfilled: the main visual field, supporting regions, whitespace role, and Insight footprint feel intentionally balanced
   - secondary_region_integrity_lock is fulfilled: any split or auxiliary region reads as a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field
   - body_silhouette_lock is fulfilled: the body reads as one closed visual block with aligned outer edges, lower edges, and footer clearance
   - illustration_intensity is respected; illustration feels designer-authored, flat 2D, and does not overpower the slide
   - density_tier and density_design are fulfilled without shrinking body text below 18pt equivalent
   - density_lift_lock is fulfilled in both the slide structure and final image prompt
-  - consulting_structure_bias is considered: strategy-consulting structures are used where they clarify the claim, and not forced where they would add noise
+  - structure_choice_bias is considered: structured presentation patterns are used where they clarify the message, and not forced where they would add noise
   - structured_density_bias is fulfilled when useful: one or two evidence layers, labels, drivers, or comparison cues add decision value without crowding
-  - consulting_structure_status is not_applicable, applied, intentionally_skipped, or repair_required with a clear reason
+  - structure_choice_status is not_applicable, applied, intentionally_skipped, or repair_required with a clear reason
   - structure_first_visual_mix is fulfilled through argument-carrying charts, tables, matrices, flows, maps, comparison axes, or evidence strips where appropriate, with illustration used as support
-  - density_levers improve the claim through comparison, evidence, annotation, grouping, or source cues rather than decoration
+  - density_levers improve the message through comparison, evidence, annotation, grouping, or source cues rather than decoration
   - decision-relevant numbers are preserved when legible; numbers are not minimized by default
   - message boxes and Insight surfaces use flat solid fills only, with no decorative patterns or motifs
   - message_box_scale_lock is honored: message boxes stay compact and are not enlarged to carry long prose
@@ -619,7 +643,7 @@ post_generation_audit:
   - saturated yellow, dark yellow, or large yellow areas are absent
   - coordinate_inventory_1672 matches visible major objects
   - all major regions snap to grid/shared edges
-  - layout_family matches the slide claim, and layout_diversity_plan / layout_rotation_guard make deck-level composition feel intentionally varied rather than mechanically repeated
+  - layout_family matches the slide message, and layout_diversity_plan / layout_rotation_guard make deck-level composition feel intentionally varied rather than mechanically repeated
   - repeated elements are equalized
   - body text remains readable
   - embedded ATOM design system palette and typography are followed
@@ -637,26 +661,27 @@ post_generation_audit:
   - speaker_notes_depth_lock is honored: speaker_notes_text exists for deck slides, is substantial enough for PPT presentation delivery, and does not appear on the slide image
   - post_generation_full_deck_review_loop is complete: after generating slide PNGs, every actual image has been opened, compared against the deck, and reviewed before claiming completion
   - all_generated_images_reviewed is true for the current output file set
-  - weak_slide_regeneration_queue is empty after reviewing tone consistency, content quality, design quality, text legibility, source/footer/header integrity, illustration consistency, consulting structure fit, and deck unity
+  - weak_slide_regeneration_queue is empty after reviewing tone consistency, content quality, design quality, text legibility, source/footer/header integrity, illustration consistency, structure fit, and deck unity
   - deck_tone_consistency_status is approved after comparing first third, middle third, and last third for palette, linework, icon family, illustration intensity, density rhythm, card geometry, and source behavior
-  - content_quality_status is approved: no slide has a weak claim, missing evidence, misleading source use, vague labels, or shallow consulting structure when structure would clarify the argument
+  - content_quality_status is approved: no slide has a weak message, missing evidence, misleading source use, vague labels, or shallow structure when structure would clarify the argument
   - design_quality_status is approved: no slide looks mechanically generated, under-composed, over-dense, off-grid, typographically awkward, or visually weaker than the rest of the deck
   - deck_unity_status is approved: all generated PNGs feel like one deck in palette, illustration tone, icon family, component geometry, information density, header/footer behavior, and editorial rhythm
   - completion_ready_status is approved only after all review queues are empty and all content/design/deck-unity statuses are approved
   - regenerate_until_quality_approved has been applied to every weak slide
   - completion_blocker: do not report complete while any generated slide has blocker, major, deck-consistency, content-quality, or design-quality issues
-  - generation_block_rule: if generation or repair is blocked, mark completion_ready_status: blocked and do not package or report complete
+  - generation_block_rule: only if Codex built-in generation or repair is actually blocked by the image tool, mark completion_ready_status: blocked and do not package or report complete; do not use local environment uncertainty as the blocker
+  - credential_setup_blocker: no account credential, local token, SDK setup, or environment-variable workflow is part of the route
   - review_manifest_status: approved after validate_review_manifest covers every generated PNG path, confirms slides_final/ master paths are used, confirms weak_slide_regeneration_queue is empty, and confirms all final/content/design/deck-unity/completion statuses are approved
   - post_generation_design_balance_check is approved on actual generated PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, header integrity, card/table height equalization, line-weight consistency, icon-family consistency, Deep Blue scatter, Honey strength, and human-designed operational diagram feel
   - pre_package_image_review has inspected the actual generated PNG, not only the prompt
-  - pre_google_slides_image_review is also approved when Google Slides roll-up is requested
+  - pre_external_slide_image_review is also approved when external slide-hosting roll-up is requested
   - image_review_status is approved only when there are no blocker or major issues
   - PPTX roll-up starts only after final_image_quality_status is approved for every generated PNG
   - PPTX roll-up contains one full-bleed generated PNG per slide in order, with speaker notes inserted when packaging supports notes
-  - Google Slides roll-up, when requested, contains one full-bleed generated PNG per slide and speaker notes inserted on every corresponding slide
+  - external slide-hosting roll-up, when requested, contains one full-bleed generated PNG per slide and speaker notes inserted on every corresponding slide
 
 pre_package_image_review:
-  - Inspect the actual generated PNG with multimodal review before any PPTX or Google Slides insertion.
+  - Inspect the actual generated PNG with multimodal review before any PPTX roll-up or external slide insertion.
   - Review every actual generated image in the deck as a set before claiming completion.
   - Score model route, exact text, header lock, grid/shared edges, typography, density, illustration clarity, human-designed feel, source hygiene, and speaker-notes separation.
   - Score layout_family fit and layout_rotation_guard across the generated image set.
@@ -691,7 +716,7 @@ def deck_plan_tail() -> str:
       low_density_opener_repair: add evidence, tension, comparison, or mechanism before image generation
   - slide_list:
       - slide_number:
-        slide_claim:
+        slide_message:
         opening_slide_role: opening_thesis_slide / standard_story_slide
         first_slide_not_title_only: true / N/A
         opening_density_gate:
@@ -733,16 +758,16 @@ def deck_plan_tail() -> str:
           density_levers:
           overload_controls:
         density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
-        consulting_structure_bias: gently prefer strategy-consulting style structure when it clarifies the claim, without forcing it on every slide
+        structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
         structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
-        consulting_structure_status:
+        structure_choice_status:
         structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation
         max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
         imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation
         editorial_polish_repair_loop: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm
-        visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide claim, evidence, and audience context
-        claim_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide claim before adding supporting elements
-        region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide claim, evidence shape, reading path, and body silhouette
+        visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide message, evidence, and audience context
+        message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements
+        region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette
         composition_fit_plan: [main visual field, supporting regions, whitespace role, Insight footprint, and intended occupancy rhythm]
         secondary_region_integrity_lock: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field
         body_silhouette_lock: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions
@@ -756,37 +781,40 @@ def deck_plan_tail() -> str:
   - layout_sequence_table:
       - slide_number:
         section_role:
-        claim_type:
+        message_type:
         layout_family:
         composition_family:
         previous_family:
         repeat_or_change_reason:
   - deck_tone_master_lock:
   - deck_tone_signature_lock:
+  - near_white_slide_base_lock: #FCFBF8 default ATOM slide canvas; optional #F4F3EF subtle warm light-neutral tint only; keep #DDE3EA/#D6E1EE for panels/cards and avoid darker cream/beige page backgrounds
   - illustration_tone_lock: keep all illustrations in one deck on the same editorial vector system
   - illustration_style_sheet:
   - illustration_consistency_status:
   - visual_design_quality_traits:
   - deck_header_master_lock:
+  - header_identity_lock:
   - header_line_top_rule:
   - header_left_accent_master_lock:
   - header_left_accent_reference_lock:
   - header_left_accent_shape_lock:
-  - header_left_accent_controlled_overhang_rule:
+  - header_left_accent_no_protrusion_rule:
   - header_left_accent_top_protrusion_blocker:
+  - header_integrity_blocker_lock:
   - deep_blue_usage_lock:
   - visual_asset_judgment:
   - visual_richness_mix_plan:
   - density_tier_plan:
-  - consulting_structure_bias:
+  - structure_choice_bias:
   - structured_density_bias:
-  - consulting_structure_status:
+  - structure_choice_status:
   - density_design_plan:
   - insight_count_plan:
   - source_collection_needs:
   - speaker_notes_plan:
   - speaker_notes_depth_lock: substantial Japanese PPT talk script, 4-7 sentences or roughly 180-320 Japanese chars per slide unless user requests brief notes
-  - pre_google_slides_review_plan:
+  - pre_external_slide_review_plan:
   - pre_package_image_review_plan:
   - post_generation_full_deck_review_loop: after generating slide PNGs, review every actual image before claiming completion
   - all_generated_images_reviewed:
@@ -815,13 +843,13 @@ def deck_plan_tail() -> str:
   - deck_unity_status:
   - completion_ready_status:
   - regenerate_until_quality_approved:
-  - generation_block_rule: if generation or repair is blocked, mark completion_ready_status: blocked and do not package or report complete
+  - generation_block_rule: only if Codex built-in generation or repair is actually blocked by the image tool, mark completion_ready_status: blocked and do not package or report complete; do not use local environment uncertainty as the blocker
   - review_manifest:
   - review_manifest_status: approved
   - pptx_package_gate: PPTX package gate requires an approved review manifest
   - validate_review_manifest:
   - pptx_rollup_plan:
-  - google_slides_rollup_plan: optional only when explicitly requested
+  - external_slide_rollup_plan: optional only when explicitly requested
   - slides_requiring_full_planning_block:
   - blocking_unresolved_items: all slide-level planning blocks remain required before image generation
 """
@@ -834,8 +862,8 @@ def text_structure_tail() -> str:
   primary_guideline:
   guideline_priority:
   brand_style_notes:
-  storyline_frame: SCQA / problem-solution-evidence / past-present-future / market-problem-solution-moat / investment-thesis-risk-milestones
-  claim_backlog:
+  storyline_frame: SCQA / problem-solution-evidence / past-present-future / context-problem-solution-differentiation / thesis-risk-milestones
+  message_backlog:
   evidence_ledger:
   source_ledger:
   appendix_candidates:
@@ -857,7 +885,7 @@ def text_structure_tail() -> str:
       first_slide_not_title_only: true / N/A
       opening_density_gate:
       reader_question_answered:
-      claim_type: context / urgency / solution / evidence / moat / market / economics / roadmap / risk / vision
+      message_type: context / urgency / solution / evidence / differentiation / market / economics / roadmap / risk / vision
       evidence_items:
       evidence_strength:
       source_span_ids:
@@ -878,7 +906,7 @@ def text_structure_tail() -> str:
       speaker_notes_text:
       speaker_notes_source_cues:
       speaker_notes_transition:
-      pre_google_slides_image_review:
+      pre_external_slide_image_review:
       pre_package_image_review:
       post_generation_full_deck_review_loop: after generating slide PNGs, review every actual image before claiming completion
       all_generated_images_reviewed:
@@ -908,7 +936,7 @@ def text_structure_tail() -> str:
       deck_unity_status:
       completion_ready_status:
       regenerate_until_quality_approved:
-      generation_block_rule: if generation or repair is blocked, mark completion_ready_status: blocked and do not package or report complete
+      generation_block_rule: only if Codex built-in generation or repair is actually blocked by the image tool, mark completion_ready_status: blocked and do not package or report complete; do not use local environment uncertainty as the blocker
       review_manifest:
       review_manifest_status: approved
       validate_review_manifest:
@@ -943,9 +971,9 @@ def text_structure_tail() -> str:
         density_levers:
         overload_controls:
       density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
-      consulting_structure_bias: gently prefer strategy-consulting style structure when it clarifies the claim, without forcing it on every slide
+      structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
       structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
-      consulting_structure_status:
+      structure_choice_status:
       structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation
       information_unit_budget:
       density_guardrails:
@@ -954,7 +982,7 @@ def text_structure_tail() -> str:
       header_left_accent_master_lock:
       header_left_accent_reference_lock:
       header_left_accent_shape_lock:
-      header_left_accent_controlled_overhang_rule:
+      header_left_accent_no_protrusion_rule:
       header_left_accent_top_protrusion_blocker:
       deck_tone_master_lock:
       illustration_tone_lock:
@@ -970,9 +998,9 @@ def text_structure_tail() -> str:
       max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
       imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation
       editorial_polish_repair_loop: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm
-      visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide claim, evidence, and audience context
-      claim_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide claim before adding supporting elements
-      region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide claim, evidence shape, reading path, and body silhouette
+      visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide message, evidence, and audience context
+      message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements
+      region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette
       composition_fit_plan: [main visual field, supporting regions, whitespace role, Insight footprint, and intended occupancy rhythm]
       secondary_region_integrity_lock: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field
       body_silhouette_lock: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions
@@ -1005,8 +1033,8 @@ def text_structure_tail() -> str:
   layout_sequence_table:
   unresolved_items:
   pptx_rollup_plan:
-  google_slides_rollup_plan: optional only when explicitly requested
-  next_step: create canonical planning blocks for image_prompt_ready slides, run Codex built-in image generation pilot, then run pre_package_image_review before any PPTX or Google Slides insertion."""
+  external_slide_rollup_plan: optional only when explicitly requested
+  next_step: create canonical planning blocks for image_prompt_ready slides, run Codex built-in image generation pilot, then run pre_package_image_review before any PPTX roll-up or external slide insertion."""
 
 
 def audit_tail() -> str:
