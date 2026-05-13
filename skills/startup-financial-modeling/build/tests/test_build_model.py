@@ -475,6 +475,7 @@ def test_all_modes_produce_expected_bundles() -> None:
             assert _defined_name_count(wb) == 0
             assert _merged_count(wb) == 0
             assert _wrapped_cells(wb) == []
+            assert _manual_line_break_violations(wb) == []
             assert _styled_blank_cells(wb) == []
             assert _font_design_violations(wb) == []
             assert _semantic_alignment_violations(wb) == []
@@ -741,16 +742,57 @@ def test_ib_helpers_reject_wrap_text_true() -> None:
 
     ws["A5"] = "bounded\nprose"
     try:
-        ib.apply_wrapped_exception(ws["A5"], user_approved=False)
+        ib.apply_wrapped_exception(
+            ws["A5"],
+            user_approved=False,
+            bounded_prose=True,
+            adjacent_cells_carry_meaning=True,
+        )
     except ValueError as exc:
         assert "explicit user approval" in str(exc)
     else:
         raise AssertionError("apply_wrapped_exception accepted missing approval")
-    ib.apply_wrapped_exception(ws["A5"], user_approved=True)
+
+    try:
+        ib.apply_wrapped_exception(
+            ws["A5"],
+            user_approved=True,
+            bounded_prose=False,
+            adjacent_cells_carry_meaning=True,
+        )
+    except ValueError as exc:
+        assert "bounded prose" in str(exc)
+    else:
+        raise AssertionError("apply_wrapped_exception accepted horizontal-read text")
+
+    try:
+        ib.apply_wrapped_exception(
+            ws["A5"],
+            user_approved=True,
+            bounded_prose=True,
+            adjacent_cells_carry_meaning=False,
+        )
+    except ValueError as exc:
+        assert "adjacent table cells carry meaningful" in str(exc)
+    else:
+        raise AssertionError("apply_wrapped_exception accepted blank overflow text")
+
+    ib.apply_wrapped_exception(
+        ws["A5"],
+        user_approved=True,
+        bounded_prose=True,
+        adjacent_cells_carry_meaning=True,
+    )
     assert ws["A5"].alignment.wrap_text is True
     assert ws.row_dimensions[5].height == ib.wrapped_text_row_height(2)
     ws["A6"] = "bounded\nprose"
-    ib.apply_wrapped_exception(ws["A6"], user_approved=True, line_count=0)
+    ib.apply_wrapped_exception(
+        ws["A6"],
+        user_approved=True,
+        bounded_prose=True,
+        adjacent_cells_carry_meaning=True,
+        line_count=0,
+    )
     assert ws.row_dimensions[6].height == ib.wrapped_text_row_height(1)
 
 
@@ -763,6 +805,7 @@ def test_runtime_builders_do_not_use_wrap_or_merge_layout_shortcuts() -> None:
     for path in runtime_files:
         text = path.read_text(encoding="utf-8")
         assert "wrap_text=True" not in text
+        assert "apply_wrapped_exception(" not in text
         text_without_unmerge = text.replace("unmerge_cells(", "")
         assert ".merge_cells(" not in text_without_unmerge
         assert "merge_cells(" not in text_without_unmerge
@@ -772,6 +815,8 @@ def test_runtime_builders_do_not_use_wrap_or_merge_layout_shortcuts() -> None:
     assert ".merge_cells(" not in ib_text_without_unmerge
     assert "merge_cells(" not in ib_text_without_unmerge
     assert "blank overflow cells without merging" in ib.WRAP_TEXT_ERROR
+    assert "use_user_approved_bounded_prose_wrap_only" in ib.WRAP_DECISION_LADDER
+    assert "final print/render column" in ib.WRAP_BEST_PRACTICE
 
 
 def test_skill_guidance_makes_no_wrap_rule_explicit() -> None:
@@ -803,6 +848,13 @@ def test_skill_guidance_makes_no_wrap_rule_explicit() -> None:
     assert "row height matched exactly to visible line count" in eval_text
     assert "visible wrap/tall-text rows are audited by role" in eval_text
     assert "no unnecessary wrapping on horizontal-read" in eval_text
+    assert "IB wrap decision ladder" in design_text
+    assert "Use the IB wrap decision ladder" in skill_text
+    assert "Horizontal-read rows must also have visual runway" in design_text
+    assert "Manual line breaks are treated as wrapped exceptions" in design_text
+    assert "blank unstyled overflow cells" in combined
+    assert "print/render boundary" in combined
+    assert "XLSX_WRAP_DISCIPLINE" in eval_text
 
 
 def test_skill_guidance_requires_fix_and_rerun_iteration() -> None:
@@ -933,6 +985,8 @@ def test_xlsx_evals_load_full_design_reference_stack() -> None:
             missing.append(f"{item['id']}:{item['name']} missing XLSX_DESIGN assertion")
         if not any(assertion.get("id") == "XLSX_SHEET_QUALITY" for assertion in assertions):
             missing.append(f"{item['id']}:{item['name']} missing XLSX_SHEET_QUALITY assertion")
+        if not any(assertion.get("id") == "XLSX_WRAP_DISCIPLINE" for assertion in assertions):
+            missing.append(f"{item['id']}:{item['name']} missing XLSX_WRAP_DISCIPLINE assertion")
         if not any(assertion.get("id") == "XLSX_FONT_HIERARCHY" for assertion in assertions):
             missing.append(f"{item['id']}:{item['name']} missing XLSX_FONT_HIERARCHY assertion")
         for assertion in assertions:
@@ -980,6 +1034,16 @@ def test_xlsx_evals_load_full_design_reference_stack() -> None:
                     missing.append(f"{item['id']}:{item['name']} missing sheet purpose/evidence quality guidance")
                 if "Focused tasks include only sheets needed for the decision" not in text:
                     missing.append(f"{item['id']}:{item['name']} missing focused-sheet restraint guidance")
+            if assertion.get("id") == "XLSX_WRAP_DISCIPLINE":
+                text = assertion.get("text", "")
+                if "generated cells keep wrap_text off by default" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing no-wrap default assertion")
+                if "blank unmerged unstyled overflow cells" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing blank overflow assertion")
+                if "final print/render column" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing print/render boundary assertion")
+                if "manual line breaks appear only for user-approved bounded prose" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing manual-line-break assertion")
             if assertion.get("id") == "XLSX_FONT_HIERARCHY":
                 text = assertion.get("text", "")
                 if "constrained IB hierarchy" not in text:

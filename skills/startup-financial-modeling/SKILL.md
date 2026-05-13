@@ -55,6 +55,11 @@ because adjacent cells carry meaningful values, formulas, units, or notes. If
 such an exception uses wrapping or manual line breaks, row height must be set
 to the exact visible line count so no text is clipped and the row still looks
 intentional.
+Use the IB wrap decision ladder: first shorten or split the copy, then widen
+the role column, then reserve blank unstyled overflow cells, then move prose to
+a dedicated note/interpretation column or separate row. Only after those fail
+may a user-approved bounded-prose wrap be used. Do not place horizontal-read
+text in the final printed/rendered column where it cannot overflow visibly.
 Text position is part of auditability: labels, sources, notes, titles, memos,
 and interpretation text are left-aligned; numeric values, formulas, money,
 percentages, multiples, counts, and unit labels are right-aligned; only period

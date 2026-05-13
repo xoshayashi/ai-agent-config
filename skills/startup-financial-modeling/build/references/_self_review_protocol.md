@@ -93,6 +93,11 @@ heavy process.
   cells, and let the text read horizontally without merging cells. Keep wrap
   only for user-approved bounded prose where neighboring cells carry meaningful
   values, formulas, units, or notes.
+- Apply the wrap decision ladder before approving any exception: shorten/split
+  the copy, widen the role column, reserve blank unstyled overflow cells, move
+  prose to a note/interpretation surface, and only then allow bounded prose
+  wrapping. Confirm horizontal-read text is not trapped at the print/render
+  boundary or blocked by styled overflow cells.
 - If a user-approved exception uses wrapping or manual line breaks, verify the
   row height is sized to the exact visible line count and the rendered text is
   neither clipped nor padded into a loose-looking row.
@@ -167,9 +172,10 @@ heavy process.
 - Run the workbook-design checks that prove visible sheet quality:
   canonical fonts, no wrap/freeze/merge/native indent, Google-Sheets-20px
   hierarchy columns, role-based left/right/center text alignment, constrained
-  9/10/11/14pt cell-size palette, row heights, semantic fill spans, sparse
-  colors/borders, blank-cell style cleanup, print areas, chart anchors, and
-  rendered bounds.
+  9/10/11/14pt cell-size palette, no horizontal-read wrap, no styled overflow
+  blockers, exact wrap-exception row heights, row heights, semantic fill spans,
+  sparse colors/borders, blank-cell style cleanup, print areas, chart anchors,
+  and rendered bounds.
 - Treat command output and rendered screenshots/PDFs as complementary evidence.
   Passing commands do not excuse a visibly poor sheet; a good-looking render
   does not excuse broken formulas, units, sources, or reconciliations.

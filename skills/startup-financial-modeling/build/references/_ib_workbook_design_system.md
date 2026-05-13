@@ -82,6 +82,17 @@ is neither clipped nor floating inside excess whitespace.
 Use the row-height helper in `ib_format.py` rather than relying on spreadsheet
 auto-height guesses.
 
+IB wrap decision ladder:
+
+1. Shorten the label, source caveat, note, or memo sentence.
+2. Widen the role column if the wider column remains consistent with the sheet.
+3. Reserve blank, unstyled overflow cells to the right so horizontal-read text
+   can display without wrapping or merging.
+4. Move longer prose to a dedicated note / interpretation column, source
+   register, memo sheet, or separate lower row.
+5. Use a wrapped/manual-line-break exception only for user-approved bounded
+   prose that must remain inside a populated table column.
+
 Before allowing any wrap exception, classify the text row:
 
 - Horizontal-read rows keep wrap off. This includes sheet titles, subtitles,
@@ -89,10 +100,15 @@ Before allowing any wrap exception, classify the text row:
   memo lines when adjacent cells to the right can stay empty for overflow. A
   horizontal note is better as one low row that reads across blank unmerged
   cells than as a tall wrapped or merged cell.
+- Horizontal-read rows must also have visual runway: do not place them in the
+  final print/render column or immediately before a styled/filled/bordered
+  overflow blocker. If the text cannot overflow visibly, restructure the row.
 - Bounded table prose may use a user-approved wrap exception only when the text
   must remain inside one column because adjacent cells carry related table
   values, formulas, units, or notes. Even then, the row height must match the
   rendered line count exactly.
+- Manual line breaks are treated as wrapped exceptions. They need the same
+  user approval, `wrap_text=True`, and exact line-count row height.
 - If a screenshot shows a tall row created only by wrapping a horizontal-read
   note, repair by turning wrap off, clearing the overflow cells, and widening
   or restructuring the row before considering any wrap exception. Do not use

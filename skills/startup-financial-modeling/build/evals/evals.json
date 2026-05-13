@@ -74,6 +74,11 @@
           "type": "design"
         },
         {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded prose with exact visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
           "id": "XLSX_FONT_HIERARCHY",
           "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
           "type": "design"
@@ -133,6 +138,11 @@
         {
           "id": "XLSX_DESIGN",
           "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded prose with exact visible-line-count row height and PDF/render verification.",
           "type": "design"
         },
         {
@@ -196,6 +206,11 @@
         {
           "id": "XLSX_DESIGN",
           "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded prose with exact visible-line-count row height and PDF/render verification.",
           "type": "design"
         },
         {
@@ -269,6 +284,11 @@
           "type": "design"
         },
         {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded prose with exact visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
           "id": "XLSX_FONT_HIERARCHY",
           "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
           "type": "design"
@@ -331,6 +351,11 @@
           "type": "design"
         },
         {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded prose with exact visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
           "id": "XLSX_FONT_HIERARCHY",
           "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
           "type": "design"
@@ -389,6 +414,11 @@
           "type": "design"
         },
         {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded prose with exact visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
           "id": "XLSX_FONT_HIERARCHY",
           "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
           "type": "design"
@@ -440,6 +470,11 @@
         {
           "id": "XLSX_DESIGN",
           "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded prose with exact visible-line-count row height and PDF/render verification.",
           "type": "design"
         },
         {
@@ -517,6 +552,11 @@
           "type": "design"
         },
         {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded prose with exact visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
           "id": "XLSX_FONT_HIERARCHY",
           "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
           "type": "design"
@@ -568,6 +608,11 @@
         {
           "id": "XLSX_DESIGN",
           "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded prose with exact visible-line-count row height and PDF/render verification.",
           "type": "design"
         },
         {
@@ -623,6 +668,11 @@
           "type": "design"
         },
         {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded prose with exact visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
           "id": "XLSX_FONT_HIERARCHY",
           "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
           "type": "design"
@@ -666,6 +716,7 @@
     "Model creation is not completion: agents must verify both model logic and sheet design with command-based workbook checks plus rendered-output inspection, then fix and rerun until both are sufficient or a real blocker is documented.",
     "Examples, maturity cues, sectors, and modes are pattern prompts only; evals should reject fixed stage-sector-purpose routing and keyword-triggered metric packs.",
     "Xlsx design quality includes IB-style text positioning: labels/sources/notes/titles/memos left, values/formulas/units right, and period/scenario/matrix headers centered only.",
-    "Xlsx design quality includes IB-style font-size discipline: 9pt supporting notes/sources/units, 10pt body/model cells, 11pt compact section emphasis, 14pt sheet titles, and no 8pt squeezed cell text or 16pt+ presentation headings."
+    "Xlsx design quality includes IB-style font-size discipline: 9pt supporting notes/sources/units, 10pt body/model cells, 11pt compact section emphasis, 14pt sheet titles, and no 8pt squeezed cell text or 16pt+ presentation headings.",
+    "XLSX_WRAP_DISCIPLINE requires no generated wrap by default, blank unstyled overflow cells for horizontal-read text, no print/render boundary trapping, and exact row heights for any approved bounded-prose exception."
   ]
 }

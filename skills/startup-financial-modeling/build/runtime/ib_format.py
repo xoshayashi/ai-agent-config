@@ -160,6 +160,21 @@ WRAP_TEXT_ERROR = (
     "user-approved bounded-prose exception uses wrapping or manual line breaks, "
     "set row height to the exact visible line count."
 )
+WRAP_DECISION_LADDER: tuple[str, ...] = (
+    "shorten_or_split_copy",
+    "widen_role_column",
+    "reserve_blank_unstyled_overflow_cells",
+    "move_to_note_or_interpretation_surface",
+    "use_user_approved_bounded_prose_wrap_only",
+)
+WRAP_BEST_PRACTICE = (
+    "IB model cells keep wrap_text off by default. Horizontal-read titles, "
+    "instructions, notes, bullets, source caveats, and memo lines should read "
+    "through blank unstyled overflow cells without merging and must not be "
+    "trapped at the final print/render column. Wrapping or manual line breaks "
+    "are reserved for user-approved bounded prose and require exact line-count "
+    "row height."
+)
 
 ALIGN_LABEL = "left"
 ALIGN_SOURCE_NOTE = "left"
@@ -1288,19 +1303,28 @@ def apply_wrapped_exception(
     cell: Cell,
     *,
     user_approved: bool,
+    bounded_prose: bool,
+    adjacent_cells_carry_meaning: bool,
     line_count: int | None = None,
 ) -> None:
     """Apply the only sanctioned wrap path for bounded prose exceptions.
 
     Normal generated workbook cells must not use wrapping. Call this only after
     the user has explicitly approved bounded prose that cannot read through
-    blank overflow cells. The helper sets wrapping and exact row height
-    together so the exception cannot clip text or create a loose padded row.
+    blank overflow cells because neighboring table cells carry meaningful
+    values, formulas, units, or notes. The helper sets wrapping and exact row
+    height together so the exception cannot clip text or create a loose padded
+    row.
     """
     if not user_approved:
         raise ValueError(
             "Wrapped prose exceptions require explicit user approval; use "
             "blank overflow cells without merging for horizontal-read text."
+        )
+    if not bounded_prose or not adjacent_cells_carry_meaning:
+        raise ValueError(
+            "Wrapped prose exceptions are only for bounded prose whose adjacent "
+            "table cells carry meaningful values, formulas, units, or notes."
         )
     base = cell.alignment
     count = visible_text_line_count(cell.value) if line_count is None else max(1, int(line_count))
@@ -1646,7 +1670,8 @@ __all__ = [
     "IB_CHART_COLORS_WATERFALL_TOTAL",
     # Fonts (Arial 10pt 基準 — Google Sheets default + IB de facto standard)
     "FONT_FAMILY", "FONT_SIZE_BASE", "FONT_SIZE_SMALL", "FONT_SIZE_LARGE",
-    "FONT_SIZE_TITLE", "FONT_SIZE_TINY",
+    "FONT_SIZE_TITLE", "FONT_SIZE_TINY", "FONT_SIZE_ALLOWED_CELLS",
+    "FONT_SIZE_BEST_PRACTICE",
     "FONT_BODY", "FONT_BODY_BOLD", "FONT_HARD_INPUT", "FONT_FORMULA",
     "FONT_LINK_INTRA", "FONT_LINK_EXTERNAL",
     "FONT_COMMENT", "FONT_FOOTNOTE", "FONT_SECTION_HEADER", "FONT_TITLE",
@@ -1656,6 +1681,8 @@ __all__ = [
     # Alignment semantics
     "ALIGN_LABEL", "ALIGN_SOURCE_NOTE", "ALIGN_VALUE", "ALIGN_UNIT",
     "ALIGN_PERIOD_HEADER", "ALIGN_VERTICAL_BODY", "ALIGNMENT_BEST_PRACTICE",
+    # Wrap semantics
+    "WRAP_TEXT_ERROR", "WRAP_DECISION_LADDER", "WRAP_BEST_PRACTICE",
     # Number formats
     "FMT_JPY_YEN", "FMT_JPY_THOUSAND", "FMT_JPY_MILLION", "FMT_JPY_HUNDRED_MILLION",
     "FMT_USD_DOLLAR", "FMT_USD_THOUSAND", "FMT_USD_MILLION",
