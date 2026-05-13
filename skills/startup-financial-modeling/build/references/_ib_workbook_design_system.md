@@ -48,6 +48,34 @@ is neither clipped nor floating inside excess whitespace.
 Use the row-height helper in `ib_format.py` rather than relying on spreadsheet
 auto-height guesses.
 
+## Workbook Tokens
+
+Use these tokens instead of inventing local formatting:
+
+| Token | Value | Use |
+|---|---|---|
+| Base font | Arial 10pt | All body cells and generated default workbook font |
+| Comment font | Arial 9pt italic gray `#808080` | Sources, notes, explanations, unit helpers |
+| Title font | Arial 14pt bold | Sheet title row |
+| Section font | Arial 10-11pt bold | Section or block labels |
+| Input font | Blue `#0000FF` | Typed assumptions and source facts |
+| Formula font | Black `#000000` | Same-sheet formulas and calculated values |
+| Internal link font | Green `#008000` | Cross-sheet formulas |
+| External link font | Red `#FF0000` | External file / URL references |
+| Header / label row fill | Light blue `#D9EAF7` | A row that names a model block, matrix, register, or period/value area |
+| Total/check band fill | Pale blue `#EAF2F8` | Totals and reconciliation rows when they need a band |
+| Section band fill | Navy `#1F3A66` | Block/section dividers across the attached block width |
+| Selected output fill | Pale yellow `#FFF9C4` | One chosen output/check/caution row |
+| Body row height | 15pt | Normal model rows |
+| Header row height | 18pt | Row 5 or compact header/label rows |
+| Section row height | 20-22pt | Section/block divider rows |
+| Wrapped exception height | 15pt x visible line count | User-approved wrap/manual-break exceptions only |
+| Money formats | Raw stored values with display formats | `円`, `千円`, `百万円`, `億円`, `$`, `$K`, `$M`; negatives show red and zeros may show dash |
+| Percent / multiple | `%`, `x` formats | Percentages right-aligned, multiples as `0.0x` / `0.00x` |
+
+The xlsx default font must also be Arial 10pt so newly inserted rows inherit
+the same look after the user opens the workbook.
+
 ## Color Roles
 
 Color should help a reviewer understand the workbook faster:
@@ -59,13 +87,13 @@ Color should help a reviewer understand the workbook faster:
 | Cross-sheet formulas | Green font |
 | External links | Red font |
 | Sources / notes / units | Gray, with sources and notes in italic |
-| Table headers | Light blue fill with dark text |
+| Header / label rows | Light blue fill with dark text |
 | Section labels | Navy band across the attached table/block width, compact and repeated |
 | Totals / checks / selected outputs | Pale blue or pale yellow fill on the selected semantic row |
 | Caution / placeholder | Pale yellow for a small number of decision-critical cells |
 
 The base grid stays white. Background fills are selective accents for major
-semantic moments only: section band, table header, selected output/check,
+semantic moments only: section band, header/label row, selected output/check,
 caution/placeholder, or deliberate heatmap. A filled row should feel like an
 event in the sheet.
 
@@ -84,8 +112,8 @@ Fill span rules:
 - Section headers inherit the width of the table/block they introduce. If the
   following table spans B:K, the section band spans B:K even when only B has
   the label.
-- Table headers and selected output/check rows align their fill width to the
-  same table or model block so the reviewer sees a clean vertical edge.
+- Header/label rows and selected output/check rows align their fill width to
+  the same model block so the reviewer sees a clean vertical edge.
 - Do not repeat the same non-heatmap background fill on adjacent rows. If two
   nearby rows feel important, fill the single decision row and use font weight,
   borders, spacing, or comments for the supporting row.

@@ -58,9 +58,9 @@ components use one consistent rectangular column span, and that span is chosen
 from the attached table/block rather than from which cells contain text. Do not
 stop a fill because a cell is blank; do not repeat the same non-heatmap fill on
 adjacent rows; do not color several rows merely because they are nearby.
-Section headers, table headers, selected outputs/checks, and caution rows are
-the normal fill roles. Use `ib_format.py` semantic fill helpers for generated
-xlsx work instead of hand-painting arbitrary cells.
+Section/block dividers, header/label rows, selected outputs/checks, and caution
+rows are the normal fill roles. Use `ib_format.py` semantic fill helpers for
+generated xlsx work instead of hand-painting arbitrary cells.
 
 Analysis gates: material assumptions need selected driver, explanatory drivers,
 implied value, support ratio/variance, and evidence status. Weak evidence feeds

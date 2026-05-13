@@ -47,7 +47,7 @@
 - Spacer cells that support text overflow remain truly blank and unstyled;
   formatting appears where it carries table, header, output, or status meaning.
 - Empty cells can still be part of the design. When a row is a semantic
-  component such as a table header, selected output, check, caution, or
+  component such as a header/label row, selected output, check, caution, or
   interpretation band, extend the background fill across the same useful
   columns as comparable rows even where some cells have no text. This keeps the
   row visually aligned and intentional; absence of text alone is not a reason
@@ -86,12 +86,12 @@ those roles.
 - Treat background color as a workbook-level design surface, not as isolated
   single-cell decoration. Generated sheets should keep the base grid quiet and
   concentrate color in recurring structural or semantic roles, such as
-  table-header bands, section typography or rules, selected outputs, checks,
+  header/label row bands, section typography or rules, selected outputs, checks,
   caution, or status.
-- Background fills belong to repeated semantic roles: table headers, section
+- Background fills belong to repeated semantic roles: header/label rows, section
   dividers, total/check rows, selected outputs, caution states, and heatmaps.
 - Use a blue-based structural palette inside sheets by default: near-white blue
-  table headers and navy section labels/rules are a safe default, but other
+  header/label rows and navy section labels/rules are a safe default, but other
   accents may be used when their role is explicit and repeated consistently.
   The base grid stays quiet, with structural palette roles repeated
   consistently so important accents stay immediately visible.

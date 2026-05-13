@@ -321,26 +321,29 @@ def _write_period_header(ws: Worksheet, facts: SourceFacts, row: int = 5) -> Non
     for col in _period_cols(facts):
         ws.column_dimensions[get_column_letter(col)].width = LAYOUT.period_width
     ws.column_dimensions[get_column_letter(_start_period_col() + len(facts.period_labels))].width = LAYOUT.note_width
+    ib.apply_semantic_fill_span(
+        ws,
+        row,
+        LAYOUT.first_hierarchy_col,
+        _start_period_col() + len(facts.period_labels) - 1,
+        ib.BG_TABLE_HEADER,
+        bottom=ib.THIN_LINE,
+    )
     for col, label in zip(_period_cols(facts), facts.period_labels):
         cell = ws.cell(row=row, column=col, value=label)
         ib.apply_year_header(cell, label)
-        cell.fill = PatternFill("solid", fgColor=ib.BG_TABLE_HEADER)
-        cell.border = ib.BORDER_BOTTOM_THIN
     headers = [(LAYOUT.first_hierarchy_col, ""), (LAYOUT.label_col, "Line item"), (LAYOUT.source_col, "Source / driver"), (LAYOUT.unit_col, "Unit")]
     for col, label in headers:
         c = ws.cell(row=row, column=col, value=label if label else None)
         c.font = ib.FONT_BODY_BOLD
-        c.fill = PatternFill("solid", fgColor=ib.BG_TABLE_HEADER)
         c.alignment = Alignment(horizontal="left" if col in (LAYOUT.first_hierarchy_col, LAYOUT.label_col, LAYOUT.source_col) else "right", vertical="center", wrap_text=False)
-        c.border = ib.BORDER_BOTTOM_THIN
 
 
 def _apply_text_header(cell, label: str) -> None:
     cell.value = label
     cell.font = ib.FONT_BODY_BOLD
-    cell.fill = PatternFill("solid", fgColor=ib.BG_TABLE_HEADER)
     cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=False)
-    cell.border = ib.BORDER_BOTTOM_THIN
+    ib.apply_semantic_fill_span(cell.parent, cell.row, cell.column, cell.column, ib.BG_TABLE_HEADER, bottom=ib.THIN_LINE)
 
 
 def _compact_status(value: object) -> object:
@@ -498,7 +501,7 @@ def _uses_default_layout(ws: Worksheet) -> bool:
 
 
 def _apply_design_surface(wb: Workbook) -> None:
-    table_header = PatternFill("solid", fgColor=ib.BG_TABLE_HEADER)
+    header_row_fill = PatternFill("solid", fgColor=ib.BG_TABLE_HEADER)
     for ws in wb.worksheets:
         uses_default_layout = _uses_default_layout(ws)
         max_col = max(ws.max_column, 9)
@@ -520,7 +523,7 @@ def _apply_design_surface(wb: Workbook) -> None:
                     cell.border = _merge_border(cell.border, bottom=ib.THIN_LINE)
                     continue
                 if row == 5 and row_has_value and col >= LAYOUT.first_hierarchy_col and not is_section:
-                    cell.fill = table_header
+                    cell.fill = header_row_fill
                     cell.border = _merge_border(cell.border, bottom=ib.THIN_LINE)
                 if uses_default_layout and col == LAYOUT.source_col and row != 5:
                     ib.apply_comment(cell, wrap_text=False)
@@ -1598,7 +1601,7 @@ def _build_ic_memo(wb: Workbook, facts: SourceFacts) -> None:
             _apply_value_style(body_cell, "General")
         else:
             ib.apply_comment(body_cell, wrap_text=False)
-        ws.row_dimensions[row + 1].height = 46
+        ws.row_dimensions[row + 1].height = ib.ROW_HEIGHT_BASE
         row += 4
 
 

@@ -82,7 +82,7 @@ BRAND_SLATE = "7F8FA6"           # Muted blue-gray output tab
 
 BG_WHITE = "FFFFFF"
 BG_CANVAS = "F7FAFE"            # Workbook canvas — near-white blue surface
-BG_TABLE_HEADER = "D9EAF7"      # Period / table header band — light blue
+BG_TABLE_HEADER = "D9EAF7"      # Header / label row band — light blue
 BG_TOTAL_BAND = "EAF2F8"        # 合計行の薄ブルーバンディング
 BG_HEADER_BAND = "1F3A66"       # Section header の濃ネイビーバンド
 BG_WORKING = "FFF9C4"           # WIP / TODO セル (yellow highlight)
@@ -291,7 +291,7 @@ def apply_semantic_fill_span(
 ) -> None:
     """Fill one rectangular semantic row span, including blank member cells.
 
-    Use this for section bands, table headers, selected outputs, checks, and
+    Use this for section bands, header/label rows, selected outputs, checks, and
     caution rows. The caller chooses `end_col` from the attached table/block,
     not from whether each cell currently has text.
     """
@@ -345,7 +345,7 @@ def clear_blank_cell_styles(wb: Workbook) -> None:
 
     This keeps overflow spacer cells and trailing canvas clean. It preserves
     blank cells that intentionally extend semantic row components, such as
-    table-header or selected-output fills aligned to the same column span as
+    header/label-row or selected-output fills aligned to the same column span as
     neighboring rows.
     """
     default_style = copy(wb._cell_styles[0])
