@@ -51,6 +51,9 @@ heavy process.
 - Confirm hierarchy / indentation uses dedicated Google-Sheets-20px columns
   (`2.14` xlsx width), with no native Excel indent, no leading-space
   indentation, and no wrapped generated cells.
+- If a user-approved exception uses wrapping or manual line breaks, verify the
+  row height is sized to the exact visible line count and the rendered text is
+  neither clipped nor padded into a loose-looking row.
 - Inspect the print/render canvas: each sheet should end at the last real value
   row and column, including chart and drawing anchors, with print area bound to
   that rendered range and no styled blank rows or columns extending the visual

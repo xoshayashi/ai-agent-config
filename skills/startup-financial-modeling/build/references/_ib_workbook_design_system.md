@@ -41,7 +41,10 @@ No-Wrap Rule: do not solve readability by turning on cell text wrapping. If
 text clips, widen the relevant role column, split the content into shorter
 rows, move commentary to a note / interpretation column, or reserve blank
 overflow cells. Generated workbook helpers should reject `wrap_text=True`
-instead of silently accepting it.
+instead of silently accepting it. If the user explicitly approves a prose-heavy
+exception with wrapping or manual line breaks, row height becomes part of the
+design contract: set it to the exact number of visible text lines so the text
+is neither clipped nor floating inside excess whitespace.
 
 ## Color Roles
 
@@ -98,6 +101,9 @@ Use borders as the primary structure:
   sheet, not as continuous wallpaper.
 - Row heights stay close to 15-18 points for body rows and 20-22 points for
   section rows.
+- Wrapped exception rows are sized by line count rather than by the normal
+  compact scale. Match the height to the actual rendered lines and inspect the
+  result at 100% zoom.
 
 The result should be dense but calm: enough structure for auditing, without
 large blocks of color or oversized empty areas.

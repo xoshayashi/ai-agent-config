@@ -39,6 +39,11 @@
 - Any proposed `wrap_text=True` change is a design failure unless the user has
   explicitly requested a prose-heavy workbook exception; prefer restructuring
   the grid before considering that exception.
+- When a user-approved exception uses wrapped text or manual line breaks,
+  adjust the row height deliberately to the rendered line count. A wrapped
+  two-line cell should have a two-line row, a three-line cell should have a
+  three-line row, and so on; clipped text, auto-height guesses, or oversized
+  padded rows are design defects.
 - Spacer cells that support text overflow remain truly blank and unstyled;
   formatting appears where it carries table, header, output, or status meaning.
 - Empty cells can still be part of the design. When a row is a semantic

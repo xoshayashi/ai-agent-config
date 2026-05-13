@@ -138,7 +138,8 @@ FONT_BODY_BOLD = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, bold=True, color=IB
 WRAP_TEXT_ERROR = (
     "startup-financial-modeling forbids wrap_text=True for generated workbook "
     "cells. Use wider columns, dedicated note columns, shorter rows, or blank "
-    "overflow cells instead."
+    "overflow cells instead. If a user-approved prose exception uses wrapping "
+    "or manual line breaks, set row height to the exact visible line count."
 )
 
 
@@ -467,6 +468,7 @@ ROW_HEIGHT_TIGHT = 14.0         # 詰め (sub-section row)
 ROW_HEIGHT_BASE = 15.0          # = ROW_BODY_HEIGHT
 ROW_HEIGHT_RELAXED = 22.0       # = ROW_SECTION_HEIGHT
 ROW_HEIGHT_HERO = 32.0          # cover title 等 (modular ratio ~2.13x)
+ROW_HEIGHT_PER_WRAPPED_LINE = ROW_HEIGHT_BASE  # user-approved wrap exceptions only
 
 # ============================================================================
 # 7. Border styles  (subtotal / grand total / section divider / box / table)
@@ -1157,6 +1159,17 @@ def apply_row_heights(ws: Worksheet, row_kind_map: dict[int, str]) -> None:
         ws.row_dimensions[row].height = height_map.get(kind, ROW_HEIGHT_BASE)
 
 
+def wrapped_text_row_height(line_count: int) -> float:
+    """Return exact row height for a user-approved wrapped text exception.
+
+    Generated model sheets should normally keep wrapping off. When the user
+    explicitly asks for wrapped prose or manual line breaks, size the row by the
+    visible line count so text is not clipped and the row does not carry loose
+    excess whitespace.
+    """
+    return max(1, int(line_count)) * ROW_HEIGHT_PER_WRAPPED_LINE
+
+
 # ============================================================================
 # 11. Sheet-level helper functions
 # ============================================================================
@@ -1503,7 +1516,7 @@ __all__ = [
     "COL_UNIT_WIDTH", "COL_PERIOD_WIDTH",
     "COL_WIDTH_TINY", "COL_WIDTH_SMALL", "COL_WIDTH_BASE", "COL_WIDTH_LARGE", "COL_WIDTH_XLARGE",
     "ROW_BODY_HEIGHT", "ROW_SPACER_HEIGHT", "ROW_SECTION_HEIGHT",
-    "ROW_HEIGHT_TIGHT", "ROW_HEIGHT_BASE", "ROW_HEIGHT_RELAXED", "ROW_HEIGHT_HERO",
+    "ROW_HEIGHT_TIGHT", "ROW_HEIGHT_BASE", "ROW_HEIGHT_RELAXED", "ROW_HEIGHT_HERO", "ROW_HEIGHT_PER_WRAPPED_LINE",
     # Borders
     "BORDER_SUBTOTAL", "BORDER_GRAND_TOTAL", "BORDER_SECTION_DIVIDER",
     "BORDER_SECTION_END_MEDIUM", "BORDER_TOP_THIN", "BORDER_BOTTOM_THIN",
@@ -1528,7 +1541,7 @@ __all__ = [
     # Hyperlink
     "apply_internal_link", "write_toc",
     # Row height
-    "apply_row_heights",
+    "apply_row_heights", "wrapped_text_row_height",
     # Sheet-level helpers
     "setup_sheet_layout", "setup_print_layout", "write_cover", "set_tab_color",
     "validate_sheet_naming",
