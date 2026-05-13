@@ -1236,6 +1236,8 @@ def build_cap_table_sheet(
     """
     if CAP_TABLE_SHEET_NAME in wb.sheetnames:
         ws = wb[CAP_TABLE_SHEET_NAME]
+        for merged_range in list(ws.merged_cells.ranges):
+            ws.unmerge_cells(str(merged_range))
         # Clear existing content
         for row in ws.iter_rows():
             for cell in row:

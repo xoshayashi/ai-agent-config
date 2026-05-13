@@ -10,6 +10,8 @@ import sys
 import tempfile
 import re
 import json
+import shutil
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -585,12 +587,14 @@ def test_cap_table_rebuild_clears_legacy_layout_state() -> None:
     ws = wb.active
     ws.title = "Ownership"
     ws.freeze_panes = "C8"
+    ws.merge_cells("B2:C2")
     ws["B1"] = "legacy"
     ws["B1"].alignment = Alignment(wrap_text=True, indent=2)
 
     cap_table.build_cap_table_sheet(wb, cap_table.CapTableInput(company_name="Layout State Test"))
     ws = wb["Ownership"]
 
+    assert _merged_count(wb) == 0
     assert ws.freeze_panes is None
     assert ws.column_dimensions["A"].width == ib.COL_MARGIN_WIDTH
     assert ws.column_dimensions["B"].width == ib.COL_HIERARCHY_WIDTH
@@ -637,6 +641,7 @@ def test_cap_table_sheet_uses_canonical_design_surface() -> None:
     )
 
     assert wb.sheetnames == ["Ownership"]
+    assert _merged_count(wb) == 0
     assert ws.freeze_panes is None
     assert ws.sheet_view.showGridLines is False
     assert ws.print_area
@@ -649,6 +654,7 @@ def test_cap_table_sheet_uses_canonical_design_surface() -> None:
     assert _column_width(ws, "C") >= ib.COL_LABEL_WIDTH
     assert _column_width(ws, "G") >= ib.COL_SOURCE_WIDTH
     assert _wrapped_cells(wb) == []
+    assert _manual_line_break_violations(wb) == []
     assert _styled_blank_cells(wb) == []
     assert _design_band_span_violations(wb) == []
     assert _repeated_semantic_fill_rows(wb) == []
@@ -704,6 +710,37 @@ def test_ib_helpers_reject_wrap_text_true() -> None:
     assert ib.visible_text_line_count("one\ntwo", "single") == 2
     ib.set_wrapped_exception_row_height(ws, 4, ib.visible_text_line_count("one\ntwo\nthree"))
     assert ws.row_dimensions[4].height == ib.ROW_HEIGHT_PER_WRAPPED_LINE * 3
+
+    ws["A5"] = "bounded\nprose"
+    try:
+        ib.apply_wrapped_exception(ws["A5"], user_approved=False)
+    except ValueError as exc:
+        assert "explicit user approval" in str(exc)
+    else:
+        raise AssertionError("apply_wrapped_exception accepted missing approval")
+    ib.apply_wrapped_exception(ws["A5"], user_approved=True)
+    assert ws["A5"].alignment.wrap_text is True
+    assert ws.row_dimensions[5].height == ib.wrapped_text_row_height(2)
+
+
+def test_runtime_builders_do_not_use_wrap_or_merge_layout_shortcuts() -> None:
+    runtime_files = [
+        SCRIPTS_DIR / "build_model.py",
+        SCRIPTS_DIR / "source_plan_builder.py",
+        SCRIPTS_DIR / "cap_table_builder.py",
+    ]
+    for path in runtime_files:
+        text = path.read_text(encoding="utf-8")
+        assert "wrap_text=True" not in text
+        text_without_unmerge = text.replace("unmerge_cells(", "")
+        assert ".merge_cells(" not in text_without_unmerge
+        assert "merge_cells(" not in text_without_unmerge
+
+    ib_text = (SCRIPTS_DIR / "ib_format.py").read_text(encoding="utf-8")
+    ib_text_without_unmerge = ib_text.replace("unmerge_cells(", "")
+    assert ".merge_cells(" not in ib_text_without_unmerge
+    assert "merge_cells(" not in ib_text_without_unmerge
+    assert "blank overflow cells without merging" in ib.WRAP_TEXT_ERROR
 
 
 def test_skill_guidance_makes_no_wrap_rule_explicit() -> None:
@@ -902,14 +939,43 @@ def _styled_blank_cells(wb) -> list[str]:
     }
     for ws in wb.worksheets:
         for row in ws.iter_rows():
-            row_has_value = any(cell.value is not None for cell in row)
             for cell in row:
-                if cell.value is not None or cell.style_id == 0:
+                if cell.value not in (None, "") or cell.style_id == 0:
                     continue
-                if row_has_value and _fill_rgb(cell) in semantic_fill_colors:
-                    continue
+                color = _fill_rgb(cell)
+                if color in semantic_fill_colors:
+                    same_fill_run = []
+                    col = cell.column
+                    while col >= 1 and _fill_rgb(ws.cell(cell.row, col)) == color:
+                        same_fill_run.append(ws.cell(cell.row, col))
+                        col -= 1
+                    col = cell.column + 1
+                    while col <= ws.max_column and _fill_rgb(ws.cell(cell.row, col)) == color:
+                        same_fill_run.append(ws.cell(cell.row, col))
+                        col += 1
+                    if any(run_cell.value not in (None, "") for run_cell in same_fill_run):
+                        continue
                 bad.append(f"{ws.title}!{cell.coordinate}: style_id={cell.style_id}")
     return bad
+
+
+def _manual_line_break_violations(wb) -> list[str]:
+    violations = []
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                if not (isinstance(cell.value, str) and "\n" in cell.value):
+                    continue
+                if cell.alignment is None or cell.alignment.wrap_text is not True:
+                    violations.append(f"{ws.title}!{cell.coordinate}: manual line break without wrapped exception")
+                    continue
+                expected = ib.wrapped_text_row_height(ib.visible_text_line_count(cell.value))
+                actual = ws.row_dimensions[cell.row].height
+                if actual != expected:
+                    violations.append(
+                        f"{ws.title}!{cell.coordinate}: height={actual} expected={expected}"
+                    )
+    return violations
 
 
 def _design_band_span_violations(wb) -> list[str]:
@@ -1183,6 +1249,7 @@ Source: customer discovery memo, market sizing memo, lender discussion notes.
         assert "Monthly price" in str(wb["Guide"]["C8"].value)
         assert "customer discovery memo" in str(wb["Market Support"]["B8"].value)
         assert _wrapped_cells(wb) == []
+        assert _manual_line_break_violations(wb) == []
         assert _unit_label_violations(wb) == []
         assert _raw_money_scale_formula_violations(wb) == []
         assert _numbered_section_labels(wb) == []
@@ -1300,7 +1367,7 @@ Source: management memo.
             if cell.value is not None
         )
 
-        assert wb["Kernel"]["C9"].value == "Marketplace / transaction"
+        assert wb["Kernel"]["D9"].value == "Marketplace / transaction"
         assert _unit_for_label(wb, "Assumptions", "Gross merchandise value") == "百万円"
         assert _unit_for_label(wb, "Assumptions", "Take rate") == "%"
         assert _first_year_cell_for_label(wb, "Revenue Build", "Transaction revenue").value == f"={FIRST_VALUE_LETTER}7*{FIRST_VALUE_LETTER}10"
@@ -1597,6 +1664,13 @@ def test_source_plan_ib_design_rhythm_and_visibility() -> None:
         "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
     )
     try:
+        kernel = wb["Kernel"]
+        assert kernel["B7"].value is None
+        assert kernel["C7"].value == "Decision"
+        assert kernel["D7"].value
+        assert _column_width(kernel, "B") == ib.COL_HIERARCHY_WIDTH
+        assert _column_width(kernel, "C") >= 32
+        assert _column_width(kernel, "D") >= 92
         for ws in wb.worksheets:
             assert ws.sheet_view.showGridLines is False
             assert ws.sheet_view.zoomScale == 90
@@ -1642,6 +1716,7 @@ def test_all_generated_modes_pass_visual_design_invariants() -> None:
             assert _defined_name_count(wb) == 0
             assert _merged_count(wb) == 0
             assert _wrapped_cells(wb) == []
+            assert _manual_line_break_violations(wb) == []
             assert _leading_space_labels(wb) == []
             assert _styled_blank_cells(wb) == []
             assert _design_band_span_violations(wb) == []
@@ -1689,6 +1764,42 @@ def test_source_plan_print_canvas_includes_rendered_used_range() -> None:
             assert ws.cell(ws.max_row + 1, 1).style_id == 0
     finally:
         tmp.cleanup()
+
+
+def test_representative_workbook_pdf_render_smoke_when_available() -> None:
+    soffice = shutil.which("soffice")
+    pdftoppm = shutil.which("pdftoppm")
+    if not soffice or not pdftoppm:
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        source_md = tmp_path / "render_source.md"
+        out = tmp_path / "render_source.xlsx"
+        source_md.write_text(
+            "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo.",
+            encoding="utf-8",
+        )
+        source_plan.build_source_plan_workbook(source_md, out)
+        subprocess.run(
+            [soffice, "--headless", "--convert-to", "pdf", "--outdir", tmp, str(out)],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        pdf = tmp_path / "render_source.pdf"
+        assert pdf.exists()
+        assert pdf.stat().st_size > 50_000
+        subprocess.run(
+            [pdftoppm, "-png", "-r", "80", "-f", "1", "-l", "2", str(pdf), str(tmp_path / "page")],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        pages = sorted(tmp_path.glob("page-*.png"))
+        assert len(pages) >= 2
+        assert all(page.stat().st_size > 10_000 for page in pages)
 
 
 def test_source_plan_custom_tables_keep_text_columns_readable() -> None:
@@ -1836,6 +1947,7 @@ if __name__ == "__main__":
     test_cap_table_rebuild_clears_legacy_layout_state()
     test_cap_table_sheet_uses_canonical_design_surface()
     test_ib_helpers_reject_wrap_text_true()
+    test_runtime_builders_do_not_use_wrap_or_merge_layout_shortcuts()
     test_skill_guidance_makes_no_wrap_rule_explicit()
     test_skill_guidance_requires_fix_and_rerun_iteration()
     test_skill_guidance_uses_meaningful_sparse_fills_and_borders()
@@ -1858,6 +1970,7 @@ if __name__ == "__main__":
     test_source_plan_ib_design_rhythm_and_visibility()
     test_all_generated_modes_pass_visual_design_invariants()
     test_source_plan_print_canvas_includes_rendered_used_range()
+    test_representative_workbook_pdf_render_smoke_when_available()
     test_source_plan_custom_tables_keep_text_columns_readable()
     test_excluded_sheets_cannot_create_broken_references()
     test_ib_helpers_do_not_use_native_indent_for_hierarchy()

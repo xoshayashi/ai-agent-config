@@ -69,7 +69,7 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
           "type": "design"
         }
       ]
@@ -121,7 +121,7 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
           "type": "design"
         }
       ]
@@ -174,7 +174,7 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
           "type": "design"
         }
       ]
@@ -234,7 +234,7 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
           "type": "design"
         }
       ]
@@ -286,7 +286,7 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
           "type": "design"
         }
       ]
@@ -334,7 +334,7 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
           "type": "design"
         }
       ]
@@ -378,7 +378,7 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
           "type": "design"
         }
       ]
@@ -442,7 +442,7 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
           "type": "design"
         }
       ]
@@ -486,7 +486,7 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
           "type": "design"
         }
       ]
@@ -528,7 +528,7 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
           "type": "design"
         }
       ]
