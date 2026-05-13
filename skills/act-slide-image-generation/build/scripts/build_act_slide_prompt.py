@@ -10,12 +10,9 @@ from pathlib import Path
 UNRESOLVED_ARCHETYPE = "UNRESOLVED - choose one guideline-compatible layout_archetype before final prompt"
 UNRESOLVED_GRID_MODE = "UNRESOLVED - choose one grid_mode before final prompt"
 IMAGE_MODEL = "gpt-image-2"
-ALLOWED_16_9_SIZES = {"1536x864", "2048x1152", "2560x1440", "3840x2160"}
+ALLOWED_16_9_SIZES = {"2048x1152"}
 SIZE_LABELS = {
-    "1536x864": "fast draft 16:9 image-generation size",
     "2048x1152": "default 16:9 2K-width image-generation output size",
-    "2560x1440": "optional QHD/1440p 16:9 image-generation size; explicit high-detail request only",
-    "3840x2160": "4K UHD 16:9 image-generation size; explicit request only",
 }
 REQUIRED_PROMPT_FIELDS = [
     "slide_message",
@@ -128,7 +125,7 @@ def validate_size(size: str) -> str:
         width = int(width_raw)
         height = int(height_raw)
     except ValueError as exc:
-        raise SystemExit(f"Invalid --size '{size}'. Use WIDTHxHEIGHT, e.g. 2560x1440.") from exc
+        raise SystemExit(f"Invalid --size '{size}'. Use 2048x1152 for 16:9 2K slide PNG masters.") from exc
 
     if width % 16 or height % 16:
         raise SystemExit(f"Invalid --size '{size}'. gpt-image-2 requires both edges to be multiples of 16.")
@@ -185,8 +182,8 @@ def canonical_planning_block(
   image_moderation: auto
   image_n: 1
   image_streaming: optional for exploration, final QA uses completed image
-  image_delivery_size: same as approved generated PNG unless the user explicitly requests another valid 16:9 output size
-  default_2k_generation_lock: use image_size 2048x1152 as the default generated slide output; 1536x864 is draft-only by explicit request, and 2560x1440 or 3840x2160 require explicit high-detail/large-output instruction
+  image_delivery_size: 2048x1152; PPTX/PDF packaging uses the same approved 2K slides_final/ PNG masters
+  default_2k_generation_lock: use image_size 2048x1152 as the generated slide output for review, repair, PPTX, and PDF packaging; do not create alternate 16:9 delivery PNG masters
   pdf_export_source_lock: create PDF outputs from the approved slides_final/ PNG masters; do not copy final PNGs into render_check/pdf_pages/ as a second source of truth
   generation_route: Codex built-in image generation
   builtin_generation_lock: when slide images are requested in Codex, invoke Codex built-in image generation directly and start generating; do not pause for local environment preflight or local artifact-route probing before generation
@@ -299,7 +296,7 @@ def canonical_planning_block(
   illustration_consistency_status: pending / approved / repair_required
   visual_design_quality_traits: [design treatment only: near-white warm base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, intentional canvas occupancy, concrete visual anchor, crisp focal hierarchy; do not change slide count, message order, or storyline solely for this]
   imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation
-  default_2k_generation_lock: 2048x1152 is the standard generated PNG size for both working review and final slide image output unless the user explicitly requests a different valid 16:9 size
+  default_2k_generation_lock: 2048x1152 is the standard generated PNG size for working review, final slide image output, PPTX packaging, and PDF packaging
   pdf_export_source_lock: PDF export, when requested, references approved slides_final/ PNG masters; render_check/pdf_pages/ is disposable render QA only and not a storage location for final PNGs
   visible_text_only_lock: exact_text is the only source of visible words; lock names, field names, route/status metadata, speaker notes, and audit instructions are non-rendered
   render_contract_lock: image prompt receives drawing-relevant instructions only: canvas, visible text, layout, visual hierarchy, palette, typography, source rendering, and repair scope
@@ -571,10 +568,10 @@ draft_image_prompt_scaffold:
   Apply contact_sheet_mastering_lock: keep one retained contact sheet by default, render_check/contact_sheet_review.png, built from slides_final/ master PNGs.
   Apply single_contact_sheet_policy: do not retain parallel contact_sheet_generated*, contact_sheet_package*, and contact_sheet_pdf_render* files for the same slide set; if package/PDF render QA needs comparison, create one contact_sheet_delivery_compare.png or render_diff_report.json instead.
 
-  Plan coordinates on a 1672x941 basis and generate approved PNG masters at the requested valid 16:9 size.
-  Apply default_2k_generation_lock: use 2048x1152 as the default generated slide output size for review and final PNGs; use 1536x864 only for explicit quick drafts, 2560x1440 only for explicit QHD/high-detail requests, and 3840x2160 only for explicit 4K requests.
+  Plan coordinates on a 1672x941 basis, but generate approved PNG masters only at 2048x1152.
+  Apply default_2k_generation_lock: use 2048x1152 as the generated slide output size for review, final PNGs, PPTX packaging, and PDF packaging; do not create separate 1920x1080 or other 16:9 delivery masters.
   Apply pdf_export_source_lock: build PDF outputs from approved slides_final/ master PNGs; never duplicate final PNG masters into render_check/pdf_pages/ for PDF creation.
-  Use size terminology consistently: 1920x1080 is FHD/1080p delivery, 2048x1152 is the default 16:9 2K-width generation output, 2560x1440 is optional QHD/1440p generation by explicit request, and 3840x2160 is 4K UHD generation by explicit request.
+  Use size terminology consistently: 1672x941 is layout-coordinate basis only, and 2048x1152 is the single 16:9 2K-width generated PNG master size for delivery wrappers.
   Use a 12-column grid, 8px spacing rhythm, precise shared edges, and fixed header/footer anchors.
   Define deck_tone_master_lock before slide-level prompting and preserve it through the whole deck: slide base, typography scale, header/footer, Petrol role, Honey treatment, illustration style, icon family, density rhythm, whitespace/occupancy rhythm, card/table geometry, outer padding, invisible source alignment baseline, and negative prompt. Later slides must feel like the same deck as the first approved pilot slides.
   Apply deck_tone_signature_lock: preserve one material system across the deck for base, typography, rule weight, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior. Vary layout families from the message, not from random changes in palette, header, surface weight, icon style, or illustration finish.
@@ -666,8 +663,8 @@ post_generation_audit:
   - image model is {IMAGE_MODEL}
   - generation_route is Codex built-in image generation, not local rendering or a local credential workaround
   - credential_setup_blocker is honored: no account credential, local token, SDK setup, or environment-variable workflow was attempted before generation
-  - image_size {size} is valid for gpt-image-2, labeled as {size_label(size)}, and final delivery is resized only after generation if needed
-  - default_2k_generation_lock is honored: generated slide PNGs use 2048x1152 unless the user explicitly requested another valid 16:9 size
+  - image_size {size} is valid for gpt-image-2, labeled as {size_label(size)}, and final delivery wrappers reuse the same 2048x1152 slides_final/ PNG masters without resizing or alternate master creation
+  - default_2k_generation_lock is honored: generated slide PNG masters use 2048x1152 for review, PPTX, and PDF packaging
   - prompt_order_lock is fulfilled: the prompt led with draw/edit action, exact visible text, canvas/style, fixed components, layout/reading path, visual details, optional Insight, then focused blockers
   - render_contract_lock is fulfilled: operational metadata stayed out of visible slide content
   - visible_text_only_lock is fulfilled: only exact_text strings appear on the slide
