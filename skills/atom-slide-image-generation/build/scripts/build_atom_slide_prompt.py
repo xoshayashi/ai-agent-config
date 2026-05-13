@@ -34,6 +34,7 @@ REQUIRED_PROMPT_FIELDS = [
     "specific_visual_details",
     "imageability_lock",
     "default_2k_generation_lock",
+    "nonconforming_existing_png_regeneration_lock",
     "pdf_export_source_lock",
     "visible_text_only_lock",
     "render_contract_lock",
@@ -184,6 +185,7 @@ def canonical_planning_block(
   image_streaming: optional for exploration, final QA uses completed image
   image_delivery_size: 2048x1152; PPTX/PDF packaging uses the same approved 2K slides_final/ PNG masters
   default_2k_generation_lock: use image_size 2048x1152 as the generated slide output for review, repair, PPTX, and PDF packaging; do not create alternate 16:9 delivery PNG masters
+  nonconforming_existing_png_regeneration_lock: existing/source PNGs at 1672x941 or any non-approved size are not final blockers and must not be converted, upscaled, HTML-rendered, API-rendered, or locally redrawn; reuse the approved slide specification and generate new 2048x1152 slides_final/ masters with Codex built-in gpt-image-2, then review and package those generated masters
   pdf_export_source_lock: create PDF outputs from the approved slides_final/ PNG masters; do not copy final PNGs into render_check/pdf_pages/ as a second source of truth
   generation_route: Codex built-in image generation
   builtin_generation_lock: when slide images are requested in Codex, invoke Codex built-in image generation directly and start generating; do not pause for local environment preflight or local artifact-route probing before generation
@@ -303,6 +305,7 @@ def canonical_planning_block(
   visual_design_quality_traits: [design treatment only: calm light base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, intentional canvas occupancy, concrete visual anchor, crisp focal hierarchy; do not change slide count, message order, or storyline solely for this]
   imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation
   default_2k_generation_lock: 2048x1152 is the standard generated PNG size for working review, final slide image output, PPTX packaging, and PDF packaging
+  nonconforming_existing_png_regeneration_lock: if existing/source PNGs are 1672x941 or another non-approved package size, continue by generating new 2048x1152 masters with Codex built-in gpt-image-2 from the same slide specification; do not stop, convert, upscale, HTML-render, API-render, or locally redraw them
   pdf_export_source_lock: PDF export, when requested, references approved slides_final/ PNG masters; render_check/pdf_pages/ is disposable render QA only and not a storage location for final PNGs
   visible_text_only_lock: exact_text is the only source of visible words; lock names, field names, route/status metadata, speaker notes, and audit instructions are non-rendered
   render_contract_lock: image prompt receives drawing-relevant instructions only: canvas, visible text, layout, visual hierarchy, palette, typography, source rendering, and repair scope
@@ -429,9 +432,9 @@ def canonical_planning_block(
     height: [calculated after body and footer rhythm; use the lowest comfortable height when it helps the main content area; bottom Insight bars target 72-96px on the 1672 basis, with 108px only for a necessary two-line sentence]
     radius: 8px or 12px
     padding: [balanced px; enough for centered text but not a tall band]
-    honey_bar_style: [N/A unless Honey bottom bar is selected; then use #F7EECF flat pale fill, #C49A2C thin 2-3px outline, optional left icon well, one #C49A2C vertical separator, #2D332E text, and no dashed border]
+    honey_bar_style: [N/A unless Honey bottom bar is selected; then use #FBF3D7 very pale Honey fill, #C49A2C thin 2-3px outline, optional left icon well with a small 20-24px icon on the 1672 basis, one #C49A2C vertical separator, #2D332E text, and no dashed border]
     left_accent: [Honey bottom bars use a thin separator after the optional icon well, not a full-height far-left stripe; Deep Blue uses embedded ATOM design system accent line spec only outside Honey]
-    background: [flat solid fill color only; Honey message box uses #F7EECF; no pattern, texture, gradient, motif, dashed outline, or internal illustration]
+    background: [flat solid fill color only; Honey message box uses #FBF3D7; no pattern, texture, gradient, motif, dashed outline, or internal illustration]
     text_alignment: [optically centered horizontally and vertically within the surface]
     placement_relation: [inside the 12-column grid; tied to the interpreted body region; bottom variants bridge body content and Source without touching either]
     text: [one judgment sentence if kept]
@@ -601,6 +604,7 @@ draft_image_prompt_scaffold:
 
   Plan coordinates on a 1672x941 basis, but generate approved PNG masters only at 2048x1152.
   Apply default_2k_generation_lock: use 2048x1152 as the generated slide output size for review, final PNGs, PPTX packaging, and PDF packaging; do not create separate 1920x1080 or other 16:9 delivery masters.
+  Apply nonconforming_existing_png_regeneration_lock: when existing/source PNGs are 1672x941 or another non-approved package size, do not treat package-script rejection as final blockage and do not convert, upscale, HTML-render, API-render, or locally redraw them. Reuse the approved slide specification and generate new 2048x1152 slides_final/ masters with Codex built-in gpt-image-2, then review and package those generated masters.
   Apply pdf_export_source_lock: build PDF outputs from approved slides_final/ master PNGs; never duplicate final PNG masters into render_check/pdf_pages/ for PDF creation.
   Use size terminology consistently: 1672x941 is layout-coordinate basis only, and 2048x1152 is the single 16:9 2K-width generated PNG master size for delivery wrappers.
   Use a 12-column grid, 8px spacing rhythm, precise shared edges, and fixed header/footer anchors.
@@ -659,7 +663,7 @@ draft_image_prompt_scaffold:
   Create freshness through viewpoint, asymmetric composition, designed margin vignettes, evidence strips, partial cutaways, and magnified details, not decoration or glossy concept art.
   Use Deep Blue structurally with a 4-8% visual area budget, up to 12% only for strong closing slides, and never for body text.
   Apply insight_absence_default_lock and insight_justification_required: start from no Insight/message-box; keep one only when the slide loses non-redundant interpretation, decision signal, or reading bridge without it.
-  Use Honey only for ATOM or compatible guidelines where it is a justified bottom decision signal: #F7EECF flat pale Honey fill, #C49A2C thin 2-3px outline, optional left icon well, one #C49A2C vertical separator, #2D332E text, one component maximum. Apply honey_selective_signal_lock and honey_justification_required: Honey starts absent, is never the default message-box color, and must be removed if it is decorative, redundant, space-filling, or stronger than the body content.
+  Use Honey only for ATOM or compatible guidelines where it is a justified bottom decision signal: #FBF3D7 very pale Honey fill, #C49A2C thin 2-3px outline, optional left icon well with a small 20-24px icon on the 1672 basis, one #C49A2C vertical separator, #2D332E text, one component maximum. Apply honey_selective_signal_lock and honey_justification_required: Honey starts absent, is never the default message-box color, and must be removed if it is decorative, redundant, space-filling, or stronger than the body content.
   Use flat solid fills for all message boxes and Insight surfaces; do not add patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
   Apply message_box_scale_lock: message boxes are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered. For bottom Insight bars, target 72-96px height on the 1672 basis and allow up to 108px only for a necessary two-line sentence. Keep copy to one short judgment sentence, prefer one line, max two lines, and do not enlarge the surface to rescue long prose.
   Apply message_box_text_size_lock: message-box/Insight text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below the subtitle, and never becomes a second title or second hero headline.
@@ -699,6 +703,7 @@ post_generation_audit:
   - progress_update_route_lock is honored: user-facing progress did not describe local credential, environment, SDK, save-route, or alternate setup checks as prerequisites
   - image_size {size} is valid for gpt-image-2, labeled as {size_label(size)}, and final delivery wrappers reuse the same 2048x1152 slides_final/ PNG masters without resizing or alternate master creation
   - default_2k_generation_lock is honored: generated slide PNG masters use 2048x1152 for review, PPTX, and PDF packaging
+  - nonconforming_existing_png_regeneration_lock is honored: any existing/source PNG at 1672x941 or another non-approved package size was not treated as a final blocker or converted locally; a new 2048x1152 Codex built-in gpt-image-2 master was generated from the approved specification before packaging
   - prompt_order_lock is fulfilled: the prompt led with draw/edit action, exact visible text, canvas/style, fixed components, layout/reading path, visual details, optional Insight, then focused blockers
   - render_contract_lock is fulfilled: operational metadata stayed out of visible slide content
   - visible_text_only_lock is fulfilled: only exact_text strings appear on the slide
@@ -752,7 +757,7 @@ post_generation_audit:
   - message_box_text_alignment_lock is honored: Insight/message-box text is optically centered horizontally and vertically inside the surface
   - insight_surface_placement_lock is honored: kept Insight/message-box surfaces bridge the interpreted body region and footer rhythm without competing with either
   - visible_brand_label_blocker passes: no separate ATOM wordmark, logo, title kicker, or brand label appears in the header unless exact_text explicitly requested it
-  - If a Honey Insight/message-box is justified and kept, it uses #F7EECF fill, #C49A2C thin outline/separator, optional left icon well, and #2D332E text consistently
+  - If a Honey Insight/message-box is justified and kept, it uses #FBF3D7 very pale fill, #C49A2C thin outline/separator, optional left icon well with a small 20-24px icon, and #2D332E text consistently
   - Honey is not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block
   - Honey is absent from main content cards, missing-body placeholders, dashed outlines, category badges, title underlines, and decorative yellow blocks
   - saturated yellow, dark yellow, or large yellow areas are absent

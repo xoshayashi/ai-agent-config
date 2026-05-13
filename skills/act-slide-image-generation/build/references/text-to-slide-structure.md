@@ -96,6 +96,7 @@ Use this reference when the input is a long memo, strategy narrative, research n
    - Apply `source_real_only_lock`: render Source only for real traceable external/provided sources; if no real source exists, set `source_line: none` and draw no Source footer.
    - Apply `source_placeholder_blocklist`: never use brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, working assumptions, upload names, or draft provenance as Source text.
    - Apply `output_artifact_mastering_lock`: approved generated PNGs live once in `slides_final/`; `slides_package/` holds PPTX, notes, manifest, and metadata only; `render_check/pdf_pages/` is disposable render QA output.
+   - Apply `nonconforming_existing_png_regeneration_lock`: if existing/source PNGs are `1672x941` or any non-approved package size, do not treat the package-script rejection as final blockage and do not convert, upscale, HTML-render, API-render, or locally redraw them. Reuse the approved slide specification and generate new `2048x1152` `slides_final/` masters with Codex built-in gpt-image-2, then review and package those generated masters.
    - Apply `pdf_export_source_lock`: create PDF outputs from `slides_final/` master PNGs; do not use `render_check/pdf_pages/` as a source image folder.
    - Apply `contact_sheet_mastering_lock`: keep one retained `render_check/contact_sheet_review.png` by default; use one comparison sheet or render diff report only when delivery/render QA needs it.
    - Apply `image_generation_tool_lock`, `script_boundary_lock`, `credential_setup_blocker`, and `progress_update_route_lock`: final PNG pixels come from Codex built-in image generation; prompt/package scripts may scaffold, validate, or wrap approved artifacts, but never render, draw, screenshot, export, simulate, replace slide images, inspect local setup, probe save routes, or narrate setup checks as prerequisites.
@@ -388,6 +389,7 @@ deck_unity_status:
 completion_ready_status:
 regenerate_until_quality_approved:
 generation_block_rule:
+nonconforming_existing_png_regeneration_lock:
 review_manifest:
 review_manifest_status: approved
 validate_review_manifest:
