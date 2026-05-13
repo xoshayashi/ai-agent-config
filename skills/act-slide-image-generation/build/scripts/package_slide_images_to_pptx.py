@@ -82,7 +82,10 @@ def validate_image_file(path: Path) -> None:
     width, height = validate_image_bytes(path.read_bytes(), path.suffix, str(path))
     if (width, height) not in APPROVED_SLIDE_IMAGE_SIZES:
         allowed = ", ".join(f"{w}x{h}" for w, h in sorted(APPROVED_SLIDE_IMAGE_SIZES))
-        raise SystemExit(f"{path} must be the approved 16:9 2K slide PNG master size; found {width}x{height}. Allowed: {allowed}. Use 1672x941 only as layout-coordinate basis, not as a package input.")
+        message = f"{path} must be the approved 16:9 2K slide PNG master size; found {width}x{height}. Allowed: {allowed}."
+        if (width, height) == (1672, 941):
+            message += " Use 1672x941 only as layout-coordinate basis, not as a package input."
+        raise SystemExit(message)
 
 
 def validate_master_image_path(path: Path) -> None:
