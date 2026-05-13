@@ -36,11 +36,15 @@ image_moderation: auto
 image_n: 1 for final text-heavy slides; variations only for drafts
 image_streaming: optional for exploration, final QA uses completed image
 image_delivery_size: 2048x1152; use the same approved slides_final/ PNG masters for PPTX/PDF delivery wrappers
+nonconforming_existing_png_regeneration_lock: existing/source PNGs at 1672x941 or any non-approved size are not final blockers and must not be converted, upscaled, HTML-rendered, API-rendered, or locally redrawn; reuse the approved slide specification and generate new 2048x1152 slides_final/ masters with Codex built-in gpt-image-2
 generation_route: Codex built-in image generation
 builtin_generation_lock: invoke Codex built-in image generation directly and start generating slide PNGs; do not pause for local environment preflight or local artifact-route probing before generation
 codex_image_artifact_rule: the image returned by Codex built-in image generation is the authoritative generated PNG artifact; use the Codex-provided artifact/download/attachment path to materialize approved outputs under slides_final/ when a filesystem path is needed for PPTX packaging
+image_generation_tool_lock: final slide PNG pixels must be produced by Codex built-in image generation, not by repo scripts, local renderers, screenshots, or presentation exports
+script_boundary_lock: prompt builder scripts are planning helpers only; package scripts run only after approved Codex image artifacts exist and must never render, draw, screenshot, export, simulate, or replace final slide PNGs
 local_env_non_blocker: local environment uncertainty is not a blocker and must not be reported as the reason PPTX is unfinished
 credential_setup_blocker: do not create, request, decrypt, configure, inspect, or wait for account credentials, local tokens, SDK setup, or environment variables; use Codex built-in image generation directly
+progress_update_route_lock: in user-facing progress updates, do not mention local credential, environment, SDK, save-route, or alternate account/setup checks as prerequisites; say that slide structuring and built-in image generation are starting
 generation_status: generated_with_builtin_gpt-image-2 / blocked
 package_delivery: requested PPTX/PDF wrappers after generated PNGs pass QA, unless user asks for PNG files only
 pptx_status: pending_generated_images_and_pre_package_image_review / created / blocked
@@ -139,6 +143,10 @@ header_footer_text_color_lock:
   forbidden_text_colors: Petrol, Honey, yellow, arbitrary gray
 visible_brand_label_blocker: no separate ACT wordmark, logo, title kicker, badge, or brand label in the header unless exact_text explicitly requests it
 message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement
+insight_absence_default_lock: start from no Insight/message-box on each slide; add one only when it passes insight_justification_required
+insight_justification_required: keep an Insight/message-box only with a clear non-redundant interpretation, decision signal, or reading bridge
+honey_selective_signal_lock: Honey starts absent and appears only when a justified bottom decision signal is stronger than no component or neutral outline
+honey_justification_required: keep Honey only with a written reason tied to decision clarity; remove decorative or space-filling Honey
 message_box_scale_lock: compact interpretation surface sized after the main content area; lower height is welcome when it gives the body, figure, table, or diagram more useful room; bottom bars target 72-96px on the 1672 basis
 message_box_text_size_lock:
 max_text_size_lock:
@@ -224,8 +232,10 @@ ACT slide contract:
 - embedded ACT style is the default, palette, typography, and components
 - use embedded ACT design mechanics
 - use image_model gpt-image-2
+- prompt/package scripts are helpers only: use them to scaffold prompts, validate manifests, or package already-approved Codex image artifacts; never use scripts to render, draw, screenshot, export, simulate, or replace final slide PNGs
 - use generation_mode new_image for new single-slide images or image_edit for screenshot/reference repair
 - use image_size 2048x1152 for generated slide output, review, PPTX packaging, and PDF packaging; do not create separate 1920x1080, 1672x941, draft-size, QHD, or 4K delivery PNG masters
+- if existing/source PNGs are 1672x941 or another non-approved package size, do not stop at the package-script rejection and do not convert, upscale, HTML-render, API-render, or locally redraw them; reuse the approved slide specification and generate new 2048x1152 slides_final/ masters with Codex built-in gpt-image-2, then review and package those generated masters
 - treat strict DCI 2K 2048x1080 and DCI 4K 4096x2160 as non-target cinema sizes, not ACT 16:9 slide generation sizes
 - use image_background opaque or auto, never transparent
 - use png for slide fidelity unless latency or file size matters
@@ -284,8 +294,10 @@ ACT slide contract:
 - keep the slide in a strategy operating-deck look: useful occupancy, small explanatory visuals, crisp rules, low-contrast surfaces, and no ornamental depth
 - let structure, spacing, rules, numbers, and typography carry hierarchy
 - use the embedded ACT design system's accent color structurally with a restrained area budget; for ACT work, Petrol uses a 6-12% area budget and never appears as body text
-- use Insight component only if it adds interpretation or decision weight and is compatible with the embedded ACT design system; many slides should use no message box
-- if Honey is used in ACT or compatible guidelines, use it preferably as a bottom Insight bar with #F5E2A8 flat pale fill, #C49A2C thin 2-3px outline/separator, optional left icon well, #2D332E text, one component maximum
+- start from `insight_decision: none`; use Insight component only if it adds non-redundant interpretation, decision weight, or a reading bridge and is compatible with the embedded ACT design system; many slides should use no message box
+- apply insight_justification_required: if the same sentence is already clear from H1, subtitle, chart/table labels, or notes, remove the Insight/message-box
+- apply honey_selective_signal_lock: Honey starts absent; use it only when a justified bottom decision signal is stronger than no component or a neutral outlined treatment
+- if Honey is used in ACT or compatible guidelines, use it only as a justified bottom Insight bar with #FBF3D7 very pale fill, #C49A2C thin 2-3px outline/separator, optional left icon well with a small 20-24px icon on the 1672 basis, #2D332E text, one component maximum
 - keep all Insight/message boxes flat solid fill only; no patterns, textures, gradients, motifs, icon wallpaper, dashed outlines, or internal illustrations
 - apply content_area_priority_lock before sizing an Insight/message-box: give the body, figure, table, or diagram the needed height first, then use the remaining calculated space for the optional box
 - apply message_box_scale_lock: keep Insight/message boxes compact, one short judgment sentence, one line preferred and two lines maximum; bottom bars target 72-96px on the 1672 basis; move detail to notes instead of growing the surface
@@ -323,16 +335,19 @@ Process:
 2. Create intake_map with source_span_id values for chapters, facts, quotes, assumptions, and uncertainties.
 3. Choose one storyline frame: SCQA, problem-solution-evidence, past-present-future, context-problem-solution-differentiation, or thesis-risk-milestones.
 4. Draft slide-level action titles as standalone messages. No topic labels; slide 1 should be an opening_thesis_slide, not a title-only opener.
-5. Build message_backlog, evidence_ledger, source_ledger, appendix_candidates, and open_questions.
-6. For each message, assign supporting evidence, source policy, visual structure, visual richness role, illustration intensity, creative variance, density tier, and density risk.
-7. Run a density design gate for each slide: set reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
-8. Split any slide that has more than one message, more than one dominant structure, more than three major regions, or would force body text below 18pt equivalent.
-9. Combine adjacent slides only when messages repeat, the same comparison must be seen together, or the user explicitly requests a shorter deck.
-10. Define deck_header_master_lock, invisible footer alignment baseline, Insight surface master, and repeated table/card/icon masters before image generation.
-11. Read only the action titles in order and repair logical gaps before image generation.
-12. Freeze quoted exact_text for every slide; do not leave copywriting to image generation.
-13. Draft speaker_notes_text for every slide with speaker_notes_depth_lock: 4-7 substantive Japanese sentences or roughly 180-320 Japanese chars, covering framing, 2-3 evidence/assumption cues, implication, caveat/source context when relevant, and transition cue.
-14. For each final slide, produce the canonical planning block and then the image prompt.
+5. Apply message_sharpness_lock: each action title names actor/topic, change/tension, and implication; repair vague labels, slogans, or generic benefit claims.
+6. Build message_backlog, evidence_ledger, source_ledger, appendix_candidates, and open_questions.
+7. For each message, assign supporting evidence, source policy, visual structure, visual richness role, illustration intensity, creative variance, density tier, and density risk.
+8. Run impact_clarity_density_gate: each slide has one unmistakable takeaway, one dominant visual structure, a useful evidence layer, and a simple reading path; repair slides that feel flat, vague, thin, or cluttered.
+9. Run a density design gate for each slide: set reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
+10. Apply evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation.
+11. Split any slide that has more than one message, more than one dominant structure, more than three major regions, or would force body text below 18pt equivalent.
+12. Combine adjacent slides only when messages repeat, the same comparison must be seen together, or the user explicitly requests a shorter deck.
+13. Define deck_header_master_lock, invisible footer alignment baseline, Insight surface master, and repeated table/card/icon masters before image generation.
+14. Read only the action titles in order and repair logical gaps before image generation.
+15. Freeze quoted exact_text for every slide; do not leave copywriting to image generation.
+16. Draft speaker_notes_text for every slide with speaker_notes_depth_lock: 4-7 substantive Japanese sentences or roughly 180-320 Japanese chars, covering framing, 2-3 evidence/assumption cues, implication, caveat/source context when relevant, and transition cue.
+17. For each final slide, produce the canonical planning block and then the image prompt.
 
 Output:
 - deck_thesis:
@@ -351,6 +366,7 @@ Output:
   - slide_id:
     chapter:
     action_title:
+    message_sharpness_lock:
     opening_slide_role:
     first_slide_not_title_only:
     opening_density_gate:
@@ -379,6 +395,7 @@ Output:
     visual_richness_role:
     signature_visual_plan:
     density_tier:
+    impact_clarity_density_gate:
     density_layers:
     density_design:
       reader_mode:
@@ -386,6 +403,7 @@ Output:
       information_units:
       density_levers:
       overload_controls:
+    evidence_compression_ladder:
     information_unit_budget:
     density_guardrails:
     deck_header_master_lock:
@@ -439,7 +457,7 @@ Process:
 7. Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide, with a deck-level mix of human-designed editorial/vector illustrations, data visuals, small system scenes, icon evidence, and quiet tables.
 8. Assign density_design for every slide: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
 9. Assign visual_design_quality_traits as visual treatment only: compact fixed header, thin structural lines, pale cards/tables, restrained icons, explanatory line drawings, stable outer padding, concrete visual anchor, and crisp focal hierarchy.
-10. Assign Insight components selectively across the deck only when they add interpretation, decision weight, or reading speed; Honey remains rare and purposeful.
+10. Assign Insight components selectively across the deck only when they add non-redundant interpretation, decision weight, or reading speed. Start each slide from `insight_decision: none`, and keep a component only when `insight_justification_required` is satisfied. Apply `honey_selective_signal_lock`: Honey remains rare, purposeful, and bottom-bar-only.
 11. Vary dominant structures so the deck feels edited around the argument.
 12. Mark restrained illustration candidates where the idea becomes more memorable or fresh without becoming a rough sketch or glossy hero illustration.
 13. Flag slides that should split because density would force body below 18pt equivalent or create competing major regions.
@@ -485,15 +503,19 @@ Repair:
 Decide whether this slide needs an Insight component.
 
 Evaluate:
+- Start from none. What would be lost if the slide had no Insight/message-box?
+- Is the proposed sentence non-redundant with the H1, subtitle, labels, or visual structure?
 - Does the table, diagram, or comparison need a one-sentence interpretation?
 - Does the slide contain a strategic turning point, winning logic, or decision?
 - Would the component become a second title or second hero?
 - Can the component stay as one short judgment sentence, preferably one line and never more than two?
 - Is the component text smaller than the selected H1 by at least 6pt and visually below subtitle?
 - Is the deck underusing or overusing Insight components?
+- Would keeping no component make the slide simpler, stronger, and give the body more room?
 - Which choice is quietest and clearest under the embedded ACT design system: none, outlined thesis, outlined bottom, accent surface, dark accent surface, or Honey bottom bar when ACT?
 - If Honey is chosen, does it help the reader decide faster?
-- Does the Honey component use the fixed bottom-bar treatment (#F5E2A8 fill, #C49A2C 2-3px outline/separator, optional left icon well, #2D332E text)?
+- If Honey is chosen, is there a written honey_justification_required reason tied to decision clarity rather than decoration?
+- Does the Honey component use the fixed bottom-bar treatment (#FBF3D7 very pale fill, #C49A2C 2-3px outline/separator, optional left icon well with a small 20-24px icon, #2D332E text)?
 - Is the Insight/message-box footprint tied to the interpreted body region and footer rhythm rather than floating in leftover space?
 - For bottom variants, does it sit as a centered bridge between body content and Source, with clear breathing room above and below?
 - Is the Insight/message-box text optically centered inside the surface both horizontally and vertically?
@@ -601,6 +623,7 @@ Content:
 - source_line and table_note_microline are separate
 - source_real_only_lock passes: Source footer is shown only for real traceable external/provided sources
 - source_placeholder_blocklist passes: no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions appears as Source text
+- nonconforming_existing_png_regeneration_lock passes: any existing/source PNG at 1672x941 or another non-approved package size was not treated as a final blocker or converted locally; a new 2048x1152 Codex built-in gpt-image-2 master was generated from the approved specification before packaging
 - output_artifact_mastering_lock passes: `slides_final/` is the only loose-PNG master and package/render-check artifacts reference it
 - pdf_export_source_lock passes: PDF outputs are created from `slides_final/` master PNGs; `render_check/pdf_pages/` is rendered-back QA only
 - no_duplicate_png_output_lock passes: no duplicate loose final PNG copies remain across `slides_final/`, `slides_package/`, and `render_check/pdf_pages/`

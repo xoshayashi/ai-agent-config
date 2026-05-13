@@ -34,6 +34,7 @@ REQUIRED_PROMPT_FIELDS = [
     "specific_visual_details",
     "imageability_lock",
     "default_2k_generation_lock",
+    "nonconforming_existing_png_regeneration_lock",
     "pdf_export_source_lock",
     "visible_text_only_lock",
     "render_contract_lock",
@@ -184,12 +185,16 @@ def canonical_planning_block(
   image_streaming: optional for exploration, final QA uses completed image
   image_delivery_size: 2048x1152; PPTX/PDF packaging uses the same approved 2K slides_final/ PNG masters
   default_2k_generation_lock: use image_size 2048x1152 as the generated slide output for review, repair, PPTX, and PDF packaging; do not create alternate 16:9 delivery PNG masters
+  nonconforming_existing_png_regeneration_lock: existing/source PNGs at 1672x941 or any non-approved size are not final blockers and must not be converted, upscaled, HTML-rendered, API-rendered, or locally redrawn; reuse the approved slide specification and generate new 2048x1152 slides_final/ masters with Codex built-in gpt-image-2, then review and package those generated masters
   pdf_export_source_lock: create PDF outputs from the approved slides_final/ PNG masters; do not copy final PNGs into render_check/pdf_pages/ as a second source of truth
   generation_route: Codex built-in image generation
   builtin_generation_lock: when slide images are requested in Codex, invoke Codex built-in image generation directly and start generating; do not pause for local environment preflight or local artifact-route probing before generation
   codex_image_artifact_rule: Codex built-in image generation returns the authoritative generated PNG artifact; use the Codex-provided artifact/download/attachment path to materialize approved outputs under slides_final/ when a filesystem path is needed for PPTX packaging
+  image_generation_tool_lock: final slide PNG pixels must be produced by Codex built-in image generation, not by repo scripts, local renderers, screenshots, or presentation exports
+  script_boundary_lock: prompt builder scripts are planning helpers only; package scripts run only after approved Codex image artifacts exist and must never render, draw, screenshot, export, simulate, or replace final slide PNGs
   local_env_non_blocker: local environment uncertainty is not a blocker and must not be reported as the reason PPTX is unfinished
   credential_setup_blocker: do not create, request, decrypt, configure, inspect, or wait for account credentials, local tokens, SDK setup, or environment variables; use Codex built-in image generation directly
+  progress_update_route_lock: user-facing progress updates must not narrate local credentials, environment variables, SDK setup, save-route probing, or alternate account/setup routes as prerequisites; say that slide structuring and built-in image generation are starting
   visible_text_only_lock: list every on-slide string under exact_text before generation; render only those strings and no lock names, YAML keys, review statuses, or workflow instructions
   render_contract_lock: keep non-rendered instructions, audit fields, lock names, and route/status metadata outside the visible slide content; if any appears in the PNG, repair or regenerate
   prompt_order_lock: final prompts should lead with draw/edit action, visible text contract, canvas/layout, concrete visual anchor, semantic graphics, style system, source/footer behavior, then targeted blockers
@@ -300,6 +305,7 @@ def canonical_planning_block(
   visual_design_quality_traits: [design treatment only: calm light base, compact fixed header, thin structural rules, pale equalized cards/tables, restrained line icons, small explanatory technical line drawings, intentional canvas occupancy, concrete visual anchor, crisp focal hierarchy; do not change slide count, message order, or storyline solely for this]
   imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation
   default_2k_generation_lock: 2048x1152 is the standard generated PNG size for working review, final slide image output, PPTX packaging, and PDF packaging
+  nonconforming_existing_png_regeneration_lock: if existing/source PNGs are 1672x941 or another non-approved package size, continue by generating new 2048x1152 masters with Codex built-in gpt-image-2 from the same slide specification; do not stop, convert, upscale, HTML-render, API-render, or locally redraw them
   pdf_export_source_lock: PDF export, when requested, references approved slides_final/ PNG masters; render_check/pdf_pages/ is disposable render QA only and not a storage location for final PNGs
   visible_text_only_lock: exact_text is the only source of visible words; lock names, field names, route/status metadata, speaker notes, and audit instructions are non-rendered
   render_contract_lock: image prompt receives drawing-relevant instructions only: canvas, visible text, layout, visual hierarchy, palette, typography, source rendering, and repair scope
@@ -359,6 +365,9 @@ def canonical_planning_block(
     information_units: [message, context, comparison, trend, mechanism, risk, implication, assumption, source]
     density_levers: [KPI strip, supporting context region, evidence strip, small multiples, annotation, benchmark/context column, source cue]
     overload_controls: [one dominant structure, max three major regions, body >=18pt equivalent, grouped labels, no decorative density]
+  impact_clarity_density_gate: [one unmistakable takeaway, one dominant visual structure, one useful evidence layer, simple reading path, clear hierarchy]
+  message_sharpness_lock: action title names actor/topic, change/tension, and implication; repair generic labels, vague benefit claims, or slogans before image prompting
+  evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation
   density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
   structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
   structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
@@ -383,12 +392,16 @@ def canonical_planning_block(
   footer_anchor_baseline: 1672 basis x=44-56 baseline y=895-912, invisible alignment position only, planned even if source_line is none
   header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E; no Deep Blue/Honey/arbitrary gray in header or footer text
   message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement; many slides should use no message box
+  insight_absence_default_lock: start each slide from insight_decision: none; add an Insight/message-box only when it passes insight_justification_required
+  insight_justification_required: keep an Insight/message-box only with a clear non-redundant interpretation, decision signal, or reading bridge; remove it if it repeats H1/subtitle/labels or fills empty space
   message_box_scale_lock: compact interpretation surface sized after the main content area; shorter height is welcome when it gives the body, figure, table, or diagram more useful room, while remaining legible; trim text, move detail to body/notes, or remove Insight instead of enlarging the box
   message_box_text_size_lock: message-box/Insight text default 20-24pt, 24-26pt only by exception; always at least 6pt smaller than selected H1, visually below subtitle, and never a second title
   message_box_compactness_blocker_lock: Insight/message-box surfaces that dominate the slide, behave like a banner, or compensate for layout imbalance are blockers
   message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface; plan line box, padding, and baseline so the sentence sits at the visual center
   insight_surface_placement_lock: when an Insight/message-box is kept, place it as a deliberate interpretation bridge tied to the body silhouette and footer baseline; bottom variants sit in the breathing space between body content and Source, centered to the interpreted region or full body block, with Source kept separate on its invisible baseline
-  honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed box, category badge, title underline, or decorative yellow block
+  honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block
+  honey_selective_signal_lock: Honey starts absent and appears only when a justified bottom decision signal is stronger than no component or neutral outline
+  honey_justification_required: keep Honey only with a written reason tied to decision clarity; remove decorative or space-filling Honey
   max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
   table_note_microline: none / [one text note line above source text; text only, never drawn as a horizontal rule]
   source_real_only_lock: render Source footer only for real traceable external/provided sources; if no real source exists, set source_line: none and draw no Source footer text
@@ -407,6 +420,10 @@ def canonical_planning_block(
   icon_system_plan: none / [role, style, stroke, color logic, grouping, why it helps]
   illustration_presence: none / marginal / integrated / restrained_signature
   insight_decision:
+    insight_absence_default_lock: start from keep_remove: remove / variant: none
+    insight_justification_required: keep only when the slide loses non-redundant interpretation, decision signal, or reading bridge without it
+    honey_selective_signal_lock: Honey starts absent and is considered only for a justified bottom decision signal
+    honey_justification_required: if Honey is selected, explain why a quiet Honey bar improves decision clarity more than none or a neutral outline
     keep_remove: [keep/remove]
     reason: [interpretation or decision need]
     variant: none / bottom-main / top-thesis / side-context-wide / side-context-tall / inline-pill / outlined thesis / outlined bottom / accent surface / dark accent surface / Honey bottom bar when ATOM
@@ -415,9 +432,9 @@ def canonical_planning_block(
     height: [calculated after body and footer rhythm; use the lowest comfortable height when it helps the main content area; bottom Insight bars target 72-96px on the 1672 basis, with 108px only for a necessary two-line sentence]
     radius: 8px or 12px
     padding: [balanced px; enough for centered text but not a tall band]
-    honey_bar_style: [N/A unless Honey bottom bar is selected; then use #F7EECF flat pale fill, #C49A2C thin 2-3px outline, optional left icon well, one #C49A2C vertical separator, #2D332E text, and no dashed border]
+    honey_bar_style: [N/A unless Honey bottom bar is selected; then use #FBF3D7 very pale Honey fill, #C49A2C thin 2-3px outline, optional left icon well with a small 20-24px icon on the 1672 basis, one #C49A2C vertical separator, #2D332E text, and no dashed border]
     left_accent: [Honey bottom bars use a thin separator after the optional icon well, not a full-height far-left stripe; Deep Blue uses embedded ATOM design system accent line spec only outside Honey]
-    background: [flat solid fill color only; Honey message box uses #F7EECF; no pattern, texture, gradient, motif, dashed outline, or internal illustration]
+    background: [flat solid fill color only; Honey message box uses #FBF3D7; no pattern, texture, gradient, motif, dashed outline, or internal illustration]
     text_alignment: [optically centered horizontally and vertically within the surface]
     placement_relation: [inside the 12-column grid; tied to the interpreted body region; bottom variants bridge body content and Source without touching either]
     text: [one judgment sentence if kept]
@@ -434,6 +451,7 @@ def mode_guidance(mode: str) -> str:
   - Define deck_thesis, audience_decision, storyline_frame, section_map, and slide-level action_title messages.
   - Plan slide 1 as opening_thesis_slide, not a title-only opener: include the core thesis, 2-4 proof/tension points, a real visual structure, and a narrative bridge.
   - Map every message to evidence, source_policy, visual_structure, layout_archetype, grid_mode, exact_text_budget, and split_merge_decision.
+  - Apply message_sharpness_lock: rewrite each action title until it names actor/topic, change/tension, and implication; reject generic labels, vague positive claims, and slogans.
   - Apply source_real_only_lock and source_line_lock: render Source: ... only for real traceable external/provided sources; use source_line: none and draw no Source footer when no real source exists.
   - Apply output_artifact_mastering_lock, single_final_png_master_lock, and no_duplicate_png_output_lock: use slides_final/ as the single loose-PNG master; slides_package/ stores PPTX/notes/manifest only; render_check/pdf_pages/ is disposable QA output only.
   - Apply contact_sheet_mastering_lock and single_contact_sheet_policy: keep one retained contact sheet from slides_final/ by default; generate a comparison contact sheet only when delivery/render QA needs it.
@@ -443,7 +461,9 @@ def mode_guidance(mode: str) -> str:
   - Add pre_package_image_review, post_generation_full_deck_review_loop, all_generated_images_reviewed, weak_slide_regeneration_queue, content_quality_status, design_quality_status, deck_unity_status, completion_ready_status, and regenerate_until_quality_approved fields so generated PNGs are reviewed, repaired, and re-reviewed before PPTX, or completion.
   - Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide before image prompting.
   - Apply illustration_tone_lock and illustration_style_sheet before image prompting so people, devices, UI panels, document objects, icon badges, linework, fills, and crop stay consistent across the deck.
+  - Run impact_clarity_density_gate before image prompting: every slide needs one unmistakable takeaway, one dominant visual structure, a useful evidence layer, and a simple reading path; repair slides that feel flat, vague, thin, or cluttered.
   - Run density_design for every slide: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
+  - Apply evidence_compression_ladder: choose the smallest proof structure that makes the message credible before adding prose or decorative detail.
   - Apply density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting.
   - Apply structure_choice_bias and structured_density_bias as a gentle direction: use issue trees, driver trees, 2x2 matrices, value chains, waterfalls, KPI bridges, decision tables, or hypothesis-evidence-implication rows when they clarify the message; intentionally skip them when a simpler visual is stronger.
   - Apply structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation.
@@ -459,9 +479,12 @@ def mode_guidance(mode: str) -> str:
     if mode == "deck-plan":
         return """mode_guidance:
   - Define deck thesis and one primary message per slide.
+  - Apply message_sharpness_lock: each slide message should name actor/topic, change/tension, and implication; repair section-label or slogan-like messages before prompt writing.
   - Use the embedded ATOM design system in SKILL.md; do not load an external ATOM pattern file.
   - Apply builtin_generation_lock: invoke Codex built-in image generation directly for gpt-image-2 slide PNGs, without local environment preflight or local artifact-route probing before generation.
+  - Apply image_generation_tool_lock and script_boundary_lock: prompt/package scripts may plan, validate, or wrap approved artifacts, but final PNG pixels must come from Codex built-in image generation, never from scripts, screenshots, local renderers, or presentation exports.
   - Apply credential_setup_blocker: do not create, request, decrypt, configure, inspect, or wait for account credentials, local tokens, SDK setup, or environment variables; start Codex built-in image generation instead.
+  - Apply progress_update_route_lock: do not tell the user that local credentials, environment variables, SDK setup, save-route probing, or alternate account/setup routes are being checked before generation; describe the next step as slide structuring and Codex built-in image generation.
   - Apply pptx_first_blocker: do not create a presentation deck as the source of truth before image generation; generate and review slide PNGs first, then package approved PNGs into PPTX at the end.
   - Start with opening_thesis_slide rather than a title-only first slide: the opener should make the main phrase memorable while also showing the thesis, tension/proof points, structure, and bridge.
   - Select layout_archetype and grid_mode for every slide.
@@ -472,7 +495,9 @@ def mode_guidance(mode: str) -> str:
   - Define deck_header_master_lock before any slide-level prompt. Do not leave header coordinates as ranges.
   - Apply header_identity_lock, header_integrity_blocker_lock, deck_tone_signature_lock, illustration_tone_lock, illustration_style_sheet, and message_box_compactness_blocker_lock before slide-level variation.
   - Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide; use the same flat 2D editorial workflow illustration style on chapter openers, turning points, complex systems, and final vision slides.
+  - Run impact_clarity_density_gate: every slide needs one unmistakable takeaway, one dominant visual structure, a useful evidence layer, and a simple reading path; repair low-impact, hard-to-understand, empty, or cluttered slides before image prompting.
   - Assign density_design for every slide: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
+  - Apply evidence_compression_ladder: compress proof into a key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation before adding prose.
   - Apply density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting.
   - Apply structure_choice_bias and structured_density_bias as a gentle direction: use issue trees, driver trees, 2x2 matrices, value chains, waterfalls, KPI bridges, decision tables, or hypothesis-evidence-implication rows when they clarify the message; intentionally skip them when a simpler visual is stronger.
   - Apply structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation.
@@ -537,6 +562,9 @@ model_route_assumption: Codex built-in image generation is the gpt-image-2 route
 generation_route: Codex built-in image generation
 builtin_generation_lock: invoke Codex built-in image generation directly; do not pause for local environment preflight or local artifact-route probing before generation
 credential_setup_blocker: do not create, request, decrypt, configure, inspect, or wait for account credentials, local tokens, SDK setup, or environment variables; use Codex built-in image generation directly
+progress_update_route_lock: do not narrate local credentials, environment variables, SDK setup, save-route probing, or alternate account/setup routes as prerequisites; progress should move from slide structuring to Codex built-in image generation
+image_generation_tool_lock: final slide PNG pixels must be produced by Codex built-in image generation, not by repo scripts, local renderers, screenshots, or presentation exports
+script_boundary_lock: prompt builder scripts are planning helpers only; package scripts run only after approved Codex image artifacts exist and must never render, draw, screenshot, export, simulate, or replace final slide PNGs
 prompt_readiness: draft_scaffold_until_blocking_unresolved_items_none
 
 final_generation_prompt_payload:
@@ -559,9 +587,12 @@ draft_image_prompt_scaffold:
   Apply visible_text_only_lock: render only exact_text strings on the slide; do not render lock names, YAML keys, route/status fields, audit labels, speaker notes, file paths, or workflow instructions.
   Apply positive_quality_lock: state the desired calm editorial slide quality before blockers: clear figure-ground separation, exact text, compact fixed header, one dominant structure, grouped evidence, stable line weight, restrained accent area, and a concrete visual anchor.
   PPTX is a delivery wrapper only. Never create final PNGs by exporting, rendering, or screenshotting a PPTX.
+  Prompt builder scripts are planning helpers only; they must never render, draw, screenshot, export, or simulate final slide PNGs.
+  Package scripts run only after approved Codex built-in image artifacts exist, and package scripts must not be used as a workaround for missing image generation.
   Apply pptx_first_blocker: do not create a presentation deck as the source of truth before image generation; generate and review slide PNGs first, then package approved PNGs into PPTX at the end.
   Correct order: generate gpt-image-2 PNGs, review and repair PNGs, then package approved PNGs into requested PPTX/PDF outputs.
   Only mark image generation blocked after invoking Codex built-in image generation and the image tool itself fails, is unavailable, or refuses the request. Local environment uncertainty is not a blocker.
+  Apply progress_update_route_lock: never present local credential, environment, SDK, save-route, or alternate setup checks as parallel prerequisites before built-in image generation.
   Apply output_artifact_mastering_lock: write approved generated PNGs once under slides_final/ and treat that path as the sole loose-PNG master.
   Apply single_final_png_master_lock: review_manifest, package_image_mapping, pptx_image_mapping, pdf_image_mapping must reference the slides_final/ master path rather than copied PNGs.
   Apply slides_package_policy: slides_package/ contains PPTX, speaker notes, review_manifest, and metadata only; do not copy final PNG files into slides_package/.
@@ -573,6 +604,7 @@ draft_image_prompt_scaffold:
 
   Plan coordinates on a 1672x941 basis, but generate approved PNG masters only at 2048x1152.
   Apply default_2k_generation_lock: use 2048x1152 as the generated slide output size for review, final PNGs, PPTX packaging, and PDF packaging; do not create separate 1920x1080 or other 16:9 delivery masters.
+  Apply nonconforming_existing_png_regeneration_lock: when existing/source PNGs are 1672x941 or another non-approved package size, do not treat package-script rejection as final blockage and do not convert, upscale, HTML-render, API-render, or locally redraw them. Reuse the approved slide specification and generate new 2048x1152 slides_final/ masters with Codex built-in gpt-image-2, then review and package those generated masters.
   Apply pdf_export_source_lock: build PDF outputs from approved slides_final/ master PNGs; never duplicate final PNG masters into render_check/pdf_pages/ for PDF creation.
   Use size terminology consistently: 1672x941 is layout-coordinate basis only, and 2048x1152 is the single 16:9 2K-width generated PNG master size for delivery wrappers.
   Use a 12-column grid, 8px spacing rhythm, precise shared edges, and fixed header/footer anchors.
@@ -630,7 +662,8 @@ draft_image_prompt_scaffold:
   Keep visual subject selection open and message-led; use the subject that makes the argument most observable through scale, interaction, place, evidence, or operating context.
   Create freshness through viewpoint, asymmetric composition, designed margin vignettes, evidence strips, partial cutaways, and magnified details, not decoration or glossy concept art.
   Use Deep Blue structurally with a 4-8% visual area budget, up to 12% only for strong closing slides, and never for body text.
-  Use Honey only for ATOM or compatible guidelines where it is a decision signal, preferably as a bottom Insight bar: #F7EECF flat pale Honey fill, #C49A2C thin 2-3px outline, optional left icon well, one #C49A2C vertical separator, #2D332E text, one component maximum. Honey is not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block.
+  Apply insight_absence_default_lock and insight_justification_required: start from no Insight/message-box; keep one only when the slide loses non-redundant interpretation, decision signal, or reading bridge without it.
+  Use Honey only for ATOM or compatible guidelines where it is a justified bottom decision signal: #FBF3D7 very pale Honey fill, #C49A2C thin 2-3px outline, optional left icon well with a small 20-24px icon on the 1672 basis, one #C49A2C vertical separator, #2D332E text, one component maximum. Apply honey_selective_signal_lock and honey_justification_required: Honey starts absent, is never the default message-box color, and must be removed if it is decorative, redundant, space-filling, or stronger than the body content.
   Use flat solid fills for all message boxes and Insight surfaces; do not add patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
   Apply message_box_scale_lock: message boxes are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered. For bottom Insight bars, target 72-96px height on the 1672 basis and allow up to 108px only for a necessary two-line sentence. Keep copy to one short judgment sentence, prefer one line, max two lines, and do not enlarge the surface to rescue long prose.
   Apply message_box_text_size_lock: message-box/Insight text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below the subtitle, and never becomes a second title or second hero headline.
@@ -638,7 +671,7 @@ draft_image_prompt_scaffold:
   Apply message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface; use balanced padding and line-box placement so the sentence reads intentional, not baseline-drifted.
   Apply insight_surface_placement_lock: when kept, the Insight/message-box belongs to the body composition and footer rhythm; bottom variants sit in the breathing space between body content and Source, centered to the interpreted region or full body block, while Source remains a separate footer cue on its invisible baseline.
   Enforce max_text_size_lock across every visible string; do not use display typography, hero numerals, badges, or message-box text above the cap.
-  Keep Honey quiet and consistent: no saturated yellow fills, no dark yellow message boxes, no large yellow areas, no yellow title underline, and no Honey color variation across a deck.
+  Keep Honey quiet and consistent: no saturated yellow fills, no dark yellow message boxes, no large yellow areas, no yellow title underline, no Honey color variation across a deck, and no Honey on slides where neutral/no Insight is clearer.
   Use illustrations/icons when they help understanding, memory, comparison, or navigation; do not add them by quota. A slide with no icon or illustration is acceptable when the structure already carries the message.
   Do not minimize numbers by default. Keep sourced or explicitly assumed numbers when they help comparison, sizing, prioritization, credibility, or decision-making; remove only unsupported, redundant, unreadable, or decorative numbers.
   Render ONLY the exact text strings listed in the planning block or final prompt; do not invent extra labels.
@@ -664,9 +697,13 @@ negative_prompt_hard_blockers:
 post_generation_audit:
   - image model is {IMAGE_MODEL}
   - generation_route is Codex built-in image generation, not local rendering or a local credential workaround
+  - image_generation_tool_lock is honored: the final PNG pixels came from Codex built-in image generation, not scripts, local renderers, screenshots, or presentation exports
+  - script_boundary_lock is honored: prompt/package scripts were used only for planning, validation, or delivery wrapping after approved Codex image artifacts existed
   - credential_setup_blocker is honored: no account credential, local token, SDK setup, or environment-variable workflow was attempted before generation
+  - progress_update_route_lock is honored: user-facing progress did not describe local credential, environment, SDK, save-route, or alternate setup checks as prerequisites
   - image_size {size} is valid for gpt-image-2, labeled as {size_label(size)}, and final delivery wrappers reuse the same 2048x1152 slides_final/ PNG masters without resizing or alternate master creation
   - default_2k_generation_lock is honored: generated slide PNG masters use 2048x1152 for review, PPTX, and PDF packaging
+  - nonconforming_existing_png_regeneration_lock is honored: any existing/source PNG at 1672x941 or another non-approved package size was not treated as a final blocker or converted locally; a new 2048x1152 Codex built-in gpt-image-2 master was generated from the approved specification before packaging
   - prompt_order_lock is fulfilled: the prompt led with draw/edit action, exact visible text, canvas/style, fixed components, layout/reading path, visual details, optional Insight, then focused blockers
   - render_contract_lock is fulfilled: operational metadata stayed out of visible slide content
   - visible_text_only_lock is fulfilled: only exact_text strings appear on the slide
@@ -703,6 +740,9 @@ post_generation_audit:
   - body_silhouette_lock is fulfilled: the body reads as one closed visual block with aligned outer edges, lower edges, and footer clearance
   - illustration_intensity is respected; illustration feels designer-authored, flat 2D, and does not overpower the slide
   - density_tier and density_design are fulfilled without shrinking body text below 18pt equivalent
+  - impact_clarity_density_gate is fulfilled: the slide has a sharp takeaway, clear structure, useful evidence, simplicity, and hierarchy
+  - message_sharpness_lock is fulfilled: the H1/action title is not a vague label or slogan
+  - evidence_compression_ladder is fulfilled: proof is compressed into a readable structure rather than prose or decoration
   - density_lift_lock is fulfilled in both the slide structure and final image prompt
   - structure_choice_bias is considered: structured presentation patterns are used where they clarify the message, and not forced where they would add noise
   - structured_density_bias is fulfilled when useful: one or two evidence layers, labels, drivers, or comparison cues add decision value without crowding
@@ -717,8 +757,9 @@ post_generation_audit:
   - message_box_text_alignment_lock is honored: Insight/message-box text is optically centered horizontally and vertically inside the surface
   - insight_surface_placement_lock is honored: kept Insight/message-box surfaces bridge the interpreted body region and footer rhythm without competing with either
   - visible_brand_label_blocker passes: no separate ATOM wordmark, logo, title kicker, or brand label appears in the header unless exact_text explicitly requested it
-  - Honey message boxes use #F7EECF fill, #C49A2C thin outline/separator, optional left icon well, and #2D332E text consistently
-  - Honey is absent from main content cards, missing-body placeholders, dashed boxes, category badges, title underlines, and decorative yellow blocks
+  - If a Honey Insight/message-box is justified and kept, it uses #FBF3D7 very pale fill, #C49A2C thin outline/separator, optional left icon well with a small 20-24px icon, and #2D332E text consistently
+  - Honey is not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block
+  - Honey is absent from main content cards, missing-body placeholders, dashed outlines, category badges, title underlines, and decorative yellow blocks
   - saturated yellow, dark yellow, or large yellow areas are absent
   - coordinate_inventory_1672 matches visible major objects
   - all major regions snap to grid/shared edges
@@ -816,7 +857,11 @@ def deck_plan_tail() -> str:
         signature_visual_plan:
         insight_decision:
         message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement; many slides should use no message box
-        honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed box, category badge, title underline, or decorative yellow block
+        insight_absence_default_lock: start from no Insight/message-box
+        insight_justification_required: keep only with a non-redundant interpretation, decision signal, or reading bridge
+        honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block
+        honey_selective_signal_lock: Honey starts absent and appears only when a justified bottom decision signal is stronger than no component or neutral outline
+        honey_justification_required: keep Honey only with a written reason tied to decision clarity
         output_artifact_mastering_lock: slides_final/ is the only loose-PNG master; package and render-check folders hold only derivative artifacts
         single_final_png_master_lock: review manifests and package mappings reference the slides_final/ master path
         no_duplicate_png_output_lock: no duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/
@@ -829,6 +874,9 @@ def deck_plan_tail() -> str:
         source_policy:
         source_line:
         density_risk:
+        impact_clarity_density_gate:
+        message_sharpness_lock:
+        evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation
         speaker_notes_depth_lock: substantial PPT talk script, 4-7 Japanese sentences or roughly 180-320 Japanese chars unless user requests brief notes
         speaker_notes_text:
         speaker_notes_source_cues:
@@ -895,7 +943,11 @@ def deck_plan_tail() -> str:
   - density_design_plan:
   - insight_count_plan:
   - message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement; many slides should use no message box
-  - honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed box, category badge, title underline, or decorative yellow block
+  - insight_absence_default_lock: start each slide from no Insight/message-box
+  - insight_justification_required: use a message box only when the slide loses needed interpretation, decision signal, or reading bridge without it
+  - honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block
+  - honey_selective_signal_lock: Honey starts absent and appears only when a justified bottom decision signal is stronger than no component or neutral outline
+  - honey_justification_required: keep Honey only with a written reason tied to decision clarity
   - message_box_scale_lock: bottom Insight bars target 72-96px on the 1672 basis, with 108px only for a necessary two-line sentence
   - message_box_compactness_blocker_lock:
   - source_collection_needs:
@@ -1054,6 +1106,9 @@ def text_structure_tail() -> str:
       illustration_consistency_status:
       creative_variance: low / medium / high
       density_tier: T1_sparse / T2_balanced / T3_dense / T4_appendix_dense
+      impact_clarity_density_gate:
+      message_sharpness_lock:
+      evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation
       density_layers:
       density_design:
         reader_mode: scan / read / reference
@@ -1083,7 +1138,11 @@ def text_structure_tail() -> str:
       header_footer_text_color_lock:
       visible_brand_label_blocker: no separate ATOM wordmark, logo, title kicker, badge, or brand label in the header unless exact_text explicitly requests it
       message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement; many slides should use no message box
-      honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed box, category badge, title underline, or decorative yellow block
+      insight_absence_default_lock: start from no Insight/message-box
+      insight_justification_required: keep only with a non-redundant interpretation, decision signal, or reading bridge
+      honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block
+      honey_selective_signal_lock: Honey starts absent and appears only when a justified bottom decision signal is stronger than no component or neutral outline
+      honey_justification_required: keep Honey only with a written reason tied to decision clarity
       message_box_scale_lock:
       message_box_text_size_lock:
       message_box_compactness_blocker_lock:
@@ -1117,6 +1176,10 @@ def text_structure_tail() -> str:
       data_to_render:
       exact_text_budget: H1 + subtitle + short labels + decision-relevant numbers + optional one-sentence Insight
       insight_decision:
+      insight_absence_default_lock: start from no Insight/message-box
+      insight_justification_required: keep only with a non-redundant interpretation, decision signal, or reading bridge
+      honey_selective_signal_lock: Honey starts absent and appears only when a justified bottom decision signal is stronger than no component or neutral outline
+      honey_justification_required: keep Honey only with a written reason tied to decision clarity
       density_risk:
       split_merge_decision:
       prompt_text_budget:

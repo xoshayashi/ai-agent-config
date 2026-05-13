@@ -26,6 +26,9 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Create `layout_diversity_plan` before final prompts. Let repeated layouts serve deliberate comparison, and let composition change when the message role, evidence type, time horizon, or decision question changes.
 - Apply `layout_rotation_guard` during deck review so the sequence feels intentionally edited around the argument instead of locked to one repeated width habit.
 - Apply `density_lift_lock`: raise useful information density during both slide-structure planning and slide-image prompting. Useful density means more decision-relevant comparison, evidence, units, assumptions, annotations, and source cues with one clear reading path.
+- Apply `impact_clarity_density_gate`: every slide should earn attention quickly, explain itself without narration, stay visually simple, and still carry enough decision-relevant evidence. If a slide feels flat, vague, thin, or cluttered, repair the message, evidence, and dominant structure before image prompting.
+- Apply `message_sharpness_lock`: rewrite each action title until it contains a clear actor/topic, change/tension, and implication. Avoid generic topic labels, vague positive claims, and slogans that do not say what changed or why it matters.
+- Apply `evidence_compression_ladder`: compress evidence into the smallest structure that still proves the message: one sharp number, ranked comparison, before/after delta, driver tree, causal chain, 2x2, mini table, or evidence strip. Use speaker notes or appendix candidates for detail that does not change the slide decision.
 - Apply `structure_choice_bias`: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide.
 - Apply `structured_density_bias`: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits.
 - Use structured presentation patterns as an option, not a quota: issue trees, driver trees, 2x2 matrices, value chains, funnels, waterfalls, KPI bridges, decision tables, before/after bridges, and hypothesis-evidence-implication rows are available when they make the argument easier to scan.
@@ -56,6 +59,8 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Apply `revised_prompt_review_lock`: when the image tool exposes a revised or rewritten prompt, compare it against `exact_text`, source policy, header master, and visible/non-visible boundaries before approving the PNG.
 - Apply `chart_semantic_integrity_lock`: chart/table/matrix/flow/map structures should explain what is compared, which unit/denominator/period applies, and how rows, columns, axes, arrows, or legends connect; decorative pseudo-data is a major issue.
 - Apply `thumbnail_legibility_lock` and `reading_path_lock`: the main claim, focal structure, region boundaries, and key numbers should remain understandable in slide-sorter/contact-sheet review, with a clear path from H1 to main visual, evidence/context, optional Insight, and Source.
+- Apply `insight_absence_default_lock`: start each slide with `insight_decision: none`; keep no message box unless the slide has a specific interpretation gap, decision signal, or reading bridge that the title, visual structure, and labels cannot already carry.
+- Apply `insight_justification_required`: when an Insight/message-box is kept, record the exact reason, the non-redundant sentence, and why it improves reading speed or decision clarity. If the reason is weak, repetitive, decorative, or simply fills space, remove the component.
 - Message boxes and Insight surfaces are optional, not default. Use them only when a one-sentence interpretation, decision signal, or reading bridge genuinely helps; many slides should use no message box.
 - Message boxes and Insight surfaces should use a flat solid fill only. Do not add patterns, textures, gradients, motifs, icon wallpaper, dashed outlines, or internal illustration inside message boxes.
 - Apply `message_box_scale_lock`: Insight/message-box components are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered. For bottom Insight bars, target 72-96px height on the 1672 basis and allow up to 108px only for a necessary two-line sentence. Prefer one short judgment sentence, one line when possible and two lines maximum; trim, move explanation to notes/body, or remove the component instead of enlarging the box.
@@ -64,6 +69,8 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Apply `message_box_compactness_blocker_lock`: an Insight/message-box that dominates the slide, behaves like a banner, spans beyond the interpreted region, grows tall to carry prose, or compensates for layout imbalance is a blocker. A lower, quieter box that returns space to the body, figure, table, or diagram is preferred when the sentence remains legible and optically centered.
 - Apply `message_box_text_alignment_lock`: Insight/message-box text sits at the optical center of the surface, both horizontally and vertically, using balanced padding and a centered line box.
 - Apply `insight_surface_placement_lock`: decide the Insight footprint with the body silhouette and footer rhythm. Bottom Insight variants should bridge the body content and Source footer area with clear breathing room, centered to the interpreted region or full body block, while Source remains separate on its invisible baseline. Honey is preferred only for this bottom-bar decision-signal role, not for main content cards.
+- Apply `honey_selective_signal_lock`: Honey starts as absent. Use Honey only after the slide passes `insight_justification_required`, and only when a quiet bottom decision signal is more helpful than no component or a neutral outlined treatment. Honey is never a default message-box color.
+- Apply `honey_justification_required`: when Honey is selected, record why the pale Honey treatment improves decision clarity without overpowering the body. If it is decorative, repeats the title, fills empty space, or becomes a yellow card/banner, remove Honey or remove the Insight.
 - Apply `max_text_size_lock`: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
 - Lock deck-level header and footer masters before slide design. Apply `header_identity_lock`: the header is always the same compact left vertical line + H1 + subtitle system, never a slide-specific decoration surface. Every slide must reuse the same visible header elements, exact selected geometry, title color, subtitle size/color, visual alignment rule, body_start_y, and clear zone. Header fields must be exact values in final prompts, not ranges or loose descriptions. Do not render a separate ACT wordmark, logo, title kicker, badge, or brand label in the header unless the user explicitly supplies it as visible exact_text.
 - Apply `header_line_top_rule`: the left vertical line is the approved header-block anchor, not a short title tick. On the 1672x941 basis, use `vertical_line x=50 y=40 w=10 h=120 #008A80` unless a newer embedded master is supplied. Its top must never sit above the first visible H1 glyph/title top; align it with the title top or place it 0-6px below. Any upward protrusion, page-top floating, clipping outside `header_safe_area`, detachment from H1/subtitle, or body intrusion is a blocker. If it fails, repair the line x/y/h before touching H1.
@@ -89,8 +96,10 @@ Use this reference when the input is a long memo, strategy narrative, research n
    - Apply `source_real_only_lock`: render Source only for real traceable external/provided sources; if no real source exists, set `source_line: none` and draw no Source footer.
    - Apply `source_placeholder_blocklist`: never use brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, working assumptions, upload names, or draft provenance as Source text.
    - Apply `output_artifact_mastering_lock`: approved generated PNGs live once in `slides_final/`; `slides_package/` holds PPTX, notes, manifest, and metadata only; `render_check/pdf_pages/` is disposable render QA output.
+   - Apply `nonconforming_existing_png_regeneration_lock`: if existing/source PNGs are `1672x941` or any non-approved package size, do not treat the package-script rejection as final blockage and do not convert, upscale, HTML-render, API-render, or locally redraw them. Reuse the approved slide specification and generate new `2048x1152` `slides_final/` masters with Codex built-in gpt-image-2, then review and package those generated masters.
    - Apply `pdf_export_source_lock`: create PDF outputs from `slides_final/` master PNGs; do not use `render_check/pdf_pages/` as a source image folder.
    - Apply `contact_sheet_mastering_lock`: keep one retained `render_check/contact_sheet_review.png` by default; use one comparison sheet or render diff report only when delivery/render QA needs it.
+   - Apply `image_generation_tool_lock`, `script_boundary_lock`, `credential_setup_blocker`, and `progress_update_route_lock`: final PNG pixels come from Codex built-in image generation; prompt/package scripts may scaffold, validate, or wrap approved artifacts, but never render, draw, screenshot, export, simulate, replace slide images, inspect local setup, probe save routes, or narrate setup checks as prerequisites.
    - Apply `source_line_lock`: render `Source: ...` when traceable sources exist; use `source_line: none` only when no traceable source exists.
    - Apply `source_separator_lock`: Source is text-only; no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline may appear above, below, behind, or adjacent to Source.
    - Split the input into chapters, paragraphs, data points, quotes, assumptions, and uncertainties. Assign stable `source_span_id` values when source tracing matters.
@@ -108,6 +117,7 @@ Use this reference when the input is a long memo, strategy narrative, research n
    - Each sentence should answer "so what?".
    - Prefer concrete nouns, active verbs, and useful sourced numbers.
    - Reject topic labels such as `Market`, `Solution`, `Roadmap`, or `Differentiation` unless they are part of a full message.
+   - Apply `message_sharpness_lock`: every action title should name what changed, who/what is affected, and why the reader should care. Repair titles that read like a section label, vague benefit, or slogan.
    - Set slide 1 as `opening_thesis_slide` and record `first_slide_not_title_only: true`.
    - Run `opening_density_gate`: repair slide 1 before generation if it only contains a brand/name/slogan, lacks proof or tension, lacks a real visual structure, or does not bridge into the deck.
 
@@ -139,8 +149,10 @@ Use this reference when the input is a long memo, strategy narrative, research n
 
 6. **Density And Split Gate**
    - Assign `density_tier`: `T1_sparse`, `T2_balanced`, `T3_dense`, or `T4_appendix_dense`.
+   - Run `impact_clarity_density_gate` before image prompting: the slide must have one unmistakable takeaway, one dominant visual structure, a useful evidence layer, and a simple reading path. Repair any slide that feels low-impact, hard to understand, over-simplified to emptiness, or dense without hierarchy.
    - Define `reader_mode`, `decision_question`, `information_units`, `density_levers`, and `overload_controls`.
    - Use `density_lift_lock` to add one or two useful evidence layers before image prompting when a slide feels too empty for the decision question.
+   - Use `evidence_compression_ladder` to choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation.
    - Use `structure_choice_bias` and `structured_density_bias` to add issue-tree, driver-tree, matrix, value-chain, KPI-bridge, or decision-table structure only when it improves the reader's decision path.
    - Use `structure_first_visual_mix` to choose a chart, table, matrix, flow, map, comparison axis, or evidence strip when that structure gives the reader a clearer path than a standalone illustration.
    - Use `imageability_lock` to convert abstract messages into concrete visual anchors that make the message observable.
@@ -187,6 +199,9 @@ For every slide, answer:
 - `reader_mode`: scan, read, or reference. Scan pages need fewer words; reference pages can carry more rows if grouped.
 - `decision_question`: what should be answerable without narration?
 - `information_units`: message, context, comparison, trend, mechanism, risk, implication, assumption, source.
+- `impact_clarity_density_gate`: attention hook, self-explanatory logic, simple dominant structure, sufficient evidence, and clear hierarchy.
+- `message_sharpness_lock`: action title includes actor/topic, change/tension, and implication.
+- `evidence_compression_ladder`: smallest proof structure that supports the decision without adding prose.
 - `density_levers`: which added layer improves the message: denominator, time horizon, benchmark, segmentation, scenario, assumption, source, counterpoint, or implication.
 - `overload_controls`: one dominant structure, max three major regions, grouped labels, body at 18pt equivalent or larger, and no illustration detail doing the job of evidence.
 
@@ -307,7 +322,11 @@ message_box_compactness_blocker_lock:
 message_box_text_alignment_lock:
 insight_surface_placement_lock:
 message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement
-honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed box, category badge, title underline, or decorative yellow block
+insight_absence_default_lock: start from no Insight/message-box; add one only when it passes insight_justification_required
+insight_justification_required: keep an Insight/message-box only with a clear non-redundant interpretation, decision signal, or reading bridge
+honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block
+honey_selective_signal_lock: Honey starts absent and appears only when a justified bottom decision signal is stronger than no component or neutral outline
+honey_justification_required: keep Honey only with a written reason tied to decision clarity; remove decorative or space-filling Honey
 max_text_size_lock:
 imageability_lock:
 concrete_visual_anchor:
@@ -348,6 +367,10 @@ grid_mode:
 exact_text:
 exact_text_budget:
 insight_decision:
+insight_absence_default_lock:
+insight_justification_required:
+honey_selective_signal_lock:
+honey_justification_required:
 data_to_render:
 density_risk:
 split_merge_decision:
@@ -366,6 +389,7 @@ deck_unity_status:
 completion_ready_status:
 regenerate_until_quality_approved:
 generation_block_rule:
+nonconforming_existing_png_regeneration_lock:
 review_manifest:
 review_manifest_status: approved
 validate_review_manifest:
