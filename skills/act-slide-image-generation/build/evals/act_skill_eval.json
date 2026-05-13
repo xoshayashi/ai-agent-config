@@ -672,6 +672,20 @@
         "requires both edges to be multiples of 16"
       ],
       "must_not_contain": []
+    },
+    {
+      "name": "reject_non_2k_16x9_generation",
+      "args": [
+        "--mode",
+        "deck-plan",
+        "--size",
+        "2560x1440"
+      ],
+      "expect_exit": 1,
+      "must_contain": [
+        "This ACT slide skill only supports 16:9 gpt-image-2 sizes: 2048x1152"
+      ],
+      "must_not_contain": []
     }
   ]
 }
