@@ -21,14 +21,15 @@ pptx_packager = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(pptx_packager)
 
 
-def png_bytes() -> bytes:
+def png_bytes(width: int = 2048, height: int = 1152) -> bytes:
     def chunk(kind: bytes, data: bytes) -> bytes:
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", binascii.crc32(kind + data) & 0xFFFFFFFF)
 
+    row = b"\x00" + (b"\xff\xff\xff" * width)
     return (
         b"\x89PNG\r\n\x1a\n"
-        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
-        + chunk(b"IDAT", zlib.compress(b"\x00\xff\xff\xff"))
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(row * height))
         + chunk(b"IEND", b"")
     )
 
@@ -61,7 +62,9 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
     def test_package_preserves_media_and_notes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            image = root / "slide01.png"
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
             notes = root / "notes.json"
             manifest = root / "review.json"
             output = root / "deck.pptx"
@@ -70,7 +73,7 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             manifest.write_text(json.dumps(approved_manifest([image])), encoding="utf-8")
 
             images = pptx_packager.collect_images([str(image)])
-            slide_notes = pptx_packager.load_notes(str(notes), None, 1, images)
+            slide_notes = pptx_packager.load_notes(notes_json=str(notes), notes_file=None, slide_count=1, images=images)
             pptx_packager.validate_review_manifest(str(manifest), images)
             pptx_packager.build_pptx(output, images, slide_notes)
             pptx_packager.validate_pptx(output, images, slide_notes)
@@ -84,7 +87,9 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
     def test_requires_review_manifest_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            image = root / "slide01.png"
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
             image.write_bytes(png_bytes())
             images = pptx_packager.collect_images([str(image)])
 
@@ -94,7 +99,9 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
     def test_rejects_unapproved_review_manifest(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
-            image = root / "slide01.png"
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
             manifest = root / "review.json"
             image.write_bytes(png_bytes())
             data = approved_manifest([image])
@@ -119,6 +126,66 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
                 pptx_packager.collect_images([str(package_image)])
             with self.assertRaises(SystemExit):
                 pptx_packager.collect_images([str(render_image)])
+
+    def test_rejects_non_slides_final_input_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            image = root / "slide01.png"
+            image.write_bytes(png_bytes())
+
+            with self.assertRaises(SystemExit):
+                pptx_packager.collect_images([str(image)])
+
+    def test_rejects_traversal_out_of_slides_final(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            (root / "slides_final").mkdir()
+            outside = root / "outside"
+            outside.mkdir()
+            image = outside / "slide01.png"
+            image.write_bytes(png_bytes())
+            traversal_path = root / "slides_final" / ".." / "outside" / "slide01.png"
+
+            with self.assertRaises(SystemExit):
+                pptx_packager.collect_images([str(traversal_path)])
+
+    def test_rejects_non_slide_sized_images(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
+            image.write_bytes(png_bytes(1, 1))
+
+            with self.assertRaises(SystemExit):
+                pptx_packager.collect_images([str(image)])
+
+    def test_rejects_legacy_manifest_path_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
+            manifest = root / "review.json"
+            image.write_bytes(png_bytes())
+            data = approved_manifest([image])
+            data["slides"][0]["image_path"] = data["slides"][0].pop("png_path")
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+            images = pptx_packager.collect_images([str(image)])
+
+            with self.assertRaises(SystemExit):
+                pptx_packager.validate_review_manifest(str(manifest), images)
+
+    def test_rejects_non_png_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.jpg"
+            image.write_bytes(b"\xff\xd8\xff\xd9")
+
+            with self.assertRaises(SystemExit):
+                pptx_packager.collect_images([str(image)])
 
 
 if __name__ == "__main__":
