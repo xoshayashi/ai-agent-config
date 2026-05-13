@@ -21,11 +21,16 @@ SLIDE_CX = 12_192_000
 SLIDE_CY = 6_858_000
 NOTES_CX = 6_858_000
 NOTES_CY = 9_144_000
-IMAGE_EXTENSIONS = {".png", ".jpg", ".jpeg"}
+IMAGE_EXTENSIONS = {".png"}
+APPROVED_SLIDE_IMAGE_SIZES = {
+    (1536, 864),
+    (1920, 1080),
+    (2048, 1152),
+    (2560, 1440),
+    (3840, 2160),
+}
 CONTENT_TYPES = {
     ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
 }
 P_REL = "http://schemas.openxmlformats.org/package/2006/relationships"
 O_REL = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
@@ -33,12 +38,13 @@ A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
 CT_NS = "http://schemas.openxmlformats.org/package/2006/content-types"
 
 
-def validate_png_bytes(data: bytes, label: str) -> None:
+def validate_png_bytes(data: bytes, label: str) -> tuple[int, int]:
     if not data.startswith(b"\x89PNG\r\n\x1a\n"):
         raise SystemExit(f"{label} is not a valid PNG: missing PNG signature")
     offset = 8
     seen_ihdr = False
     seen_iend = False
+    dimensions: tuple[int, int] | None = None
     while offset + 12 <= len(data):
         length = struct.unpack(">I", data[offset : offset + 4])[0]
         kind = data[offset + 4 : offset + 8]
@@ -53,6 +59,8 @@ def validate_png_bytes(data: bytes, label: str) -> None:
             raise SystemExit(f"{label} is not a valid PNG: CRC mismatch in {kind.decode('latin1', errors='replace')}")
         if kind == b"IHDR":
             seen_ihdr = True
+            width, height = struct.unpack(">II", data[start : start + 8])
+            dimensions = (width, height)
         if kind == b"IEND":
             seen_iend = True
             if crc_end != len(data):
@@ -61,30 +69,35 @@ def validate_png_bytes(data: bytes, label: str) -> None:
         offset = crc_end
     if not seen_ihdr or not seen_iend:
         raise SystemExit(f"{label} is not a valid PNG: missing IHDR or IEND")
+    if dimensions is None:
+        raise SystemExit(f"{label} is not a valid PNG: missing dimensions")
+    return dimensions
 
 
-def validate_image_bytes(data: bytes, suffix: str, label: str) -> None:
+def validate_image_bytes(data: bytes, suffix: str, label: str) -> tuple[int, int]:
     ext = suffix.lower()
     if ext == ".png":
-        validate_png_bytes(data, label)
-    elif ext in {".jpg", ".jpeg"}:
-        if not (data.startswith(b"\xff\xd8") and data.endswith(b"\xff\xd9")):
-            raise SystemExit(f"{label} is not a valid JPEG: missing SOI/EOI markers")
+        return validate_png_bytes(data, label)
     else:
-        raise SystemExit(f"{label} has unsupported image extension: {suffix}")
+        raise SystemExit(f"{label} has unsupported image extension: {suffix}; use PNG slide masters only")
 
 
 def validate_image_file(path: Path) -> None:
-    validate_image_bytes(path.read_bytes(), path.suffix, str(path))
+    width, height = validate_image_bytes(path.read_bytes(), path.suffix, str(path))
+    if (width, height) not in APPROVED_SLIDE_IMAGE_SIZES:
+        allowed = ", ".join(f"{w}x{h}" for w, h in sorted(APPROVED_SLIDE_IMAGE_SIZES))
+        raise SystemExit(f"{path} must be an approved 16:9 slide image size; found {width}x{height}. Allowed: {allowed}.")
 
 
 def validate_master_image_path(path: Path) -> None:
-    parts = tuple(part.lower() for part in path.parts)
+    parts = tuple(part.lower() for part in path.expanduser().resolve().parts)
     if "slides_package" in parts:
         raise SystemExit(f"{path} is under slides_package/. Use the approved slides_final/ PNG master instead.")
     for idx, part in enumerate(parts[:-1]):
         if part == "render_check" and parts[idx + 1] == "pdf_pages":
             raise SystemExit(f"{path} is under render_check/pdf_pages/. Use the approved slides_final/ PNG master instead.")
+    if "slides_final" not in parts:
+        raise SystemExit(f"{path} is not under slides_final/. Use the approved slides_final/ PNG master instead.")
 
 
 def natural_key(path: Path) -> list[object]:
@@ -103,7 +116,7 @@ def collect_images(inputs: Iterable[str]) -> list[Path]:
         else:
             raise SystemExit(f"Unsupported image input: {item}")
     if not images:
-        raise SystemExit("No PNG/JPEG slide images were provided.")
+        raise SystemExit("No PNG slide images were provided.")
     for image in images:
         validate_master_image_path(image)
         validate_image_file(image)
@@ -217,11 +230,7 @@ def validate_review_manifest(manifest_file: str | None, images: list[Path]) -> N
             findings = slide.get(key)
             if findings not in (None, [], {}):
                 raise SystemExit(f"review_manifest slide {idx} has non-empty {key}.")
-        path = (
-            normalize_manifest_path(slide.get("png_path"), base)
-            or normalize_manifest_path(slide.get("image_path"), base)
-            or normalize_manifest_path(slide.get("input"), base)
-        )
+        path = normalize_manifest_path(slide.get("png_path"), base)
         if path is None:
             raise SystemExit(f"review_manifest slide {idx} is missing png_path.")
         manifest_paths.add(path)
@@ -522,7 +531,7 @@ def ensure_notes_text(archive: zipfile.ZipFile, notes: list[str]) -> None:
 def image_mapping(images: list[Path]) -> dict[str, dict[str, str]]:
     return {
         str(idx): {
-            "input": str(image),
+            "png_path": str(image),
             "slide_part": f"ppt/slides/slide{idx}.xml",
             "media_part": f"ppt/media/image{idx}{image.suffix.lower()}",
         }
@@ -565,7 +574,7 @@ def validate_pptx(output: Path, images: list[Path], notes: list[str]) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("images", nargs="+", help="PNG/JPEG slide images or directories containing slide images")
+    parser.add_argument("images", nargs="+", help="PNG slide images or directories containing slide images")
     parser.add_argument("--output", required=True, help="Output .pptx path")
     parser.add_argument("--notes-json", help="Optional JSON list/object with speaker notes")
     parser.add_argument("--notes-file", help="Optional text file split by form-feed or ---SLIDE---")

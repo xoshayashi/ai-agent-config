@@ -1,6 +1,6 @@
 # Text To Slide Structure
 
-Use this reference when the input is a long memo, equity story, research note, transcript, or dense bullet dump. Do not send long prose directly to image generation. Convert it into a deck structure first.
+Use this reference when the input is a long memo, strategy narrative, research note, transcript, operating brief, policy note, technical explainer, education material, internal report, or dense bullet dump. Do not send long prose directly to image generation. Convert it into a deck structure first.
 
 ## Contents
 
@@ -18,7 +18,7 @@ Use this reference when the input is a long memo, equity story, research note, t
 - Build the storyline before designing slides. Read only the action titles in order; they should form the deck's argument without body text.
 - Start with a high-signal opening thesis, not a title-only first slide. The opener can use the deck's main phrase, but it should also carry the core thesis, 2-4 proof/tension points, a visible market-shift / matrix / causal-map / wedge structure, and a bridge into the next section.
 - Put the conclusion or recommendation early enough for an intended decision-maker to understand the point before details.
-- Every slide needs a role in the story: set context, prove urgency, explain solution, show differentiation, size market, prove traction/plan, handle risk, or close the thesis.
+- Every slide needs a role in the story: set context, prove urgency, explain a solution, compare options, show differentiation, summarize evidence, explain operations, teach a concept, size impact, prove traction/plan, handle risk, or close the thesis.
 - Treat message, evidence, visual, and source as separate jobs: message says `so what`, evidence says `why believe`, visual says `how to see`, and source says `can we trust it`.
 - Map each message to evidence and source policy before image prompting. Unsupported facts are either removed from the slide or marked as research/source needs.
 - Convert prose into visual grammar: comparison, table, flow, roadmap, loop, matrix, KPI strip, architecture stack, or signature visual. Avoid prose boxes as the default.
@@ -31,6 +31,9 @@ Use this reference when the input is a long memo, equity story, research note, t
 - Use structured presentation patterns as an option, not a quota: issue trees, driver trees, 2x2 matrices, value chains, funnels, waterfalls, KPI bridges, decision tables, before/after bridges, and hypothesis-evidence-implication rows are available when they make the argument easier to scan.
 - Apply `structure_first_visual_mix`: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation.
 - Apply `imageability_lock`: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation.
+- Apply `visible_text_only_lock` and `render_contract_lock`: separate on-slide strings from planning, workflow, audit, speaker-note, file-path, and packaging metadata; only quoted `exact_text` can be visible.
+- Apply `prompt_order_lock`: final image prompts should be ordered as drawing action, canvas/brand, exact visible text, fixed components, layout/reading path, main visual/structure details, optional Insight, then focused blockers.
+- Apply `edit_scope_lock`: repair prompts should be single-delta (`issue_observed`, `change_only`, `preserve`, `re_check`) and avoid global restyle unless explicitly required.
 - Apply `editorial_polish_repair_loop`: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm.
 - Apply `visual_subject_open_set`: keep visual subject choices open; select the clearest concrete subject from the slide message, evidence, and audience context.
 - Apply `message_led_composition_lock`: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements.
@@ -43,16 +46,21 @@ Use this reference when the input is a long memo, equity story, research note, t
 - Apply `near_white_slide_base_lock`: use `#FCFBF8` as the default ATOM slide canvas, with `#F4F3EF` only as a subtle warm light-neutral tint; keep `#DDE3EA/#D6E1EE` for panels/cards, not the full slide background, and avoid darker cream/beige page bases.
 - Apply `deck_tone_signature_lock`: keep one material system across the deck for base, typography, rule weight, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior. Vary message-led layouts without changing the deck's visual language.
 - Apply `illustration_tone_lock`: keep all illustrations in one deck on the same editorial vector system.
-- Define `illustration_style_sheet` before prompt writing and reuse it across the deck: flat 2D business/healthcare workflow scenes, simplified people, tablets/laptops, document stacks, CRM/report panels, rounded UI cards, small icon badges, soft pale blue-gray or warm gray fills, Deep Blue and charcoal linework, restrained Honey highlights, consistent 2-3px stroke, crop, facial detail, body proportion, and fill opacity.
+- Define `illustration_style_sheet` before prompt writing and reuse it across the deck: domain-matched flat 2D editorial/vector scenes, with objects selected from the brief, audience context, and slide message. Optional motifs include people, devices, documents, evidence artifacts, UI panels, operational objects, handoff points, map routes, and small icon badges; keep soft pale blue-gray or warm gray fills, Deep Blue and charcoal linework, restrained Honey highlights, consistent 2-3px stroke, crop, facial detail, body proportion, and fill opacity.
 - Set illustration intensity before prompt writing: `0_none`, `1_marginal`, `2_integrated`, or `3_restrained_signature`. Use `3_restrained_signature` sparingly. Most slides should use `1_marginal` or `2_integrated`, where the chart, table, matrix, or roadmap remains primary.
 - Set `creative_variance` before prompt writing when the user asks for higher temperature, freshness, or surprise. Use `low`, `medium`, or `high`. High variance changes composition choices, viewpoint, crop, visual metaphor, and layout rhythm; it does not relax brand rules, exact text, source policy, header master, or readability.
 - Prefer human-designed editorial/vector illustration over generated-looking concept art or rough hand-drawn sketch: clean controlled strokes, crisp silhouettes, intentional simplification, restrained fills, clear figure-ground separation, a clear focal motif, and only useful supporting details. Keep the projection, viewpoint, abstraction level, and motif message-led.
 - Set density intentionally. A strategic deck can be slightly dense, but density should mean more decision-relevant information per view, not more objects or smaller type. Use structured layers, supporting context regions, evidence strips, mini charts, comparison baselines, and short labels while keeping body text at 18pt equivalent or larger.
 - Do not impose a default numeric cap. Preserve decision-relevant sourced or explicitly assumed numbers when they help comparison, sizing, prioritization, credibility, or decision-making.
+- Apply `exact_text_fidelity_lock`: freeze every visible H1, subtitle, label, number, source string, and optional Insight as quoted `exact_text`; generated copy that is missing, invented, garbled, duplicated, or rewritten is repair_required.
+- Apply `revised_prompt_review_lock`: when the image tool exposes a revised or rewritten prompt, compare it against `exact_text`, source policy, header master, and visible/non-visible boundaries before approving the PNG.
+- Apply `chart_semantic_integrity_lock`: chart/table/matrix/flow/map structures should explain what is compared, which unit/denominator/period applies, and how rows, columns, axes, arrows, or legends connect; decorative pseudo-data is a major issue.
+- Apply `thumbnail_legibility_lock` and `reading_path_lock`: the main claim, focal structure, region boundaries, and key numbers should remain understandable in slide-sorter/contact-sheet review, with a clear path from H1 to main visual, evidence/context, optional Insight, and Source.
 - Message boxes and Insight surfaces should use a flat solid fill only. Do not add patterns, textures, gradients, motifs, icon wallpaper, or internal illustration inside message boxes.
-- Apply `message_box_scale_lock`: Insight/message-box components are compact interpretation surfaces, not display surfaces. Prefer one short judgment sentence, one line when possible and two lines maximum; trim, move explanation to notes/body, or remove the component instead of enlarging the box.
+- Apply `message_box_scale_lock`: Insight/message-box components are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered. Prefer one short judgment sentence, one line when possible and two lines maximum; trim, move explanation to notes/body, or remove the component instead of enlarging the box.
+- Apply `content_area_priority_lock`: allocate height to the body, figure, table, or diagram first; size any optional Insight/message-box from the remaining calculated space so it supports rather than compresses the main content area.
 - Apply `message_box_text_size_lock`: Insight/message-box text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than H1, and must not become a second title or compete with subtitle.
-- Apply `message_box_compactness_blocker_lock`: an Insight/message-box that dominates the slide, behaves like a banner, spans beyond the interpreted region, grows tall to carry prose, or compensates for layout imbalance is a blocker.
+- Apply `message_box_compactness_blocker_lock`: an Insight/message-box that dominates the slide, behaves like a banner, spans beyond the interpreted region, grows tall to carry prose, or compensates for layout imbalance is a blocker. A lower, quieter box that returns space to the body, figure, table, or diagram is preferred when the sentence remains legible and optically centered.
 - Apply `message_box_text_alignment_lock`: Insight/message-box text sits at the optical center of the surface, both horizontally and vertically, using balanced padding and a centered line box.
 - Apply `insight_surface_placement_lock`: decide the Insight footprint with the body silhouette and footer rhythm. Bottom Insight variants should bridge the body content and Source footer area with clear breathing room, centered to the interpreted region or full body block, while Source remains separate on its invisible baseline.
 - Apply `max_text_size_lock`: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
@@ -60,7 +68,7 @@ Use this reference when the input is a long memo, equity story, research note, t
 - Apply `header_line_top_rule`: the left vertical line is the approved header-block anchor, not a short title tick. On the 1672x941 basis, use `vertical_line x=50 y=40 w=10 h=120 #0B2F5B` unless a newer embedded master is supplied. Its top must never sit above the first visible H1 glyph/title top; align it with the title top or place it 0-6px below. Any upward protrusion, page-top floating, clipping outside `header_safe_area`, detachment from H1/subtitle, or body intrusion is a blocker. If it fails, repair the line x/y/h before touching H1.
 - Apply `header_integrity_blocker_lock`: malformed, missing, oversized, recolored, right-decorated, or intruded headers are blockers; repair header identity before other visual polish.
 - Apply `header_footer_text_color_lock`: H1 `#2D332E`, subtitle `#4D544E`, footer/source/table-note text `#6E756E`. Do not use Deep Blue, Honey, yellow, or arbitrary gray for header/footer text.
-- Define `deck_tone_master_lock` before image generation and check generated images for whole-deck tone consistency before PPTX roll-up.
+- Define `deck_tone_master_lock` before image generation and check generated images for whole-deck tone consistency before PPTX/PDF packaging.
 - Check `illustration_consistency_status` after image generation by comparing first, middle, and last thirds for stroke weight, fill opacity, face/detail level, object treatment, and illustration density.
 - After image generation, run `post_generation_design_balance_check` on actual PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
 - Use `visual_asset_judgment`: add illustration/icons only when they help understanding, memory, comparison, or navigation; do not add them by quota.
@@ -80,9 +88,10 @@ Use this reference when the input is a long memo, equity story, research note, t
    - Apply `source_real_only_lock`: render Source only for real traceable external/provided sources; if no real source exists, set `source_line: none` and draw no Source footer.
    - Apply `source_placeholder_blocklist`: never use brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, working assumptions, upload names, or draft provenance as Source text.
    - Apply `output_artifact_mastering_lock`: approved generated PNGs live once in `slides_final/`; `slides_package/` holds PPTX, notes, manifest, and metadata only; `render_check/pdf_pages/` is disposable render QA output.
+   - Apply `pdf_export_source_lock`: create PDF outputs from `slides_final/` master PNGs; do not use `render_check/pdf_pages/` as a source image folder.
    - Apply `contact_sheet_mastering_lock`: keep one retained `render_check/contact_sheet_review.png` by default; use one comparison sheet or render diff report only when delivery/render QA needs it.
    - Apply `source_line_lock`: render `Source: ...` when traceable sources exist; use `source_line: none` only when no traceable source exists.
-   - Apply `source_separator_lock`: no horizontal divider, rule, underline, or hairline above Source.
+   - Apply `source_separator_lock`: Source is text-only; no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline may appear above, below, behind, or adjacent to Source.
    - Split the input into chapters, paragraphs, data points, quotes, assumptions, and uncertainties. Assign stable `source_span_id` values when source tracing matters.
 
 2. **Storyline Frame**
@@ -107,14 +116,14 @@ Use this reference when the input is a long memo, equity story, research note, t
    - Decide `source_line`: `Source: ...` with real traceable source names / `none` only when no traceable source exists / research needed.
    - Do not drop real source names to reduce visual density; shorten or group source names instead.
    - Do not place internal process notes, upload filenames, draft provenance, brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions in Source.
-   - Keep package and render-check artifacts pointing at `slides_final/` master PNGs; do not duplicate the same final PNG set into `slides_package/` or `render_check/pdf_pages/`.
+   - Keep package and render-check artifacts pointing at `slides_final/` master PNGs; do not duplicate the same final PNG set into `slides_package/` or `render_check/pdf_pages/`. PDF creation also references `slides_final/` directly.
 
 5. **Visual Structure Assignment**
    - Pick one dominant structure per slide:
      - chronological shift -> timeline / sequence / staged flow
      - market or labor statistics -> KPI strip / trend table
      - competing options -> comparison table / 2x2 matrix
-     - product/strategy system -> architecture flow / stack
+     - system, solution, workflow, or technical architecture -> architecture flow / stack
      - compounding asset -> loop
      - rollout plan -> phase roadmap
      - use cases -> grid/table
@@ -151,7 +160,7 @@ Use this reference when the input is a long memo, equity story, research note, t
    - Draft `speaker_notes_text` for every deck slide before image prompting, with `speaker_notes_depth_lock` so PPT notes are substantial enough to present from.
    - Use the deck language unless the user specifies otherwise.
    - Notes should include: the spoken message in plain language, the evidence or assumption to mention, source caveat or confidence level when relevant, and a transition to the next slide.
-   - Keep notes out of `exact_text` and out of the image prompt's on-slide text. Speaker notes belong in PPTX or external slide-hosting notes pages after image generation.
+   - Keep notes out of `exact_text` and out of the image prompt's on-slide text. Speaker notes belong in PPTX or PPTX speaker notes after image generation.
    - Do not add unsupported facts, invented sources, internal prompt notes, file paths, or production-route language to speaker notes.
 
 9. **Image Prompt Handoff**
@@ -358,6 +367,7 @@ validate_review_manifest:
 slides_final_master_path:
 slides_package_policy:
 render_check_policy:
+pdf_export_source_lock:
 contact_sheet_review_path:
 render_diff_report:
 unresolved_items:
@@ -368,13 +378,14 @@ unresolved_items:
 These practices synthesize common professional-presentation guidance:
 
 - Source footers are part of credibility, not decoration. Render `Source: ...` only when traceable real external/provided sources exist; use `source_line: none` and draw no Source footer when no traceable source exists. Never render brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, working assumptions, upload names, or draft provenance as Source.
-- Source footers sit on an invisible alignment baseline. Do not draw a horizontal divider, rule, underline, or hairline above Source.
+- Source footers sit on an invisible alignment baseline. Do not draw a gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline above, below, behind, or adjacent to Source.
 
 ## Output Artifact Notes
 
 - `slides_final/` is the single loose-PNG master for approved generated slide images.
 - `slides_package/` should contain PPTX, speaker notes, review manifest, and metadata only. It should not contain copied slide PNGs.
 - `render_check/pdf_pages/` is disposable QA output from a rendered PDF/PPT check. It is not a source of truth and can be regenerated.
+- PDF outputs should be created from `slides_final/` master PNGs, not from copied PNGs under `render_check/pdf_pages/`.
 - Keep one retained contact sheet by default: `render_check/contact_sheet_review.png` from `slides_final/`.
 - If delivery QA needs generated-vs-package-vs-PDF comparison, create one `render_check/contact_sheet_delivery_compare.png` or `render_check/render_diff_report.json`; do not retain parallel `contact_sheet_generated*`, `contact_sheet_package*`, and `contact_sheet_pdf_render*` files for the same slide set.
 

@@ -102,6 +102,7 @@ def check_entrypoint_symlinks() -> list[Result]:
     expected = {
         "scripts/build_atom_slide_prompt.py": "../build/scripts/build_atom_slide_prompt.py",
         "scripts/eval_atom_skill.py": "../build/scripts/eval_atom_skill.py",
+        "scripts/package_slide_images_to_pdf.py": "../build/scripts/package_slide_images_to_pdf.py",
         "scripts/package_slide_images_to_pptx.py": "../build/scripts/package_slide_images_to_pptx.py",
         "scripts/test_package_slide_images_to_pptx.py": "../build/scripts/test_package_slide_images_to_pptx.py",
     }
@@ -145,7 +146,102 @@ def run_helper_check(check: dict) -> Result:
     return Result(check["name"], True)
 
 
-def valid_png_bytes(rgb: tuple[int, int, int] = (255, 255, 255)) -> bytes:
+def check_final_generation_prompt_hygiene() -> Result:
+    script = ROOT / "build" / "scripts" / "build_atom_slide_prompt.py"
+    env = os.environ.copy()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    proc = subprocess.run(
+        [
+            sys.executable,
+            str(script),
+            "--mode",
+            "single-slide-image",
+            "--archetype",
+            "market-table + supporting-context",
+            "--grid-mode",
+            "message-led split",
+        ],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    combined = proc.stdout + proc.stderr
+    if proc.returncode != 0:
+        return Result("final_generation_prompt_hygiene", False, combined[:2000])
+    start = combined.find("final_generation_prompt_payload:")
+    end = combined.find("\n\nnon_rendered_workflow_qa:", start)
+    if start < 0 or end < 0:
+        return Result("final_generation_prompt_hygiene", False, "missing final_generation_prompt_payload boundary")
+    payload = combined[start:end]
+    forbidden = [
+        "review_manifest",
+        "weak_slide_regeneration_queue",
+        "slides_final/",
+        "PPTX package gate",
+        "credential_setup_blocker",
+        "slides_package/",
+        "render_check/",
+    ]
+    hits = [needle for needle in forbidden if needle in payload]
+    if hits:
+        return Result("final_generation_prompt_hygiene", False, "forbidden generation-prompt terms: " + ", ".join(hits))
+    if "image_size 2048x1152" not in payload:
+        return Result("final_generation_prompt_hygiene", False, "default 2048x1152 image size missing from generation prompt payload")
+    return Result("final_generation_prompt_hygiene", True)
+
+
+def slice_named_block(text: str, start_label: str, end_label: str) -> str:
+    start = text.find(start_label)
+    if start < 0:
+        return ""
+    end = text.find(end_label, start)
+    if end < 0:
+        end = len(text)
+    return text[start:end]
+
+
+def check_deck_plan_output_hygiene() -> Result:
+    script = ROOT / "build" / "scripts" / "build_atom_slide_prompt.py"
+    env = os.environ.copy()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    proc = subprocess.run(
+        [sys.executable, str(script), "--mode", "deck-plan", "--size", "2048x1152"],
+        cwd=ROOT,
+        env=env,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    combined = proc.stdout + proc.stderr
+    if proc.returncode != 0:
+        return Result("deck_plan_output_hygiene", False, combined[:2000])
+    block = slice_named_block(combined, "deck_plan_output:", "\n\ntext_to_slide_structure_output:")
+    if not block:
+        return Result("deck_plan_output_hygiene", False, "missing deck_plan_output block")
+    required = [
+        "deck_tone_signature_lock",
+        "header_identity_lock",
+        "header_integrity_blocker_lock",
+        "message_box_compactness_blocker_lock",
+        "package_delivery",
+        "pdf_delivery",
+        "pdf_status",
+        "pdf_output_path",
+        "pdf_slide_count",
+        "package_image_mapping",
+        "pdf_image_mapping",
+    ]
+    missing = [needle for needle in required if needle not in block]
+    if missing:
+        return Result("deck_plan_output_hygiene", False, "missing deck-plan terms: " + ", ".join(missing))
+    return Result("deck_plan_output_hygiene", True)
+
+
+def valid_png_bytes(rgb: tuple[int, int, int] = (255, 255, 255), width: int = 2048, height: int = 1152) -> bytes:
     import binascii
     import struct
     import zlib
@@ -154,11 +250,11 @@ def valid_png_bytes(rgb: tuple[int, int, int] = (255, 255, 255)) -> bytes:
         crc = binascii.crc32(kind + data) & 0xFFFFFFFF
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", crc)
 
-    raw_scanline = b"\x00" + bytes(rgb)
+    raw_scanline = b"\x00" + (bytes(rgb) * width)
     return (
         b"\x89PNG\r\n\x1a\n"
-        + chunk(b"IHDR", struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0))
-        + chunk(b"IDAT", zlib.compress(raw_scanline))
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(raw_scanline * height))
         + chunk(b"IEND", b"")
     )
 
@@ -194,8 +290,10 @@ def run_pptx_package_check() -> Result:
     env["PYTHONDONTWRITEBYTECODE"] = "1"
     with tempfile.TemporaryDirectory() as tmp:
         tmp_path = Path(tmp)
-        image1 = tmp_path / "slide01.png"
-        image2 = tmp_path / "slide02.png"
+        slides_dir = tmp_path / "slides_final"
+        slides_dir.mkdir()
+        image1 = slides_dir / "slide01.png"
+        image2 = slides_dir / "slide02.png"
         image1.write_bytes(png_bytes)
         image2.write_bytes(png_bytes)
         notes = tmp_path / "notes.json"
@@ -258,6 +356,106 @@ def run_pptx_package_check() -> Result:
     return Result("pptx_package_check", True)
 
 
+def run_pdf_package_check() -> Result:
+    script = ROOT / "build" / "scripts" / "package_slide_images_to_pdf.py"
+    png_bytes = valid_png_bytes()
+    env = os.environ.copy()
+    env["PYTHONDONTWRITEBYTECODE"] = "1"
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        slides_dir = tmp_path / "slides_final"
+        slides_dir.mkdir()
+        image1 = slides_dir / "slide01.png"
+        image2 = slides_dir / "slide02.png"
+        image1.write_bytes(png_bytes)
+        image2.write_bytes(png_bytes)
+        manifest = tmp_path / "review-manifest.json"
+        manifest.write_text(json.dumps(approved_review_manifest([image1, image2]), ensure_ascii=False), encoding="utf-8")
+        output = tmp_path / "deck.pdf"
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                "--output",
+                str(output),
+                "--review-manifest",
+                str(manifest),
+                str(slides_dir),
+            ],
+            cwd=ROOT,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        combined = proc.stdout + proc.stderr
+        if proc.returncode != 0:
+            return Result("pdf_package_check", False, combined[:2000])
+        if "pdf_package_status: created" not in combined or "pdf_slide_count: 2" not in combined:
+            return Result("pdf_package_check", False, combined[:2000])
+        if "pdf_output_path:" not in combined:
+            return Result("pdf_package_check", False, combined[:2000])
+        if "pdf_image_mapping: {" not in combined:
+            return Result("pdf_package_check", False, combined[:2000])
+        if not output.exists() or output.stat().st_size <= 0:
+            return Result("pdf_package_check", False, "PDF output was not created")
+        if not output.read_bytes().startswith(b"%PDF"):
+            return Result("pdf_package_check", False, "PDF output does not start with %PDF")
+        bad_image = tmp_path / "slide-outside-master.png"
+        bad_image.write_bytes(png_bytes)
+        bad_manifest = tmp_path / "bad-review-manifest.json"
+        bad_manifest.write_text(json.dumps(approved_review_manifest([bad_image]), ensure_ascii=False), encoding="utf-8")
+        bad_proc = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                "--output",
+                str(tmp_path / "bad.pdf"),
+                "--review-manifest",
+                str(bad_manifest),
+                str(bad_image),
+            ],
+            cwd=ROOT,
+            env=env,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+        if bad_proc.returncode == 0:
+            return Result("pdf_package_check", False, "PDF package accepted image outside slides_final/")
+        for rel_path in ["slides_package/slide01.png", "render_check/pdf_pages/page-01.png"]:
+            derivative_image = tmp_path / rel_path
+            derivative_image.parent.mkdir(parents=True, exist_ok=True)
+            derivative_image.write_bytes(png_bytes)
+            derivative_manifest = tmp_path / f"{derivative_image.stem}-review-manifest.json"
+            derivative_manifest.write_text(
+                json.dumps(approved_review_manifest([derivative_image]), ensure_ascii=False),
+                encoding="utf-8",
+            )
+            derivative_proc = subprocess.run(
+                [
+                    sys.executable,
+                    str(script),
+                    "--output",
+                    str(tmp_path / f"{derivative_image.stem}.pdf"),
+                    "--review-manifest",
+                    str(derivative_manifest),
+                    str(derivative_image),
+                ],
+                cwd=ROOT,
+                env=env,
+                text=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                check=False,
+            )
+            if derivative_proc.returncode == 0:
+                return Result("pdf_package_check", False, f"PDF package accepted derivative source path: {rel_path}")
+    return Result("pdf_package_check", True)
+
+
 def check_no_old_files() -> list[Result]:
     # Guard against stale cross-brand artifacts copied into the ATOM skill root.
     old_paths = [
@@ -289,7 +487,10 @@ def main() -> int:
     results.extend(check_entrypoint_symlinks())
     for check in config["helper_checks"]:
         results.append(run_helper_check(check))
+    results.append(check_final_generation_prompt_hygiene())
+    results.append(check_deck_plan_output_hygiene())
     results.append(run_pptx_package_check())
+    results.append(run_pdf_package_check())
 
     failed = [r for r in results if not r.passed]
     for result in results:

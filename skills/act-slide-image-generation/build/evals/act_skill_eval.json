@@ -6,64 +6,250 @@
     "build/scripts/*.py"
   ],
   "forbidden_patterns": [
-    {"pattern": "\\bATOM\\b", "reason": "No old skill name or brand wording should remain."},
-    {"pattern": "\\bAtom\\b", "reason": "No old skill name or brand wording should remain."},
-    {"pattern": "\\batom\\b", "reason": "No old skill identifier should remain."},
-    {"pattern": "atom-slide", "reason": "No old skill identifier should remain."},
-    {"pattern": "build_atom", "reason": "No old helper script name should remain."},
-    {"pattern": "eval_atom", "reason": "No old eval script name should remain."},
-    {"pattern": "ATOM_Slide_Patterns", "reason": "Skill must not depend on the external ATOM pattern file."},
-    {"pattern": "\\bAct\\b", "reason": "Visible brand wording should use ACT uppercase."},
-    {"pattern": "Act_Slide_Patterns", "reason": "Skill must not depend on the external ACT pattern file."},
-    {"pattern": "/Users/sh/Library", "reason": "Skill must not hard-code local guideline paths."},
-    {"pattern": "プロダクト事業部", "reason": "No old source guideline path remnants."},
-    {"pattern": "デザインガイドライン", "reason": "No old source guideline path remnants."},
-    {"pattern": "Deep Blue", "reason": "ACT uses Petrol, not the ATOM accent naming."},
-    {"pattern": "deep_blue", "reason": "ACT uses petrol_usage_lock, not ATOM deep_blue_usage_lock."},
-    {"pattern": "#0B2F5B", "reason": "ACT uses Petrol, not ATOM Deep Blue."},
-    {"pattern": "#071F3D", "reason": "ACT uses Petrol Deep, not ATOM Deep Blue dark."},
-    {"pattern": "#D6E1EE", "reason": "ACT uses Petrol tint, not ATOM blue tint."},
-    {"pattern": "#DDE3EA", "reason": "ACT uses Panel Mint, not ATOM light gray."},
-    {"pattern": "#FCFBF8", "reason": "ACT slide canvas should use the newer near-white base #FFFDFC."},
-    {"pattern": "#F4F3EF", "reason": "ACT slide canvas should avoid darker cream/beige page backgrounds."},
-    {"pattern": "Light Gray", "reason": "ACT uses Panel Mint / Surface naming."},
-    {"pattern": "Charcoal Ink", "reason": "ACT token is Forest Charcoal."},
-    {"pattern": "provided slide guideline", "reason": "Default prompt should use embedded ACT design system, not an external/provided guideline."},
-    {"pattern": "slide/brand guideline", "reason": "Skill should not frame itself around external guideline loading."},
-    {"pattern": "minimal numbers", "reason": "Do not impose a minimal-numbers slide rule."},
-    {"pattern": "minimum numbers", "reason": "Do not impose a minimal-numbers slide rule."},
-    {"pattern": "最小限の数字", "reason": "Do not impose a minimal-numbers slide rule."},
-    {"pattern": "Honey hex", "reason": "No decorative Honey motif guidance should remain for message boxes."},
-    {"pattern": "#D39A19", "reason": "Honey should use the quieter #C49A2C accent, not the stronger yellow accent."},
-    {"pattern": "rgba\\(236,200,90,0\\.30\\)", "reason": "Honey message boxes should use the fixed pale solid fill #F5E2A8."},
-    {"pattern": "dark-yellow", "reason": "Honey should not be prompted as dark yellow."},
-    {"pattern": "visual_asset_requirement", "reason": "Visual assets should be judgment-based, not quota-based."},
-    {"pattern": "At least 70%", "reason": "Do not impose numeric quotas for illustrations or icons."},
-    {"pattern": "two consecutive slides", "reason": "Do not impose numeric quotas for illustrations or icons."},
-    {"pattern": "explicitly accepts residual issues", "reason": "Completion may not be approved with known residual issues."},
-    {"pattern": "residual issues", "reason": "Completion may not be approved with known residual issues."},
-    {"pattern": "stop early when generation is blocked", "reason": "Generation blocks must produce a blocked status, not an early completion escape."},
-    {"pattern": "Google Slides", "reason": "No fixed Google Slides delivery route should remain."},
-    {"pattern": "google_slides", "reason": "No fixed Google Slides field names should remain."},
-    {"pattern": "\\binvestor\\b", "reason": "Skill must stay audience-neutral unless the user supplies an investor context."},
-    {"pattern": "\\binvestment\\b", "reason": "Skill must stay audience-neutral unless the user supplies an investment context."},
-    {"pattern": "1 slide = 1 claim", "reason": "Use generic one-primary-message language instead of a fixed investor-style claim frame."},
-    {"pattern": "direct_native", "reason": "Do not guide agents toward presentation construction as the generation source."},
-    {"pattern": "native shape", "reason": "Do not guide agents toward shape construction as the generation source."},
-    {"pattern": "controlled 8-16px", "reason": "Header accent must not protrude above the H1/title top."},
-    {"pattern": "may sit 8-16px above", "reason": "Header accent must not protrude above the H1/title top."},
-    {"pattern": "more than 18px above the first visible H1 glyph top", "reason": "Any upward header accent protrusion is a blocker now."},
-    {"pattern": "OPENAI_API_KEY", "reason": "Do not route or explain slide generation through local API-key availability."},
-    {"pattern": "OpenAI SDK", "reason": "Do not route or explain slide generation through local SDK availability."},
-    {"pattern": "API key", "reason": "Do not route or explain slide generation through local API-key availability."},
-    {"pattern": "APIキー", "reason": "Do not route or explain slide generation through local API-key availability."},
-    {"pattern": "OpenAI Platform", "reason": "Do not route slide generation through account or connector setup."},
-    {"pattern": "Platform connector", "reason": "Do not route slide generation through account or connector setup."},
-    {"pattern": "コネクタ", "reason": "Do not route slide generation through connector setup."},
-    {"pattern": "key creation", "reason": "Do not route slide generation through credential creation flows."},
-    {"pattern": "鍵作成", "reason": "Do not route slide generation through credential creation flows."},
-    {"pattern": "safe key", "reason": "Do not route slide generation through credential creation flows."},
-    {"pattern": "PNG-save-route", "reason": "Use Codex image artifacts instead of local save-route probing."}
+    {
+      "pattern": "\\bATOM\\b",
+      "reason": "No old skill name or brand wording should remain."
+    },
+    {
+      "pattern": "\\bAtom\\b",
+      "reason": "No old skill name or brand wording should remain."
+    },
+    {
+      "pattern": "\\batom\\b",
+      "reason": "No old skill identifier should remain."
+    },
+    {
+      "pattern": "atom-slide",
+      "reason": "No old skill identifier should remain."
+    },
+    {
+      "pattern": "build_atom",
+      "reason": "No old helper script name should remain."
+    },
+    {
+      "pattern": "eval_atom",
+      "reason": "No old eval script name should remain."
+    },
+    {
+      "pattern": "ATOM_Slide_Patterns",
+      "reason": "Skill must not depend on the external ATOM pattern file."
+    },
+    {
+      "pattern": "\\bAct\\b",
+      "reason": "Visible brand wording should use ACT uppercase."
+    },
+    {
+      "pattern": "Act_Slide_Patterns",
+      "reason": "Skill must not depend on the external ACT pattern file."
+    },
+    {
+      "pattern": "/Users/sh/Library",
+      "reason": "Skill must not hard-code local guideline paths."
+    },
+    {
+      "pattern": "プロダクト事業部",
+      "reason": "No old source guideline path remnants."
+    },
+    {
+      "pattern": "デザインガイドライン",
+      "reason": "No old source guideline path remnants."
+    },
+    {
+      "pattern": "Deep Blue",
+      "reason": "ACT uses Petrol, not the ATOM accent naming."
+    },
+    {
+      "pattern": "deep_blue",
+      "reason": "ACT uses petrol_usage_lock, not ATOM deep_blue_usage_lock."
+    },
+    {
+      "pattern": "#0B2F5B",
+      "reason": "ACT uses Petrol, not ATOM Deep Blue."
+    },
+    {
+      "pattern": "#071F3D",
+      "reason": "ACT uses Petrol Deep, not ATOM Deep Blue dark."
+    },
+    {
+      "pattern": "#D6E1EE",
+      "reason": "ACT uses Petrol tint, not ATOM blue tint."
+    },
+    {
+      "pattern": "#DDE3EA",
+      "reason": "ACT uses Panel Mint, not ATOM light gray."
+    },
+    {
+      "pattern": "#FCFBF8",
+      "reason": "ACT slide canvas should use the newer near-white base #FFFDFC."
+    },
+    {
+      "pattern": "#F4F3EF",
+      "reason": "ACT slide canvas should avoid darker cream/beige page backgrounds."
+    },
+    {
+      "pattern": "Light Gray",
+      "reason": "ACT uses Panel Mint / Surface naming."
+    },
+    {
+      "pattern": "Charcoal Ink",
+      "reason": "ACT token is Forest Charcoal."
+    },
+    {
+      "pattern": "provided slide guideline",
+      "reason": "Default prompt should use embedded ACT design system, not an external/provided guideline."
+    },
+    {
+      "pattern": "slide/brand guideline",
+      "reason": "Skill should not frame itself around external guideline loading."
+    },
+    {
+      "pattern": "minimal numbers",
+      "reason": "Do not impose a minimal-numbers slide rule."
+    },
+    {
+      "pattern": "minimum numbers",
+      "reason": "Do not impose a minimal-numbers slide rule."
+    },
+    {
+      "pattern": "最小限の数字",
+      "reason": "Do not impose a minimal-numbers slide rule."
+    },
+    {
+      "pattern": "Honey hex",
+      "reason": "No decorative Honey motif guidance should remain for message boxes."
+    },
+    {
+      "pattern": "#D39A19",
+      "reason": "Honey should use the quieter #C49A2C accent, not the stronger yellow accent."
+    },
+    {
+      "pattern": "rgba\\(236,200,90,0\\.30\\)",
+      "reason": "Honey message boxes should use the fixed pale solid fill #F5E2A8."
+    },
+    {
+      "pattern": "dark-yellow",
+      "reason": "Honey should not be prompted as dark yellow."
+    },
+    {
+      "pattern": "visual_asset_requirement",
+      "reason": "Visual assets should be judgment-based, not quota-based."
+    },
+    {
+      "pattern": "At least 70%",
+      "reason": "Do not impose numeric quotas for illustrations or icons."
+    },
+    {
+      "pattern": "two consecutive slides",
+      "reason": "Do not impose numeric quotas for illustrations or icons."
+    },
+    {
+      "pattern": "explicitly accepts residual issues",
+      "reason": "Completion may not be approved with known residual issues."
+    },
+    {
+      "pattern": "residual issues",
+      "reason": "Completion may not be approved with known residual issues."
+    },
+    {
+      "pattern": "stop early when generation is blocked",
+      "reason": "Generation blocks must produce a blocked status, not an early completion escape."
+    },
+    {
+      "pattern": "Google Slides",
+      "reason": "No fixed Google Slides delivery route should remain."
+    },
+    {
+      "pattern": "google_slides",
+      "reason": "No fixed Google Slides field names should remain."
+    },
+    {
+      "pattern": "\\binvestor\\b",
+      "reason": "Skill must stay audience-neutral unless the user supplies an investor context."
+    },
+    {
+      "pattern": "\\binvestment\\b",
+      "reason": "Skill must stay audience-neutral unless the user supplies an investment context."
+    },
+    {
+      "pattern": "1 slide = 1 claim",
+      "reason": "Use generic one-primary-message language instead of a fixed investor-style claim frame."
+    },
+    {
+      "pattern": "direct_native",
+      "reason": "Do not guide agents toward presentation construction as the generation source."
+    },
+    {
+      "pattern": "native shape",
+      "reason": "Do not guide agents toward shape construction as the generation source."
+    },
+    {
+      "pattern": "controlled 8-16px",
+      "reason": "Header accent must not protrude above the H1/title top."
+    },
+    {
+      "pattern": "may sit 8-16px above",
+      "reason": "Header accent must not protrude above the H1/title top."
+    },
+    {
+      "pattern": "more than 18px above the first visible H1 glyph top",
+      "reason": "Any upward header accent protrusion is a blocker now."
+    },
+    {
+      "pattern": "OPENAI_API_KEY",
+      "reason": "Do not route or explain slide generation through local API-key availability."
+    },
+    {
+      "pattern": "OpenAI SDK",
+      "reason": "Do not route or explain slide generation through local SDK availability."
+    },
+    {
+      "pattern": "API key",
+      "reason": "Do not route or explain slide generation through local API-key availability."
+    },
+    {
+      "pattern": "APIキー",
+      "reason": "Do not route or explain slide generation through local API-key availability."
+    },
+    {
+      "pattern": "OpenAI Platform",
+      "reason": "Do not route slide generation through account or connector setup."
+    },
+    {
+      "pattern": "Platform connector",
+      "reason": "Do not route slide generation through account or connector setup."
+    },
+    {
+      "pattern": "コネクタ",
+      "reason": "Do not route slide generation through connector setup."
+    },
+    {
+      "pattern": "key creation",
+      "reason": "Do not route slide generation through credential creation flows."
+    },
+    {
+      "pattern": "鍵作成",
+      "reason": "Do not route slide generation through credential creation flows."
+    },
+    {
+      "pattern": "safe key",
+      "reason": "Do not route slide generation through credential creation flows."
+    },
+    {
+      "pattern": "PNG-save-route",
+      "reason": "Use Codex image artifacts instead of local save-route probing."
+    },
+    {
+      "pattern": "external_slide",
+      "reason": "Clean-base PPTX/PDF skill should not retain external slide-hosting route fields."
+    },
+    {
+      "pattern": "external slide-hosting",
+      "reason": "Clean-base PPTX/PDF skill should not retain external slide-hosting route wording."
+    },
+    {
+      "pattern": "presentation_app_import",
+      "reason": "Clean-base packaging should use script-based PPTX/PDF routes only."
+    }
   ],
   "required_skill_phrases": [
     "name: act-slide-image-generation",
@@ -79,20 +265,21 @@
     "all_text_font_lock: Noto Sans JP",
     "speaker notes",
     "speaker_notes_depth_lock",
-    "external slide-hosting",
     "PPTX",
-    "PPTX roll-up",
+    "PPTX/PDF roll-up",
     "PPTX is a delivery wrapper only; never use PPTX, PowerPoint export, screenshots, local rendering, HTML, SVG, canvas, or PIL to create final PNGs.",
-    "Correct order: gpt-image-2 PNG generation -> PNG review/repair -> PPTX roll-up.",
+    "Correct order: generate gpt-image-2 PNGs, review and repair PNGs, then package approved PNGs into requested PPTX/PDF outputs",
     "Only mark image generation blocked after invoking Codex built-in image generation and the image tool itself fails, is unavailable, or refuses the request. Local environment uncertainty is not a blocker.",
     "scripts/package_slide_images_to_pptx.py",
+    "scripts/package_slide_images_to_pdf.py",
     "gpt-image-2",
+    "model_route_assumption",
     "Codex built-in image generation",
     "codex_image_artifact_rule",
     "local_env_non_blocker",
     "credential_setup_blocker",
-    "builtin_generation_lock", "pptx_first_blocker",
-    "pre_external_slide_image_review",
+    "builtin_generation_lock",
+    "pptx_first_blocker",
     "final_image_quality_status",
     "repair_iteration_plan",
     "post_generation_full_deck_review_loop: after generating slide PNGs, review every actual image before claiming completion",
@@ -107,7 +294,7 @@
     "generation_block_rule: only if Codex built-in generation or repair is actually blocked by the image tool, mark completion_ready_status: blocked and do not package or report complete; do not use local environment uncertainty as the blocker",
     "review_manifest",
     "review_manifest_status: approved",
-    "PPTX package gate requires an approved review manifest",
+    "PPTX/PDF package gate requires an approved review manifest",
     "validate_review_manifest",
     "header_identity_lock: header is always the same compact left vertical line + H1 + subtitle system, never a slide-specific decoration surface",
     "header_footer_text_color_lock",
@@ -120,6 +307,7 @@
     "any upward protrusion above H1 is a blocker",
     "header_integrity_blocker_lock: malformed, missing, oversized, recolored, right-decorated, or intruded header is a blocker and must be repaired before other polish",
     "message_box_scale_lock",
+    "content_area_priority_lock",
     "message_box_text_size_lock",
     "message_box_compactness_blocker_lock: Insight/message-box surfaces that dominate the slide, behave like a banner, or compensate for layout imbalance are blockers",
     "message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface",
@@ -150,15 +338,21 @@
     "asymmetric main + context region",
     "center-hub + surrounding-nodes",
     "top-map + bottom-detail-table",
-    "PPTX package gate",
+    "PPTX/PDF package gate",
     "pre_package_image_review",
     "pptx_slide_count",
     "pptx_image_mapping",
+    "package_delivery",
+    "pdf_delivery",
+    "pdf_status",
+    "pdf_output_path",
+    "pdf_slide_count",
+    "pdf_image_mapping",
+    "package_image_mapping",
     "pptx_speaker_notes_mapping",
     "draft_image_prompt_scaffold",
     "negative_prompt_hard_blockers",
     "no_header_ranges_in_final_prompts",
-    "Create external slide-hosting only when explicitly requested",
     "Do not impose a default numeric cap",
     "flat solid fill",
     "#F5E2A8",
@@ -177,7 +371,7 @@
     "contact_sheet_review.png",
     "source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists",
     "Do not drop real source names to reduce visual density; shorten or group source names instead.",
-    "source_separator_lock: no horizontal divider, rule, underline, or hairline above Source",
+    "source_separator_lock: Source is text-only; no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline may appear above, below, behind, or adjacent to Source",
     "density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting",
     "structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide",
     "structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits",
@@ -185,6 +379,21 @@
     "structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation",
     "max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt",
     "imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation",
+    "default_2k_generation_lock",
+    "model_route_assumption",
+    "pdf_export_source_lock",
+    "final_generation_prompt_payload",
+    "non_rendered_workflow_qa",
+    "visible_text_only_lock",
+    "render_contract_lock",
+    "prompt_order_lock",
+    "positive_quality_lock",
+    "edit_scope_lock",
+    "revised_prompt_review_lock",
+    "exact_text_fidelity_lock",
+    "chart_semantic_integrity_lock",
+    "thumbnail_legibility_lock",
+    "reading_path_lock",
     "editorial_polish_repair_loop: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm",
     "visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide message, evidence, and audience context",
     "message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements",
@@ -199,23 +408,252 @@
   "helper_checks": [
     {
       "name": "deck_plan_2k",
-      "args": ["--mode", "deck-plan", "--size", "2048x1152"],
+      "args": [
+        "--mode",
+        "deck-plan",
+        "--size",
+        "2048x1152"
+      ],
       "expect_exit": 0,
-      "must_contain": ["embedded ACT design system", "speaker_notes_plan", "speaker_notes_depth_lock", "pre_external_slide_review_plan", "pre_package_image_review_plan", "pptx_rollup_plan", "external_slide_rollup_plan: optional only when explicitly requested", "layout_diversity_plan", "layout_rotation_guard", "layout_sequence_table", "opening_thesis_slide", "first_slide_not_title_only", "opening_density_gate", "image_review_matrix", "deck_consistency_matrix", "near_white_slide_base_lock", "#FFFDFC", "#FAFAF7", "deck_tone_signature_lock", "illustration_tone_lock", "illustration_consistency_status", "structure_choice_bias", "structured_density_bias", "source_real_only_lock", "source_placeholder_blocklist", "no brand assumptions, brand analysis", "output_artifact_mastering_lock", "single_final_png_master_lock", "no_duplicate_png_output_lock", "contact_sheet_mastering_lock", "single_contact_sheet_policy", "header_left_accent_reference_lock", "header_left_accent_no_protrusion_rule", "builtin_generation_lock", "credential_setup_blocker", "pptx_first_blocker", "post_generation_full_deck_review_loop", "all_generated_images_reviewed", "weak_slide_regeneration_queue", "completion_ready_status", "regenerate_until_quality_approved", "review_manifest", "review_manifest_status: approved", "PPTX package gate requires an approved review manifest"],
-      "must_not_contain": ["ATOM", "atom-slide", "Deep Blue", "#0B2F5B", "Act_Slide_Patterns"]
+      "must_contain": [
+        "embedded ACT design system",
+        "speaker_notes_plan",
+        "speaker_notes_depth_lock",
+        "pre_package_image_review_plan",
+        "pptx_rollup_plan",
+        "layout_diversity_plan",
+        "layout_rotation_guard",
+        "layout_sequence_table",
+        "opening_thesis_slide",
+        "first_slide_not_title_only",
+        "opening_density_gate",
+        "image_review_matrix",
+        "deck_consistency_matrix",
+        "near_white_slide_base_lock",
+        "#FFFDFC",
+        "#FAFAF7",
+        "deck_tone_signature_lock",
+        "illustration_tone_lock",
+        "illustration_consistency_status",
+        "structure_choice_bias",
+        "structured_density_bias",
+        "source_real_only_lock",
+        "source_placeholder_blocklist",
+        "no brand assumptions, brand analysis",
+        "output_artifact_mastering_lock",
+        "single_final_png_master_lock",
+        "no_duplicate_png_output_lock",
+        "contact_sheet_mastering_lock",
+        "single_contact_sheet_policy",
+        "header_left_accent_reference_lock",
+        "header_left_accent_no_protrusion_rule",
+        "builtin_generation_lock",
+        "credential_setup_blocker",
+        "pptx_first_blocker",
+        "post_generation_full_deck_review_loop",
+        "all_generated_images_reviewed",
+        "weak_slide_regeneration_queue",
+        "completion_ready_status",
+        "regenerate_until_quality_approved",
+        "review_manifest",
+        "review_manifest_status: approved",
+        "PPTX/PDF package gate requires an approved review manifest"
+      ],
+      "must_not_contain": [
+        "ATOM",
+        "atom-slide",
+        "Deep Blue",
+        "#0B2F5B",
+        "Act_Slide_Patterns"
+      ]
     },
     {
       "name": "single_slide_prompt",
-      "args": ["--mode", "single-slide-image", "--archetype", "market-table + supporting-context", "--grid-mode", "message-led split", "--size", "2048x1152"],
+      "args": [
+        "--mode",
+        "single-slide-image",
+        "--archetype",
+        "market-table + supporting-context",
+        "--grid-mode",
+        "message-led split",
+        "--size",
+        "2048x1152"
+      ],
       "expect_exit": 0,
-      "must_contain": ["gpt-image-2", "Codex built-in image generation", "builtin_generation_lock", "credential_setup_blocker", "pptx_first_blocker", "speaker_notes_text", "speaker_notes_depth_lock", "pre_external_slide_image_review", "pre_package_image_review", "repair_iteration_plan", "post_generation_full_deck_review_loop", "all_generated_images_reviewed", "weak_slide_regeneration_queue", "content_quality_status", "design_quality_status", "deck_unity_status", "completion_ready_status", "regenerate_until_quality_approved", "generation_block_rule", "review_manifest", "review_manifest_status: approved", "PPTX package gate requires an approved review manifest", "validate_review_manifest", "near_white_slide_base_lock", "#FFFDFC", "#FAFAF7", "header_identity_lock", "header_footer_text_color_lock", "header_line_top_rule", "header_left_accent_reference_lock", "header_left_accent_no_protrusion_rule", "header_left_accent_top_protrusion_blocker", "vertical_line x=50 y=40 w=10 h=120", "header_integrity_blocker_lock", "message_box_scale_lock", "message_box_text_size_lock", "message_box_compactness_blocker_lock", "message_box_text_alignment_lock", "insight_surface_placement_lock", "deck_tone_master_lock", "deck_tone_signature_lock", "deck_tone_consistency_status", "illustration_tone_lock", "illustration_style_sheet", "illustration_consistency_status", "structure_choice_bias", "structured_density_bias", "structure_choice_status", "post_generation_design_balance_check", "visual_design_quality_traits", "whitespace_occupancy_balance_status", "typography_balance_status", "color_consistency_status", "outer_padding_consistency_status", "header_integrity_status", "petrol_usage_lock", "visual_asset_judgment", "layout_diversity_plan", "layout_rotation_guard", "layout_sequence_table", "opening_thesis_slide", "first_slide_not_title_only", "opening_density_gate", "image_review_matrix", "deck_consistency_matrix", "prompt_readiness", "draft_image_prompt_scaffold", "negative_prompt_hard_blockers", "external_slide_delivery: optional only when explicitly requested", "pptx_delivery", "pptx_packaging_route", "PPTX is a delivery wrapper only", "Never create final PNGs by exporting, rendering, or screenshotting a PPTX", "Correct order: generate gpt-image-2 PNGs, review and repair PNGs, then package approved PNGs into PPTX", "no_header_ranges_in_final_prompts", "Use Noto Sans JP for every visible text string", "source_real_only_lock", "source_placeholder_blocklist", "no brand assumptions, brand analysis", "output_artifact_mastering_lock", "single_final_png_master_lock", "no_duplicate_png_output_lock", "contact_sheet_mastering_lock", "single_contact_sheet_policy", "source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists", "Do not drop real source names to reduce visual density; shorten or group source names instead.", "source_separator_lock: no horizontal divider, rule, underline, or hairline above Source", "density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting", "structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation", "max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt", "imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation", "editorial_polish_repair_loop: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm", "visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide message, evidence, and audience context", "message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements", "region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette", "composition_fit_plan: set the main visual field, supporting regions, whitespace role, and Insight footprint before generation so the canvas has deliberate occupancy and breathing room", "secondary_region_integrity_lock: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field", "body_silhouette_lock: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions", "footer/source/table-note #6E756E", "no default cap on decision-relevant numbers", "flat solid fill", "#F5E2A8", "#C49A2C", "No Petrol H1", "PPTX roll-up", "external slide-hosting roll-up"],
-      "must_not_contain": ["ATOM", "atom-slide", "Deep Blue", "#0B2F5B", "Act_Slide_Patterns"]
+      "must_contain": [
+        "gpt-image-2",
+        "Codex built-in image generation",
+        "builtin_generation_lock",
+        "credential_setup_blocker",
+        "pptx_first_blocker",
+        "speaker_notes_text",
+        "speaker_notes_depth_lock",
+        "pre_package_image_review",
+        "repair_iteration_plan",
+        "repair_or_regenerate_decision",
+        "post_generation_full_deck_review_loop",
+        "all_generated_images_reviewed",
+        "weak_slide_regeneration_queue",
+        "content_quality_status",
+        "design_quality_status",
+        "deck_unity_status",
+        "completion_ready_status",
+        "regenerate_until_quality_approved",
+        "generation_block_rule",
+        "review_manifest",
+        "review_manifest_status: approved",
+        "PPTX/PDF package gate requires an approved review manifest",
+        "validate_review_manifest",
+        "near_white_slide_base_lock",
+        "#FFFDFC",
+        "#FAFAF7",
+        "header_identity_lock",
+        "header_footer_text_color_lock",
+        "header_line_top_rule",
+        "header_left_accent_reference_lock",
+        "header_left_accent_no_protrusion_rule",
+        "header_left_accent_top_protrusion_blocker",
+        "vertical_line x=50 y=40 w=10 h=120",
+        "header_integrity_blocker_lock",
+        "message_box_scale_lock",
+        "content_area_priority_lock",
+        "message_box_text_size_lock",
+        "message_box_compactness_blocker_lock",
+        "message_box_text_alignment_lock",
+        "insight_surface_placement_lock",
+        "deck_tone_master_lock",
+        "deck_tone_signature_lock",
+        "deck_tone_consistency_status",
+        "illustration_tone_lock",
+        "illustration_style_sheet",
+        "illustration_consistency_status",
+        "structure_choice_bias",
+        "structured_density_bias",
+        "structure_choice_status",
+        "post_generation_design_balance_check",
+        "visual_design_quality_traits",
+        "whitespace_occupancy_balance_status",
+        "typography_balance_status",
+        "color_consistency_status",
+        "outer_padding_consistency_status",
+        "header_integrity_status",
+        "petrol_usage_lock",
+        "visual_asset_judgment",
+        "layout_diversity_plan",
+        "layout_rotation_guard",
+        "layout_sequence_table",
+        "opening_thesis_slide",
+        "first_slide_not_title_only",
+        "opening_density_gate",
+        "image_review_matrix",
+        "deck_consistency_matrix",
+        "prompt_readiness",
+        "draft_image_prompt_scaffold",
+        "negative_prompt_hard_blockers",
+        "package_delivery",
+        "pptx_delivery",
+        "pdf_delivery",
+        "pdf_status",
+        "pdf_packaging_route",
+        "package_image_mapping",
+        "pdf_image_mapping",
+        "pptx_packaging_route",
+        "PPTX is a delivery wrapper only",
+        "Never create final PNGs by exporting, rendering, or screenshotting a PPTX",
+        "Correct order: generate gpt-image-2 PNGs, review and repair PNGs, then package approved PNGs into requested PPTX/PDF outputs",
+        "no_header_ranges_in_final_prompts",
+        "Use Noto Sans JP for every visible text string",
+        "source_real_only_lock",
+        "source_placeholder_blocklist",
+        "no brand assumptions, brand analysis",
+        "output_artifact_mastering_lock",
+        "single_final_png_master_lock",
+        "no_duplicate_png_output_lock",
+        "contact_sheet_mastering_lock",
+        "single_contact_sheet_policy",
+        "source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists",
+        "Do not drop real source names to reduce visual density; shorten or group source names instead.",
+        "source_separator_lock: Source is text-only; no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline may appear above, below, behind, or adjacent to Source",
+        "density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting",
+        "structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation",
+        "max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt",
+        "imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation",
+        "default_2k_generation_lock",
+        "model_route_assumption",
+        "visible_text_only_lock",
+        "render_contract_lock",
+        "prompt_order_lock",
+        "positive_quality_lock",
+        "edit_scope_lock",
+        "revised_prompt_review_lock",
+        "exact_text_fidelity_lock",
+        "chart_semantic_integrity_lock",
+        "thumbnail_legibility_lock",
+        "reading_path_lock",
+        "editorial_polish_repair_loop: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm",
+        "visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide message, evidence, and audience context",
+        "message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements",
+        "region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette",
+        "composition_fit_plan: set the main visual field, supporting regions, whitespace role, and Insight footprint before generation so the canvas has deliberate occupancy and breathing room",
+        "secondary_region_integrity_lock: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field",
+        "body_silhouette_lock: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions",
+        "footer/source/table-note #6E756E",
+        "no default cap on decision-relevant numbers",
+        "flat solid fill",
+        "#F5E2A8",
+        "#C49A2C",
+        "No Petrol H1",
+        "PPTX/PDF roll-up"
+      ],
+      "must_not_contain": [
+        "ATOM",
+        "atom-slide",
+        "Deep Blue",
+        "#0B2F5B",
+        "Act_Slide_Patterns"
+      ]
+    },
+    {
+      "name": "single_slide_default_2k",
+      "args": [
+        "--mode",
+        "single-slide-image",
+        "--archetype",
+        "market-table + supporting-context",
+        "--grid-mode",
+        "message-led split"
+      ],
+      "expect_exit": 0,
+      "must_contain": [
+        "image_size: 2048x1152",
+        "image_size_label: default 16:9 2K-width image-generation output size",
+        "Draw a 16:9 strategy slide image with gpt-image-2, image_size 2048x1152",
+        "default_2k_generation_lock",
+        "model_route_assumption",
+        "final_generation_prompt_payload",
+        "non_rendered_workflow_qa",
+        "pdf_export_source_lock"
+      ],
+      "must_not_contain": [
+        "ATOM",
+        "atom-slide",
+        "Deep Blue",
+        "#0B2F5B",
+        "Act_Slide_Patterns"
+      ]
     },
     {
       "name": "reject_1920x1080_direct_generation",
-      "args": ["--mode", "deck-plan", "--size", "1920x1080"],
+      "args": [
+        "--mode",
+        "deck-plan",
+        "--size",
+        "1920x1080"
+      ],
       "expect_exit": 1,
-      "must_contain": ["requires both edges to be multiples of 16"],
+      "must_contain": [
+        "requires both edges to be multiples of 16"
+      ],
       "must_not_contain": []
     }
   ]
