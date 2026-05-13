@@ -70,6 +70,12 @@ heavy process.
 - Verify that the workbook renders with readable columns, visible overflow
   where intended, compact row rhythm, semantic fills, no frozen panes,
   source / unit alignment, and calm accent usage.
+- Verify text position role-by-role: labels, sources, notes, titles, memos,
+  and interpretation text are left-aligned; numeric values, formulas, money,
+  percentages, multiples, counts, and unit labels are right-aligned; only period
+  headers, short scenario/matrix headers, and compact column headers are
+  centered. Long prose, line-item labels, source caveats, and memo sentences
+  should not be centered.
 - Confirm workbook default font and populated cell fonts use the canonical
   design tokens: Arial 10pt body/default, 9pt italic gray notes, 14pt title,
   and compact bold section/header rows.
@@ -155,8 +161,9 @@ heavy process.
   names unless explicitly required, and mode-specific dependency closure.
 - Run the workbook-design checks that prove visible sheet quality:
   canonical fonts, no wrap/freeze/merge/native indent, Google-Sheets-20px
-  hierarchy columns, row heights, semantic fill spans, sparse colors/borders,
-  blank-cell style cleanup, print areas, chart anchors, and rendered bounds.
+  hierarchy columns, role-based left/right/center text alignment, row heights,
+  semantic fill spans, sparse colors/borders, blank-cell style cleanup, print
+  areas, chart anchors, and rendered bounds.
 - Treat command output and rendered screenshots/PDFs as complementary evidence.
   Passing commands do not excuse a visibly poor sheet; a good-looking render
   does not excuse broken formulas, units, sources, or reconciliations.

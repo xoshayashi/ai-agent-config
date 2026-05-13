@@ -875,6 +875,27 @@ def test_skill_guidance_uses_meaningful_sparse_fills_and_borders() -> None:
     assert "black border colors by default" in eval_text
 
 
+def test_skill_guidance_enforces_ib_text_positioning() -> None:
+    skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    design_text = (SKILL_DIR / "build" / "references" / "_ib_workbook_design_system.md").read_text(encoding="utf-8")
+    self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+    eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
+    ib_text = (RUNTIME_DIR / "ib_format.py").read_text(encoding="utf-8")
+    combined_flat = " ".join("\n".join([skill_text, design_text, self_review_text, eval_text, ib_text]).split())
+
+    for phrase in [
+        "Investment-banking model alignment is functional, not decorative",
+        "labels, sources, notes, titles, memos, and interpretation text are left-aligned",
+        "numeric values, formulas, money, percentages, multiples, counts, and unit labels are right-aligned",
+        "only period headers, scenario/matrix headers, and short column headers are centered",
+        "Do not center long prose or labels",
+        "Hierarchy is expressed with dedicated hierarchy/indent columns",
+        "role-based left/right/center text alignment",
+        "ALIGNMENT_BEST_PRACTICE",
+    ]:
+        assert phrase in combined_flat
+
+
 def test_xlsx_evals_load_full_design_reference_stack() -> None:
     evals = json.loads((SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8"))["evals"]
     required = {"_layout_canonical", "_ib_workbook_design_system", "_self_review_protocol", "_sheet_quality_rubric"}
@@ -913,6 +934,14 @@ def test_xlsx_evals_load_full_design_reference_stack() -> None:
                     missing.append(f"{item['id']}:{item['name']} missing black border color guidance")
                 if "sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation" not in text:
                     missing.append(f"{item['id']}:{item['name']} missing sheet-specific quality guidance")
+                if "IB-style text positioning" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing IB text positioning guidance")
+                if "left-aligned labels/sources/notes" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing left text alignment guidance")
+                if "right-aligned values/formulas/units" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing right value alignment guidance")
+                if "centered period/scenario/matrix headers only" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing centered-header-only guidance")
             if assertion.get("id") == "XLSX_SHEET_QUALITY":
                 text = assertion.get("text", "")
                 if "sheet-specific purpose, traceable source/evidence boundary" not in text:
@@ -2174,6 +2203,29 @@ def test_ib_helpers_do_not_use_native_indent_for_hierarchy() -> None:
     assert ws["D3"].alignment.indent == 0
 
 
+def test_ib_helpers_encode_role_based_alignment_tokens() -> None:
+    wb = Workbook()
+    ws = wb.active
+
+    ib.apply_label(ws["B2"])
+    ib.apply_comment(ws["C2"])
+    ib.apply_unit_label(ws["D2"])
+    ib.apply_year_header(ws["E2"], "FY2027")
+    ib.apply_hard_input(ws["F2"])
+
+    assert ib.ALIGN_LABEL == "left"
+    assert ib.ALIGN_SOURCE_NOTE == "left"
+    assert ib.ALIGN_UNIT == "right"
+    assert ib.ALIGN_VALUE == "right"
+    assert ib.ALIGN_PERIOD_HEADER == "center"
+    assert "labels, sources, notes, titles, memos, and interpretation text are left-aligned" in ib.ALIGNMENT_BEST_PRACTICE
+    assert ws["B2"].alignment.horizontal == ib.ALIGN_LABEL
+    assert ws["C2"].alignment.horizontal == ib.ALIGN_SOURCE_NOTE
+    assert ws["D2"].alignment.horizontal == ib.ALIGN_UNIT
+    assert ws["E2"].alignment.horizontal == ib.ALIGN_PERIOD_HEADER
+    assert ws["F2"].alignment.horizontal == ib.ALIGN_VALUE
+
+
 def test_added_hierarchy_columns_use_google_sheets_20px_width() -> None:
     wb = Workbook()
     ws = wb.active
@@ -2284,6 +2336,7 @@ if __name__ == "__main__":
     test_skill_guidance_makes_no_wrap_rule_explicit()
     test_skill_guidance_requires_fix_and_rerun_iteration()
     test_skill_guidance_uses_meaningful_sparse_fills_and_borders()
+    test_skill_guidance_enforces_ib_text_positioning()
     test_xlsx_evals_load_full_design_reference_stack()
     test_semantic_fill_helper_uses_rectangular_span_including_blanks()
     test_source_backed_plan_reaches_generic_kernel_shape()
@@ -2308,6 +2361,7 @@ if __name__ == "__main__":
     test_source_plan_custom_tables_keep_text_columns_readable()
     test_excluded_sheets_cannot_create_broken_references()
     test_ib_helpers_do_not_use_native_indent_for_hierarchy()
+    test_ib_helpers_encode_role_based_alignment_tokens()
     test_added_hierarchy_columns_use_google_sheets_20px_width()
     test_generic_kernel_does_not_promote_domain_specific_mentions_to_sources()
     test_benchmark_register_uses_evidence_status_not_fake_source_placeholders()

@@ -37,6 +37,40 @@ Long labels receive enough width in their role column or move to a dedicated
 notes / interpretation column. Adjacent cells that support text overflow remain
 plain empty cells, so Google Sheets can show the full text.
 
+## Text Position And Alignment
+
+Investment-banking model alignment is functional, not decorative. A reviewer
+should be able to infer the role of a cell from its position before reading the
+formula. Keep the alignment system boring and consistent:
+
+- Row labels, section labels, source text, notes, memo text, and interpretation
+  text are left-aligned. Text reads from the model spine outward.
+- Numeric values, formulas, percentages, multiples, dates used as values,
+  counts, and money amounts are right-aligned so magnitudes, decimals, signs,
+  dashes, and parentheses scan vertically.
+- Unit labels are right-aligned in the unit column immediately before the first
+  value column. Units belong visually to the value block, not to the prose
+  label.
+- Period headers, scenario-case headers, and compact matrix column headers are
+  the main centered text. Do not center long prose, line-item labels, source
+  caveats, notes, or memo sentences.
+- Sheet titles and subtitle/purpose lines are left-aligned in the first wide
+  text column. They should read horizontally across blank unmerged overflow
+  cells, not sit centered above the grid.
+- Vertical alignment is center for normal compact rows. Do not use vertical
+  centering to justify tall wrapped rows; fix the row structure or exact row
+  height instead.
+- Hierarchy is expressed with dedicated hierarchy/indent columns, each 20px in
+  Google Sheets (`2.14` xlsx width). Do not use native Excel indent, leading
+  spaces, or centered indentation to fake hierarchy.
+- Keep column roles stable across sheets. The same role should appear in the
+  same horizontal position whenever possible: hierarchy/label/source/unit first,
+  then periods/values, then notes/interpretation. This is more important than
+  squeezing one sheet into fewer columns.
+- Avoid "presentation centering" in model grids. Centering is acceptable for
+  short headers over a value block; it is a defect when it makes labels, notes,
+  or assumptions harder to audit.
+
 No-Wrap Rule: do not solve readability by turning on cell text wrapping. If
 text clips, widen the relevant role column, split the content into shorter
 rows, move commentary to a note / interpretation column, or reserve blank

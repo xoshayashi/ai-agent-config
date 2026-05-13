@@ -55,6 +55,13 @@ because adjacent cells carry meaningful values, formulas, units, or notes. If
 such an exception uses wrapping or manual line breaks, row height must be set
 to the exact visible line count so no text is clipped and the row still looks
 intentional.
+Text position is part of auditability: labels, sources, notes, titles, memos,
+and interpretation text are left-aligned; numeric values, formulas, money,
+percentages, multiples, counts, and unit labels are right-aligned; only period
+headers, scenario/matrix headers, and short column headers are centered. Do not
+center long prose or labels, do not use native indent or spaces for hierarchy,
+and keep the same label/source/unit/value positions across sheets whenever
+possible.
 
 Design gates: `_layout_canonical.md` owns grid, columns, hierarchy widths, units,
 formulas, and layout mechanics. `_ib_workbook_design_system.md` owns visual
