@@ -1544,6 +1544,7 @@ def build_cap_table_sheet(
             min(9, max(7, ws.max_column)),
             ib.BG_HEADER_BAND,
             bottom=ib.THIN_LINE,
+            border_start_col=3,
         )
         for col in range(2, min(9, max(7, ws.max_column)) + 1):
             cell = ws.cell(row=row, column=col)
@@ -1564,7 +1565,7 @@ def build_cap_table_sheet(
     for row in header_rows:
         end_col = max(col for col in range(3, 10) if ws.cell(row=row, column=col).value)
         ib.apply_semantic_fill_span(
-            ws, row, 2, end_col, ib.BG_TABLE_HEADER, bottom=ib.THIN_LINE
+            ws, row, 2, end_col, ib.BG_TABLE_HEADER, bottom=ib.THIN_LINE, border_start_col=3
         )
         for col in range(2, end_col + 1):
             cell = ws.cell(row=row, column=col)
@@ -1583,8 +1584,6 @@ def build_cap_table_sheet(
             cell = ws.cell(row=row, column=col)
             if cell.value in (None, ""):
                 continue
-            if cell.row not in section_rows and cell.row not in header_rows:
-                cell.border = ib.BORDER_BOTTOM_THIN
             if isinstance(cell.value, (int, float)) or (
                 isinstance(cell.value, str) and cell.value.startswith("=")
             ):

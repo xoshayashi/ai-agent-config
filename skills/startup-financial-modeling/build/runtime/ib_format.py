@@ -293,22 +293,33 @@ def apply_semantic_fill_span(
     *,
     top: Side | None = None,
     bottom: Side | None = None,
+    border_start_col: int | None = None,
 ) -> None:
-    """Fill one rectangular semantic row span, including blank member cells.
+    """Style one rectangular semantic row span, including blank member cells.
 
     Use this for section bands, header/label rows, selected outputs, checks, and
     caution rows. The caller chooses `end_col` from the attached table/block,
-    not from whether each cell currently has text.
+    not from whether each cell currently has text. If `top` or `bottom` is
+    supplied, the border is applied across the full row-component span from
+    `border_start_col` (or `start_col` by default) so blank member cells align
+    with the related table/block instead of producing a ragged rule. Keep
+    dedicated hierarchy / indent columns borderless by setting
+    `border_start_col` to the row's real label/data start column.
     """
     if end_col < start_col:
         raise ValueError(
             f"semantic fill span end_col ({end_col}) must be >= start_col ({start_col})"
         )
+    border_first_col = border_start_col if border_start_col is not None else start_col
+    if border_first_col < start_col or border_first_col > end_col:
+        raise ValueError(
+            f"border_start_col ({border_first_col}) must be within span {start_col}:{end_col}"
+        )
     fill = PatternFill("solid", fgColor=color)
     for col in range(start_col, end_col + 1):
         cell = ws.cell(row=row, column=col)
         cell.fill = fill
-        if top is not None or bottom is not None:
+        if col >= border_first_col and (top is not None or bottom is not None):
             cell.border = Border(
                 left=cell.border.left,
                 right=cell.border.right,
@@ -523,7 +534,7 @@ ROW_HEIGHT_PER_WRAPPED_LINE = ROW_HEIGHT_BASE  # user-approved wrap exceptions o
 # ============================================================================
 # IB Border convention (canonical = Macabacus / WSP / IB pitchbook):
 #   - 小計 (subtotal)         : top = thin black single
-#   - 合計 (grand total)      : top = thin black single, bottom = thin double
+#   - 合計 (grand total)      : top = thin black single, bottom = medium black
 #   - Section 区切り          : bottom = thin black
 #   - Section 末 medium       : bottom = medium black (sub-section ⇒ section の境界)
 #   - Sensitivity / call-out  : 4 辺 = thin black (box)
@@ -532,21 +543,16 @@ ROW_HEIGHT_PER_WRAPPED_LINE = ROW_HEIGHT_BASE  # user-approved wrap exceptions o
 # Sides — line weight × color (gray は補助、IB convention は黒基本)
 THIN_LINE = Side(border_style="thin", color=IB_FORMULA)
 MEDIUM_LINE = Side(border_style="medium", color=IB_FORMULA)
-THICK_LINE = Side(border_style="thick", color=IB_FORMULA)
-DOUBLE_LINE = Side(border_style="double", color=IB_FORMULA)
-HAIRLINE_GRAY = Side(border_style="hair", color=IB_COMMENT)       # data table 内部 hairline
-THIN_GRAY = Side(border_style="thin", color=IB_COMMENT)           # 補助仕切り
+DOTTED_LINE = Side(border_style="dotted", color=IB_FORMULA)
 
 BORDER_SUBTOTAL = Border(top=THIN_LINE)                           # 小計: 上 single
-BORDER_GRAND_TOTAL = Border(top=THIN_LINE, bottom=DOUBLE_LINE)    # 合計: 上 single + 下 double
+BORDER_GRAND_TOTAL = Border(top=THIN_LINE, bottom=MEDIUM_LINE)    # 合計: 上 single + 下 medium
 BORDER_SECTION_DIVIDER = Border(bottom=THIN_LINE)                 # Section 区切り
 BORDER_SECTION_END_MEDIUM = Border(bottom=MEDIUM_LINE)            # Section 末 (medium)
 BORDER_TOP_THIN = Border(top=THIN_LINE)
 BORDER_BOTTOM_THIN = Border(bottom=THIN_LINE)
-BORDER_BOTTOM_DOUBLE = Border(bottom=DOUBLE_LINE)
 BORDER_BOX_THIN = Border(top=THIN_LINE, bottom=THIN_LINE, left=THIN_LINE, right=THIN_LINE)
 BORDER_BOX_MEDIUM = Border(top=MEDIUM_LINE, bottom=MEDIUM_LINE, left=MEDIUM_LINE, right=MEDIUM_LINE)
-BORDER_BOX_THICK = Border(top=THICK_LINE, bottom=THICK_LINE, left=THICK_LINE, right=THICK_LINE)
 
 # ============================================================================
 # 8. Page Setup
@@ -806,7 +812,7 @@ def apply_grand_total(
     cell,
     fmt: str = FMT_MONEY,
 ) -> None:
-    """合計セル (top single + bottom double + bold + total band)."""
+    """合計セル (top thin + bottom medium + bold + total band)."""
     cell.font = FONT_TOTAL
     cell.number_format = fmt
     cell.alignment = Alignment(horizontal="right", vertical="center", wrap_text=False)
@@ -927,18 +933,14 @@ def _merge_border(existing: Border | None, *, top=None, bottom=None, left=None, 
     )
 
 
-def apply_section_bottom_border(cell, *, double: bool = False, weight: str = "medium") -> None:
+def apply_section_bottom_border(cell, *, weight: str = "medium") -> None:
     """セクション末 (subtotal / grand total / sub-section 区切り) の bottom border.
 
     Args:
         cell: 適用先 cell
-        double: True で grand total の二重線 (medium/thick より優先)
-        weight: "thin" / "medium" / "thick" (double=False のとき有効)
+        weight: "thin" / "medium" / "dotted"。strong total は medium を使う。
     """
-    if double:
-        side = DOUBLE_LINE
-    else:
-        side = {"thin": THIN_LINE, "medium": MEDIUM_LINE, "thick": THICK_LINE}.get(weight, MEDIUM_LINE)
+    side = {"thin": THIN_LINE, "medium": MEDIUM_LINE, "dotted": DOTTED_LINE}.get(weight, MEDIUM_LINE)
     cell.border = _merge_border(cell.border, bottom=side)
 
 
@@ -947,30 +949,30 @@ def apply_box_border(
     range_str: str,
     *,
     weight: str = "thin",
-    inner_hairline: bool = False,
+    inner_dotted: bool = False,
 ) -> None:
     """範囲全体に枠線 (sensitivity matrix / call-out box / data table 用).
 
     Args:
         ws: Worksheet
         range_str: "B5:G12" 形式 or "B5" (単一 cell)
-        weight: "thin" / "medium" / "thick" — 外枠の線種
-        inner_hairline: True で内部の cell 間に gray hairline を引く (data table 用)
+        weight: "thin" / "medium" / "dotted" — 外枠の線種
+        inner_dotted: True で内部に dotted を引く。通常は行ごとの罫線を避ける。
 
     Note:
         既存 cell.border は上書きされる外枠 side のみ更新し、他の side は保持される。
     """
-    side_map = {"thin": THIN_LINE, "medium": MEDIUM_LINE, "thick": THICK_LINE}
+    side_map = {"thin": THIN_LINE, "medium": MEDIUM_LINE, "dotted": DOTTED_LINE}
     outer = side_map.get(weight, THIN_LINE)
     min_col, min_row, max_col, max_row = range_boundaries(range_str)
 
     for r in range(min_row, max_row + 1):
         for c in range(min_col, max_col + 1):
             cell = ws.cell(row=r, column=c)
-            top = outer if r == min_row else (HAIRLINE_GRAY if inner_hairline else None)
-            bottom = outer if r == max_row else (HAIRLINE_GRAY if inner_hairline else None)
-            left = outer if c == min_col else (HAIRLINE_GRAY if inner_hairline else None)
-            right = outer if c == max_col else (HAIRLINE_GRAY if inner_hairline else None)
+            top = outer if r == min_row else (DOTTED_LINE if inner_dotted else None)
+            bottom = outer if r == max_row else (DOTTED_LINE if inner_dotted else None)
+            left = outer if c == min_col else (DOTTED_LINE if inner_dotted else None)
+            right = outer if c == max_col else (DOTTED_LINE if inner_dotted else None)
             cell.border = _merge_border(cell.border, top=top, bottom=bottom, left=left, right=right)
 
 
@@ -1618,8 +1620,8 @@ __all__ = [
     # Borders
     "BORDER_SUBTOTAL", "BORDER_GRAND_TOTAL", "BORDER_SECTION_DIVIDER",
     "BORDER_SECTION_END_MEDIUM", "BORDER_TOP_THIN", "BORDER_BOTTOM_THIN",
-    "BORDER_BOTTOM_DOUBLE", "BORDER_BOX_THIN", "BORDER_BOX_MEDIUM", "BORDER_BOX_THICK",
-    "THIN_LINE", "MEDIUM_LINE", "THICK_LINE", "DOUBLE_LINE", "HAIRLINE_GRAY", "THIN_GRAY",
+    "BORDER_BOX_THIN", "BORDER_BOX_MEDIUM",
+    "THIN_LINE", "MEDIUM_LINE", "DOTTED_LINE",
     # Sheet naming
     "CANONICAL_SHEET_ORDER", "OPTIONAL_SHEETS",
     # Cell-level helpers
