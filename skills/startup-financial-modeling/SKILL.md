@@ -52,10 +52,15 @@ the row still looks intentional.
 Design gates: `_layout_canonical.md` owns grid, columns, hierarchy widths, units,
 formulas, and layout mechanics. `_ib_workbook_design_system.md` owns visual
 roles, font, color, borders, highlights, charts, and render expectations.
-Use background fills and prominent borders as selective semantic signals: extend
-them through blank cells when that completes a row component or section band,
-but avoid repeating the same fill or heavy rule across consecutive rows unless
-the adjacent rows form a deliberate table structure or heatmap.
+Color discipline is a hard workbook gate, not a polish preference: background
+fills are selective accents for major semantic moments only, filled row
+components use one consistent rectangular column span, and that span is chosen
+from the attached table/block rather than from which cells contain text. Do not
+stop a fill because a cell is blank; do not repeat the same non-heatmap fill on
+adjacent rows; do not color several rows merely because they are nearby.
+Section headers, table headers, selected outputs/checks, and caution rows are
+the normal fill roles. Use `ib_format.py` semantic fill helpers for generated
+xlsx work instead of hand-painting arbitrary cells.
 
 Analysis gates: material assumptions need selected driver, explanatory drivers,
 implied value, support ratio/variance, and evidence status. Weak evidence feeds

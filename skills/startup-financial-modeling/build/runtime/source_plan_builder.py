@@ -376,14 +376,18 @@ def _section_band_end_col(ws: Worksheet, explicit_end_col: int | None = None) ->
 
 
 def _section(ws: Worksheet, row: int, label: str, end_col: int | None = None) -> None:
-    band_fill = PatternFill("solid", fgColor=ib.BG_HEADER_BAND)
+    band_end_col = _section_band_end_col(ws, end_col)
     cell = ws.cell(row=row, column=LAYOUT.first_hierarchy_col, value=label)
     cell.font = Font(name=ib.FONT_FAMILY, size=10, bold=True, color="FFFFFF")
     cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=False)
-    for col in range(LAYOUT.first_hierarchy_col, _section_band_end_col(ws, end_col) + 1):
-        band_cell = ws.cell(row=row, column=col)
-        band_cell.fill = band_fill
-        band_cell.border = _merge_border(band_cell.border, bottom=ib.THIN_LINE)
+    ib.apply_semantic_fill_span(
+        ws,
+        row,
+        LAYOUT.first_hierarchy_col,
+        band_end_col,
+        ib.BG_HEADER_BAND,
+        bottom=ib.THIN_LINE,
+    )
     ws.row_dimensions[row].height = ib.ROW_HEIGHT_RELAXED
 
 
@@ -424,10 +428,15 @@ def _label(
 
 def _highlight_row(ws: Worksheet, row: int, last_col: int | None = None) -> None:
     end_col = last_col if last_col is not None else max(ws.max_column, 9)
-    for col in range(LAYOUT.first_hierarchy_col, end_col + 1):
-        cell = ws.cell(row=row, column=col)
-        cell.fill = PatternFill("solid", fgColor=ib.BG_WORKING)
-        cell.border = _merge_border(cell.border, top=ib.THIN_LINE, bottom=ib.THIN_LINE)
+    ib.apply_semantic_fill_span(
+        ws,
+        row,
+        LAYOUT.first_hierarchy_col,
+        end_col,
+        ib.BG_WORKING,
+        top=ib.THIN_LINE,
+        bottom=ib.THIN_LINE,
+    )
 
 
 def _merge_border(existing: Border | None, *, top=None, bottom=None, left=None, right=None) -> Border:

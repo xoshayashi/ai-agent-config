@@ -683,10 +683,31 @@ def test_skill_guidance_uses_meaningful_sparse_fills_and_borders() -> None:
     eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
 
     combined = "\n".join([skill_text, layout_text, design_text, self_review_text, eval_text])
-    assert "same non-heatmap fill" in combined
-    assert "heavy border pattern is not repeated across consecutive rows" in combined
-    assert "Prominent borders follow the same meaning-first rule as fills" in combined
-    assert "extend them through blank cells when that completes a row component or section band" in combined
+    combined_flat = " ".join(combined.split()).lower()
+    assert "same non-heatmap fill" in combined_flat
+    assert "background fills are selective accents for major semantic moments only" in combined_flat
+    assert "use one rectangular span per filled row component" in combined_flat
+    assert "do not choose the end column only from cells that happen to contain text" in combined_flat
+    assert "do not stop a fill because a cell is blank" in " ".join(skill_text.split()).lower()
+    assert "for every filled row, name its role and inspect the start column, end column" in " ".join(self_review_text.split()).lower()
+    assert "semantic fill helper in `ib_format.py`" in design_text
+    assert "rectangular column-consistent spans chosen from the attached table/block" in eval_text
+    assert "heavy border pattern" in combined_flat
+    assert "prominent borders follow the same meaning-first rule as fills" in combined_flat
+
+
+def test_semantic_fill_helper_uses_rectangular_span_including_blanks() -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.cell(3, 2, "Section")
+    ws.cell(3, 5, "Last populated")
+
+    ib.apply_semantic_fill_span(ws, 3, 2, 6, ib.BG_HEADER_BAND, bottom=ib.THIN_LINE)
+
+    for col in range(2, 7):
+        assert _fill_rgb(ws.cell(3, col)) == ib.BG_HEADER_BAND
+        assert ws.cell(3, col).border.bottom.style == "thin"
+    assert ws.cell(3, 7).fill.fill_type in (None, "none")
 
 
 def _unit_label_violations(wb) -> list[str]:
@@ -1570,6 +1591,8 @@ if __name__ == "__main__":
     test_ib_helpers_reject_wrap_text_true()
     test_skill_guidance_makes_no_wrap_rule_explicit()
     test_skill_guidance_requires_fix_and_rerun_iteration()
+    test_skill_guidance_uses_meaningful_sparse_fills_and_borders()
+    test_semantic_fill_helper_uses_rectangular_span_including_blanks()
     test_source_backed_plan_reaches_generic_kernel_shape()
     test_structured_yaml_currency_and_display_scale_are_generic()
     test_marketplace_source_does_not_emit_unrelated_asset_heavy_template()

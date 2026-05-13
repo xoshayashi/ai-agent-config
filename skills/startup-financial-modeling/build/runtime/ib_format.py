@@ -279,6 +279,46 @@ SEMANTIC_BLANK_FILL_COLORS = {
 }
 
 
+def apply_semantic_fill_span(
+    ws: Worksheet,
+    row: int,
+    start_col: int,
+    end_col: int,
+    color: str,
+    *,
+    top: Side | None = None,
+    bottom: Side | None = None,
+) -> None:
+    """Fill one rectangular semantic row span, including blank member cells.
+
+    Use this for section bands, table headers, selected outputs, checks, and
+    caution rows. The caller chooses `end_col` from the attached table/block,
+    not from whether each cell currently has text.
+    """
+    if end_col < start_col:
+        raise ValueError(
+            f"semantic fill span end_col ({end_col}) must be >= start_col ({start_col})"
+        )
+    fill = PatternFill("solid", fgColor=color)
+    for col in range(start_col, end_col + 1):
+        cell = ws.cell(row=row, column=col)
+        cell.fill = fill
+        if top is not None or bottom is not None:
+            cell.border = Border(
+                left=cell.border.left,
+                right=cell.border.right,
+                top=top if top is not None else cell.border.top,
+                bottom=bottom if bottom is not None else cell.border.bottom,
+                diagonal=cell.border.diagonal,
+                diagonal_direction=cell.border.diagonal_direction,
+                diagonalUp=cell.border.diagonalUp,
+                diagonalDown=cell.border.diagonalDown,
+                outline=cell.border.outline,
+                vertical=cell.border.vertical,
+                horizontal=cell.border.horizontal,
+            )
+
+
 def _fill_rgb(cell: Cell) -> str | None:
     fill = cell.fill
     if fill is None or fill.fill_type != "solid":
@@ -1496,6 +1536,7 @@ __all__ = [
     "TAB_COLOR_BY_ROLE", "SHEET_ROLE_MAPPING", "get_sheet_role",
     "apply_canonical_tab_colors",
     "BG_WHITE", "BG_CANVAS", "BG_TABLE_HEADER", "BG_TOTAL_BAND", "BG_HEADER_BAND", "BG_WORKING",
+    "SEMANTIC_BLANK_FILL_COLORS", "apply_semantic_fill_span",
     "LINK_COLOR",
     # Heatmap palettes
     "HEATMAP_LOW_COOL", "HEATMAP_MID_NEUTRAL", "HEATMAP_HIGH_WARM",
