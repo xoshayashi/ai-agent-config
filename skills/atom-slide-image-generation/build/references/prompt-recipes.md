@@ -26,8 +26,8 @@ Quality anchor vocabulary for evaluation and prompt consistency:
 ```text
 generation_mode: new_image / image_edit
 image_model: gpt-image-2
-image_size: 2048x1152 by default for generated slide output; 1536x864 for explicit drafts only; 2560x1440 for explicit QHD/high-detail requests only; 3840x2160 for explicit 4K requests only
-image_size_label: 1920x1080 is FHD delivery only; 2048x1152 is 16:9 2K-width; 3840x2160 is 4K UHD
+image_size: 2048x1152 for generated slide output, review, PPTX packaging, and PDF packaging
+image_size_label: 2048x1152 is the single 16:9 2K-width PNG master size; 1672x941 is layout-coordinate basis only
 image_quality: low for draft, medium/high for final or text-heavy slides
 image_background: opaque or auto
 image_output_format: png
@@ -35,7 +35,7 @@ image_output_compression: none for PNG slide masters
 image_moderation: auto
 image_n: 1 for final text-heavy slides; variations only for drafts
 image_streaming: optional for exploration, final QA uses completed image
-image_delivery_size: same as approved generated PNG unless the user explicitly requests another valid 16:9 output size
+image_delivery_size: 2048x1152; use the same approved slides_final/ PNG masters for PPTX/PDF delivery wrappers
 generation_route: Codex built-in image generation
 builtin_generation_lock: invoke Codex built-in image generation directly and start generating slide PNGs; do not pause for local environment preflight or local artifact-route probing before generation
 codex_image_artifact_rule: the image returned by Codex built-in image generation is the authoritative generated PNG artifact; use the Codex-provided artifact/download/attachment path to materialize approved outputs under slides_final/ when a filesystem path is needed for PPTX packaging
@@ -227,7 +227,7 @@ ATOM slide contract:
 - use embedded ATOM design mechanics
 - use image_model gpt-image-2
 - use generation_mode new_image for new single-slide images or image_edit for screenshot/reference repair
-- use image_size 2048x1152 by default for generated slide output; use 1536x864 only for explicit quick drafts, 2560x1440 only for explicit QHD/high-detail requests, and resize to 1920x1080 after generation if exact FHD/1080p delivery size is required
+- use image_size 2048x1152 for generated slide output, review, PPTX packaging, and PDF packaging; do not create separate 1920x1080, 1672x941, draft-size, QHD, or 4K delivery PNG masters
 - treat strict DCI 2K 2048x1080 and DCI 4K 4096x2160 as non-target cinema sizes, not ATOM 16:9 slide generation sizes
 - use image_background opaque or auto, never transparent
 - use png for slide fidelity unless latency or file size matters
