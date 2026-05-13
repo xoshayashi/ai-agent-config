@@ -261,14 +261,11 @@ def _setup_sheet(
     ws: Worksheet,
     title: str,
     subtitle: str = "",
-    freeze: str | None = None,
     period_sheet: bool = False,
     periods: int = 0,
 ) -> None:
     ws.sheet_view.showGridLines = False
-    if freeze is None and period_sheet:
-        freeze = f"{get_column_letter(START_PERIOD_COL)}6"
-    ws.freeze_panes = freeze
+    ws.freeze_panes = None
     ws.column_dimensions["A"].width = 3
     for col in range(LAYOUT.first_hierarchy_col, LAYOUT.label_col):
         ws.column_dimensions[get_column_letter(col)].width = LAYOUT.hierarchy_width
@@ -289,11 +286,12 @@ def _setup_sheet(
 
 def _set_column_widths(ws: Worksheet, widths: dict[int | str, float]) -> None:
     role_min_widths = {
-        LAYOUT.first_hierarchy_col: LAYOUT.hierarchy_width,
         LAYOUT.label_col: LAYOUT.label_width,
         LAYOUT.source_col: LAYOUT.source_width,
         LAYOUT.unit_col: LAYOUT.unit_width,
     }
+    for col in range(LAYOUT.first_hierarchy_col, LAYOUT.label_col):
+        role_min_widths[col] = LAYOUT.hierarchy_width
     for col, width in widths.items():
         letter = col if isinstance(col, str) else get_column_letter(col)
         col_index = col if isinstance(col, int) else ws[letter + "1"].column
@@ -318,8 +316,6 @@ def _period_display(facts: SourceFacts) -> str:
 
 
 def _write_period_header(ws: Worksheet, facts: SourceFacts, row: int = 5) -> None:
-    if ws.freeze_panes is None:
-        ws.freeze_panes = f"{get_column_letter(START_PERIOD_COL)}{row + 1}"
     for col in _period_cols(facts):
         ws.column_dimensions[get_column_letter(col)].width = LAYOUT.period_width
     ws.column_dimensions[get_column_letter(START_PERIOD_COL + len(facts.period_labels))].width = LAYOUT.note_width
@@ -473,8 +469,7 @@ def _apply_design_surface(wb: Workbook) -> None:
         uses_default_layout = _uses_default_layout(ws)
         max_col = max(ws.max_column, 9)
         max_row = max(ws.max_row, 5)
-        if ws.freeze_panes is None and any(ws.cell(row=5, column=col).value is not None for col in range(START_PERIOD_COL, max_col + 1)):
-            ws.freeze_panes = f"{get_column_letter(START_PERIOD_COL)}6"
+        ws.freeze_panes = None
         for row in range(1, max_row + 1):
             row_has_value = any(ws.cell(row=row, column=col).value is not None for col in range(1, max_col + 1))
             is_section = _is_section_row(ws, row)
@@ -645,7 +640,7 @@ def _add_bar_chart(ws: Worksheet, title: str, data_ref: Reference, cats_ref: Ref
 
 def _build_guide(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Guide"]
-    _setup_sheet(ws, f"{facts.company} Financial Model Guide", "Generic economic-kernel workbook assembled from the source narrative.", None)
+    _setup_sheet(ws, f"{facts.company} Financial Model Guide", "Generic economic-kernel workbook assembled from the source narrative.")
     _set_column_widths(ws, {2: 30, 3: 92})
     rows = [
         ("Purpose", "Investor-ready startup financial plan with traceable assumptions and editable formulas."),
@@ -677,7 +672,7 @@ def _build_guide(wb: Workbook, facts: SourceFacts) -> None:
 
 def _build_kernel(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Kernel"]
-    _setup_sheet(ws, f"{facts.company} — Economic kernel", "Economic kernel before workbook tabs: decision, grain, mechanics, source status.", None)
+    _setup_sheet(ws, f"{facts.company} — Economic kernel", "Economic kernel before workbook tabs: decision, grain, mechanics, source status.")
     _section(ws, 6, "Kernel definition")
     rows = [
         ("Decision", "Build a startup financial plan for fundraising, board, lender, or investor diligence decisions."),
@@ -813,7 +808,7 @@ def _build_assumptions(wb: Workbook, facts: SourceFacts) -> None:
 
 def _build_driver_tree(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Driver Tree"]
-    _setup_sheet(ws, f"{facts.company} — Driver Tree", "The workbook is composed from economic dependencies, not category routing.", None)
+    _setup_sheet(ws, f"{facts.company} — Driver Tree", "The workbook is composed from economic dependencies, not category routing.")
     _set_column_widths(ws, {2: 22, 3: 44, 4: 30, 5: 42, 6: 22})
     headers = ["Layer", "Driver", "Workbook owner", "Decision relevance", "Source status"]
     for c, header in enumerate(headers, start=2):
@@ -1174,7 +1169,7 @@ def _build_exit_waterfall(wb: Workbook, facts: SourceFacts) -> None:
 
 def _build_segments(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Segments"]
-    _setup_sheet(ws, f"{facts.company} — Segment Lens", "Generic segment allocation for multi-product, geography, or entity models.", None)
+    _setup_sheet(ws, f"{facts.company} — Segment Lens", "Generic segment allocation for multi-product, geography, or entity models.")
     _set_column_widths(ws, {2: 58, 3: 16, 4: 16, 5: 16, 6: 24, 7: 58})
     headers = ["Segment", "Revenue share", "Gross margin", "CapEx share", "Source status", "Decision implication"]
     for col, header in enumerate(headers, start=2):
@@ -1250,7 +1245,7 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
 
 def _build_scenarios(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Scenarios"]
-    _setup_sheet(ws, f"{facts.company} — Scenario Engine", "Downside / base / upside cases expressed as coherent driver sets.", None)
+    _setup_sheet(ws, f"{facts.company} — Scenario Engine", "Downside / base / upside cases expressed as coherent driver sets.")
     scenario_cols = list(range(START_PERIOD_COL, START_PERIOD_COL + 3))
     for col, label in zip(scenario_cols, ["Downside", "Base", "Upside"]):
         ws.cell(5, col, label)
@@ -1353,7 +1348,7 @@ def _scenario_output_formula(facts: SourceFacts, label: str, col: str, drivers: 
 
 def _build_sensitivity(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Sensitivity"]
-    _setup_sheet(ws, f"{facts.company} — Sensitivity", "Two-variable sensitivity around the decision-critical drivers.", None)
+    _setup_sheet(ws, f"{facts.company} — Sensitivity", "Two-variable sensitivity around the decision-critical drivers.")
     _set_column_widths(ws, {START_PERIOD_COL - 1: LAYOUT.period_width})
     final_col = _final_period_col(facts)
     drivers = scenario_drivers_for(facts)
@@ -1495,7 +1490,7 @@ def _build_valuation(wb: Workbook, facts: SourceFacts) -> None:
 
 def _build_market_support(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Market Support"]
-    _setup_sheet(ws, f"{facts.company} — Market Support", "Traceable market, customer, and benchmark support from the provided source.", None)
+    _setup_sheet(ws, f"{facts.company} — Market Support", "Traceable market, customer, and benchmark support from the provided source.")
     _section(ws, 6, "Source anchors")
     ws["B8"] = "Source anchors: " + ("; ".join(facts.source_names) if facts.source_names else "No explicit external source listed")
     ib.apply_comment(ws["B8"], wrap_text=False)
@@ -1544,7 +1539,7 @@ def _build_benchmarks(wb: Workbook, facts: SourceFacts) -> None:
 
 def _build_ic_memo(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["IC Memo"]
-    _setup_sheet(ws, f"{facts.company} — IC Memo Notes", "Investment committee summary generated from the model and source story.", None)
+    _setup_sheet(ws, f"{facts.company} — IC Memo Notes", "Investment committee summary generated from the model and source story.")
     final_col = _final_period_col(facts)
     sections = [
         ("Investment thesis", f"{facts.company} is modeled through an economic kernel described as {facts.mechanics}; use this as a driver composition, not a sector template."),

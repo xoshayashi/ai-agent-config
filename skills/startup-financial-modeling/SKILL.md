@@ -44,7 +44,7 @@ generated cells with `wrap_text` off. Treat text wrapping as prohibited for
 generated workbook cells; fix long text with column width, table structure, or
 blank overflow space instead of enabling `wrap_text=True`.
 
-Design gates: `_layout_canonical.md` owns grid, columns, freeze panes, units,
+Design gates: `_layout_canonical.md` owns grid, columns, hierarchy widths, units,
 formulas, and layout mechanics. `_ib_workbook_design_system.md` owns visual
 roles, font, color, borders, highlights, charts, and render expectations.
 

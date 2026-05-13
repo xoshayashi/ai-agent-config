@@ -1131,7 +1131,6 @@ def setup_sheet_layout(
     *,
     n_periods: int = 36,
     has_unit_col: bool = True,
-    freeze_at: str = "C5",
 ) -> None:
     """シート全体のレイアウト初期化.
 
@@ -1157,7 +1156,7 @@ def setup_sheet_layout(
         ws.column_dimensions[col_letter].width = COL_PERIOD_WIDTH
 
     ws.sheet_view.showGridLines = False
-    ws.freeze_panes = freeze_at
+    ws.freeze_panes = None
 
 
 def setup_print_layout(
@@ -1269,7 +1268,7 @@ def write_cover(
         ws["B14"] = " | ".join(footer_lines)
         apply_comment(ws["B14"])
 
-    setup_sheet_layout(ws, n_periods=4, has_unit_col=False, freeze_at="A1")
+    setup_sheet_layout(ws, n_periods=4, has_unit_col=False)
     ws.sheet_properties.tabColor = BRAND_NAVY  # §2.X canonical: Cover = Navy
 
 

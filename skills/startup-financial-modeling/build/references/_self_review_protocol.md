@@ -46,7 +46,7 @@ heavy process.
 
 - Open or render the workbook when practical.
 - Verify that the workbook renders with readable columns, visible overflow
-  where intended, compact row rhythm, semantic fills, working freeze panes,
+  where intended, compact row rhythm, semantic fills, no frozen panes,
   source / unit alignment, and calm accent usage.
 - Inspect the print/render canvas: each sheet should end at the last real value
   row and column, including chart and drawing anchors, with print area bound to

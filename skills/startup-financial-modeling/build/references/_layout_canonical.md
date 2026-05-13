@@ -5,18 +5,18 @@
 - Use directly auditable cell references and simple editable grid structures;
   generated investor plans keep each label, section, and value in its own cell.
 - Keep assumptions on their own rows with unit and source/note columns.
-- Represent hierarchy through dedicated columns. A is a narrow visual gutter. B
-  is the parent hierarchy column at width 20. If a model needs deeper
-  hierarchy, add more width-20 hierarchy columns to the right, then place the
-  lowest-level line item in the first wide label column. Source / driver, unit,
-  and value columns follow that label column.
+- Represent hierarchy through dedicated columns, not Excel native indent or
+  leading spaces. A is a narrow visual gutter. Every hierarchy / indentation
+  column starts at B and must be width 20. If a model needs deeper hierarchy,
+  add more width-20 hierarchy columns to the right, then place the lowest-level
+  line item in the first wide label column. Source / driver, unit, and value
+  columns follow that label column.
 - The default generated period layout is A gutter, B section, C line item, D
   source / driver, E unit, and F onward for periods or values. Custom matrices
   and scenario tables must derive their first data column from the same layout
   object instead of hard-coding C/D/E or E:I ranges.
-- Freeze panes must preserve every metadata column before the first value
-  column. In the default layout, freeze at F6 for period sheets so B-E stay
-  visible while scrolling through forecast periods.
+- Do not freeze rows or columns in generated workbooks. Keep the layout readable
+  without relying on pane state.
 - Use alignment by meaning: prose, sources, and comments are left-aligned;
   units and numbers are right-aligned; period headers are centered.
 - Monetary cells store raw base-currency values. Show `円`, `千円`, `百万円`,
@@ -44,7 +44,7 @@
 - Use direct cell references in formulas so model logic can be audited without
   hidden aliases.
 - Use the workbook font defined in `_ib_workbook_design_system.md`, clear
-  section bands, frozen panes where useful, and readable number formats.
+  section bands, no frozen panes, and readable number formats.
 
 ## Layout-Linked Visual Semantics
 
