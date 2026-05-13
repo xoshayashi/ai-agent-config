@@ -625,6 +625,17 @@ def test_skill_guidance_makes_no_wrap_rule_explicit() -> None:
     assert "明示的に wrap_text=True" not in ib_text
 
 
+def test_skill_guidance_requires_fix_and_rerun_iteration() -> None:
+    skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+    skill_flat = " ".join(skill_text.split())
+    self_review_flat = " ".join(self_review_text.split())
+
+    assert "fix the concrete failed items and rerun the same checks" in skill_flat
+    assert "fix the concrete failed item, rerun the same check" in self_review_flat
+    assert "Do not replace failed verification with a narrative explanation" in self_review_flat
+
+
 def _unit_label_violations(wb) -> list[str]:
     bad_fragments = ("単位:", "単位：", "Unit:", "JPY M", "JPY B")
     return [
@@ -1418,6 +1429,7 @@ if __name__ == "__main__":
     test_cap_table_rebuild_clears_prior_sheet_fills()
     test_ib_helpers_reject_wrap_text_true()
     test_skill_guidance_makes_no_wrap_rule_explicit()
+    test_skill_guidance_requires_fix_and_rerun_iteration()
     test_source_backed_plan_reaches_generic_kernel_shape()
     test_structured_yaml_currency_and_display_scale_are_generic()
     test_marketplace_source_does_not_emit_unrelated_asset_heavy_template()

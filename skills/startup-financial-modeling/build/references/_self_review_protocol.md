@@ -61,6 +61,11 @@ heavy process.
 
 ## Closeout
 
+If any test, workbook inspection, render check, or checklist item fails, treat
+that finding as work still in progress: fix the concrete failed item, rerun the
+same check, and repeat until the check passes or a real blocker is documented.
+Do not replace failed verification with a narrative explanation.
+
 In the final response, state what was built, what was verified, and which
 assumptions, placeholders, or source gaps remain. Do not present a weak-source
 or unrecalculated workbook as fully proven.

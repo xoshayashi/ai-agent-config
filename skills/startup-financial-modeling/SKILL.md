@@ -54,4 +54,7 @@ scenario/sensitivity/benchmark/DD. KPI, scenario, valuation, benchmark, and memo
 surfaces interpret the model and connect evidence to next actions.
 
 Before completion, recalculate or open/render the xlsx when practical and follow
-`_self_review_protocol.md`.
+`_self_review_protocol.md`. If tests, workbook inspection, render checks, or
+artifact self-review find failures, fix the concrete failed items and rerun the
+same checks. Do not close out while known test or inspection failures remain
+unless a blocker is explicitly documented.
