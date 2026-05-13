@@ -402,12 +402,12 @@ FMT_DEFAULT              = FMT_NUM_MILLION
 # Spacing scale: Material Design-style T-shirt sizing applied to Excel row/col.
 # Ratio ≒ 1.25 (Major Third) on row heights — 15 / 18 / 22 / 32 ≈ 1.0 / 1.2 /
 # 1.47 / 2.13 (relaxed). column widths follow {tiny, small, base, large, xl}
-# ramp consistent with B(parent)=20 / C(label)=44 / D(source)=40 /
+# ramp consistent with B(parent/indent)≈20px in Google Sheets / C(label)=54 / D(source)=54 /
 # E(unit)=12 / F-(period)=15 baseline.
 
 # Column widths
 COL_MARGIN_WIDTH = 3.0          # A: visual gutter only
-COL_HIERARCHY_WIDTH = 20.0      # B and additional hierarchy columns
+COL_HIERARCHY_WIDTH = 2.14      # B and additional hierarchy columns; renders at ~20px in Google Sheets
 COL_LABEL_WIDTH = 54.0          # Lowest-level line-item label
 COL_SOURCE_WIDTH = 54.0         # Source / driver
 COL_UNIT_WIDTH = 14.0           # Unit (¥M / %)

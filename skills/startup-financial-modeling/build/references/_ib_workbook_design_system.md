@@ -26,7 +26,7 @@ Use columns to express hierarchy and readability:
 | Column role | Width guide | Alignment |
 |---|---:|---|
 | A gutter | 3 | visual margin |
-| Hierarchy columns | 20 each | left |
+| Hierarchy columns | 20px in Google Sheets (`2.14` xlsx width) | left |
 | Lowest-level line item | 54 or wider | left |
 | Source / driver | 54 or wider | left, gray italic |
 | Unit | 14 | right, gray |

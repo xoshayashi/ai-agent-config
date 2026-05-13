@@ -290,8 +290,6 @@ def _set_column_widths(ws: Worksheet, widths: dict[int | str, float]) -> None:
         LAYOUT.source_col: LAYOUT.source_width,
         LAYOUT.unit_col: LAYOUT.unit_width,
     }
-    for col in range(LAYOUT.first_hierarchy_col, LAYOUT.label_col):
-        role_min_widths[col] = LAYOUT.hierarchy_width
     for col, width in widths.items():
         letter = col if isinstance(col, str) else get_column_letter(col)
         col_index = col if isinstance(col, int) else ws[letter + "1"].column
@@ -1170,19 +1168,20 @@ def _build_exit_waterfall(wb: Workbook, facts: SourceFacts) -> None:
 def _build_segments(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Segments"]
     _setup_sheet(ws, f"{facts.company} — Segment Lens", "Generic segment allocation for multi-product, geography, or entity models.")
-    _set_column_widths(ws, {2: 58, 3: 16, 4: 16, 5: 16, 6: 24, 7: 58})
+    start_col = LAYOUT.label_col
+    _set_column_widths(ws, {start_col: 58, start_col + 1: 16, start_col + 2: 16, start_col + 3: 16, start_col + 4: 24, start_col + 5: 58})
     headers = ["Segment", "Revenue share", "Gross margin", "CapEx share", "Source status", "Decision implication"]
-    for col, header in enumerate(headers, start=2):
+    for col, header in enumerate(headers, start=start_col):
         _apply_text_header(ws.cell(5, col), header)
     segment_count = max(len(facts.segments), 1)
     for idx, segment in enumerate(facts.segments, start=6):
         share = 1 / segment_count
         row = [segment, share, f"='KPI'!{_final_period_col(facts)}16", share, "source / assumption", "Use this row to split drivers when segment economics diverge."]
-        for col, value in enumerate(row, start=2):
+        for col, value in enumerate(row, start=start_col):
             ws.cell(idx, col, value)
-            if col in (3, 5):
+            if col in (start_col + 1, start_col + 3):
                 ib.apply_hard_input(ws.cell(idx, col), ib.FMT_PERCENT)
-            elif col == 4:
+            elif col == start_col + 2:
                 _apply_value_style(ws.cell(idx, col), ib.FMT_PERCENT)
             else:
                 ib.apply_comment(ws.cell(idx, col), wrap_text=False)
