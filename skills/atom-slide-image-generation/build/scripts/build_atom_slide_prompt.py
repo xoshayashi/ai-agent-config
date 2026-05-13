@@ -871,6 +871,7 @@ def deck_plan_tail() -> str:
         density_risk:
         impact_clarity_density_gate:
         message_sharpness_lock:
+        evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation
         speaker_notes_depth_lock: substantial PPT talk script, 4-7 Japanese sentences or roughly 180-320 Japanese chars unless user requests brief notes
         speaker_notes_text:
         speaker_notes_source_cues:
@@ -881,7 +882,6 @@ def deck_plan_tail() -> str:
           information_units:
           density_levers:
           overload_controls:
-        evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation
         density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
         structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
         structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
@@ -1103,6 +1103,7 @@ def text_structure_tail() -> str:
       density_tier: T1_sparse / T2_balanced / T3_dense / T4_appendix_dense
       impact_clarity_density_gate:
       message_sharpness_lock:
+      evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation
       density_layers:
       density_design:
         reader_mode: scan / read / reference
@@ -1110,7 +1111,6 @@ def text_structure_tail() -> str:
         information_units:
         density_levers:
         overload_controls:
-      evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation
       density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
       structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
       structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
