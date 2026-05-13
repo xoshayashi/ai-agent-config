@@ -239,6 +239,22 @@
       "reason": "Use Codex image artifacts instead of local save-route probing."
     },
     {
+      "pattern": "保存可能な生成経路",
+      "reason": "Do not make save-route probing a prerequisite for slide generation."
+    },
+    {
+      "pattern": "ローカル保存",
+      "reason": "Do not make local save mechanics a prerequisite for slide generation."
+    },
+    {
+      "pattern": "一時キー",
+      "reason": "Do not route slide generation through temporary credential flows."
+    },
+    {
+      "pattern": "並行して確認",
+      "reason": "Do not pair slide planning with parallel credential or save-route probing."
+    },
+    {
       "pattern": "external_slide",
       "reason": "Clean-base PPTX/PDF skill should not retain external slide-hosting route fields."
     },
@@ -282,6 +298,7 @@
     "Package scripts run only after approved Codex built-in image artifacts exist",
     "local_env_non_blocker",
     "credential_setup_blocker",
+    "progress_update_route_lock",
     "builtin_generation_lock",
     "pptx_first_blocker",
     "final_image_quality_status",
@@ -365,7 +382,11 @@
     "visible_brand_label_blocker",
     "no separate ACT wordmark, logo, title kicker, badge, or brand label in the header unless exact_text explicitly requests it",
     "message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement",
+    "insight_absence_default_lock",
+    "insight_justification_required",
     "honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment",
+    "honey_selective_signal_lock",
+    "honey_justification_required",
     "Honey is not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block",
     "bottom Insight bars target 72-96px",
     "#C49A2C thin 2-3px outline",
@@ -384,6 +405,9 @@
     "Do not drop real source names to reduce visual density; shorten or group source names instead.",
     "source_separator_lock: Source is text-only; no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline may appear above, below, behind, or adjacent to Source",
     "density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting",
+    "impact_clarity_density_gate",
+    "message_sharpness_lock",
+    "evidence_compression_ladder",
     "structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide",
     "structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits",
     "structure_choice_status",
@@ -446,6 +470,9 @@
         "deck_tone_signature_lock",
         "illustration_tone_lock",
         "illustration_consistency_status",
+        "impact_clarity_density_gate",
+        "message_sharpness_lock",
+        "evidence_compression_ladder",
         "structure_choice_bias",
         "structured_density_bias",
         "source_real_only_lock",
@@ -461,12 +488,17 @@
         "visible_brand_label_blocker",
         "no separate ACT wordmark, logo, title kicker, badge, or brand label in the header unless exact_text explicitly requests it",
         "message_box_optionality_lock",
+        "insight_absence_default_lock",
+        "insight_justification_required",
         "honey_bottom_bar_lock",
+        "honey_selective_signal_lock",
+        "honey_justification_required",
         "bottom Insight bars target 72-96px",
         "builtin_generation_lock",
         "image_generation_tool_lock",
         "script_boundary_lock",
         "credential_setup_blocker",
+        "progress_update_route_lock",
         "pptx_first_blocker",
         "post_generation_full_deck_review_loop",
         "all_generated_images_reviewed",
@@ -503,6 +535,7 @@
         "Codex built-in image generation",
         "builtin_generation_lock",
         "credential_setup_blocker",
+        "progress_update_route_lock",
         "pptx_first_blocker",
         "speaker_notes_text",
         "speaker_notes_depth_lock",
@@ -624,6 +657,10 @@
         "#C49A2C",
         "visible_brand_label_blocker",
         "message_box_optionality_lock",
+        "insight_absence_default_lock",
+        "insight_justification_required",
+        "honey_selective_signal_lock",
+        "honey_justification_required",
         "Honey is not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block",
         "bottom Insight bars target 72-96px",
         "#C49A2C thin 2-3px outline",
@@ -659,7 +696,8 @@
         "non_rendered_workflow_qa",
         "pdf_export_source_lock",
         "image_generation_tool_lock",
-        "script_boundary_lock"
+        "script_boundary_lock",
+        "progress_update_route_lock"
       ],
       "must_not_contain": [
         "ATOM",
