@@ -80,6 +80,7 @@ REQUIRED_PROMPT_FIELDS = [
     "sentence_density_lift_lock",
     "semantic_sentence_layer",
     "semantic_copy_gate",
+    "icon_restraint_plan",
     "icon_restraint_lock",
     "icon_density_budget",
     "information_unit_budget",
