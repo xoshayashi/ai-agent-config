@@ -550,6 +550,20 @@ def _write_values(
             cell.border = ib.BORDER_SUBTOTAL
 
 
+def _label_rows(ws: Worksheet, labels: tuple[str, ...], *, max_row: int | None = None) -> dict[str, int]:
+    wanted = set(labels)
+    found: dict[str, int] = {}
+    scan_until = max_row or ws.max_row
+    for row in range(1, scan_until + 1):
+        value = ws.cell(row=row, column=LAYOUT.label_col).value
+        if value in wanted:
+            found[str(value)] = row
+    missing = wanted - set(found)
+    if missing:
+        raise KeyError(f"Missing labels while building row references: {', '.join(sorted(missing))}")
+    return found
+
+
 def _resolve_row_refs(value: str, row_by_label: dict[str, int]) -> str:
     def repl(match: re.Match[str]) -> str:
         label = match.group(1)
@@ -762,14 +776,18 @@ def _build_assumptions(wb: Workbook, facts: SourceFacts) -> None:
     _write_values(ws, 60, "Fraud and loss / GMV", "%", [facts.fraud_loss_pct_gmv for _ in cols], source="risk loss", fmt=ib.FMT_PERCENT)
 
     groups = assumption_decomposition_for(facts)
-    row_by_label: dict[str, int] = {
-        "New primary units": 7,
-        "Monthly price / unit": 11,
-        "Variable COGS": 24,
-        "Delivery cost / primary unit": 25,
-        "Cloud / platform cost": 26,
-        "Support cost / customer": 27,
-    }
+    row_by_label = _label_rows(
+        ws,
+        (
+            "New primary units",
+            "Monthly price / unit",
+            "Variable COGS",
+            "Delivery cost / primary unit",
+            "Cloud / platform cost",
+            "Support cost / customer",
+        ),
+        max_row=62,
+    )
     preview_row = 63
     for group in groups:
         preview_row += 1
@@ -1327,7 +1345,7 @@ def _scenario_output_formula(facts: SourceFacts, label: str, col: str, drivers: 
         "EBITDA": f"={col}15-('P&L'!{final_col}17*{opex_factor})",
         "Ending cash": f"='CF'!{final_col}31+{col}16-'P&L'!{final_col}18",
         "Exit EV": f"=MAX(0,{col}16*'Valuation'!{final_col}15)",
-        "Funding gap": f"=MAX(0,-{col}17*{financing_factor})",
+        "Funding gap": f"=MAX(0,-{col}17/MAX(0.01,{financing_factor}))",
         "Founder ownership": f"='Ownership'!{final_col}7/({col}$7^0.15)",
     }
     return formulas[label]

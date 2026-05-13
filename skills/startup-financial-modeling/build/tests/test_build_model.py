@@ -223,12 +223,12 @@ def test_cost_labeled_scenario_drivers_pressure_costs_not_revenue() -> None:
         ws = wb["Scenarios"]
         scenario_row = _row_for_label(wb, "Scenarios", "Prototype / program cost factor")
         assert ws.cell(scenario_row, source_plan.LAYOUT.label_col).value == "Prototype / program cost factor"
-        revenue_formula = ws.cell(14, FIRST_VALUE_COL).value
-        gross_profit_formula = ws.cell(15, FIRST_VALUE_COL).value
+        revenue_formula = _first_year_cell_for_label(wb, "Scenarios", "Revenue").value
+        gross_profit_formula = _first_year_cell_for_label(wb, "Scenarios", "Gross profit").value
         assert f"{FIRST_VALUE_LETTER}${scenario_row}" not in revenue_formula
         assert f"{FIRST_VALUE_LETTER}${scenario_row}" in gross_profit_formula
         hiring_row = _row_for_label(wb, "Scenarios", "Hiring capacity scale")
-        ebitda_formula = ws.cell(16, FIRST_VALUE_COL).value
+        ebitda_formula = _first_year_cell_for_label(wb, "Scenarios", "EBITDA").value
         assert f"{FIRST_VALUE_LETTER}${hiring_row}" not in revenue_formula
         assert f"{FIRST_VALUE_LETTER}${hiring_row}" in ebitda_formula
     finally:
@@ -244,6 +244,20 @@ def test_unclassified_scenario_drivers_default_to_opex_not_revenue() -> None:
     assert cost_factor == "1"
     assert opex_factor == f"{FIRST_VALUE_LETTER}$7"
     assert financing_factor == "1"
+
+
+def test_financing_driver_downside_widens_funding_gap() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nAsset-heavy deployment startup with lease financing, warehouse capacity, and deployment risk. Source: management memo."
+    )
+    try:
+        formula = _first_year_cell_for_label(wb, "Scenarios", "Funding gap").value
+        financing_row = _row_for_label(wb, "Scenarios", "Financing capacity scale")
+        assert f"MAX(0.01,{FIRST_VALUE_LETTER}${financing_row})" in formula
+        assert f"-{FIRST_VALUE_LETTER}17/MAX" in formula
+        assert f"-{FIRST_VALUE_LETTER}17*{FIRST_VALUE_LETTER}${financing_row}" not in formula
+    finally:
+        tmp.cleanup()
 
 
 def test_cost_build_does_not_double_count_detailed_service_costs_in_variable_cogs() -> None:
@@ -1355,6 +1369,7 @@ if __name__ == "__main__":
     test_ambiguous_mechanics_use_generic_kpis_and_scenario_axes()
     test_cost_labeled_scenario_drivers_pressure_costs_not_revenue()
     test_unclassified_scenario_drivers_default_to_opex_not_revenue()
+    test_financing_driver_downside_widens_funding_gap()
     test_cost_build_does_not_double_count_detailed_service_costs_in_variable_cogs()
     test_orchestrator_routes_through_generic_source_plan_builder()
     test_focused_modes_use_generic_kernel_after_bundle_filter()
