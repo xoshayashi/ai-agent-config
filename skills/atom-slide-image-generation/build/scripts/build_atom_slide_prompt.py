@@ -418,7 +418,7 @@ def canonical_planning_block(
     height: [calculated after body and footer rhythm; use the lowest comfortable height when it helps the main content area; bottom Insight bars target 72-96px on the 1672 basis, with 108px only for a necessary two-line sentence]
     radius: 8px or 12px
     padding: [balanced px; enough for centered text but not a tall band]
-    honey_bar_style: [Honey bottom bar uses #F7EECF flat pale fill, #C49A2C thin 2-3px outline, optional left icon well, one #C49A2C vertical separator, #2D332E or #8A6400 text, and no dashed border]
+    honey_bar_style: [N/A unless Honey bottom bar is selected; then use #F7EECF flat pale fill, #C49A2C thin 2-3px outline, optional left icon well, one #C49A2C vertical separator, #2D332E text, and no dashed border]
     left_accent: [Honey bottom bars use a thin separator after the optional icon well, not a full-height far-left stripe; Deep Blue uses embedded ATOM design system accent line spec only outside Honey]
     background: [flat solid fill color only; Honey message box uses #F7EECF; no pattern, texture, gradient, motif, dashed outline, or internal illustration]
     text_alignment: [optically centered horizontally and vertically within the surface]
@@ -633,7 +633,7 @@ draft_image_prompt_scaffold:
   Keep visual subject selection open and message-led; use the subject that makes the argument most observable through scale, interaction, place, evidence, or operating context.
   Create freshness through viewpoint, asymmetric composition, designed margin vignettes, evidence strips, partial cutaways, and magnified details, not decoration or glossy concept art.
   Use Deep Blue structurally with a 4-8% visual area budget, up to 12% only for strong closing slides, and never for body text.
-  Use Honey only for ATOM or compatible guidelines where it is a decision signal, preferably as a bottom Insight bar: #F7EECF flat pale Honey fill, #C49A2C thin 2-3px outline, optional left icon well, one #C49A2C vertical separator, #2D332E or #8A6400 text, one component maximum. Honey is not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block.
+  Use Honey only for ATOM or compatible guidelines where it is a decision signal, preferably as a bottom Insight bar: #F7EECF flat pale Honey fill, #C49A2C thin 2-3px outline, optional left icon well, one #C49A2C vertical separator, #2D332E text, one component maximum. Honey is not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block.
   Use flat solid fills for all message boxes and Insight surfaces; do not add patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
   Apply message_box_scale_lock: message boxes are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered. For bottom Insight bars, target 72-96px height on the 1672 basis and allow up to 108px only for a necessary two-line sentence. Keep copy to one short judgment sentence, prefer one line, max two lines, and do not enlarge the surface to rescue long prose.
   Apply message_box_text_size_lock: message-box/Insight text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below the subtitle, and never becomes a second title or second hero headline.
@@ -720,7 +720,7 @@ post_generation_audit:
   - message_box_text_alignment_lock is honored: Insight/message-box text is optically centered horizontally and vertically inside the surface
   - insight_surface_placement_lock is honored: kept Insight/message-box surfaces bridge the interpreted body region and footer rhythm without competing with either
   - visible_brand_label_blocker passes: no separate ATOM wordmark, logo, title kicker, or brand label appears in the header unless exact_text explicitly requested it
-  - Honey message boxes use #F7EECF fill, #C49A2C thin outline/separator, optional left icon well, and #2D332E or #8A6400 text consistently
+  - Honey message boxes use #F7EECF fill, #C49A2C thin outline/separator, optional left icon well, and #2D332E text consistently
   - Honey is absent from main content cards, missing-body placeholders, dashed boxes, category badges, title underlines, and decorative yellow blocks
   - saturated yellow, dark yellow, or large yellow areas are absent
   - coordinate_inventory_1672 matches visible major objects

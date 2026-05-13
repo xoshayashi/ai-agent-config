@@ -284,7 +284,7 @@ ATOM slide contract:
 - let structure, spacing, rules, numbers, and typography carry hierarchy
 - use the embedded ATOM design system's accent color structurally with a restrained area budget; for ATOM work, Deep Blue uses a standard 4-8% area budget, may reach 10% on dense table slides, and may reach 12% only for rare chapter/closing slides; it never appears as body text
 - use Insight component only if it adds interpretation or decision weight and is compatible with the embedded ATOM design system; many slides should use no message box
-- if Honey is used in ATOM or compatible guidelines, use it preferably as a bottom Insight bar with #F7EECF flat pale fill, #C49A2C thin 2-3px outline/separator, optional left icon well, #2D332E or #8A6400 text, one component maximum
+- if Honey is used in ATOM or compatible guidelines, use it preferably as a bottom Insight bar with #F7EECF flat pale fill, #C49A2C thin 2-3px outline/separator, optional left icon well, #2D332E text, one component maximum
 - keep all Insight/message boxes flat solid fill only; no patterns, textures, gradients, motifs, icon wallpaper, dashed outlines, or internal illustrations
 - apply content_area_priority_lock before sizing an Insight/message-box: give the body, figure, table, or diagram the needed height first, then use the remaining calculated space for the optional box
 - apply message_box_scale_lock: keep Insight/message boxes compact, one short judgment sentence, one line preferred and two lines maximum; bottom bars target 72-96px on the 1672 basis; move detail to notes instead of growing the surface
@@ -491,7 +491,7 @@ Evaluate:
 - Is the deck underusing or overusing Insight components?
 - Which choice is quietest and clearest under the embedded ATOM design system: none, outlined thesis, outlined bottom, accent surface, dark accent surface, or Honey bottom bar when ATOM?
 - If Honey is chosen, does it help the reader decide faster?
-- Does the Honey component use the fixed bottom-bar treatment (#F7EECF fill, #C49A2C 2-3px outline/separator, optional left icon well, #2D332E or #8A6400 text)?
+- Does the Honey component use the fixed bottom-bar treatment (#F7EECF fill, #C49A2C 2-3px outline/separator, optional left icon well, #2D332E text)?
 
 Output:
 - keep/remove
