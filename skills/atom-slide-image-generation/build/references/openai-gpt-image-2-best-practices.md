@@ -68,6 +68,7 @@ Important size rule:
 - `1920x1080` is not a valid direct generation size because `1080` is not divisible by `16`.
 - Keep ATOM layout planning on the `1672x941` coordinate basis, but generate and package approved PNG masters at `2048x1152`.
 - `2048x1152`: required 16:9 2K-width generated slide output for working review, final PNGs, PPTX packaging, and PDF packaging.
+- Apply `nonconforming_existing_png_regeneration_lock`: existing/source PNGs at `1672x941` or another non-approved size are not final blockers. Do not convert, upscale, HTML-render, API-render, or locally redraw them. Reuse the approved slide specification and generate new `2048x1152` `slides_final/` masters with Codex built-in gpt-image-2, then review and package those generated masters.
 - Do not create separate `1920x1080`, `1672x941`, draft-size, QHD, or 4K delivery PNG masters for this skill.
 - Strict cinema/DCI sizes such as `2048x1080` and `4096x2160` are not ATOM 16:9 slide targets; `4096x2160` also exceeds the current `3840px` maximum edge constraint for this workflow.
 

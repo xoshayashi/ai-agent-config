@@ -36,6 +36,7 @@ image_moderation: auto
 image_n: 1 for final text-heavy slides; variations only for drafts
 image_streaming: optional for exploration, final QA uses completed image
 image_delivery_size: 2048x1152; use the same approved slides_final/ PNG masters for PPTX/PDF delivery wrappers
+nonconforming_existing_png_regeneration_lock: existing/source PNGs at 1672x941 or any non-approved size are not final blockers and must not be converted, upscaled, HTML-rendered, API-rendered, or locally redrawn; reuse the approved slide specification and generate new 2048x1152 slides_final/ masters with Codex built-in gpt-image-2
 generation_route: Codex built-in image generation
 builtin_generation_lock: invoke Codex built-in image generation directly and start generating slide PNGs; do not pause for local environment preflight or local artifact-route probing before generation
 codex_image_artifact_rule: the image returned by Codex built-in image generation is the authoritative generated PNG artifact; use the Codex-provided artifact/download/attachment path to materialize approved outputs under slides_final/ when a filesystem path is needed for PPTX packaging
@@ -234,6 +235,7 @@ ACT slide contract:
 - prompt/package scripts are helpers only: use them to scaffold prompts, validate manifests, or package already-approved Codex image artifacts; never use scripts to render, draw, screenshot, export, simulate, or replace final slide PNGs
 - use generation_mode new_image for new single-slide images or image_edit for screenshot/reference repair
 - use image_size 2048x1152 for generated slide output, review, PPTX packaging, and PDF packaging; do not create separate 1920x1080, 1672x941, draft-size, QHD, or 4K delivery PNG masters
+- if existing/source PNGs are 1672x941 or another non-approved package size, do not stop at the package-script rejection and do not convert, upscale, HTML-render, API-render, or locally redraw them; reuse the approved slide specification and generate new 2048x1152 slides_final/ masters with Codex built-in gpt-image-2, then review and package those generated masters
 - treat strict DCI 2K 2048x1080 and DCI 4K 4096x2160 as non-target cinema sizes, not ACT 16:9 slide generation sizes
 - use image_background opaque or auto, never transparent
 - use png for slide fidelity unless latency or file size matters
@@ -295,7 +297,7 @@ ACT slide contract:
 - start from `insight_decision: none`; use Insight component only if it adds non-redundant interpretation, decision weight, or a reading bridge and is compatible with the embedded ACT design system; many slides should use no message box
 - apply insight_justification_required: if the same sentence is already clear from H1, subtitle, chart/table labels, or notes, remove the Insight/message-box
 - apply honey_selective_signal_lock: Honey starts absent; use it only when a justified bottom decision signal is stronger than no component or a neutral outlined treatment
-- if Honey is used in ACT or compatible guidelines, use it only as a justified bottom Insight bar with #F5E2A8 flat pale fill, #C49A2C thin 2-3px outline/separator, optional left icon well, #2D332E text, one component maximum
+- if Honey is used in ACT or compatible guidelines, use it only as a justified bottom Insight bar with #FBF3D7 very pale fill, #C49A2C thin 2-3px outline/separator, optional left icon well with a small 20-24px icon on the 1672 basis, #2D332E text, one component maximum
 - keep all Insight/message boxes flat solid fill only; no patterns, textures, gradients, motifs, icon wallpaper, dashed outlines, or internal illustrations
 - apply content_area_priority_lock before sizing an Insight/message-box: give the body, figure, table, or diagram the needed height first, then use the remaining calculated space for the optional box
 - apply message_box_scale_lock: keep Insight/message boxes compact, one short judgment sentence, one line preferred and two lines maximum; bottom bars target 72-96px on the 1672 basis; move detail to notes instead of growing the surface
@@ -513,7 +515,7 @@ Evaluate:
 - Which choice is quietest and clearest under the embedded ACT design system: none, outlined thesis, outlined bottom, accent surface, dark accent surface, or Honey bottom bar when ACT?
 - If Honey is chosen, does it help the reader decide faster?
 - If Honey is chosen, is there a written honey_justification_required reason tied to decision clarity rather than decoration?
-- Does the Honey component use the fixed bottom-bar treatment (#F5E2A8 fill, #C49A2C 2-3px outline/separator, optional left icon well, #2D332E text)?
+- Does the Honey component use the fixed bottom-bar treatment (#FBF3D7 very pale fill, #C49A2C 2-3px outline/separator, optional left icon well with a small 20-24px icon, #2D332E text)?
 - Is the Insight/message-box footprint tied to the interpreted body region and footer rhythm rather than floating in leftover space?
 - For bottom variants, does it sit as a centered bridge between body content and Source, with clear breathing room above and below?
 - Is the Insight/message-box text optically centered inside the surface both horizontally and vertically?
@@ -621,6 +623,7 @@ Content:
 - source_line and table_note_microline are separate
 - source_real_only_lock passes: Source footer is shown only for real traceable external/provided sources
 - source_placeholder_blocklist passes: no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions appears as Source text
+- nonconforming_existing_png_regeneration_lock passes: any existing/source PNG at 1672x941 or another non-approved package size was not treated as a final blocker or converted locally; a new 2048x1152 Codex built-in gpt-image-2 master was generated from the approved specification before packaging
 - output_artifact_mastering_lock passes: `slides_final/` is the only loose-PNG master and package/render-check artifacts reference it
 - pdf_export_source_lock passes: PDF outputs are created from `slides_final/` master PNGs; `render_check/pdf_pages/` is rendered-back QA only
 - no_duplicate_png_output_lock passes: no duplicate loose final PNG copies remain across `slides_final/`, `slides_package/`, and `render_check/pdf_pages/`
