@@ -297,7 +297,7 @@ ACT slide contract:
 - start from `insight_decision: none`; use Insight component only if it adds non-redundant interpretation, decision weight, or a reading bridge and is compatible with the embedded ACT design system; many slides should use no message box
 - apply insight_justification_required: if the same sentence is already clear from H1, subtitle, chart/table labels, or notes, remove the Insight/message-box
 - apply honey_selective_signal_lock: Honey starts absent; use it only when a justified bottom decision signal is stronger than no component or a neutral outlined treatment
-- if Honey is used in ACT or compatible guidelines, use it only as a justified bottom Insight bar with #F5E2A8 flat pale fill, #C49A2C thin 2-3px outline/separator, optional left icon well, #2D332E text, one component maximum
+- if Honey is used in ACT or compatible guidelines, use it only as a justified bottom Insight bar with #FBF3D7 very pale fill, #C49A2C thin 2-3px outline/separator, optional left icon well with a small 20-24px icon on the 1672 basis, #2D332E text, one component maximum
 - keep all Insight/message boxes flat solid fill only; no patterns, textures, gradients, motifs, icon wallpaper, dashed outlines, or internal illustrations
 - apply content_area_priority_lock before sizing an Insight/message-box: give the body, figure, table, or diagram the needed height first, then use the remaining calculated space for the optional box
 - apply message_box_scale_lock: keep Insight/message boxes compact, one short judgment sentence, one line preferred and two lines maximum; bottom bars target 72-96px on the 1672 basis; move detail to notes instead of growing the surface
@@ -515,7 +515,7 @@ Evaluate:
 - Which choice is quietest and clearest under the embedded ACT design system: none, outlined thesis, outlined bottom, accent surface, dark accent surface, or Honey bottom bar when ACT?
 - If Honey is chosen, does it help the reader decide faster?
 - If Honey is chosen, is there a written honey_justification_required reason tied to decision clarity rather than decoration?
-- Does the Honey component use the fixed bottom-bar treatment (#F5E2A8 fill, #C49A2C 2-3px outline/separator, optional left icon well, #2D332E text)?
+- Does the Honey component use the fixed bottom-bar treatment (#FBF3D7 very pale fill, #C49A2C 2-3px outline/separator, optional left icon well with a small 20-24px icon, #2D332E text)?
 - Is the Insight/message-box footprint tied to the interpreted body region and footer rhythm rather than floating in leftover space?
 - For bottom variants, does it sit as a centered bridge between body content and Source, with clear breathing room above and below?
 - Is the Insight/message-box text optically centered inside the surface both horizontally and vertically?

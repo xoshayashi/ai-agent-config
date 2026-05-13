@@ -429,9 +429,9 @@ def canonical_planning_block(
     height: [calculated after body and footer rhythm; use the lowest comfortable height when it helps the main content area; bottom Insight bars target 72-96px on the 1672 basis, with 108px only for a necessary two-line sentence]
     radius: 8px or 12px
     padding: [balanced px; enough for centered text but not a tall band]
-    honey_bar_style: [N/A unless Honey bottom bar is selected; then use #F5E2A8 flat pale fill, #C49A2C thin 2-3px outline, optional left icon well, one #C49A2C vertical separator, #2D332E text, and no dashed border]
+    honey_bar_style: [N/A unless Honey bottom bar is selected; then use #FBF3D7 very pale Honey fill, #C49A2C thin 2-3px outline, optional left icon well with a small 20-24px icon on the 1672 basis, one #C49A2C vertical separator, #2D332E text, and no dashed border]
     left_accent: [Honey bottom bars use a thin separator after the optional icon well, not a full-height far-left stripe; Petrol uses embedded ACT design system accent line spec only outside Honey]
-    background: [flat solid fill color only; Honey message box uses #F5E2A8; no pattern, texture, gradient, motif, dashed outline, or internal illustration]
+    background: [flat solid fill color only; Honey message box uses #FBF3D7; no pattern, texture, gradient, motif, dashed outline, or internal illustration]
     text_alignment: [optically centered horizontally and vertically within the surface]
     placement_relation: [inside the 12-column grid; tied to the interpreted body region; bottom variants bridge body content and Source without touching either]
     text: [one judgment sentence if kept]
@@ -661,7 +661,7 @@ draft_image_prompt_scaffold:
   Create freshness through viewpoint, asymmetric composition, designed margin vignettes, evidence strips, partial cutaways, and magnified details, not decoration or glossy concept art.
   Use Petrol structurally with a 6-12% visual area budget, and never for body text.
   Apply insight_absence_default_lock and insight_justification_required: start from no Insight/message-box; keep one only when the slide loses non-redundant interpretation, decision signal, or reading bridge without it.
-  Use Honey only for ACT or compatible guidelines where it is a justified bottom decision signal: #F5E2A8 flat pale Honey fill, #C49A2C thin 2-3px outline, optional left icon well, one #C49A2C vertical separator, #2D332E text, one component maximum. Apply honey_selective_signal_lock and honey_justification_required: Honey starts absent, is never the default message-box color, and must be removed if it is decorative, redundant, space-filling, or stronger than the body content.
+  Use Honey only for ACT or compatible guidelines where it is a justified bottom decision signal: #FBF3D7 very pale Honey fill, #C49A2C thin 2-3px outline, optional left icon well with a small 20-24px icon on the 1672 basis, one #C49A2C vertical separator, #2D332E text, one component maximum. Apply honey_selective_signal_lock and honey_justification_required: Honey starts absent, is never the default message-box color, and must be removed if it is decorative, redundant, space-filling, or stronger than the body content.
   Use flat solid fills for all message boxes and Insight surfaces; do not add patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
   Apply message_box_scale_lock: message boxes are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered. For bottom Insight bars, target 72-96px height on the 1672 basis and allow up to 108px only for a necessary two-line sentence. Keep copy to one short judgment sentence, prefer one line, max two lines, and do not enlarge the surface to rescue long prose.
   Apply message_box_text_size_lock: message-box/Insight text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below the subtitle, and never becomes a second title or second hero headline.
@@ -755,7 +755,7 @@ post_generation_audit:
   - message_box_text_alignment_lock is honored: Insight/message-box text is optically centered horizontally and vertically inside the surface
   - insight_surface_placement_lock is honored: kept Insight/message-box surfaces bridge the interpreted body region and footer rhythm, and bottom variants sit between body content and Source without competing with either
   - visible_brand_label_blocker passes: no separate ACT wordmark, logo, title kicker, or brand label appears in the header unless exact_text explicitly requested it
-  - If a Honey Insight/message-box is justified and kept, it uses #F5E2A8 fill, #C49A2C thin outline/separator, optional left icon well, and #2D332E text consistently
+  - If a Honey Insight/message-box is justified and kept, it uses #FBF3D7 very pale fill, #C49A2C thin outline/separator, optional left icon well with a small 20-24px icon, and #2D332E text consistently
   - Honey is not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block
   - Honey is absent from main content cards, missing-body placeholders, dashed outlines, category badges, title underlines, and decorative yellow blocks
   - saturated yellow, dark yellow, or large yellow areas are absent
