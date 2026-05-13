@@ -417,7 +417,7 @@ COL_PERIOD_WIDTH = 16.0         # Each period (Y1 / Q1 / Jan-26)
 COL_WIDTH_TINY = 6.0
 COL_WIDTH_SMALL = 12.0
 COL_WIDTH_BASE = 16.0
-COL_WIDTH_LARGE = 20.0          # = hierarchy-column width
+COL_WIDTH_LARGE = 20.0          # auxiliary large text/table width; not hierarchy width
 COL_WIDTH_XLARGE = 32.0
 COL_NOTE_WIDTH = 72.0
 

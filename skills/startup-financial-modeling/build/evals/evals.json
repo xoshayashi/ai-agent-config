@@ -13,10 +13,10 @@
         { "id": "A1", "text": "Model begins with decision, model grain, entity scope, source facts, assumptions, and unknowns before sheet selection", "type": "structure" },
         { "id": "A2", "text": "Driver tree links units, price, utilization, capacity, manufacturing cost, working capital, capex, financing, and ownership", "type": "logic" },
         { "id": "A2b", "text": "Critical assumptions include explanatory drivers, implied values, support ratios or variances, and evidence status", "type": "logic" },
-        { "id": "A3", "text": "Workbook includes raw base-currency monetary values, correct non-monetary units, direct formulas, no workbook-scoped names, no merged cells, and no text wrapping", "type": "implementation" },
+        { "id": "A3", "text": "Workbook includes raw base-currency monetary values, correct non-monetary units, direct formulas, no workbook-scoped names, no merged cells, no frozen panes, no text wrapping, and hierarchy / indent columns that render as 20px in Google Sheets (about 2.14 xlsx width)", "type": "implementation" },
         { "id": "A4", "text": "KPI reflects actual economics such as fleet, utilization, payback, gross margin, runway, burn multiple, capital efficiency, and deployment capacity", "type": "metric" },
         { "id": "A5", "text": "Valuation and funding logic tie to scenarios, cash runway, dilution, lease/debt capacity, and investor return rather than a generic revenue multiple only", "type": "valuation" },
-        { "id": "A6", "text": "IC memo interprets KPI, downside triggers, valuation support, financing/dilution, and DD actions instead of merely listing workbook tabs", "type": "memo" },
+        { "id": "A6", "text": "IC memo is written from a clean decision-specific base, ignores legacy/backward-compatible memo layouts, and interprets KPI, downside triggers, valuation support, financing/dilution, and DD actions with only necessary and sufficient supplemental context", "type": "memo" },
         { "id": "A7", "text": "Generated defaults are labeled by evidence status and weak default assumptions are linked to scenario, benchmark refresh, or DD actions rather than presented as sourced facts", "type": "evidence" }
       ]
     },
@@ -119,6 +119,7 @@
       "assertions": [
         { "id": "H1", "text": "Findings cite concrete sheet/cell locations and distinguish style blockers from formula/modeling issues", "type": "audit" },
         { "id": "H2", "text": "Blank cells intended for overflow remain genuinely blank and unstyled after repair", "type": "implementation" },
+        { "id": "H2a", "text": "Hierarchy / indent columns render as 20px in Google Sheets (about 2.14 xlsx width), with no native Excel indent, no leading-space indentation, no frozen panes, and no generated text wrapping", "type": "implementation" },
         { "id": "H2b", "text": "Sheet canvases and print areas stop at the real used range, with no styled trailing rows or columns that create extra rendered pages", "type": "implementation" },
         { "id": "H2c", "text": "Borders and background fills form a calm repeated design system instead of noisy isolated cell decoration", "type": "design" },
         { "id": "H2d", "text": "Charts, drawings, and newly inserted rows or cells remain inside an editable rendered canvas without inheriting noisy blank styles", "type": "implementation" },
@@ -181,8 +182,8 @@
   "notes": [
     "The core regression is generic composition from economic kernel and driver tree.",
     "Maturity, sector, and funding context are evidence fields, not template selectors.",
-    "All xlsx outputs should preserve raw base-currency money storage, unit integrity, no text wrapping, direct formulas, and editable workbook structure.",
-    "Prompt guidance must force assumption epistemology, KPI interpretation, coherent scenarios, valuation method credibility, benchmark/source hygiene, and self-inspection before completion.",
+    "All xlsx outputs should preserve raw base-currency money storage, unit integrity, no text wrapping, no frozen panes, Google-Sheets-20px hierarchy / indent columns, direct formulas, and editable workbook structure.",
+    "Prompt guidance must force assumption epistemology, KPI interpretation, coherent scenarios, valuation method credibility, clean-base memo writing, benchmark/source hygiene, and self-inspection before completion.",
     "Examples, maturity cues, sectors, and modes are pattern prompts only; evals should reject fixed stage-sector-purpose routing and keyword-triggered metric packs."
   ]
 }

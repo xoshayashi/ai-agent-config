@@ -48,6 +48,9 @@ heavy process.
 - Verify that the workbook renders with readable columns, visible overflow
   where intended, compact row rhythm, semantic fills, no frozen panes,
   source / unit alignment, and calm accent usage.
+- Confirm hierarchy / indentation uses dedicated Google-Sheets-20px columns
+  (`2.14` xlsx width), with no native Excel indent, no leading-space
+  indentation, and no wrapped generated cells.
 - Inspect the print/render canvas: each sheet should end at the last real value
   row and column, including chart and drawing anchors, with print area bound to
   that rendered range and no styled blank rows or columns extending the visual

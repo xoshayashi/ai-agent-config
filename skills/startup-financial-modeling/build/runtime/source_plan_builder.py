@@ -98,6 +98,10 @@ class LayoutSpec:
 
 LAYOUT = LayoutSpec()
 START_PERIOD_COL = LAYOUT.first_value_col
+
+
+def _start_period_col() -> int:
+    return LAYOUT.first_value_col
 TAB_COLORS = {
     "Guide": ib.BRAND_NAVY,
     "Kernel": ib.BRAND_PRIMARY_DEEP,
@@ -273,9 +277,9 @@ def _setup_sheet(
     ws.column_dimensions[get_column_letter(LAYOUT.source_col)].width = LAYOUT.source_width
     ws.column_dimensions[get_column_letter(LAYOUT.unit_col)].width = LAYOUT.unit_width
     if period_sheet:
-        for col in range(START_PERIOD_COL, START_PERIOD_COL + max(periods, 1)):
+        for col in range(_start_period_col(), _start_period_col() + max(periods, 1)):
             ws.column_dimensions[get_column_letter(col)].width = LAYOUT.period_width
-        ws.column_dimensions[get_column_letter(START_PERIOD_COL + max(periods, 1))].width = LAYOUT.note_width
+        ws.column_dimensions[get_column_letter(_start_period_col() + max(periods, 1))].width = LAYOUT.note_width
     ws["B2"] = title
     ws["B2"].font = Font(name=ib.FONT_FAMILY, size=14, bold=True, color=ib.IB_INK)
     ws["B3"] = subtitle
@@ -298,7 +302,7 @@ def _set_column_widths(ws: Worksheet, widths: dict[int | str, float]) -> None:
 
 
 def _period_cols(facts: SourceFacts) -> list[int]:
-    return list(range(START_PERIOD_COL, START_PERIOD_COL + len(facts.period_labels)))
+    return list(range(_start_period_col(), _start_period_col() + len(facts.period_labels)))
 
 
 def _final_period_col(facts: SourceFacts) -> str:
@@ -316,15 +320,15 @@ def _period_display(facts: SourceFacts) -> str:
 def _write_period_header(ws: Worksheet, facts: SourceFacts, row: int = 5) -> None:
     for col in _period_cols(facts):
         ws.column_dimensions[get_column_letter(col)].width = LAYOUT.period_width
-    ws.column_dimensions[get_column_letter(START_PERIOD_COL + len(facts.period_labels))].width = LAYOUT.note_width
+    ws.column_dimensions[get_column_letter(_start_period_col() + len(facts.period_labels))].width = LAYOUT.note_width
     for col, label in zip(_period_cols(facts), facts.period_labels):
         cell = ws.cell(row=row, column=col, value=label)
         ib.apply_year_header(cell, label)
         cell.fill = PatternFill("solid", fgColor=ib.BG_TABLE_HEADER)
         cell.border = ib.BORDER_BOTTOM_THIN
-    headers = [(LAYOUT.first_hierarchy_col, "Section"), (LAYOUT.label_col, "Line item"), (LAYOUT.source_col, "Source / driver"), (LAYOUT.unit_col, "Unit")]
+    headers = [(LAYOUT.first_hierarchy_col, ""), (LAYOUT.label_col, "Line item"), (LAYOUT.source_col, "Source / driver"), (LAYOUT.unit_col, "Unit")]
     for col, label in headers:
-        c = ws.cell(row=row, column=col, value=label)
+        c = ws.cell(row=row, column=col, value=label if label else None)
         c.font = ib.FONT_BODY_BOLD
         c.fill = PatternFill("solid", fgColor=ib.BG_TABLE_HEADER)
         c.alignment = Alignment(horizontal="left" if col in (LAYOUT.first_hierarchy_col, LAYOUT.label_col, LAYOUT.source_col) else "right", vertical="center", wrap_text=False)
@@ -453,8 +457,16 @@ def _is_highlight_row(ws: Worksheet, row: int) -> bool:
 
 
 def _uses_default_layout(ws: Worksheet) -> bool:
-    return [ws.cell(row=5, column=col).value for col in range(2, 6)] == [
-        "Section",
+    hierarchy_values = [
+        ws.cell(row=5, column=col).value
+        for col in range(LAYOUT.first_hierarchy_col, LAYOUT.label_col)
+    ]
+    role_values = [
+        ws.cell(row=5, column=LAYOUT.label_col).value,
+        ws.cell(row=5, column=LAYOUT.source_col).value,
+        ws.cell(row=5, column=LAYOUT.unit_col).value,
+    ]
+    return hierarchy_values == [None] * LAYOUT.hierarchy_cols and role_values == [
         "Line item",
         "Source / driver",
         "Unit",
@@ -524,7 +536,7 @@ def _write_values(
     facts = _facts_for_sheet(ws, facts)
     applied_fmt = _format_for_unit(unit, fmt, facts)
     _label(ws, row, label, unit, source, note, bold=bold, fmt=applied_fmt, facts=facts)
-    period_cols = list(range(START_PERIOD_COL, START_PERIOD_COL + len(values)))
+    period_cols = list(range(_start_period_col(), _start_period_col() + len(values)))
     for col, value in zip(period_cols, values):
         model_value = _model_value(value, unit)
         cell = ws.cell(row=row, column=col, value=model_value)
@@ -533,7 +545,7 @@ def _write_values(
         else:
             _apply_value_style(cell, applied_fmt)
     if bold:
-        for col in range(LAYOUT.first_hierarchy_col, START_PERIOD_COL + len(values)):
+        for col in range(LAYOUT.first_hierarchy_col, _start_period_col() + len(values)):
             cell = ws.cell(row=row, column=col)
             if cell.value is None:
                 continue
@@ -754,7 +766,7 @@ def _build_assumptions(wb: Workbook, facts: SourceFacts) -> None:
         prior = get_column_letter(prior_col)
         beginning_cash.append(f"={prior}47+'CF'!{prior}23")
     _write_values(ws, 47, "Beginning cash", "JPY", beginning_cash, source="cash roll-forward", kind="formula", fmt=ib.FMT_MONEY)
-    ib.apply_hard_input(ws.cell(47, START_PERIOD_COL), _money_format(facts))
+    ib.apply_hard_input(ws.cell(47, _start_period_col()), _money_format(facts))
 
     _section(ws, 50, "Operating policy")
     _write_values(ws, 51, "S&M / revenue", "%", facts.sm_pct_revenue, source="go-to-market spend policy", fmt=ib.FMT_PERCENT)
@@ -978,7 +990,7 @@ def _build_bs(wb: Workbook, facts: SourceFacts) -> None:
     ]
     for row, label, unit, values in rows:
         _write_values(ws, row, label, unit, values, kind="formula", fmt=ib.FMT_MONEY, bold=row in (10, 15, 21, 25, 27))
-    _highlight_row(ws, 27, START_PERIOD_COL + len(cols) - 1)
+    _highlight_row(ws, 27, _start_period_col() + len(cols) - 1)
 
 
 def _build_cf(wb: Workbook, facts: SourceFacts) -> None:
@@ -1084,7 +1096,7 @@ def _build_ownership(wb: Workbook, facts: SourceFacts) -> None:
     ]
     for row, label, unit, values, source, kind, fmt in rows:
         _write_values(ws, row, label, unit, values, source=source, kind=kind, fmt=fmt, bold=row == 16)
-    _highlight_row(ws, 16, START_PERIOD_COL + len(cols) - 1)
+    _highlight_row(ws, 16, _start_period_col() + len(cols) - 1)
 
 
 def _build_pricing(wb: Workbook, facts: SourceFacts) -> None:
@@ -1107,8 +1119,8 @@ def _build_pricing(wb: Workbook, facts: SourceFacts) -> None:
     ]
     for row, label, unit, values, source, kind, fmt in rows:
         _write_values(ws, row, label, unit, values, source=source, kind=kind, fmt=fmt, bold=row in (7, 16, 17))
-    _highlight_row(ws, 16, START_PERIOD_COL + len(cols) - 1)
-    _highlight_row(ws, 17, START_PERIOD_COL + len(cols) - 1)
+    _highlight_row(ws, 16, _start_period_col() + len(cols) - 1)
+    _highlight_row(ws, 17, _start_period_col() + len(cols) - 1)
 
 
 def _build_financing(wb: Workbook, facts: SourceFacts) -> None:
@@ -1125,12 +1137,12 @@ def _build_financing(wb: Workbook, facts: SourceFacts) -> None:
         (12, "Customer advances", "JPY", facts.customer_advances_yen, "working-capital offset", "input", ib.FMT_MONEY),
         (13, "Founder / investor secondary", "JPY", facts.secondary_yen, "liquidity use", "input", ib.FMT_MONEY),
         (15, "Financing cash inflow", "JPY", [f"=SUM({get_column_letter(c)}7:{get_column_letter(c)}12)-{get_column_letter(c)}13" for c in cols], "cash inflow", "formula", ib.FMT_MONEY),
-        (16, "Downside funding gap", "JPY", [f"='Scenarios'!{get_column_letter(START_PERIOD_COL)}19" for _ in cols], "scenario pressure", "formula", ib.FMT_MONEY),
+        (16, "Downside funding gap", "JPY", [f"='Scenarios'!{get_column_letter(_start_period_col())}19" for _ in cols], "scenario pressure", "formula", ib.FMT_MONEY),
         (17, "NOL balance", "JPY", facts.nol_yen, "tax shield", "input", ib.FMT_MONEY),
     ]
     for row, label, unit, values, source, kind, fmt in rows:
         _write_values(ws, row, label, unit, values, source=source, kind=kind, fmt=fmt, bold=row in (15, 16))
-    _highlight_row(ws, 16, START_PERIOD_COL + len(cols) - 1)
+    _highlight_row(ws, 16, _start_period_col() + len(cols) - 1)
 
 
 def _build_exit_waterfall(wb: Workbook, facts: SourceFacts) -> None:
@@ -1141,9 +1153,9 @@ def _build_exit_waterfall(wb: Workbook, facts: SourceFacts) -> None:
     for col, header in enumerate(headers, start=2):
         _apply_text_header(ws.cell(5, col), header)
     cases = [
-        ("Downside", f"='Scenarios'!{get_column_letter(START_PERIOD_COL)}18"),
+        ("Downside", f"='Scenarios'!{get_column_letter(_start_period_col())}18"),
         ("Base", f"='Valuation'!{_final_period_col(facts)}24"),
-        ("Upside", f"='Scenarios'!{get_column_letter(START_PERIOD_COL + 2)}18"),
+        ("Upside", f"='Scenarios'!{get_column_letter(_start_period_col() + 2)}18"),
     ]
     for row, (label, exit_ev) in enumerate(cases, start=6):
         ws.cell(row, 2, label)
@@ -1221,9 +1233,10 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
     _add_line_chart(ws, "Economic value", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=14, max_row=15), cats, "J28", _money_unit(facts))
     _add_line_chart(ws, "Margin and ownership", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=16, max_row=22), cats, "B44", "%")
     _section(ws, 62, "KPI interpretation register")
-    _set_column_widths(ws, {2: 24, 3: 42, 4: 28, 5: 38, 6: 28, 7: 48})
+    start_col = LAYOUT.label_col
+    _set_column_widths(ws, {start_col: 24, start_col + 1: 42, start_col + 2: 36, start_col + 3: 38, start_col + 4: 40, start_col + 5: 48})
     headers = ["KPI", "Formula / driver", "Applies when", "Source context", "Downside trigger", "IC implication"]
-    for col, header in enumerate(headers, start=2):
+    for col, header in enumerate(headers, start=start_col):
         _apply_text_header(ws.cell(63, col), header)
     interpretation_rows = [
         (
@@ -1237,7 +1250,7 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
         for item in kpi_definitions_for(facts)
     ]
     for row, values in enumerate(interpretation_rows, start=64):
-        for col, value in enumerate(values, start=2):
+        for col, value in enumerate(values, start=start_col):
             ws.cell(row, col, value)
             ib.apply_comment(ws.cell(row, col), wrap_text=False)
 
@@ -1245,7 +1258,7 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
 def _build_scenarios(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Scenarios"]
     _setup_sheet(ws, f"{facts.company} — Scenario Engine", "Downside / base / upside cases expressed as coherent driver sets.")
-    scenario_cols = list(range(START_PERIOD_COL, START_PERIOD_COL + 3))
+    scenario_cols = list(range(_start_period_col(), _start_period_col() + 3))
     for col, label in zip(scenario_cols, ["Downside", "Base", "Upside"]):
         ws.cell(5, col, label)
         ib.apply_year_header(ws.cell(5, col), label)
@@ -1274,9 +1287,10 @@ def _build_scenarios(wb: Workbook, facts: SourceFacts) -> None:
             ws.cell(r, col, _scenario_output_formula(facts, label, c, drivers))
             _apply_value_style(ws.cell(r, col), ib.FMT_PERCENT if unit == "%" else _money_format(facts))
     _section(ws, 23, "Scenario interpretation")
-    _set_column_widths(ws, {2: 24, 3: 40, 4: 98, 5: 34, 6: 64})
+    start_col = LAYOUT.label_col
+    _set_column_widths(ws, {start_col: 24, start_col + 1: 40, start_col + 2: 98, start_col + 3: 46, start_col + 4: 64})
     headers = ["Case", "Cause", "Linked driver changes", "Breakpoint", "DD action"]
-    for col, header in enumerate(headers, start=2):
+    for col, header in enumerate(headers, start=start_col):
         _apply_text_header(ws.cell(24, col), header)
     driver_summary = "; ".join(driver.label for driver in drivers[:4])
     scenario_notes = [
@@ -1285,7 +1299,7 @@ def _build_scenarios(wb: Workbook, facts: SourceFacts) -> None:
         ("Upside", drivers[-1].why, driver_summary, drivers[-1].breakpoint, drivers[-1].decision_implication),
     ]
     for row, values in enumerate(scenario_notes, start=25):
-        for col, value in enumerate(values, start=2):
+        for col, value in enumerate(values, start=start_col):
             ws.cell(row, col, value)
             ib.apply_comment(ws.cell(row, col), wrap_text=False)
     _add_bar_chart(ws, "Scenario EBITDA", Reference(ws, min_col=scenario_cols[0], max_col=scenario_cols[-1], min_row=16, max_row=16), Reference(ws, min_col=scenario_cols[0], max_col=scenario_cols[-1], min_row=5), "B33", _money_unit(facts))
@@ -1348,7 +1362,7 @@ def _scenario_output_formula(facts: SourceFacts, label: str, col: str, drivers: 
 def _build_sensitivity(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Sensitivity"]
     _setup_sheet(ws, f"{facts.company} — Sensitivity", "Two-variable sensitivity around the decision-critical drivers.")
-    _set_column_widths(ws, {START_PERIOD_COL - 1: LAYOUT.period_width})
+    _set_column_widths(ws, {_start_period_col() - 1: LAYOUT.period_width})
     final_col = _final_period_col(facts)
     drivers = scenario_drivers_for(facts)
     x_axis = drivers[0]
@@ -1356,8 +1370,8 @@ def _build_sensitivity(wb: Workbook, facts: SourceFacts) -> None:
     _section(ws, 5, f"{facts.period_labels[-1]} EBITDA — {x_axis.label} x {y_axis.label}")
     scales = [0.60, 0.80, 1.00, 1.20, 1.40]
     prices = [0.80, 0.90, 1.00, 1.10, 1.20]
-    matrix_cols = list(range(START_PERIOD_COL, START_PERIOD_COL + len(scales)))
-    row_axis_col = get_column_letter(START_PERIOD_COL - 1)
+    matrix_cols = list(range(_start_period_col(), _start_period_col() + len(scales)))
+    row_axis_col = get_column_letter(_start_period_col() - 1)
     _label(ws, 7, x_axis.label, x_axis.unit)
     _label(ws, 8, y_axis.label, y_axis.unit)
     x_bucket = _scenario_driver_bucket(x_axis)
@@ -1366,8 +1380,8 @@ def _build_sensitivity(wb: Workbook, facts: SourceFacts) -> None:
         ws.cell(7, idx, scale)
         ib.apply_hard_input(ws.cell(7, idx), ib.FMT_MULTIPLE)
     for r, price in enumerate(prices, start=8):
-        ws.cell(r, START_PERIOD_COL - 1, price)
-        ib.apply_hard_input(ws.cell(r, START_PERIOD_COL - 1), ib.FMT_MULTIPLE)
+        ws.cell(r, _start_period_col() - 1, price)
+        ib.apply_hard_input(ws.cell(r, _start_period_col() - 1), ib.FMT_MULTIPLE)
         for c in matrix_cols:
             col = get_column_letter(c)
             revenue_term = "1"
@@ -1397,24 +1411,25 @@ def _build_sensitivity(wb: Workbook, facts: SourceFacts) -> None:
         ws.cell(17, idx, value)
         ib.apply_hard_input(ws.cell(17, idx), ib.FMT_MULTIPLE)
     for r, round_size in enumerate(rounds, start=18):
-        ws.cell(r, START_PERIOD_COL - 1, round_size)
-        ib.apply_hard_input(ws.cell(r, START_PERIOD_COL - 1), ib.FMT_MULTIPLE)
+        ws.cell(r, _start_period_col() - 1, round_size)
+        ib.apply_hard_input(ws.cell(r, _start_period_col() - 1), ib.FMT_MULTIPLE)
         for c in matrix_cols:
             col = get_column_letter(c)
             ws.cell(r, c, f"='Ownership'!{final_col}7*(1-('Capital Stack'!{final_col}7*${row_axis_col}{r})/('Capital Stack'!{final_col}15*{col}$17))")
             _apply_value_style(ws.cell(r, c), ib.FMT_PERCENT)
     ib.apply_heatmap_3color(ws, f"{get_column_letter(matrix_cols[0])}18:{get_column_letter(matrix_cols[-1])}22")
     _section(ws, 25, "Sensitivity rationale")
-    _set_column_widths(ws, {2: 24, 3: 100, 4: 34, 5: 34, 6: 64})
+    start_col = LAYOUT.label_col
+    _set_column_widths(ws, {start_col: 24, start_col + 1: 100, start_col + 2: 34, start_col + 3: 34, start_col + 4: 64})
     headers = ["Matrix", "Why selected", "Output pressured", "Breakpoint", "Decision implication"]
-    for col, header in enumerate(headers, start=2):
+    for col, header in enumerate(headers, start=start_col):
         _apply_text_header(ws.cell(26, col), header)
     rationale_rows = [
         ("Operating economics", f"selected from weak-evidence drivers: {x_axis.label} and {y_axis.label}", "EBITDA and cash capacity", "EBITDA or runway turns negative", "pricing, cost, or growth plan must change"),
         ("Financing terms", "use when dilution is decision-critical", "founder ownership and investor return", "ownership falls below tolerance", "round size, valuation, or instrument mix must change"),
     ]
     for row, values in enumerate(rationale_rows, start=27):
-        for col, value in enumerate(values, start=2):
+        for col, value in enumerate(values, start=start_col):
             ws.cell(row, col, value)
             ib.apply_comment(ws.cell(row, col), wrap_text=False)
 
@@ -1435,16 +1450,16 @@ def _build_valuation(wb: Workbook, facts: SourceFacts) -> None:
     ]
     for row, label, unit, formula in rows:
         _label(ws, row, label, unit, fmt=ib.FMT_PERCENT if unit == "%" else ib.FMT_MONEY)
-        ws.cell(row, START_PERIOD_COL, formula)
+        ws.cell(row, _start_period_col(), formula)
         if isinstance(formula, str) and formula.startswith("="):
-            _apply_value_style(ws.cell(row, START_PERIOD_COL), _money_format(facts))
+            _apply_value_style(ws.cell(row, _start_period_col()), _money_format(facts))
         else:
-            ib.apply_hard_input(ws.cell(row, START_PERIOD_COL), ib.FMT_PERCENT)
+            ib.apply_hard_input(ws.cell(row, _start_period_col()), ib.FMT_PERCENT)
     _section(ws, 12, "Multiple range")
     _write_values(ws, 13, "Revenue multiple", "x", facts.revenue_multiple, source="benchmark / refresh required", fmt=ib.FMT_MULTIPLE)
     _write_values(ws, 14, "Gross profit multiple", "x", facts.gross_profit_multiple, source="benchmark / refresh required", fmt=ib.FMT_MULTIPLE)
     _write_values(ws, 15, "EBITDA multiple", "x", facts.ebitda_multiple, source="benchmark / refresh required", fmt=ib.FMT_MULTIPLE)
-    basis_col = get_column_letter(START_PERIOD_COL)
+    basis_col = get_column_letter(_start_period_col())
     _write_values(ws, 16, "Revenue-implied EV", "JPY", [f"=${basis_col}$7*{get_column_letter(c)}13" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
     _write_values(ws, 17, "GP-implied EV", "JPY", [f"=${basis_col}$8*{get_column_letter(c)}14" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
     _write_values(ws, 18, "EBITDA-implied EV", "JPY", [f"=${basis_col}$9*{get_column_letter(c)}15" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
@@ -1460,11 +1475,12 @@ def _build_valuation(wb: Workbook, facts: SourceFacts) -> None:
     _write_values(ws, 22, "DCF EV", "JPY", [f"={get_column_letter(c)}20+{get_column_letter(c)}21" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
     _write_values(ws, 23, "SOTP EV", "JPY", [f"='Segments'!$C$6*{get_column_letter(c)}19" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
     _write_values(ws, 24, "Selected EV", "JPY", [f"=IF({get_column_letter(c)}19>0,{get_column_letter(c)}19,IF({get_column_letter(c)}22>0,{get_column_letter(c)}22,{get_column_letter(c)}23))" for c in cols], kind="formula", fmt=ib.FMT_MONEY, bold=True)
-    _highlight_row(ws, 24, START_PERIOD_COL + len(cols) - 1)
+    _highlight_row(ws, 24, _start_period_col() + len(cols) - 1)
     _section(ws, 30, "Method credibility")
-    _set_column_widths(ws, {2: 24, 3: 42, 4: 34, 5: 42, 6: 26})
+    start_col = LAYOUT.label_col
+    _set_column_widths(ws, {start_col: 24, start_col + 1: 42, start_col + 2: 34, start_col + 3: 42, start_col + 4: 26})
     headers = ["Method", "Role", "Use when", "Exclusion / caution", "Linked driver"]
-    for col, header in enumerate(headers, start=2):
+    for col, header in enumerate(headers, start=start_col):
         _apply_text_header(ws.cell(31, col), header)
     method_rows = [
         ("Revenue multiple", "primary if revenue quality is central", "recurring or high-quality growth", "weak margin or non-recurring revenue", "growth / retention"),
@@ -1474,7 +1490,7 @@ def _build_valuation(wb: Workbook, facts: SourceFacts) -> None:
         ("SOTP", "support if segments differ", "segments have distinct economics", "segment allocation is arbitrary", "segment mix"),
     ]
     for row, values in enumerate(method_rows, start=32):
-        for col, value in enumerate(values, start=2):
+        for col, value in enumerate(values, start=start_col):
             ws.cell(row, col, value)
             ib.apply_comment(ws.cell(row, col), wrap_text=False)
     _section(ws, 25, "Investor return")
@@ -1482,7 +1498,7 @@ def _build_valuation(wb: Workbook, facts: SourceFacts) -> None:
     _write_values(ws, 27, "New investor ownership", "%", [f"='Capital Stack'!{get_column_letter(c)}16" for c in cols], kind="formula", fmt=ib.FMT_PERCENT)
     _write_values(ws, 28, "MOIC at selected EV", "x", [f"=IF({get_column_letter(c)}26=0,\"-\",{get_column_letter(c)}24*{get_column_letter(c)}27/{get_column_letter(c)}26)" for c in cols], kind="formula", fmt=ib.FMT_MULTIPLE)
     _write_values(ws, 29, "Illustrative IRR", "%", [f"=IF({get_column_letter(c)}28=\"-\",\"-\",{get_column_letter(c)}28^(1/{max(idx, 1)})-1)" for idx, c in enumerate(cols, start=1)], kind="formula", fmt=ib.FMT_PERCENT)
-    _highlight_row(ws, 28, START_PERIOD_COL + len(cols) - 1)
+    _highlight_row(ws, 28, _start_period_col() + len(cols) - 1)
     cats = Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=13)
     _add_bar_chart(ws, "Exit EV range", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=16, max_row=24), cats, "B40", _money_unit(facts))
 
@@ -1504,10 +1520,10 @@ def _build_market_support(wb: Workbook, facts: SourceFacts) -> None:
     ]
     for r, (label, source, value, note) in enumerate(rows, start=20):
         _label(ws, r, label, "JPY", source=source, note=note, bold=label == "SOM", fmt=ib.FMT_MONEY)
-        ws.cell(r, START_PERIOD_COL, value)
-        ib.apply_hard_input(ws.cell(r, START_PERIOD_COL), _money_format(facts))
+        ws.cell(r, _start_period_col(), value)
+        ib.apply_hard_input(ws.cell(r, _start_period_col()), _money_format(facts))
         if label == "SOM":
-            _highlight_row(ws, r, START_PERIOD_COL)
+            _highlight_row(ws, r, _start_period_col())
     if facts.source_urls:
         _section(ws, 26, "URLs captured from source")
         for r, url in enumerate(facts.source_urls[:8], start=27):
@@ -1543,7 +1559,7 @@ def _build_ic_memo(wb: Workbook, facts: SourceFacts) -> None:
     sections = [
         ("Investment thesis", f"{facts.company} is modeled through an economic kernel described as {facts.mechanics}; use this as a driver composition, not a sector template."),
         ("KPI readout", f"=\"Final runway: \"&TEXT('KPI'!{final_col}20,\"0.0\")&\" months; burn multiple: \"&TEXT('KPI'!{final_col}18,\"0.0x\")&\"; gross margin: \"&TEXT('KPI'!{final_col}16,\"0%\")"),
-        ("Funding and dilution", f"=\"Final funding gap: \"&TEXT('Scenarios'!{get_column_letter(START_PERIOD_COL)}19,\"¥#,##0,,M\")&\"; new investor ownership: \"&TEXT('Capital Stack'!{final_col}16,\"0%\")&\"; founder ownership: \"&TEXT('Ownership'!{final_col}7,\"0%\")"),
+        ("Funding and dilution", f"=\"Final funding gap: \"&TEXT('Scenarios'!{get_column_letter(_start_period_col())}19,\"¥#,##0,,M\")&\"; new investor ownership: \"&TEXT('Capital Stack'!{final_col}16,\"0%\")&\"; founder ownership: \"&TEXT('Ownership'!{final_col}7,\"0%\")"),
         ("Valuation and return", f"=\"Selected EV: \"&TEXT('Valuation'!{final_col}24,\"¥#,##0,,M\")&\"; MOIC: \"&TEXT('Valuation'!{final_col}28,\"0.0x\")&\"; IRR: \"&TEXT('Valuation'!{final_col}29,\"0%\")"),
         ("What must be true", "Selected demand, pricing, cost-to-serve, capacity, financing, and valuation assumptions must reconcile to their support ratios or be carried as weak evidence."),
         ("Scenario breakpoint", "Downside is decision-relevant when it creates a funding gap, runway breach, covenant issue, unacceptable dilution, or valuation support break."),
@@ -1553,11 +1569,11 @@ def _build_ic_memo(wb: Workbook, facts: SourceFacts) -> None:
     row = 6
     for title, body in sections:
         _section(ws, row, title)
-        ws.cell(row + 1, 2, body)
+        body_cell = ws.cell(row + 1, LAYOUT.label_col, body)
         if isinstance(body, str) and body.startswith("="):
-            _apply_value_style(ws.cell(row + 1, 2), "General")
+            _apply_value_style(body_cell, "General")
         else:
-            ib.apply_comment(ws.cell(row + 1, 2), wrap_text=False)
+            ib.apply_comment(body_cell, wrap_text=False)
         ws.row_dimensions[row + 1].height = 46
         row += 4
 
