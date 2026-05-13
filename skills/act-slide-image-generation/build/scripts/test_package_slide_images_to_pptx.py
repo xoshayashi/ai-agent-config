@@ -160,6 +160,21 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 pptx_packager.collect_images([str(image)])
 
+    def test_rejects_non_2k_slide_master_sizes(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            legacy_basis = slides_dir / "slide_basis.png"
+            fhd = slides_dir / "slide_fhd.png"
+            legacy_basis.write_bytes(png_bytes(1672, 941))
+            fhd.write_bytes(png_bytes(1920, 1080))
+
+            with self.assertRaisesRegex(SystemExit, "layout-coordinate basis"):
+                pptx_packager.collect_images([str(legacy_basis)])
+            with self.assertRaisesRegex(SystemExit, "found 1920x1080"):
+                pptx_packager.collect_images([str(fhd)])
+
     def test_rejects_legacy_manifest_path_aliases(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

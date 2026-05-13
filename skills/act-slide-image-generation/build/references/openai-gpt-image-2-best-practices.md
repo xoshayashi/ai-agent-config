@@ -43,8 +43,8 @@ Use these defaults for ACT slide images:
 ```text
 generation_mode: new_image / image_edit
 image_model: gpt-image-2
-image_size: 2048x1152 by default for generated slide output; 1536x864 for explicit drafts only; 2560x1440 for explicit QHD/high-detail requests only; 3840x2160 for explicit 4K requests only
-image_size_label: 1920x1080 is FHD delivery only; 2048x1152 is 16:9 2K-width; 3840x2160 is 4K UHD
+image_size: 2048x1152 for generated slide output, review, PPTX packaging, and PDF packaging
+image_size_label: 2048x1152 is the single 16:9 2K-width PNG master size; 1672x941 is layout-coordinate basis only
 image_quality: low for fast layout drafts, medium/high for dense text or final slides
 image_background: opaque or auto
 image_output_format: png
@@ -60,11 +60,9 @@ Important size rule:
 
 - `gpt-image-2` requires both edges to be multiples of `16`.
 - `1920x1080` is not a valid direct generation size because `1080` is not divisible by `16`.
-- Keep ACT planning and delivery thinking in `1920x1080`, but generate at `2048x1152` by default, then resize to `1920x1080` only if exact delivery dimensions are required.
-- `1536x864`: fast draft layout and composition checks by explicit request only.
-- `2048x1152`: default 16:9 2K-width generated slide output for both working review and final PNGs.
-- `2560x1440`: optional QHD/high-detail 16:9 slide image size by explicit request only.
-- `3840x2160`: valid 16:9 4K UHD size, but use only when explicitly requested because it is more expensive, slower, and may be more variable.
+- Keep ACT layout planning on the `1672x941` coordinate basis, but generate and package approved PNG masters at `2048x1152`.
+- `2048x1152`: required 16:9 2K-width generated slide output for working review, final PNGs, PPTX packaging, and PDF packaging.
+- Do not create separate `1920x1080`, `1672x941`, draft-size, QHD, or 4K delivery PNG masters for this skill.
 - Strict cinema/DCI sizes such as `2048x1080` and `4096x2160` are not ACT 16:9 slide targets; `4096x2160` also exceeds the current `3840px` maximum edge constraint for this workflow.
 
 Other model constraints from the official references:
