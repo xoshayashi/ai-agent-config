@@ -44,10 +44,34 @@ heavy process.
 
 ## Visual and Editability Inspection
 
-- Open or render the workbook when practical.
+- Model generation is not the finish line. Closeout requires two independent
+  verification surfaces: command-based workbook checks and rendered-output
+  inspection. Apply both to the finance model itself and to sheet design.
+- For generated or repaired xlsx files, always run an inspection pass before
+  closeout. At minimum, inspect the workbook with openpyxl/XML checks for
+  widths, fonts, wraps, merged cells, frozen panes, row heights, blank-cell
+  styles, semantic fill spans, print areas, chart anchors, and number formats.
+  When LibreOffice/PDF/screenshot rendering is available, render and inspect
+  the visible output. Use an actual Google Sheets import/readback when the
+  handoff target is Google Sheets.
 - Verify that the workbook renders with readable columns, visible overflow
-  where intended, compact row rhythm, semantic fills, working freeze panes,
+  where intended, compact row rhythm, semantic fills, no frozen panes,
   source / unit alignment, and calm accent usage.
+- Confirm workbook default font and populated cell fonts use the canonical
+  design tokens: Arial 10pt body/default, 9pt italic gray notes, 14pt title,
+  and compact bold section/header rows.
+- Confirm hierarchy / indentation uses dedicated Google-Sheets-20px columns
+  (`2.14` xlsx width), with no native Excel indent, no leading-space
+  indentation, and no wrapped generated cells.
+- Audit every visible wrap or tall text row before accepting it. If the cell is
+  a title, instruction, explanation, bullet, source caveat, or note and the
+  right-side cells can remain blank, remove wrapping, clear those overflow
+  cells, and let the text read horizontally without merging cells. Keep wrap
+  only for user-approved bounded prose where neighboring cells carry meaningful
+  values, formulas, units, or notes.
+- If a user-approved exception uses wrapping or manual line breaks, verify the
+  row height is sized to the exact visible line count and the rendered text is
+  neither clipped nor padded into a loose-looking row.
 - Inspect the print/render canvas: each sheet should end at the last real value
   row and column, including chart and drawing anchors, with print area bound to
   that rendered range and no styled blank rows or columns extending the visual
@@ -55,11 +79,47 @@ heavy process.
 - Review borders and background fills as a system. Row rules should support
   scanning, section and total borders should create hierarchy, and fills should
   sit on repeated semantic roles rather than isolated or noisy cells.
+- Check fill span positively: semantic rows such as headers, selected outputs,
+  checks, caution, and interpretation bands may include filled blank cells to
+  match the column width of related rows. Treat that as good alignment when it
+  is role-based and bounded; only trailing canvas or unrelated blank fills are
+  defects.
+- For every filled row, name its role and inspect the start column, end column,
+  and adjacent rows. The fill should be one rectangular span aligned to the
+  related table/block, not a ragged set of populated cells.
+- For section headers, verify the band width matches the attached table or
+  block width, not merely the one cell containing the section label.
+- Check color sparsity. The same non-heatmap background color should not appear
+  across consecutive rows as a decorative block. Filled rows should mark major
+  semantic moments, with borders and typography carrying the quieter rows.
+- Check border sparsity with the same eye. Prominent rules should mark table
+  starts, totals, checks, section changes, and interpretation rows; repeated
+  heavy rules across consecutive rows should have an explicit structural reason.
 - Confirm generated plans use simple editable grids, direct formulas, raw
   base-currency money values, correct unit labels, and consistent font-color
   semantics.
 
+## Command Checks
+
+- Run the narrowest available command checks that prove model quality:
+  formula/link integrity, reconciliations, balance/cash/ownership checks,
+  unit and display-scale consistency, source/benchmark hygiene, no workbook
+  names unless explicitly required, and mode-specific dependency closure.
+- Run the workbook-design checks that prove visible sheet quality:
+  canonical fonts, no wrap/freeze/merge/native indent, Google-Sheets-20px
+  hierarchy columns, row heights, semantic fill spans, sparse colors/borders,
+  blank-cell style cleanup, print areas, chart anchors, and rendered bounds.
+- Treat command output and rendered screenshots/PDFs as complementary evidence.
+  Passing commands do not excuse a visibly poor sheet; a good-looking render
+  does not excuse broken formulas, units, sources, or reconciliations.
+
 ## Closeout
+
+If any test, command check, workbook inspection, render check, or checklist
+item fails, treat that finding as work still in progress: fix the concrete
+failed item, rerun the same check, and repeat until both the model logic and
+the visible sheet design pass or a real blocker is documented. Do not replace
+failed verification with a narrative explanation.
 
 In the final response, state what was built, what was verified, and which
 assumptions, placeholders, or source gaps remain. Do not present a weak-source

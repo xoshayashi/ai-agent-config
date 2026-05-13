@@ -82,7 +82,7 @@ BRAND_SLATE = "7F8FA6"           # Muted blue-gray output tab
 
 BG_WHITE = "FFFFFF"
 BG_CANVAS = "F7FAFE"            # Workbook canvas — near-white blue surface
-BG_TABLE_HEADER = "D9EAF7"      # Period / table header band — light blue
+BG_TABLE_HEADER = "D9EAF7"      # Header / label row band — light blue
 BG_TOTAL_BAND = "EAF2F8"        # 合計行の薄ブルーバンディング
 BG_HEADER_BAND = "1F3A66"       # Section header の濃ネイビーバンド
 BG_WORKING = "FFF9C4"           # WIP / TODO セル (yellow highlight)
@@ -134,6 +134,21 @@ FONT_SIZE_TINY = 8         # chart axis tick (charts only — cells should not u
 
 FONT_BODY = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, color=IB_INK)
 FONT_BODY_BOLD = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, bold=True, color=IB_INK)
+
+WRAP_TEXT_ERROR = (
+    "startup-financial-modeling forbids wrap_text=True for generated workbook "
+    "cells. Classify the cell role first: titles, instructions, notes, bullets, "
+    "and source caveats with empty cells to the right should read horizontally "
+    "through blank overflow cells without merging. Use wider columns, dedicated "
+    "note columns, shorter rows, or blank overflow cells instead. If a "
+    "user-approved bounded-prose exception uses wrapping or manual line breaks, "
+    "set row height to the exact visible line count."
+)
+
+
+def _ensure_no_wrap_text(wrap_text: bool) -> None:
+    if wrap_text:
+        raise ValueError(WRAP_TEXT_ERROR)
 
 
 def set_workbook_default_font(wb, name: str = FONT_FAMILY, size: int = FONT_SIZE_BASE) -> None:
@@ -252,6 +267,8 @@ def rendered_bounds(ws: Worksheet) -> tuple[int, int]:
         ext = getattr(anchor, "ext", None)
         width = (float(ext.cx) / 360000) if ext and getattr(ext, "cx", None) else float(getattr(chart, "width", 15) or 15)
         height = (float(ext.cy) / 360000) if ext and getattr(ext, "cy", None) else float(getattr(chart, "height", 7.5) or 7.5)
+        # Chart extents are reported in centimeters; estimate the occupied grid
+        # with the workbook's visual scale (~1.8 cm/column, ~0.55 cm/row).
         col_span = max(4, int(round(width / 1.8)) + 1)
         row_span = max(10, int(round(height / 0.55)) + 1)
         last_row = max(last_row, row + row_span)
@@ -259,25 +276,98 @@ def rendered_bounds(ws: Worksheet) -> tuple[int, int]:
     return last_row, last_col
 
 
+SEMANTIC_BLANK_FILL_COLORS = {
+    BG_TABLE_HEADER,
+    BG_TOTAL_BAND,
+    BG_HEADER_BAND,
+    BG_WORKING,
+}
+
+
+def apply_semantic_fill_span(
+    ws: Worksheet,
+    row: int,
+    start_col: int,
+    end_col: int,
+    color: str,
+    *,
+    top: Side | None = None,
+    bottom: Side | None = None,
+) -> None:
+    """Fill one rectangular semantic row span, including blank member cells.
+
+    Use this for section bands, header/label rows, selected outputs, checks, and
+    caution rows. The caller chooses `end_col` from the attached table/block,
+    not from whether each cell currently has text.
+    """
+    if end_col < start_col:
+        raise ValueError(
+            f"semantic fill span end_col ({end_col}) must be >= start_col ({start_col})"
+        )
+    fill = PatternFill("solid", fgColor=color)
+    for col in range(start_col, end_col + 1):
+        cell = ws.cell(row=row, column=col)
+        cell.fill = fill
+        if top is not None or bottom is not None:
+            cell.border = Border(
+                left=cell.border.left,
+                right=cell.border.right,
+                top=top if top is not None else cell.border.top,
+                bottom=bottom if bottom is not None else cell.border.bottom,
+                diagonal=cell.border.diagonal,
+                diagonal_direction=cell.border.diagonal_direction,
+                diagonalUp=cell.border.diagonalUp,
+                diagonalDown=cell.border.diagonalDown,
+                outline=cell.border.outline,
+                vertical=cell.border.vertical,
+                horizontal=cell.border.horizontal,
+            )
+
+
+def _fill_rgb(cell: Cell) -> str | None:
+    fill = cell.fill
+    if fill is None or fill.fill_type != "solid":
+        return None
+    value = getattr(fill.fgColor, "rgb", None)
+    return value[-6:].upper() if isinstance(value, str) else None
+
+
+def _is_intentional_blank_component_cell(cell: Cell, row_has_value: bool) -> bool:
+    """Keep blank cells that visually complete a semantic row component.
+
+    Empty cells are normally reset so overflow text and trailing canvas stay
+    clean. A blank cell with a semantic row fill is different: it can be the
+    quiet continuation of a header/check/highlight band, aligned to the same
+    visual width as neighboring rows.
+    """
+    if not row_has_value:
+        return False
+    return _fill_rgb(cell) in SEMANTIC_BLANK_FILL_COLORS
+
+
 def clear_blank_cell_styles(wb: Workbook) -> None:
     """Reset blank cells to the workbook default style.
 
-    This keeps empty cells available for Excel overflow and prevents trailing
-    blank regions from becoming visible canvas after fills, borders, or row
-    sizing were applied earlier in a builder.
+    This keeps overflow spacer cells and trailing canvas clean. It preserves
+    blank cells that intentionally extend semantic row components, such as
+    header/label-row or selected-output fills aligned to the same column span as
+    neighboring rows.
     """
     default_style = copy(wb._cell_styles[0])
     for ws in wb.worksheets:
         for row in ws.iter_rows():
+            row_has_value = any(cell.value not in (None, "") for cell in row)
             for cell in row:
                 if cell.value not in (None, ""):
+                    continue
+                if _is_intentional_blank_component_cell(cell, row_has_value):
                     continue
                 cell.value = None
                 cell._style = copy(default_style)
 
 
 def trim_blank_canvas(wb: Workbook, *, set_print_area: bool = True) -> None:
-    """Trim every sheet to its real used range and clear blank-cell styling."""
+    """Trim every sheet to its real used range and clear non-semantic blanks."""
     default_style = copy(wb._cell_styles[0])
     for ws in wb.worksheets:
         last_row, last_col = rendered_bounds(ws)
@@ -293,8 +383,11 @@ def trim_blank_canvas(wb: Workbook, *, set_print_area: bool = True) -> None:
             if col_idx > last_col:
                 del ws.column_dimensions[key]
         for row in ws.iter_rows():
+            row_has_value = any(cell.value not in (None, "") for cell in row)
             for cell in row:
                 if cell.value in (None, ""):
+                    if _is_intentional_blank_component_cell(cell, row_has_value):
+                        continue
                     cell.value = None
                     cell._style = copy(default_style)
         if set_print_area:
@@ -391,12 +484,12 @@ FMT_DEFAULT              = FMT_NUM_MILLION
 # Spacing scale: Material Design-style T-shirt sizing applied to Excel row/col.
 # Ratio ≒ 1.25 (Major Third) on row heights — 15 / 18 / 22 / 32 ≈ 1.0 / 1.2 /
 # 1.47 / 2.13 (relaxed). column widths follow {tiny, small, base, large, xl}
-# ramp consistent with B(parent)=20 / C(label)=44 / D(source)=40 /
+# ramp consistent with B(parent/indent)≈20px in Google Sheets / C(label)=54 / D(source)=54 /
 # E(unit)=12 / F-(period)=15 baseline.
 
 # Column widths
 COL_MARGIN_WIDTH = 3.0          # A: visual gutter only
-COL_HIERARCHY_WIDTH = 20.0      # B and additional hierarchy columns
+COL_HIERARCHY_WIDTH = 2.14      # B and additional hierarchy columns; renders at ~20px in Google Sheets
 COL_LABEL_WIDTH = 54.0          # Lowest-level line-item label
 COL_SOURCE_WIDTH = 54.0         # Source / driver
 COL_UNIT_WIDTH = 14.0           # Unit (¥M / %)
@@ -406,7 +499,7 @@ COL_PERIOD_WIDTH = 16.0         # Each period (Y1 / Q1 / Jan-26)
 COL_WIDTH_TINY = 6.0
 COL_WIDTH_SMALL = 12.0
 COL_WIDTH_BASE = 16.0
-COL_WIDTH_LARGE = 20.0          # = hierarchy-column width
+COL_WIDTH_LARGE = 20.0          # auxiliary large text/table width; not hierarchy width
 COL_WIDTH_XLARGE = 32.0
 COL_NOTE_WIDTH = 72.0
 
@@ -418,8 +511,12 @@ ROW_SECTION_HEIGHT = 22.0
 # Row height T-shirt scale (補助 token. 既存 ROW_*_HEIGHT を踏襲)
 ROW_HEIGHT_TIGHT = 14.0         # 詰め (sub-section row)
 ROW_HEIGHT_BASE = 15.0          # = ROW_BODY_HEIGHT
+ROW_HEIGHT_STANDARD = 18.0      # compact title / helper rows
+ROW_HEIGHT_MEDIUM = 20.0        # short banner / title rows
 ROW_HEIGHT_RELAXED = 22.0       # = ROW_SECTION_HEIGHT
 ROW_HEIGHT_HERO = 32.0          # cover title 等 (modular ratio ~2.13x)
+ROW_HEIGHT_COVER_TITLE = 60.0   # cover-only display title row
+ROW_HEIGHT_PER_WRAPPED_LINE = ROW_HEIGHT_BASE  # user-approved wrap exceptions only
 
 # ============================================================================
 # 7. Border styles  (subtotal / grand total / section divider / box / table)
@@ -557,14 +654,15 @@ def apply_link_external(
 def apply_label(cell, bold: bool = False, wrap_text: bool = False) -> None:
     """行ラベル (左寄せ、Excel indent なし、Arial 10pt).
 
-    wrap_text=False が default。長文は隣接セルにはみ出して表示する (IB 慣習)。
-    明示的に wrap_text=True を指定したいときのみ折り返す。
+    wrap_text=True は禁止。長文は列幅、専用 note 列、短い行分割、
+    または隣接空白セルへの overflow で解決する。
     Font は Arial 10pt 固定 (Google Sheets default + IB de facto standard)。
     階層表現は列追加で行い、Excel native indent は使わない。
     """
+    _ensure_no_wrap_text(wrap_text)
     cell.font = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, bold=bold, color=IB_INK)
     cell.alignment = Alignment(
-        horizontal="left", vertical="center", indent=0, wrap_text=wrap_text
+        horizontal="left", vertical="center", indent=0, wrap_text=False
     )
 
 
@@ -719,12 +817,13 @@ def apply_grand_total(
 def apply_comment(cell, wrap_text: bool = False) -> None:
     """注記セル (gray + italic).
 
-    wrap_text=False が default。長文は隣接の空きセルにはみ出して表示する。
-    明示的に折り返したい場合は wrap_text=True を渡す。
+    wrap_text=True は禁止。長文は列幅、専用 note 列、短い行分割、
+    または隣接空白セルへの overflow で解決する。
     """
+    _ensure_no_wrap_text(wrap_text)
     cell.font = FONT_COMMENT
     cell.alignment = Alignment(
-        horizontal="left", vertical="center", wrap_text=wrap_text
+        horizontal="left", vertical="center", wrap_text=False
     )
 
 
@@ -1108,6 +1207,65 @@ def apply_row_heights(ws: Worksheet, row_kind_map: dict[int, str]) -> None:
         ws.row_dimensions[row].height = height_map.get(kind, ROW_HEIGHT_BASE)
 
 
+def wrapped_text_row_height(line_count: int) -> float:
+    """Return exact row height for a user-approved wrapped text exception.
+
+    Generated model sheets should normally keep wrapping off. When the user
+    explicitly asks for wrapped prose or manual line breaks, size the row by the
+    visible line count so text is not clipped and the row does not carry loose
+    excess whitespace.
+    """
+    return max(1, int(line_count)) * ROW_HEIGHT_PER_WRAPPED_LINE
+
+
+def visible_text_line_count(*values: object) -> int:
+    """Count visible manual-line-break lines for wrapped-text exceptions."""
+    counts = []
+    for value in values:
+        text = "" if value is None else str(value)
+        counts.append(text.count("\n") + 1)
+    return max(counts, default=1)
+
+
+def set_wrapped_exception_row_height(ws: Worksheet, row: int, line_count: int) -> None:
+    """Set exact row height for a user-approved wrap/manual-break exception."""
+    ws.row_dimensions[row].height = wrapped_text_row_height(line_count)
+
+
+def apply_wrapped_exception(
+    cell: Cell,
+    *,
+    user_approved: bool,
+    line_count: int | None = None,
+) -> None:
+    """Apply the only sanctioned wrap path for bounded prose exceptions.
+
+    Normal generated workbook cells must not use wrapping. Call this only after
+    the user has explicitly approved bounded prose that cannot read through
+    blank overflow cells. The helper sets wrapping and exact row height
+    together so the exception cannot clip text or create a loose padded row.
+    """
+    if not user_approved:
+        raise ValueError(
+            "Wrapped prose exceptions require explicit user approval; use "
+            "blank overflow cells without merging for horizontal-read text."
+        )
+    base = cell.alignment
+    count = visible_text_line_count(cell.value) if line_count is None else max(1, int(line_count))
+    cell.alignment = Alignment(
+        horizontal=base.horizontal or "left",
+        vertical=base.vertical or "center",
+        text_rotation=base.text_rotation,
+        wrap_text=True,
+        shrink_to_fit=base.shrink_to_fit,
+        indent=base.indent,
+        relativeIndent=base.relativeIndent,
+        justifyLastLine=base.justifyLastLine,
+        readingOrder=base.readingOrder,
+    )
+    set_wrapped_exception_row_height(cell.parent, cell.row, count)
+
+
 # ============================================================================
 # 11. Sheet-level helper functions
 # ============================================================================
@@ -1118,7 +1276,6 @@ def setup_sheet_layout(
     *,
     n_periods: int = 36,
     has_unit_col: bool = True,
-    freeze_at: str = "C5",
 ) -> None:
     """シート全体のレイアウト初期化.
 
@@ -1144,7 +1301,7 @@ def setup_sheet_layout(
         ws.column_dimensions[col_letter].width = COL_PERIOD_WIDTH
 
     ws.sheet_view.showGridLines = False
-    ws.freeze_panes = freeze_at
+    ws.freeze_panes = None
 
 
 def setup_print_layout(
@@ -1236,7 +1393,7 @@ def write_cover(
     ws["B6"].font = FONT_COVER_TITLE
     ws["B6"].fill = PatternFill("solid", fgColor=BRAND_PRIMARY_DEEP)
     ws["B6"].alignment = Alignment(horizontal="left", vertical="center", indent=0)
-    ws.row_dimensions[6].height = 60
+    ws.row_dimensions[6].height = ROW_HEIGHT_COVER_TITLE
 
     if subtitle:
         ws["B8"] = subtitle
@@ -1256,7 +1413,7 @@ def write_cover(
         ws["B14"] = " | ".join(footer_lines)
         apply_comment(ws["B14"])
 
-    setup_sheet_layout(ws, n_periods=4, has_unit_col=False, freeze_at="A1")
+    setup_sheet_layout(ws, n_periods=4, has_unit_col=False)
     ws.sheet_properties.tabColor = BRAND_NAVY  # §2.X canonical: Cover = Navy
 
 
@@ -1421,6 +1578,7 @@ __all__ = [
     "TAB_COLOR_BY_ROLE", "SHEET_ROLE_MAPPING", "get_sheet_role",
     "apply_canonical_tab_colors",
     "BG_WHITE", "BG_CANVAS", "BG_TABLE_HEADER", "BG_TOTAL_BAND", "BG_HEADER_BAND", "BG_WORKING",
+    "SEMANTIC_BLANK_FILL_COLORS", "apply_semantic_fill_span",
     "LINK_COLOR",
     # Heatmap palettes
     "HEATMAP_LOW_COOL", "HEATMAP_MID_NEUTRAL", "HEATMAP_HIGH_WARM",
@@ -1455,7 +1613,8 @@ __all__ = [
     "COL_UNIT_WIDTH", "COL_PERIOD_WIDTH",
     "COL_WIDTH_TINY", "COL_WIDTH_SMALL", "COL_WIDTH_BASE", "COL_WIDTH_LARGE", "COL_WIDTH_XLARGE",
     "ROW_BODY_HEIGHT", "ROW_SPACER_HEIGHT", "ROW_SECTION_HEIGHT",
-    "ROW_HEIGHT_TIGHT", "ROW_HEIGHT_BASE", "ROW_HEIGHT_RELAXED", "ROW_HEIGHT_HERO",
+    "ROW_HEIGHT_TIGHT", "ROW_HEIGHT_BASE", "ROW_HEIGHT_STANDARD", "ROW_HEIGHT_MEDIUM",
+    "ROW_HEIGHT_RELAXED", "ROW_HEIGHT_HERO", "ROW_HEIGHT_COVER_TITLE", "ROW_HEIGHT_PER_WRAPPED_LINE",
     # Borders
     "BORDER_SUBTOTAL", "BORDER_GRAND_TOTAL", "BORDER_SECTION_DIVIDER",
     "BORDER_SECTION_END_MEDIUM", "BORDER_TOP_THIN", "BORDER_BOTTOM_THIN",
@@ -1480,7 +1639,7 @@ __all__ = [
     # Hyperlink
     "apply_internal_link", "write_toc",
     # Row height
-    "apply_row_heights",
+    "apply_row_heights", "wrapped_text_row_height", "visible_text_line_count", "set_wrapped_exception_row_height",
     # Sheet-level helpers
     "setup_sheet_layout", "setup_print_layout", "write_cover", "set_tab_color",
     "validate_sheet_naming",
