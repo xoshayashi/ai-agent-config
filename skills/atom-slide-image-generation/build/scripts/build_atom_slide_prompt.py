@@ -362,6 +362,9 @@ def canonical_planning_block(
     information_units: [message, context, comparison, trend, mechanism, risk, implication, assumption, source]
     density_levers: [KPI strip, supporting context region, evidence strip, small multiples, annotation, benchmark/context column, source cue]
     overload_controls: [one dominant structure, max three major regions, body >=18pt equivalent, grouped labels, no decorative density]
+  impact_clarity_density_gate: [one unmistakable takeaway, one dominant visual structure, one useful evidence layer, simple reading path, clear hierarchy]
+  message_sharpness_lock: action title names actor/topic, change/tension, and implication; repair generic labels, vague benefit claims, or slogans before image prompting
+  evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation
   density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
   structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
   structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
@@ -437,6 +440,7 @@ def mode_guidance(mode: str) -> str:
   - Define deck_thesis, audience_decision, storyline_frame, section_map, and slide-level action_title messages.
   - Plan slide 1 as opening_thesis_slide, not a title-only opener: include the core thesis, 2-4 proof/tension points, a real visual structure, and a narrative bridge.
   - Map every message to evidence, source_policy, visual_structure, layout_archetype, grid_mode, exact_text_budget, and split_merge_decision.
+  - Apply message_sharpness_lock: rewrite each action title until it names actor/topic, change/tension, and implication; reject generic labels, vague positive claims, and slogans.
   - Apply source_real_only_lock and source_line_lock: render Source: ... only for real traceable external/provided sources; use source_line: none and draw no Source footer when no real source exists.
   - Apply output_artifact_mastering_lock, single_final_png_master_lock, and no_duplicate_png_output_lock: use slides_final/ as the single loose-PNG master; slides_package/ stores PPTX/notes/manifest only; render_check/pdf_pages/ is disposable QA output only.
   - Apply contact_sheet_mastering_lock and single_contact_sheet_policy: keep one retained contact sheet from slides_final/ by default; generate a comparison contact sheet only when delivery/render QA needs it.
@@ -446,7 +450,9 @@ def mode_guidance(mode: str) -> str:
   - Add pre_package_image_review, post_generation_full_deck_review_loop, all_generated_images_reviewed, weak_slide_regeneration_queue, content_quality_status, design_quality_status, deck_unity_status, completion_ready_status, and regenerate_until_quality_approved fields so generated PNGs are reviewed, repaired, and re-reviewed before PPTX, or completion.
   - Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide before image prompting.
   - Apply illustration_tone_lock and illustration_style_sheet before image prompting so people, devices, UI panels, document objects, icon badges, linework, fills, and crop stay consistent across the deck.
+  - Run impact_clarity_density_gate before image prompting: every slide needs one unmistakable takeaway, one dominant visual structure, a useful evidence layer, and a simple reading path; repair slides that feel flat, vague, thin, or cluttered.
   - Run density_design for every slide: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
+  - Apply evidence_compression_ladder: choose the smallest proof structure that makes the message credible before adding prose or decorative detail.
   - Apply density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting.
   - Apply structure_choice_bias and structured_density_bias as a gentle direction: use issue trees, driver trees, 2x2 matrices, value chains, waterfalls, KPI bridges, decision tables, or hypothesis-evidence-implication rows when they clarify the message; intentionally skip them when a simpler visual is stronger.
   - Apply structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation.
@@ -462,6 +468,7 @@ def mode_guidance(mode: str) -> str:
     if mode == "deck-plan":
         return """mode_guidance:
   - Define deck thesis and one primary message per slide.
+  - Apply message_sharpness_lock: each slide message should name actor/topic, change/tension, and implication; repair section-label or slogan-like messages before prompt writing.
   - Use the embedded ATOM design system in SKILL.md; do not load an external ATOM pattern file.
   - Apply builtin_generation_lock: invoke Codex built-in image generation directly for gpt-image-2 slide PNGs, without local environment preflight or local artifact-route probing before generation.
   - Apply image_generation_tool_lock and script_boundary_lock: prompt/package scripts may plan, validate, or wrap approved artifacts, but final PNG pixels must come from Codex built-in image generation, never from scripts, screenshots, local renderers, or presentation exports.
@@ -477,7 +484,9 @@ def mode_guidance(mode: str) -> str:
   - Define deck_header_master_lock before any slide-level prompt. Do not leave header coordinates as ranges.
   - Apply header_identity_lock, header_integrity_blocker_lock, deck_tone_signature_lock, illustration_tone_lock, illustration_style_sheet, and message_box_compactness_blocker_lock before slide-level variation.
   - Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide; use the same flat 2D editorial workflow illustration style on chapter openers, turning points, complex systems, and final vision slides.
+  - Run impact_clarity_density_gate: every slide needs one unmistakable takeaway, one dominant visual structure, a useful evidence layer, and a simple reading path; repair low-impact, hard-to-understand, empty, or cluttered slides before image prompting.
   - Assign density_design for every slide: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
+  - Apply evidence_compression_ladder: compress proof into a key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation before adding prose.
   - Apply density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting.
   - Apply structure_choice_bias and structured_density_bias as a gentle direction: use issue trees, driver trees, 2x2 matrices, value chains, waterfalls, KPI bridges, decision tables, or hypothesis-evidence-implication rows when they clarify the message; intentionally skip them when a simpler visual is stronger.
   - Apply structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation.
@@ -717,6 +726,9 @@ post_generation_audit:
   - body_silhouette_lock is fulfilled: the body reads as one closed visual block with aligned outer edges, lower edges, and footer clearance
   - illustration_intensity is respected; illustration feels designer-authored, flat 2D, and does not overpower the slide
   - density_tier and density_design are fulfilled without shrinking body text below 18pt equivalent
+  - impact_clarity_density_gate is fulfilled: the slide has a sharp takeaway, clear structure, useful evidence, simplicity, and hierarchy
+  - message_sharpness_lock is fulfilled: the H1/action title is not a vague label or slogan
+  - evidence_compression_ladder is fulfilled: proof is compressed into a readable structure rather than prose or decoration
   - density_lift_lock is fulfilled in both the slide structure and final image prompt
   - structure_choice_bias is considered: structured presentation patterns are used where they clarify the message, and not forced where they would add noise
   - structured_density_bias is fulfilled when useful: one or two evidence layers, labels, drivers, or comparison cues add decision value without crowding
@@ -843,6 +855,8 @@ def deck_plan_tail() -> str:
         source_policy:
         source_line:
         density_risk:
+        impact_clarity_density_gate:
+        message_sharpness_lock:
         speaker_notes_depth_lock: substantial PPT talk script, 4-7 Japanese sentences or roughly 180-320 Japanese chars unless user requests brief notes
         speaker_notes_text:
         speaker_notes_source_cues:
@@ -853,6 +867,7 @@ def deck_plan_tail() -> str:
           information_units:
           density_levers:
           overload_controls:
+        evidence_compression_ladder:
         density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
         structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
         structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
@@ -1068,6 +1083,8 @@ def text_structure_tail() -> str:
       illustration_consistency_status:
       creative_variance: low / medium / high
       density_tier: T1_sparse / T2_balanced / T3_dense / T4_appendix_dense
+      impact_clarity_density_gate:
+      message_sharpness_lock:
       density_layers:
       density_design:
         reader_mode: scan / read / reference
@@ -1075,6 +1092,7 @@ def text_structure_tail() -> str:
         information_units:
         density_levers:
         overload_controls:
+      evidence_compression_ladder:
       density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
       structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
       structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits

@@ -325,16 +325,19 @@ Process:
 2. Create intake_map with source_span_id values for chapters, facts, quotes, assumptions, and uncertainties.
 3. Choose one storyline frame: SCQA, problem-solution-evidence, past-present-future, context-problem-solution-differentiation, or thesis-risk-milestones.
 4. Draft slide-level action titles as standalone messages. No topic labels; slide 1 should be an opening_thesis_slide, not a title-only opener.
-5. Build message_backlog, evidence_ledger, source_ledger, appendix_candidates, and open_questions.
-6. For each message, assign supporting evidence, source policy, visual structure, visual richness role, illustration intensity, creative variance, density tier, and density risk.
-7. Run a density design gate for each slide: set reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
-8. Split any slide that has more than one message, more than one dominant structure, more than three major regions, or would force body text below 18pt equivalent.
-9. Combine adjacent slides only when messages repeat, the same comparison must be seen together, or the user explicitly requests a shorter deck.
-10. Define deck_header_master_lock, invisible footer alignment baseline, Insight surface master, and repeated table/card/icon masters before image generation.
-11. Read only the action titles in order and repair logical gaps before image generation.
-12. Freeze quoted exact_text for every slide; do not leave copywriting to image generation.
-13. Draft speaker_notes_text for every slide: talk track, evidence/assumption cue, source caveat when relevant, and transition cue.
-14. For each final slide, produce the canonical planning block and then the image prompt.
+5. Apply message_sharpness_lock: each action title names actor/topic, change/tension, and implication; repair vague labels, slogans, or generic benefit claims.
+6. Build message_backlog, evidence_ledger, source_ledger, appendix_candidates, and open_questions.
+7. For each message, assign supporting evidence, source policy, visual structure, visual richness role, illustration intensity, creative variance, density tier, and density risk.
+8. Run impact_clarity_density_gate: each slide has one unmistakable takeaway, one dominant visual structure, a useful evidence layer, and a simple reading path; repair slides that feel flat, vague, thin, or cluttered.
+9. Run a density design gate for each slide: set reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
+10. Apply evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation.
+11. Split any slide that has more than one message, more than one dominant structure, more than three major regions, or would force body text below 18pt equivalent.
+12. Combine adjacent slides only when messages repeat, the same comparison must be seen together, or the user explicitly requests a shorter deck.
+13. Define deck_header_master_lock, invisible footer alignment baseline, Insight surface master, and repeated table/card/icon masters before image generation.
+14. Read only the action titles in order and repair logical gaps before image generation.
+15. Freeze quoted exact_text for every slide; do not leave copywriting to image generation.
+16. Draft speaker_notes_text for every slide: talk track, evidence/assumption cue, source caveat when relevant, and transition cue.
+17. For each final slide, produce the canonical planning block and then the image prompt.
 
 Output:
 - deck_thesis:
@@ -353,6 +356,7 @@ Output:
   - slide_id:
     chapter:
     action_title:
+    message_sharpness_lock:
     opening_slide_role:
     first_slide_not_title_only:
     opening_density_gate:
@@ -381,6 +385,7 @@ Output:
     visual_richness_role:
     signature_visual_plan:
     density_tier:
+    impact_clarity_density_gate:
     density_layers:
     density_design:
       reader_mode:
@@ -388,6 +393,7 @@ Output:
       information_units:
       density_levers:
       overload_controls:
+    evidence_compression_ladder:
     information_unit_budget:
     density_guardrails:
     deck_header_master_lock:

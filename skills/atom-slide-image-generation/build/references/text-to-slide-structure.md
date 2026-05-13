@@ -26,6 +26,9 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Create `layout_diversity_plan` before final prompts. Let repeated layouts serve deliberate comparison, and let composition change when the message role, evidence type, time horizon, or decision question changes.
 - Apply `layout_rotation_guard` during deck review so the sequence feels intentionally edited around the argument instead of locked to one repeated width habit.
 - Apply `density_lift_lock`: raise useful information density during both slide-structure planning and slide-image prompting. Useful density means more decision-relevant comparison, evidence, units, assumptions, annotations, and source cues with one clear reading path.
+- Apply `impact_clarity_density_gate`: every slide should earn attention quickly, explain itself without narration, stay visually simple, and still carry enough decision-relevant evidence. If a slide feels flat, vague, thin, or cluttered, repair the message, evidence, and dominant structure before image prompting.
+- Apply `message_sharpness_lock`: rewrite each action title until it contains a clear actor/topic, change/tension, and implication. Avoid generic topic labels, vague positive claims, and slogans that do not say what changed or why it matters.
+- Apply `evidence_compression_ladder`: compress evidence into the smallest structure that still proves the message: one sharp number, ranked comparison, before/after delta, driver tree, causal chain, 2x2, mini table, or evidence strip. Use speaker notes or appendix candidates for detail that does not change the slide decision.
 - Apply `structure_choice_bias`: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide.
 - Apply `structured_density_bias`: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits.
 - Use structured presentation patterns as an option, not a quota: issue trees, driver trees, 2x2 matrices, value chains, funnels, waterfalls, KPI bridges, decision tables, before/after bridges, and hypothesis-evidence-implication rows are available when they make the argument easier to scan.
@@ -109,6 +112,7 @@ Use this reference when the input is a long memo, strategy narrative, research n
    - Each sentence should answer "so what?".
    - Prefer concrete nouns, active verbs, and useful sourced numbers.
    - Reject topic labels such as `Market`, `Solution`, `Roadmap`, or `Differentiation` unless they are part of a full message.
+   - Apply `message_sharpness_lock`: every action title should name what changed, who/what is affected, and why the reader should care. Repair titles that read like a section label, vague benefit, or slogan.
    - Set slide 1 as `opening_thesis_slide` and record `first_slide_not_title_only: true`.
    - Run `opening_density_gate`: repair slide 1 before generation if it only contains a brand/name/slogan, lacks proof or tension, lacks a real visual structure, or does not bridge into the deck.
 
@@ -140,8 +144,10 @@ Use this reference when the input is a long memo, strategy narrative, research n
 
 6. **Density And Split Gate**
    - Assign `density_tier`: `T1_sparse`, `T2_balanced`, `T3_dense`, or `T4_appendix_dense`.
+   - Run `impact_clarity_density_gate` before image prompting: the slide must have one unmistakable takeaway, one dominant visual structure, a useful evidence layer, and a simple reading path. Repair any slide that feels low-impact, hard to understand, over-simplified to emptiness, or dense without hierarchy.
    - Define `reader_mode`, `decision_question`, `information_units`, `density_levers`, and `overload_controls`.
    - Use `density_lift_lock` to add one or two useful evidence layers before image prompting when a slide feels too empty for the decision question.
+   - Use `evidence_compression_ladder` to choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation.
    - Use `structure_choice_bias` and `structured_density_bias` to add issue-tree, driver-tree, matrix, value-chain, KPI-bridge, or decision-table structure only when it improves the reader's decision path.
    - Use `structure_first_visual_mix` to choose a chart, table, matrix, flow, map, comparison axis, or evidence strip when that structure gives the reader a clearer path than a standalone illustration.
    - Use `imageability_lock` to convert abstract messages into concrete visual anchors that make the message observable.
@@ -188,6 +194,9 @@ For every slide, answer:
 - `reader_mode`: scan, read, or reference. Scan pages need fewer words; reference pages can carry more rows if grouped.
 - `decision_question`: what should be answerable without narration?
 - `information_units`: message, context, comparison, trend, mechanism, risk, implication, assumption, source.
+- `impact_clarity_density_gate`: attention hook, self-explanatory logic, simple dominant structure, sufficient evidence, and clear hierarchy.
+- `message_sharpness_lock`: action title includes actor/topic, change/tension, and implication.
+- `evidence_compression_ladder`: smallest proof structure that supports the decision without adding prose.
 - `density_levers`: which added layer improves the message: denominator, time horizon, benchmark, segmentation, scenario, assumption, source, counterpoint, or implication.
 - `overload_controls`: one dominant structure, max three major regions, grouped labels, body at 18pt equivalent or larger, and no illustration detail doing the job of evidence.
 
