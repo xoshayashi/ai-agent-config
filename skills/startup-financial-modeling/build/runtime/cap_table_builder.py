@@ -1513,11 +1513,17 @@ def build_cap_table_sheet(
         for cell in row:
             if isinstance(cell.value, str):
                 cell.value = cell.value.lstrip()
+            base = cell.alignment
             cell.alignment = Alignment(
-                horizontal=cell.alignment.horizontal,
-                vertical=cell.alignment.vertical,
+                horizontal=base.horizontal,
+                vertical=base.vertical,
+                text_rotation=base.text_rotation,
                 wrap_text=False,
+                shrink_to_fit=base.shrink_to_fit,
                 indent=0,
+                relativeIndent=base.relativeIndent,
+                justifyLastLine=base.justifyLastLine,
+                readingOrder=base.readingOrder,
             )
 
     section_rows = [

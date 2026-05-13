@@ -721,6 +721,9 @@ def test_ib_helpers_reject_wrap_text_true() -> None:
     ib.apply_wrapped_exception(ws["A5"], user_approved=True)
     assert ws["A5"].alignment.wrap_text is True
     assert ws.row_dimensions[5].height == ib.wrapped_text_row_height(2)
+    ws["A6"] = "bounded\nprose"
+    ib.apply_wrapped_exception(ws["A6"], user_approved=True, line_count=0)
+    assert ws.row_dimensions[6].height == ib.wrapped_text_row_height(1)
 
 
 def test_runtime_builders_do_not_use_wrap_or_merge_layout_shortcuts() -> None:
@@ -1167,10 +1170,11 @@ def _row_height_violations(wb) -> list[str]:
     allowed = {
         ib.ROW_HEIGHT_TIGHT,
         ib.ROW_HEIGHT_BASE,
-        18.0,
-        20.0,
+        ib.ROW_HEIGHT_STANDARD,
+        ib.ROW_HEIGHT_MEDIUM,
         ib.ROW_HEIGHT_RELAXED,
         ib.ROW_HEIGHT_HERO,
+        ib.ROW_HEIGHT_COVER_TITLE,
     }
     violations = []
     for ws in wb.worksheets:

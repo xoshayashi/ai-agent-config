@@ -267,6 +267,8 @@ def rendered_bounds(ws: Worksheet) -> tuple[int, int]:
         ext = getattr(anchor, "ext", None)
         width = (float(ext.cx) / 360000) if ext and getattr(ext, "cx", None) else float(getattr(chart, "width", 15) or 15)
         height = (float(ext.cy) / 360000) if ext and getattr(ext, "cy", None) else float(getattr(chart, "height", 7.5) or 7.5)
+        # Chart extents are reported in centimeters; estimate the occupied grid
+        # with the workbook's visual scale (~1.8 cm/column, ~0.55 cm/row).
         col_span = max(4, int(round(width / 1.8)) + 1)
         row_span = max(10, int(round(height / 0.55)) + 1)
         last_row = max(last_row, row + row_span)
@@ -509,8 +511,11 @@ ROW_SECTION_HEIGHT = 22.0
 # Row height T-shirt scale (補助 token. 既存 ROW_*_HEIGHT を踏襲)
 ROW_HEIGHT_TIGHT = 14.0         # 詰め (sub-section row)
 ROW_HEIGHT_BASE = 15.0          # = ROW_BODY_HEIGHT
+ROW_HEIGHT_STANDARD = 18.0      # compact title / helper rows
+ROW_HEIGHT_MEDIUM = 20.0        # short banner / title rows
 ROW_HEIGHT_RELAXED = 22.0       # = ROW_SECTION_HEIGHT
 ROW_HEIGHT_HERO = 32.0          # cover title 等 (modular ratio ~2.13x)
+ROW_HEIGHT_COVER_TITLE = 60.0   # cover-only display title row
 ROW_HEIGHT_PER_WRAPPED_LINE = ROW_HEIGHT_BASE  # user-approved wrap exceptions only
 
 # ============================================================================
@@ -1246,7 +1251,7 @@ def apply_wrapped_exception(
             "blank overflow cells without merging for horizontal-read text."
         )
     base = cell.alignment
-    count = line_count or visible_text_line_count(cell.value)
+    count = visible_text_line_count(cell.value) if line_count is None else max(1, int(line_count))
     cell.alignment = Alignment(
         horizontal=base.horizontal or "left",
         vertical=base.vertical or "center",
@@ -1388,7 +1393,7 @@ def write_cover(
     ws["B6"].font = FONT_COVER_TITLE
     ws["B6"].fill = PatternFill("solid", fgColor=BRAND_PRIMARY_DEEP)
     ws["B6"].alignment = Alignment(horizontal="left", vertical="center", indent=0)
-    ws.row_dimensions[6].height = 60
+    ws.row_dimensions[6].height = ROW_HEIGHT_COVER_TITLE
 
     if subtitle:
         ws["B8"] = subtitle
@@ -1608,7 +1613,8 @@ __all__ = [
     "COL_UNIT_WIDTH", "COL_PERIOD_WIDTH",
     "COL_WIDTH_TINY", "COL_WIDTH_SMALL", "COL_WIDTH_BASE", "COL_WIDTH_LARGE", "COL_WIDTH_XLARGE",
     "ROW_BODY_HEIGHT", "ROW_SPACER_HEIGHT", "ROW_SECTION_HEIGHT",
-    "ROW_HEIGHT_TIGHT", "ROW_HEIGHT_BASE", "ROW_HEIGHT_RELAXED", "ROW_HEIGHT_HERO", "ROW_HEIGHT_PER_WRAPPED_LINE",
+    "ROW_HEIGHT_TIGHT", "ROW_HEIGHT_BASE", "ROW_HEIGHT_STANDARD", "ROW_HEIGHT_MEDIUM",
+    "ROW_HEIGHT_RELAXED", "ROW_HEIGHT_HERO", "ROW_HEIGHT_COVER_TITLE", "ROW_HEIGHT_PER_WRAPPED_LINE",
     # Borders
     "BORDER_SUBTOTAL", "BORDER_GRAND_TOTAL", "BORDER_SECTION_DIVIDER",
     "BORDER_SECTION_END_MEDIUM", "BORDER_TOP_THIN", "BORDER_BOTTOM_THIN",
