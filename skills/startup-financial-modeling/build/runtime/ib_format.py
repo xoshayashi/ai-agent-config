@@ -137,9 +137,12 @@ FONT_BODY_BOLD = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, bold=True, color=IB
 
 WRAP_TEXT_ERROR = (
     "startup-financial-modeling forbids wrap_text=True for generated workbook "
-    "cells. Use wider columns, dedicated note columns, shorter rows, or blank "
-    "overflow cells instead. If a user-approved prose exception uses wrapping "
-    "or manual line breaks, set row height to the exact visible line count."
+    "cells. Classify the cell role first: titles, instructions, notes, bullets, "
+    "and source caveats with empty cells to the right should read horizontally "
+    "through blank overflow cells without merging. Use wider columns, dedicated "
+    "note columns, shorter rows, or blank overflow cells instead. If a "
+    "user-approved bounded-prose exception uses wrapping or manual line breaks, "
+    "set row height to the exact visible line count."
 )
 
 
@@ -1222,6 +1225,40 @@ def visible_text_line_count(*values: object) -> int:
 def set_wrapped_exception_row_height(ws: Worksheet, row: int, line_count: int) -> None:
     """Set exact row height for a user-approved wrap/manual-break exception."""
     ws.row_dimensions[row].height = wrapped_text_row_height(line_count)
+
+
+def apply_wrapped_exception(
+    cell: Cell,
+    *,
+    user_approved: bool,
+    line_count: int | None = None,
+) -> None:
+    """Apply the only sanctioned wrap path for bounded prose exceptions.
+
+    Normal generated workbook cells must not use wrapping. Call this only after
+    the user has explicitly approved bounded prose that cannot read through
+    blank overflow cells. The helper sets wrapping and exact row height
+    together so the exception cannot clip text or create a loose padded row.
+    """
+    if not user_approved:
+        raise ValueError(
+            "Wrapped prose exceptions require explicit user approval; use "
+            "blank overflow cells without merging for horizontal-read text."
+        )
+    base = cell.alignment
+    count = line_count or visible_text_line_count(cell.value)
+    cell.alignment = Alignment(
+        horizontal=base.horizontal or "left",
+        vertical=base.vertical or "center",
+        text_rotation=base.text_rotation,
+        wrap_text=True,
+        shrink_to_fit=base.shrink_to_fit,
+        indent=base.indent,
+        relativeIndent=base.relativeIndent,
+        justifyLastLine=base.justifyLastLine,
+        readingOrder=base.readingOrder,
+    )
+    set_wrapped_exception_row_height(cell.parent, cell.row, count)
 
 
 # ============================================================================

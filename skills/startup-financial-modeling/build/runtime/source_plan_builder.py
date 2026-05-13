@@ -678,7 +678,7 @@ def _add_bar_chart(ws: Worksheet, title: str, data_ref: Reference, cats_ref: Ref
 def _build_guide(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Guide"]
     _setup_sheet(ws, f"{facts.company} Financial Model Guide", "Generic economic-kernel workbook assembled from the source narrative.")
-    _set_column_widths(ws, {2: 30, 3: 92})
+    _set_column_widths(ws, {2: 30, 3: 128})
     rows = [
         ("Purpose", "Investor-ready startup financial plan with traceable assumptions and editable formulas."),
         ("Source story signals", facts.source_summary),
@@ -710,6 +710,7 @@ def _build_guide(wb: Workbook, facts: SourceFacts) -> None:
 def _build_kernel(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Kernel"]
     _setup_sheet(ws, f"{facts.company} — Economic kernel", "Economic kernel before workbook tabs: decision, grain, mechanics, source status.")
+    _set_column_widths(ws, {3: 32, 4: 92})
     _section(ws, 6, "Kernel definition")
     rows = [
         ("Decision", "Build a startup financial plan for fundraising, board, lender, or investor diligence decisions."),
@@ -722,10 +723,10 @@ def _build_kernel(wb: Workbook, facts: SourceFacts) -> None:
         ("Unknowns", "; ".join(facts.source_unknowns)),
     ]
     for r, (label, value) in enumerate(rows, start=7):
-        ws.cell(r, 2, label)
-        ws.cell(r, 3, value)
-        ib.apply_label(ws.cell(r, 2), bold=True)
-        ib.apply_comment(ws.cell(r, 3), wrap_text=False)
+        ws.cell(r, 3, label)
+        ws.cell(r, 4, value)
+        ib.apply_label(ws.cell(r, 3), bold=True)
+        ib.apply_comment(ws.cell(r, 4), wrap_text=False)
     _section(ws, 17, "Engine composition")
     engines = [
         ("Operating engine", "Primary units / GMV / customers -> revenue -> gross profit."),
@@ -736,10 +737,10 @@ def _build_kernel(wb: Workbook, facts: SourceFacts) -> None:
         ("Scenario engine", "Base/downside/upside plus sensitivity around the decision-critical drivers."),
     ]
     for r, (engine, body) in enumerate(engines, start=18):
-        ws.cell(r, 2, engine)
-        ws.cell(r, 3, body)
-        ib.apply_label(ws.cell(r, 2), bold=True)
-        ib.apply_comment(ws.cell(r, 3), wrap_text=False)
+        ws.cell(r, 3, engine)
+        ws.cell(r, 4, body)
+        ib.apply_label(ws.cell(r, 3), bold=True)
+        ib.apply_comment(ws.cell(r, 4), wrap_text=False)
 
 
 def _build_assumptions(wb: Workbook, facts: SourceFacts) -> None:
