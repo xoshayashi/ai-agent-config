@@ -605,6 +605,62 @@ def test_cap_table_rebuild_clears_legacy_layout_state() -> None:
     ] == []
 
 
+def test_cap_table_sheet_uses_canonical_design_surface() -> None:
+    inp = cap_table.CapTableInput(
+        company_name="Design Surface Test",
+        safes=[
+            cap_table.SAFEInstrument(
+                name="Seed SAFE",
+                type="j_kiss_v2",
+                principal_money_m=20,
+                cap_money_m=1_000,
+                discount=0.20,
+            )
+        ],
+        round_pre_money_money_m=2_000,
+        round_investment_money_m=500,
+        round_target_pool_pct=0.10,
+    )
+    round_result = cap_table.run_round_state_machine(inp)
+    waterfall = [
+        (
+            3_000.0,
+            cap_table.compute_exit_waterfall(inp=inp, exit_value_money_m=3_000.0),
+        )
+    ]
+    wb = Workbook()
+    ws = cap_table.build_cap_table_sheet(
+        wb,
+        inp,
+        round_result=round_result,
+        waterfall_scenarios=waterfall,
+    )
+
+    assert wb.sheetnames == ["Ownership"]
+    assert ws.freeze_panes is None
+    assert ws.sheet_view.showGridLines is False
+    assert ws.print_area
+    assert ws.page_setup.orientation == "landscape"
+    assert ws.page_setup.fitToWidth == 1
+    assert ws.print_title_rows in {"1:3", "$1:$3"}
+    assert ws.print_title_cols in {"A:C", "$A:$C"}
+    assert _column_width(ws, "A") == ib.COL_MARGIN_WIDTH
+    assert _column_width(ws, "B") == ib.COL_HIERARCHY_WIDTH
+    assert _column_width(ws, "C") >= ib.COL_LABEL_WIDTH
+    assert _column_width(ws, "G") >= ib.COL_SOURCE_WIDTH
+    assert _wrapped_cells(wb) == []
+    assert _styled_blank_cells(wb) == []
+    assert _design_band_span_violations(wb) == []
+    assert _repeated_semantic_fill_rows(wb) == []
+    assert _font_design_violations(wb) == []
+    assert _border_surface_violations(wb) == []
+    assert _row_height_violations(wb) == []
+    for row in (5, 25, 50, 70):
+        assert [_fill_rgb(ws.cell(row=row, column=col)) for col in range(2, 8)] == [
+            ib.BG_HEADER_BAND
+        ] * 6
+
+
 def _chart_count(wb) -> int:
     return sum(len(getattr(ws, "_charts", [])) for ws in wb.worksheets)
 
@@ -979,6 +1035,65 @@ def _money_unit_format_mismatches(wb) -> list[str]:
                         f"{ws.title}!{cell.coordinate}: unit={unit} fmt={cell.number_format}"
                     )
     return mismatches
+
+
+def _semantic_unit_format_mismatches(wb) -> list[str]:
+    expected = {
+        "%": {
+            ib.FMT_PERCENT,
+            ib.FMT_PERCENT_BPS,
+            ib.FMT_PCT_0,
+            ib.FMT_PCT_1,
+            ib.FMT_PCT_2,
+        },
+        "x": {ib.FMT_MULTIPLE, ib.FMT_MULTIPLE_1, ib.FMT_MULTIPLE_2},
+        "FTE": {ib.FMT_INTEGER, ib.FMT_NUM},
+        "units": {ib.FMT_INTEGER, ib.FMT_NUM},
+        "customers": {ib.FMT_INTEGER, ib.FMT_NUM},
+        "count": {ib.FMT_INTEGER, ib.FMT_NUM},
+        "months": {ib.FMT_NUM, ib.FMT_INTEGER},
+        "days": {ib.FMT_NUM, ib.FMT_INTEGER},
+    }
+    mismatches = []
+    for ws in wb.worksheets:
+        if ws.max_column < FIRST_VALUE_COL:
+            continue
+        for row in ws.iter_rows():
+            unit = ws.cell(row=row[0].row, column=UNIT_COL).value
+            if unit not in expected:
+                continue
+            for cell in row[FIRST_VALUE_COL - 1:]:
+                if cell.value is None:
+                    continue
+                if not (
+                    isinstance(cell.value, (int, float))
+                    or (isinstance(cell.value, str) and cell.value.startswith("="))
+                ):
+                    continue
+                if cell.number_format not in expected[unit]:
+                    mismatches.append(
+                        f"{ws.title}!{cell.coordinate}: unit={unit} fmt={cell.number_format}"
+                    )
+    return mismatches
+
+
+def _row_height_violations(wb) -> list[str]:
+    allowed = {
+        ib.ROW_HEIGHT_TIGHT,
+        ib.ROW_HEIGHT_BASE,
+        18.0,
+        20.0,
+        ib.ROW_HEIGHT_RELAXED,
+        ib.ROW_HEIGHT_HERO,
+    }
+    violations = []
+    for ws in wb.worksheets:
+        for idx, dimension in ws.row_dimensions.items():
+            if dimension.height is None:
+                continue
+            if float(dimension.height) not in allowed:
+                violations.append(f"{ws.title}!{idx}: height={dimension.height}")
+    return violations
 
 
 def _fill_rgb(cell) -> str | None:
@@ -1497,6 +1612,37 @@ def _print_area_bounds(ws) -> tuple[int, int, int, int]:
     return range_boundaries(area)
 
 
+def test_all_generated_modes_pass_visual_design_invariants() -> None:
+    for mode in build_model.VALID_MODES:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / f"{mode}.xlsx"
+            build_model.build_model(None, out, mode=mode)
+            wb = load_workbook(out, data_only=False)
+
+            assert _defined_name_count(wb) == 0
+            assert _merged_count(wb) == 0
+            assert _wrapped_cells(wb) == []
+            assert _leading_space_labels(wb) == []
+            assert _styled_blank_cells(wb) == []
+            assert _design_band_span_violations(wb) == []
+            assert _repeated_semantic_fill_rows(wb) == []
+            assert _font_design_violations(wb) == []
+            assert _semantic_alignment_violations(wb) == []
+            assert _border_surface_violations(wb) == []
+            assert _money_unit_format_mismatches(wb) == []
+            assert _semantic_unit_format_mismatches(wb) == []
+            assert _row_height_violations(wb) == []
+            for ws in wb.worksheets:
+                assert ws.freeze_panes is None
+                assert ws.sheet_view.showGridLines is False
+                assert ws.print_area
+                rendered_row, rendered_col = ib.rendered_bounds(ws)
+                min_col, min_row, max_col, max_row = _print_area_bounds(ws)
+                assert (min_row, min_col) == (1, 1)
+                assert max_row >= rendered_row
+                assert max_col >= rendered_col
+
+
 def test_source_plan_print_canvas_includes_rendered_used_range() -> None:
     tmp, wb = _sample_source_workbook(
         "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
@@ -1668,6 +1814,7 @@ if __name__ == "__main__":
     test_mfn_applied_only_for_changed_safe_terms()
     test_cap_table_rebuild_clears_prior_sheet_fills()
     test_cap_table_rebuild_clears_legacy_layout_state()
+    test_cap_table_sheet_uses_canonical_design_surface()
     test_ib_helpers_reject_wrap_text_true()
     test_skill_guidance_makes_no_wrap_rule_explicit()
     test_skill_guidance_requires_fix_and_rerun_iteration()
@@ -1689,6 +1836,7 @@ if __name__ == "__main__":
     test_source_plan_has_no_excel_indent_or_clipped_role_columns()
     test_source_plan_has_no_long_centered_prose_headers()
     test_source_plan_ib_design_rhythm_and_visibility()
+    test_all_generated_modes_pass_visual_design_invariants()
     test_source_plan_print_canvas_includes_rendered_used_range()
     test_source_plan_custom_tables_keep_text_columns_readable()
     test_excluded_sheets_cannot_create_broken_references()
