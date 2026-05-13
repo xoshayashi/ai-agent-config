@@ -9,6 +9,7 @@ from __future__ import annotations
 import sys
 import tempfile
 import re
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -448,6 +449,13 @@ def test_all_modes_produce_expected_bundles() -> None:
             wb = load_workbook(out, data_only=False)
             assert wb.sheetnames == build_model.resolve_bundle(mode)
             assert _defined_name_count(wb) == 0
+            assert _merged_count(wb) == 0
+            assert _wrapped_cells(wb) == []
+            assert _styled_blank_cells(wb) == []
+            assert _font_design_violations(wb) == []
+            assert _semantic_alignment_violations(wb) == []
+            for ws in wb.worksheets:
+                assert ws.freeze_panes is None
 
 
 def test_generated_modes_do_not_reference_removed_sheets() -> None:
@@ -686,6 +694,9 @@ def test_skill_guidance_uses_meaningful_sparse_fills_and_borders() -> None:
     combined_flat = " ".join(combined.split()).lower()
     assert "same non-heatmap fill" in combined_flat
     assert "background fills are selective accents for major semantic moments only" in combined_flat
+    assert "workbook tokens" in combined_flat
+    assert "arial 10pt" in combined_flat
+    assert "header / label row" in combined_flat
     assert "use one rectangular span per filled row component" in combined_flat
     assert "do not choose the end column only from cells that happen to contain text" in combined_flat
     assert "do not stop a fill because a cell is blank" in " ".join(skill_text.split()).lower()
@@ -694,6 +705,20 @@ def test_skill_guidance_uses_meaningful_sparse_fills_and_borders() -> None:
     assert "rectangular column-consistent spans chosen from the attached table/block" in eval_text
     assert "heavy border pattern" in combined_flat
     assert "prominent borders follow the same meaning-first rule as fills" in combined_flat
+
+
+def test_xlsx_evals_load_full_design_reference_stack() -> None:
+    evals = json.loads((SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8"))["evals"]
+    required = {"_layout_canonical", "_ib_workbook_design_system", "_self_review_protocol"}
+    missing = []
+    for item in evals:
+        refs = set(item.get("applicable_references", []))
+        if not required <= refs:
+            missing.append(f"{item['id']}:{item['name']} missing {sorted(required - refs)}")
+        assertions = item.get("assertions", [])
+        if not any(assertion.get("id") == "XLSX_DESIGN" for assertion in assertions):
+            missing.append(f"{item['id']}:{item['name']} missing XLSX_DESIGN assertion")
+    assert missing == []
 
 
 def test_semantic_fill_helper_uses_rectangular_span_including_blanks() -> None:
@@ -862,6 +887,57 @@ def _repeated_semantic_fill_rows(wb) -> list[str]:
     return violations
 
 
+def _font_design_violations(wb) -> list[str]:
+    violations = []
+    allowed_sizes = {ib.FONT_SIZE_SMALL, ib.FONT_SIZE_BASE, ib.FONT_SIZE_LARGE, ib.FONT_SIZE_TITLE}
+    default_font = wb._fonts[0]
+    if default_font.name != ib.FONT_FAMILY or float(default_font.sz) != float(ib.FONT_SIZE_BASE):
+        violations.append(f"workbook default font={default_font.name} size={default_font.sz}")
+    normal_font = wb._named_styles["Normal"].font
+    if normal_font.name != ib.FONT_FAMILY or float(normal_font.sz) != float(ib.FONT_SIZE_BASE):
+        violations.append(f"Normal style font={normal_font.name} size={normal_font.sz}")
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.value is None:
+                    continue
+                if cell.font.name != ib.FONT_FAMILY:
+                    violations.append(f"{ws.title}!{cell.coordinate}: font={cell.font.name}")
+                if cell.font.sz is not None and int(float(cell.font.sz)) not in allowed_sizes:
+                    violations.append(f"{ws.title}!{cell.coordinate}: size={cell.font.sz}")
+    return violations
+
+
+def _semantic_alignment_violations(wb) -> list[str]:
+    violations = []
+    for ws in wb.worksheets:
+        if not source_plan._uses_default_layout(ws):
+            continue
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.value is None:
+                    continue
+                alignment = cell.alignment
+                horizontal = alignment.horizontal
+                indent = getattr(alignment, "indent", 0)
+                if cell.row == 5 and cell.column >= FIRST_VALUE_COL and horizontal != "center":
+                    violations.append(f"{ws.title}!{cell.coordinate}: period header horizontal={horizontal}")
+                elif cell.row != 5 and cell.column == source_plan.LAYOUT.source_col:
+                    if horizontal != "left" or not cell.font.italic or _font_rgb(cell) != ib.IB_COMMENT:
+                        violations.append(f"{ws.title}!{cell.coordinate}: source alignment/font")
+                elif cell.row != 5 and cell.column == source_plan.LAYOUT.unit_col:
+                    if horizontal != "right" or _font_rgb(cell) != ib.IB_COMMENT:
+                        violations.append(f"{ws.title}!{cell.coordinate}: unit alignment/font")
+                elif cell.row != 5 and cell.column in (source_plan.LAYOUT.first_hierarchy_col, source_plan.LAYOUT.label_col):
+                    if horizontal != "left" or indent:
+                        violations.append(f"{ws.title}!{cell.coordinate}: label horizontal={horizontal} indent={indent}")
+                elif cell.row != 5 and cell.column >= FIRST_VALUE_COL:
+                    if isinstance(cell.value, (int, float)) or (isinstance(cell.value, str) and cell.value.startswith("=")):
+                        if horizontal != "right":
+                            violations.append(f"{ws.title}!{cell.coordinate}: value horizontal={horizontal}")
+    return violations
+
+
 def _border_surface_violations(wb) -> list[str]:
     missing = []
     for ws in wb.worksheets:
@@ -980,6 +1056,8 @@ Source: customer discovery memo, market sizing memo, lender discussion notes.
         assert _styled_blank_cells(wb) == []
         assert _design_band_span_violations(wb) == []
         assert _repeated_semantic_fill_rows(wb) == []
+        assert _font_design_violations(wb) == []
+        assert _semantic_alignment_violations(wb) == []
         assert _border_surface_violations(wb) == []
         assert _money_unit_format_mismatches(wb) == []
         assert _unit_for_label(wb, "Assumptions", "New primary units") == "units"
@@ -1307,6 +1385,8 @@ def test_source_plan_design_surface_uses_generic_blue_palette() -> None:
         assert ib.BG_TABLE_HEADER in observed
         assert _styled_blank_cells(wb) == []
         assert _repeated_semantic_fill_rows(wb) == []
+        assert _font_design_violations(wb) == []
+        assert _semantic_alignment_violations(wb) == []
         total_populated = sum(
             1
             for ws in wb.worksheets
@@ -1592,6 +1672,7 @@ if __name__ == "__main__":
     test_skill_guidance_makes_no_wrap_rule_explicit()
     test_skill_guidance_requires_fix_and_rerun_iteration()
     test_skill_guidance_uses_meaningful_sparse_fills_and_borders()
+    test_xlsx_evals_load_full_design_reference_stack()
     test_semantic_fill_helper_uses_rectangular_span_including_blanks()
     test_source_backed_plan_reaches_generic_kernel_shape()
     test_structured_yaml_currency_and_display_scale_are_generic()

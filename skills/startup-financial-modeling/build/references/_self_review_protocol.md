@@ -44,10 +44,19 @@ heavy process.
 
 ## Visual and Editability Inspection
 
-- Open or render the workbook when practical.
+- For generated or repaired xlsx files, always run an inspection pass before
+  closeout. At minimum, inspect the workbook with openpyxl/XML checks for
+  widths, fonts, wraps, merged cells, frozen panes, row heights, blank-cell
+  styles, semantic fill spans, print areas, chart anchors, and number formats.
+  When LibreOffice/PDF/screenshot rendering is available, render and inspect
+  the visible output. Use an actual Google Sheets import/readback when the
+  handoff target is Google Sheets.
 - Verify that the workbook renders with readable columns, visible overflow
   where intended, compact row rhythm, semantic fills, no frozen panes,
   source / unit alignment, and calm accent usage.
+- Confirm workbook default font and populated cell fonts use the canonical
+  design tokens: Arial 10pt body/default, 9pt italic gray notes, 14pt title,
+  and compact bold section/header rows.
 - Confirm hierarchy / indentation uses dedicated Google-Sheets-20px columns
   (`2.14` xlsx width), with no native Excel indent, no leading-space
   indentation, and no wrapped generated cells.
