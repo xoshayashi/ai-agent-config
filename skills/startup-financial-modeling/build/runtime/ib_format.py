@@ -270,25 +270,58 @@ def rendered_bounds(ws: Worksheet) -> tuple[int, int]:
     return last_row, last_col
 
 
+SEMANTIC_BLANK_FILL_COLORS = {
+    BG_TABLE_HEADER,
+    BG_TOTAL_BAND,
+    BG_HEADER_BAND,
+    BG_WORKING,
+}
+
+
+def _fill_rgb(cell: Cell) -> str | None:
+    fill = cell.fill
+    if fill is None or fill.fill_type != "solid":
+        return None
+    value = getattr(fill.fgColor, "rgb", None)
+    return value[-6:].upper() if isinstance(value, str) else None
+
+
+def _is_intentional_blank_component_cell(cell: Cell, row_has_value: bool) -> bool:
+    """Keep blank cells that visually complete a semantic row component.
+
+    Empty cells are normally reset so overflow text and trailing canvas stay
+    clean. A blank cell with a semantic row fill is different: it can be the
+    quiet continuation of a header/check/highlight band, aligned to the same
+    visual width as neighboring rows.
+    """
+    if not row_has_value:
+        return False
+    return _fill_rgb(cell) in SEMANTIC_BLANK_FILL_COLORS
+
+
 def clear_blank_cell_styles(wb: Workbook) -> None:
     """Reset blank cells to the workbook default style.
 
-    This keeps empty cells available for Excel overflow and prevents trailing
-    blank regions from becoming visible canvas after fills, borders, or row
-    sizing were applied earlier in a builder.
+    This keeps overflow spacer cells and trailing canvas clean. It preserves
+    blank cells that intentionally extend semantic row components, such as
+    table-header or selected-output fills aligned to the same column span as
+    neighboring rows.
     """
     default_style = copy(wb._cell_styles[0])
     for ws in wb.worksheets:
         for row in ws.iter_rows():
+            row_has_value = any(cell.value not in (None, "") for cell in row)
             for cell in row:
                 if cell.value not in (None, ""):
+                    continue
+                if _is_intentional_blank_component_cell(cell, row_has_value):
                     continue
                 cell.value = None
                 cell._style = copy(default_style)
 
 
 def trim_blank_canvas(wb: Workbook, *, set_print_area: bool = True) -> None:
-    """Trim every sheet to its real used range and clear blank-cell styling."""
+    """Trim every sheet to its real used range and clear non-semantic blanks."""
     default_style = copy(wb._cell_styles[0])
     for ws in wb.worksheets:
         last_row, last_col = rendered_bounds(ws)
@@ -304,8 +337,11 @@ def trim_blank_canvas(wb: Workbook, *, set_print_area: bool = True) -> None:
             if col_idx > last_col:
                 del ws.column_dimensions[key]
         for row in ws.iter_rows():
+            row_has_value = any(cell.value not in (None, "") for cell in row)
             for cell in row:
                 if cell.value in (None, ""):
+                    if _is_intentional_blank_component_cell(cell, row_has_value):
+                        continue
                     cell.value = None
                     cell._style = copy(default_style)
         if set_print_area:

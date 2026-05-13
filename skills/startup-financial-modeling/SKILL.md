@@ -49,6 +49,10 @@ blank overflow space instead of enabling `wrap_text=True`.
 Design gates: `_layout_canonical.md` owns grid, columns, hierarchy widths, units,
 formulas, and layout mechanics. `_ib_workbook_design_system.md` owns visual
 roles, font, color, borders, highlights, charts, and render expectations.
+Use background fills and prominent borders as selective semantic signals: extend
+them through blank cells when that completes a row component or section band,
+but avoid repeating the same fill or heavy rule across consecutive rows unless
+the adjacent rows form a deliberate table structure or heatmap.
 
 Analysis gates: material assumptions need selected driver, explanatory drivers,
 implied value, support ratio/variance, and evidence status. Weak evidence feeds

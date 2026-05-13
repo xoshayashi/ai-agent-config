@@ -58,6 +58,19 @@ heavy process.
 - Review borders and background fills as a system. Row rules should support
   scanning, section and total borders should create hierarchy, and fills should
   sit on repeated semantic roles rather than isolated or noisy cells.
+- Check fill span positively: semantic rows such as headers, selected outputs,
+  checks, caution, and interpretation bands may include filled blank cells to
+  match the column width of related rows. Treat that as good alignment when it
+  is role-based and bounded; only trailing canvas or unrelated blank fills are
+  defects.
+- For section headers, verify the band width matches the attached table or
+  block width, not merely the one cell containing the section label.
+- Check color sparsity. The same non-heatmap background color should not appear
+  across consecutive rows as a decorative block. Filled rows should mark major
+  semantic moments, with borders and typography carrying the quieter rows.
+- Check border sparsity with the same eye. Prominent rules should mark table
+  starts, totals, checks, section changes, and interpretation rows; repeated
+  heavy rules across consecutive rows should have an explicit structural reason.
 - Confirm generated plans use simple editable grids, direct formulas, raw
   base-currency money values, correct unit labels, and consistent font-color
   semantics.
