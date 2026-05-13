@@ -121,7 +121,7 @@
         { "id": "H2", "text": "Blank cells intended for overflow remain genuinely blank and unstyled after repair", "type": "implementation" },
         { "id": "H2a", "text": "Hierarchy / indent columns render as 20px in Google Sheets (about 2.14 xlsx width), with no native Excel indent, no leading-space indentation, no frozen panes, and no generated text wrapping", "type": "implementation" },
         { "id": "H2b", "text": "Sheet canvases and print areas stop at the real used range, with no styled trailing rows or columns that create extra rendered pages", "type": "implementation" },
-        { "id": "H2c", "text": "Borders and background fills form a calm repeated design system instead of noisy isolated cell decoration", "type": "design" },
+        { "id": "H2c", "text": "Borders and background fills form a calm repeated design system instead of noisy isolated cell decoration; semantic rows and section headers may intentionally carry fills through blank cells to align with related tables, but the same non-heatmap fill or heavy border pattern is not repeated across consecutive rows without a structural reason", "type": "design" },
         { "id": "H2d", "text": "Charts, drawings, and newly inserted rows or cells remain inside an editable rendered canvas without inheriting noisy blank styles", "type": "implementation" },
         { "id": "H3", "text": "Source fields use traceable sources or evidence status and avoid fake assumptions/analysis labels", "type": "evidence" },
         { "id": "H4", "text": "KPI and memo gaps are repaired or translated into explicit decision interpretation and DD questions", "type": "memo" }
@@ -182,7 +182,7 @@
   "notes": [
     "The core regression is generic composition from economic kernel and driver tree.",
     "Maturity, sector, and funding context are evidence fields, not template selectors.",
-    "All xlsx outputs should preserve raw base-currency money storage, unit integrity, no text wrapping, no frozen panes, Google-Sheets-20px hierarchy / indent columns, direct formulas, and editable workbook structure.",
+    "All xlsx outputs should preserve raw base-currency money storage, unit integrity, no text wrapping, no frozen panes, Google-Sheets-20px hierarchy / indent columns, sparse semantic fill/border spans for aligned row components, direct formulas, and editable workbook structure.",
     "Prompt guidance must force assumption epistemology, KPI interpretation, coherent scenarios, valuation method credibility, clean-base memo writing, benchmark/source hygiene, and self-inspection before completion.",
     "Examples, maturity cues, sectors, and modes are pattern prompts only; evals should reject fixed stage-sector-purpose routing and keyword-triggered metric packs."
   ]

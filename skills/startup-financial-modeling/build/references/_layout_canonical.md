@@ -41,6 +41,24 @@
   the grid before considering that exception.
 - Spacer cells that support text overflow remain truly blank and unstyled;
   formatting appears where it carries table, header, output, or status meaning.
+- Empty cells can still be part of the design. When a row is a semantic
+  component such as a table header, selected output, check, caution, or
+  interpretation band, extend the background fill across the same useful
+  columns as comparable rows even where some cells have no text. This keeps the
+  row visually aligned and intentional; absence of text alone is not a reason
+  to stop the fill.
+- Section headers should usually carry their band across the full width of the
+  table they introduce. If the following table spans six columns, the section
+  band spans those six useful columns too, even when only the leftmost section
+  cell has text.
+- Fill span is row-level alignment, not permission to color blocks. Do not stack
+  the same background color across consecutive rows except for true heatmaps.
+  Keep accent rows selective so each filled row has a clear structural or
+  decision meaning.
+- Apply the same principle to borders: thin table rules can support ordinary
+  grids, but prominent top/bottom borders should appear where structure changes
+  or a decision row needs attention. Avoid repeated heavy rules across
+  consecutive rows unless the repetition is the table structure itself.
 - Evidence status cells in period columns must use compact, controlled labels
   such as `actual`, `contracted`, `pipeline-backed`, `benchmark`,
   `management target`, `estimate`, `placeholder`, or `unknown`; keep longer

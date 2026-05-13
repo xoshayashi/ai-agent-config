@@ -56,12 +56,30 @@ Color should help a reviewer understand the workbook faster:
 | Sources / notes / units | Gray, with sources and notes in italic |
 | Table headers | Light blue fill with dark text |
 | Section labels | Navy text or navy rule, compact and repeated |
-| Totals / checks / selected outputs | Pale blue or pale yellow fill on the selected populated row only |
+| Totals / checks / selected outputs | Pale blue or pale yellow fill on the selected semantic row |
 | Caution / placeholder | Pale yellow for a small number of decision-critical cells |
 
 The base grid stays white. Filled backgrounds form a coherent row, header,
 total, check, or interpretation component. A sheet normally has only a few
 highlighted rows, so the important rows are easy to find.
+
+Use fill span as a positive layout tool. For a header, selected output, check,
+caution, or interpretation row, the background may intentionally continue
+through empty cells so its width matches neighboring components. This is not
+noise when it is aligned, repeated, and role-based; it gives the reviewer a
+stable visual rhythm.
+
+Section headers follow the same component logic: extend the section band to the
+column count of the table or block it introduces. A compact label at the left
+can sit inside a wider band that quietly establishes the table width.
+
+Color coding must stay sparse and meaningful. Do not use the same background
+fill on multiple consecutive rows as a block of decoration. Repeated adjacent
+fills flatten hierarchy and make the model harder to scan. Use background color
+for large semantic moments only: one table header row, one section band, one
+selected output/check row, one caution row, or a deliberate heatmap. If several
+nearby rows all feel important, choose the single decision row to fill and use
+borders, font weight, or spacing for the supporting rows.
 
 ## Borders And Spacing
 
@@ -71,6 +89,13 @@ Use borders as the primary structure:
 - Subtotals use a single top border and bold text.
 - Grand totals and key checks use a top border plus double bottom border.
 - Section starts use a compact navy label or rule.
+- Prominent borders follow the same meaning-first rule as fills. They should
+  mark real structure: table starts, subtotals, grand totals, checks,
+  interpretation bands, or a deliberately repeated table grid. Avoid stacking
+  the same heavy top/bottom rule across many consecutive rows because it turns
+  hierarchy into noise.
+- Avoid repeated filled rows. A filled row should read as an event in the
+  sheet, not as continuous wallpaper.
 - Row heights stay close to 15-18 points for body rows and 20-22 points for
   section rows.
 
@@ -90,9 +115,10 @@ Design for the rendered sheet, not only the xlsx file:
 - The workbook canvas ends at the last rendered row and column on every sheet:
   values, charts, and drawings stay inside the print area, while trailing blank
   rows or columns do not carry fills, borders, or row-height styling.
-- Background fills appear on populated headers, sections, selected outputs, and
-  checks. Blank cells stay visually quiet, so filled regions feel intentional
-  rather than like a colored spreadsheet canvas.
+- Background fills appear on headers, sections, selected outputs, checks, and
+  their aligned row spans. Blank cells that complete those row components may
+  carry the same fill; trailing canvas and overflow spacer cells outside a
+  semantic row stay visually quiet.
 
 When screenshots show clipped labels, hidden notes, noisy color, or inconsistent
 alignment, repair the design system and rerun artifact inspection rather than

@@ -361,12 +361,29 @@ def _compact_status(value: object) -> object:
     return text
 
 
-def _section(ws: Worksheet, row: int, label: str) -> None:
+def _section_band_end_col(ws: Worksheet, explicit_end_col: int | None = None) -> int:
+    if explicit_end_col is not None:
+        return explicit_end_col
+    note_col = getattr(ws, "_startup_note_col", None)
+    facts = _facts_for_sheet(ws)
+    if facts is not None:
+        return max(
+            LAYOUT.unit_col,
+            _start_period_col() + len(facts.period_labels) - 1,
+            note_col or 0,
+        )
+    return max(LAYOUT.unit_col, ws.max_column)
+
+
+def _section(ws: Worksheet, row: int, label: str, end_col: int | None = None) -> None:
+    band_fill = PatternFill("solid", fgColor=ib.BG_HEADER_BAND)
     cell = ws.cell(row=row, column=LAYOUT.first_hierarchy_col, value=label)
     cell.font = Font(name=ib.FONT_FAMILY, size=10, bold=True, color="FFFFFF")
     cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=False)
-    cell.fill = PatternFill("solid", fgColor=ib.BG_HEADER_BAND)
-    cell.border = _merge_border(cell.border, bottom=ib.THIN_LINE)
+    for col in range(LAYOUT.first_hierarchy_col, _section_band_end_col(ws, end_col) + 1):
+        band_cell = ws.cell(row=row, column=col)
+        band_cell.fill = band_fill
+        band_cell.border = _merge_border(band_cell.border, bottom=ib.THIN_LINE)
     ws.row_dimensions[row].height = ib.ROW_HEIGHT_RELAXED
 
 
@@ -409,8 +426,6 @@ def _highlight_row(ws: Worksheet, row: int, last_col: int | None = None) -> None
     end_col = last_col if last_col is not None else max(ws.max_column, 9)
     for col in range(LAYOUT.first_hierarchy_col, end_col + 1):
         cell = ws.cell(row=row, column=col)
-        if cell.value is None:
-            continue
         cell.fill = PatternFill("solid", fgColor=ib.BG_WORKING)
         cell.border = _merge_border(cell.border, top=ib.THIN_LINE, bottom=ib.THIN_LINE)
 
@@ -1120,7 +1135,6 @@ def _build_pricing(wb: Workbook, facts: SourceFacts) -> None:
     for row, label, unit, values, source, kind, fmt in rows:
         _write_values(ws, row, label, unit, values, source=source, kind=kind, fmt=fmt, bold=row in (7, 16, 17))
     _highlight_row(ws, 16, _start_period_col() + len(cols) - 1)
-    _highlight_row(ws, 17, _start_period_col() + len(cols) - 1)
 
 
 def _build_financing(wb: Workbook, facts: SourceFacts) -> None:
@@ -1232,9 +1246,9 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
     _add_line_chart(ws, "Operating scale", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=13, max_row=13), cats, "B28", "units")
     _add_line_chart(ws, "Economic value", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=14, max_row=15), cats, "J28", _money_unit(facts))
     _add_line_chart(ws, "Margin and ownership", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=16, max_row=22), cats, "B44", "%")
-    _section(ws, 62, "KPI interpretation register")
     start_col = LAYOUT.label_col
     _set_column_widths(ws, {start_col: 24, start_col + 1: 42, start_col + 2: 36, start_col + 3: 38, start_col + 4: 40, start_col + 5: 48})
+    _section(ws, 62, "KPI interpretation register", start_col + 5)
     headers = ["KPI", "Formula / driver", "Applies when", "Source context", "Downside trigger", "IC implication"]
     for col, header in enumerate(headers, start=start_col):
         _apply_text_header(ws.cell(63, col), header)
@@ -1286,9 +1300,9 @@ def _build_scenarios(wb: Workbook, facts: SourceFacts) -> None:
             c = get_column_letter(col)
             ws.cell(r, col, _scenario_output_formula(facts, label, c, drivers))
             _apply_value_style(ws.cell(r, col), ib.FMT_PERCENT if unit == "%" else _money_format(facts))
-    _section(ws, 23, "Scenario interpretation")
     start_col = LAYOUT.label_col
     _set_column_widths(ws, {start_col: 24, start_col + 1: 40, start_col + 2: 98, start_col + 3: 46, start_col + 4: 64})
+    _section(ws, 23, "Scenario interpretation", start_col + 4)
     headers = ["Case", "Cause", "Linked driver changes", "Breakpoint", "DD action"]
     for col, header in enumerate(headers, start=start_col):
         _apply_text_header(ws.cell(24, col), header)
@@ -1418,9 +1432,9 @@ def _build_sensitivity(wb: Workbook, facts: SourceFacts) -> None:
             ws.cell(r, c, f"='Ownership'!{final_col}7*(1-('Capital Stack'!{final_col}7*${row_axis_col}{r})/('Capital Stack'!{final_col}15*{col}$17))")
             _apply_value_style(ws.cell(r, c), ib.FMT_PERCENT)
     ib.apply_heatmap_3color(ws, f"{get_column_letter(matrix_cols[0])}18:{get_column_letter(matrix_cols[-1])}22")
-    _section(ws, 25, "Sensitivity rationale")
     start_col = LAYOUT.label_col
     _set_column_widths(ws, {start_col: 24, start_col + 1: 100, start_col + 2: 34, start_col + 3: 34, start_col + 4: 64})
+    _section(ws, 25, "Sensitivity rationale", start_col + 4)
     headers = ["Matrix", "Why selected", "Output pressured", "Breakpoint", "Decision implication"]
     for col, header in enumerate(headers, start=start_col):
         _apply_text_header(ws.cell(26, col), header)
@@ -1476,9 +1490,9 @@ def _build_valuation(wb: Workbook, facts: SourceFacts) -> None:
     _write_values(ws, 23, "SOTP EV", "JPY", [f"='Segments'!$C$6*{get_column_letter(c)}19" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
     _write_values(ws, 24, "Selected EV", "JPY", [f"=IF({get_column_letter(c)}19>0,{get_column_letter(c)}19,IF({get_column_letter(c)}22>0,{get_column_letter(c)}22,{get_column_letter(c)}23))" for c in cols], kind="formula", fmt=ib.FMT_MONEY, bold=True)
     _highlight_row(ws, 24, _start_period_col() + len(cols) - 1)
-    _section(ws, 30, "Method credibility")
     start_col = LAYOUT.label_col
     _set_column_widths(ws, {start_col: 24, start_col + 1: 42, start_col + 2: 34, start_col + 3: 42, start_col + 4: 26})
+    _section(ws, 30, "Method credibility", start_col + 4)
     headers = ["Method", "Role", "Use when", "Exclusion / caution", "Linked driver"]
     for col, header in enumerate(headers, start=start_col):
         _apply_text_header(ws.cell(31, col), header)
@@ -1512,7 +1526,8 @@ def _build_market_support(wb: Workbook, facts: SourceFacts) -> None:
     for r, line in enumerate(facts.market_lines[:8], start=9):
         ws.cell(r, 2, line)
         ib.apply_comment(ws.cell(r, 2), wrap_text=False)
-    _section(ws, 19, "TAM / SAM / SOM bridge")
+    ws._startup_note_col = 11
+    _section(ws, 19, "TAM / SAM / SOM bridge", 11)
     rows = [
         ("TAM", "top-down opportunity", facts.tam_yen, "category-wide opportunity"),
         ("SAM", "serviceable market", facts.sam_yen, "reachable wedge given geography/channel/product readiness"),

@@ -661,6 +661,20 @@ def test_skill_guidance_requires_fix_and_rerun_iteration() -> None:
     assert "Do not replace failed verification with a narrative explanation" in self_review_flat
 
 
+def test_skill_guidance_uses_meaningful_sparse_fills_and_borders() -> None:
+    skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    layout_text = (SKILL_DIR / "build" / "references" / "_layout_canonical.md").read_text(encoding="utf-8")
+    design_text = (SKILL_DIR / "build" / "references" / "_ib_workbook_design_system.md").read_text(encoding="utf-8")
+    self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+    eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
+
+    combined = "\n".join([skill_text, layout_text, design_text, self_review_text, eval_text])
+    assert "same non-heatmap fill" in combined
+    assert "heavy border pattern is not repeated across consecutive rows" in combined
+    assert "Prominent borders follow the same meaning-first rule as fills" in combined
+    assert "extend them through blank cells when that completes a row component or section band" in combined
+
+
 def _unit_label_violations(wb) -> list[str]:
     bad_fragments = ("単位:", "単位：", "Unit:", "JPY M", "JPY B")
     return [
@@ -712,7 +726,6 @@ def _missing_section_band_fills(wb) -> list[str]:
     for ws in wb.worksheets:
         for row_idx in range(1, ws.max_row + 1):
             label = ws.cell(row_idx, source_plan.LAYOUT.first_hierarchy_col)
-            overflow_cell = ws.cell(row_idx, source_plan.LAYOUT.label_col)
             if not isinstance(label.value, str):
                 continue
             label_fill = label.fill
@@ -725,21 +738,42 @@ def _missing_section_band_fills(wb) -> list[str]:
                 continue
             font = label.font
             label_has_white_text = font.color is not None and str(font.color.rgb).endswith("FFFFFF")
-            overflow_is_clear = overflow_cell.value is None
-            if not (label_has_white_text and overflow_is_clear):
+            band_cells = []
+            for col in range(source_plan.LAYOUT.first_hierarchy_col, ws.max_column + 1):
+                cell = ws.cell(row_idx, col)
+                if _fill_rgb(cell) == ib.BG_HEADER_BAND:
+                    band_cells.append(cell)
+            band_is_contiguous = band_cells and [cell.column for cell in band_cells] == list(range(band_cells[0].column, band_cells[-1].column + 1))
+            following_cols = [
+                cell.column
+                for next_row in range(row_idx + 1, min(ws.max_row, row_idx + 3) + 1)
+                for cell in ws[next_row]
+                if cell.value is not None
+            ]
+            attached_width_col = max([source_plan.LAYOUT.label_col, *following_cols])
+            if not (label_has_white_text and band_is_contiguous and band_cells[-1].column >= attached_width_col):
                 missing.append(f"{ws.title}!{label.coordinate}")
     return missing
 
 
 def _styled_blank_cells(wb) -> list[str]:
-    return [
-        f"{ws.title}!{cell.coordinate}: style_id={cell.style_id}"
-        for ws in wb.worksheets
-        for row in ws.iter_rows()
-        for cell in row
-        if cell.value is None
-        and cell.style_id != 0
-    ]
+    bad = []
+    semantic_fill_colors = {
+        ib.BG_TABLE_HEADER,
+        ib.BG_TOTAL_BAND,
+        ib.BG_HEADER_BAND,
+        ib.BG_WORKING,
+    }
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            row_has_value = any(cell.value is not None for cell in row)
+            for cell in row:
+                if cell.value is not None or cell.style_id == 0:
+                    continue
+                if row_has_value and _fill_rgb(cell) in semantic_fill_colors:
+                    continue
+                bad.append(f"{ws.title}!{cell.coordinate}: style_id={cell.style_id}")
+    return bad
 
 
 def _design_band_span_violations(wb) -> list[str]:
@@ -759,12 +793,37 @@ def _design_band_span_violations(wb) -> list[str]:
                 last = max(cell.column for cell in populated if _fill_rgb(cell) == row_band)
                 check_cells = [ws.cell(row=row_idx, column=col) for col in range(2, last + 1)]
             else:
-                check_cells = populated
+                first = min(cell.column for cell in populated if _fill_rgb(cell) == row_band)
+                last = max(cell.column for cell in populated if _fill_rgb(cell) == row_band)
+                check_cells = [ws.cell(row=row_idx, column=col) for col in range(first, last + 1)]
             for cell in check_cells:
-                if cell.value is None:
-                    continue
                 if _fill_rgb(cell) != row_band:
                     violations.append(f"{ws.title}!{cell.coordinate}: expected row band {row_band}")
+    return violations
+
+
+def _repeated_semantic_fill_rows(wb) -> list[str]:
+    violations = []
+    semantic_fill_colors = {
+        ib.BG_TABLE_HEADER,
+        ib.BG_TOTAL_BAND,
+        ib.BG_HEADER_BAND,
+        ib.BG_WORKING,
+    }
+    for ws in wb.worksheets:
+        previous_color = None
+        previous_row = None
+        for row_idx in range(1, ws.max_row + 1):
+            colors = [
+                _fill_rgb(ws.cell(row=row_idx, column=col))
+                for col in range(1, ws.max_column + 1)
+            ]
+            row_colors = [color for color in colors if color in semantic_fill_colors]
+            row_color = max(set(row_colors), key=row_colors.count) if row_colors else None
+            if row_color is not None and row_color == previous_color:
+                violations.append(f"{ws.title}!{previous_row}:{row_idx}: repeated semantic fill {row_color}")
+            previous_color = row_color
+            previous_row = row_idx if row_color is not None else None
     return violations
 
 
@@ -885,6 +944,7 @@ Source: customer discovery memo, market sizing memo, lender discussion notes.
         assert _missing_section_band_fills(wb) == []
         assert _styled_blank_cells(wb) == []
         assert _design_band_span_violations(wb) == []
+        assert _repeated_semantic_fill_rows(wb) == []
         assert _border_surface_violations(wb) == []
         assert _money_unit_format_mismatches(wb) == []
         assert _unit_for_label(wb, "Assumptions", "New primary units") == "units"
@@ -1211,6 +1271,7 @@ def test_source_plan_design_surface_uses_generic_blue_palette() -> None:
         assert observed <= allowed
         assert ib.BG_TABLE_HEADER in observed
         assert _styled_blank_cells(wb) == []
+        assert _repeated_semantic_fill_rows(wb) == []
         total_populated = sum(
             1
             for ws in wb.worksheets
