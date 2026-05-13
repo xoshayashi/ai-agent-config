@@ -10,7 +10,7 @@ Every sheet follows the same reading rhythm:
 
 | Zone | Design intent |
 |---|---|
-| Title area | B2 contains the sheet title; B3 contains a short gray italic purpose line |
+| Title area | Row 2 in the first wide label/text column contains the sheet title; row 3 contains a short gray italic purpose line |
 | Header row | Row 5 anchors metadata columns and period/value columns |
 | Body | Each row has one role: section, line item, source/note, unit, value, or output |
 | Interpretation area | KPI, scenario, sensitivity, valuation, benchmark, and memo sheets include concise judgment rows |

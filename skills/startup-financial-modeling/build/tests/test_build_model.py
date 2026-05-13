@@ -14,7 +14,7 @@ from types import SimpleNamespace
 
 from openpyxl import Workbook
 from openpyxl import load_workbook
-from openpyxl.styles import PatternFill
+from openpyxl.styles import Alignment, PatternFill
 from openpyxl.utils import range_boundaries
 
 SKILL_DIR = Path(__file__).resolve().parents[2]
@@ -166,15 +166,15 @@ def test_generated_workbook_contains_interpretive_analysis_surfaces() -> None:
         build_model.build_model(None, out, mode="full")
         wb = load_workbook(out, data_only=False)
 
-        assert wb["KPI"].cell(_row_for_label(wb, "KPI", "KPI interpretation register"), 2).value == "KPI interpretation register"
-        assert wb["Scenarios"].cell(_row_for_label(wb, "Scenarios", "Scenario interpretation"), 2).value == "Scenario interpretation"
-        assert wb["Sensitivity"].cell(_row_for_label(wb, "Sensitivity", "Sensitivity rationale"), 2).value == "Sensitivity rationale"
-        assert wb["Valuation"].cell(_row_for_label(wb, "Valuation", "Method credibility"), 2).value == "Method credibility"
+        assert wb["KPI"].cell(_row_for_label(wb, "KPI", "KPI interpretation register"), source_plan.LAYOUT.first_hierarchy_col).value == "KPI interpretation register"
+        assert wb["Scenarios"].cell(_row_for_label(wb, "Scenarios", "Scenario interpretation"), source_plan.LAYOUT.first_hierarchy_col).value == "Scenario interpretation"
+        assert wb["Sensitivity"].cell(_row_for_label(wb, "Sensitivity", "Sensitivity rationale"), source_plan.LAYOUT.first_hierarchy_col).value == "Sensitivity rationale"
+        assert wb["Valuation"].cell(_row_for_label(wb, "Valuation", "Method credibility"), source_plan.LAYOUT.first_hierarchy_col).value == "Method credibility"
         assert wb["Benchmarks"]["B5"].value == "source_id"
         memo_row = _row_for_label(wb, "IC Memo", "KPI readout")
-        assert wb["IC Memo"].cell(memo_row, 2).value == "KPI readout"
-        assert isinstance(wb["IC Memo"].cell(memo_row + 1, 2).value, str)
-        assert wb["IC Memo"].cell(memo_row + 1, 2).value.startswith("=")
+        assert wb["IC Memo"].cell(memo_row, source_plan.LAYOUT.first_hierarchy_col).value == "KPI readout"
+        assert isinstance(wb["IC Memo"].cell(memo_row + 1, source_plan.LAYOUT.label_col).value, str)
+        assert wb["IC Memo"].cell(memo_row + 1, source_plan.LAYOUT.label_col).value.startswith("=")
 
         formulas = [formula for _, _, formula in _formula_cells(wb)]
         assert not any("AVERAGE(" in formula and "'Valuation'" not in formula for formula in formulas)
@@ -572,6 +572,31 @@ def test_cap_table_rebuild_clears_prior_sheet_fills() -> None:
     assert wb["Ownership"]["A1"].fill.fill_type in (None, "none")
 
 
+def test_cap_table_rebuild_clears_legacy_layout_state() -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Ownership"
+    ws.freeze_panes = "C8"
+    ws["B1"] = "legacy"
+    ws["B1"].alignment = Alignment(wrap_text=True, indent=2)
+
+    cap_table.build_cap_table_sheet(wb, cap_table.CapTableInput(company_name="Layout State Test"))
+    ws = wb["Ownership"]
+
+    assert ws.freeze_panes is None
+    assert ws.column_dimensions["A"].width == ib.COL_MARGIN_WIDTH
+    assert ws.column_dimensions["B"].width == ib.COL_HIERARCHY_WIDTH
+    assert ws["C1"].value == "Layout State Test — Cap Table"
+    assert _wrapped_cells(wb) == []
+    assert _leading_space_labels(wb) == []
+    assert [
+        f"{cell.coordinate}: {cell.alignment.indent}"
+        for row in ws.iter_rows()
+        for cell in row
+        if getattr(cell.alignment, "indent", 0)
+    ] == []
+
+
 def _chart_count(wb) -> int:
     return sum(len(getattr(ws, "_charts", [])) for ws in wb.worksheets)
 
@@ -685,15 +710,24 @@ def _leading_space_labels(wb) -> list[str]:
 def _missing_section_band_fills(wb) -> list[str]:
     missing = []
     for ws in wb.worksheets:
-        for row in ws.iter_rows():
-            label = row[1].value if len(row) > 1 else None
-            if not isinstance(label, str):
+        for row_idx in range(1, ws.max_row + 1):
+            label = ws.cell(row_idx, source_plan.LAYOUT.first_hierarchy_col)
+            overflow_cell = ws.cell(row_idx, source_plan.LAYOUT.label_col)
+            if not isinstance(label.value, str):
                 continue
-            fill = row[1].fill
-            font = row[1].font
-            is_section = fill.fill_type == "solid" and (fill.fgColor.rgb or "").endswith(ib.BG_HEADER_BAND)
-            if is_section and (font.color is None or not str(font.color.rgb).endswith("FFFFFF")):
-                missing.append(f"{ws.title}!B{row[1].row}")
+            label_fill = label.fill
+            is_section = (
+                label_fill.fill_type == "solid"
+                and isinstance(label_fill.fgColor.rgb, str)
+                and label_fill.fgColor.rgb.endswith(ib.BG_HEADER_BAND)
+            )
+            if not is_section:
+                continue
+            font = label.font
+            label_has_white_text = font.color is not None and str(font.color.rgb).endswith("FFFFFF")
+            overflow_is_clear = overflow_cell.value is None
+            if not (label_has_white_text and overflow_is_clear):
+                missing.append(f"{ws.title}!{label.coordinate}")
     return missing
 
 
@@ -1051,13 +1085,14 @@ def test_source_plan_uses_column_based_hierarchy_layout() -> None:
         assert ws.column_dimensions[FIRST_VALUE_LETTER].width == layout.period_width
         assert ws.freeze_panes is None
         assert [ws.cell(5, c).value for c in range(2, FIRST_VALUE_COL + 1)] == [
-            "Section",
+            None,
             "Line item",
             "Source / driver",
             "Unit",
             "FY2026",
         ]
         assert ws["B6"].value == "Volume and demand"
+        assert ws["C6"].value is None
         assert ws["C7"].value == "New primary units"
         assert ws["B7"].value is None
         assert wb["Guide"]["B8"].value == "Source story signals"
@@ -1360,7 +1395,10 @@ def test_added_hierarchy_columns_use_google_sheets_20px_width() -> None:
     original_layout = source_plan.LAYOUT
     try:
         source_plan.LAYOUT = source_plan.LayoutSpec(hierarchy_cols=3)
+        facts = kernel.derive_source_facts("# PLAN\nSource: management memo.")
+        ws._startup_facts = facts
         source_plan._setup_sheet(ws, "Hierarchy width check")
+        source_plan._write_period_header(ws, facts)
 
         assert ws.column_dimensions["B"].width == ib.COL_HIERARCHY_WIDTH
         assert ws.column_dimensions["C"].width == ib.COL_HIERARCHY_WIDTH
@@ -1369,6 +1407,12 @@ def test_added_hierarchy_columns_use_google_sheets_20px_width() -> None:
         assert ws.column_dimensions["E"].width == ib.COL_LABEL_WIDTH
         assert ws.column_dimensions["F"].width == ib.COL_SOURCE_WIDTH
         assert ws.column_dimensions["G"].width == ib.COL_UNIT_WIDTH
+        assert ws.cell(5, source_plan.LAYOUT.label_col).value == "Line item"
+        assert ws.cell(5, source_plan.LAYOUT.source_col).value == "Source / driver"
+        assert ws.cell(5, source_plan.LAYOUT.unit_col).value == "Unit"
+        assert ws.cell(5, source_plan.LAYOUT.first_value_col).value == facts.period_labels[0]
+        assert source_plan._uses_default_layout(ws) is True
+        assert ws.freeze_panes is None
     finally:
         source_plan.LAYOUT = original_layout
 
@@ -1447,6 +1491,7 @@ if __name__ == "__main__":
     test_balance_sheet_has_opening_capital_counterpart()
     test_mfn_applied_only_for_changed_safe_terms()
     test_cap_table_rebuild_clears_prior_sheet_fills()
+    test_cap_table_rebuild_clears_legacy_layout_state()
     test_ib_helpers_reject_wrap_text_true()
     test_skill_guidance_makes_no_wrap_rule_explicit()
     test_skill_guidance_requires_fix_and_rerun_iteration()

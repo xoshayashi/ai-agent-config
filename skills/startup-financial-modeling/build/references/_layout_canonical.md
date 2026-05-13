@@ -9,14 +9,17 @@
   leading spaces. A is a narrow visual gutter. Every hierarchy / indentation
   column starts at B and must render as 20px wide in Google Sheets. In xlsx /
   openpyxl terms that is approximately column width `2.14`, not `20.0`.
-  If a model needs deeper hierarchy, add more Google-Sheets-20px hierarchy
-  columns to the right, then place the lowest-level line item in the first wide
-  label column. Source / driver, unit, and value columns follow that label
-  column.
-- The default generated period layout is A gutter, B section, C line item, D
-  source / driver, E unit, and F onward for periods or values. Custom matrices
-  and scenario tables must derive their first data column from the same layout
-  object instead of hard-coding C/D/E or E:I ranges.
+  Section or hierarchy text may live in B only when the cells to the right are
+  intentionally blank so the text can overflow visibly in Google Sheets. If a
+  model needs deeper hierarchy, add more Google-Sheets-20px hierarchy columns
+  to the right, then leave the overflow cells blank or place the lowest-level
+  line item in the first wide label column. Source / driver, unit, and value
+  columns follow that label column.
+- The default generated period layout is A gutter, B 20px hierarchy / indent
+  marker, C line item or section text, D source / driver, E unit, and F onward
+  for periods or values. Custom matrices and scenario tables must derive their
+  first data column from the same layout object instead of hard-coding C/D/E or
+  E:I ranges.
 - Do not freeze rows or columns in generated workbooks. Keep the layout readable
   without relying on pane state.
 - Use alignment by meaning: prose, sources, and comments are left-aligned;

@@ -11,6 +11,12 @@ decision easier, not merely describe formulas.
 
 ## Memo Sections
 
+Write the memo from a clean base. Do not preserve legacy section order,
+backward-compatible wording, or previous workbook memo layouts just because
+they existed. Use only the sections needed for the current decision, and keep
+supplemental context necessary and sufficient: enough to explain the judgment,
+evidence, risk, and next action, without carrying template residue.
+
 Use the sections that fit the decision:
 
 - recommendation or decision framing;

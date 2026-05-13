@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from openpyxl import Workbook
-from openpyxl.styles import PatternFill
+from openpyxl.styles import Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -1242,6 +1242,8 @@ def build_cap_table_sheet(
                 cell.value = None
                 cell.font = ib.FONT_BODY
                 cell.fill = PatternFill(fill_type="none")
+                cell.alignment = Alignment(wrap_text=False, indent=0)
+        ws.freeze_panes = None
     else:
         ws = wb.create_sheet(CAP_TABLE_SHEET_NAME)
 
@@ -1493,6 +1495,24 @@ def build_cap_table_sheet(
             )
             ib.apply_comment(ws.cell(row=r, column=7))
             r += 1
+
+    ws.insert_cols(2)
+    ws.column_dimensions["A"].width = ib.COL_MARGIN_WIDTH
+    ws.column_dimensions["B"].width = ib.COL_HIERARCHY_WIDTH
+    ws.column_dimensions["C"].width = ib.COL_WIDTH_XLARGE
+    for col in "DEFGHI":
+        ws.column_dimensions[col].width = ib.COL_WIDTH_BASE
+    ws.freeze_panes = None
+    for row in ws.iter_rows():
+        for cell in row:
+            if isinstance(cell.value, str):
+                cell.value = cell.value.lstrip()
+            cell.alignment = Alignment(
+                horizontal=cell.alignment.horizontal,
+                vertical=cell.alignment.vertical,
+                wrap_text=False,
+                indent=0,
+            )
 
     ib.set_tab_color(ws, "memo")
     return ws
