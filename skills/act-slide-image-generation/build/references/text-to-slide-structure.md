@@ -59,6 +59,8 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Apply `revised_prompt_review_lock`: when the image tool exposes a revised or rewritten prompt, compare it against `exact_text`, source policy, header master, and visible/non-visible boundaries before approving the PNG.
 - Apply `chart_semantic_integrity_lock`: chart/table/matrix/flow/map structures should explain what is compared, which unit/denominator/period applies, and how rows, columns, axes, arrows, or legends connect; decorative pseudo-data is a major issue.
 - Apply `thumbnail_legibility_lock` and `reading_path_lock`: the main claim, focal structure, region boundaries, and key numbers should remain understandable in slide-sorter/contact-sheet review, with a clear path from H1 to main visual, evidence/context, optional Insight, and Source.
+- Apply `insight_absence_default_lock`: start each slide with `insight_decision: none`; keep no message box unless the slide has a specific interpretation gap, decision signal, or reading bridge that the title, visual structure, and labels cannot already carry.
+- Apply `insight_justification_required`: when an Insight/message-box is kept, record the exact reason, the non-redundant sentence, and why it improves reading speed or decision clarity. If the reason is weak, repetitive, decorative, or simply fills space, remove the component.
 - Message boxes and Insight surfaces are optional, not default. Use them only when a one-sentence interpretation, decision signal, or reading bridge genuinely helps; many slides should use no message box.
 - Message boxes and Insight surfaces should use a flat solid fill only. Do not add patterns, textures, gradients, motifs, icon wallpaper, dashed outlines, or internal illustration inside message boxes.
 - Apply `message_box_scale_lock`: Insight/message-box components are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered. For bottom Insight bars, target 72-96px height on the 1672 basis and allow up to 108px only for a necessary two-line sentence. Prefer one short judgment sentence, one line when possible and two lines maximum; trim, move explanation to notes/body, or remove the component instead of enlarging the box.
@@ -67,6 +69,8 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Apply `message_box_compactness_blocker_lock`: an Insight/message-box that dominates the slide, behaves like a banner, spans beyond the interpreted region, grows tall to carry prose, or compensates for layout imbalance is a blocker. A lower, quieter box that returns space to the body, figure, table, or diagram is preferred when the sentence remains legible and optically centered.
 - Apply `message_box_text_alignment_lock`: Insight/message-box text sits at the optical center of the surface, both horizontally and vertically, using balanced padding and a centered line box.
 - Apply `insight_surface_placement_lock`: decide the Insight footprint with the body silhouette and footer rhythm. Bottom Insight variants should bridge the body content and Source footer area with clear breathing room, centered to the interpreted region or full body block, while Source remains separate on its invisible baseline. Honey is preferred only for this bottom-bar decision-signal role, not for main content cards.
+- Apply `honey_selective_signal_lock`: Honey starts as absent. Use Honey only after the slide passes `insight_justification_required`, and only when a quiet bottom decision signal is more helpful than no component or a neutral outlined treatment. Honey is never a default message-box color.
+- Apply `honey_justification_required`: when Honey is selected, record why the pale Honey treatment improves decision clarity without overpowering the body. If it is decorative, repeats the title, fills empty space, or becomes a yellow card/banner, remove Honey or remove the Insight.
 - Apply `max_text_size_lock`: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
 - Lock deck-level header and footer masters before slide design. Apply `header_identity_lock`: the header is always the same compact left vertical line + H1 + subtitle system, never a slide-specific decoration surface. Every slide must reuse the same visible header elements, exact selected geometry, title color, subtitle size/color, visual alignment rule, body_start_y, and clear zone. Header fields must be exact values in final prompts, not ranges or loose descriptions. Do not render a separate ACT wordmark, logo, title kicker, badge, or brand label in the header unless the user explicitly supplies it as visible exact_text.
 - Apply `header_line_top_rule`: the left vertical line is the approved header-block anchor, not a short title tick. On the 1672x941 basis, use `vertical_line x=50 y=40 w=10 h=120 #008A80` unless a newer embedded master is supplied. Its top must never sit above the first visible H1 glyph/title top; align it with the title top or place it 0-6px below. Any upward protrusion, page-top floating, clipping outside `header_safe_area`, detachment from H1/subtitle, or body intrusion is a blocker. If it fails, repair the line x/y/h before touching H1.
@@ -317,7 +321,11 @@ message_box_compactness_blocker_lock:
 message_box_text_alignment_lock:
 insight_surface_placement_lock:
 message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement
-honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed box, category badge, title underline, or decorative yellow block
+insight_absence_default_lock: start from no Insight/message-box; add one only when it passes insight_justification_required
+insight_justification_required: keep an Insight/message-box only with a clear non-redundant interpretation, decision signal, or reading bridge
+honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block
+honey_selective_signal_lock: Honey starts absent and appears only when a justified bottom decision signal is stronger than no component or neutral outline
+honey_justification_required: keep Honey only with a written reason tied to decision clarity; remove decorative or space-filling Honey
 max_text_size_lock:
 imageability_lock:
 concrete_visual_anchor:
@@ -358,6 +366,10 @@ grid_mode:
 exact_text:
 exact_text_budget:
 insight_decision:
+insight_absence_default_lock:
+insight_justification_required:
+honey_selective_signal_lock:
+honey_justification_required:
 data_to_render:
 density_risk:
 split_merge_decision:

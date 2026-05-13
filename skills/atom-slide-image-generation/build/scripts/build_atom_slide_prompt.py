@@ -389,12 +389,16 @@ def canonical_planning_block(
   footer_anchor_baseline: 1672 basis x=44-56 baseline y=895-912, invisible alignment position only, planned even if source_line is none
   header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E; no Deep Blue/Honey/arbitrary gray in header or footer text
   message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement; many slides should use no message box
+  insight_absence_default_lock: start each slide from insight_decision: none; add an Insight/message-box only when it passes insight_justification_required
+  insight_justification_required: keep an Insight/message-box only with a clear non-redundant interpretation, decision signal, or reading bridge; remove it if it repeats H1/subtitle/labels or fills empty space
   message_box_scale_lock: compact interpretation surface sized after the main content area; shorter height is welcome when it gives the body, figure, table, or diagram more useful room, while remaining legible; trim text, move detail to body/notes, or remove Insight instead of enlarging the box
   message_box_text_size_lock: message-box/Insight text default 20-24pt, 24-26pt only by exception; always at least 6pt smaller than selected H1, visually below subtitle, and never a second title
   message_box_compactness_blocker_lock: Insight/message-box surfaces that dominate the slide, behave like a banner, or compensate for layout imbalance are blockers
   message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface; plan line box, padding, and baseline so the sentence sits at the visual center
   insight_surface_placement_lock: when an Insight/message-box is kept, place it as a deliberate interpretation bridge tied to the body silhouette and footer baseline; bottom variants sit in the breathing space between body content and Source, centered to the interpreted region or full body block, with Source kept separate on its invisible baseline
-  honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed box, category badge, title underline, or decorative yellow block
+  honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block
+  honey_selective_signal_lock: Honey starts absent and appears only when a justified bottom decision signal is stronger than no component or neutral outline
+  honey_justification_required: keep Honey only with a written reason tied to decision clarity; remove decorative or space-filling Honey
   max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
   table_note_microline: none / [one text note line above source text; text only, never drawn as a horizontal rule]
   source_real_only_lock: render Source footer only for real traceable external/provided sources; if no real source exists, set source_line: none and draw no Source footer text
@@ -413,6 +417,10 @@ def canonical_planning_block(
   icon_system_plan: none / [role, style, stroke, color logic, grouping, why it helps]
   illustration_presence: none / marginal / integrated / restrained_signature
   insight_decision:
+    insight_absence_default_lock: start from keep_remove: remove / variant: none
+    insight_justification_required: keep only when the slide loses non-redundant interpretation, decision signal, or reading bridge without it
+    honey_selective_signal_lock: Honey starts absent and is considered only for a justified bottom decision signal
+    honey_justification_required: if Honey is selected, explain why a quiet Honey bar improves decision clarity more than none or a neutral outline
     keep_remove: [keep/remove]
     reason: [interpretation or decision need]
     variant: none / bottom-main / top-thesis / side-context-wide / side-context-tall / inline-pill / outlined thesis / outlined bottom / accent surface / dark accent surface / Honey bottom bar when ATOM
@@ -650,7 +658,8 @@ draft_image_prompt_scaffold:
   Keep visual subject selection open and message-led; use the subject that makes the argument most observable through scale, interaction, place, evidence, or operating context.
   Create freshness through viewpoint, asymmetric composition, designed margin vignettes, evidence strips, partial cutaways, and magnified details, not decoration or glossy concept art.
   Use Deep Blue structurally with a 4-8% visual area budget, up to 12% only for strong closing slides, and never for body text.
-  Use Honey only for ATOM or compatible guidelines where it is a decision signal, preferably as a bottom Insight bar: #F7EECF flat pale Honey fill, #C49A2C thin 2-3px outline, optional left icon well, one #C49A2C vertical separator, #2D332E text, one component maximum. Honey is not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block.
+  Apply insight_absence_default_lock and insight_justification_required: start from no Insight/message-box; keep one only when the slide loses non-redundant interpretation, decision signal, or reading bridge without it.
+  Use Honey only for ATOM or compatible guidelines where it is a justified bottom decision signal: #F7EECF flat pale Honey fill, #C49A2C thin 2-3px outline, optional left icon well, one #C49A2C vertical separator, #2D332E text, one component maximum. Apply honey_selective_signal_lock and honey_justification_required: Honey starts absent, is never the default message-box color, and must be removed if it is decorative, redundant, space-filling, or stronger than the body content.
   Use flat solid fills for all message boxes and Insight surfaces; do not add patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
   Apply message_box_scale_lock: message boxes are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered. For bottom Insight bars, target 72-96px height on the 1672 basis and allow up to 108px only for a necessary two-line sentence. Keep copy to one short judgment sentence, prefer one line, max two lines, and do not enlarge the surface to rescue long prose.
   Apply message_box_text_size_lock: message-box/Insight text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below the subtitle, and never becomes a second title or second hero headline.
@@ -658,7 +667,7 @@ draft_image_prompt_scaffold:
   Apply message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface; use balanced padding and line-box placement so the sentence reads intentional, not baseline-drifted.
   Apply insight_surface_placement_lock: when kept, the Insight/message-box belongs to the body composition and footer rhythm; bottom variants sit in the breathing space between body content and Source, centered to the interpreted region or full body block, while Source remains a separate footer cue on its invisible baseline.
   Enforce max_text_size_lock across every visible string; do not use display typography, hero numerals, badges, or message-box text above the cap.
-  Keep Honey quiet and consistent: no saturated yellow fills, no dark yellow message boxes, no large yellow areas, no yellow title underline, and no Honey color variation across a deck.
+  Keep Honey quiet and consistent: no saturated yellow fills, no dark yellow message boxes, no large yellow areas, no yellow title underline, no Honey color variation across a deck, and no Honey on slides where neutral/no Insight is clearer.
   Use illustrations/icons when they help understanding, memory, comparison, or navigation; do not add them by quota. A slide with no icon or illustration is acceptable when the structure already carries the message.
   Do not minimize numbers by default. Keep sourced or explicitly assumed numbers when they help comparison, sizing, prioritization, credibility, or decision-making; remove only unsupported, redundant, unreadable, or decorative numbers.
   Render ONLY the exact text strings listed in the planning block or final prompt; do not invent extra labels.
@@ -743,8 +752,9 @@ post_generation_audit:
   - message_box_text_alignment_lock is honored: Insight/message-box text is optically centered horizontally and vertically inside the surface
   - insight_surface_placement_lock is honored: kept Insight/message-box surfaces bridge the interpreted body region and footer rhythm without competing with either
   - visible_brand_label_blocker passes: no separate ATOM wordmark, logo, title kicker, or brand label appears in the header unless exact_text explicitly requested it
-  - Honey message boxes use #F7EECF fill, #C49A2C thin outline/separator, optional left icon well, and #2D332E text consistently
-  - Honey is absent from main content cards, missing-body placeholders, dashed boxes, category badges, title underlines, and decorative yellow blocks
+  - If a Honey Insight/message-box is justified and kept, it uses #F7EECF fill, #C49A2C thin outline/separator, optional left icon well, and #2D332E text consistently
+  - Honey is not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block
+  - Honey is absent from main content cards, missing-body placeholders, dashed outlines, category badges, title underlines, and decorative yellow blocks
   - saturated yellow, dark yellow, or large yellow areas are absent
   - coordinate_inventory_1672 matches visible major objects
   - all major regions snap to grid/shared edges
@@ -842,7 +852,11 @@ def deck_plan_tail() -> str:
         signature_visual_plan:
         insight_decision:
         message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement; many slides should use no message box
-        honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed box, category badge, title underline, or decorative yellow block
+        insight_absence_default_lock: start from no Insight/message-box
+        insight_justification_required: keep only with a non-redundant interpretation, decision signal, or reading bridge
+        honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block
+        honey_selective_signal_lock: Honey starts absent and appears only when a justified bottom decision signal is stronger than no component or neutral outline
+        honey_justification_required: keep Honey only with a written reason tied to decision clarity
         output_artifact_mastering_lock: slides_final/ is the only loose-PNG master; package and render-check folders hold only derivative artifacts
         single_final_png_master_lock: review manifests and package mappings reference the slides_final/ master path
         no_duplicate_png_output_lock: no duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/
@@ -924,7 +938,11 @@ def deck_plan_tail() -> str:
   - density_design_plan:
   - insight_count_plan:
   - message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement; many slides should use no message box
-  - honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed box, category badge, title underline, or decorative yellow block
+  - insight_absence_default_lock: start each slide from no Insight/message-box
+  - insight_justification_required: use a message box only when the slide loses needed interpretation, decision signal, or reading bridge without it
+  - honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block
+  - honey_selective_signal_lock: Honey starts absent and appears only when a justified bottom decision signal is stronger than no component or neutral outline
+  - honey_justification_required: keep Honey only with a written reason tied to decision clarity
   - message_box_scale_lock: bottom Insight bars target 72-96px on the 1672 basis, with 108px only for a necessary two-line sentence
   - message_box_compactness_blocker_lock:
   - source_collection_needs:
@@ -1115,7 +1133,11 @@ def text_structure_tail() -> str:
       header_footer_text_color_lock:
       visible_brand_label_blocker: no separate ATOM wordmark, logo, title kicker, badge, or brand label in the header unless exact_text explicitly requests it
       message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement; many slides should use no message box
-      honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed box, category badge, title underline, or decorative yellow block
+      insight_absence_default_lock:
+      insight_justification_required:
+      honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block
+      honey_selective_signal_lock:
+      honey_justification_required:
       message_box_scale_lock:
       message_box_text_size_lock:
       message_box_compactness_blocker_lock:
@@ -1149,6 +1171,10 @@ def text_structure_tail() -> str:
       data_to_render:
       exact_text_budget: H1 + subtitle + short labels + decision-relevant numbers + optional one-sentence Insight
       insight_decision:
+      insight_absence_default_lock:
+      insight_justification_required:
+      honey_selective_signal_lock:
+      honey_justification_required:
       density_risk:
       split_merge_decision:
       prompt_text_budget:

@@ -142,6 +142,10 @@ header_footer_text_color_lock:
   forbidden_text_colors: Petrol, Honey, yellow, arbitrary gray
 visible_brand_label_blocker: no separate ACT wordmark, logo, title kicker, badge, or brand label in the header unless exact_text explicitly requests it
 message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement
+insight_absence_default_lock: start from no Insight/message-box on each slide; add one only when it passes insight_justification_required
+insight_justification_required: keep an Insight/message-box only with a clear non-redundant interpretation, decision signal, or reading bridge
+honey_selective_signal_lock: Honey starts absent and appears only when a justified bottom decision signal is stronger than no component or neutral outline
+honey_justification_required: keep Honey only with a written reason tied to decision clarity; remove decorative or space-filling Honey
 message_box_scale_lock: compact interpretation surface sized after the main content area; lower height is welcome when it gives the body, figure, table, or diagram more useful room; bottom bars target 72-96px on the 1672 basis
 message_box_text_size_lock:
 max_text_size_lock:
@@ -288,8 +292,10 @@ ACT slide contract:
 - keep the slide in a strategy operating-deck look: useful occupancy, small explanatory visuals, crisp rules, low-contrast surfaces, and no ornamental depth
 - let structure, spacing, rules, numbers, and typography carry hierarchy
 - use the embedded ACT design system's accent color structurally with a restrained area budget; for ACT work, Petrol uses a 6-12% area budget and never appears as body text
-- use Insight component only if it adds interpretation or decision weight and is compatible with the embedded ACT design system; many slides should use no message box
-- if Honey is used in ACT or compatible guidelines, use it preferably as a bottom Insight bar with #F5E2A8 flat pale fill, #C49A2C thin 2-3px outline/separator, optional left icon well, #2D332E text, one component maximum
+- start from `insight_decision: none`; use Insight component only if it adds non-redundant interpretation, decision weight, or a reading bridge and is compatible with the embedded ACT design system; many slides should use no message box
+- apply insight_justification_required: if the same sentence is already clear from H1, subtitle, chart/table labels, or notes, remove the Insight/message-box
+- apply honey_selective_signal_lock: Honey starts absent; use it only when a justified bottom decision signal is stronger than no component or a neutral outlined treatment
+- if Honey is used in ACT or compatible guidelines, use it only as a justified bottom Insight bar with #F5E2A8 flat pale fill, #C49A2C thin 2-3px outline/separator, optional left icon well, #2D332E text, one component maximum
 - keep all Insight/message boxes flat solid fill only; no patterns, textures, gradients, motifs, icon wallpaper, dashed outlines, or internal illustrations
 - apply content_area_priority_lock before sizing an Insight/message-box: give the body, figure, table, or diagram the needed height first, then use the remaining calculated space for the optional box
 - apply message_box_scale_lock: keep Insight/message boxes compact, one short judgment sentence, one line preferred and two lines maximum; bottom bars target 72-96px on the 1672 basis; move detail to notes instead of growing the surface
@@ -449,7 +455,7 @@ Process:
 7. Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide, with a deck-level mix of human-designed editorial/vector illustrations, data visuals, small system scenes, icon evidence, and quiet tables.
 8. Assign density_design for every slide: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
 9. Assign visual_design_quality_traits as visual treatment only: compact fixed header, thin structural lines, pale cards/tables, restrained icons, explanatory line drawings, stable outer padding, concrete visual anchor, and crisp focal hierarchy.
-10. Assign Insight components selectively across the deck only when they add interpretation, decision weight, or reading speed; Honey remains rare and purposeful.
+10. Assign Insight components selectively across the deck only when they add non-redundant interpretation, decision weight, or reading speed. Start each slide from `insight_decision: none`, and keep a component only when `insight_justification_required` is satisfied. Apply `honey_selective_signal_lock`: Honey remains rare, purposeful, and bottom-bar-only.
 11. Vary dominant structures so the deck feels edited around the argument.
 12. Mark restrained illustration candidates where the idea becomes more memorable or fresh without becoming a rough sketch or glossy hero illustration.
 13. Flag slides that should split because density would force body below 18pt equivalent or create competing major regions.
@@ -495,14 +501,18 @@ Repair:
 Decide whether this slide needs an Insight component.
 
 Evaluate:
+- Start from none. What would be lost if the slide had no Insight/message-box?
+- Is the proposed sentence non-redundant with the H1, subtitle, labels, or visual structure?
 - Does the table, diagram, or comparison need a one-sentence interpretation?
 - Does the slide contain a strategic turning point, winning logic, or decision?
 - Would the component become a second title or second hero?
 - Can the component stay as one short judgment sentence, preferably one line and never more than two?
 - Is the component text smaller than the selected H1 by at least 6pt and visually below subtitle?
 - Is the deck underusing or overusing Insight components?
+- Would keeping no component make the slide simpler, stronger, and give the body more room?
 - Which choice is quietest and clearest under the embedded ACT design system: none, outlined thesis, outlined bottom, accent surface, dark accent surface, or Honey bottom bar when ACT?
 - If Honey is chosen, does it help the reader decide faster?
+- If Honey is chosen, is there a written honey_justification_required reason tied to decision clarity rather than decoration?
 - Does the Honey component use the fixed bottom-bar treatment (#F5E2A8 fill, #C49A2C 2-3px outline/separator, optional left icon well, #2D332E text)?
 - Is the Insight/message-box footprint tied to the interpreted body region and footer rhythm rather than floating in leftover space?
 - For bottom variants, does it sit as a centered bridge between body content and Source, with clear breathing room above and below?
