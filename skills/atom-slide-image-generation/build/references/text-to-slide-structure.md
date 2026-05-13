@@ -32,7 +32,7 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Apply `structure_first_visual_mix`: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation.
 - Apply `imageability_lock`: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation.
 - Apply `visible_text_only_lock` and `render_contract_lock`: separate on-slide strings from planning, workflow, audit, speaker-note, file-path, and packaging metadata; only quoted `exact_text` can be visible.
-- Apply `prompt_order_lock`: final image prompts should be ordered as drawing action, canvas/brand, exact visible text, fixed components, layout/reading path, main visual/structure details, optional Insight, then focused blockers.
+- Apply `prompt_order_lock`: final image prompts should be ordered as drawing action, exact visible text, canvas/style system, fixed components, layout/reading path, main visual/structure details, optional Insight, then focused blockers.
 - Apply `edit_scope_lock`: repair prompts should be single-delta (`issue_observed`, `change_only`, `preserve`, `re_check`) and avoid global restyle unless explicitly required.
 - Apply `editorial_polish_repair_loop`: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm.
 - Apply `visual_subject_open_set`: keep visual subject choices open; select the clearest concrete subject from the slide message, evidence, and audience context.
@@ -56,15 +56,16 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Apply `revised_prompt_review_lock`: when the image tool exposes a revised or rewritten prompt, compare it against `exact_text`, source policy, header master, and visible/non-visible boundaries before approving the PNG.
 - Apply `chart_semantic_integrity_lock`: chart/table/matrix/flow/map structures should explain what is compared, which unit/denominator/period applies, and how rows, columns, axes, arrows, or legends connect; decorative pseudo-data is a major issue.
 - Apply `thumbnail_legibility_lock` and `reading_path_lock`: the main claim, focal structure, region boundaries, and key numbers should remain understandable in slide-sorter/contact-sheet review, with a clear path from H1 to main visual, evidence/context, optional Insight, and Source.
-- Message boxes and Insight surfaces should use a flat solid fill only. Do not add patterns, textures, gradients, motifs, icon wallpaper, or internal illustration inside message boxes.
-- Apply `message_box_scale_lock`: Insight/message-box components are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered. Prefer one short judgment sentence, one line when possible and two lines maximum; trim, move explanation to notes/body, or remove the component instead of enlarging the box.
+- Message boxes and Insight surfaces are optional, not default. Use them only when a one-sentence interpretation, decision signal, or reading bridge genuinely helps; many slides should use no message box.
+- Message boxes and Insight surfaces should use a flat solid fill only. Do not add patterns, textures, gradients, motifs, icon wallpaper, dashed outlines, or internal illustration inside message boxes.
+- Apply `message_box_scale_lock`: Insight/message-box components are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered. For bottom Insight bars, target 72-96px height on the 1672 basis and allow up to 108px only for a necessary two-line sentence. Prefer one short judgment sentence, one line when possible and two lines maximum; trim, move explanation to notes/body, or remove the component instead of enlarging the box.
 - Apply `content_area_priority_lock`: allocate height to the body, figure, table, or diagram first; size any optional Insight/message-box from the remaining calculated space so it supports rather than compresses the main content area.
 - Apply `message_box_text_size_lock`: Insight/message-box text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than H1, and must not become a second title or compete with subtitle.
 - Apply `message_box_compactness_blocker_lock`: an Insight/message-box that dominates the slide, behaves like a banner, spans beyond the interpreted region, grows tall to carry prose, or compensates for layout imbalance is a blocker. A lower, quieter box that returns space to the body, figure, table, or diagram is preferred when the sentence remains legible and optically centered.
 - Apply `message_box_text_alignment_lock`: Insight/message-box text sits at the optical center of the surface, both horizontally and vertically, using balanced padding and a centered line box.
-- Apply `insight_surface_placement_lock`: decide the Insight footprint with the body silhouette and footer rhythm. Bottom Insight variants should bridge the body content and Source footer area with clear breathing room, centered to the interpreted region or full body block, while Source remains separate on its invisible baseline.
+- Apply `insight_surface_placement_lock`: decide the Insight footprint with the body silhouette and footer rhythm. Bottom Insight variants should bridge the body content and Source footer area with clear breathing room, centered to the interpreted region or full body block, while Source remains separate on its invisible baseline. Honey is preferred only for this bottom-bar decision-signal role, not for main content cards.
 - Apply `max_text_size_lock`: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
-- Lock deck-level header and footer masters before slide design. Apply `header_identity_lock`: the header is always the same compact left vertical line + H1 + subtitle system, never a slide-specific decoration surface. Every slide must reuse the same visible header elements, exact selected geometry, title color, subtitle size/color, visual alignment rule, body_start_y, and clear zone. Header fields must be exact values in final prompts, not ranges or loose descriptions.
+- Lock deck-level header and footer masters before slide design. Apply `header_identity_lock`: the header is always the same compact left vertical line + H1 + subtitle system, never a slide-specific decoration surface. Every slide must reuse the same visible header elements, exact selected geometry, title color, subtitle size/color, visual alignment rule, body_start_y, and clear zone. Header fields must be exact values in final prompts, not ranges or loose descriptions. Do not render a separate ATOM wordmark, logo, title kicker, badge, or brand label in the header unless the user explicitly supplies it as visible exact_text.
 - Apply `header_line_top_rule`: the left vertical line is the approved header-block anchor, not a short title tick. On the 1672x941 basis, use `vertical_line x=50 y=40 w=10 h=120 #0B2F5B` unless a newer embedded master is supplied. Its top must never sit above the first visible H1 glyph/title top; align it with the title top or place it 0-6px below. Any upward protrusion, page-top floating, clipping outside `header_safe_area`, detachment from H1/subtitle, or body intrusion is a blocker. If it fails, repair the line x/y/h before touching H1.
 - Apply `header_integrity_blocker_lock`: malformed, missing, oversized, recolored, right-decorated, or intruded headers are blockers; repair header identity before other visual polish.
 - Apply `header_footer_text_color_lock`: H1 `#2D332E`, subtitle `#4D544E`, footer/source/table-note text `#6E756E`. Do not use Deep Blue, Honey, yellow, or arbitrary gray for header/footer text.
@@ -291,6 +292,7 @@ deck_header_master_lock:
   body_start_y:
   upper_right_clear_zone:
   forbidden_header_elements:
+visible_brand_label_blocker: no separate ATOM wordmark, logo, title kicker, badge, or brand label in the header unless exact_text explicitly requests it
 header_identity_lock:
 header_integrity_blocker_lock:
 header_footer_text_color_lock:
@@ -303,6 +305,8 @@ message_box_text_size_lock:
 message_box_compactness_blocker_lock:
 message_box_text_alignment_lock:
 insight_surface_placement_lock:
+message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement
+honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed box, category badge, title underline, or decorative yellow block
 max_text_size_lock:
 imageability_lock:
 concrete_visual_anchor:
