@@ -10,6 +10,7 @@ import sys
 import tempfile
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 from openpyxl import Workbook
 from openpyxl import load_workbook
@@ -165,13 +166,15 @@ def test_generated_workbook_contains_interpretive_analysis_surfaces() -> None:
         build_model.build_model(None, out, mode="full")
         wb = load_workbook(out, data_only=False)
 
-        assert wb["KPI"]["B62"].value == "KPI interpretation register"
-        assert wb["Scenarios"]["B23"].value == "Scenario interpretation"
-        assert wb["Sensitivity"]["B25"].value == "Sensitivity rationale"
-        assert wb["Valuation"]["B30"].value == "Method credibility"
+        assert wb["KPI"].cell(_row_for_label(wb, "KPI", "KPI interpretation register"), 2).value == "KPI interpretation register"
+        assert wb["Scenarios"].cell(_row_for_label(wb, "Scenarios", "Scenario interpretation"), 2).value == "Scenario interpretation"
+        assert wb["Sensitivity"].cell(_row_for_label(wb, "Sensitivity", "Sensitivity rationale"), 2).value == "Sensitivity rationale"
+        assert wb["Valuation"].cell(_row_for_label(wb, "Valuation", "Method credibility"), 2).value == "Method credibility"
         assert wb["Benchmarks"]["B5"].value == "source_id"
-        assert wb["IC Memo"]["B10"].value == "KPI readout"
-        assert isinstance(wb["IC Memo"]["B11"].value, str) and wb["IC Memo"]["B11"].value.startswith("=")
+        memo_row = _row_for_label(wb, "IC Memo", "KPI readout")
+        assert wb["IC Memo"].cell(memo_row, 2).value == "KPI readout"
+        assert isinstance(wb["IC Memo"].cell(memo_row + 1, 2).value, str)
+        assert wb["IC Memo"].cell(memo_row + 1, 2).value.startswith("=")
 
         formulas = [formula for _, _, formula in _formula_cells(wb)]
         assert not any("AVERAGE(" in formula and "'Valuation'" not in formula for formula in formulas)
@@ -218,13 +221,29 @@ def test_cost_labeled_scenario_drivers_pressure_costs_not_revenue() -> None:
     )
     try:
         ws = wb["Scenarios"]
-        assert ws.cell(8, source_plan.LAYOUT.label_col).value == "Prototype / program cost factor"
+        scenario_row = _row_for_label(wb, "Scenarios", "Prototype / program cost factor")
+        assert ws.cell(scenario_row, source_plan.LAYOUT.label_col).value == "Prototype / program cost factor"
         revenue_formula = ws.cell(14, FIRST_VALUE_COL).value
         gross_profit_formula = ws.cell(15, FIRST_VALUE_COL).value
-        assert f"{FIRST_VALUE_LETTER}$8" not in revenue_formula
-        assert f"{FIRST_VALUE_LETTER}$8" in gross_profit_formula
+        assert f"{FIRST_VALUE_LETTER}${scenario_row}" not in revenue_formula
+        assert f"{FIRST_VALUE_LETTER}${scenario_row}" in gross_profit_formula
+        hiring_row = _row_for_label(wb, "Scenarios", "Hiring capacity scale")
+        ebitda_formula = ws.cell(16, FIRST_VALUE_COL).value
+        assert f"{FIRST_VALUE_LETTER}${hiring_row}" not in revenue_formula
+        assert f"{FIRST_VALUE_LETTER}${hiring_row}" in ebitda_formula
     finally:
         tmp.cleanup()
+
+
+def test_unclassified_scenario_drivers_default_to_opex_not_revenue() -> None:
+    revenue_factor, cost_factor, opex_factor, financing_factor = source_plan._scenario_driver_formula_terms(
+        FIRST_VALUE_LETTER,
+        (SimpleNamespace(label="Regulatory clearance readiness"),),
+    )
+    assert revenue_factor == "1"
+    assert cost_factor == "1"
+    assert opex_factor == f"{FIRST_VALUE_LETTER}$7"
+    assert financing_factor == "1"
 
 
 def test_cost_build_does_not_double_count_detailed_service_costs_in_variable_cogs() -> None:
@@ -233,7 +252,7 @@ def test_cost_build_does_not_double_count_detailed_service_costs_in_variable_cog
         build_model.build_model(None, out, mode="full")
         wb = load_workbook(out, data_only=False)
 
-        formula = wb["Cost Build"].cell(8, FIRST_VALUE_COL).value
+        formula = _first_year_cell_for_label(wb, "Cost Build", "Variable COGS").value
         assert formula == f"={FIRST_VALUE_LETTER}7*'Assumptions'!{FIRST_VALUE_LETTER}24"
         assert "SUM('Assumptions'!" not in formula
 
@@ -375,7 +394,7 @@ def test_cash_flow_runway_formula_floors_negative_cash_at_zero() -> None:
         build_model.build_model(None, out, mode="full")
 
         wb = load_workbook(out, data_only=False)
-        formula = wb["CF"].cell(32, FIRST_VALUE_COL).value
+        formula = _first_year_cell_for_label(wb, "CF", "Runway months").value
 
         assert formula == f"=IF({FIRST_VALUE_LETTER}16>=0,99,MAX(0,{FIRST_VALUE_LETTER}31)/ABS({FIRST_VALUE_LETTER}16/12))"
 
@@ -912,8 +931,9 @@ def test_source_plan_starting_cash_is_hard_input_blue() -> None:
         "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
     )
     try:
-        assert _font_rgb(wb["Assumptions"].cell(47, FIRST_VALUE_COL)) == ib.IB_HARD_INPUT
-        assert _font_rgb(wb["Assumptions"].cell(47, SECOND_VALUE_COL)) == ib.IB_LINK_INTRA
+        beginning_cash_row = _row_for_label(wb, "Assumptions", "Beginning cash")
+        assert _font_rgb(wb["Assumptions"].cell(beginning_cash_row, FIRST_VALUE_COL)) == ib.IB_HARD_INPUT
+        assert _font_rgb(wb["Assumptions"].cell(beginning_cash_row, SECOND_VALUE_COL)) == ib.IB_LINK_INTRA
     finally:
         tmp.cleanup()
 
@@ -950,9 +970,9 @@ def test_source_plan_bold_rows_preserve_ib_cell_colors() -> None:
         "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
     )
     try:
-        assert _font_rgb(wb["Capital Stack"].cell(7, FIRST_VALUE_COL)) == ib.IB_HARD_INPUT
-        assert _font_rgb(wb["Capital Stack"].cell(12, FIRST_VALUE_COL)) == ib.IB_LINK_INTRA
-        assert _font_rgb(wb["Capital Stack"].cell(13, FIRST_VALUE_COL)) == ib.IB_LINK_INTRA
+        assert _font_rgb(_first_year_cell_for_label(wb, "Capital Stack", "Equity financing")) == ib.IB_HARD_INPUT
+        assert _font_rgb(_first_year_cell_for_label(wb, "Capital Stack", "Ending cash")) == ib.IB_LINK_INTRA
+        assert _font_rgb(_first_year_cell_for_label(wb, "Capital Stack", "Runway")) == ib.IB_LINK_INTRA
         assert _font_rgb(wb["Cost Build"].cell(16, FIRST_VALUE_COL)) == ib.IB_LINK_INTRA
         assert _font_rgb(wb["People Plan"].cell(11, FIRST_VALUE_COL)) == ib.IB_LINK_INTRA
     finally:
@@ -1078,7 +1098,7 @@ def test_source_plan_tables_do_not_overlap_metadata_columns() -> None:
         assert wb["Financing"].cell(16, FIRST_VALUE_COL).value == f"='Scenarios'!{FIRST_VALUE_LETTER}19"
         assert [wb["Sensitivity"].cell(7, c).value for c in range(FIRST_VALUE_COL, FIRST_VALUE_COL + 5)] == [0.60, 0.80, 1.00, 1.20, 1.40]
         assert wb["Sensitivity"].cell(8, FIRST_VALUE_COL - 1).value == 0.80
-        assert wb["Sensitivity"].cell(8, FIRST_VALUE_COL).value == f"=('Revenue Build'!J18*{FIRST_VALUE_LETTER}$7*$E8)-('Cost Build'!J12*1)-'P&L'!J17"
+        assert wb["Sensitivity"].cell(8, FIRST_VALUE_COL).value == f"=('Revenue Build'!J18*{FIRST_VALUE_LETTER}$7*$E8)-('Cost Build'!J12*1)-('P&L'!J17*1)"
     finally:
         tmp.cleanup()
 
@@ -1334,6 +1354,7 @@ if __name__ == "__main__":
     test_mechanic_specific_kpi_and_scenario_axes_are_rendered()
     test_ambiguous_mechanics_use_generic_kpis_and_scenario_axes()
     test_cost_labeled_scenario_drivers_pressure_costs_not_revenue()
+    test_unclassified_scenario_drivers_default_to_opex_not_revenue()
     test_cost_build_does_not_double_count_detailed_service_costs_in_variable_cogs()
     test_orchestrator_routes_through_generic_source_plan_builder()
     test_focused_modes_use_generic_kernel_after_bundle_filter()

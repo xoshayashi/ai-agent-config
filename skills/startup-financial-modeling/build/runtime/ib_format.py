@@ -664,10 +664,6 @@ def apply_section_header_band(
             f"apply_section_header_band: end_col ({end_col}) must be >= "
             f"start_col ({start_col})"
         )
-    head = ws.cell(row=row, column=start_col)
-    apply_section_header(head, label)
-    if end_col == start_col:
-        return
     band_fill = PatternFill("solid", fgColor=BG_HEADER_BAND)
     band_font = Font(
         name=FONT_FAMILY, size=FONT_SIZE_LARGE, bold=True, color="FFFFFF"
@@ -675,6 +671,13 @@ def apply_section_header_band(
     band_align = Alignment(
         horizontal="left", vertical="center", wrap_text=False
     )
+    head = ws.cell(row=row, column=start_col)
+    apply_section_header(head, label)
+    head.fill = band_fill
+    head.font = band_font
+    head.alignment = band_align
+    if end_col == start_col:
+        return
     for col in range(start_col + 1, end_col + 1):
         c = ws.cell(row=row, column=col)
         # value は左端のみ (No-Merge 原則)

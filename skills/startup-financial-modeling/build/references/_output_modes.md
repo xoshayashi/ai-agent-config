@@ -49,6 +49,9 @@ or rewire the logic as a compact spec or register so no remaining surface
 depends on omitted sheets. A pricing model may need customer ROI and
 contribution margin; a cap table may need option pool, secondary, tax, and
 financing round mechanics.
+Reject sheet exclusions that would leave remaining formulas pointing to missing
+sheets unless the dependent surfaces are also removed or rewired in the same
+pass.
 
 Structured inputs should be accepted as first-class model facts, not only as
 free-text narrative. In particular, `currency`, `display_scale`, `grain`,

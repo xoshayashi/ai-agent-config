@@ -762,7 +762,14 @@ def _build_assumptions(wb: Workbook, facts: SourceFacts) -> None:
     _write_values(ws, 60, "Fraud and loss / GMV", "%", [facts.fraud_loss_pct_gmv for _ in cols], source="risk loss", fmt=ib.FMT_PERCENT)
 
     groups = assumption_decomposition_for(facts)
-    row_by_label: dict[str, int] = {}
+    row_by_label: dict[str, int] = {
+        "New primary units": 7,
+        "Monthly price / unit": 11,
+        "Variable COGS": 24,
+        "Delivery cost / primary unit": 25,
+        "Cloud / platform cost": 26,
+        "Support cost / customer": 27,
+    }
     preview_row = 63
     for group in groups:
         preview_row += 1
@@ -1272,33 +1279,52 @@ def _build_scenarios(wb: Workbook, facts: SourceFacts) -> None:
     _add_bar_chart(ws, "Scenario EBITDA", Reference(ws, min_col=scenario_cols[0], max_col=scenario_cols[-1], min_row=16, max_row=16), Reference(ws, min_col=scenario_cols[0], max_col=scenario_cols[-1], min_row=5), "B33", _money_unit(facts))
 
 
-def _scenario_driver_formula_terms(col: str, drivers: tuple[ScenarioDriver, ...]) -> tuple[str, str, str]:
+def _scenario_driver_bucket(driver: ScenarioDriver) -> str:
+    label = driver.label.lower()
+    if any(token in label for token in ("financing", "debt", "lease", "grant", "warehouse", "working-capital")):
+        return "financing"
+    if any(token in label for token in ("cost", "loss", "incentive", "bom", "service", "prototype", "program")):
+        return "cost"
+    if any(token in label for token in ("cac", "sales capacity", "hiring", "headcount", "fte", "talent")):
+        return "opex"
+    if any(token in label for token in ("demand", "gmv", "liquidity", "take-rate", "pricing", "value capture", "utilization", "origination", "spread", "new logo", "conversion", "acv", "expansion", "retention", "churn", "deployment capacity")):
+        return "revenue"
+    return "opex"
+
+
+def _scenario_driver_formula_terms(col: str, drivers: tuple[ScenarioDriver, ...]) -> tuple[str, str, str, str]:
     revenue_rows: list[str] = []
     cost_rows: list[str] = []
+    opex_rows: list[str] = []
     financing_rows: list[str] = []
     for offset, driver in enumerate(drivers[:4], start=7):
         row_ref = f"{col}${offset}"
-        label = driver.label.lower()
-        if any(token in label for token in ("cost", "loss", "incentive", "bom", "cac", "service", "prototype", "program")):
+        bucket = _scenario_driver_bucket(driver)
+        if bucket == "cost":
             cost_rows.append(row_ref)
-        elif any(token in label for token in ("financing", "debt", "lease", "grant", "warehouse", "working-capital")):
+        elif bucket == "opex":
+            opex_rows.append(row_ref)
+        elif bucket == "financing":
             financing_rows.append(row_ref)
-        else:
+        elif bucket == "revenue":
             revenue_rows.append(row_ref)
+        else:
+            opex_rows.append(row_ref)
     return (
         "*".join(revenue_rows) if revenue_rows else "1",
         "*".join(cost_rows) if cost_rows else "1",
+        "*".join(opex_rows) if opex_rows else "1",
         "*".join(financing_rows) if financing_rows else "1",
     )
 
 
 def _scenario_output_formula(facts: SourceFacts, label: str, col: str, drivers: tuple[ScenarioDriver, ...]) -> str:
     final_col = _final_period_col(facts)
-    revenue_factor, cost_factor, financing_factor = _scenario_driver_formula_terms(col, drivers)
+    revenue_factor, cost_factor, opex_factor, financing_factor = _scenario_driver_formula_terms(col, drivers)
     formulas = {
         "Revenue": f"='Revenue Build'!{final_col}18*{revenue_factor}",
         "Gross profit": f"={col}14-('Cost Build'!{final_col}12*{cost_factor})",
-        "EBITDA": f"={col}15-('P&L'!{final_col}17)",
+        "EBITDA": f"={col}15-('P&L'!{final_col}17*{opex_factor})",
         "Ending cash": f"='CF'!{final_col}31+{col}16-'P&L'!{final_col}18",
         "Exit EV": f"=MAX(0,{col}16*'Valuation'!{final_col}15)",
         "Funding gap": f"=MAX(0,-{col}17*{financing_factor})",
@@ -1322,9 +1348,8 @@ def _build_sensitivity(wb: Workbook, facts: SourceFacts) -> None:
     row_axis_col = get_column_letter(START_PERIOD_COL - 1)
     _label(ws, 7, x_axis.label, x_axis.unit)
     _label(ws, 8, y_axis.label, y_axis.unit)
-    cost_tokens = ("cost", "loss", "incentive", "bom", "cac", "service", "prototype", "program")
-    x_is_cost = any(token in x_axis.label.lower() for token in cost_tokens)
-    y_is_cost = any(token in y_axis.label.lower() for token in cost_tokens)
+    x_bucket = _scenario_driver_bucket(x_axis)
+    y_bucket = _scenario_driver_bucket(y_axis)
     for idx, scale in zip(matrix_cols, scales):
         ws.cell(7, idx, scale)
         ib.apply_hard_input(ws.cell(7, idx), ib.FMT_MULTIPLE)
@@ -1335,15 +1360,20 @@ def _build_sensitivity(wb: Workbook, facts: SourceFacts) -> None:
             col = get_column_letter(c)
             revenue_term = "1"
             cost_term = "1"
-            if x_is_cost:
+            opex_term = "1"
+            if x_bucket == "cost":
                 cost_term = f"{col}$7"
-            else:
+            elif x_bucket == "opex":
+                opex_term = f"{col}$7"
+            elif x_bucket == "revenue":
                 revenue_term = f"{col}$7"
-            if y_is_cost:
+            if y_bucket == "cost":
                 cost_term = f"{cost_term}*${row_axis_col}{r}"
-            else:
+            elif y_bucket == "opex":
+                opex_term = f"{opex_term}*${row_axis_col}{r}"
+            elif y_bucket == "revenue":
                 revenue_term = f"{revenue_term}*${row_axis_col}{r}"
-            ws.cell(r, c, f"=('Revenue Build'!{final_col}18*{revenue_term})-('Cost Build'!{final_col}12*{cost_term})-'P&L'!{final_col}17")
+            ws.cell(r, c, f"=('Revenue Build'!{final_col}18*{revenue_term})-('Cost Build'!{final_col}12*{cost_term})-('P&L'!{final_col}17*{opex_term})")
             _apply_value_style(ws.cell(r, c), _money_format(facts))
     ib.apply_heatmap_3color(ws, f"{get_column_letter(matrix_cols[0])}8:{get_column_letter(matrix_cols[-1])}12")
     _section(ws, 15, "Founder ownership — valuation x round size")
