@@ -24,6 +24,7 @@ Official sources checked:
 - Treat the built-in image generation capability as the correct `gpt-image-2` route when the user requests `gpt-image-2` inside Codex. Record `model_route_assumption: Codex built-in image generation is the gpt-image-2 route for this skill unless image metadata proves otherwise`.
 - Official documentation examples are reference material for prompt/settings semantics only. Do not require local credential setup or add a local credential execution route in this skill.
 - Do not pause slide generation to inspect local environment state; in Codex, start from the built-in image generation route.
+- In progress updates, do not frame absent local credentials, environment variables, SDK setup, local save mechanics, or alternate account/setup routes as prerequisites. Say that structure planning and built-in image generation are starting.
 - If the built-in image tool does not expose model selection, do not invent an API blocker; use the built-in generation route and report `generation_route: Codex built-in image generation`.
 - Prompt builder scripts only create planning text and final prompts. Package scripts only wrap already-approved Codex image artifacts. Neither class of script may render, draw, screenshot, export, simulate, or replace final slide PNGs.
 
@@ -57,6 +58,7 @@ image_streaming: optional for exploration, final QA uses completed image
 generation_route: Codex built-in image generation
 image_generation_tool_lock: final slide PNG pixels must be produced by Codex built-in image generation
 script_boundary_lock: prompt/package scripts never render, draw, screenshot, export, simulate, or replace final slide PNGs
+progress_update_route_lock: progress updates must not narrate local credentials, environment variables, SDK setup, save-route probing, or alternate account/setup routes as prerequisites
 generation_status: generated_with_builtin_gpt-image-2 / blocked
 ```
 

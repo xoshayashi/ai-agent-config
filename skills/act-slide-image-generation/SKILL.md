@@ -9,7 +9,7 @@ Use `scripts/build_act_slide_prompt.py` only to scaffold planning blocks and ima
 
 Route: scaffold -> Codex built-in gpt-image-2 PNGs -> review/repair -> approved manifest -> PPTX/PDF roll-up.
 
-Start Codex built-in image generation directly. Do not run local preflight, account/credential/token/SDK/env setup, artifact-route probing, or local substitute generation. Do not write or run Python, HTML, SVG, canvas, PIL, PPTX, screenshot, or other scripts to draw final slide PNGs. Only the Codex image tool itself can block generation.
+Start Codex built-in image generation directly. Do not run local preflight, account/credential/token/SDK/env setup, artifact-route probing, save-route probing, or local substitute generation. Progress updates should say that slide structure and built-in image generation are starting; they must not narrate missing local credentials, environment variables, SDK setup, or alternate account/setup routes as prerequisites. Do not write or run Python, HTML, SVG, canvas, PIL, PPTX, screenshot, or other scripts to draw final slide PNGs. Only the Codex image tool itself can block generation.
 Generate slide PNG masters at `2048x1152` for review, PPTX, and PDF packaging. Treat `1672x941` as layout-coordinate basis only, not an output PNG size, and do not create alternate delivery PNG masters.
 
 Use the embedded ACT system in the prompt builder: Noto Sans JP, 1672x941, near-white base, Petrol accent, compact header, real-source-only footer, and one editorial illustration tone.

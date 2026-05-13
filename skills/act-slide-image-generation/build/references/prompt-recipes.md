@@ -43,6 +43,7 @@ image_generation_tool_lock: final slide PNG pixels must be produced by Codex bui
 script_boundary_lock: prompt builder scripts are planning helpers only; package scripts run only after approved Codex image artifacts exist and must never render, draw, screenshot, export, simulate, or replace final slide PNGs
 local_env_non_blocker: local environment uncertainty is not a blocker and must not be reported as the reason PPTX is unfinished
 credential_setup_blocker: do not create, request, decrypt, configure, inspect, or wait for account credentials, local tokens, SDK setup, or environment variables; use Codex built-in image generation directly
+progress_update_route_lock: in user-facing progress updates, do not mention local credential, environment, SDK, save-route, or alternate account/setup checks as prerequisites; say that slide structuring and built-in image generation are starting
 generation_status: generated_with_builtin_gpt-image-2 / blocked
 package_delivery: requested PPTX/PDF wrappers after generated PNGs pass QA, unless user asks for PNG files only
 pptx_status: pending_generated_images_and_pre_package_image_review / created / blocked

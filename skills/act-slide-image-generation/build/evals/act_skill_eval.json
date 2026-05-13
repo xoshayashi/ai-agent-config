@@ -239,6 +239,22 @@
       "reason": "Use Codex image artifacts instead of local save-route probing."
     },
     {
+      "pattern": "保存可能な生成経路",
+      "reason": "Do not make save-route probing a prerequisite for slide generation."
+    },
+    {
+      "pattern": "ローカル保存",
+      "reason": "Do not make local save mechanics a prerequisite for slide generation."
+    },
+    {
+      "pattern": "一時キー",
+      "reason": "Do not route slide generation through temporary credential flows."
+    },
+    {
+      "pattern": "並行して確認",
+      "reason": "Do not pair slide planning with parallel credential or save-route probing."
+    },
+    {
       "pattern": "external_slide",
       "reason": "Clean-base PPTX/PDF skill should not retain external slide-hosting route fields."
     },
@@ -282,6 +298,7 @@
     "Package scripts run only after approved Codex built-in image artifacts exist",
     "local_env_non_blocker",
     "credential_setup_blocker",
+    "progress_update_route_lock",
     "builtin_generation_lock",
     "pptx_first_blocker",
     "final_image_quality_status",
@@ -467,6 +484,7 @@
         "image_generation_tool_lock",
         "script_boundary_lock",
         "credential_setup_blocker",
+        "progress_update_route_lock",
         "pptx_first_blocker",
         "post_generation_full_deck_review_loop",
         "all_generated_images_reviewed",
@@ -503,6 +521,7 @@
         "Codex built-in image generation",
         "builtin_generation_lock",
         "credential_setup_blocker",
+        "progress_update_route_lock",
         "pptx_first_blocker",
         "speaker_notes_text",
         "speaker_notes_depth_lock",
@@ -659,7 +678,8 @@
         "non_rendered_workflow_qa",
         "pdf_export_source_lock",
         "image_generation_tool_lock",
-        "script_boundary_lock"
+        "script_boundary_lock",
+        "progress_update_route_lock"
       ],
       "must_not_contain": [
         "ATOM",
