@@ -136,24 +136,74 @@ Fill span rules:
 - Do not create decorative color blocks. Several consecutive rows with the same
   fill are acceptable only for true heatmaps or an intentionally defined table
   component with a different visual mechanism.
+- Keep fills finance-model calm: light blue/near-white for table headers,
+  navy for section anchors, pale yellow for a single selected output or caution,
+  and white for ordinary calculation rows. Avoid rainbow palettes, saturated
+  backgrounds, decorative alternating row fills, and one-off colors that do not
+  map to a repeated workbook role.
+- Input emphasis should primarily come from blue font and, only when useful, a
+  very light input-section fill. Do not shade every editable cell if it creates
+  a block of color that overwhelms formulas or outputs.
 
-Generated xlsx builders should use the semantic fill helper in `ib_format.py`
-for row components. Hand-painting isolated cells is a smell unless the row has
-a documented table/block span.
+Generated xlsx builders should use the semantic row-span helper in
+`ib_format.py` for fill/border row components. Hand-painting isolated cells is
+a smell unless the row has a documented table/block span.
 
 ## Borders And Spacing
 
-Use borders as the primary structure:
+Use borders as sparse structural accents:
 
-- Light hairline row rules guide scanning inside tables.
-- Subtotals use a single top border and bold text.
-- Grand totals and key checks use a top border plus double bottom border.
+- Borders are sparse accents, not row gridlines. Do not draw a bottom rule on
+  every body row; that creates visual noise. Ordinary rows can stay borderless
+  and rely on alignment, spacing, and typography.
+- Memo, source, note, and interpretation cells are usually borderless. They are
+  explanatory surfaces, not table boundaries.
+- Subtotals use a single normal thin top border and bold text.
+- Grand totals and key checks use a normal thin top border plus the one-step
+  thicker medium bottom border only when the stronger rule has real
+  check/closing meaning.
 - Section starts use a compact navy label or rule.
+- Border spans are semantic row components, exactly like fill spans. Decide the
+  start and end columns from the attached table, matrix, interpretation block,
+  or comparable row width; then draw the rule across that full span, including
+  blank cells inside the component. A blank cell inside the table/header/check
+  width still receives the border so the reviewer sees one clean vertical edge.
+- Hierarchy / indent columns are intentionally quiet. Fills may include a
+  hierarchy column when it is part of the visual band, but borders begin at the
+  row's real label/data start column. In the default layout that means B stays
+  borderless and row rules begin at C; deeper layouts start the rule at the
+  actual hierarchy-position column, not across earlier spacer columns.
+- Do not draw borders cell-by-cell around only populated cells. Ragged borders
+  whose right edge changes row by row are defects unless they mark an explicitly
+  smaller nested table. A table that spans B:K should have header, body,
+  subtotal, total, and check rules aligned to B:K.
+- Keep trailing canvas, overflow spacer cells, and unrelated blank columns
+  borderless. The rule is "complete the component span", not "decorate empty
+  worksheet space".
 - Prominent borders follow the same meaning-first rule as fills. They should
   mark real structure: table starts, subtotals, grand totals, checks,
   interpretation bands, or a deliberately repeated table grid. Avoid stacking
   the same heavy top/bottom rule across many consecutive rows because it turns
   hierarchy into noise.
+- The same prominent border should not repeat on adjacent rows by default. If
+  two consecutive rows feel meaningful, border the row that carries the main
+  structural meaning and let typography, spacing, a comment, or whitespace
+  support the other row. Consecutive heavy borders need an explicit table
+  grid or nested-component reason.
+- Use three border styles by meaning, similar to how background-color intensity
+  is chosen by role: normal thin for ordinary structural breaks, one-step
+  thicker medium for major section or decision boundaries, and normal dotted for
+  soft/provisional separations such as optional checks, scenario support, or
+  secondary context. Avoid extra weights unless the user supplies a house style.
+- Border color is black by default across thin, medium, and dotted rules.
+  This follows finance-model convention: structure should be readable and
+  consistent, while emphasis comes from where the rule appears and which of the
+  three weights it uses. Avoid gray, blue, red, or decorative border colors
+  unless a user-provided house style explicitly requires them.
+- Prefer top borders for calculation/summation rows when the row summarizes the
+  numbers above; use a bottom medium rule only for a true closing total or key
+  check. Use outside/box borders sparingly for matrices or callout blocks, not
+  as a default around every row.
 - Avoid repeated filled rows. A filled row should read as an event in the
   sheet, not as continuous wallpaper.
 - Row heights stay close to 15-18 points for body rows and 20-22 points for

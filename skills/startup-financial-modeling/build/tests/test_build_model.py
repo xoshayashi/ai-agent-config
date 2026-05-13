@@ -18,7 +18,7 @@ from types import SimpleNamespace
 from openpyxl import Workbook
 from openpyxl import load_workbook
 from openpyxl.styles import Alignment, PatternFill
-from openpyxl.utils import range_boundaries
+from openpyxl.utils import get_column_letter, range_boundaries
 
 SKILL_DIR = Path(__file__).resolve().parents[2]
 REPO_ROOT = SKILL_DIR.parents[1]
@@ -128,6 +128,28 @@ def test_prompt_guidance_resists_fixed_template_routing() -> None:
     assert "Choose tabs, KPIs, scenarios, valuation methods, colors, and cell positions from the decision" in generic_flat
     assert "These are not mandatory bundles" in output_modes_text
     assert "Maturity and mechanics are signals for selecting metrics, not metric packs" in kpi_text
+
+
+def test_sheet_quality_rubric_covers_every_generated_sheet() -> None:
+    rubric_text = (SKILL_DIR / "build" / "references" / "_sheet_quality_rubric.md").read_text(encoding="utf-8")
+    skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    output_modes_text = (SKILL_DIR / "build" / "references" / "_output_modes.md").read_text(encoding="utf-8")
+    self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+    eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
+    combined_flat = " ".join(
+        "\n".join([rubric_text, skill_text, output_modes_text, self_review_text, eval_text]).split()
+    )
+    for sheet_name in source_plan.SOURCE_PLAN_SHEETS:
+        assert f"| {sheet_name} |" in rubric_text
+    for phrase in [
+        "a distinct purpose, source boundary, dependency flow, checks where errors would matter, and interpretation",
+        "Do not create a sheet just because it belongs to a canonical full-workbook order",
+        "sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation",
+        "Load `_sheet_quality_rubric.md` for every xlsx build or repair",
+        "Every included sheet must satisfy `_sheet_quality_rubric.md`",
+        "Guide and Kernel define the decision, evidence, mechanics, and scope",
+    ]:
+        assert phrase in combined_flat
 
 
 def test_economic_kernel_is_separate_from_workbook_renderer() -> None:
@@ -658,8 +680,14 @@ def test_cap_table_sheet_uses_canonical_design_surface() -> None:
     assert _styled_blank_cells(wb) == []
     assert _design_band_span_violations(wb) == []
     assert _repeated_semantic_fill_rows(wb) == []
+    assert _unknown_fill_color_violations(wb) == []
+    assert _repeated_prominent_border_rows(wb) == []
+    assert _hierarchy_spacer_border_violations(wb) == []
     assert _font_design_violations(wb) == []
-    assert _border_surface_violations(wb) == []
+    assert _border_density_violations(wb) == []
+    assert _memo_note_border_violations(wb) == []
+    assert _border_style_violations(wb) == []
+    assert _border_color_violations(wb) == []
     assert _row_height_violations(wb) == []
     for row in (5, 25, 50, 70):
         assert [_fill_rgb(ws.cell(row=row, column=col)) for col in range(2, 8)] == [
@@ -810,6 +838,10 @@ def test_skill_guidance_uses_meaningful_sparse_fills_and_borders() -> None:
     combined_flat = " ".join(combined.split()).lower()
     assert "same non-heatmap fill" in combined_flat
     assert "background fills are selective accents for major semantic moments only" in combined_flat
+    assert "avoid rainbow palettes" in combined_flat
+    assert "role-based sparse fill palette" in eval_text
+    assert "no rainbow or decorative background fills" in eval_text
+    assert "ordinary calculation rows should stay white" in combined_flat
     assert "workbook tokens" in combined_flat
     assert "arial 10pt" in combined_flat
     assert "header / label row" in combined_flat
@@ -817,15 +849,35 @@ def test_skill_guidance_uses_meaningful_sparse_fills_and_borders() -> None:
     assert "do not choose the end column only from cells that happen to contain text" in combined_flat
     assert "do not stop a fill because a cell is blank" in " ".join(skill_text.split()).lower()
     assert "for every filled row, name its role and inspect the start column, end column" in " ".join(self_review_text.split()).lower()
-    assert "semantic fill helper in `ib_format.py`" in design_text
-    assert "rectangular column-consistent spans chosen from the attached table/block" in eval_text
-    assert "heavy border pattern" in combined_flat
+    assert "semantic row-span helper in\n`ib_format.py` for fill/border row components" in design_text
+    assert "rectangular column-consistent fill and border spans chosen from the attached table/block" in eval_text
+    assert "heavy border pattern or ragged populated-cell-only rule" in combined_flat
     assert "prominent borders follow the same meaning-first rule as fills" in combined_flat
+    assert "do not stop a border because a cell is blank" in " ".join(skill_text.split()).lower()
+    assert "draw the rule across that full span, including blank cells inside the component" in combined_flat
+    assert "a blank cell inside the table/header/check width still receives the border" in combined_flat
+    assert "check border span with the same positive rule as fill span" in combined_flat
+    assert "dedicated hierarchy / indent columns stay borderless" in " ".join(skill_text.split()).lower()
+    assert "b stays borderless and row rules begin at c" in combined_flat
+    assert "confirm hierarchy / indent columns are not carrying row rules" in combined_flat
+    assert "avoid repeating the same prominent top/bottom rule across adjacent rows" in " ".join(skill_text.split()).lower()
+    assert "the same prominent border should not repeat on adjacent rows by default" in combined_flat
+    assert "check border rhythm exactly as you check color rhythm" in combined_flat
+    assert "no adjacent repeated prominent border rows" in eval_text
+    assert "borders are not row-by-row decoration" in " ".join(skill_text.split()).lower()
+    assert "memo, source, note, and interpretation cells are usually borderless" in combined_flat
+    assert "three border styles by meaning" in combined_flat
+    assert "border colors are black by default" in combined_flat
+    assert "border color is black by default" in combined_flat
+    assert "normal dotted for soft/provisional separations" in combined_flat
+    assert "no per-row gridline borders" in eval_text
+    assert "borderless memo/source/note cells" in eval_text
+    assert "black border colors by default" in eval_text
 
 
 def test_xlsx_evals_load_full_design_reference_stack() -> None:
     evals = json.loads((SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8"))["evals"]
-    required = {"_layout_canonical", "_ib_workbook_design_system", "_self_review_protocol"}
+    required = {"_layout_canonical", "_ib_workbook_design_system", "_self_review_protocol", "_sheet_quality_rubric"}
     missing = []
     for item in evals:
         refs = set(item.get("applicable_references", []))
@@ -834,6 +886,39 @@ def test_xlsx_evals_load_full_design_reference_stack() -> None:
         assertions = item.get("assertions", [])
         if not any(assertion.get("id") == "XLSX_DESIGN" for assertion in assertions):
             missing.append(f"{item['id']}:{item['name']} missing XLSX_DESIGN assertion")
+        if not any(assertion.get("id") == "XLSX_SHEET_QUALITY" for assertion in assertions):
+            missing.append(f"{item['id']}:{item['name']} missing XLSX_SHEET_QUALITY assertion")
+        for assertion in assertions:
+            if assertion.get("id") == "XLSX_DESIGN":
+                text = assertion.get("text", "")
+                if "rectangular semantic fill and border spans including member blank cells" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing semantic border span guidance")
+                if "no rainbow or decorative background fills" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing restrained fill palette guidance")
+                if "role-based sparse fill palette" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing role-based fill palette guidance")
+                if "table-width row rules" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing table-width row rule guidance")
+                if "start after hierarchy spacer columns" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing hierarchy-border start guidance")
+                if "no adjacent repeated prominent border rows" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing border rhythm guidance")
+                if "no per-row gridline borders" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing no-gridline border guidance")
+                if "borderless memo/source/note cells" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing memo borderless guidance")
+                if "three semantic border styles" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing border style guidance")
+                if "black border colors by default" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing black border color guidance")
+                if "sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing sheet-specific quality guidance")
+            if assertion.get("id") == "XLSX_SHEET_QUALITY":
+                text = assertion.get("text", "")
+                if "sheet-specific purpose, traceable source/evidence boundary" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing sheet purpose/evidence quality guidance")
+                if "Focused tasks include only sheets needed for the decision" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing focused-sheet restraint guidance")
     assert missing == []
 
 
@@ -849,6 +934,42 @@ def test_semantic_fill_helper_uses_rectangular_span_including_blanks() -> None:
         assert _fill_rgb(ws.cell(3, col)) == ib.BG_HEADER_BAND
         assert ws.cell(3, col).border.bottom.style == "thin"
     assert ws.cell(3, 7).fill.fill_type in (None, "none")
+    assert ws.cell(3, 7).border.bottom.style is None
+
+    ib.apply_semantic_fill_span(
+        ws, 4, 2, 6, ib.BG_HEADER_BAND, bottom=ib.THIN_LINE, border_start_col=3
+    )
+    assert _fill_rgb(ws.cell(4, 2)) == ib.BG_HEADER_BAND
+    assert ws.cell(4, 2).border.bottom.style is None
+    for col in range(3, 7):
+        assert ws.cell(4, col).border.bottom.style == "thin"
+    try:
+        ib.apply_semantic_fill_span(
+            ws, 5, 2, 6, ib.BG_HEADER_BAND, bottom=ib.THIN_LINE, border_start_col=7
+        )
+        raise AssertionError("border_start_col beyond the span should fail")
+    except ValueError as exc:
+        assert "must be within span 2:6" in str(exc)
+
+    ib.apply_box_border(ws, "B7:D9", inner_dotted=True)
+    assert ws["C8"].border.top.style == "dotted"
+    assert ws["C8"].border.left.style == "dotted"
+
+    source_plan._section(ws, 11, "Section before layout setup", end_col=6)
+    assert _fill_rgb(ws.cell(11, source_plan.LAYOUT.first_hierarchy_col)) == ib.BG_HEADER_BAND
+    assert ws.cell(11, source_plan.LAYOUT.first_hierarchy_col).border.bottom.style is None
+    for col in range(source_plan.LAYOUT.label_col, 7):
+        assert ws.cell(11, col).border.bottom.style == "thin"
+
+    ws.cell(13, source_plan.LAYOUT.label_col, "Selected output")
+    ws.cell(13, source_plan.LAYOUT.source_col, "source note")
+    ws.cell(13, source_plan.LAYOUT.unit_col, "JPY")
+    ws.cell(13, FIRST_VALUE_COL, 1)
+    source_plan._highlight_row(ws, 13, FIRST_VALUE_COL)
+    assert ws.cell(13, source_plan.LAYOUT.label_col).border.top.style == "thin"
+    assert ws.cell(13, source_plan.LAYOUT.source_col).border.top.style is None
+    assert ws.cell(13, source_plan.LAYOUT.unit_col).border.top.style is None
+    assert ws.cell(13, FIRST_VALUE_COL).border.top.style == "thin"
 
 
 def _unit_label_violations(wb) -> list[str]:
@@ -1032,6 +1153,149 @@ def _repeated_semantic_fill_rows(wb) -> list[str]:
     return violations
 
 
+def _unknown_fill_color_violations(wb) -> list[str]:
+    allowed = {
+        ib.BG_CANVAS,
+        ib.BG_TABLE_HEADER,
+        ib.BG_TOTAL_BAND,
+        ib.BG_HEADER_BAND,
+        ib.BG_WORKING,
+    }
+    violations = []
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                color = _fill_rgb(cell)
+                if color is not None and color not in allowed:
+                    violations.append(f"{ws.title}!{cell.coordinate}: unexpected fill {color}")
+    return violations
+
+
+def _repeated_prominent_border_rows(wb) -> list[str]:
+    violations = []
+    prominent_styles = {"medium", "thick", "double"}
+    for ws in wb.worksheets:
+        previous_signature = None
+        previous_row = None
+        for row_idx in range(1, ws.max_row + 1):
+            counts = {}
+            for col in range(1, ws.max_column + 1):
+                cell = ws.cell(row=row_idx, column=col)
+                for side_name in ("top", "bottom"):
+                    style = getattr(getattr(cell.border, side_name), "style", None)
+                    if style in prominent_styles:
+                        key = (side_name, style)
+                        counts[key] = counts.get(key, 0) + 1
+            signature = max(counts, key=counts.get) if counts and max(counts.values()) >= 2 else None
+            if signature is not None and signature == previous_signature:
+                violations.append(
+                    f"{ws.title}!{previous_row}:{row_idx}: repeated prominent border {signature[0]}={signature[1]}"
+                )
+            previous_signature = signature
+            previous_row = row_idx if signature is not None else None
+    return violations
+
+
+def _hierarchy_spacer_border_violations(wb) -> list[str]:
+    violations = []
+    for ws in wb.worksheets:
+        hierarchy_cols = [
+            idx
+            for idx in range(1, ws.max_column + 1)
+            if abs(float(ws.column_dimensions[get_column_letter(idx)].width or 0) - float(ib.COL_HIERARCHY_WIDTH)) < 0.001
+        ]
+        for row in range(1, ws.max_row + 1):
+            for col in hierarchy_cols:
+                cell = ws.cell(row=row, column=col)
+                if any(
+                    getattr(getattr(cell.border, side_name), "style", None)
+                    for side_name in ("top", "bottom", "left", "right")
+                ):
+                    violations.append(f"{ws.title}!{cell.coordinate}: hierarchy spacer carries border")
+    return violations
+
+
+def _border_density_violations(wb) -> list[str]:
+    violations = []
+    for ws in wb.worksheets:
+        bordered_rows = 0
+        populated_rows = 0
+        for row_idx in range(1, ws.max_row + 1):
+            row_has_value = any(ws.cell(row=row_idx, column=col).value not in (None, "") for col in range(1, ws.max_column + 1))
+            if not row_has_value:
+                continue
+            populated_rows += 1
+            has_border = any(
+                getattr(getattr(ws.cell(row=row_idx, column=col).border, side_name), "style", None)
+                for col in range(1, ws.max_column + 1)
+                for side_name in ("top", "bottom", "left", "right")
+            )
+            if has_border:
+                bordered_rows += 1
+        if populated_rows and bordered_rows / populated_rows > 0.45:
+            violations.append(f"{ws.title}: bordered_rows={bordered_rows} populated_rows={populated_rows}")
+    return violations
+
+
+def _memo_note_border_violations(wb) -> list[str]:
+    note_header_labels = {"source / driver", "source", "note", "notes", "memo", "interpretation"}
+    violations = []
+    for ws in wb.worksheets:
+        note_cols = set()
+        startup_note_col = getattr(ws, "_startup_note_col", None)
+        if isinstance(startup_note_col, int):
+            note_cols.add(startup_note_col)
+        for row in ws.iter_rows():
+            for cell in row:
+                value = str(cell.value or "").strip().lower()
+                if value in note_header_labels:
+                    note_cols.add(cell.column)
+        for col in note_cols:
+            for cell in ws[get_column_letter(col)]:
+                if cell.value in (None, ""):
+                    continue
+                value = str(cell.value or "").strip().lower()
+                if value in note_header_labels:
+                    continue
+                if _fill_rgb(cell) in {ib.BG_TABLE_HEADER, ib.BG_HEADER_BAND}:
+                    continue
+                if any(
+                    getattr(getattr(cell.border, side_name), "style", None)
+                    for side_name in ("top", "bottom", "left", "right")
+                ):
+                    violations.append(f"{ws.title}!{cell.coordinate}: memo/source/note cell carries border")
+    return violations
+
+
+def _border_style_violations(wb) -> list[str]:
+    allowed = {"thin", "medium", "dotted"}
+    violations = []
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                for side_name in ("top", "bottom", "left", "right"):
+                    style = getattr(getattr(cell.border, side_name), "style", None)
+                    if style is not None and style not in allowed:
+                        violations.append(f"{ws.title}!{cell.coordinate}: {side_name}={style}")
+    return violations
+
+
+def _border_color_violations(wb) -> list[str]:
+    violations = []
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                for side_name in ("top", "bottom", "left", "right"):
+                    side = getattr(cell.border, side_name)
+                    if getattr(side, "style", None) is None:
+                        continue
+                    rgb = getattr(getattr(side, "color", None), "rgb", None)
+                    if isinstance(rgb, str) and rgb[-6:].upper() == ib.IB_FORMULA:
+                        continue
+                    violations.append(f"{ws.title}!{cell.coordinate}: {side_name} border color={rgb}")
+    return violations
+
+
 def _font_design_violations(wb) -> list[str]:
     violations = []
     allowed_sizes = {ib.FONT_SIZE_SMALL, ib.FONT_SIZE_BASE, ib.FONT_SIZE_LARGE, ib.FONT_SIZE_TITLE}
@@ -1081,18 +1345,6 @@ def _semantic_alignment_violations(wb) -> list[str]:
                         if horizontal != "right":
                             violations.append(f"{ws.title}!{cell.coordinate}: value horizontal={horizontal}")
     return violations
-
-
-def _border_surface_violations(wb) -> list[str]:
-    missing = []
-    for ws in wb.worksheets:
-        for row in ws.iter_rows():
-            for cell in row:
-                if cell.value is None:
-                    continue
-                if not (getattr(cell.border.top, "style", None) or getattr(cell.border.bottom, "style", None)):
-                    missing.append(f"{ws.title}!{cell.coordinate}: no structural border")
-    return missing
 
 
 def _money_unit_format_mismatches(wb) -> list[str]:
@@ -1272,9 +1524,15 @@ Source: customer discovery memo, market sizing memo, lender discussion notes.
         assert _styled_blank_cells(wb) == []
         assert _design_band_span_violations(wb) == []
         assert _repeated_semantic_fill_rows(wb) == []
+        assert _unknown_fill_color_violations(wb) == []
+        assert _repeated_prominent_border_rows(wb) == []
+        assert _hierarchy_spacer_border_violations(wb) == []
         assert _font_design_violations(wb) == []
         assert _semantic_alignment_violations(wb) == []
-        assert _border_surface_violations(wb) == []
+        assert _border_density_violations(wb) == []
+        assert _memo_note_border_violations(wb) == []
+        assert _border_style_violations(wb) == []
+        assert _border_color_violations(wb) == []
         assert _money_unit_format_mismatches(wb) == []
         assert _unit_for_label(wb, "Assumptions", "New primary units") == "units"
         assert _unit_for_label(wb, "Assumptions", "Ending primary units") == "units"
@@ -1325,6 +1583,58 @@ Source: customer discovery memo, market sizing memo, lender discussion notes.
         assert _fill_rgb(wb["BS"].cell(_row_for_label(wb, "BS", "Balance check"), FIRST_VALUE_COL)) == ib.BG_WORKING
         assert _fill_rgb(wb["Ownership"].cell(_row_for_label(wb, "Ownership", "Ownership check"), FIRST_VALUE_COL)) == ib.BG_WORKING
         assert _fill_rgb(wb["Valuation"].cell(_row_for_label(wb, "Valuation", "Selected EV"), FIRST_VALUE_COL)) == ib.BG_WORKING
+
+
+def test_generated_workbook_has_sheet_specific_quality_markers() -> None:
+    source_text = """# Asset deployment equity story
+
+AI device deployment with 月額32万円 pricing, capex, financing, ownership,
+valuation, market sizing, benchmark refresh, and DD needs.
+Source: management memo, customer discovery memo.
+"""
+    expected_markers = {
+        "Guide": ["Sheet-level acceptance criteria", "Workbook map"],
+        "Kernel": ["Economic kernel", "Mechanics", "Engine composition"],
+        "Assumptions": ["Source / driver", "Support ratio"],
+        "Driver Tree": ["Decision relevance", "Workbook owner"],
+        "Revenue Build": ["Revenue drivers", "Total revenue"],
+        "Cost Build": ["Gross profit bridge", "Gross margin"],
+        "People Plan": ["Total headcount", "Avg loaded comp / FTE"],
+        "P&L": ["Gross profit", "EBITDA"],
+        "BS": ["Balance check", "Total assets"],
+        "CF": ["Operating cash flow", "Ending cash", "Runway"],
+        "Capital Stack": ["Runway", "Illustrative post-money"],
+        "Ownership": ["Ownership check", "Founder ownership"],
+        "Pricing": ["Customer ROI", "Suggested floor price"],
+        "Financing": ["Funding gap", "Financing cash inflow"],
+        "Exit Waterfall": ["Investor proceeds", "Founder proceeds"],
+        "Segments": ["Decision implication", "Source status"],
+        "KPI": ["KPI interpretation register", "IC implication"],
+        "Scenarios": ["Scenario interpretation", "Funding gap"],
+        "Sensitivity": ["Sensitivity rationale", "Decision implication"],
+        "Valuation": ["Method credibility", "Selected EV"],
+        "Market Support": ["TAM / SAM / SOM bridge", "Source anchors"],
+        "Benchmarks": ["source_id", "Applicability limits", "Refresh needed"],
+        "IC Memo": ["What must be true", "DD questions", "Source boundary"],
+    }
+    with tempfile.TemporaryDirectory() as tmp:
+        source_md = Path(tmp) / "asset_deployment_story.md"
+        out = Path(tmp) / "source_plan.xlsx"
+        source_md.write_text(source_text, encoding="utf-8")
+
+        source_plan.build_source_plan_workbook(source_md, out)
+        wb = load_workbook(out, data_only=False)
+
+        for sheet_name, markers in expected_markers.items():
+            sheet_text = " ".join(
+                str(cell.value)
+                for row in wb[sheet_name].iter_rows()
+                for cell in row
+                if cell.value is not None
+            )
+            sheet_text_lower = sheet_text.lower()
+            missing = [marker for marker in markers if marker.lower() not in sheet_text_lower]
+            assert missing == [], f"{sheet_name}: missing {missing}"
 
 
 def test_structured_yaml_currency_and_display_scale_are_generic() -> None:
@@ -1601,6 +1911,8 @@ def test_source_plan_design_surface_uses_generic_blue_palette() -> None:
         assert ib.BG_TABLE_HEADER in observed
         assert _styled_blank_cells(wb) == []
         assert _repeated_semantic_fill_rows(wb) == []
+        assert _repeated_prominent_border_rows(wb) == []
+        assert _hierarchy_spacer_border_violations(wb) == []
         assert _font_design_violations(wb) == []
         assert _semantic_alignment_violations(wb) == []
         total_populated = sum(
@@ -1735,9 +2047,15 @@ def test_all_generated_modes_pass_visual_design_invariants() -> None:
             assert _styled_blank_cells(wb) == []
             assert _design_band_span_violations(wb) == []
             assert _repeated_semantic_fill_rows(wb) == []
+            assert _unknown_fill_color_violations(wb) == []
+            assert _repeated_prominent_border_rows(wb) == []
+            assert _hierarchy_spacer_border_violations(wb) == []
             assert _font_design_violations(wb) == []
             assert _semantic_alignment_violations(wb) == []
-            assert _border_surface_violations(wb) == []
+            assert _border_density_violations(wb) == []
+            assert _memo_note_border_violations(wb) == []
+            assert _border_style_violations(wb) == []
+            assert _border_color_violations(wb) == []
             assert _money_unit_format_mismatches(wb) == []
             assert _semantic_unit_format_mismatches(wb) == []
             assert _row_height_violations(wb) == []
@@ -1934,6 +2252,7 @@ if __name__ == "__main__":
     test_skill_exposes_clean_build_route_only()
     test_skill_uses_generic_economic_kernel_not_stage_matrix()
     test_prompt_guidance_resists_fixed_template_routing()
+    test_sheet_quality_rubric_covers_every_generated_sheet()
     test_economic_kernel_is_separate_from_workbook_renderer()
     test_japanese_money_units_parse_at_correct_scale()
     test_seed_to_pre_ipo_horizon_is_not_truncated_to_two_years()
@@ -1968,6 +2287,7 @@ if __name__ == "__main__":
     test_xlsx_evals_load_full_design_reference_stack()
     test_semantic_fill_helper_uses_rectangular_span_including_blanks()
     test_source_backed_plan_reaches_generic_kernel_shape()
+    test_generated_workbook_has_sheet_specific_quality_markers()
     test_structured_yaml_currency_and_display_scale_are_generic()
     test_marketplace_source_does_not_emit_unrelated_asset_heavy_template()
     test_hardware_source_ignores_low_usd_competitor_price_noise()

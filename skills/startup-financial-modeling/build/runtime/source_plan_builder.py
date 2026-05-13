@@ -328,6 +328,7 @@ def _write_period_header(ws: Worksheet, facts: SourceFacts, row: int = 5) -> Non
         _start_period_col() + len(facts.period_labels) - 1,
         ib.BG_TABLE_HEADER,
         bottom=ib.THIN_LINE,
+        border_start_col=_row_rule_start_col(ws),
     )
     for col, label in zip(_period_cols(facts), facts.period_labels):
         cell = ws.cell(row=row, column=col, value=label)
@@ -390,6 +391,7 @@ def _section(ws: Worksheet, row: int, label: str, end_col: int | None = None) ->
         band_end_col,
         ib.BG_HEADER_BAND,
         bottom=ib.THIN_LINE,
+        border_start_col=_row_rule_start_col(ws),
     )
     ws.row_dimensions[row].height = ib.ROW_HEIGHT_RELAXED
 
@@ -431,15 +433,20 @@ def _label(
 
 def _highlight_row(ws: Worksheet, row: int, last_col: int | None = None) -> None:
     end_col = last_col if last_col is not None else max(ws.max_column, 9)
+    facts = _facts_for_sheet(ws)
+    period_end_col = _start_period_col() + len(facts.period_labels) - 1 if facts is not None else end_col
+    border_end_col = min(end_col, period_end_col)
     ib.apply_semantic_fill_span(
         ws,
         row,
         LAYOUT.first_hierarchy_col,
         end_col,
         ib.BG_WORKING,
-        top=ib.THIN_LINE,
-        bottom=ib.THIN_LINE,
     )
+    accent_cols = [LAYOUT.label_col, *range(_start_period_col(), border_end_col + 1)]
+    for col in accent_cols:
+        cell = ws.cell(row=row, column=col)
+        cell.border = _merge_border(cell.border, top=ib.THIN_LINE, bottom=ib.THIN_LINE)
 
 
 def _merge_border(existing: Border | None, *, top=None, bottom=None, left=None, right=None) -> Border:
@@ -459,12 +466,6 @@ def _fill_rgb(cell) -> str | None:
         return None
     value = getattr(fill.fgColor, "rgb", None)
     return value[-6:].upper() if isinstance(value, str) else None
-
-
-def _ensure_bottom_border(cell, side) -> None:
-    if getattr(cell.border.bottom, "style", None):
-        return
-    cell.border = _merge_border(cell.border, bottom=side)
 
 
 def _is_section_row(ws: Worksheet, row: int) -> bool:
@@ -500,6 +501,17 @@ def _uses_default_layout(ws: Worksheet) -> bool:
     ]
 
 
+def _is_hierarchy_spacer_col(ws: Worksheet, col: int) -> bool:
+    width = ws.column_dimensions[get_column_letter(col)].width
+    return width is not None and abs(float(width) - float(LAYOUT.hierarchy_width)) < 0.001
+
+
+def _row_rule_start_col(ws: Worksheet) -> int:
+    if LAYOUT.hierarchy_cols > 0:
+        return LAYOUT.label_col
+    return LAYOUT.label_col if _is_hierarchy_spacer_col(ws, LAYOUT.first_hierarchy_col) else LAYOUT.first_hierarchy_col
+
+
 def _apply_design_surface(wb: Workbook) -> None:
     header_row_fill = PatternFill("solid", fgColor=ib.BG_TABLE_HEADER)
     for ws in wb.worksheets:
@@ -520,20 +532,17 @@ def _apply_design_surface(wb: Workbook) -> None:
                     else:
                         cell.font = Font(name=ib.FONT_FAMILY, size=10, bold=True, color=ib.BG_HEADER_BAND)
                     cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=False)
-                    cell.border = _merge_border(cell.border, bottom=ib.THIN_LINE)
                     continue
                 if row == 5 and row_has_value and col >= LAYOUT.first_hierarchy_col and not is_section:
                     cell.fill = header_row_fill
-                    cell.border = _merge_border(cell.border, bottom=ib.THIN_LINE)
+                    if col >= LAYOUT.label_col:
+                        cell.border = _merge_border(cell.border, bottom=ib.THIN_LINE)
                 if uses_default_layout and col == LAYOUT.source_col and row != 5:
                     ib.apply_comment(cell, wrap_text=False)
                 elif uses_default_layout and col == LAYOUT.unit_col and row != 5:
                     _apply_unit_cell(cell)
                 elif uses_default_layout and col in (LAYOUT.first_hierarchy_col, LAYOUT.label_col) and row != 5:
                     ib.apply_label(cell, bold=cell.font.bold is True)
-                if row_has_value and not is_section:
-                    _ensure_bottom_border(cell, ib.HAIRLINE_GRAY)
-
 
 def _apply_value_style(cell, fmt: str) -> None:
     value = cell.value
@@ -572,7 +581,8 @@ def _write_values(
         else:
             _apply_value_style(cell, applied_fmt)
     if bold:
-        for col in range(LAYOUT.first_hierarchy_col, _start_period_col() + len(values)):
+        accent_cols = [LAYOUT.label_col, *period_cols]
+        for col in accent_cols:
             cell = ws.cell(row=row, column=col)
             if cell.value is None:
                 continue

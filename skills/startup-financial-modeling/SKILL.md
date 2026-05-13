@@ -12,7 +12,8 @@ boundary. Separate facts, estimates, assumptions, and unknowns.
 References live in `build/references/`; load the smallest set that covers the
 decision. Start with `_output_modes.md`, `_generic_composition_protocol.md`,
 and `_self_review_protocol.md`. For any xlsx generation or repair, also load
-`_layout_canonical.md` and `_ib_workbook_design_system.md`. Add `_modeling_kernel.md`,
+`_layout_canonical.md`, `_ib_workbook_design_system.md`, and
+`_sheet_quality_rubric.md`. Add `_modeling_kernel.md`,
 `_coverage_universe.md`, `_assumption_decomposition_patterns.md`,
 `_kpi_analytics.md`, `_scenario_sensitivity_playbook.md`,
 `_valuation_and_return_logic.md`, `_ic_memo_depth.md`,
@@ -64,9 +65,33 @@ components use one consistent rectangular column span, and that span is chosen
 from the attached table/block rather than from which cells contain text. Do not
 stop a fill because a cell is blank; do not repeat the same non-heatmap fill on
 adjacent rows; do not color several rows merely because they are nearby.
-Section/block dividers, header/label rows, selected outputs/checks, and caution
-rows are the normal fill roles. Use `ib_format.py` semantic fill helpers for
-generated xlsx work instead of hand-painting arbitrary cells.
+Section/block dividers, header/label rows, selected outputs/checks, input
+sections, and caution rows are the normal fill roles. Keep the palette small
+and calm: avoid rainbow palettes, decorative alternating fills, and high-chroma
+backgrounds that compete with the model logic. Use `ib_format.py` semantic row-span helpers
+for generated xlsx fill/border row components instead of hand-painting
+arbitrary cells. Border discipline
+follows the same rule and is equally strict: meaningful row rules use the same
+table/block column span as the attached data surface, including blank member
+cells where that keeps the section, header, total, or check row aligned. Do not
+stop a border because a cell is blank, and do not draw borders only around
+populated cells when the data table continues farther right. Stop the rule at
+the edge of the related table/block or comparable row span; leave only trailing
+canvas and unrelated overflow spacer cells borderless. Dedicated hierarchy /
+indent columns stay borderless; draw the rule from the row's actual
+hierarchy-position label/data column, not across earlier 20px spacer columns.
+Memo, source, note, and interpretation cells are usually borderless; they read
+through typography and placement, not grid lines. Borders are not row-by-row
+decoration. Use them mainly before or around meaningful rows where a structural
+accent is needed. As with background fills, avoid repeating the same prominent
+top/bottom rule across adjacent rows unless it is an explicitly declared table
+grid; use typography, spacing, or quiet whitespace for supporting rows. Use
+three border weights by meaning: normal thin for ordinary structural breaks,
+one-step-thicker medium for major section or decision boundaries, and normal
+dotted for soft/provisional separations such as optional checks or supporting
+context. Border colors are black by default. Do not introduce gray, colored, or
+decorative border colors unless the user supplies a house style; visual priority
+comes from sparsity, placement, and thin/medium/dotted weight, not from color.
 
 Analysis gates: material assumptions need selected driver, explanatory drivers,
 implied value, support ratio/variance, and evidence status. Weak evidence feeds
@@ -74,6 +99,10 @@ scenario/sensitivity/benchmark/DD. KPI, scenario, valuation, benchmark, and memo
 surfaces interpret the model and connect evidence to next actions. Write memos
 from a clean base rather than preserving legacy layout compatibility; include
 only the necessary and sufficient supplemental context for the current decision.
+For xlsx outputs, each generated sheet must pass the sheet-level quality rubric:
+it needs a distinct purpose, source boundary, dependency flow, checks where
+errors would matter, and interpretation where it is an output surface. Do not
+create a sheet just because it belongs to a canonical full-workbook order.
 
 Do not treat model construction as completion. Before closeout, run command
 checks and rendered-output inspection for both finance logic and sheet design:
