@@ -1170,6 +1170,20 @@ def wrapped_text_row_height(line_count: int) -> float:
     return max(1, int(line_count)) * ROW_HEIGHT_PER_WRAPPED_LINE
 
 
+def visible_text_line_count(*values: object) -> int:
+    """Count visible manual-line-break lines for wrapped-text exceptions."""
+    counts = []
+    for value in values:
+        text = "" if value is None else str(value)
+        counts.append(text.count("\n") + 1)
+    return max(counts, default=1)
+
+
+def set_wrapped_exception_row_height(ws: Worksheet, row: int, line_count: int) -> None:
+    """Set exact row height for a user-approved wrap/manual-break exception."""
+    ws.row_dimensions[row].height = wrapped_text_row_height(line_count)
+
+
 # ============================================================================
 # 11. Sheet-level helper functions
 # ============================================================================
@@ -1541,7 +1555,7 @@ __all__ = [
     # Hyperlink
     "apply_internal_link", "write_toc",
     # Row height
-    "apply_row_heights", "wrapped_text_row_height",
+    "apply_row_heights", "wrapped_text_row_height", "visible_text_line_count", "set_wrapped_exception_row_height",
     # Sheet-level helpers
     "setup_sheet_layout", "setup_print_layout", "write_cover", "set_tab_color",
     "validate_sheet_naming",

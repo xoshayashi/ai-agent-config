@@ -45,6 +45,8 @@ instead of silently accepting it. If the user explicitly approves a prose-heavy
 exception with wrapping or manual line breaks, row height becomes part of the
 design contract: set it to the exact number of visible text lines so the text
 is neither clipped nor floating inside excess whitespace.
+Use the row-height helper in `ib_format.py` rather than relying on spreadsheet
+auto-height guesses.
 
 ## Color Roles
 

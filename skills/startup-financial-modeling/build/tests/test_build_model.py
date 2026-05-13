@@ -637,6 +637,9 @@ def test_ib_helpers_reject_wrap_text_true() -> None:
     assert ws["A3"].alignment.wrap_text is False
     assert ib.wrapped_text_row_height(3) == ib.ROW_HEIGHT_PER_WRAPPED_LINE * 3
     assert ib.wrapped_text_row_height(0) == ib.ROW_HEIGHT_PER_WRAPPED_LINE
+    assert ib.visible_text_line_count("one\ntwo", "single") == 2
+    ib.set_wrapped_exception_row_height(ws, 4, ib.visible_text_line_count("one\ntwo\nthree"))
+    assert ws.row_dimensions[4].height == ib.ROW_HEIGHT_PER_WRAPPED_LINE * 3
 
 
 def test_skill_guidance_makes_no_wrap_rule_explicit() -> None:
@@ -657,6 +660,7 @@ def test_skill_guidance_makes_no_wrap_rule_explicit() -> None:
     assert "clipped text, auto-height guesses, or oversized padded rows are design defects" in layout_flat
     assert "exact number of visible text lines" in design_text
     assert "wrapped_text_row_height" in ib_text
+    assert "set_wrapped_exception_row_height" in ib_text
     assert "row height matched exactly to visible line count" in eval_text
 
 
