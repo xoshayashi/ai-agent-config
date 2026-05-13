@@ -23,11 +23,7 @@ NOTES_CX = 6_858_000
 NOTES_CY = 9_144_000
 IMAGE_EXTENSIONS = {".png"}
 APPROVED_SLIDE_IMAGE_SIZES = {
-    (1536, 864),
-    (1920, 1080),
     (2048, 1152),
-    (2560, 1440),
-    (3840, 2160),
 }
 CONTENT_TYPES = {
     ".png": "image/png",
@@ -86,7 +82,7 @@ def validate_image_file(path: Path) -> None:
     width, height = validate_image_bytes(path.read_bytes(), path.suffix, str(path))
     if (width, height) not in APPROVED_SLIDE_IMAGE_SIZES:
         allowed = ", ".join(f"{w}x{h}" for w, h in sorted(APPROVED_SLIDE_IMAGE_SIZES))
-        raise SystemExit(f"{path} must be an approved 16:9 slide image size; found {width}x{height}. Allowed: {allowed}.")
+        raise SystemExit(f"{path} must be the approved 16:9 2K slide PNG master size; found {width}x{height}. Allowed: {allowed}. Use 1672x941 only as layout-coordinate basis, not as a package input.")
 
 
 def validate_master_image_path(path: Path) -> None:
