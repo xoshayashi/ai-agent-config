@@ -188,6 +188,8 @@ def canonical_planning_block(
   generation_route: Codex built-in image generation
   builtin_generation_lock: when slide images are requested in Codex, invoke Codex built-in image generation directly and start generating; do not pause for local environment preflight or local artifact-route probing before generation
   codex_image_artifact_rule: Codex built-in image generation returns the authoritative generated PNG artifact; use the Codex-provided artifact/download/attachment path to materialize approved outputs under slides_final/ when a filesystem path is needed for PPTX packaging
+  image_generation_tool_lock: final slide PNG pixels must be produced by Codex built-in image generation, not by repo scripts, local renderers, screenshots, or presentation exports
+  script_boundary_lock: prompt builder scripts are planning helpers only; package scripts run only after approved Codex image artifacts exist and must never render, draw, screenshot, export, simulate, or replace final slide PNGs
   local_env_non_blocker: local environment uncertainty is not a blocker and must not be reported as the reason PPTX is unfinished
   credential_setup_blocker: do not create, request, decrypt, configure, inspect, or wait for account credentials, local tokens, SDK setup, or environment variables; use Codex built-in image generation directly
   visible_text_only_lock: list every on-slide string under exact_text before generation; render only those strings and no lock names, YAML keys, review statuses, or workflow instructions
@@ -458,6 +460,7 @@ def mode_guidance(mode: str) -> str:
   - Define deck thesis and one primary message per slide.
   - Use the embedded ACT design system in SKILL.md; do not load an external ACT pattern file.
   - Apply builtin_generation_lock: invoke Codex built-in image generation directly for gpt-image-2 slide PNGs, without local environment preflight or local artifact-route probing before generation.
+  - Apply image_generation_tool_lock and script_boundary_lock: prompt/package scripts may plan, validate, or wrap approved artifacts, but final PNG pixels must come from Codex built-in image generation, never from scripts, screenshots, local renderers, or presentation exports.
   - Apply credential_setup_blocker: do not create, request, decrypt, configure, inspect, or wait for account credentials, local tokens, SDK setup, or environment variables; start Codex built-in image generation instead.
   - Apply pptx_first_blocker: do not create a presentation deck as the source of truth before image generation; generate and review slide PNGs first, then package approved PNGs into PPTX at the end.
   - Start with opening_thesis_slide rather than a title-only first slide: the opener should make the main phrase memorable while also showing the thesis, tension/proof points, structure, and bridge.
@@ -534,6 +537,8 @@ model_route_assumption: Codex built-in image generation is the gpt-image-2 route
 generation_route: Codex built-in image generation
 builtin_generation_lock: invoke Codex built-in image generation directly; do not pause for local environment preflight or local artifact-route probing before generation
 credential_setup_blocker: do not create, request, decrypt, configure, inspect, or wait for account credentials, local tokens, SDK setup, or environment variables; use Codex built-in image generation directly
+image_generation_tool_lock: final slide PNG pixels must be produced by Codex built-in image generation, not by repo scripts, local renderers, screenshots, or presentation exports
+script_boundary_lock: prompt builder scripts are planning helpers only; package scripts run only after approved Codex image artifacts exist and must never render, draw, screenshot, export, simulate, or replace final slide PNGs
 prompt_readiness: draft_scaffold_until_blocking_unresolved_items_none
 
 final_generation_prompt_payload:
@@ -556,6 +561,8 @@ draft_image_prompt_scaffold:
   Apply visible_text_only_lock: render only exact_text strings on the slide; do not render lock names, YAML keys, route/status fields, audit labels, speaker notes, file paths, or workflow instructions.
   Apply positive_quality_lock: state the desired calm editorial slide quality before blockers: clear figure-ground separation, exact text, compact fixed header, one dominant structure, grouped evidence, stable line weight, restrained accent area, and a concrete visual anchor.
   PPTX is a delivery wrapper only. Never create final PNGs by exporting, rendering, or screenshotting a PPTX.
+  Prompt builder scripts are planning helpers only; they must never render, draw, screenshot, export, or simulate final slide PNGs.
+  Package scripts run only after approved Codex built-in image artifacts exist, and package scripts must not be used as a workaround for missing image generation.
   Apply pptx_first_blocker: do not create a presentation deck as the source of truth before image generation; generate and review slide PNGs first, then package approved PNGs into PPTX at the end.
   Correct order: generate gpt-image-2 PNGs, review and repair PNGs, then package approved PNGs into requested PPTX/PDF outputs.
   Only mark image generation blocked after invoking Codex built-in image generation and the image tool itself fails, is unavailable, or refuses the request. Local environment uncertainty is not a blocker.
@@ -662,6 +669,8 @@ negative_prompt_hard_blockers:
 post_generation_audit:
   - image model is {IMAGE_MODEL}
   - generation_route is Codex built-in image generation, not local rendering or a local credential workaround
+  - image_generation_tool_lock is honored: the final PNG pixels came from Codex built-in image generation, not scripts, local renderers, screenshots, or presentation exports
+  - script_boundary_lock is honored: prompt/package scripts were used only for planning, validation, or delivery wrapping after approved Codex image artifacts existed
   - credential_setup_blocker is honored: no account credential, local token, SDK setup, or environment-variable workflow was attempted before generation
   - image_size {size} is valid for gpt-image-2, labeled as {size_label(size)}, and final delivery wrappers reuse the same 2048x1152 slides_final/ PNG masters without resizing or alternate master creation
   - default_2k_generation_lock is honored: generated slide PNG masters use 2048x1152 for review, PPTX, and PDF packaging
