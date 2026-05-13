@@ -77,6 +77,12 @@ REQUIRED_PROMPT_FIELDS = [
     "reader_mode",
     "decision_question",
     "information_units",
+    "sentence_density_lift_lock",
+    "semantic_sentence_layer",
+    "semantic_copy_gate",
+    "icon_restraint_plan",
+    "icon_restraint_lock",
+    "icon_density_budget",
     "information_unit_budget",
     "density_levers",
     "density_guardrails",
@@ -363,12 +369,20 @@ def canonical_planning_block(
     reader_mode: scan / read / reference
     decision_question: [what the reader can answer without narration]
     information_units: [message, context, comparison, trend, mechanism, risk, implication, assumption, source]
+    semantic_sentence_layer: [1-3 compact meaningful clauses/sentences in body labels, rows, annotations, or optional Insight that explain relationship, reason, consequence, or decision relevance]
+    semantic_copy_gate: [major body labels use meaningful clauses/sentences; noun-only labels are allowed only for headers, axes, or category names]
+    icon_restraint_plan: [which icons are necessary, what they clarify, and which icon candidates were removed because text/structure communicates better]
+    icon_density_budget: [default 0-3 purposeful icons per slide and keep icon count below semantic text units unless the visual logic demands otherwise]
     density_levers: [KPI strip, supporting context region, evidence strip, small multiples, annotation, benchmark/context column, source cue]
     overload_controls: [one dominant structure, max three major regions, body >=18pt equivalent, grouped labels, no decorative density]
   impact_clarity_density_gate: [one unmistakable takeaway, one dominant visual structure, one useful evidence layer, simple reading path, clear hierarchy]
   message_sharpness_lock: action title names actor/topic, change/tension, and implication; repair generic labels, vague benefit claims, or slogans before image prompting
   evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation
   density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
+  sentence_density_lift_lock: raise density one step with compact meaningful clauses or short sentences in body labels, rows, annotations, and optional Insight; avoid icon-and-keyword-only slides
+  semantic_copy_gate: major body labels use meaningful clauses/sentences; noun-only labels are allowed only for headers, axes, or category names
+  icon_restraint_lock: icons are sparse wayfinding or evidence markers, not the primary content layer
+  icon_density_budget: default to 0-3 purposeful icons per slide and keep icon count below semantic text units unless the visual logic demands otherwise
   structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
   structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
   structure_choice_status: not_applicable / applied / intentionally_skipped / repair_required
@@ -650,6 +664,10 @@ draft_image_prompt_scaffold:
   For deck openers, apply opening_density_gate: first slide role is opening_thesis_slide, first_slide_not_title_only is true, and the slide includes a core thesis, 2-4 proof/tension points, one visible market-shift/matrix/causal-map/wedge structure, and a bridge to the next section.
   Include density_design in the prompt. Density should answer the reader's decision_question through grouped information units, comparison baselines, evidence strips, supporting context regions, small multiples, annotations, units, assumptions, and source cues. Do not solve density with smaller body text, extra decorative cards, or illustration detail.
   Apply density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting. Prefer adding decision-relevant comparison, benchmark, denominator, unit, assumption, source cue, or annotation before adding decorative space.
+  Apply sentence_density_lift_lock: body labels, card rows, chart/table annotations, and optional Insight should include compact meaningful clauses or short sentences that explain relationship, reason, consequence, or decision relevance. A slide made mostly of icons plus one-word labels is under-dense and must be repaired before generation.
+  Apply semantic_copy_gate before freezing exact_text: rewrite noun-only body labels into compact meaning-bearing copy, typically label + change/reason/implication. Noun-only text is acceptable only for table headers, axes, legends, or category names; card grids with only nouns are repair_required.
+  Apply icon_restraint_lock: icons are quiet wayfinding or evidence markers only. Reduce icon count when icons repeat generic ideas, compete with the main structure, or replace explanatory text; prefer a short sentence, mini table, causal chain, labeled diagram, or data row when that carries meaning better.
+  Apply icon_density_budget: default to 0-3 purposeful icons per slide, avoid one icon per card/row as a habit, and keep icon count below semantic text units unless the visual logic explicitly needs more.
   Apply structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide. Good candidates include issue tree, driver tree, 2x2 matrix, value chain, funnel, waterfall, KPI bridge, decision table, before/after bridge, and hypothesis-evidence-implication rows.
   Apply structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits; keep hierarchy readable and intentionally skip the added structure when it would dilute the focal message.
   Apply structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation.
@@ -673,6 +691,7 @@ draft_image_prompt_scaffold:
   Enforce max_text_size_lock across every visible string; do not use display typography, hero numerals, badges, or message-box text above the cap.
   Keep Honey quiet and consistent: no saturated yellow fills, no dark yellow message boxes, no large yellow areas, no yellow title underline, no Honey color variation across a deck, and no Honey on slides where neutral/no Insight is clearer.
   Use illustrations/icons when they help understanding, memory, comparison, or navigation; do not add them by quota. A slide with no icon or illustration is acceptable when the structure already carries the message.
+  Keep icons below the semantic sentence layer: if icons and nouns are doing the work that a reader needs sentences, relationships, or proof to do, rewrite the content before image generation.
   Do not minimize numbers by default. Keep sourced or explicitly assumed numbers when they help comparison, sizing, prioritization, credibility, or decision-making; remove only unsupported, redundant, unreadable, or decorative numbers.
   Render ONLY the exact text strings listed in the planning block or final prompt; do not invent extra labels.
   Keep diagram, chart, table, matrix, map, and flow text simple enough to audit after generation; if the visual needs many tiny labels, group or move detail to speaker notes instead of relying on illegible microtext.
@@ -690,6 +709,7 @@ negative_prompt_hard_blockers:
   oversized header, decorative header badge or right-side header ornament, H1/subtitle/source color drift, any gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline near Source/footer, body content invading header/footer, visible text above max_text_size_lock, unreadable body text below 18pt equivalent,
   invented labels or sources, garbled or rewritten exact_text, visible lock names, visible YAML keys, visible route/status fields, decorative pseudo-chart/table/map glyphs, unreadable thumbnail-level hierarchy, broken reading path, placeholder Source footer such as brand assumptions or brand analysis, speaker notes visible on slide, thin or perfunctory PPT talk script, darker beige/cream page background, duplicate loose final PNG copies across output folders, parallel contact sheets for generated/package/pdf_render of the same slide set, unresolved grid, severe grid drift, hard-to-picture abstract visual,
   title-only first slide or low-density opener without proof/tension points,
+  icon-and-keyword-only slide, noun-only card grid, generic icon grid, icon wallpaper, repeated decorative icon row, one-icon-per-card habit, icon-only composition with no explanatory sentence layer,
   patterned or textured message box, oversized message box, full-width banner-like Insight, message-box text competing with H1/subtitle,
   saturated yellow message box, deck tone drift, mixed illustration tone, inconsistent face detail or body proportion, inconsistent icon family, inconsistent card/table surface weight, decorative pseudo-3D depth, rough sketch aesthetic,
   mechanical repeated composition without narrative or comparison purpose, generic icon-only composition, dated template composition, slide number, title kicker, logo in upper-right clear zone
@@ -744,6 +764,10 @@ post_generation_audit:
   - message_sharpness_lock is fulfilled: the H1/action title is not a vague label or slogan
   - evidence_compression_ladder is fulfilled: proof is compressed into a readable structure rather than prose or decoration
   - density_lift_lock is fulfilled in both the slide structure and final image prompt
+  - sentence_density_lift_lock is fulfilled: body labels, rows, annotations, or optional Insight contain compact meaningful clauses/sentences that explain relationship, reason, consequence, or decision relevance
+  - semantic_copy_gate is fulfilled: major body labels are not noun-only unless they are headers, axes, legends, or categories
+  - icon_restraint_lock is fulfilled: icons are sparse, purposeful wayfinding/evidence markers and never replace the semantic sentence layer or dominate the content
+  - icon_density_budget is fulfilled: icon count is normally 0-3 per slide, below semantic text units, and never follows a one-icon-per-card habit
   - structure_choice_bias is considered: structured presentation patterns are used where they clarify the message, and not forced where they would add noise
   - structured_density_bias is fulfilled when useful: one or two evidence layers, labels, drivers, or comparison cues add decision value without crowding
   - structure_choice_status is not_applicable, applied, intentionally_skipped, or repair_required with a clear reason
@@ -885,9 +909,17 @@ def deck_plan_tail() -> str:
           reader_mode:
           decision_question:
           information_units:
+          semantic_sentence_layer:
+          semantic_copy_gate:
+          icon_restraint_plan:
+          icon_density_budget:
           density_levers:
           overload_controls:
         density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
+        sentence_density_lift_lock: raise density one step with compact meaningful clauses or short sentences in body labels, rows, annotations, and optional Insight; avoid icon-and-keyword-only slides
+        semantic_copy_gate: major body labels use meaningful clauses/sentences; noun-only labels are allowed only for headers, axes, or category names
+        icon_restraint_lock: icons are sparse wayfinding/evidence markers and not the primary content layer
+        icon_density_budget: default to 0-3 purposeful icons per slide and keep icon count below semantic text units unless the visual logic demands otherwise
         structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
         structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
         structure_choice_status:
@@ -1114,9 +1146,17 @@ def text_structure_tail() -> str:
         reader_mode: scan / read / reference
         decision_question:
         information_units:
+        semantic_sentence_layer:
+        semantic_copy_gate:
+        icon_restraint_plan:
+        icon_density_budget:
         density_levers:
         overload_controls:
       density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
+      sentence_density_lift_lock: raise density one step with compact meaningful clauses or short sentences in body labels, rows, annotations, and optional Insight; avoid icon-and-keyword-only slides
+      semantic_copy_gate: major body labels use meaningful clauses/sentences; noun-only labels are allowed only for headers, axes, or category names
+      icon_restraint_lock: icons are sparse wayfinding/evidence markers and not the primary content layer
+      icon_density_budget: default to 0-3 purposeful icons per slide and keep icon count below semantic text units unless the visual logic demands otherwise
       structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
       structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
       structure_choice_status:
@@ -1170,8 +1210,8 @@ def text_structure_tail() -> str:
       exact_text:
         h1:
         subtitle:
-        body_labels:
-        chart_labels:
+        body_labels: [compact meaningful clauses/sentences except headers/categories]
+        chart_labels: [legible labels; noun-only allowed for axes/legends/categories]
         insight_text:
       data_to_render:
       exact_text_budget: H1 + subtitle + short labels + decision-relevant numbers + optional one-sentence Insight
