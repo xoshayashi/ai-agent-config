@@ -506,7 +506,7 @@ def test_structured_yaml_controls_grain_periods_and_drivers() -> None:
         assert wb["Assumptions"].cell(11, first_col + 5).value == 150000
         assert wb["Financing"].cell(7, first_col).value == 10000000
         assert wb["Financing"].cell(8, first_col + 1).value == 50000000
-        assert wb["Segments"]["B6"].value == "Japan SaaS"
+        assert wb["Segments"].cell(6, source_plan.LAYOUT.label_col).value == "Japan SaaS"
         assert wb["Assumptions"].cell(_row_for_label(wb, "Assumptions", "Value capture share"), first_col).value == 0.30
         assert wb["Assumptions"].cell(_row_for_label(wb, "Assumptions", "Target gross margin"), first_col).value == 0.65
         assert wb["Assumptions"].cell(_row_for_label(wb, "Assumptions", "Support tickets / customer / year"), first_col).value == 10
@@ -1043,7 +1043,7 @@ def test_source_plan_uses_column_based_hierarchy_layout() -> None:
         ws = wb["Assumptions"]
         layout = source_plan.LAYOUT
         assert source_plan.START_PERIOD_COL == layout.unit_col + 1
-        assert ws.column_dimensions["A"].width == layout.hierarchy_width - 17
+        assert ws.column_dimensions["A"].width == ib.COL_MARGIN_WIDTH
         assert ws.column_dimensions["B"].width == layout.hierarchy_width
         assert ws.column_dimensions["C"].width == layout.label_width
         assert ws.column_dimensions["D"].width == layout.source_width
@@ -1131,10 +1131,11 @@ def test_segment_lens_handles_long_generic_segment_names_without_clipping() -> N
         build_model.build_model(input_path, out, mode="full")
         wb = load_workbook(out, data_only=False)
         ws = wb["Segments"]
-        width = ws.column_dimensions["B"].width or 0
+        segment_col = source_plan.get_column_letter(source_plan.LAYOUT.label_col)
+        width = ws.column_dimensions[segment_col].width or 0
         clipped = [
             f"{cell.coordinate}: width={width} value={cell.value}"
-            for cell in ws["B"]
+            for cell in ws[segment_col]
             if isinstance(cell.value, str)
             and cell.row >= 6
             and len(cell.value) > width * 1.15
@@ -1353,20 +1354,21 @@ def test_ib_helpers_do_not_use_native_indent_for_hierarchy() -> None:
     assert ws["D3"].alignment.indent == 0
 
 
-def test_added_hierarchy_columns_keep_width_20_floor() -> None:
+def test_added_hierarchy_columns_use_google_sheets_20px_width() -> None:
     wb = Workbook()
     ws = wb.active
     original_layout = source_plan.LAYOUT
     try:
         source_plan.LAYOUT = source_plan.LayoutSpec(hierarchy_cols=3)
-        source_plan._set_column_widths(ws, {2: 5, 3: 8, 4: 10, 5: 24, 6: 24, 7: 8})
+        source_plan._setup_sheet(ws, "Hierarchy width check")
 
         assert ws.column_dimensions["B"].width == ib.COL_HIERARCHY_WIDTH
         assert ws.column_dimensions["C"].width == ib.COL_HIERARCHY_WIDTH
         assert ws.column_dimensions["D"].width == ib.COL_HIERARCHY_WIDTH
-        assert ws.column_dimensions["E"].width >= ib.COL_LABEL_WIDTH
-        assert ws.column_dimensions["F"].width >= ib.COL_SOURCE_WIDTH
-        assert ws.column_dimensions["G"].width >= ib.COL_UNIT_WIDTH
+        assert ib.COL_HIERARCHY_WIDTH == 2.14
+        assert ws.column_dimensions["E"].width == ib.COL_LABEL_WIDTH
+        assert ws.column_dimensions["F"].width == ib.COL_SOURCE_WIDTH
+        assert ws.column_dimensions["G"].width == ib.COL_UNIT_WIDTH
     finally:
         source_plan.LAYOUT = original_layout
 
@@ -1467,7 +1469,7 @@ if __name__ == "__main__":
     test_source_plan_custom_tables_keep_text_columns_readable()
     test_excluded_sheets_cannot_create_broken_references()
     test_ib_helpers_do_not_use_native_indent_for_hierarchy()
-    test_added_hierarchy_columns_keep_width_20_floor()
+    test_added_hierarchy_columns_use_google_sheets_20px_width()
     test_generic_kernel_does_not_promote_domain_specific_mentions_to_sources()
     test_benchmark_register_uses_evidence_status_not_fake_source_placeholders()
     test_scenario_formulas_are_not_built_with_fragile_substring_replacement()

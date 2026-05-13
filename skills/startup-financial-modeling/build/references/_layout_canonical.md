@@ -7,10 +7,12 @@
 - Keep assumptions on their own rows with unit and source/note columns.
 - Represent hierarchy through dedicated columns, not Excel native indent or
   leading spaces. A is a narrow visual gutter. Every hierarchy / indentation
-  column starts at B and must be width 20. If a model needs deeper hierarchy,
-  add more width-20 hierarchy columns to the right, then place the lowest-level
-  line item in the first wide label column. Source / driver, unit, and value
-  columns follow that label column.
+  column starts at B and must render as 20px wide in Google Sheets. In xlsx /
+  openpyxl terms that is approximately column width `2.14`, not `20.0`.
+  If a model needs deeper hierarchy, add more Google-Sheets-20px hierarchy
+  columns to the right, then place the lowest-level line item in the first wide
+  label column. Source / driver, unit, and value columns follow that label
+  column.
 - The default generated period layout is A gutter, B section, C line item, D
   source / driver, E unit, and F onward for periods or values. Custom matrices
   and scenario tables must derive their first data column from the same layout
