@@ -881,7 +881,7 @@ def deck_plan_tail() -> str:
           information_units:
           density_levers:
           overload_controls:
-        evidence_compression_ladder:
+        evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation
         density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
         structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
         structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
@@ -1110,7 +1110,7 @@ def text_structure_tail() -> str:
         information_units:
         density_levers:
         overload_controls:
-      evidence_compression_ladder:
+      evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation
       density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
       structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
       structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
@@ -1133,11 +1133,11 @@ def text_structure_tail() -> str:
       header_footer_text_color_lock:
       visible_brand_label_blocker: no separate ATOM wordmark, logo, title kicker, badge, or brand label in the header unless exact_text explicitly requests it
       message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement; many slides should use no message box
-      insight_absence_default_lock:
-      insight_justification_required:
+      insight_absence_default_lock: start from no Insight/message-box
+      insight_justification_required: keep only with a non-redundant interpretation, decision signal, or reading bridge
       honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block
-      honey_selective_signal_lock:
-      honey_justification_required:
+      honey_selective_signal_lock: Honey starts absent and appears only when a justified bottom decision signal is stronger than no component or neutral outline
+      honey_justification_required: keep Honey only with a written reason tied to decision clarity
       message_box_scale_lock:
       message_box_text_size_lock:
       message_box_compactness_blocker_lock:
@@ -1171,10 +1171,10 @@ def text_structure_tail() -> str:
       data_to_render:
       exact_text_budget: H1 + subtitle + short labels + decision-relevant numbers + optional one-sentence Insight
       insight_decision:
-      insight_absence_default_lock:
-      insight_justification_required:
-      honey_selective_signal_lock:
-      honey_justification_required:
+      insight_absence_default_lock: start from no Insight/message-box
+      insight_justification_required: keep only with a non-redundant interpretation, decision signal, or reading bridge
+      honey_selective_signal_lock: Honey starts absent and appears only when a justified bottom decision signal is stronger than no component or neutral outline
+      honey_justification_required: keep Honey only with a written reason tied to decision clarity
       density_risk:
       split_merge_decision:
       prompt_text_budget:
