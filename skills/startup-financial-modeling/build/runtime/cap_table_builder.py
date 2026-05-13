@@ -1548,8 +1548,17 @@ def build_cap_table_sheet(
         for col in range(2, min(9, max(7, ws.max_column)) + 1):
             cell = ws.cell(row=row, column=col)
             cell.font = ib.FONT_COVER_TITLE
+            base = cell.alignment
             cell.alignment = Alignment(
-                horizontal="left", vertical="center", wrap_text=False, indent=0
+                horizontal="left",
+                vertical="center",
+                text_rotation=base.text_rotation,
+                wrap_text=False,
+                shrink_to_fit=base.shrink_to_fit,
+                indent=0,
+                relativeIndent=base.relativeIndent,
+                justifyLastLine=base.justifyLastLine,
+                readingOrder=base.readingOrder,
             )
         ws.row_dimensions[row].height = ib.ROW_HEIGHT_RELAXED
     for row in header_rows:
