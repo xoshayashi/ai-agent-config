@@ -1765,7 +1765,7 @@ def test_source_plan_print_canvas_includes_rendered_used_range() -> None:
 
         for ws in wb.worksheets:
             ws.insert_rows(ws.max_row + 1)
-            assert ws.cell(ws.max_row + 1, 1).style_id == 0
+            assert ws.cell(ws.max_row, 1).style_id == 0
     finally:
         tmp.cleanup()
 
