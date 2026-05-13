@@ -36,6 +36,7 @@ image_moderation: auto
 image_n: 1 for final text-heavy slides; variations only for drafts
 image_streaming: optional for exploration, final QA uses completed image
 image_delivery_size: 2048x1152; use the same approved slides_final/ PNG masters for PPTX/PDF delivery wrappers
+nonconforming_existing_png_regeneration_lock: existing/source PNGs at 1672x941 or any non-approved size are not final blockers and must not be converted, upscaled, HTML-rendered, API-rendered, or locally redrawn; reuse the approved slide specification and generate new 2048x1152 slides_final/ masters with Codex built-in gpt-image-2
 generation_route: Codex built-in image generation
 builtin_generation_lock: invoke Codex built-in image generation directly and start generating slide PNGs; do not pause for local environment preflight or local artifact-route probing before generation
 codex_image_artifact_rule: the image returned by Codex built-in image generation is the authoritative generated PNG artifact; use the Codex-provided artifact/download/attachment path to materialize approved outputs under slides_final/ when a filesystem path is needed for PPTX packaging
@@ -236,6 +237,7 @@ ATOM slide contract:
 - prompt/package scripts are helpers only: use them to scaffold prompts, validate manifests, or package already-approved Codex image artifacts; never use scripts to render, draw, screenshot, export, simulate, or replace final slide PNGs
 - use generation_mode new_image for new single-slide images or image_edit for screenshot/reference repair
 - use image_size 2048x1152 for generated slide output, review, PPTX packaging, and PDF packaging; do not create separate 1920x1080, 1672x941, draft-size, QHD, or 4K delivery PNG masters
+- if existing/source PNGs are 1672x941 or another non-approved package size, do not stop at the package-script rejection and do not convert, upscale, HTML-render, API-render, or locally redraw them; reuse the approved slide specification and generate new 2048x1152 slides_final/ masters with Codex built-in gpt-image-2, then review and package those generated masters
 - treat strict DCI 2K 2048x1080 and DCI 4K 4096x2160 as non-target cinema sizes, not ATOM 16:9 slide generation sizes
 - use image_background opaque or auto, never transparent
 - use png for slide fidelity unless latency or file size matters
@@ -612,6 +614,7 @@ Content:
 - source_line and table_note_microline are separate
 - source_real_only_lock passes: Source footer is shown only for real traceable external/provided sources
 - source_placeholder_blocklist passes: no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions appears as Source text
+- nonconforming_existing_png_regeneration_lock passes: any existing/source PNG at 1672x941 or another non-approved package size was not treated as a final blocker or converted locally; a new 2048x1152 Codex built-in gpt-image-2 master was generated from the approved specification before packaging
 - output_artifact_mastering_lock passes: `slides_final/` is the only loose-PNG master and package/render-check artifacts reference it
 - pdf_export_source_lock passes: PDF outputs are created from `slides_final/` master PNGs; `render_check/pdf_pages/` is rendered-back QA only
 - no_duplicate_png_output_lock passes: no duplicate loose final PNG copies remain across `slides_final/`, `slides_package/`, and `render_check/pdf_pages/`

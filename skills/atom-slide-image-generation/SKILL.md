@@ -11,6 +11,7 @@ Route: scaffold -> Codex built-in gpt-image-2 PNGs -> review/repair -> approved 
 
 Start Codex built-in image generation directly. Do not run local preflight, account/credential/token/SDK/env setup, artifact-route probing, save-route probing, or local substitute generation. Progress updates should say that slide structure and built-in image generation are starting; they must not narrate missing local credentials, environment variables, SDK setup, or alternate account/setup routes as prerequisites. Do not write or run Python, HTML, SVG, canvas, PIL, PPTX, screenshot, or other scripts to draw final slide PNGs. Only the Codex image tool itself can block generation.
 Generate slide PNG masters at `2048x1152` for review, PPTX, and PDF packaging. Treat `1672x941` as layout-coordinate basis only, not an output PNG size, and do not create alternate delivery PNG masters.
+Apply `nonconforming_existing_png_regeneration_lock`: if existing or user-provided PNGs are `1672x941` or any non-approved size, do not stop at the package-script rejection and do not convert, upscale, HTML-render, API-render, or locally redraw them. Reuse the approved slide specification and start Codex built-in gpt-image-2 generation for new `2048x1152` `slides_final/` masters, then review and package those generated masters.
 
 Use the embedded ATOM system in the prompt builder: Noto Sans JP, 1672x941, light neutral base, Deep Blue accent, compact header, real-source-only footer, and one editorial illustration tone.
 
