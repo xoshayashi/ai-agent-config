@@ -1526,6 +1526,8 @@ def build_cap_table_sheet(
                 readingOrder=base.readingOrder,
             )
 
+    # Optional round/waterfall sections are styled only when their shifted
+    # content label exists in column C after the hierarchy column is inserted.
     section_rows = [
         row for row in (5, 25, 50, 70) if ws.cell(row=row, column=3).value
     ]
