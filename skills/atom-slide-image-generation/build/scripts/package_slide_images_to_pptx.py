@@ -84,7 +84,9 @@ def validate_image_file(path: Path) -> None:
         allowed = ", ".join(f"{w}x{h}" for w, h in sorted(APPROVED_SLIDE_IMAGE_SIZES))
         message = f"{path} must be the approved 16:9 2K slide PNG master size; found {width}x{height}. Allowed: {allowed}."
         if (width, height) == (1672, 941):
-            message += " Use 1672x941 only as layout-coordinate basis, not as a package input."
+            message += " Use 1672x941 only as layout-coordinate basis, not as a package input; generate a new 2048x1152 slides_final/ master with Codex built-in gpt-image-2 from the approved slide specification."
+        else:
+            message += " Generate a new 2048x1152 slides_final/ master with Codex built-in gpt-image-2 from the approved slide specification instead of converting or locally redrawing this file."
         raise SystemExit(message)
 
 

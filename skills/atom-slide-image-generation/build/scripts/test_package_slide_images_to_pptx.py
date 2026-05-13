@@ -170,9 +170,9 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             legacy_basis.write_bytes(png_bytes(1672, 941))
             fhd.write_bytes(png_bytes(1920, 1080))
 
-            with self.assertRaisesRegex(SystemExit, "layout-coordinate basis"):
+            with self.assertRaisesRegex(SystemExit, "generate a new 2048x1152 slides_final/ master"):
                 pptx_packager.collect_images([str(legacy_basis)])
-            with self.assertRaisesRegex(SystemExit, "found 1920x1080"):
+            with self.assertRaisesRegex(SystemExit, "instead of converting or locally redrawing"):
                 pptx_packager.collect_images([str(fhd)])
 
     def test_rejects_legacy_manifest_path_aliases(self) -> None:

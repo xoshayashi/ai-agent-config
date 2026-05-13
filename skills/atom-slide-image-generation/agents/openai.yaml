@@ -1,4 +1,4 @@
 interface:
   display_name: "ATOM Slide Image Generation"
   short_description: "Structure text and generate ATOM slide images"
-  default_prompt: "Use $atom-slide-image-generation to structure the brief, call Codex built-in gpt-image-2 image generation directly at 2048x1152 by default, skip local/account/credential setup, review and repair actual PNG artifacts, then package approved slides_final/ PNGs into PPTX/PDF outputs."
+  default_prompt: "Use $atom-slide-image-generation to structure the brief, then call Codex built-in gpt-image-2 image generation directly at 2048x1152. Skip local/account/credential setup, local preflight, and save-route probing; do not mention them as prerequisites in progress updates. Do not write or run scripts to draw final PNGs; scripts only scaffold prompts or package approved Codex image artifacts. Review and repair actual PNG artifacts, then package approved slides_final/ PNGs into PPTX/PDF."
