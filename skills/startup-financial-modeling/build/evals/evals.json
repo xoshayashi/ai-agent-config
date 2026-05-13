@@ -563,6 +563,7 @@
     "Maturity, sector, and funding context are evidence fields, not template selectors.",
     "All xlsx outputs should preserve raw base-currency money storage, unit integrity, no text wrapping, exact line-count row heights for approved wrap/line-break exceptions, no frozen panes, Google-Sheets-20px hierarchy / indent columns, sparse rectangular semantic fill/border spans aligned to attached row components, direct formulas, and editable workbook structure.",
     "Prompt guidance must force assumption epistemology, KPI interpretation, coherent scenarios, valuation method credibility, clean-base memo writing, benchmark/source hygiene, and self-inspection before completion.",
+    "Model creation is not completion: agents must verify both model logic and sheet design with command-based workbook checks plus rendered-output inspection, then fix and rerun until both are sufficient or a real blocker is documented.",
     "Examples, maturity cues, sectors, and modes are pattern prompts only; evals should reject fixed stage-sector-purpose routing and keyword-triggered metric packs."
   ]
 }
