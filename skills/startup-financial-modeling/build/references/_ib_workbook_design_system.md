@@ -37,6 +37,12 @@ Long labels receive enough width in their role column or move to a dedicated
 notes / interpretation column. Adjacent cells that support text overflow remain
 plain empty cells, so Google Sheets can show the full text.
 
+No-Wrap Rule: do not solve readability by turning on cell text wrapping. If
+text clips, widen the relevant role column, split the content into shorter
+rows, move commentary to a note / interpretation column, or reserve blank
+overflow cells. Generated workbook helpers should reject `wrap_text=True`
+instead of silently accepting it.
+
 ## Color Roles
 
 Color should help a reviewer understand the workbook faster:

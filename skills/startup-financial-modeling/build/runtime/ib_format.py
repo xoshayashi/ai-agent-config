@@ -135,6 +135,17 @@ FONT_SIZE_TINY = 8         # chart axis tick (charts only — cells should not u
 FONT_BODY = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, color=IB_INK)
 FONT_BODY_BOLD = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, bold=True, color=IB_INK)
 
+WRAP_TEXT_ERROR = (
+    "startup-financial-modeling forbids wrap_text=True for generated workbook "
+    "cells. Use wider columns, dedicated note columns, shorter rows, or blank "
+    "overflow cells instead."
+)
+
+
+def _ensure_no_wrap_text(wrap_text: bool) -> None:
+    if wrap_text:
+        raise ValueError(WRAP_TEXT_ERROR)
+
 
 def set_workbook_default_font(wb, name: str = FONT_FAMILY, size: int = FONT_SIZE_BASE) -> None:
     """Make `name` `size` the workbook-wide default font (persistent in xlsx).
@@ -557,14 +568,15 @@ def apply_link_external(
 def apply_label(cell, bold: bool = False, wrap_text: bool = False) -> None:
     """行ラベル (左寄せ、Excel indent なし、Arial 10pt).
 
-    wrap_text=False が default。長文は隣接セルにはみ出して表示する (IB 慣習)。
-    明示的に wrap_text=True を指定したいときのみ折り返す。
+    wrap_text=True は禁止。長文は列幅、専用 note 列、短い行分割、
+    または隣接空白セルへの overflow で解決する。
     Font は Arial 10pt 固定 (Google Sheets default + IB de facto standard)。
     階層表現は列追加で行い、Excel native indent は使わない。
     """
+    _ensure_no_wrap_text(wrap_text)
     cell.font = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, bold=bold, color=IB_INK)
     cell.alignment = Alignment(
-        horizontal="left", vertical="center", indent=0, wrap_text=wrap_text
+        horizontal="left", vertical="center", indent=0, wrap_text=False
     )
 
 
@@ -719,12 +731,13 @@ def apply_grand_total(
 def apply_comment(cell, wrap_text: bool = False) -> None:
     """注記セル (gray + italic).
 
-    wrap_text=False が default。長文は隣接の空きセルにはみ出して表示する。
-    明示的に折り返したい場合は wrap_text=True を渡す。
+    wrap_text=True は禁止。長文は列幅、専用 note 列、短い行分割、
+    または隣接空白セルへの overflow で解決する。
     """
+    _ensure_no_wrap_text(wrap_text)
     cell.font = FONT_COMMENT
     cell.alignment = Alignment(
-        horizontal="left", vertical="center", wrap_text=wrap_text
+        horizontal="left", vertical="center", wrap_text=False
     )
 
 
