@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Iterable
 
 DEFAULT_FORECAST_PERIODS = 5
-MAX_FORECAST_PERIODS = 24
+MAX_FORECAST_PERIODS = 60
 
 
 def forecast_years(start_year: int | None = None, periods: int = DEFAULT_FORECAST_PERIODS) -> list[int]:
@@ -82,6 +82,29 @@ class AssumptionLine:
 class AssumptionGroup:
     title: str
     lines: tuple[AssumptionLine, ...]
+
+
+@dataclass(frozen=True)
+class ScenarioDriver:
+    label: str
+    unit: str
+    downside: float
+    base: float
+    upside: float
+    why: str
+    output_pressured: str
+    breakpoint: str
+    decision_implication: str
+
+
+@dataclass(frozen=True)
+class KPIDefinition:
+    name: str
+    formula_driver: str
+    applies_when: str
+    source_context: str
+    downside_trigger: str
+    ic_implication: str
 
 
 @dataclass(frozen=True)
@@ -551,9 +574,13 @@ def money_yen(patterns: Iterable[str], text: str, default: int) -> int:
             value = float(raw)
         except ValueError:
             continue
-        if unit in {"兆", "t", "tn", "trillion"}:
+        if unit in {"兆"}:
             return int(value * 1_000_000_000_000)
-        if unit in {"億", "b", "bn", "billion"}:
+        if unit in {"t", "tn", "trillion"}:
+            return int(value * 1_000_000_000_000)
+        if unit in {"億"}:
+            return int(value * 100_000_000)
+        if unit in {"b", "bn", "billion"}:
             return int(value * 1_000_000_000)
         if unit in {"百万", "m", "mn", "million"}:
             return int(value * 1_000_000)
@@ -700,6 +727,111 @@ def driver_surfaces_for(facts: SourceFacts) -> tuple[DriverSurface, ...]:
         DriverSurface("Risk", "Scenario and sensitivity", "Scenarios / Sensitivity", "Downside and decision pressure", "model"),
         DriverSurface("Value", "Exit, SOTP, investor return", "Valuation / IC Memo", "Investment judgment", "model"),
     )
+
+
+def _mechanic_key(facts: SourceFacts) -> str:
+    lowered = f"{facts.mechanics} {' '.join(facts.segments)}".lower()
+    signals = {
+        "marketplace": ("marketplace", "transaction", "gmv", "liquidity", "two-sided"),
+        "hardware_asset_heavy": ("hardware", "asset", "equipment", "robot", "lease", "deployed"),
+        "fintech_balance_sheet": ("fintech", "balance", "loan", "lending", "credit", "warehouse"),
+        "pre_revenue_milestone": ("proof", "pre-revenue", "milestone", "prototype", "grant"),
+        "recurring_software": ("software", "recurring", "saas", "subscription", "arr"),
+    }
+    scores = {key: sum(1 for token in tokens if token in lowered) for key, tokens in signals.items()}
+    strongest = max(scores.values())
+    if strongest <= 0:
+        return "generic"
+    winners = [key for key, score in scores.items() if score == strongest]
+    if len(winners) > 1:
+        return "generic"
+    return winners[0]
+
+
+def scenario_drivers_for(facts: SourceFacts) -> tuple[ScenarioDriver, ...]:
+    key = _mechanic_key(facts)
+    registry = {
+        "marketplace": (
+            ScenarioDriver("GMV / liquidity scale", "x", 0.65, 1.00, 1.35, "buyer/seller liquidity evidence is weakest", "net revenue and contribution margin", "liquidity or repeat rate misses plan", "tighten wedge, incentives, or funding plan"),
+            ScenarioDriver("Take-rate / pricing scale", "x", 0.85, 1.00, 1.12, "monetization may pressure marketplace liquidity", "net revenue and NRR quality", "take rate cannot hold without churn", "reprice, bundle, or change value capture"),
+            ScenarioDriver("Incentive / loss factor", "x", 1.30, 1.00, 0.80, "incentives, payment fees, or fraud can absorb gross profit", "gross margin and burn", "contribution margin turns negative", "validate unit economics by cohort"),
+            ScenarioDriver("Working-capital factor", "x", 1.20, 1.00, 0.85, "cash timing may diverge from GMV growth", "runway and funding gap", "cash conversion absorbs raise", "change settlement, advances, or debt plan"),
+        ),
+        "hardware_asset_heavy": (
+            ScenarioDriver("Deployment capacity scale", "x", 0.65, 1.00, 1.30, "manufacturing or field deployment constrains growth", "revenue, capex, and runway", "units ship below milestone", "phase rollout or add capacity financing"),
+            ScenarioDriver("Utilization / pricing scale", "x", 0.85, 1.00, 1.15, "asset ROI depends on utilization and price capture", "revenue and payback", "payback exceeds funding window", "validate customer ROI and pricing"),
+            ScenarioDriver("BOM / service cost factor", "x", 1.25, 1.00, 0.85, "hardware/service cost evidence is often thin", "gross margin and capex intensity", "margin falls below target", "lock BOM, warranty, and service data"),
+            ScenarioDriver("Lease/debt availability", "x", 0.70, 1.00, 1.25, "non-dilutive capacity may be unavailable in downside", "funding gap and dilution", "debt/lease headroom fails", "resize equity round or asset plan"),
+        ),
+        "fintech_balance_sheet": (
+            ScenarioDriver("Origination scale", "x", 0.70, 1.00, 1.25, "demand and underwriting capacity may diverge", "revenue and capital need", "origination below cost base", "tighten ICP and credit box"),
+            ScenarioDriver("Spread / pricing scale", "x", 0.85, 1.00, 1.10, "pricing may not offset funding cost", "gross profit and valuation", "spread compression", "reprice, hedge, or reduce growth"),
+            ScenarioDriver("Loss / collection factor", "x", 1.35, 1.00, 0.80, "loss and collection evidence drives survivability", "cash, runway, and covenants", "losses breach headroom", "validate cohorts before scaling"),
+            ScenarioDriver("Warehouse / debt headroom", "x", 0.70, 1.00, 1.20, "balance-sheet growth depends on committed funding", "funding gap and dilution", "warehouse capacity unavailable", "slow originations or raise equity"),
+        ),
+        "pre_revenue_milestone": (
+            ScenarioDriver("Milestone timing scale", "x", 0.65, 1.00, 1.20, "proof points may slip before commercial revenue", "cash-out date and next round", "milestone slips beyond runway", "reduce scope or raise bridge"),
+            ScenarioDriver("Prototype / program cost factor", "x", 1.30, 1.00, 0.85, "R&D and prototype cost evidence is thin", "burn and funding gap", "cost overrun consumes buffer", "add contingency and vendor proof"),
+            ScenarioDriver("Grant / non-dilutive coverage", "x", 0.70, 1.00, 1.25, "non-dilutive funding may not arrive on time", "equity need and dilution", "coverage below target", "replace with bridge or equity"),
+            ScenarioDriver("Hiring capacity scale", "x", 0.80, 1.00, 1.20, "execution depends on recruiting scarce talent", "milestone delivery and burn", "critical hires slip", "sequence hires to proof points"),
+        ),
+        "recurring_software": (
+            ScenarioDriver("New logo / conversion scale", "x", 0.70, 1.00, 1.30, "pipeline conversion drives ARR", "ARR, burn multiple, and runway", "sales capacity misses plan", "revise GTM capacity or spend"),
+            ScenarioDriver("ACV / expansion scale", "x", 0.85, 1.00, 1.15, "pricing and expansion quality drive NRR", "ARR and valuation quality", "expansion below benchmark", "validate packaging and customer ROI"),
+            ScenarioDriver("Churn / retention factor", "x", 1.30, 1.00, 0.80, "retention is often the hardest evidence gap", "NRR, LTV, and valuation", "churn breaks payback", "cohort retention DD before scaling"),
+            ScenarioDriver("CAC / sales capacity factor", "x", 1.20, 1.00, 0.85, "sales efficiency controls funding need", "burn multiple and payback", "payback exceeds cash window", "rebalance GTM mix"),
+        ),
+        "generic": (
+            ScenarioDriver("Demand evidence scale", "x", 0.70, 1.00, 1.25, "demand proof is not yet tied to one mechanic", "revenue, burn, and runway", "demand evidence fails to support plan", "clarify economic unit before scaling spend"),
+            ScenarioDriver("Value capture scale", "x", 0.85, 1.00, 1.15, "pricing or monetization route remains uncertain", "gross profit and valuation support", "value capture lacks customer proof", "validate willingness-to-pay or monetization path"),
+            ScenarioDriver("Cost-to-serve factor", "x", 1.25, 1.00, 0.85, "delivery burden may be understated", "gross margin and burn", "unit economics fail under service load", "decompose cost stack and operating capacity"),
+            ScenarioDriver("Financing capacity scale", "x", 0.75, 1.00, 1.20, "capital availability depends on unresolved proof points", "funding gap and dilution", "financing need exceeds credible capacity", "reset milestone scope or capital plan"),
+        ),
+    }
+    return registry.get(key, registry["generic"])
+
+
+def kpi_definitions_for(facts: SourceFacts) -> tuple[KPIDefinition, ...]:
+    common = [
+        KPIDefinition("Runway", "CF ending cash / burn", "cash survival matters", "cash forecast / financing terms", "below target runway", "round timing or burn reset"),
+        KPIDefinition("Burn multiple", "net burn / net new revenue", "funding efficiency matters", "cash flow and revenue ramp", "burn not justified by growth", "capital efficiency and round size"),
+        KPIDefinition("Funding coverage", "committed financing / cash need", "raise sizing is a decision", "capital stack and milestone plan", "coverage below target", "round size, bridge, or debt plan"),
+        KPIDefinition("Evidence coverage", "support status across material drivers", "source quality is uneven", "benchmark/source register", "material driver remains unknown", "prioritize DD before circulation"),
+    ]
+    key = _mechanic_key(facts)
+    registry = {
+        "marketplace": (
+            KPIDefinition("Take rate", "net revenue / GMV", "transaction monetization is central", "transaction and pricing proof", "take rate weakens liquidity", "pricing and incentive DD"),
+            KPIDefinition("Contribution margin", "gross profit after incentives/losses", "subsidies or fraud matter", "payment, incentive, fraud evidence", "contribution margin negative", "cohort unit economics DD"),
+            KPIDefinition("Repeat / liquidity quality", "repeat rate and GMV growth", "network health drives scale", "cohort behavior", "repeat behavior below threshold", "wedge or supply/demand focus"),
+        ),
+        "hardware_asset_heavy": (
+            KPIDefinition("Deployment capacity", "units deployed / capacity", "physical rollout drives revenue", "manufacturing/deployment evidence", "capacity below unit plan", "capacity financing or phasing"),
+            KPIDefinition("Asset payback", "capex per unit / unit gross profit", "assets consume cash", "BOM, service, utilization evidence", "payback beyond funding window", "lease/debt and pricing DD"),
+            KPIDefinition("Service burden", "support workload / Ops-CS capacity", "service quality affects margins", "ticket and field-service evidence", "coverage below 1.0x", "support model or warranty DD"),
+        ),
+        "fintech_balance_sheet": (
+            KPIDefinition("Loss / collection quality", "loss and collection assumptions", "credit risk drives value", "cohort loss evidence", "losses exceed spread", "credit and collections DD"),
+            KPIDefinition("Funding spread", "yield minus funding cost", "warehouse funding drives economics", "debt terms and origination data", "spread compression", "funding partner or pricing DD"),
+            KPIDefinition("Debt / warehouse headroom", "debt capacity / originations", "growth depends on balance sheet", "capital stack evidence", "capacity below plan", "slow growth or raise equity"),
+        ),
+        "pre_revenue_milestone": (
+            KPIDefinition("Milestone runway", "cash runway vs proof-point timing", "revenue proof is ahead", "technical roadmap and burn", "runway ends before proof", "scope, bridge, or hiring reset"),
+            KPIDefinition("Prototype cost variance", "selected cost vs implied cost", "R&D cost evidence is thin", "vendor and team estimates", "cost overrun consumes buffer", "contingency and vendor DD"),
+            KPIDefinition("Non-dilutive coverage", "grants/advances / milestone spend", "funding mix changes dilution", "grant/customer advance status", "coverage slips", "replace with equity or convert"),
+        ),
+        "recurring_software": (
+            KPIDefinition("Net retention", "opening ARR + expansion - churn", "recurring revenue quality matters", "cohort behavior", "NRR below target", "retention and expansion DD"),
+            KPIDefinition("CAC payback", "CAC / gross profit from new ARR", "GTM spend drives burn", "sales cycle and CAC evidence", "payback beyond cash window", "GTM mix or pricing reset"),
+            KPIDefinition("Sales efficiency", "new ARR / sales and marketing spend", "growth efficiency matters", "GTM capacity", "efficiency below benchmark", "quota and channel DD"),
+        ),
+        "generic": (
+            KPIDefinition("Economic unit clarity", "selected unit and value flow", "mechanic is ambiguous", "driver tree and source facts", "unit cannot be traced to cash", "model design or DD before forecast"),
+            KPIDefinition("Unit margin support", "price/value capture minus cost-to-serve", "unit economics must be credible", "pricing, cost, and support evidence", "margin depends on unsupported default", "decompose pricing and cost stack"),
+            KPIDefinition("Proof-point coverage", "runway and funding vs required evidence", "funding should buy evidence", "milestone and capital plan", "proof point slips beyond runway", "resize scope, round, or validation plan"),
+        ),
+    }
+    return tuple(common + list(registry.get(key, registry["generic"])))
 
 
 def extract_source_facts(source_md: Path) -> SourceFacts:
@@ -923,7 +1055,7 @@ def assumption_decomposition_for(facts: SourceFacts) -> tuple[AssumptionGroup, .
                 AssumptionLine("Qualified demand pool", "count", qualified_pool, "funnel / addressable accounts", fmt_key="integer", note="Use when source support for new units is thin."),
                 AssumptionLine("Demand conversion to units", "%", facts.utilization_conversion, "conversion evidence", fmt_key="percent"),
                 AssumptionLine("Implied new units from funnel", "units", "={c}{row:Qualified demand pool}*{c}{row:Demand conversion to units}", kind="formula", fmt_key="integer"),
-                AssumptionLine("Selected new units", "units", "={c}7", kind="formula", fmt_key="integer"),
+                AssumptionLine("Selected new units", "units", "={c}{row:New primary units}", kind="formula", fmt_key="integer"),
                 AssumptionLine("Demand support coverage", "x", "=IF({c}{row:Selected new units}=0,0,{c}{row:Implied new units from funnel}/{c}{row:Selected new units})", kind="formula", fmt_key="multiple", bold=True),
                 AssumptionLine("Demand evidence status", "status", evidence, "source / management / estimate", fmt_key="text"),
             ),
@@ -935,8 +1067,8 @@ def assumption_decomposition_for(facts: SourceFacts) -> tuple[AssumptionGroup, .
                 AssumptionLine("Value capture share", "%", facts.value_capture_share, pricing_source, fmt_key="percent"),
                 AssumptionLine("Value-based monthly price", "JPY", "={c}{row:Customer annual value / ROI}*{c}{row:Value capture share}/12", kind="formula", fmt_key="jpy_yen"),
                 AssumptionLine("Target gross margin", "%", facts.target_gross_margin, "margin policy / benchmark", fmt_key="percent"),
-                AssumptionLine("Cost-plus monthly floor", "JPY", "=({c}25+{c}26+{c}27)/(1-MAX(0.01,{c}{row:Target gross margin}))", kind="formula", fmt_key="jpy_yen"),
-                AssumptionLine("Selected monthly price", "JPY", "={c}11", kind="formula", fmt_key="jpy_yen"),
+                AssumptionLine("Cost-plus monthly floor", "JPY", "=({c}{row:Delivery cost / primary unit}+{c}{row:Cloud / platform cost}+{c}{row:Support cost / customer})/(1-MAX(0.01,{c}{row:Target gross margin}))", kind="formula", fmt_key="jpy_yen"),
+                AssumptionLine("Selected monthly price", "JPY", "={c}{row:Monthly price / unit}", kind="formula", fmt_key="jpy_yen"),
                 AssumptionLine("Pricing support ratio", "x", "=IF(MAX({c}{row:Value-based monthly price},{c}{row:Cost-plus monthly floor})=0,0,{c}{row:Selected monthly price}/MAX({c}{row:Value-based monthly price},{c}{row:Cost-plus monthly floor}))", kind="formula", fmt_key="multiple", bold=True),
                 AssumptionLine("Pricing evidence status", "status", evidence, "source / management / estimate", fmt_key="text"),
             ),
@@ -944,15 +1076,15 @@ def assumption_decomposition_for(facts: SourceFacts) -> tuple[AssumptionGroup, .
         AssumptionGroup(
             "Cost-to-serve support",
             (
-                AssumptionLine("Direct delivery cost / unit", "JPY", "={c}25", kind="formula", fmt_key="jpy_yen"),
-                AssumptionLine("Cloud / platform cost / unit", "JPY", "={c}26", kind="formula", fmt_key="jpy_yen"),
+                AssumptionLine("Direct delivery cost / unit", "JPY", "={c}{row:Delivery cost / primary unit}", kind="formula", fmt_key="jpy_yen"),
+                AssumptionLine("Cloud / platform cost / unit", "JPY", "={c}{row:Cloud / platform cost}", kind="formula", fmt_key="jpy_yen"),
                 AssumptionLine("Support tickets / customer / year", "count", facts.support_tickets_per_customer, cost_source, fmt_key="integer"),
                 AssumptionLine("Minutes / support ticket", "count", facts.minutes_per_support_ticket, "support workload", fmt_key="integer"),
                 AssumptionLine("Support FTE ticket capacity", "count", facts.support_fte_capacity_tickets, "support capacity", fmt_key="integer"),
-                AssumptionLine("Cost / support ticket", "JPY", "=IF({c}{row:Support tickets / customer / year}=0,0,{c}27*12/{c}{row:Support tickets / customer / year})", kind="formula", fmt_key="jpy_yen"),
+                AssumptionLine("Cost / support ticket", "JPY", "=IF({c}{row:Support tickets / customer / year}=0,0,{c}{row:Support cost / customer}*12/{c}{row:Support tickets / customer / year})", kind="formula", fmt_key="jpy_yen"),
                 AssumptionLine("Implied annual service cost / customer", "JPY", "={c}{row:Direct delivery cost / unit}*12+{c}{row:Cloud / platform cost / unit}*12+{c}{row:Cost / support ticket}*{c}{row:Support tickets / customer / year}", kind="formula", fmt_key="money"),
-                AssumptionLine("Implied variable COGS %", "%", "=IF({c}11=0,0,{c}{row:Implied annual service cost / customer}/({c}11*12))", kind="formula", fmt_key="percent"),
-                AssumptionLine("Selected variable COGS %", "%", "={c}24", kind="formula", fmt_key="percent"),
+                AssumptionLine("Implied variable COGS %", "%", "=IF({c}{row:Monthly price / unit}=0,0,{c}{row:Implied annual service cost / customer}/({c}{row:Monthly price / unit}*12))", kind="formula", fmt_key="percent"),
+                AssumptionLine("Selected variable COGS %", "%", "={c}{row:Variable COGS}", kind="formula", fmt_key="percent"),
                 AssumptionLine("COGS support ratio", "x", "=IF({c}{row:Selected variable COGS %}=0,0,{c}{row:Implied variable COGS %}/{c}{row:Selected variable COGS %})", kind="formula", fmt_key="multiple", bold=True),
                 AssumptionLine("COGS evidence status", "status", evidence, "source / management / estimate", fmt_key="text"),
             ),

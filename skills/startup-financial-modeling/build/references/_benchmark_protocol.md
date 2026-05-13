@@ -58,7 +58,7 @@ When benchmarks or source facts are material, keep a compact register with:
 | Field | Purpose |
 |---|---|
 | source_id | Stable short identifier used by assumption, KPI, and memo rows |
-| source type | actual, contract, pipeline, benchmark, management target, estimate, placeholder, or unknown |
+| source type | Use the canonical evidence status vocabulary from `_terminology.md` |
 | date / period | Date of observation or benchmark period |
 | URL / file / owner | Traceable location or internal owner |
 | applicability limits | Geography, customer type, contract length, evidence stage, or method caveat |

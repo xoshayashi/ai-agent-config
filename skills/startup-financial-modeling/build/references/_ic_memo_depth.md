@@ -46,3 +46,12 @@ Each major model output should answer one of these questions:
 - Does it show a downside trigger or breakpoint?
 
 If a memo does not answer any of these, the model has not yet been interpreted.
+
+## Computed Readout
+
+When the output is a workbook, the memo should pull from model cells where
+practical rather than restating generic guidance. At minimum, surface the final
+or decision-period readout for runway, funding gap, burn multiple, gross margin,
+selected valuation, investor return, dilution, and the weakest evidence items.
+Then translate those outputs into what must be true and what diligence should
+happen next.

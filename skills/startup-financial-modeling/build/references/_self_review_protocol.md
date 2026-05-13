@@ -48,6 +48,13 @@ heavy process.
 - Verify that the workbook renders with readable columns, visible overflow
   where intended, compact row rhythm, semantic fills, working freeze panes,
   source / unit alignment, and calm accent usage.
+- Inspect the print/render canvas: each sheet should end at the last real value
+  row and column, including chart and drawing anchors, with print area bound to
+  that rendered range and no styled blank rows or columns extending the visual
+  surface.
+- Review borders and background fills as a system. Row rules should support
+  scanning, section and total borders should create hierarchy, and fills should
+  sit on repeated semantic roles rather than isolated or noisy cells.
 - Confirm generated plans use simple editable grids, direct formulas, raw
   base-currency money values, correct unit labels, and consistent font-color
   semantics.
