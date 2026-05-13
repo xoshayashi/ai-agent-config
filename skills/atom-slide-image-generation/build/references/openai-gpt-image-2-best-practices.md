@@ -25,6 +25,7 @@ Official sources checked:
 - Official documentation examples are reference material for prompt/settings semantics only. Do not require local credential setup or add a local credential execution route in this skill.
 - Do not pause slide generation to inspect local environment state; in Codex, start from the built-in image generation route.
 - If the built-in image tool does not expose model selection, do not invent an API blocker; use the built-in generation route and report `generation_route: Codex built-in image generation`.
+- Prompt builder scripts only create planning text and final prompts. Package scripts only wrap already-approved Codex image artifacts. Neither class of script may render, draw, screenshot, export, simulate, or replace final slide PNGs.
 
 ## Hard Delivery Rule
 
@@ -33,6 +34,7 @@ If the user asks for slide image generation, final images must come from `gpt-im
 - Do not replace image generation with PIL, SVG, web-rendered screenshots, canvas, matplotlib, PowerPoint exports, or other deterministic rendering.
 - Use Codex's built-in image generation function for final images.
 - Prompt packs and local mockups are planning artifacts, not generated image deliverables.
+- Do not write a new script to create final slide images when the request is for slide image generation. If a script is useful, it may only scaffold prompts, validate manifests, or package images that already came from Codex built-in image generation.
 - If Codex built-in image generation is unavailable, stop with a blocker. Do not ask for local API credentials as the default fix and do not create substitute "final" images.
 - For decks over 3 slides, generate 1-2 pilot slides first and inspect them before batch generation.
 
@@ -53,6 +55,8 @@ image_moderation: auto
 image_n: 1 for final text-heavy slides; multiple variations only for drafts
 image_streaming: optional for exploration, final QA uses completed image
 generation_route: Codex built-in image generation
+image_generation_tool_lock: final slide PNG pixels must be produced by Codex built-in image generation
+script_boundary_lock: prompt/package scripts never render, draw, screenshot, export, simulate, or replace final slide PNGs
 generation_status: generated_with_builtin_gpt-image-2 / blocked
 ```
 
@@ -159,3 +163,4 @@ Keep everything else exactly the same: layout, grid, arrows, labels, source text
 - Preserve the footer/source alignment position even when no Source text is rendered; do not draw a visible horizontal line for that baseline.
 - Run a visual QA pass after generation, preferably with high-detail/original vision inspection for dense screenshots.
 - Model/route QA must explicitly confirm the image used Codex built-in image generation, not local rendering.
+- Script-boundary QA must explicitly confirm that any prompt builder or packaging script was not used to create the final PNG pixels.
