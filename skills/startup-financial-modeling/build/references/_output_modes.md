@@ -29,6 +29,11 @@ Expected surfaces:
 - KPI, scenarios, sensitivity, valuation, market support, benchmarks, and IC
   memo where they clarify the decision.
 
+Every included sheet must satisfy `_sheet_quality_rubric.md`: a distinct
+purpose, source boundary, dependency flow, checks where errors would matter,
+and interpretation for output surfaces. The full-workbook order is a reading
+flow, not permission to include low-value tabs.
+
 ## Focused Finance Module
 
 Use when the user explicitly asks for a focused output such as pricing, unit

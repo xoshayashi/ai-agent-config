@@ -21,6 +21,7 @@
         "_ic_memo_depth",
         "_benchmark_protocol",
         "_self_review_protocol",
+        "_sheet_quality_rubric",
         "_output_modes",
         "_layout_canonical",
         "_terminology",
@@ -69,8 +70,12 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation.",
           "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
     },
@@ -88,6 +93,7 @@
         "_scenario_sensitivity_playbook",
         "_ic_memo_depth",
         "_self_review_protocol",
+        "_sheet_quality_rubric",
         "_output_modes",
         "_layout_canonical",
         "_terminology",
@@ -121,8 +127,12 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation.",
           "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
     },
@@ -144,6 +154,7 @@
         "_layout_canonical",
         "_terminology",
         "_ib_workbook_design_system",
+        "_sheet_quality_rubric",
         "_self_review_protocol"
       ],
       "assertions": [
@@ -174,8 +185,12 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation.",
           "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
     },
@@ -199,6 +214,7 @@
         "_layout_canonical",
         "_terminology",
         "_ib_workbook_design_system",
+        "_sheet_quality_rubric",
         "_self_review_protocol"
       ],
       "assertions": [
@@ -234,8 +250,12 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation.",
           "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
     },
@@ -256,6 +276,7 @@
         "_layout_canonical",
         "_terminology",
         "_ib_workbook_design_system",
+        "_sheet_quality_rubric",
         "_self_review_protocol"
       ],
       "assertions": [
@@ -286,8 +307,12 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation.",
           "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
     },
@@ -309,6 +334,7 @@
         "_benchmark_protocol",
         "_layout_canonical",
         "_ib_workbook_design_system",
+        "_sheet_quality_rubric",
         "_self_review_protocol"
       ],
       "assertions": [
@@ -334,8 +360,12 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation.",
           "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
     },
@@ -351,6 +381,7 @@
         "_coverage_universe",
         "_assumption_decomposition_patterns",
         "_output_modes",
+        "_sheet_quality_rubric",
         "_self_review_protocol",
         "_layout_canonical",
         "_ib_workbook_design_system"
@@ -378,8 +409,12 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation.",
           "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
     },
@@ -397,6 +432,7 @@
         "_benchmark_protocol",
         "_kpi_analytics",
         "_ic_memo_depth",
+        "_sheet_quality_rubric",
         "_self_review_protocol"
       ],
       "assertions": [
@@ -422,7 +458,7 @@
         },
         {
           "id": "H2c",
-          "text": "Borders and background fills form a calm repeated design system instead of noisy isolated cell decoration; semantic rows and section headers use rectangular column-consistent spans chosen from the attached table/block, intentionally fill blank cells inside that span, and never repeat the same non-heatmap fill or heavy border pattern across consecutive rows without a structural reason",
+          "text": "Borders and background fills form a calm repeated design system instead of noisy isolated cell decoration; semantic rows and section headers use rectangular column-consistent fill and border spans chosen from the attached table/block, intentionally style blank cells inside that span, and never repeat the same non-heatmap fill or heavy border pattern, per-row gridline border, memo-cell border, or ragged populated-cell-only rule across consecutive rows without a structural reason",
           "type": "design"
         },
         {
@@ -442,8 +478,12 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation.",
           "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
     },
@@ -459,6 +499,7 @@
         "_kpi_analytics",
         "_scenario_sensitivity_playbook",
         "_output_modes",
+        "_sheet_quality_rubric",
         "_self_review_protocol",
         "_layout_canonical",
         "_ib_workbook_design_system"
@@ -486,8 +527,12 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation.",
           "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
     },
@@ -508,6 +553,7 @@
         "_output_modes",
         "_layout_canonical",
         "_ib_workbook_design_system",
+        "_sheet_quality_rubric",
         "_self_review_protocol"
       ],
       "assertions": [
@@ -528,8 +574,12 @@
         },
         {
           "id": "XLSX_DESIGN",
-          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill spans including member blank cells, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats.",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged overflow cells are available, exact row heights for approved bounded-prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation.",
           "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
     }
@@ -561,8 +611,8 @@
   "notes": [
     "The core regression is generic composition from economic kernel and driver tree.",
     "Maturity, sector, and funding context are evidence fields, not template selectors.",
-    "All xlsx outputs should preserve raw base-currency money storage, unit integrity, no merged cells, no text wrapping, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank overflow cells are available, exact line-count row heights for approved bounded-prose wrap/line-break exceptions, no frozen panes, Google-Sheets-20px hierarchy / indent columns, sparse rectangular semantic fill/border spans aligned to attached row components, direct formulas, and editable workbook structure.",
-    "Prompt guidance must force assumption epistemology, KPI interpretation, coherent scenarios, valuation method credibility, clean-base memo writing, benchmark/source hygiene, and self-inspection before completion.",
+    "All xlsx outputs should preserve raw base-currency money storage, unit integrity, no merged cells, no text wrapping, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank overflow cells are available, exact line-count row heights for approved bounded-prose wrap/line-break exceptions, no frozen panes, Google-Sheets-20px hierarchy / indent columns, sparse rectangular semantic fill/border spans aligned to attached table/block row components including blank member cells while keeping hierarchy spacer columns and memo/source/note cells borderless, direct formulas, and editable workbook structure.",
+    "Prompt guidance must force sheet-specific quality gates, assumption epistemology, KPI interpretation, coherent scenarios, valuation method credibility, clean-base memo writing, benchmark/source hygiene, and self-inspection before completion.",
     "Model creation is not completion: agents must verify both model logic and sheet design with command-based workbook checks plus rendered-output inspection, then fix and rerun until both are sufficient or a real blocker is documented.",
     "Examples, maturity cues, sectors, and modes are pattern prompts only; evals should reject fixed stage-sector-purpose routing and keyword-triggered metric packs."
   ]

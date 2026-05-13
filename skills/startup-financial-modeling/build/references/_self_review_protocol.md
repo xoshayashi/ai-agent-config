@@ -33,6 +33,19 @@ heavy process.
   investor/founder return?
 - Does the memo explain implications rather than only restating tabs?
 
+## Sheet-Level Quality
+
+- Load `_sheet_quality_rubric.md` for every xlsx build or repair and review
+  each generated sheet against its sheet-specific gate.
+- Does each sheet have a distinct purpose and ownership surface, or should it
+  be omitted/merged for a focused module?
+- Can a reviewer trace the flow from Guide/Kernel to assumptions, driver tree,
+  operating schedules, checks, output analytics, benchmarks, valuation, and IC
+  memo without hidden hardcodes or unexplained jumps?
+- Do output sheets include interpretation and decision implications, not only
+  calculations?
+- Do omitted sheets preserve dependency closure and avoid broken references?
+
 ## Source and Benchmark Hygiene
 
 - Are true sources separated from estimates, management targets, placeholders,
@@ -89,12 +102,47 @@ heavy process.
   related table/block, not a ragged set of populated cells.
 - For section headers, verify the band width matches the attached table or
   block width, not merely the one cell containing the section label.
+- Check palette restraint: ordinary calculation rows should stay white, fills
+  should map to a small set of repeated roles, and rainbow / saturated /
+  decorative alternating fills should be removed unless the range is a declared
+  heatmap or raw data table.
+- Check border span with the same positive rule as fill span. For each table,
+  header, subtotal, total, check, section, caution, and interpretation row,
+  name the attached block and verify the border runs across that block's full
+  useful column span, including blank cells inside the component. Borders that
+  stop at the last populated cell while the table continues farther right are
+  defects.
+- Confirm hierarchy / indent columns are not carrying row rules. A border span
+  should start at the row's real hierarchy-position label/data column; earlier
+  20px hierarchy spacer columns remain borderless even if the fill band spans
+  them for visual alignment.
+- Inspect data-table borders row by row. Header rules, ordinary row rules,
+  subtotal rules, grand-total rules, and check rules should share the same
+  left/right edge as the table they belong to. Only explicitly nested subtables
+  may use a narrower border span.
+- Verify unrelated overflow spacer cells and trailing canvas remain borderless.
+  The goal is aligned table/block structure, not worksheet-wide decoration.
 - Check color sparsity. The same non-heatmap background color should not appear
   across consecutive rows as a decorative block. Filled rows should mark major
   semantic moments, with borders and typography carrying the quieter rows.
 - Check border sparsity with the same eye. Prominent rules should mark table
   starts, totals, checks, section changes, and interpretation rows; repeated
   heavy rules across consecutive rows should have an explicit structural reason.
+- Check that borders are not being used as row-by-row gridlines. Ordinary body
+  rows, memo cells, source cells, note cells, and interpretation cells should
+  usually be borderless unless that exact row carries a structural break/check.
+- Check border rhythm exactly as you check color rhythm. The same prominent
+  top/bottom rule should not appear on adjacent rows unless the rows form a
+  declared table grid or nested component. If consecutive heavy borders appear,
+  name the structure they belong to; otherwise reduce the supporting row to
+  typography, spacing, comments, or whitespace.
+- Check border style semantics: normal thin for ordinary structural breaks,
+  medium for one-step-stronger section/decision boundaries, and normal dotted
+  for soft/provisional separations. If a workbook uses more weights than these,
+  ask what meaning each additional weight carries.
+- Check border color semantics: generated workbook borders should be black by
+  default. If a gray or colored border appears, verify it comes from a supplied
+  house style or remove it; color should not substitute for clean hierarchy.
 - Confirm generated plans use simple editable grids, direct formulas, raw
   base-currency money values, correct unit labels, and consistent font-color
   semantics.

@@ -76,8 +76,47 @@
   decision meaning.
 - Apply the same principle to borders: thin table rules can support ordinary
   grids, but prominent top/bottom borders should appear where structure changes
-  or a decision row needs attention. Avoid repeated heavy rules across
+  or a decision row needs attention. Choose the border span from the data table,
+  section, or row component being framed, then draw the rule across that full
+  useful width, including blank cells that belong to the component. Do not stop
+  a border merely because the next cell is empty; stop it at the edge of the
+  related table/block or comparable row span. Avoid repeated heavy rules across
   consecutive rows unless the repetition is the table structure itself.
+- Data-table border spans are table-owned, not row-owned. If a table's header
+  defines columns B:K, then body row rules, subtotal rules, total/check rules,
+  and interpretation rules that belong to that table should share the B:K edge
+  even when an individual row has values only in B:F. Only an explicitly nested
+  subtable may use a narrower declared border span.
+- Dedicated hierarchy / indent columns are not border surfaces. They may carry
+  hierarchy spacing, labels, or fills where the design needs a band, but table
+  rules start at the row's actual hierarchy-position label/data column. In the
+  default generated layout, B is a 20px hierarchy spacer, so table/header/total
+  borders start at C unless the row explicitly declares a deeper hierarchy
+  column as its label/data start. Do not drag a border through earlier spacer
+  columns merely to make the row look wider.
+- Border rhythm follows the same non-consecutive accent rule as background
+  fills. Do not put the same prominent top/bottom rule on adjacent rows merely
+  because nearby rows are important. Pick the structural row, then use font
+  weight, spacing, comments, or quiet whitespace for the rows around
+  it. Consecutive heavier borders are acceptable only when they are the declared
+  mechanism of a real table grid or nested component.
+- Borders are not default row gridlines. Most ordinary body rows and memo /
+  source / note / interpretation cells should be borderless. Add a rule before
+  a row when the row introduces, closes, checks, or materially changes a block;
+  do not add a rule simply because a row has values. Avoid any heavy border
+  pattern or ragged populated-cell-only rule that makes the workbook busier
+  without adding hierarchy.
+- Use exactly three border styles by meaning: normal thin for ordinary
+  structural breaks, one-step-thicker medium for major section/decision
+  boundaries, and normal dotted for softer provisional/supporting separations.
+  Treat them like color accents: pick the lightest style that communicates the
+  semantic difference. Border colors are black by default; do not use gray or
+  colored borders to create extra hierarchy when spacing, typography, and the
+  three approved line styles are enough.
+- Borderless blank cells are allowed only when they are outside the component:
+  trailing canvas, overflow spacer cells for no-wrap text, or unrelated blank
+  columns. Blank cells inside a semantic row or data table width receive the
+  same border as the row component.
 - Evidence status cells in period columns must use compact, controlled labels
   such as `actual`, `contracted`, `pipeline-backed`, `benchmark`,
   `management target`, `estimate`, `placeholder`, or `unknown`; keep longer
@@ -106,6 +145,10 @@ those roles.
   accents may be used when their role is explicit and repeated consistently.
   The base grid stays quiet, with structural palette roles repeated
   consistently so important accents stay immediately visible.
+- Avoid rainbow palettes, saturated fills, and decorative alternating row bands
+  in model tabs. If alternating row shading is useful for a raw data table, keep
+  it light, table-scoped, and distinct from semantic accent fills so it does not
+  compete with headers, checks, and selected outputs.
 - Alignment is semantic: source / memo text is left-aligned gray italic, units
   are right-aligned gray, period headers are centered, numeric values are
   right-aligned, and prose is never centered just because it sits in a table.
