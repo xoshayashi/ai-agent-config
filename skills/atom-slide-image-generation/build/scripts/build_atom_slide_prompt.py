@@ -306,7 +306,7 @@ def canonical_planning_block(
   pdf_export_source_lock: PDF export, when requested, references approved slides_final/ PNG masters; render_check/pdf_pages/ is disposable render QA only and not a storage location for final PNGs
   visible_text_only_lock: exact_text is the only source of visible words; lock names, field names, route/status metadata, speaker notes, and audit instructions are non-rendered
   render_contract_lock: image prompt receives drawing-relevant instructions only: canvas, visible text, layout, visual hierarchy, palette, typography, source rendering, and repair scope
-  prompt_order_lock: [draw/edit action -> canvas and brand system -> exact visible text -> fixed header/source components -> layout and reading path -> main visual/chart/table/illustration details -> optional Insight -> focused blockers]
+  prompt_order_lock: [draw/edit action -> exact visible text -> canvas and style system -> fixed header/source components -> layout and reading path -> main visual/chart/table/illustration details -> optional Insight -> focused blockers]
   positive_quality_lock: desired quality is calm editorial slide design with clear figure-ground separation, exact text, compact fixed header, one dominant structure, grouped evidence, stable line weight, restrained accent area, and a concrete visual anchor
   edit_scope_lock: repair prompt includes issue_observed, change_only, preserve, and re_check; no global restyle unless explicitly required
   revised_prompt_review_lock: revised_prompt_status checked when available; final approval still depends on actual PNG review
@@ -343,7 +343,7 @@ def canonical_planning_block(
     visual_alignment: [visible accent top aligns with the H1 glyph/title top or sits 0-6px below it; visible accent bottom lands 4-10px below subtitle lower visual edge; no upward protrusion]
     body_start_y: [exact selected value; ATOM default 180, or 218 only if explicit two-line H1 fallback is declared]
     upper_right_clear_zone: [x/y/w/h exact selected values and empty; ATOM default x=1420 y=24 w=208 h=88]
-    forbidden_header_elements: [slide number, title kicker, header badge, logo/right object unless guideline requires it, right-side header decoration, body objects above body_start_y]
+    forbidden_header_elements: [separate ATOM wordmark or brand label, slide number, title kicker, header badge, logo/right object unless the user explicitly provides it as visible exact_text, right-side header decoration, body objects above body_start_y]
   component_inventory: [master components and coordinates]
   equalized_groups: [cards, rows, phase cards, icons]
   shared_edges: [header, main structure, supporting region, insight, source alignment baseline; no visible Source separator]
@@ -385,11 +385,13 @@ def canonical_planning_block(
     upper_right_clear_zone: exact x/y/w/h copied from deck_header_master_lock and kept empty
   footer_anchor_baseline: 1672 basis x=44-56 baseline y=895-912, invisible alignment position only, planned even if source_line is none
   header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E; no Deep Blue/Honey/arbitrary gray in header or footer text
+  message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement; many slides should use no message box
   message_box_scale_lock: compact interpretation surface sized after the main content area; shorter height is welcome when it gives the body, figure, table, or diagram more useful room, while remaining legible; trim text, move detail to body/notes, or remove Insight instead of enlarging the box
   message_box_text_size_lock: message-box/Insight text default 20-24pt, 24-26pt only by exception; always at least 6pt smaller than selected H1, visually below subtitle, and never a second title
   message_box_compactness_blocker_lock: Insight/message-box surfaces that dominate the slide, behave like a banner, or compensate for layout imbalance are blockers
   message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface; plan line box, padding, and baseline so the sentence sits at the visual center
   insight_surface_placement_lock: when an Insight/message-box is kept, place it as a deliberate interpretation bridge tied to the body silhouette and footer baseline; bottom variants sit in the breathing space between body content and Source, centered to the interpreted region or full body block, with Source kept separate on its invisible baseline
+  honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed box, category badge, title underline, or decorative yellow block
   max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
   table_note_microline: none / [one text note line above source text; text only, never drawn as a horizontal rule]
   source_real_only_lock: render Source footer only for real traceable external/provided sources; if no real source exists, set source_line: none and draw no Source footer text
@@ -401,7 +403,8 @@ def canonical_planning_block(
   source_density_rule: Do not drop real source names to reduce visual density; shorten or group source names instead.
   brand_accent_usage_budget: restrained visual area; for ATOM work, Deep Blue uses standard 4-8%, may reach 10% on dense table slides, and may reach 12% only for rare chapter/closing slides; it never appears as body text
   deep_blue_usage_lock: exact #0B2F5B structural use; one active body blue system; no blue H1/subtitle/body/footer text; no extra blue hues
-  brand_accent_system_role: header band / rule / icon / number / badge / matrix highlight / none, adjusted to the embedded ATOM design system
+  brand_accent_system_role: left header accent / rule / icon / number / badge / matrix highlight / none, adjusted to the embedded ATOM design system; never a separate visible ATOM label in the header
+  visible_brand_label_blocker: do not render ATOM, a logo, or any brand word as a separate header label unless it is explicitly listed in exact_text as the H1 or body copy
   visual_asset_judgment: use illustration/icons only if they improve understanding, memory, comparison, or navigation; no quota and no filler
   visual_asset_role: integrated_line_illustration / margin_vignette / icon_evidence_strip / diagram_embedded_icons / process_icons / data_icon_markers / none
   icon_system_plan: none / [role, style, stroke, color logic, grouping, why it helps]
@@ -409,14 +412,15 @@ def canonical_planning_block(
   insight_decision:
     keep_remove: [keep/remove]
     reason: [interpretation or decision need]
-    variant: none / bottom-main / top-thesis / side-context-wide / side-context-tall / inline-pill / outlined thesis / outlined bottom / brand surface / dark brand surface / Honey surface when ATOM
+    variant: none / bottom-main / top-thesis / side-context-wide / side-context-tall / inline-pill / outlined thesis / outlined bottom / accent surface / dark accent surface / Honey bottom bar when ATOM
     deck_count_check: [single slide or deck-level count]
     geometry: [x/y/w/h in 1672 basis if kept; choose the smallest legible width tied to the interpreted region, not full-canvas width by default]
-    height: [calculated after body and footer rhythm; use the lowest comfortable height when it helps the main content area]
+    height: [calculated after body and footer rhythm; use the lowest comfortable height when it helps the main content area; bottom Insight bars target 72-96px on the 1672 basis, with 108px only for a necessary two-line sentence]
     radius: 8px or 12px
     padding: [balanced px; enough for centered text but not a tall band]
-    left_accent: [Honey uses #C49A2C 4-5px full-height left line; Deep Blue uses embedded ATOM design system accent line spec]
-    background: [flat solid fill color only; Honey message box uses #F7EECF; no pattern, texture, gradient, motif, or internal illustration]
+    honey_bar_style: [Honey bottom bar uses #F7EECF flat pale fill, #C49A2C thin 2-3px outline, optional left icon well, one #C49A2C vertical separator, #2D332E or #8A6400 text, and no dashed border]
+    left_accent: [Honey bottom bars use a thin separator after the optional icon well, not a full-height far-left stripe; Deep Blue uses embedded ATOM design system accent line spec only outside Honey]
+    background: [flat solid fill color only; Honey message box uses #F7EECF; no pattern, texture, gradient, motif, dashed outline, or internal illustration]
     text_alignment: [optically centered horizontally and vertically within the surface]
     placement_relation: [inside the 12-column grid; tied to the interpreted body region; bottom variants bridge body content and Source without touching either]
     text: [one judgment sentence if kept]
@@ -540,7 +544,7 @@ prompt_readiness: draft_scaffold_until_blocking_unresolved_items_none
 
 final_generation_prompt_payload:
 {prompt_lead}
-  canvas_and_brand: use the embedded ATOM design system, 1672x941 layout basis, 2048x1152 generated output, near-white slide base, fixed compact header, Noto Sans JP, and ATOM palette.
+  canvas_and_style: use the embedded ATOM design system, 1672x941 layout basis, 2048x1152 generated output, near-white slide base, fixed compact header, Noto Sans JP, and ATOM palette; ATOM is style metadata, not a visible header wordmark unless exact_text explicitly asks for it.
   exact_visible_text: render only the strings listed under exact_text; no lock names, field names, file paths, audit labels, route/status fields, manifests, or speaker notes.
   layout_and_reading_path: use selected layout_family, 12-column grid, fixed header/source anchors, one primary focal point, and a clear path from H1 to main structure to evidence/context to optional Insight to Source.
   visual_structure: choose the message-led chart, table, matrix, map, flow, evidence strip, or domain-matched editorial illustration that makes the argument observable.
@@ -553,7 +557,7 @@ non_rendered_workflow_qa:
 draft_image_prompt_scaffold:
   Distill the final image prompt from final_generation_prompt_payload; keep non_rendered_workflow_qa, PPTX packaging, manifests, credential blockers, contact sheets, and audit statuses outside the image prompt payload.
   Use the embedded ATOM design system in SKILL.md. Do not load an external ATOM pattern file.
-  Apply prompt_order_lock: keep the final generation prompt ordered as draw/edit action, canvas and brand system, exact visible text, fixed header/source components, layout and reading path, main visual/chart/table/illustration details, optional Insight, then focused blockers.
+  Apply prompt_order_lock: keep the final generation prompt ordered as draw/edit action, exact visible text, canvas and style system, fixed header/source components, layout and reading path, main visual/chart/table/illustration details, optional Insight, then focused blockers.
   Apply render_contract_lock: pass drawing-relevant instructions to image generation; keep PPTX packaging, file paths, manifests, credentials, contact sheets, speaker notes, and audit/status fields outside visible slide content.
   Apply visible_text_only_lock: render only exact_text strings on the slide; do not render lock names, YAML keys, route/status fields, audit labels, speaker notes, file paths, or workflow instructions.
   Apply positive_quality_lock: state the desired calm editorial slide quality before blockers: clear figure-ground separation, exact text, compact fixed header, one dominant structure, grouped evidence, stable line weight, restrained accent area, and a concrete visual anchor.
@@ -608,7 +612,7 @@ draft_image_prompt_scaffold:
   Apply max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
   Apply near_white_slide_base_lock: use #FCFBF8 as the default ATOM slide canvas, optionally #F4F3EF as only a barely visible warm light-neutral tint; the page should read closer to white than beige. Keep #DDE3EA/#D6E1EE for panels/cards only, not the full slide background.
   For ATOM work, use #FCFBF8 primary slide base and optional #F4F3EF subtle warm light-neutral tint, #2D332E text, #4D544E subtitle, #6E756E footer/source/table-note text, and #0B2F5B Deep Blue structure. Avoid darker cream/beige page backgrounds; #DDE3EA/#D6E1EE are reserved for panels/cards, not the full slide canvas.
-  H1 30-34pt weight 700 #2D332E, subtitle 21-23pt weight 400 #4D544E, body 18pt equivalent. Use the exact compact ATOM header: 1672 basis header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=40 w=10 h=120 #0B2F5B; header_line_top_rule accent top must not sit above the first visible H1 glyph/title top and should align with it or sit 0-6px below it; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.14 #2D332E; subtitle x=88 y=82 w=1332 max_lines=1 size=22pt weight=400 line_height=1.18 #4D544E; visual_alignment accent spans the H1 + subtitle block with no upward protrusion and bottom 4-10px below subtitle lower visual edge; body_start_y=180; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty. Two-line H1 fallback: vertical_line y=40 with h recalculated to end 6-10px below subtitle lower visual edge, subtitle y=118, body_start_y=218. No Deep Blue H1. No right-side header decoration, logo, badge, or body object in the header safe area.
+  H1 30-34pt weight 700 #2D332E, subtitle 21-23pt weight 400 #4D544E, body 18pt equivalent. Use the exact compact ATOM header: 1672 basis header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=40 w=10 h=120 #0B2F5B; header_line_top_rule accent top must not sit above the first visible H1 glyph/title top and should align with it or sit 0-6px below it; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.14 #2D332E; subtitle x=88 y=82 w=1332 max_lines=1 size=22pt weight=400 line_height=1.18 #4D544E; visual_alignment accent spans the H1 + subtitle block with no upward protrusion and bottom 4-10px below subtitle lower visual edge; body_start_y=180; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty. Two-line H1 fallback: vertical_line y=40 with h recalculated to end 6-10px below subtitle lower visual edge, subtitle y=118, body_start_y=218. No separate ATOM wordmark, logo, kicker, or badge. No Deep Blue H1. No right-side header decoration or body object in the header safe area.
   Lock header and footer text colors as one Ink-family hierarchy: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E. Do not use Deep Blue, Honey, yellow, or arbitrary gray for header/footer text.
   Apply header_integrity_blocker_lock: malformed, missing, oversized, recolored, right-decorated, or intruded headers are blockers; repair header identity before any other visual polish.
   Let structure, numbers, rules, spacing, and typography carry the hierarchy.
@@ -629,9 +633,9 @@ draft_image_prompt_scaffold:
   Keep visual subject selection open and message-led; use the subject that makes the argument most observable through scale, interaction, place, evidence, or operating context.
   Create freshness through viewpoint, asymmetric composition, designed margin vignettes, evidence strips, partial cutaways, and magnified details, not decoration or glossy concept art.
   Use Deep Blue structurally with a 4-8% visual area budget, up to 12% only for strong closing slides, and never for body text.
-  Use Honey only for ATOM or compatible guidelines where it is a decision signal: #F7EECF flat pale Honey fill, #C49A2C 4-5px full-height left accent line, #2D332E text, one component maximum.
+  Use Honey only for ATOM or compatible guidelines where it is a decision signal, preferably as a bottom Insight bar: #F7EECF flat pale Honey fill, #C49A2C thin 2-3px outline, optional left icon well, one #C49A2C vertical separator, #2D332E or #8A6400 text, one component maximum. Honey is not a main content card, missing-body placeholder, dashed outline, category badge, title underline, or decorative yellow block.
   Use flat solid fills for all message boxes and Insight surfaces; do not add patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations inside the box.
-  Apply message_box_scale_lock: message boxes are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered. Keep copy to one short judgment sentence, prefer one line, max two lines, and do not enlarge the surface to rescue long prose.
+  Apply message_box_scale_lock: message boxes are compact interpretation surfaces sized after the main content area, not display surfaces. A lower, quieter height is welcome when it gives the body, figure, table, or diagram more useful room while the sentence remains legible and optically centered. For bottom Insight bars, target 72-96px height on the 1672 basis and allow up to 108px only for a necessary two-line sentence. Keep copy to one short judgment sentence, prefer one line, max two lines, and do not enlarge the surface to rescue long prose.
   Apply message_box_text_size_lock: message-box/Insight text defaults to 20-24pt, uses 24-26pt only by exception, stays at least 6pt smaller than the selected H1, remains visually below the subtitle, and never becomes a second title or second hero headline.
   Apply message_box_compactness_blocker_lock: an Insight/message-box that dominates the slide, becomes a banner, spans more than the interpreted region needs, grows tall to carry prose, or compensates for layout imbalance is a blocker. Prefer a lower, quieter box that returns space to the body, figure, table, or diagram; repair by shortening the sentence, narrowing the surface, moving detail into the body/notes, or removing the component.
   Apply message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface; use balanced padding and line-box placement so the sentence reads intentional, not baseline-drifted.
@@ -666,7 +670,7 @@ post_generation_audit:
   - credential_setup_blocker is honored: no account credential, local token, SDK setup, or environment-variable workflow was attempted before generation
   - image_size {size} is valid for gpt-image-2, labeled as {size_label(size)}, and final delivery is resized only after generation if needed
   - default_2k_generation_lock is honored: generated slide PNGs use 2048x1152 unless the user explicitly requested another valid 16:9 size
-  - prompt_order_lock is fulfilled: the prompt led with draw/edit action, canvas/brand, exact visible text, fixed components, layout/reading path, visual details, optional Insight, then focused blockers
+  - prompt_order_lock is fulfilled: the prompt led with draw/edit action, exact visible text, canvas/style, fixed components, layout/reading path, visual details, optional Insight, then focused blockers
   - render_contract_lock is fulfilled: operational metadata stayed out of visible slide content
   - visible_text_only_lock is fulfilled: only exact_text strings appear on the slide
   - positive_quality_lock is fulfilled: blockers did not replace the positive composition target
@@ -715,7 +719,9 @@ post_generation_audit:
   - message_box_compactness_blocker_lock is clear: no Insight/message-box dominates the slide, behaves like a banner, grows tall for prose, or compensates for layout imbalance
   - message_box_text_alignment_lock is honored: Insight/message-box text is optically centered horizontally and vertically inside the surface
   - insight_surface_placement_lock is honored: kept Insight/message-box surfaces bridge the interpreted body region and footer rhythm without competing with either
-  - Honey message boxes use #F7EECF fill, #C49A2C 4-5px left accent line, and #2D332E text consistently
+  - visible_brand_label_blocker passes: no separate ATOM wordmark, logo, title kicker, or brand label appears in the header unless exact_text explicitly requested it
+  - Honey message boxes use #F7EECF fill, #C49A2C thin outline/separator, optional left icon well, and #2D332E or #8A6400 text consistently
+  - Honey is absent from main content cards, missing-body placeholders, dashed boxes, category badges, title underlines, and decorative yellow blocks
   - saturated yellow, dark yellow, or large yellow areas are absent
   - coordinate_inventory_1672 matches visible major objects
   - all major regions snap to grid/shared edges
@@ -812,6 +818,8 @@ def deck_plan_tail() -> str:
         density_tier:
         signature_visual_plan:
         insight_decision:
+        message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement; many slides should use no message box
+        honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed box, category badge, title underline, or decorative yellow block
         output_artifact_mastering_lock: slides_final/ is the only loose-PNG master; package and render-check folders hold only derivative artifacts
         single_final_png_master_lock: review manifests and package mappings reference the slides_final/ master path
         no_duplicate_png_output_lock: no duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/
@@ -879,6 +887,7 @@ def deck_plan_tail() -> str:
   - header_left_accent_no_protrusion_rule:
   - header_left_accent_top_protrusion_blocker:
   - header_integrity_blocker_lock:
+  - visible_brand_label_blocker: no separate ATOM wordmark, logo, title kicker, badge, or brand label in the header unless exact_text explicitly requests it
   - deep_blue_usage_lock:
   - visual_asset_judgment:
   - visual_richness_mix_plan:
@@ -888,6 +897,9 @@ def deck_plan_tail() -> str:
   - structure_choice_status:
   - density_design_plan:
   - insight_count_plan:
+  - message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement; many slides should use no message box
+  - honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed box, category badge, title underline, or decorative yellow block
+  - message_box_scale_lock: bottom Insight bars target 72-96px on the 1672 basis, with 108px only for a necessary two-line sentence
   - message_box_compactness_blocker_lock:
   - source_collection_needs:
   - speaker_notes_plan:
@@ -1072,6 +1084,9 @@ def text_structure_tail() -> str:
       illustration_consistency_status:
       deep_blue_usage_lock:
       header_footer_text_color_lock:
+      visible_brand_label_blocker: no separate ATOM wordmark, logo, title kicker, badge, or brand label in the header unless exact_text explicitly requests it
+      message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement; many slides should use no message box
+      honey_bottom_bar_lock: Honey is a quiet optional bottom Insight bar treatment, not a main content card, missing-body placeholder, dashed box, category badge, title underline, or decorative yellow block
       message_box_scale_lock:
       message_box_text_size_lock:
       message_box_compactness_blocker_lock:
