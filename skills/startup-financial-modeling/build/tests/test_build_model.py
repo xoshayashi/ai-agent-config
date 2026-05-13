@@ -731,12 +731,23 @@ def test_skill_guidance_makes_no_wrap_rule_explicit() -> None:
 def test_skill_guidance_requires_fix_and_rerun_iteration() -> None:
     skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
     self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+    eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
     skill_flat = " ".join(skill_text.split())
     self_review_flat = " ".join(self_review_text.split())
+    eval_flat = " ".join(eval_text.split())
 
     assert "fix the concrete failed items and rerun the same checks" in skill_flat
+    assert "Do not treat model construction as completion" in skill_flat
+    assert "command checks and rendered-output inspection for both finance logic and sheet design" in skill_flat
+    assert "Keep iterating until the model logic and the visible sheet design are both sufficient" in skill_flat
+    assert "command-based workbook checks and rendered-output inspection" in self_review_flat
+    assert "Apply both to the finance model itself and to sheet design" in self_review_flat
+    assert "Passing commands do not excuse a visibly poor sheet" in self_review_flat
+    assert "a good-looking render does not excuse broken formulas" in self_review_flat
     assert "fix the concrete failed item, rerun the same check" in self_review_flat
     assert "Do not replace failed verification with a narrative explanation" in self_review_flat
+    assert "Model creation is not completion" in eval_flat
+    assert "verify both model logic and sheet design with command-based workbook checks plus rendered-output inspection" in eval_flat
 
 
 def test_skill_guidance_uses_meaningful_sparse_fills_and_borders() -> None:

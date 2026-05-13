@@ -69,8 +69,13 @@ surfaces interpret the model and connect evidence to next actions. Write memos
 from a clean base rather than preserving legacy layout compatibility; include
 only the necessary and sufficient supplemental context for the current decision.
 
-Before completion, recalculate or open/render the xlsx when practical and follow
-`_self_review_protocol.md`. If tests, workbook inspection, render checks, or
-artifact self-review find failures, fix the concrete failed items and rerun the
-same checks. Do not close out while known test or inspection failures remain
-unless a blocker is explicitly documented.
+Do not treat model construction as completion. Before closeout, run command
+checks and rendered-output inspection for both finance logic and sheet design:
+formulas, reconciliation, unit/scale integrity, source status, styles, layout,
+fonts, fills, borders, print/canvas bounds, and visible readability. Render or
+open the xlsx/PDF/screenshot whenever tooling is available; if rendering is
+blocked, document the blocker and still run workbook inspection commands.
+Follow `_self_review_protocol.md`. If tests, workbook inspection, render
+checks, or artifact self-review find failures, fix the concrete failed items
+and rerun the same checks. Keep iterating until the model logic and the visible
+sheet design are both sufficient, or a real blocker is explicitly documented.

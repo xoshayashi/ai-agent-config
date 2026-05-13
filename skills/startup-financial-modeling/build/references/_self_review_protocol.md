@@ -44,6 +44,9 @@ heavy process.
 
 ## Visual and Editability Inspection
 
+- Model generation is not the finish line. Closeout requires two independent
+  verification surfaces: command-based workbook checks and rendered-output
+  inspection. Apply both to the finance model itself and to sheet design.
 - For generated or repaired xlsx files, always run an inspection pass before
   closeout. At minimum, inspect the workbook with openpyxl/XML checks for
   widths, fonts, wraps, merged cells, frozen panes, row heights, blank-cell
@@ -90,12 +93,27 @@ heavy process.
   base-currency money values, correct unit labels, and consistent font-color
   semantics.
 
+## Command Checks
+
+- Run the narrowest available command checks that prove model quality:
+  formula/link integrity, reconciliations, balance/cash/ownership checks,
+  unit and display-scale consistency, source/benchmark hygiene, no workbook
+  names unless explicitly required, and mode-specific dependency closure.
+- Run the workbook-design checks that prove visible sheet quality:
+  canonical fonts, no wrap/freeze/merge/native indent, Google-Sheets-20px
+  hierarchy columns, row heights, semantic fill spans, sparse colors/borders,
+  blank-cell style cleanup, print areas, chart anchors, and rendered bounds.
+- Treat command output and rendered screenshots/PDFs as complementary evidence.
+  Passing commands do not excuse a visibly poor sheet; a good-looking render
+  does not excuse broken formulas, units, sources, or reconciliations.
+
 ## Closeout
 
-If any test, workbook inspection, render check, or checklist item fails, treat
-that finding as work still in progress: fix the concrete failed item, rerun the
-same check, and repeat until the check passes or a real blocker is documented.
-Do not replace failed verification with a narrative explanation.
+If any test, command check, workbook inspection, render check, or checklist
+item fails, treat that finding as work still in progress: fix the concrete
+failed item, rerun the same check, and repeat until both the model logic and
+the visible sheet design pass or a real blocker is documented. Do not replace
+failed verification with a narrative explanation.
 
 In the final response, state what was built, what was verified, and which
 assumptions, placeholders, or source gaps remain. Do not present a weak-source
