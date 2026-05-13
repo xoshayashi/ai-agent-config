@@ -27,7 +27,9 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Apply `layout_rotation_guard` during deck review so the sequence feels intentionally edited around the argument instead of locked to one repeated width habit.
 - Apply `density_lift_lock`: raise useful information density during both slide-structure planning and slide-image prompting. Useful density means more decision-relevant comparison, evidence, units, assumptions, annotations, and source cues with one clear reading path.
 - Apply `sentence_density_lift_lock`: raise density one step with compact meaningful clauses or short sentences in body labels, rows, annotations, and optional Insight. The reader should learn relationships, reasons, consequences, or decision relevance from the slide itself, not only from icons and noun labels.
+- Apply `semantic_copy_gate`: major body labels must use meaningful clauses/sentences; noun-only labels are allowed only for headers, axes, legends, or category names.
 - Apply `icon_restraint_lock`: icons are sparse wayfinding or evidence markers. Avoid icon-and-keyword-only slides, generic icon grids, icon wallpaper, or repeated icons that replace clearer sentences, tables, causal chains, or labeled diagrams.
+- Apply `icon_density_budget`: default to 0-3 purposeful icons per slide and keep icon count below semantic text units unless the visual logic clearly demands otherwise.
 - Apply `impact_clarity_density_gate`: every slide should earn attention quickly, explain itself without narration, stay visually simple, and still carry enough decision-relevant evidence. If a slide feels flat, vague, thin, or cluttered, repair the message, evidence, and dominant structure before image prompting.
 - Apply `message_sharpness_lock`: rewrite each action title until it contains a clear actor/topic, change/tension, and implication. Avoid generic topic labels, vague positive claims, and slogans that do not say what changed or why it matters.
 - Apply `evidence_compression_ladder`: compress evidence into the smallest structure that still proves the message: one sharp number, ranked comparison, before/after delta, driver tree, causal chain, 2x2, mini table, or evidence strip. Use speaker notes or appendix candidates for detail that does not change the slide decision.
@@ -152,10 +154,11 @@ Use this reference when the input is a long memo, strategy narrative, research n
 6. **Density And Split Gate**
    - Assign `density_tier`: `T1_sparse`, `T2_balanced`, `T3_dense`, or `T4_appendix_dense`.
    - Run `impact_clarity_density_gate` before image prompting: the slide must have one unmistakable takeaway, one dominant visual structure, a useful evidence layer, and a simple reading path. Repair any slide that feels low-impact, hard to understand, over-simplified to emptiness, or dense without hierarchy.
-   - Define `reader_mode`, `decision_question`, `information_units`, `semantic_sentence_layer`, `icon_restraint_plan`, `density_levers`, and `overload_controls`.
+   - Define `reader_mode`, `decision_question`, `information_units`, `semantic_sentence_layer`, `semantic_copy_gate`, `icon_restraint_plan`, `icon_density_budget`, `density_levers`, and `overload_controls`.
    - Use `density_lift_lock` to add one or two useful evidence layers before image prompting when a slide feels too empty for the decision question.
    - Use `sentence_density_lift_lock` to replace noun-only labels with compact explanatory clauses/sentences where the reader needs meaning.
-   - Use `icon_restraint_lock` to remove decorative or redundant icons before adding any new ones.
+   - Use `semantic_copy_gate` to rewrite `exact_text.body_labels` before freezing copy; do not rely on image generation to invent explanatory text.
+   - Use `icon_restraint_lock` and `icon_density_budget` to remove decorative or redundant icons before adding any new ones.
    - Use `evidence_compression_ladder` to choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation.
    - Use `structure_choice_bias` and `structured_density_bias` to add issue-tree, driver-tree, matrix, value-chain, KPI-bridge, or decision-table structure only when it improves the reader's decision path.
    - Use `structure_first_visual_mix` to choose a chart, table, matrix, flow, map, comparison axis, or evidence strip when that structure gives the reader a clearer path than a standalone illustration.
@@ -293,7 +296,9 @@ density_design:
   decision_question:
   information_units:
   semantic_sentence_layer:
+  semantic_copy_gate:
   icon_restraint_plan:
+  icon_density_budget:
   density_levers:
   overload_controls:
 information_unit_budget:
@@ -355,7 +360,9 @@ illustration_consistency_status:
 structure_choice_bias:
 structured_density_bias:
 sentence_density_lift_lock:
+semantic_copy_gate:
 icon_restraint_lock:
+icon_density_budget:
 structure_choice_status:
 post_generation_design_balance_check:
 whitespace_occupancy_balance_status:
