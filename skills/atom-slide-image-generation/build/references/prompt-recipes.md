@@ -136,7 +136,9 @@ header_footer_text_color_lock:
   subtitle: "#4D544E"
   footer_source_table_note: "#6E756E"
   forbidden_text_colors: Deep Blue, Honey, yellow, arbitrary gray
-message_box_scale_lock: compact interpretation surface sized after the main content area; lower height is welcome when it gives the body, figure, table, or diagram more useful room
+visible_brand_label_blocker: no separate ATOM wordmark, logo, title kicker, badge, or brand label in the header unless exact_text explicitly requests it
+message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement
+message_box_scale_lock: compact interpretation surface sized after the main content area; lower height is welcome when it gives the body, figure, table, or diagram more useful room; bottom bars target 72-96px on the 1672 basis
 message_box_text_size_lock:
 message_box_compactness_blocker_lock:
 message_box_text_alignment_lock:
@@ -281,13 +283,13 @@ ATOM slide contract:
 - keep the slide in a strategy operating-deck look: useful occupancy, small explanatory visuals, crisp rules, low-contrast surfaces, and no ornamental depth
 - let structure, spacing, rules, numbers, and typography carry hierarchy
 - use the embedded ATOM design system's accent color structurally with a restrained area budget; for ATOM work, Deep Blue uses a standard 4-8% area budget, may reach 10% on dense table slides, and may reach 12% only for rare chapter/closing slides; it never appears as body text
-- use Insight component only if it adds interpretation or decision weight and is compatible with the embedded ATOM design system
-- if Honey is used in ATOM or compatible guidelines, use #F7EECF flat pale fill + #C49A2C 4-5px full-height left accent line + #2D332E text, one component maximum
-- keep all Insight/message boxes flat solid fill only; no patterns, textures, gradients, motifs, icon wallpaper, or internal illustrations
+- use Insight component only if it adds interpretation or decision weight and is compatible with the embedded ATOM design system; many slides should use no message box
+- if Honey is used in ATOM or compatible guidelines, use it preferably as a bottom Insight bar with #F7EECF flat pale fill, #C49A2C thin 2-3px outline/separator, optional left icon well, #2D332E text, one component maximum
+- keep all Insight/message boxes flat solid fill only; no patterns, textures, gradients, motifs, icon wallpaper, dashed outlines, or internal illustrations
 - apply content_area_priority_lock before sizing an Insight/message-box: give the body, figure, table, or diagram the needed height first, then use the remaining calculated space for the optional box
-- apply message_box_scale_lock: keep Insight/message boxes compact, one short judgment sentence, one line preferred and two lines maximum; move detail to notes instead of growing the surface
+- apply message_box_scale_lock: keep Insight/message boxes compact, one short judgment sentence, one line preferred and two lines maximum; bottom bars target 72-96px on the 1672 basis; move detail to notes instead of growing the surface
 - keep Insight/message-box text 20-24pt by default, 24-26pt only by exception, at least 6pt smaller than H1, visually below subtitle; it must not become a second title or second hero headline
-- keep Honey quiet: no saturated yellow fill, no dark yellow message box, no large yellow area, and no Honey color variation across a deck
+- keep Honey quiet: no saturated yellow fill, no dark yellow message box, no large yellow area, no dashed Honey card, no Honey placeholder region, no Honey title underline, and no Honey color variation across a deck
 - Source: render only real traceable source names; when no real source exists, use source_line: none and do not show a Source footer. Never use brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, working assumptions, or other placeholder provenance as Source text.
 - Output files: keep `slides_final/` as the only loose-PNG master. Do not duplicate approved generated PNGs into `slides_package/` or `render_check/pdf_pages/`; package and render-check artifacts must reference the `slides_final/` master. PDF creation also references `slides_final/` masters directly.
 - Keep only one retained contact sheet by default: `render_check/contact_sheet_review.png`. Use one comparison contact sheet or a render diff JSON only when delivery/render QA needs it.
@@ -487,13 +489,13 @@ Evaluate:
 - Can the component stay as one short judgment sentence, preferably one line and never more than two?
 - Is the component text smaller than the selected H1 by at least 6pt and visually below subtitle?
 - Is the deck underusing or overusing Insight components?
-- Which choice is quietest and clearest under the embedded ATOM design system: none, outlined thesis, outlined bottom, brand surface, dark brand surface, or Honey surface when ATOM?
+- Which choice is quietest and clearest under the embedded ATOM design system: none, outlined thesis, outlined bottom, accent surface, dark accent surface, or Honey bottom bar when ATOM?
 - If Honey is chosen, does it help the reader decide faster?
-- Does the Honey component use the fixed pale treatment (#F7EECF fill, #C49A2C 4-5px left line, #2D332E text)?
+- Does the Honey component use the fixed bottom-bar treatment (#F7EECF fill, #C49A2C 2-3px outline/separator, optional left icon well, #2D332E text)?
 
 Output:
 - keep/remove
-- variant: bottom-main / top-thesis / side-context-wide / side-context-tall / inline-pill / outlined thesis / outlined bottom / brand surface / dark brand surface / Honey surface when ATOM
+- variant: bottom-main / top-thesis / side-context-wide / side-context-tall / inline-pill / outlined thesis / outlined bottom / accent surface / dark accent surface / Honey bottom bar when ATOM
 - reason
 - deck_count_check
 - one-sentence component text if kept
@@ -538,6 +540,7 @@ Guideline/Brand:
 - Embedded ATOM palette and type hierarchy are followed
 - Header/footer text color lock is followed: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E
 - near_white_slide_base_lock is followed: the slide canvas reads as #FCFBF8 / very near white, with #F4F3EF only as a subtle tint and no darker cream/beige page background
+- visible_brand_label_blocker passes: no separate ATOM wordmark, logo, title kicker, or brand label appears in the header unless exact_text explicitly requested it
 - Deep Blue and Honey are absent from header/footer text
 - ATOM Honey is not decorative when used; it is a quiet pale signal, never a strong yellow block
 - Primary accent is structural and not body text; for ATOM work, Deep Blue has a standard 4-8% area budget, may reach 10% on dense table slides, and may reach 12% only for rare chapter/closing slides
