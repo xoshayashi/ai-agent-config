@@ -66,6 +66,9 @@ heavy process.
   match the column width of related rows. Treat that as good alignment when it
   is role-based and bounded; only trailing canvas or unrelated blank fills are
   defects.
+- For every filled row, name its role and inspect the start column, end column,
+  and adjacent rows. The fill should be one rectangular span aligned to the
+  related table/block, not a ragged set of populated cells.
 - For section headers, verify the band width matches the attached table or
   block width, not merely the one cell containing the section label.
 - Check color sparsity. The same non-heatmap background color should not appear

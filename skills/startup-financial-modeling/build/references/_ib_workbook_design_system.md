@@ -60,31 +60,42 @@ Color should help a reviewer understand the workbook faster:
 | External links | Red font |
 | Sources / notes / units | Gray, with sources and notes in italic |
 | Table headers | Light blue fill with dark text |
-| Section labels | Navy text or navy rule, compact and repeated |
+| Section labels | Navy band across the attached table/block width, compact and repeated |
 | Totals / checks / selected outputs | Pale blue or pale yellow fill on the selected semantic row |
 | Caution / placeholder | Pale yellow for a small number of decision-critical cells |
 
-The base grid stays white. Filled backgrounds form a coherent row, header,
-total, check, or interpretation component. A sheet normally has only a few
-highlighted rows, so the important rows are easy to find.
+The base grid stays white. Background fills are selective accents for major
+semantic moments only: section band, table header, selected output/check,
+caution/placeholder, or deliberate heatmap. A filled row should feel like an
+event in the sheet.
 
-Use fill span as a positive layout tool. For a header, selected output, check,
-caution, or interpretation row, the background may intentionally continue
-through empty cells so its width matches neighboring components. This is not
-noise when it is aligned, repeated, and role-based; it gives the reviewer a
-stable visual rhythm.
+Fill span rules:
 
-Section headers follow the same component logic: extend the section band to the
-column count of the table or block it introduces. A compact label at the left
-can sit inside a wider band that quietly establishes the table width.
+- Use one rectangular span per filled row component: same start column, same end
+  column, no gaps.
+- Choose the end column from the attached table, matrix, interpretation block,
+  or comparable row width. Do not choose the end column only from cells that
+  happen to contain text.
+- Fill blank cells inside that span when they complete the row component. A
+  blank cell can belong to the section/header/check band even though it has no
+  value.
+- Keep trailing canvas, overflow spacer cells outside the component, and
+  unrelated blank columns unfilled.
+- Section headers inherit the width of the table/block they introduce. If the
+  following table spans B:K, the section band spans B:K even when only B has
+  the label.
+- Table headers and selected output/check rows align their fill width to the
+  same table or model block so the reviewer sees a clean vertical edge.
+- Do not repeat the same non-heatmap background fill on adjacent rows. If two
+  nearby rows feel important, fill the single decision row and use font weight,
+  borders, spacing, or comments for the supporting row.
+- Do not create decorative color blocks. Several consecutive rows with the same
+  fill are acceptable only for true heatmaps or an intentionally defined table
+  component with a different visual mechanism.
 
-Color coding must stay sparse and meaningful. Do not use the same background
-fill on multiple consecutive rows as a block of decoration. Repeated adjacent
-fills flatten hierarchy and make the model harder to scan. Use background color
-for large semantic moments only: one table header row, one section band, one
-selected output/check row, one caution row, or a deliberate heatmap. If several
-nearby rows all feel important, choose the single decision row to fill and use
-borders, font weight, or spacing for the supporting rows.
+Generated xlsx builders should use the semantic fill helper in `ib_format.py`
+for row components. Hand-painting isolated cells is a smell unless the row has
+a documented table/block span.
 
 ## Borders And Spacing
 

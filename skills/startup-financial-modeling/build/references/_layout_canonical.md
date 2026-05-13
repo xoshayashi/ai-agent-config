@@ -52,6 +52,9 @@
   columns as comparable rows even where some cells have no text. This keeps the
   row visually aligned and intentional; absence of text alone is not a reason
   to stop the fill.
+- Filled row components must be rectangular and column-consistent: decide the
+  span from the table/block being introduced or evaluated, then fill every cell
+  in that span. Avoid ragged fills whose start/end columns change row by row.
 - Section headers should usually carry their band across the full width of the
   table they introduce. If the following table spans six columns, the section
   band spans those six useful columns too, even when only the leftmost section
