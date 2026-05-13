@@ -476,9 +476,9 @@ Process:
 13. Mark restrained illustration candidates where the idea becomes more memorable or fresh without becoming a rough sketch or glossy hero illustration.
 14. Flag slides that should split because density would force body below 18pt equivalent or create competing major regions.
 15. Define source policy per slide: none / real source list.
-15. Define deck-level master refs: header, invisible footer alignment baseline, Insight surface skeleton, table/card masters, icon circle sizes.
-16. Draft speaker_notes_text for every slide before generation. Each note should support presentation delivery, not duplicate all visible text: use speaker_notes_depth_lock with a substantial Japanese talk script, key evidence or assumptions to mention, source caveat if needed, implication, and transition to the next slide.
-17. Run Guideline/Brand, Header Master, Layout, Typography, Visual Richness, Density, Content, and Deck gates.
+16. Define deck-level master refs: header, invisible footer alignment baseline, Insight surface skeleton, table/card masters, icon circle sizes.
+17. Draft speaker_notes_text for every slide before generation. Each note should support presentation delivery, not duplicate all visible text: use speaker_notes_depth_lock with a substantial Japanese talk script, key evidence or assumptions to mention, source caveat if needed, implication, and transition to the next slide.
+18. Run Guideline/Brand, Header Master, Layout, Typography, Visual Richness, Density, Content, and Deck gates.
 ```
 
 ## Screenshot Or Render Repair Prompt
