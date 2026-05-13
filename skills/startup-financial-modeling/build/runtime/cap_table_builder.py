@@ -30,7 +30,7 @@ from dataclasses import dataclass, field
 from typing import Literal
 
 from openpyxl import Workbook
-from openpyxl.styles import PatternFill
+from openpyxl.styles import Alignment, PatternFill
 from openpyxl.utils import get_column_letter
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -1236,12 +1236,16 @@ def build_cap_table_sheet(
     """
     if CAP_TABLE_SHEET_NAME in wb.sheetnames:
         ws = wb[CAP_TABLE_SHEET_NAME]
+        for merged_range in list(ws.merged_cells.ranges):
+            ws.unmerge_cells(str(merged_range))
         # Clear existing content
         for row in ws.iter_rows():
             for cell in row:
                 cell.value = None
                 cell.font = ib.FONT_BODY
                 cell.fill = PatternFill(fill_type="none")
+                cell.alignment = Alignment(wrap_text=False, indent=0)
+        ws.freeze_panes = None
     else:
         ws = wb.create_sheet(CAP_TABLE_SHEET_NAME)
 
@@ -1494,7 +1498,127 @@ def build_cap_table_sheet(
             ib.apply_comment(ws.cell(row=r, column=7))
             r += 1
 
+    ws.insert_cols(2)
+    ws.column_dimensions["A"].width = ib.COL_MARGIN_WIDTH
+    ws.column_dimensions["B"].width = ib.COL_HIERARCHY_WIDTH
+    ws.column_dimensions["C"].width = ib.COL_LABEL_WIDTH
+    ws.column_dimensions["D"].width = ib.COL_WIDTH_LARGE
+    ws.column_dimensions["E"].width = ib.COL_WIDTH_BASE
+    ws.column_dimensions["F"].width = ib.COL_WIDTH_BASE
+    ws.column_dimensions["G"].width = ib.COL_SOURCE_WIDTH
+    for col in "HI":
+        ws.column_dimensions[col].width = ib.COL_WIDTH_BASE
+    ws.freeze_panes = None
+    for row in ws.iter_rows():
+        for cell in row:
+            if isinstance(cell.value, str):
+                cell.value = cell.value.lstrip()
+            base = cell.alignment
+            cell.alignment = Alignment(
+                horizontal=base.horizontal,
+                vertical=base.vertical,
+                text_rotation=base.text_rotation,
+                wrap_text=False,
+                shrink_to_fit=base.shrink_to_fit,
+                indent=0,
+                relativeIndent=base.relativeIndent,
+                justifyLastLine=base.justifyLastLine,
+                readingOrder=base.readingOrder,
+            )
+
+    # Optional round/waterfall sections are styled only when their shifted
+    # content label exists in column C after the hierarchy column is inserted.
+    section_rows = [
+        row for row in (5, 25, 50, 70) if ws.cell(row=row, column=3).value
+    ]
+    header_rows = [
+        row
+        for row in (7, 52, 72)
+        if any(ws.cell(row=row, column=col).value for col in range(3, 10))
+    ]
+    for row in section_rows:
+        ib.apply_semantic_fill_span(
+            ws,
+            row,
+            2,
+            min(9, max(7, ws.max_column)),
+            ib.BG_HEADER_BAND,
+            bottom=ib.THIN_LINE,
+        )
+        for col in range(2, min(9, max(7, ws.max_column)) + 1):
+            cell = ws.cell(row=row, column=col)
+            cell.font = ib.FONT_COVER_TITLE
+            base = cell.alignment
+            cell.alignment = Alignment(
+                horizontal="left",
+                vertical="center",
+                text_rotation=base.text_rotation,
+                wrap_text=False,
+                shrink_to_fit=base.shrink_to_fit,
+                indent=0,
+                relativeIndent=base.relativeIndent,
+                justifyLastLine=base.justifyLastLine,
+                readingOrder=base.readingOrder,
+            )
+        ws.row_dimensions[row].height = ib.ROW_HEIGHT_RELAXED
+    for row in header_rows:
+        end_col = max(col for col in range(3, 10) if ws.cell(row=row, column=col).value)
+        ib.apply_semantic_fill_span(
+            ws, row, 2, end_col, ib.BG_TABLE_HEADER, bottom=ib.THIN_LINE
+        )
+        for col in range(2, end_col + 1):
+            cell = ws.cell(row=row, column=col)
+            cell.font = ib.FONT_BODY_BOLD
+            cell.alignment = Alignment(
+                horizontal="left" if col <= 4 or isinstance(cell.value, str) else "right",
+                vertical="center",
+                wrap_text=False,
+                indent=0,
+            )
+        ws.row_dimensions[row].height = ib.ROW_HEIGHT_BASE
+    for row in range(1, ws.max_row + 1):
+        if ws.row_dimensions[row].height is None:
+            ws.row_dimensions[row].height = ib.ROW_HEIGHT_BASE
+        for col in range(2, ws.max_column + 1):
+            cell = ws.cell(row=row, column=col)
+            if cell.value in (None, ""):
+                continue
+            if cell.row not in section_rows and cell.row not in header_rows:
+                cell.border = ib.BORDER_BOTTOM_THIN
+            if isinstance(cell.value, (int, float)) or (
+                isinstance(cell.value, str) and cell.value.startswith("=")
+            ):
+                cell.alignment = Alignment(
+                    horizontal="right", vertical="center", wrap_text=False, indent=0
+                )
+            elif cell.alignment.horizontal is None:
+                cell.alignment = Alignment(
+                    horizontal="left", vertical="center", wrap_text=False, indent=0
+                )
+
     ib.set_tab_color(ws, "memo")
+    ib.normalize_workbook_fonts(wb)
+    ib.set_workbook_default_font(wb)
+    ib.clear_blank_cell_styles(wb)
+    ib.trim_blank_canvas(wb)
+    ib.setup_print_layout(
+        ws,
+        orientation="landscape",
+        fit_to_width=1,
+        print_title_rows="1:3",
+        print_title_cols="A:C",
+        footer_right="&P / &N",
+    )
+    if len(wb.worksheets) > 1:
+        for candidate in list(wb.worksheets):
+            if candidate is ws:
+                continue
+            if (
+                candidate.title == "Sheet"
+                and ib.last_value_bounds(candidate) == (1, 1)
+                and candidate["A1"].value is None
+            ):
+                wb.remove(candidate)
     return ws
 
 

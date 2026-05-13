@@ -9,12 +9,15 @@ from __future__ import annotations
 import sys
 import tempfile
 import re
+import json
+import shutil
+import subprocess
 from pathlib import Path
 from types import SimpleNamespace
 
 from openpyxl import Workbook
 from openpyxl import load_workbook
-from openpyxl.styles import PatternFill
+from openpyxl.styles import Alignment, PatternFill
 from openpyxl.utils import range_boundaries
 
 SKILL_DIR = Path(__file__).resolve().parents[2]
@@ -166,15 +169,15 @@ def test_generated_workbook_contains_interpretive_analysis_surfaces() -> None:
         build_model.build_model(None, out, mode="full")
         wb = load_workbook(out, data_only=False)
 
-        assert wb["KPI"].cell(_row_for_label(wb, "KPI", "KPI interpretation register"), 2).value == "KPI interpretation register"
-        assert wb["Scenarios"].cell(_row_for_label(wb, "Scenarios", "Scenario interpretation"), 2).value == "Scenario interpretation"
-        assert wb["Sensitivity"].cell(_row_for_label(wb, "Sensitivity", "Sensitivity rationale"), 2).value == "Sensitivity rationale"
-        assert wb["Valuation"].cell(_row_for_label(wb, "Valuation", "Method credibility"), 2).value == "Method credibility"
+        assert wb["KPI"].cell(_row_for_label(wb, "KPI", "KPI interpretation register"), source_plan.LAYOUT.first_hierarchy_col).value == "KPI interpretation register"
+        assert wb["Scenarios"].cell(_row_for_label(wb, "Scenarios", "Scenario interpretation"), source_plan.LAYOUT.first_hierarchy_col).value == "Scenario interpretation"
+        assert wb["Sensitivity"].cell(_row_for_label(wb, "Sensitivity", "Sensitivity rationale"), source_plan.LAYOUT.first_hierarchy_col).value == "Sensitivity rationale"
+        assert wb["Valuation"].cell(_row_for_label(wb, "Valuation", "Method credibility"), source_plan.LAYOUT.first_hierarchy_col).value == "Method credibility"
         assert wb["Benchmarks"]["B5"].value == "source_id"
         memo_row = _row_for_label(wb, "IC Memo", "KPI readout")
-        assert wb["IC Memo"].cell(memo_row, 2).value == "KPI readout"
-        assert isinstance(wb["IC Memo"].cell(memo_row + 1, 2).value, str)
-        assert wb["IC Memo"].cell(memo_row + 1, 2).value.startswith("=")
+        assert wb["IC Memo"].cell(memo_row, source_plan.LAYOUT.first_hierarchy_col).value == "KPI readout"
+        assert isinstance(wb["IC Memo"].cell(memo_row + 1, source_plan.LAYOUT.label_col).value, str)
+        assert wb["IC Memo"].cell(memo_row + 1, source_plan.LAYOUT.label_col).value.startswith("=")
 
         formulas = [formula for _, _, formula in _formula_cells(wb)]
         assert not any("AVERAGE(" in formula and "'Valuation'" not in formula for formula in formulas)
@@ -448,6 +451,13 @@ def test_all_modes_produce_expected_bundles() -> None:
             wb = load_workbook(out, data_only=False)
             assert wb.sheetnames == build_model.resolve_bundle(mode)
             assert _defined_name_count(wb) == 0
+            assert _merged_count(wb) == 0
+            assert _wrapped_cells(wb) == []
+            assert _styled_blank_cells(wb) == []
+            assert _font_design_violations(wb) == []
+            assert _semantic_alignment_violations(wb) == []
+            for ws in wb.worksheets:
+                assert ws.freeze_panes is None
 
 
 def test_generated_modes_do_not_reference_removed_sheets() -> None:
@@ -506,7 +516,7 @@ def test_structured_yaml_controls_grain_periods_and_drivers() -> None:
         assert wb["Assumptions"].cell(11, first_col + 5).value == 150000
         assert wb["Financing"].cell(7, first_col).value == 10000000
         assert wb["Financing"].cell(8, first_col + 1).value == 50000000
-        assert wb["Segments"]["B6"].value == "Japan SaaS"
+        assert wb["Segments"].cell(6, source_plan.LAYOUT.label_col).value == "Japan SaaS"
         assert wb["Assumptions"].cell(_row_for_label(wb, "Assumptions", "Value capture share"), first_col).value == 0.30
         assert wb["Assumptions"].cell(_row_for_label(wb, "Assumptions", "Target gross margin"), first_col).value == 0.65
         assert wb["Assumptions"].cell(_row_for_label(wb, "Assumptions", "Support tickets / customer / year"), first_col).value == 10
@@ -572,6 +582,91 @@ def test_cap_table_rebuild_clears_prior_sheet_fills() -> None:
     assert wb["Ownership"]["A1"].fill.fill_type in (None, "none")
 
 
+def test_cap_table_rebuild_clears_legacy_layout_state() -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Ownership"
+    ws.freeze_panes = "C8"
+    ws.merge_cells("B2:C2")
+    ws["B1"] = "legacy"
+    ws["B1"].alignment = Alignment(wrap_text=True, indent=2)
+
+    cap_table.build_cap_table_sheet(wb, cap_table.CapTableInput(company_name="Layout State Test"))
+    ws = wb["Ownership"]
+
+    assert _merged_count(wb) == 0
+    assert ws.freeze_panes is None
+    assert ws.column_dimensions["A"].width == ib.COL_MARGIN_WIDTH
+    assert ws.column_dimensions["B"].width == ib.COL_HIERARCHY_WIDTH
+    assert ws["C1"].value == "Layout State Test — Cap Table"
+    assert _wrapped_cells(wb) == []
+    assert _leading_space_labels(wb) == []
+    assert [
+        f"{cell.coordinate}: {cell.alignment.indent}"
+        for row in ws.iter_rows()
+        for cell in row
+        if getattr(cell.alignment, "indent", 0)
+    ] == []
+
+
+def test_cap_table_sheet_uses_canonical_design_surface() -> None:
+    inp = cap_table.CapTableInput(
+        company_name="Design Surface Test",
+        safes=[
+            cap_table.SAFEInstrument(
+                name="Seed SAFE",
+                type="j_kiss_v2",
+                principal_money_m=20,
+                cap_money_m=1_000,
+                discount=0.20,
+            )
+        ],
+        round_pre_money_money_m=2_000,
+        round_investment_money_m=500,
+        round_target_pool_pct=0.10,
+    )
+    round_result = cap_table.run_round_state_machine(inp)
+    waterfall = [
+        (
+            3_000.0,
+            cap_table.compute_exit_waterfall(inp=inp, exit_value_money_m=3_000.0),
+        )
+    ]
+    wb = Workbook()
+    ws = cap_table.build_cap_table_sheet(
+        wb,
+        inp,
+        round_result=round_result,
+        waterfall_scenarios=waterfall,
+    )
+
+    assert wb.sheetnames == ["Ownership"]
+    assert _merged_count(wb) == 0
+    assert ws.freeze_panes is None
+    assert ws.sheet_view.showGridLines is False
+    assert ws.print_area
+    assert ws.page_setup.orientation == "landscape"
+    assert ws.page_setup.fitToWidth == 1
+    assert ws.print_title_rows in {"1:3", "$1:$3"}
+    assert ws.print_title_cols in {"A:C", "$A:$C"}
+    assert _column_width(ws, "A") == ib.COL_MARGIN_WIDTH
+    assert _column_width(ws, "B") == ib.COL_HIERARCHY_WIDTH
+    assert _column_width(ws, "C") >= ib.COL_LABEL_WIDTH
+    assert _column_width(ws, "G") >= ib.COL_SOURCE_WIDTH
+    assert _wrapped_cells(wb) == []
+    assert _manual_line_break_violations(wb) == []
+    assert _styled_blank_cells(wb) == []
+    assert _design_band_span_violations(wb) == []
+    assert _repeated_semantic_fill_rows(wb) == []
+    assert _font_design_violations(wb) == []
+    assert _border_surface_violations(wb) == []
+    assert _row_height_violations(wb) == []
+    for row in (5, 25, 50, 70):
+        assert [_fill_rgb(ws.cell(row=row, column=col)) for col in range(2, 8)] == [
+            ib.BG_HEADER_BAND
+        ] * 6
+
+
 def _chart_count(wb) -> int:
     return sum(len(getattr(ws, "_charts", [])) for ws in wb.worksheets)
 
@@ -592,6 +687,168 @@ def _wrapped_cells(wb) -> list[str]:
         for cell in row
         if cell.alignment is not None and cell.alignment.wrap_text is True
     ]
+
+
+def test_ib_helpers_reject_wrap_text_true() -> None:
+    wb = Workbook()
+    ws = wb.active
+
+    for apply_func in (ib.apply_label, ib.apply_comment):
+        try:
+            apply_func(ws["A1"], wrap_text=True)
+        except ValueError as exc:
+            assert "forbids wrap_text=True" in str(exc)
+        else:
+            raise AssertionError(f"{apply_func.__name__} accepted wrap_text=True")
+
+    ib.apply_label(ws["A2"])
+    ib.apply_comment(ws["A3"])
+    assert ws["A2"].alignment.wrap_text is False
+    assert ws["A3"].alignment.wrap_text is False
+    assert ib.wrapped_text_row_height(3) == ib.ROW_HEIGHT_PER_WRAPPED_LINE * 3
+    assert ib.wrapped_text_row_height(0) == ib.ROW_HEIGHT_PER_WRAPPED_LINE
+    assert ib.visible_text_line_count("one\ntwo", "single") == 2
+    ib.set_wrapped_exception_row_height(ws, 4, ib.visible_text_line_count("one\ntwo\nthree"))
+    assert ws.row_dimensions[4].height == ib.ROW_HEIGHT_PER_WRAPPED_LINE * 3
+
+    ws["A5"] = "bounded\nprose"
+    try:
+        ib.apply_wrapped_exception(ws["A5"], user_approved=False)
+    except ValueError as exc:
+        assert "explicit user approval" in str(exc)
+    else:
+        raise AssertionError("apply_wrapped_exception accepted missing approval")
+    ib.apply_wrapped_exception(ws["A5"], user_approved=True)
+    assert ws["A5"].alignment.wrap_text is True
+    assert ws.row_dimensions[5].height == ib.wrapped_text_row_height(2)
+    ws["A6"] = "bounded\nprose"
+    ib.apply_wrapped_exception(ws["A6"], user_approved=True, line_count=0)
+    assert ws.row_dimensions[6].height == ib.wrapped_text_row_height(1)
+
+
+def test_runtime_builders_do_not_use_wrap_or_merge_layout_shortcuts() -> None:
+    runtime_files = [
+        SCRIPTS_DIR / "build_model.py",
+        SCRIPTS_DIR / "source_plan_builder.py",
+        SCRIPTS_DIR / "cap_table_builder.py",
+    ]
+    for path in runtime_files:
+        text = path.read_text(encoding="utf-8")
+        assert "wrap_text=True" not in text
+        text_without_unmerge = text.replace("unmerge_cells(", "")
+        assert ".merge_cells(" not in text_without_unmerge
+        assert "merge_cells(" not in text_without_unmerge
+
+    ib_text = (SCRIPTS_DIR / "ib_format.py").read_text(encoding="utf-8")
+    ib_text_without_unmerge = ib_text.replace("unmerge_cells(", "")
+    assert ".merge_cells(" not in ib_text_without_unmerge
+    assert "merge_cells(" not in ib_text_without_unmerge
+    assert "blank overflow cells without merging" in ib.WRAP_TEXT_ERROR
+
+
+def test_skill_guidance_makes_no_wrap_rule_explicit() -> None:
+    skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    layout_text = (SKILL_DIR / "build" / "references" / "_layout_canonical.md").read_text(encoding="utf-8")
+    design_text = (SKILL_DIR / "build" / "references" / "_ib_workbook_design_system.md").read_text(encoding="utf-8")
+    self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+    eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
+    ib_text = (SCRIPTS_DIR / "ib_format.py").read_text(encoding="utf-8")
+    skill_flat = " ".join(skill_text.split())
+    layout_flat = " ".join(layout_text.split())
+    design_flat = " ".join(design_text.split())
+
+    combined = "\n".join([skill_text, layout_text, design_text, self_review_text, eval_text, ib_text])
+    assert "No-Wrap Rule" in combined
+    assert "Treat text wrapping as prohibited" in skill_text
+    assert "no merged cells" in skill_flat
+    assert "without merging cells" in skill_flat
+    assert "reject `wrap_text=True`" in design_text
+    assert "Do not use merged cells as the repair" in design_flat
+    assert "明示的に wrap_text=True" not in ib_text
+    assert "row height must be set to the exact visible line count" in skill_flat
+    assert "clipped text, auto-height guesses, or oversized padded rows are design defects" in layout_flat
+    assert "No-Merge Rule" in layout_text
+    assert "let the text read horizontally through those blank cells without merging" in layout_flat
+    assert "exact number of visible text lines" in design_text
+    assert "wrapped_text_row_height" in ib_text
+    assert "set_wrapped_exception_row_height" in ib_text
+    assert "row height matched exactly to visible line count" in eval_text
+    assert "visible wrap/tall-text rows are audited by role" in eval_text
+    assert "no unnecessary wrapping on horizontal-read" in eval_text
+
+
+def test_skill_guidance_requires_fix_and_rerun_iteration() -> None:
+    skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+    eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
+    skill_flat = " ".join(skill_text.split())
+    self_review_flat = " ".join(self_review_text.split())
+    eval_flat = " ".join(eval_text.split())
+
+    assert "fix the concrete failed items and rerun the same checks" in skill_flat
+    assert "Do not treat model construction as completion" in skill_flat
+    assert "command checks and rendered-output inspection for both finance logic and sheet design" in skill_flat
+    assert "Keep iterating until the model logic and the visible sheet design are both sufficient" in skill_flat
+    assert "command-based workbook checks and rendered-output inspection" in self_review_flat
+    assert "Apply both to the finance model itself and to sheet design" in self_review_flat
+    assert "Passing commands do not excuse a visibly poor sheet" in self_review_flat
+    assert "a good-looking render does not excuse broken formulas" in self_review_flat
+    assert "fix the concrete failed item, rerun the same check" in self_review_flat
+    assert "Do not replace failed verification with a narrative explanation" in self_review_flat
+    assert "Model creation is not completion" in eval_flat
+    assert "verify both model logic and sheet design with command-based workbook checks plus rendered-output inspection" in eval_flat
+
+
+def test_skill_guidance_uses_meaningful_sparse_fills_and_borders() -> None:
+    skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    layout_text = (SKILL_DIR / "build" / "references" / "_layout_canonical.md").read_text(encoding="utf-8")
+    design_text = (SKILL_DIR / "build" / "references" / "_ib_workbook_design_system.md").read_text(encoding="utf-8")
+    self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+    eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
+
+    combined = "\n".join([skill_text, layout_text, design_text, self_review_text, eval_text])
+    combined_flat = " ".join(combined.split()).lower()
+    assert "same non-heatmap fill" in combined_flat
+    assert "background fills are selective accents for major semantic moments only" in combined_flat
+    assert "workbook tokens" in combined_flat
+    assert "arial 10pt" in combined_flat
+    assert "header / label row" in combined_flat
+    assert "use one rectangular span per filled row component" in combined_flat
+    assert "do not choose the end column only from cells that happen to contain text" in combined_flat
+    assert "do not stop a fill because a cell is blank" in " ".join(skill_text.split()).lower()
+    assert "for every filled row, name its role and inspect the start column, end column" in " ".join(self_review_text.split()).lower()
+    assert "semantic fill helper in `ib_format.py`" in design_text
+    assert "rectangular column-consistent spans chosen from the attached table/block" in eval_text
+    assert "heavy border pattern" in combined_flat
+    assert "prominent borders follow the same meaning-first rule as fills" in combined_flat
+
+
+def test_xlsx_evals_load_full_design_reference_stack() -> None:
+    evals = json.loads((SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8"))["evals"]
+    required = {"_layout_canonical", "_ib_workbook_design_system", "_self_review_protocol"}
+    missing = []
+    for item in evals:
+        refs = set(item.get("applicable_references", []))
+        if not required <= refs:
+            missing.append(f"{item['id']}:{item['name']} missing {sorted(required - refs)}")
+        assertions = item.get("assertions", [])
+        if not any(assertion.get("id") == "XLSX_DESIGN" for assertion in assertions):
+            missing.append(f"{item['id']}:{item['name']} missing XLSX_DESIGN assertion")
+    assert missing == []
+
+
+def test_semantic_fill_helper_uses_rectangular_span_including_blanks() -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.cell(3, 2, "Section")
+    ws.cell(3, 5, "Last populated")
+
+    ib.apply_semantic_fill_span(ws, 3, 2, 6, ib.BG_HEADER_BAND, bottom=ib.THIN_LINE)
+
+    for col in range(2, 7):
+        assert _fill_rgb(ws.cell(3, col)) == ib.BG_HEADER_BAND
+        assert ws.cell(3, col).border.bottom.style == "thin"
+    assert ws.cell(3, 7).fill.fill_type in (None, "none")
 
 
 def _unit_label_violations(wb) -> list[str]:
@@ -643,27 +900,85 @@ def _leading_space_labels(wb) -> list[str]:
 def _missing_section_band_fills(wb) -> list[str]:
     missing = []
     for ws in wb.worksheets:
-        for row in ws.iter_rows():
-            label = row[1].value if len(row) > 1 else None
-            if not isinstance(label, str):
+        for row_idx in range(1, ws.max_row + 1):
+            label = ws.cell(row_idx, source_plan.LAYOUT.first_hierarchy_col)
+            if not isinstance(label.value, str):
                 continue
-            fill = row[1].fill
-            font = row[1].font
-            is_section = fill.fill_type == "solid" and (fill.fgColor.rgb or "").endswith(ib.BG_HEADER_BAND)
-            if is_section and (font.color is None or not str(font.color.rgb).endswith("FFFFFF")):
-                missing.append(f"{ws.title}!B{row[1].row}")
+            label_fill = label.fill
+            is_section = (
+                label_fill.fill_type == "solid"
+                and isinstance(label_fill.fgColor.rgb, str)
+                and label_fill.fgColor.rgb.endswith(ib.BG_HEADER_BAND)
+            )
+            if not is_section:
+                continue
+            font = label.font
+            label_has_white_text = font.color is not None and str(font.color.rgb).endswith("FFFFFF")
+            band_cells = []
+            for col in range(source_plan.LAYOUT.first_hierarchy_col, ws.max_column + 1):
+                cell = ws.cell(row_idx, col)
+                if _fill_rgb(cell) == ib.BG_HEADER_BAND:
+                    band_cells.append(cell)
+            band_is_contiguous = band_cells and [cell.column for cell in band_cells] == list(range(band_cells[0].column, band_cells[-1].column + 1))
+            following_cols = [
+                cell.column
+                for next_row in range(row_idx + 1, min(ws.max_row, row_idx + 3) + 1)
+                for cell in ws[next_row]
+                if cell.value is not None
+            ]
+            attached_width_col = max([source_plan.LAYOUT.label_col, *following_cols])
+            if not (label_has_white_text and band_is_contiguous and band_cells[-1].column >= attached_width_col):
+                missing.append(f"{ws.title}!{label.coordinate}")
     return missing
 
 
 def _styled_blank_cells(wb) -> list[str]:
-    return [
-        f"{ws.title}!{cell.coordinate}: style_id={cell.style_id}"
-        for ws in wb.worksheets
-        for row in ws.iter_rows()
-        for cell in row
-        if cell.value is None
-        and cell.style_id != 0
-    ]
+    bad = []
+    semantic_fill_colors = {
+        ib.BG_TABLE_HEADER,
+        ib.BG_TOTAL_BAND,
+        ib.BG_HEADER_BAND,
+        ib.BG_WORKING,
+    }
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.value not in (None, "") or cell.style_id == 0:
+                    continue
+                color = _fill_rgb(cell)
+                if color in semantic_fill_colors:
+                    same_fill_run = []
+                    col = cell.column
+                    while col >= 1 and _fill_rgb(ws.cell(cell.row, col)) == color:
+                        same_fill_run.append(ws.cell(cell.row, col))
+                        col -= 1
+                    col = cell.column + 1
+                    while col <= ws.max_column and _fill_rgb(ws.cell(cell.row, col)) == color:
+                        same_fill_run.append(ws.cell(cell.row, col))
+                        col += 1
+                    if any(run_cell.value not in (None, "") for run_cell in same_fill_run):
+                        continue
+                bad.append(f"{ws.title}!{cell.coordinate}: style_id={cell.style_id}")
+    return bad
+
+
+def _manual_line_break_violations(wb) -> list[str]:
+    violations = []
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                if not (isinstance(cell.value, str) and "\n" in cell.value):
+                    continue
+                if cell.alignment is None or cell.alignment.wrap_text is not True:
+                    violations.append(f"{ws.title}!{cell.coordinate}: manual line break without wrapped exception")
+                    continue
+                expected = ib.wrapped_text_row_height(ib.visible_text_line_count(cell.value))
+                actual = ws.row_dimensions[cell.row].height
+                if actual != expected:
+                    violations.append(
+                        f"{ws.title}!{cell.coordinate}: height={actual} expected={expected}"
+                    )
+    return violations
 
 
 def _design_band_span_violations(wb) -> list[str]:
@@ -683,12 +998,88 @@ def _design_band_span_violations(wb) -> list[str]:
                 last = max(cell.column for cell in populated if _fill_rgb(cell) == row_band)
                 check_cells = [ws.cell(row=row_idx, column=col) for col in range(2, last + 1)]
             else:
-                check_cells = populated
+                first = min(cell.column for cell in populated if _fill_rgb(cell) == row_band)
+                last = max(cell.column for cell in populated if _fill_rgb(cell) == row_band)
+                check_cells = [ws.cell(row=row_idx, column=col) for col in range(first, last + 1)]
             for cell in check_cells:
-                if cell.value is None:
-                    continue
                 if _fill_rgb(cell) != row_band:
                     violations.append(f"{ws.title}!{cell.coordinate}: expected row band {row_band}")
+    return violations
+
+
+def _repeated_semantic_fill_rows(wb) -> list[str]:
+    violations = []
+    semantic_fill_colors = {
+        ib.BG_TABLE_HEADER,
+        ib.BG_TOTAL_BAND,
+        ib.BG_HEADER_BAND,
+        ib.BG_WORKING,
+    }
+    for ws in wb.worksheets:
+        previous_color = None
+        previous_row = None
+        for row_idx in range(1, ws.max_row + 1):
+            colors = [
+                _fill_rgb(ws.cell(row=row_idx, column=col))
+                for col in range(1, ws.max_column + 1)
+            ]
+            row_colors = [color for color in colors if color in semantic_fill_colors]
+            row_color = max(set(row_colors), key=row_colors.count) if row_colors else None
+            if row_color is not None and row_color == previous_color:
+                violations.append(f"{ws.title}!{previous_row}:{row_idx}: repeated semantic fill {row_color}")
+            previous_color = row_color
+            previous_row = row_idx if row_color is not None else None
+    return violations
+
+
+def _font_design_violations(wb) -> list[str]:
+    violations = []
+    allowed_sizes = {ib.FONT_SIZE_SMALL, ib.FONT_SIZE_BASE, ib.FONT_SIZE_LARGE, ib.FONT_SIZE_TITLE}
+    default_font = wb._fonts[0]
+    if default_font.name != ib.FONT_FAMILY or float(default_font.sz) != float(ib.FONT_SIZE_BASE):
+        violations.append(f"workbook default font={default_font.name} size={default_font.sz}")
+    normal_font = wb._named_styles["Normal"].font
+    if normal_font.name != ib.FONT_FAMILY or float(normal_font.sz) != float(ib.FONT_SIZE_BASE):
+        violations.append(f"Normal style font={normal_font.name} size={normal_font.sz}")
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.value is None:
+                    continue
+                if cell.font.name != ib.FONT_FAMILY:
+                    violations.append(f"{ws.title}!{cell.coordinate}: font={cell.font.name}")
+                if cell.font.sz is not None and int(float(cell.font.sz)) not in allowed_sizes:
+                    violations.append(f"{ws.title}!{cell.coordinate}: size={cell.font.sz}")
+    return violations
+
+
+def _semantic_alignment_violations(wb) -> list[str]:
+    violations = []
+    for ws in wb.worksheets:
+        if not source_plan._uses_default_layout(ws):
+            continue
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.value is None:
+                    continue
+                alignment = cell.alignment
+                horizontal = alignment.horizontal
+                indent = getattr(alignment, "indent", 0)
+                if cell.row == 5 and cell.column >= FIRST_VALUE_COL and horizontal != "center":
+                    violations.append(f"{ws.title}!{cell.coordinate}: period header horizontal={horizontal}")
+                elif cell.row != 5 and cell.column == source_plan.LAYOUT.source_col:
+                    if horizontal != "left" or not cell.font.italic or _font_rgb(cell) != ib.IB_COMMENT:
+                        violations.append(f"{ws.title}!{cell.coordinate}: source alignment/font")
+                elif cell.row != 5 and cell.column == source_plan.LAYOUT.unit_col:
+                    if horizontal != "right" or _font_rgb(cell) != ib.IB_COMMENT:
+                        violations.append(f"{ws.title}!{cell.coordinate}: unit alignment/font")
+                elif cell.row != 5 and cell.column in (source_plan.LAYOUT.first_hierarchy_col, source_plan.LAYOUT.label_col):
+                    if horizontal != "left" or indent:
+                        violations.append(f"{ws.title}!{cell.coordinate}: label horizontal={horizontal} indent={indent}")
+                elif cell.row != 5 and cell.column >= FIRST_VALUE_COL:
+                    if isinstance(cell.value, (int, float)) or (isinstance(cell.value, str) and cell.value.startswith("=")):
+                        if horizontal != "right":
+                            violations.append(f"{ws.title}!{cell.coordinate}: value horizontal={horizontal}")
     return violations
 
 
@@ -733,6 +1124,76 @@ def _money_unit_format_mismatches(wb) -> list[str]:
                         f"{ws.title}!{cell.coordinate}: unit={unit} fmt={cell.number_format}"
                     )
     return mismatches
+
+
+def _semantic_unit_format_mismatches(wb) -> list[str]:
+    expected = {
+        "%": {
+            ib.FMT_PERCENT,
+            ib.FMT_PERCENT_BPS,
+            ib.FMT_PCT_0,
+            ib.FMT_PCT_1,
+            ib.FMT_PCT_2,
+        },
+        "x": {ib.FMT_MULTIPLE, ib.FMT_MULTIPLE_1, ib.FMT_MULTIPLE_2},
+        "FTE": {ib.FMT_INTEGER, ib.FMT_NUM},
+        "units": {ib.FMT_INTEGER, ib.FMT_NUM},
+        "customers": {ib.FMT_INTEGER, ib.FMT_NUM},
+        "count": {ib.FMT_INTEGER, ib.FMT_NUM},
+        "months": {ib.FMT_NUM, ib.FMT_INTEGER},
+        "days": {ib.FMT_NUM, ib.FMT_INTEGER},
+    }
+    mismatches = []
+    for ws in wb.worksheets:
+        if ws.max_column < FIRST_VALUE_COL:
+            continue
+        for row in ws.iter_rows():
+            unit = ws.cell(row=row[0].row, column=UNIT_COL).value
+            if unit not in expected:
+                continue
+            for cell in row[FIRST_VALUE_COL - 1:]:
+                if cell.value is None:
+                    continue
+                if not (
+                    isinstance(cell.value, (int, float))
+                    or (isinstance(cell.value, str) and cell.value.startswith("="))
+                ):
+                    continue
+                if cell.number_format not in expected[unit]:
+                    mismatches.append(
+                        f"{ws.title}!{cell.coordinate}: unit={unit} fmt={cell.number_format}"
+                    )
+    return mismatches
+
+
+def _row_height_violations(wb) -> list[str]:
+    allowed = {
+        ib.ROW_HEIGHT_TIGHT,
+        ib.ROW_HEIGHT_BASE,
+        ib.ROW_HEIGHT_STANDARD,
+        ib.ROW_HEIGHT_MEDIUM,
+        ib.ROW_HEIGHT_RELAXED,
+        ib.ROW_HEIGHT_HERO,
+        ib.ROW_HEIGHT_COVER_TITLE,
+    }
+    violations = []
+    for ws in wb.worksheets:
+        for idx, dimension in ws.row_dimensions.items():
+            if dimension.height is None:
+                continue
+            actual = float(dimension.height)
+            if actual in allowed:
+                continue
+            wrapped_exception_heights = {
+                ib.wrapped_text_row_height(ib.visible_text_line_count(cell.value))
+                for cell in ws[idx]
+                if isinstance(cell.value, str)
+                and "\n" in cell.value
+                and cell.alignment.wrap_text is True
+            }
+            if actual not in wrapped_exception_heights:
+                violations.append(f"{ws.title}!{idx}: height={dimension.height}")
+    return violations
 
 
 def _fill_rgb(cell) -> str | None:
@@ -802,6 +1263,7 @@ Source: customer discovery memo, market sizing memo, lender discussion notes.
         assert "Monthly price" in str(wb["Guide"]["C8"].value)
         assert "customer discovery memo" in str(wb["Market Support"]["B8"].value)
         assert _wrapped_cells(wb) == []
+        assert _manual_line_break_violations(wb) == []
         assert _unit_label_violations(wb) == []
         assert _raw_money_scale_formula_violations(wb) == []
         assert _numbered_section_labels(wb) == []
@@ -809,6 +1271,9 @@ Source: customer discovery memo, market sizing memo, lender discussion notes.
         assert _missing_section_band_fills(wb) == []
         assert _styled_blank_cells(wb) == []
         assert _design_band_span_violations(wb) == []
+        assert _repeated_semantic_fill_rows(wb) == []
+        assert _font_design_violations(wb) == []
+        assert _semantic_alignment_violations(wb) == []
         assert _border_surface_violations(wb) == []
         assert _money_unit_format_mismatches(wb) == []
         assert _unit_for_label(wb, "Assumptions", "New primary units") == "units"
@@ -916,7 +1381,7 @@ Source: management memo.
             if cell.value is not None
         )
 
-        assert wb["Kernel"]["C9"].value == "Marketplace / transaction"
+        assert wb["Kernel"]["D9"].value == "Marketplace / transaction"
         assert _unit_for_label(wb, "Assumptions", "Gross merchandise value") == "百万円"
         assert _unit_for_label(wb, "Assumptions", "Take rate") == "%"
         assert _first_year_cell_for_label(wb, "Revenue Build", "Transaction revenue").value == f"={FIRST_VALUE_LETTER}7*{FIRST_VALUE_LETTER}10"
@@ -1001,21 +1466,22 @@ def test_source_plan_uses_column_based_hierarchy_layout() -> None:
         ws = wb["Assumptions"]
         layout = source_plan.LAYOUT
         assert source_plan.START_PERIOD_COL == layout.unit_col + 1
-        assert ws.column_dimensions["A"].width == layout.hierarchy_width - 17
+        assert ws.column_dimensions["A"].width == ib.COL_MARGIN_WIDTH
         assert ws.column_dimensions["B"].width == layout.hierarchy_width
         assert ws.column_dimensions["C"].width == layout.label_width
         assert ws.column_dimensions["D"].width == layout.source_width
         assert ws.column_dimensions["E"].width == layout.unit_width
         assert ws.column_dimensions[FIRST_VALUE_LETTER].width == layout.period_width
-        assert ws.freeze_panes == f"{FIRST_VALUE_LETTER}6"
+        assert ws.freeze_panes is None
         assert [ws.cell(5, c).value for c in range(2, FIRST_VALUE_COL + 1)] == [
-            "Section",
+            None,
             "Line item",
             "Source / driver",
             "Unit",
             "FY2026",
         ]
         assert ws["B6"].value == "Volume and demand"
+        assert ws["C6"].value is None
         assert ws["C7"].value == "New primary units"
         assert ws["B7"].value is None
         assert wb["Guide"]["B8"].value == "Source story signals"
@@ -1089,10 +1555,11 @@ def test_segment_lens_handles_long_generic_segment_names_without_clipping() -> N
         build_model.build_model(input_path, out, mode="full")
         wb = load_workbook(out, data_only=False)
         ws = wb["Segments"]
-        width = ws.column_dimensions["B"].width or 0
+        segment_col = source_plan.get_column_letter(source_plan.LAYOUT.label_col)
+        width = ws.column_dimensions[segment_col].width or 0
         clipped = [
             f"{cell.coordinate}: width={width} value={cell.value}"
-            for cell in ws["B"]
+            for cell in ws[segment_col]
             if isinstance(cell.value, str)
             and cell.row >= 6
             and len(cell.value) > width * 1.15
@@ -1133,6 +1600,9 @@ def test_source_plan_design_surface_uses_generic_blue_palette() -> None:
         assert observed <= allowed
         assert ib.BG_TABLE_HEADER in observed
         assert _styled_blank_cells(wb) == []
+        assert _repeated_semantic_fill_rows(wb) == []
+        assert _font_design_violations(wb) == []
+        assert _semantic_alignment_violations(wb) == []
         total_populated = sum(
             1
             for ws in wb.worksheets
@@ -1208,6 +1678,13 @@ def test_source_plan_ib_design_rhythm_and_visibility() -> None:
         "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
     )
     try:
+        kernel = wb["Kernel"]
+        assert kernel["B7"].value is None
+        assert kernel["C7"].value == "Decision"
+        assert kernel["D7"].value
+        assert _column_width(kernel, "B") == ib.COL_HIERARCHY_WIDTH
+        assert _column_width(kernel, "C") >= 32
+        assert _column_width(kernel, "D") >= 92
         for ws in wb.worksheets:
             assert ws.sheet_view.showGridLines is False
             assert ws.sheet_view.zoomScale == 90
@@ -1218,8 +1695,9 @@ def test_source_plan_ib_design_rhythm_and_visibility() -> None:
             expected_title_cols_abs = f"$A:${source_plan.get_column_letter(source_plan.LAYOUT.unit_col)}"
             assert ws.print_title_cols in {expected_title_cols, expected_title_cols_abs}
             assert _column_width(ws, "A") == ib.COL_MARGIN_WIDTH
-            if ws.max_column >= source_plan.LAYOUT.first_hierarchy_col:
-                assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.first_hierarchy_col)) >= ib.COL_HIERARCHY_WIDTH
+            for col in range(source_plan.LAYOUT.first_hierarchy_col, source_plan.LAYOUT.label_col):
+                if ws.max_column >= col:
+                    assert _column_width(ws, source_plan.get_column_letter(col)) >= ib.COL_HIERARCHY_WIDTH
             if ws.max_column >= source_plan.LAYOUT.label_col:
                 assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.label_col)) >= ib.COL_LABEL_WIDTH
             if ws.max_column >= source_plan.LAYOUT.source_col:
@@ -1228,8 +1706,7 @@ def test_source_plan_ib_design_rhythm_and_visibility() -> None:
                 assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.unit_col)) >= ib.COL_UNIT_WIDTH
             assert (ws.row_dimensions[2].height or 0) <= 20
             assert (ws.row_dimensions[5].height or 0) <= 18
-            if ws.cell(5, source_plan.START_PERIOD_COL).value is not None:
-                assert ws.freeze_panes == f"{source_plan.get_column_letter(source_plan.START_PERIOD_COL)}6"
+            assert ws.freeze_panes is None
         assert _column_width(wb["Assumptions"], "C") >= 54
         assert _column_width(wb["Assumptions"], "D") >= 54
     finally:
@@ -1241,6 +1718,38 @@ def _print_area_bounds(ws) -> tuple[int, int, int, int]:
     if "!" in area:
         area = area.split("!", 1)[1]
     return range_boundaries(area)
+
+
+def test_all_generated_modes_pass_visual_design_invariants() -> None:
+    for mode in build_model.VALID_MODES:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / f"{mode}.xlsx"
+            build_model.build_model(None, out, mode=mode)
+            wb = load_workbook(out, data_only=False)
+
+            assert _defined_name_count(wb) == 0
+            assert _merged_count(wb) == 0
+            assert _wrapped_cells(wb) == []
+            assert _manual_line_break_violations(wb) == []
+            assert _leading_space_labels(wb) == []
+            assert _styled_blank_cells(wb) == []
+            assert _design_band_span_violations(wb) == []
+            assert _repeated_semantic_fill_rows(wb) == []
+            assert _font_design_violations(wb) == []
+            assert _semantic_alignment_violations(wb) == []
+            assert _border_surface_violations(wb) == []
+            assert _money_unit_format_mismatches(wb) == []
+            assert _semantic_unit_format_mismatches(wb) == []
+            assert _row_height_violations(wb) == []
+            for ws in wb.worksheets:
+                assert ws.freeze_panes is None
+                assert ws.sheet_view.showGridLines is False
+                assert ws.print_area
+                rendered_row, rendered_col = ib.rendered_bounds(ws)
+                min_col, min_row, max_col, max_row = _print_area_bounds(ws)
+                assert (min_row, min_col) == (1, 1)
+                assert max_row >= rendered_row
+                assert max_col >= rendered_col
 
 
 def test_source_plan_print_canvas_includes_rendered_used_range() -> None:
@@ -1266,9 +1775,45 @@ def test_source_plan_print_canvas_includes_rendered_used_range() -> None:
 
         for ws in wb.worksheets:
             ws.insert_rows(ws.max_row + 1)
-            assert ws.cell(ws.max_row + 1, 1).style_id == 0
+            assert ws.cell(ws.max_row, 1).style_id == 0
     finally:
         tmp.cleanup()
+
+
+def test_representative_workbook_pdf_render_smoke_when_available() -> None:
+    soffice = shutil.which("soffice")
+    pdftoppm = shutil.which("pdftoppm")
+    if not soffice or not pdftoppm:
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        source_md = tmp_path / "render_source.md"
+        out = tmp_path / "render_source.xlsx"
+        source_md.write_text(
+            "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo.",
+            encoding="utf-8",
+        )
+        source_plan.build_source_plan_workbook(source_md, out)
+        subprocess.run(
+            [soffice, "--headless", "--convert-to", "pdf", "--outdir", tmp, str(out)],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        pdf = tmp_path / "render_source.pdf"
+        assert pdf.exists()
+        assert pdf.stat().st_size > 50_000
+        subprocess.run(
+            [pdftoppm, "-png", "-r", "80", "-f", "1", "-l", "2", str(pdf), str(tmp_path / "page")],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        pages = sorted(tmp_path.glob("page-*.png"))
+        assert len(pages) >= 2
+        assert all(page.stat().st_size > 10_000 for page in pages)
 
 
 def test_source_plan_custom_tables_keep_text_columns_readable() -> None:
@@ -1309,6 +1854,34 @@ def test_ib_helpers_do_not_use_native_indent_for_hierarchy() -> None:
 
     assert ws["B2"].alignment.indent == 0
     assert ws["D3"].alignment.indent == 0
+
+
+def test_added_hierarchy_columns_use_google_sheets_20px_width() -> None:
+    wb = Workbook()
+    ws = wb.active
+    original_layout = source_plan.LAYOUT
+    try:
+        source_plan.LAYOUT = source_plan.LayoutSpec(hierarchy_cols=3)
+        facts = kernel.derive_source_facts("# PLAN\nSource: management memo.")
+        ws._startup_facts = facts
+        source_plan._setup_sheet(ws, "Hierarchy width check")
+        source_plan._write_period_header(ws, facts)
+
+        assert ws.column_dimensions["B"].width == ib.COL_HIERARCHY_WIDTH
+        assert ws.column_dimensions["C"].width == ib.COL_HIERARCHY_WIDTH
+        assert ws.column_dimensions["D"].width == ib.COL_HIERARCHY_WIDTH
+        assert ib.COL_HIERARCHY_WIDTH == 2.14
+        assert ws.column_dimensions["E"].width == ib.COL_LABEL_WIDTH
+        assert ws.column_dimensions["F"].width == ib.COL_SOURCE_WIDTH
+        assert ws.column_dimensions["G"].width == ib.COL_UNIT_WIDTH
+        assert ws.cell(5, source_plan.LAYOUT.label_col).value == "Line item"
+        assert ws.cell(5, source_plan.LAYOUT.source_col).value == "Source / driver"
+        assert ws.cell(5, source_plan.LAYOUT.unit_col).value == "Unit"
+        assert ws.cell(5, source_plan.LAYOUT.first_value_col).value == facts.period_labels[0]
+        assert source_plan._uses_default_layout(ws) is True
+        assert ws.freeze_panes is None
+    finally:
+        source_plan.LAYOUT = original_layout
 
 
 def test_generic_kernel_does_not_promote_domain_specific_mentions_to_sources() -> None:
@@ -1385,6 +1958,15 @@ if __name__ == "__main__":
     test_balance_sheet_has_opening_capital_counterpart()
     test_mfn_applied_only_for_changed_safe_terms()
     test_cap_table_rebuild_clears_prior_sheet_fills()
+    test_cap_table_rebuild_clears_legacy_layout_state()
+    test_cap_table_sheet_uses_canonical_design_surface()
+    test_ib_helpers_reject_wrap_text_true()
+    test_runtime_builders_do_not_use_wrap_or_merge_layout_shortcuts()
+    test_skill_guidance_makes_no_wrap_rule_explicit()
+    test_skill_guidance_requires_fix_and_rerun_iteration()
+    test_skill_guidance_uses_meaningful_sparse_fills_and_borders()
+    test_xlsx_evals_load_full_design_reference_stack()
+    test_semantic_fill_helper_uses_rectangular_span_including_blanks()
     test_source_backed_plan_reaches_generic_kernel_shape()
     test_structured_yaml_currency_and_display_scale_are_generic()
     test_marketplace_source_does_not_emit_unrelated_asset_heavy_template()
@@ -1400,10 +1982,13 @@ if __name__ == "__main__":
     test_source_plan_has_no_excel_indent_or_clipped_role_columns()
     test_source_plan_has_no_long_centered_prose_headers()
     test_source_plan_ib_design_rhythm_and_visibility()
+    test_all_generated_modes_pass_visual_design_invariants()
     test_source_plan_print_canvas_includes_rendered_used_range()
+    test_representative_workbook_pdf_render_smoke_when_available()
     test_source_plan_custom_tables_keep_text_columns_readable()
     test_excluded_sheets_cannot_create_broken_references()
     test_ib_helpers_do_not_use_native_indent_for_hierarchy()
+    test_added_hierarchy_columns_use_google_sheets_20px_width()
     test_generic_kernel_does_not_promote_domain_specific_mentions_to_sources()
     test_benchmark_register_uses_evidence_status_not_fake_source_placeholders()
     test_scenario_formulas_are_not_built_with_fragile_substring_replacement()
