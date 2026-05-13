@@ -635,19 +635,29 @@ def test_ib_helpers_reject_wrap_text_true() -> None:
     ib.apply_comment(ws["A3"])
     assert ws["A2"].alignment.wrap_text is False
     assert ws["A3"].alignment.wrap_text is False
+    assert ib.wrapped_text_row_height(3) == ib.ROW_HEIGHT_PER_WRAPPED_LINE * 3
+    assert ib.wrapped_text_row_height(0) == ib.ROW_HEIGHT_PER_WRAPPED_LINE
 
 
 def test_skill_guidance_makes_no_wrap_rule_explicit() -> None:
     skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
     layout_text = (SKILL_DIR / "build" / "references" / "_layout_canonical.md").read_text(encoding="utf-8")
     design_text = (SKILL_DIR / "build" / "references" / "_ib_workbook_design_system.md").read_text(encoding="utf-8")
+    self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+    eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
     ib_text = (SCRIPTS_DIR / "ib_format.py").read_text(encoding="utf-8")
+    layout_flat = " ".join(layout_text.split())
 
-    combined = "\n".join([skill_text, layout_text, design_text])
+    combined = "\n".join([skill_text, layout_text, design_text, self_review_text, eval_text, ib_text])
     assert "No-Wrap Rule" in combined
     assert "Treat text wrapping as prohibited" in skill_text
     assert "reject `wrap_text=True`" in design_text
     assert "明示的に wrap_text=True" not in ib_text
+    assert "row height must be set to the exact visible line count" in skill_text
+    assert "clipped text, auto-height guesses, or oversized padded rows are design defects" in layout_flat
+    assert "exact number of visible text lines" in design_text
+    assert "wrapped_text_row_height" in ib_text
+    assert "row height matched exactly to visible line count" in eval_text
 
 
 def test_skill_guidance_requires_fix_and_rerun_iteration() -> None:

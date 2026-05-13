@@ -44,7 +44,10 @@ Google-Sheets-20px hierarchy / indent columns (`2.14` xlsx width), no native
 indent or leading-space indentation, no frozen panes, and generated cells with
 `wrap_text` off. Treat text wrapping as prohibited for
 generated workbook cells; fix long text with column width, table structure, or
-blank overflow space instead of enabling `wrap_text=True`.
+blank overflow space instead of enabling `wrap_text=True`. If the user
+explicitly requests a prose-heavy exception with wrapping or manual line breaks,
+row height must be set to the exact visible line count so no text is clipped and
+the row still looks intentional.
 
 Design gates: `_layout_canonical.md` owns grid, columns, hierarchy widths, units,
 formulas, and layout mechanics. `_ib_workbook_design_system.md` owns visual
