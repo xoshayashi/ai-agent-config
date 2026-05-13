@@ -171,6 +171,8 @@ density_design:
   reader_mode: scan / read / reference
   decision_question:
   information_units: [message, context, comparison, trend, mechanism, risk, implication, assumption, source]
+  semantic_sentence_layer: [1-3 compact meaningful clauses/sentences in body labels, rows, annotations, or optional Insight that explain relationship, reason, consequence, or decision relevance]
+  icon_restraint_plan: [necessary icons, why they clarify, and which icon candidates were removed because text/structure communicates better]
   density_levers: [KPI strip, supporting context region, evidence strip, small multiples, annotations, benchmark/context column, source cue]
   overload_controls: [one dominant structure, max three major regions, body >=18pt equivalent, grouped labels, no decorative density]
 information_unit_budget:
@@ -271,6 +273,8 @@ ACT slide contract:
 - assign visual_richness_role, illustration_intensity, creative_variance, and density_tier before generation
 - define density_design before generation: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails
 - density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
+- sentence_density_lift_lock: raise density one step with compact meaningful clauses or short sentences in body labels, rows, annotations, and optional Insight; avoid icon-and-keyword-only slides
+- icon_restraint_lock: icons are sparse wayfinding or evidence markers, not the primary content layer; remove generic icon rows, icon wallpaper, and icons that replace clearer text or structure
 - structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
 - structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
 - use issue trees, driver trees, 2x2 matrices, value chains, funnels, waterfalls, KPI bridges, decision tables, before/after bridges, or hypothesis-evidence-implication rows when they improve the reader's decision path; skip them when they would clutter the focal message
@@ -339,15 +343,16 @@ Process:
 6. Build message_backlog, evidence_ledger, source_ledger, appendix_candidates, and open_questions.
 7. For each message, assign supporting evidence, source policy, visual structure, visual richness role, illustration intensity, creative variance, density tier, and density risk.
 8. Run impact_clarity_density_gate: each slide has one unmistakable takeaway, one dominant visual structure, a useful evidence layer, and a simple reading path; repair slides that feel flat, vague, thin, or cluttered.
-9. Run a density design gate for each slide: set reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
-10. Apply evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation.
-11. Split any slide that has more than one message, more than one dominant structure, more than three major regions, or would force body text below 18pt equivalent.
-12. Combine adjacent slides only when messages repeat, the same comparison must be seen together, or the user explicitly requests a shorter deck.
-13. Define deck_header_master_lock, invisible footer alignment baseline, Insight surface master, and repeated table/card/icon masters before image generation.
-14. Read only the action titles in order and repair logical gaps before image generation.
-15. Freeze quoted exact_text for every slide; do not leave copywriting to image generation.
-16. Draft speaker_notes_text for every slide with speaker_notes_depth_lock: 4-7 substantive Japanese sentences or roughly 180-320 Japanese chars, covering framing, 2-3 evidence/assumption cues, implication, caveat/source context when relevant, and transition cue.
-17. For each final slide, produce the canonical planning block and then the image prompt.
+9. Run a density design gate for each slide: set reader_mode, decision_question, information_units, semantic_sentence_layer, icon_restraint_plan, density_levers, overload_controls, information_unit_budget, and density_guardrails.
+10. Apply sentence_density_lift_lock and icon_restraint_lock before image prompting: if the slide reads as icons plus noun labels, add compact explanatory clauses/sentences and reduce icons until the argument is understandable without narration.
+11. Apply evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation.
+12. Split any slide that has more than one message, more than one dominant structure, more than three major regions, or would force body text below 18pt equivalent.
+13. Combine adjacent slides only when messages repeat, the same comparison must be seen together, or the user explicitly requests a shorter deck.
+14. Define deck_header_master_lock, invisible footer alignment baseline, Insight surface master, and repeated table/card/icon masters before image generation.
+15. Read only the action titles in order and repair logical gaps before image generation.
+16. Freeze quoted exact_text for every slide; do not leave copywriting to image generation.
+17. Draft speaker_notes_text for every slide with speaker_notes_depth_lock: 4-7 substantive Japanese sentences or roughly 180-320 Japanese chars, covering framing, 2-3 evidence/assumption cues, implication, caveat/source context when relevant, and transition cue.
+18. For each final slide, produce the canonical planning block and then the image prompt.
 
 Output:
 - deck_thesis:
@@ -401,6 +406,8 @@ Output:
       reader_mode:
       decision_question:
       information_units:
+      semantic_sentence_layer:
+      icon_restraint_plan:
       density_levers:
       overload_controls:
     evidence_compression_ladder:
@@ -455,13 +462,14 @@ Process:
 5. Create layout_diversity_plan and layout_rotation_guard so the sequence can use full-field, asymmetric main/supporting-context, balanced comparison, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase families where useful.
 6. Define the deck_header_master_lock with exact selected x/y/w/h/color/font values and carry it verbatim into every slide prompt.
 7. Assign visual_richness_role, illustration_intensity, creative_variance, and density_tier for every slide, with a deck-level mix of human-designed editorial/vector illustrations, data visuals, small system scenes, icon evidence, and quiet tables.
-8. Assign density_design for every slide: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails.
-9. Assign visual_design_quality_traits as visual treatment only: compact fixed header, thin structural lines, pale cards/tables, restrained icons, explanatory line drawings, stable outer padding, concrete visual anchor, and crisp focal hierarchy.
-10. Assign Insight components selectively across the deck only when they add non-redundant interpretation, decision weight, or reading speed. Start each slide from `insight_decision: none`, and keep a component only when `insight_justification_required` is satisfied. Apply `honey_selective_signal_lock`: Honey remains rare, purposeful, and bottom-bar-only.
-11. Vary dominant structures so the deck feels edited around the argument.
-12. Mark restrained illustration candidates where the idea becomes more memorable or fresh without becoming a rough sketch or glossy hero illustration.
-13. Flag slides that should split because density would force body below 18pt equivalent or create competing major regions.
-14. Define source policy per slide: none / real source list.
+8. Assign density_design for every slide: reader_mode, decision_question, information_units, semantic_sentence_layer, icon_restraint_plan, density_levers, overload_controls, information_unit_budget, and density_guardrails.
+9. Ensure sentence_density_lift_lock and icon_restraint_lock are satisfied before the final prompt: body content should read as meaningful clauses/sentences, while icons remain sparse support.
+10. Assign visual_design_quality_traits as visual treatment only: compact fixed header, thin structural lines, pale cards/tables, restrained icons, explanatory line drawings, stable outer padding, concrete visual anchor, and crisp focal hierarchy.
+11. Assign Insight components selectively across the deck only when they add non-redundant interpretation, decision weight, or reading speed. Start each slide from `insight_decision: none`, and keep a component only when `insight_justification_required` is satisfied. Apply `honey_selective_signal_lock`: Honey remains rare, purposeful, and bottom-bar-only.
+12. Vary dominant structures so the deck feels edited around the argument.
+13. Mark restrained illustration candidates where the idea becomes more memorable or fresh without becoming a rough sketch or glossy hero illustration.
+14. Flag slides that should split because density would force body below 18pt equivalent or create competing major regions.
+15. Define source policy per slide: none / real source list.
 15. Define deck-level master refs: header, invisible footer alignment baseline, Insight surface skeleton, table/card masters, icon circle sizes.
 16. Draft speaker_notes_text for every slide before generation. Each note should support presentation delivery, not duplicate all visible text: use speaker_notes_depth_lock with a substantial Japanese talk script, key evidence or assumptions to mention, source caveat if needed, implication, and transition to the next slide.
 17. Run Guideline/Brand, Header Master, Layout, Typography, Visual Richness, Density, Content, and Deck gates.
@@ -616,6 +624,8 @@ Content:
 - title is a message, subtitle supports
 - density_design answers a clear decision_question and does not rely on smaller type or decorative detail
 - structure_choice_bias and structured_density_bias are applied selectively: structure and density increase the decision value without turning every slide into a rigid template
+- sentence_density_lift_lock is applied: the slide uses compact meaningful clauses/sentences where the reader needs relationships, reasons, consequences, or decision relevance, and is not an icon-and-keyword-only composition
+- icon_restraint_lock is applied: icons are purposeful, sparse support and do not dominate or substitute for the semantic sentence layer
 - information units are grouped and each added layer improves the message
 - Insight adds interpretation, not repetition
 - Insight/message-box placement creates a calm reading bridge between the relevant content and the footer when used at the bottom
