@@ -10,10 +10,12 @@ import sys
 import tempfile
 import re
 from pathlib import Path
+from types import SimpleNamespace
 
 from openpyxl import Workbook
 from openpyxl import load_workbook
 from openpyxl.styles import PatternFill
+from openpyxl.utils import range_boundaries
 
 SKILL_DIR = Path(__file__).resolve().parents[2]
 REPO_ROOT = SKILL_DIR.parents[1]
@@ -32,6 +34,11 @@ SECOND_VALUE_COL = FIRST_VALUE_COL + 1
 FIRST_VALUE_LETTER = source_plan.get_column_letter(FIRST_VALUE_COL)
 SECOND_VALUE_LETTER = source_plan.get_column_letter(SECOND_VALUE_COL)
 UNIT_COL = source_plan.LAYOUT.unit_col
+
+
+def _column_width(ws, column_letter: str) -> float:
+    dimension = ws.column_dimensions.get(column_letter)
+    return dimension.width if dimension and dimension.width is not None else 0
 
 
 def test_skill_exposes_clean_build_route_only() -> None:
@@ -141,25 +148,130 @@ def test_economic_kernel_is_separate_from_workbook_renderer() -> None:
     assert "from economic_kernel import" in builder_text
 
 
+def test_japanese_money_units_parse_at_correct_scale() -> None:
+    assert kernel.money_yen([r"([0-9,.]+)\s*(万|億|兆)"], "900億円", 0) == 90_000_000_000
+    assert kernel.money_yen([r"([0-9,.]+)\s*(万|億|兆)"], "1.2兆円", 0) == 1_200_000_000_000
+    assert kernel.money_yen([r"([0-9,.]+)\s*(万|億|兆)"], "3200万円", 0) == 32_000_000
+    assert kernel.money_yen([r"([0-9,.]+)\s*(m|bn|b)"], "12bn", 0) == 12_000_000_000
+
+
+def test_seed_to_pre_ipo_horizon_is_not_truncated_to_two_years() -> None:
+    assert kernel.extract_forecast_periods("5年のpre-IPO financial modelを月次で作る", "monthly") == 60
+    assert kernel.extract_forecast_periods("36か月のシード資金計画", "monthly") == 36
+
+
 def test_generated_workbook_contains_interpretive_analysis_surfaces() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "full.xlsx"
         build_model.build_model(None, out, mode="full")
         wb = load_workbook(out, data_only=False)
 
-        assert wb["KPI"]["B62"].value == "KPI interpretation register"
-        assert wb["Scenarios"]["B23"].value == "Scenario interpretation"
-        assert wb["Sensitivity"]["B25"].value == "Sensitivity rationale"
-        assert wb["Valuation"]["B30"].value == "Method credibility"
+        assert wb["KPI"].cell(_row_for_label(wb, "KPI", "KPI interpretation register"), 2).value == "KPI interpretation register"
+        assert wb["Scenarios"].cell(_row_for_label(wb, "Scenarios", "Scenario interpretation"), 2).value == "Scenario interpretation"
+        assert wb["Sensitivity"].cell(_row_for_label(wb, "Sensitivity", "Sensitivity rationale"), 2).value == "Sensitivity rationale"
+        assert wb["Valuation"].cell(_row_for_label(wb, "Valuation", "Method credibility"), 2).value == "Method credibility"
         assert wb["Benchmarks"]["B5"].value == "source_id"
-        assert wb["IC Memo"]["B10"].value == "KPI readout"
+        memo_row = _row_for_label(wb, "IC Memo", "KPI readout")
+        assert wb["IC Memo"].cell(memo_row, 2).value == "KPI readout"
+        assert isinstance(wb["IC Memo"].cell(memo_row + 1, 2).value, str)
+        assert wb["IC Memo"].cell(memo_row + 1, 2).value.startswith("=")
 
         formulas = [formula for _, _, formula in _formula_cells(wb)]
         assert not any("AVERAGE(" in formula and "'Valuation'" not in formula for formula in formulas)
         assert "Primary-method EV" in "\n".join(str(cell.value) for cell in wb["Valuation"]["C"] if cell.value)
+        assert "PV of forecast FCF" in "\n".join(str(cell.value) for cell in wb["Valuation"]["C"] if cell.value)
+        assert "Illustrative IRR" in "\n".join(str(cell.value) for cell in wb["Valuation"]["C"] if cell.value)
 
 
-def test_orchestrator_no_longer_routes_through_legacy_saas_skeleton() -> None:
+def test_mechanic_specific_kpi_and_scenario_axes_are_rendered() -> None:
+    cases = [
+        ("# Marketplace\nMarketplace with GMV, take rate, buyer and seller liquidity. Source: management memo.", "Take rate", "GMV / liquidity scale"),
+        ("# Robotics\nHardware robot deployment with BOM, service, lease financing and utilization. Source: management memo.", "Asset payback", "Deployment capacity scale"),
+        ("# Lending\nFintech lending model with origination, credit loss, warehouse line and collections. Source: management memo.", "Loss / collection quality", "Warehouse / debt headroom"),
+    ]
+    for source_text, expected_kpi, expected_driver in cases:
+        tmp, wb = _sample_source_workbook(source_text)
+        try:
+            kpi_text = "\n".join(str(cell.value) for row in wb["KPI"].iter_rows() for cell in row if cell.value is not None)
+            scenario_text = "\n".join(str(cell.value) for row in wb["Scenarios"].iter_rows() for cell in row if cell.value is not None)
+            assert expected_kpi in kpi_text
+            assert expected_driver in scenario_text
+        finally:
+            tmp.cleanup()
+
+
+def test_ambiguous_mechanics_use_generic_kpis_and_scenario_axes() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA new startup with unclear revenue mechanics and weak evidence. Source: management memo."
+    )
+    try:
+        kpi_text = "\n".join(str(cell.value) for row in wb["KPI"].iter_rows() for cell in row if cell.value is not None)
+        scenario_text = "\n".join(str(cell.value) for row in wb["Scenarios"].iter_rows() for cell in row if cell.value is not None)
+        assert "Economic unit clarity" in kpi_text
+        assert "Demand evidence scale" in scenario_text
+        assert "CAC payback" not in kpi_text
+        assert "New logo / conversion scale" not in scenario_text
+    finally:
+        tmp.cleanup()
+
+
+def test_cost_labeled_scenario_drivers_pressure_costs_not_revenue() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nPre-revenue prototype company with milestone, prototype, grant, and hiring risk. Source: management memo."
+    )
+    try:
+        ws = wb["Scenarios"]
+        scenario_row = _row_for_label(wb, "Scenarios", "Prototype / program cost factor")
+        assert ws.cell(scenario_row, source_plan.LAYOUT.label_col).value == "Prototype / program cost factor"
+        revenue_formula = _first_year_cell_for_label(wb, "Scenarios", "Revenue").value
+        gross_profit_formula = _first_year_cell_for_label(wb, "Scenarios", "Gross profit").value
+        assert f"{FIRST_VALUE_LETTER}${scenario_row}" not in revenue_formula
+        assert f"{FIRST_VALUE_LETTER}${scenario_row}" in gross_profit_formula
+        hiring_row = _row_for_label(wb, "Scenarios", "Hiring capacity scale")
+        ebitda_formula = _first_year_cell_for_label(wb, "Scenarios", "EBITDA").value
+        assert f"{FIRST_VALUE_LETTER}${hiring_row}" not in revenue_formula
+        assert f"{FIRST_VALUE_LETTER}${hiring_row}" in ebitda_formula
+    finally:
+        tmp.cleanup()
+
+
+def test_unclassified_scenario_drivers_default_to_opex_not_revenue() -> None:
+    revenue_factor, cost_factor, opex_factor, financing_factor = source_plan._scenario_driver_formula_terms(
+        FIRST_VALUE_LETTER,
+        (SimpleNamespace(label="Regulatory clearance readiness"),),
+    )
+    assert revenue_factor == "1"
+    assert cost_factor == "1"
+    assert opex_factor == f"{FIRST_VALUE_LETTER}$7"
+    assert financing_factor == "1"
+
+
+def test_financing_driver_downside_widens_funding_gap() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nAsset-heavy deployment startup with lease financing, warehouse capacity, and deployment risk. Source: management memo."
+    )
+    try:
+        formula = _first_year_cell_for_label(wb, "Scenarios", "Funding gap").value
+        financing_row = _row_for_label(wb, "Scenarios", "Financing capacity scale")
+        assert f"MAX(0.01,{FIRST_VALUE_LETTER}${financing_row})" in formula
+        assert f"-{FIRST_VALUE_LETTER}17/MAX" in formula
+        assert f"-{FIRST_VALUE_LETTER}17*{FIRST_VALUE_LETTER}${financing_row}" not in formula
+    finally:
+        tmp.cleanup()
+
+
+def test_cost_build_does_not_double_count_detailed_service_costs_in_variable_cogs() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "full.xlsx"
+        build_model.build_model(None, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+
+        formula = _first_year_cell_for_label(wb, "Cost Build", "Variable COGS").value
+        assert formula == f"={FIRST_VALUE_LETTER}7*'Assumptions'!{FIRST_VALUE_LETTER}24"
+        assert "SUM('Assumptions'!" not in formula
+
+
+def test_orchestrator_routes_through_generic_source_plan_builder() -> None:
     orchestrator_text = (SCRIPTS_DIR / "build_model.py").read_text(encoding="utf-8")
 
     assert "three_statement_builder" not in orchestrator_text
@@ -278,14 +390,16 @@ def test_intra_sheet_formula_cells_are_black() -> None:
         assert violations == []
 
 
-def test_ic_memo_dependency_stays_compact_when_added_to_focused_bundle() -> None:
+def test_ic_memo_dependency_closure_matches_live_formula_readouts() -> None:
     bundle = build_model.resolve_bundle("market_sizing", additional_sheets=["IC Memo"])
 
     assert "IC Memo" in bundle
     assert "Kernel" in bundle
-    assert "KPI" not in bundle
-    assert "Scenarios" not in bundle
-    assert "Valuation" not in bundle
+    assert "KPI" in bundle
+    assert "Scenarios" in bundle
+    assert "Capital Stack" in bundle
+    assert "Ownership" in bundle
+    assert "Valuation" in bundle
 
 
 def test_cash_flow_runway_formula_floors_negative_cash_at_zero() -> None:
@@ -294,7 +408,7 @@ def test_cash_flow_runway_formula_floors_negative_cash_at_zero() -> None:
         build_model.build_model(None, out, mode="full")
 
         wb = load_workbook(out, data_only=False)
-        formula = wb["CF"].cell(32, FIRST_VALUE_COL).value
+        formula = _first_year_cell_for_label(wb, "CF", "Runway months").value
 
         assert formula == f"=IF({FIRST_VALUE_LETTER}16>=0,99,MAX(0,{FIRST_VALUE_LETTER}31)/ABS({FIRST_VALUE_LETTER}16/12))"
 
@@ -491,7 +605,7 @@ def _unit_label_violations(wb) -> list[str]:
     ]
 
 
-def _legacy_money_scale_formulas(wb) -> list[str]:
+def _raw_money_scale_formula_violations(wb) -> list[str]:
     return [
         f"{ws.title}!{cell.coordinate}: {cell.value}"
         for ws in wb.worksheets
@@ -689,7 +803,7 @@ Source: customer discovery memo, market sizing memo, lender discussion notes.
         assert "customer discovery memo" in str(wb["Market Support"]["B8"].value)
         assert _wrapped_cells(wb) == []
         assert _unit_label_violations(wb) == []
-        assert _legacy_money_scale_formulas(wb) == []
+        assert _raw_money_scale_formula_violations(wb) == []
         assert _numbered_section_labels(wb) == []
         assert _leading_space_labels(wb) == []
         assert _missing_section_band_fills(wb) == []
@@ -831,8 +945,9 @@ def test_source_plan_starting_cash_is_hard_input_blue() -> None:
         "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
     )
     try:
-        assert _font_rgb(wb["Assumptions"].cell(47, FIRST_VALUE_COL)) == ib.IB_HARD_INPUT
-        assert _font_rgb(wb["Assumptions"].cell(47, SECOND_VALUE_COL)) == ib.IB_LINK_INTRA
+        beginning_cash_row = _row_for_label(wb, "Assumptions", "Beginning cash")
+        assert _font_rgb(wb["Assumptions"].cell(beginning_cash_row, FIRST_VALUE_COL)) == ib.IB_HARD_INPUT
+        assert _font_rgb(wb["Assumptions"].cell(beginning_cash_row, SECOND_VALUE_COL)) == ib.IB_LINK_INTRA
     finally:
         tmp.cleanup()
 
@@ -869,9 +984,9 @@ def test_source_plan_bold_rows_preserve_ib_cell_colors() -> None:
         "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
     )
     try:
-        assert _font_rgb(wb["Capital Stack"].cell(7, FIRST_VALUE_COL)) == ib.IB_HARD_INPUT
-        assert _font_rgb(wb["Capital Stack"].cell(12, FIRST_VALUE_COL)) == ib.IB_LINK_INTRA
-        assert _font_rgb(wb["Capital Stack"].cell(13, FIRST_VALUE_COL)) == ib.IB_LINK_INTRA
+        assert _font_rgb(_first_year_cell_for_label(wb, "Capital Stack", "Equity financing")) == ib.IB_HARD_INPUT
+        assert _font_rgb(_first_year_cell_for_label(wb, "Capital Stack", "Ending cash")) == ib.IB_LINK_INTRA
+        assert _font_rgb(_first_year_cell_for_label(wb, "Capital Stack", "Runway")) == ib.IB_LINK_INTRA
         assert _font_rgb(wb["Cost Build"].cell(16, FIRST_VALUE_COL)) == ib.IB_LINK_INTRA
         assert _font_rgb(wb["People Plan"].cell(11, FIRST_VALUE_COL)) == ib.IB_LINK_INTRA
     finally:
@@ -948,6 +1063,8 @@ def test_source_plan_chart_axes_and_tabs_follow_currency_and_semantic_roles() ->
         assert "$K / months" not in axis_titles
         assert "units" in axis_titles
         assert "units / $K" not in axis_titles
+        assert ib.validate_sheet_naming(source_plan.SOURCE_PLAN_SHEETS) == []
+        assert [name for name in source_plan.SOURCE_PLAN_SHEETS if name not in ib.SHEET_ROLE_MAPPING] == []
         assert _tab_rgb(wb["Market Support"]) == ib.BRAND_SLATE
         assert _tab_rgb(wb["Benchmarks"]) == ib.BRAND_WARNING
         assert _tab_rgb(wb["IC Memo"]) == ib.BRAND_ACCENT
@@ -990,12 +1107,12 @@ def test_source_plan_tables_do_not_overlap_metadata_columns() -> None:
     )
     try:
         assert [wb["Scenarios"].cell(7, c).value for c in range(FIRST_VALUE_COL, FIRST_VALUE_COL + 3)] == [0.70, 1.00, 1.30]
-        assert wb["Scenarios"].cell(7, source_plan.LAYOUT.label_col).value == "Volume scale"
+        assert wb["Scenarios"].cell(7, source_plan.LAYOUT.label_col).value == "New logo / conversion scale"
         assert wb["Scenarios"].cell(7, source_plan.LAYOUT.unit_col).value == "x"
         assert wb["Financing"].cell(16, FIRST_VALUE_COL).value == f"='Scenarios'!{FIRST_VALUE_LETTER}19"
         assert [wb["Sensitivity"].cell(7, c).value for c in range(FIRST_VALUE_COL, FIRST_VALUE_COL + 5)] == [0.60, 0.80, 1.00, 1.20, 1.40]
         assert wb["Sensitivity"].cell(8, FIRST_VALUE_COL - 1).value == 0.80
-        assert wb["Sensitivity"].cell(8, FIRST_VALUE_COL).value == f"=('Revenue Build'!J18*{FIRST_VALUE_LETTER}$7*$E8)-('Cost Build'!J12*{FIRST_VALUE_LETTER}$7)-'P&L'!J17"
+        assert wb["Sensitivity"].cell(8, FIRST_VALUE_COL).value == f"=('Revenue Build'!J18*{FIRST_VALUE_LETTER}$7*$E8)-('Cost Build'!J12*1)-('P&L'!J17*1)"
     finally:
         tmp.cleanup()
 
@@ -1100,17 +1217,56 @@ def test_source_plan_ib_design_rhythm_and_visibility() -> None:
             expected_title_cols = f"A:{source_plan.get_column_letter(source_plan.LAYOUT.unit_col)}"
             expected_title_cols_abs = f"$A:${source_plan.get_column_letter(source_plan.LAYOUT.unit_col)}"
             assert ws.print_title_cols in {expected_title_cols, expected_title_cols_abs}
-            assert (ws.column_dimensions["A"].width or 0) == ib.COL_MARGIN_WIDTH
-            assert (ws.column_dimensions[source_plan.get_column_letter(source_plan.LAYOUT.first_hierarchy_col)].width or 0) >= ib.COL_HIERARCHY_WIDTH
-            assert (ws.column_dimensions[source_plan.get_column_letter(source_plan.LAYOUT.label_col)].width or 0) >= ib.COL_LABEL_WIDTH
-            assert (ws.column_dimensions[source_plan.get_column_letter(source_plan.LAYOUT.source_col)].width or 0) >= ib.COL_SOURCE_WIDTH
-            assert (ws.column_dimensions[source_plan.get_column_letter(source_plan.LAYOUT.unit_col)].width or 0) >= ib.COL_UNIT_WIDTH
+            assert _column_width(ws, "A") == ib.COL_MARGIN_WIDTH
+            if ws.max_column >= source_plan.LAYOUT.first_hierarchy_col:
+                assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.first_hierarchy_col)) >= ib.COL_HIERARCHY_WIDTH
+            if ws.max_column >= source_plan.LAYOUT.label_col:
+                assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.label_col)) >= ib.COL_LABEL_WIDTH
+            if ws.max_column >= source_plan.LAYOUT.source_col:
+                assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.source_col)) >= ib.COL_SOURCE_WIDTH
+            if ws.max_column >= source_plan.LAYOUT.unit_col:
+                assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.unit_col)) >= ib.COL_UNIT_WIDTH
             assert (ws.row_dimensions[2].height or 0) <= 20
             assert (ws.row_dimensions[5].height or 0) <= 18
             if ws.cell(5, source_plan.START_PERIOD_COL).value is not None:
                 assert ws.freeze_panes == f"{source_plan.get_column_letter(source_plan.START_PERIOD_COL)}6"
-        assert wb["Assumptions"].column_dimensions["C"].width >= 54
-        assert wb["Assumptions"].column_dimensions["D"].width >= 54
+        assert _column_width(wb["Assumptions"], "C") >= 54
+        assert _column_width(wb["Assumptions"], "D") >= 54
+    finally:
+        tmp.cleanup()
+
+
+def _print_area_bounds(ws) -> tuple[int, int, int, int]:
+    area = str(ws.print_area).replace("'", "").replace("$", "")
+    if "!" in area:
+        area = area.split("!", 1)[1]
+    return range_boundaries(area)
+
+
+def test_source_plan_print_canvas_includes_rendered_used_range() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
+    )
+    try:
+        assert _styled_blank_cells(wb) == []
+        for ws in wb.worksheets:
+            rendered_row, rendered_col = ib.rendered_bounds(ws)
+            min_col, min_row, max_col, max_row = _print_area_bounds(ws)
+            assert (min_row, min_col) == (1, 1)
+            assert max_row >= rendered_row
+            assert max_col >= rendered_col
+            assert ws.max_row <= rendered_row
+            assert ws.max_column <= rendered_col
+            stray_dimensions = [
+                key
+                for key in ws.column_dimensions
+                if range_boundaries(f"{key}1:{key}1")[0] > rendered_col
+            ]
+            assert stray_dimensions == []
+
+        for ws in wb.worksheets:
+            ws.insert_rows(ws.max_row + 1)
+            assert ws.cell(ws.max_row + 1, 1).style_id == 0
     finally:
         tmp.cleanup()
 
@@ -1163,6 +1319,20 @@ def test_generic_kernel_does_not_promote_domain_specific_mentions_to_sources() -
     assert facts.source_names == ["management memo"]
 
 
+def test_benchmark_register_uses_evidence_status_not_fake_source_placeholders() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA generic startup plan. Source: management memo."
+    )
+    try:
+        text = "\n".join(str(cell.value) for row in wb["Benchmarks"].iter_rows() for cell in row if cell.value is not None)
+        forbidden = ["provided source / owner", "external benchmark TBD", "TBD"]
+        assert [term for term in forbidden if term in text] == []
+        assert "management memo" in text
+        assert "unresolved evidence" in text
+    finally:
+        tmp.cleanup()
+
+
 def test_scenario_formulas_are_not_built_with_fragile_substring_replacement() -> None:
     builder_text = (SCRIPTS_DIR / "source_plan_builder.py").read_text(encoding="utf-8")
 
@@ -1192,12 +1362,20 @@ if __name__ == "__main__":
     test_skill_uses_generic_economic_kernel_not_stage_matrix()
     test_prompt_guidance_resists_fixed_template_routing()
     test_economic_kernel_is_separate_from_workbook_renderer()
+    test_japanese_money_units_parse_at_correct_scale()
+    test_seed_to_pre_ipo_horizon_is_not_truncated_to_two_years()
     test_generated_workbook_contains_interpretive_analysis_surfaces()
-    test_orchestrator_no_longer_routes_through_legacy_saas_skeleton()
+    test_mechanic_specific_kpi_and_scenario_axes_are_rendered()
+    test_ambiguous_mechanics_use_generic_kpis_and_scenario_axes()
+    test_cost_labeled_scenario_drivers_pressure_costs_not_revenue()
+    test_unclassified_scenario_drivers_default_to_opex_not_revenue()
+    test_financing_driver_downside_widens_funding_gap()
+    test_cost_build_does_not_double_count_detailed_service_costs_in_variable_cogs()
+    test_orchestrator_routes_through_generic_source_plan_builder()
     test_focused_modes_use_generic_kernel_after_bundle_filter()
     test_full_model_uses_direct_formula_refs()
     test_intra_sheet_formula_cells_are_black()
-    test_ic_memo_dependency_stays_compact_when_added_to_focused_bundle()
+    test_ic_memo_dependency_closure_matches_live_formula_readouts()
     test_cash_flow_runway_formula_floors_negative_cash_at_zero()
     test_cross_sheet_formula_cells_are_green()
     test_pricing_bundle_is_intent_sized()
@@ -1222,9 +1400,11 @@ if __name__ == "__main__":
     test_source_plan_has_no_excel_indent_or_clipped_role_columns()
     test_source_plan_has_no_long_centered_prose_headers()
     test_source_plan_ib_design_rhythm_and_visibility()
+    test_source_plan_print_canvas_includes_rendered_used_range()
     test_source_plan_custom_tables_keep_text_columns_readable()
     test_excluded_sheets_cannot_create_broken_references()
     test_ib_helpers_do_not_use_native_indent_for_hierarchy()
     test_generic_kernel_does_not_promote_domain_specific_mentions_to_sources()
+    test_benchmark_register_uses_evidence_status_not_fake_source_placeholders()
     test_scenario_formulas_are_not_built_with_fragile_substring_replacement()
     test_build_model_routes_source_markdown_to_source_plan()

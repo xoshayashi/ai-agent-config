@@ -55,13 +55,32 @@ understand the judgment:
 | Decision implication | What management or investor should do differently |
 | DD action | Evidence needed to confirm or retire the risk |
 
-If a workbook helper uses a generic starter case, rewrite or annotate the case
-so it maps to evidenced drivers before presenting it as decision support.
+Every scenario axis must map to evidenced drivers before it is presented as
+decision support.
 
 Avoid mechanically using volume x price for every model. A pricing decision may
 need price x churn, a runway decision may need burn x financing timing, a debt
 decision may need EBITDA x covenant headroom, and a hardware model may need
 BOM x deployment utilization.
+
+## Mechanic-Aware Axes
+
+Choose axes from the actual economic unit and weakest evidence, not the company
+label:
+
+- recurring contract: conversion, ACV/expansion, churn/retention, CAC or sales
+  capacity;
+- marketplace / transaction: GMV liquidity, take rate, incentives/fraud, repeat
+  behavior, settlement or working-capital timing;
+- asset / hardware: deployment capacity, utilization, BOM/service cost, capex,
+  warranty, lease/debt availability;
+- balance-sheet / fintech: origination, loss/collection, funding cost, warehouse
+  headroom, regulatory capital;
+- proof-before-revenue: milestone timing, prototype or trial cost, grant/advance
+  coverage, hiring capacity.
+
+Name and annotate each axis so the reader sees which evidenced weakness the
+case is pressuring.
 
 ## Breakpoints
 

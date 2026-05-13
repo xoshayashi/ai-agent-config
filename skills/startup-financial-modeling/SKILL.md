@@ -9,15 +9,15 @@ Build startup finance outputs from economic primitives. First define the
 decision, model grain, currency, fiscal year, time horizon, entities, and source
 boundary. Separate facts, estimates, assumptions, and unknowns.
 
-References live in `build/references/`. Use `_modeling_kernel.md`,
-`_coverage_universe.md`, `_generic_composition_protocol.md`,
-`_assumption_decomposition_patterns.md`, `_output_modes.md`,
-`_layout_canonical.md`, `_ib_workbook_design_system.md`, `_terminology.md`,
+References live in `build/references/`; load the smallest set that covers the
+decision. Start with `_output_modes.md`, `_generic_composition_protocol.md`,
+and `_self_review_protocol.md`. Add `_modeling_kernel.md`,
+`_coverage_universe.md`, `_assumption_decomposition_patterns.md`,
 `_kpi_analytics.md`, `_scenario_sensitivity_playbook.md`,
 `_valuation_and_return_logic.md`, `_ic_memo_depth.md`,
-`_benchmark_protocol.md`, `_self_review_protocol.md`. Load the smallest bundle
-that covers the decision; investor-ready, DD, valuation, audit/repair, and full
-plan work need the KPI/scenario/valuation/benchmark/memo/self-review refs.
+`_benchmark_protocol.md`, `_terminology.md` for full plans, fundraising, DD,
+or investor outputs. Add `_layout_canonical.md` and
+`_ib_workbook_design_system.md` for workbook repair or visible design issues.
 
 Core pattern: compose from decision and dependencies; examples, maturity cues,
 sectors, and modes are prompts for reasoning, not templates. Build the driver
@@ -42,10 +42,9 @@ links, raw money values with display formats, compact unit labels, direct
 formulas, editable grid structure, unnumbered sections, traceable sources, and
 generated cells with `wrap_text` off.
 
-Design gates: `_ib_workbook_design_system.md` and `_layout_canonical.md` are the
-source of truth. Use column hierarchy, quiet white grid, semantic fills, readable
-label/source widths, real overflow lanes, aligned Source/Unit columns, centered
-period headers, left prose, and one primary chart unit per axis.
+Design gates: `_layout_canonical.md` owns grid, columns, freeze panes, units,
+formulas, and layout mechanics. `_ib_workbook_design_system.md` owns visual
+roles, font, color, borders, highlights, charts, and render expectations.
 
 Analysis gates: material assumptions need selected driver, explanatory drivers,
 implied value, support ratio/variance, and evidence status. Weak evidence feeds

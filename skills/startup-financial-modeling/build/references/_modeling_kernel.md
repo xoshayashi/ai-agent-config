@@ -127,6 +127,26 @@ Store monetary inputs as raw base-currency values and express `actual`,
 unit labels. Operational units such as units, customers, FTE, days, months,
 percentages, and multiples should keep their own non-money units.
 
+## Best-Practice Benchmark Lens
+
+Use external benchmarks as context for questions, not as frozen truth. Current
+startup finance practice consistently rewards:
+
+- driver-based assumptions separated from dependent outputs;
+- assumptions supported by historical data, source facts, benchmarks, or clear
+  evidence status;
+- unit economics at the real economic-unit level rather than blended averages;
+- runway and funding need tied to burn, milestones, working capital, capex,
+  financing capacity, and dilution;
+- scenario and sensitivity axes chosen from high-impact weak evidence;
+- valuation tied to method credibility, financing risk, ownership, and investor
+  returns;
+- a memo that names the breakpoint and DD action rather than only summarizing
+  tabs.
+
+If the model cannot source a benchmark, mark the benchmark as needing refresh
+and carry the unsupported driver into scenario, sensitivity, and diligence.
+
 ## Implementation Boundary
 
 The workbook builder should keep economic inference separate from spreadsheet

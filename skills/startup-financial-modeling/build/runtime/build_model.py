@@ -87,7 +87,7 @@ SHEET_DEPENDENCIES: dict[str, list[str]] = {
     "Valuation": ["Revenue Build", "Cost Build", "P&L", "CF", "Capital Stack", "Segments"],
     "Market Support": ["Kernel"],
     "Benchmarks": ["Kernel"],
-    "IC Memo": ["Kernel"],
+    "IC Memo": ["Kernel", "KPI", "Scenarios", "Capital Stack", "Ownership", "Valuation"],
 }
 
 VALID_MODES: list[str] = list(MODE_BUNDLE_SEEDS.keys())

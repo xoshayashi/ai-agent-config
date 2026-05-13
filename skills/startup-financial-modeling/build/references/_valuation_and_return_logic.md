@@ -37,6 +37,18 @@ Tie value to model drivers:
 Selected enterprise value should be explainable through these drivers and
 should reconcile to investor return, not only to an exit multiple.
 
+## DCF And Method Credibility
+
+DCF support should expose the actual bridge: forecast free cash flow, discount
+rate, terminal growth or exit multiple, terminal value, PV of forecast cash
+flows, PV of terminal value, enterprise value, net debt, and equity value. If
+the terminal value dominates or cash flows are not yet explainable, label DCF as
+a cross-check rather than a primary method.
+
+The selected value should identify which method is driving it and why. Averaging
+methods without a credibility rationale weakens the model; a clean method
+selection with exclusions is stronger than a broad but unsupported average.
+
 ## Return View
 
 Investor and founder outcomes should include:
