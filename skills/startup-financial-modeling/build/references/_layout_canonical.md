@@ -36,6 +36,17 @@
   fit the role column, use a wider table-specific column, move to a dedicated
   note / interpretation column, or overflow into intentionally empty adjacent
   cells.
+- No-Merge Rule: do not merge cells to make titles, section bands, headers,
+  notes, or long text look wider. Merged cells make filtering, selection,
+  filling, formulas, and Google Sheets editing worse. Use normal cells,
+  column widths, fill spans, and truly blank overflow cells instead.
+- Classify text before changing wrap settings. If the cell is a title,
+  subtitle, instruction line, explanation, bullet, source caveat, or note row
+  and the cells to the right can be left empty, keep wrapping off and let the
+  text read horizontally through those blank cells without merging. Use
+  wrapping only for bounded table prose where right-side cells are occupied by
+  meaningful values, formulas, units, or notes and the user accepts the taller
+  row.
 - Any proposed `wrap_text=True` change is a design failure unless the user has
   explicitly requested a prose-heavy workbook exception; prefer restructuring
   the grid before considering that exception.

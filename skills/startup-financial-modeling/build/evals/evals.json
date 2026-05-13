@@ -412,7 +412,7 @@
         },
         {
           "id": "H2a",
-          "text": "Hierarchy / indent columns render as 20px in Google Sheets (about 2.14 xlsx width), with no native Excel indent, no leading-space indentation, no frozen panes, and no generated text wrapping; any user-approved wrapping or manual line-break exception has row height matched exactly to visible line count",
+          "text": "Hierarchy / indent columns render as 20px in Google Sheets (about 2.14 xlsx width), with no native Excel indent, no leading-space indentation, no merged cells, no frozen panes, and no generated text wrapping; visible wrap/tall-text rows are audited by role and right-side blank overflow space, and any user-approved bounded-prose wrapping or manual line-break exception has row height matched exactly to visible line count",
           "type": "implementation"
         },
         {
@@ -561,7 +561,7 @@
   "notes": [
     "The core regression is generic composition from economic kernel and driver tree.",
     "Maturity, sector, and funding context are evidence fields, not template selectors.",
-    "All xlsx outputs should preserve raw base-currency money storage, unit integrity, no text wrapping, exact line-count row heights for approved wrap/line-break exceptions, no frozen panes, Google-Sheets-20px hierarchy / indent columns, sparse rectangular semantic fill/border spans aligned to attached row components, direct formulas, and editable workbook structure.",
+    "All xlsx outputs should preserve raw base-currency money storage, unit integrity, no merged cells, no text wrapping, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank overflow cells are available, exact line-count row heights for approved bounded-prose wrap/line-break exceptions, no frozen panes, Google-Sheets-20px hierarchy / indent columns, sparse rectangular semantic fill/border spans aligned to attached row components, direct formulas, and editable workbook structure.",
     "Prompt guidance must force assumption epistemology, KPI interpretation, coherent scenarios, valuation method credibility, clean-base memo writing, benchmark/source hygiene, and self-inspection before completion.",
     "Model creation is not completion: agents must verify both model logic and sheet design with command-based workbook checks plus rendered-output inspection, then fix and rerun until both are sufficient or a real blocker is documented.",
     "Examples, maturity cues, sectors, and modes are pattern prompts only; evals should reject fixed stage-sector-purpose routing and keyword-triggered metric packs."

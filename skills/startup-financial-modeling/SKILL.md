@@ -39,15 +39,21 @@ Money inputs are raw base-currency values; `_yen` names are money-driver names.
 
 Workbook gates: blue inputs, black formulas, green internal links, red external
 links, raw money values with display formats, compact unit labels, direct
-formulas, editable grid structure, unnumbered sections, traceable sources,
-Google-Sheets-20px hierarchy / indent columns (`2.14` xlsx width), no native
-indent or leading-space indentation, no frozen panes, and generated cells with
-`wrap_text` off. Treat text wrapping as prohibited for
+formulas, editable grid structure, unnumbered sections, traceable sources, no
+merged cells, Google-Sheets-20px hierarchy / indent columns (`2.14` xlsx
+width), no native indent or leading-space indentation, no frozen panes, and
+generated cells with `wrap_text` off. Treat text wrapping as prohibited for
 generated workbook cells; fix long text with column width, table structure, or
-blank overflow space instead of enabling `wrap_text=True`. If the user
-explicitly requests a prose-heavy exception with wrapping or manual line breaks,
-row height must be set to the exact visible line count so no text is clipped and
-the row still looks intentional.
+blank overflow space instead of enabling `wrap_text=True`. Before accepting
+any wrap exception, classify the cell's role and the right-side space:
+titles, explanatory lines, instructions, notes, bullets, and source caveats
+with empty cells to the right should keep wrapping off and read horizontally
+through blank overflow cells without merging cells. Reserve wrapping only for
+user-approved prose or table cells that must stay inside a bounded column
+because adjacent cells carry meaningful values, formulas, units, or notes. If
+such an exception uses wrapping or manual line breaks, row height must be set
+to the exact visible line count so no text is clipped and the row still looks
+intentional.
 
 Design gates: `_layout_canonical.md` owns grid, columns, hierarchy widths, units,
 formulas, and layout mechanics. `_ib_workbook_design_system.md` owns visual

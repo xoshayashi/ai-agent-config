@@ -48,6 +48,22 @@ is neither clipped nor floating inside excess whitespace.
 Use the row-height helper in `ib_format.py` rather than relying on spreadsheet
 auto-height guesses.
 
+Before allowing any wrap exception, classify the text row:
+
+- Horizontal-read rows keep wrap off. This includes sheet titles, subtitles,
+  guide/instruction rows, explanatory notes, bullets, source caveats, and short
+  memo lines when adjacent cells to the right can stay empty for overflow. A
+  horizontal note is better as one low row that reads across blank unmerged
+  cells than as a tall wrapped or merged cell.
+- Bounded table prose may use a user-approved wrap exception only when the text
+  must remain inside one column because adjacent cells carry related table
+  values, formulas, units, or notes. Even then, the row height must match the
+  rendered line count exactly.
+- If a screenshot shows a tall row created only by wrapping a horizontal-read
+  note, repair by turning wrap off, clearing the overflow cells, and widening
+  or restructuring the row before considering any wrap exception. Do not use
+  merged cells as the repair.
+
 ## Workbook Tokens
 
 Use these tokens instead of inventing local formatting:

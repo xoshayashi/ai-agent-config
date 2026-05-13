@@ -713,19 +713,28 @@ def test_skill_guidance_makes_no_wrap_rule_explicit() -> None:
     self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
     eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
     ib_text = (SCRIPTS_DIR / "ib_format.py").read_text(encoding="utf-8")
+    skill_flat = " ".join(skill_text.split())
     layout_flat = " ".join(layout_text.split())
+    design_flat = " ".join(design_text.split())
 
     combined = "\n".join([skill_text, layout_text, design_text, self_review_text, eval_text, ib_text])
     assert "No-Wrap Rule" in combined
     assert "Treat text wrapping as prohibited" in skill_text
+    assert "no merged cells" in skill_flat
+    assert "without merging cells" in skill_flat
     assert "reject `wrap_text=True`" in design_text
+    assert "Do not use merged cells as the repair" in design_flat
     assert "明示的に wrap_text=True" not in ib_text
-    assert "row height must be set to the exact visible line count" in skill_text
+    assert "row height must be set to the exact visible line count" in skill_flat
     assert "clipped text, auto-height guesses, or oversized padded rows are design defects" in layout_flat
+    assert "No-Merge Rule" in layout_text
+    assert "let the text read horizontally through those blank cells without merging" in layout_flat
     assert "exact number of visible text lines" in design_text
     assert "wrapped_text_row_height" in ib_text
     assert "set_wrapped_exception_row_height" in ib_text
     assert "row height matched exactly to visible line count" in eval_text
+    assert "visible wrap/tall-text rows are audited by role" in eval_text
+    assert "no unnecessary wrapping on horizontal-read" in eval_text
 
 
 def test_skill_guidance_requires_fix_and_rerun_iteration() -> None:

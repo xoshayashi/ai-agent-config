@@ -63,6 +63,12 @@ heavy process.
 - Confirm hierarchy / indentation uses dedicated Google-Sheets-20px columns
   (`2.14` xlsx width), with no native Excel indent, no leading-space
   indentation, and no wrapped generated cells.
+- Audit every visible wrap or tall text row before accepting it. If the cell is
+  a title, instruction, explanation, bullet, source caveat, or note and the
+  right-side cells can remain blank, remove wrapping, clear those overflow
+  cells, and let the text read horizontally without merging cells. Keep wrap
+  only for user-approved bounded prose where neighboring cells carry meaningful
+  values, formulas, units, or notes.
 - If a user-approved exception uses wrapping or manual line breaks, verify the
   row height is sized to the exact visible line count and the rendered text is
   neither clipped nor padded into a loose-looking row.
