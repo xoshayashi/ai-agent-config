@@ -1181,7 +1181,17 @@ def _row_height_violations(wb) -> list[str]:
         for idx, dimension in ws.row_dimensions.items():
             if dimension.height is None:
                 continue
-            if float(dimension.height) not in allowed:
+            actual = float(dimension.height)
+            if actual in allowed:
+                continue
+            wrapped_exception_heights = {
+                ib.wrapped_text_row_height(ib.visible_text_line_count(cell.value))
+                for cell in ws[idx]
+                if isinstance(cell.value, str)
+                and "\n" in cell.value
+                and cell.alignment.wrap_text is True
+            }
+            if actual not in wrapped_exception_heights:
                 violations.append(f"{ws.title}!{idx}: height={dimension.height}")
     return violations
 
