@@ -44,22 +44,19 @@ formulas, editable grid structure, unnumbered sections, traceable sources, no
 merged cells, Google-Sheets-20px hierarchy / indent columns (`2.14` xlsx
 width), no native indent or leading-space indentation, no frozen panes, and
 generated cells with `wrap_text` off. Treat text wrapping as prohibited for
-generated workbook cells; fix long text with column width, table structure, or
-blank overflow space instead of enabling `wrap_text=True`. Before accepting
-any wrap exception, classify the cell's role and the right-side space:
-titles, explanatory lines, instructions, notes, bullets, and source caveats
-with empty cells to the right should keep wrapping off and read horizontally
-through blank overflow cells without merging cells. Reserve wrapping only for
-user-approved prose or table cells that must stay inside a bounded column
-because adjacent cells carry meaningful values, formulas, units, or notes. If
-such an exception uses wrapping or manual line breaks, row height must be set
-to the exact visible line count so no text is clipped and the row still looks
-intentional.
-Use the IB wrap decision ladder: first shorten or split the copy, then widen
-the role column, then reserve blank unstyled overflow cells, then move prose to
-a dedicated note/interpretation column or separate row. Only after those fail
-may a user-approved bounded-prose wrap be used. Do not place horizontal-read
-text in the final printed/rendered column where it cannot overflow visibly.
+generated workbook cells. Classify the cell role before changing wrap settings:
+horizontal-read titles, explanations, instructions, notes, bullets, source
+caveats, and memo lines keep wrap off and read through blank unmerged unstyled
+overflow cells. Use the IB wrap decision ladder before any exception: shorten
+or split the copy, widen the role column, reserve blank unstyled overflow
+cells, or move prose to a dedicated note / interpretation column, source
+register, memo sheet, or separate row. Use a wrapped/manual-line-break
+exception only for user-approved bounded table prose that must stay inside one
+column because adjacent cells carry meaningful values, formulas, units, or
+notes. Do not place horizontal-read text in the final printed/rendered column
+where it cannot overflow visibly. If an exception uses wrapping or manual line
+breaks, set row height to the exact rendered visible line count so text is not
+clipped or padded.
 Text position is part of auditability: labels, sources, notes, titles, memos,
 and interpretation text are left-aligned; numeric values, formulas, money,
 percentages, multiples, counts, and unit labels are right-aligned; only period

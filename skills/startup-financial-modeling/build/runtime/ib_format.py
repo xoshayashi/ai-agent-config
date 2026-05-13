@@ -155,10 +155,11 @@ WRAP_TEXT_ERROR = (
     "startup-financial-modeling forbids wrap_text=True for generated workbook "
     "cells. Classify the cell role first: titles, instructions, notes, bullets, "
     "and source caveats with empty cells to the right should read horizontally "
-    "through blank overflow cells without merging. Use wider columns, dedicated "
-    "note columns, shorter rows, or blank overflow cells instead. If a "
-    "user-approved bounded-prose exception uses wrapping or manual line breaks, "
-    "set row height to the exact visible line count."
+    "through blank unstyled overflow cells without merging. Use wider columns, "
+    "dedicated note columns, shorter rows, or blank unstyled overflow cells "
+    "instead. If a user-approved bounded table prose exception uses wrapping "
+    "or manual line breaks, set row height to the exact rendered visible line "
+    "count."
 )
 WRAP_DECISION_LADDER: tuple[str, ...] = (
     "shorten_or_split_copy",
@@ -172,8 +173,8 @@ WRAP_BEST_PRACTICE = (
     "instructions, notes, bullets, source caveats, and memo lines should read "
     "through blank unstyled overflow cells without merging and must not be "
     "trapped at the final print/render column. Wrapping or manual line breaks "
-    "are reserved for user-approved bounded prose and require exact line-count "
-    "row height."
+    "are reserved for user-approved bounded table prose and require exact "
+    "rendered visible line-count row height."
 )
 
 ALIGN_LABEL = "left"
@@ -1307,24 +1308,24 @@ def apply_wrapped_exception(
     adjacent_cells_carry_meaning: bool,
     line_count: int | None = None,
 ) -> None:
-    """Apply the only sanctioned wrap path for bounded prose exceptions.
+    """Apply the only sanctioned wrap path for bounded table prose exceptions.
 
     Normal generated workbook cells must not use wrapping. Call this only after
-    the user has explicitly approved bounded prose that cannot read through
-    blank overflow cells because neighboring table cells carry meaningful
-    values, formulas, units, or notes. The helper sets wrapping and exact row
-    height together so the exception cannot clip text or create a loose padded
-    row.
+    the user has explicitly approved bounded table prose that cannot read
+    through blank unstyled overflow cells because neighboring table cells carry
+    meaningful values, formulas, units, or notes. The helper sets wrapping and
+    exact row height together so the exception cannot clip text or create a
+    loose padded row.
     """
     if not user_approved:
         raise ValueError(
             "Wrapped prose exceptions require explicit user approval; use "
-            "blank overflow cells without merging for horizontal-read text."
+            "blank unstyled overflow cells without merging for horizontal-read text."
         )
     if not bounded_prose or not adjacent_cells_carry_meaning:
         raise ValueError(
-            "Wrapped prose exceptions are only for bounded prose whose adjacent "
-            "table cells carry meaningful values, formulas, units, or notes."
+            "Wrapped prose exceptions are only for bounded table prose whose "
+            "adjacent table cells carry meaningful values, formulas, units, or notes."
         )
     base = cell.alignment
     count = visible_text_line_count(cell.value) if line_count is None else max(1, int(line_count))

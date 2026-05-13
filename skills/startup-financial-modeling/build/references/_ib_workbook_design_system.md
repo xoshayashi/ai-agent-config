@@ -72,15 +72,14 @@ formula. Keep the alignment system boring and consistent:
   or assumptions harder to audit.
 
 No-Wrap Rule: do not solve readability by turning on cell text wrapping. If
-text clips, widen the relevant role column, split the content into shorter
-rows, move commentary to a note / interpretation column, or reserve blank
-overflow cells. Generated workbook helpers should reject `wrap_text=True`
-instead of silently accepting it. If the user explicitly approves a prose-heavy
-exception with wrapping or manual line breaks, row height becomes part of the
-design contract: set it to the exact number of visible text lines so the text
-is neither clipped nor floating inside excess whitespace.
-Use the row-height helper in `ib_format.py` rather than relying on spreadsheet
-auto-height guesses.
+text clips, follow the IB wrap decision ladder below. Generated workbook
+helpers should reject `wrap_text=True` instead of silently accepting it. A
+wrap/manual-line-break exception is valid only for user-approved bounded table
+prose that must stay in one populated table column. When an exception is
+approved, row height becomes part of the design contract: set it to the exact
+rendered visible line count so the text is neither clipped nor floating inside
+excess whitespace. Use the row-height helper in `ib_format.py` rather than
+relying on spreadsheet auto-height guesses.
 
 IB wrap decision ladder:
 
@@ -91,7 +90,8 @@ IB wrap decision ladder:
 4. Move longer prose to a dedicated note / interpretation column, source
    register, memo sheet, or separate lower row.
 5. Use a wrapped/manual-line-break exception only for user-approved bounded
-   prose that must remain inside a populated table column.
+   table prose that must remain inside one populated table column because
+   adjacent cells carry meaningful values, formulas, units, or notes.
 
 Before allowing any wrap exception, classify the text row:
 

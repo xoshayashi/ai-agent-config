@@ -761,7 +761,7 @@ def test_ib_helpers_reject_wrap_text_true() -> None:
             adjacent_cells_carry_meaning=True,
         )
     except ValueError as exc:
-        assert "bounded prose" in str(exc)
+        assert "bounded table prose" in str(exc)
     else:
         raise AssertionError("apply_wrapped_exception accepted horizontal-read text")
 
@@ -814,7 +814,7 @@ def test_runtime_builders_do_not_use_wrap_or_merge_layout_shortcuts() -> None:
     ib_text_without_unmerge = ib_text.replace("unmerge_cells(", "")
     assert ".merge_cells(" not in ib_text_without_unmerge
     assert "merge_cells(" not in ib_text_without_unmerge
-    assert "blank overflow cells without merging" in ib.WRAP_TEXT_ERROR
+    assert "blank unstyled overflow cells without merging" in ib.WRAP_TEXT_ERROR
     assert "use_user_approved_bounded_prose_wrap_only" in ib.WRAP_DECISION_LADDER
     assert "final print/render column" in ib.WRAP_BEST_PRACTICE
 
@@ -834,18 +834,18 @@ def test_skill_guidance_makes_no_wrap_rule_explicit() -> None:
     assert "No-Wrap Rule" in combined
     assert "Treat text wrapping as prohibited" in skill_text
     assert "no merged cells" in skill_flat
-    assert "without merging cells" in skill_flat
+    assert "blank unmerged unstyled overflow cells" in skill_flat
     assert "reject `wrap_text=True`" in design_text
     assert "Do not use merged cells as the repair" in design_flat
     assert "明示的に wrap_text=True" not in ib_text
-    assert "row height must be set to the exact visible line count" in skill_flat
+    assert "set row height to the exact rendered visible line count" in skill_flat
     assert "clipped text, auto-height guesses, or oversized padded rows are design defects" in layout_flat
     assert "No-Merge Rule" in layout_text
     assert "let the text read horizontally through those blank cells without merging" in layout_flat
-    assert "exact number of visible text lines" in design_text
+    assert "exact rendered visible line count" in design_flat
     assert "wrapped_text_row_height" in ib_text
     assert "set_wrapped_exception_row_height" in ib_text
-    assert "row height matched exactly to visible line count" in eval_text
+    assert "row height matched exactly to the rendered visible line count" in eval_text
     assert "visible wrap/tall-text rows are audited by role" in eval_text
     assert "no unnecessary wrapping on horizontal-read" in eval_text
     assert "IB wrap decision ladder" in design_text
@@ -853,6 +853,10 @@ def test_skill_guidance_makes_no_wrap_rule_explicit() -> None:
     assert "Horizontal-read rows must also have visual runway" in design_text
     assert "Manual line breaks are treated as wrapped exceptions" in design_text
     assert "blank unstyled overflow cells" in combined
+    assert "user-approved prose or table cells" not in combined
+    assert "blank overflow space" not in combined
+    assert "bounded-prose" not in combined
+    assert "bounded table prose" in combined
     assert "print/render boundary" in combined
     assert "XLSX_WRAP_DISCIPLINE" in eval_text
 
@@ -1042,8 +1046,10 @@ def test_xlsx_evals_load_full_design_reference_stack() -> None:
                     missing.append(f"{item['id']}:{item['name']} missing blank overflow assertion")
                 if "final print/render column" not in text:
                     missing.append(f"{item['id']}:{item['name']} missing print/render boundary assertion")
-                if "manual line breaks appear only for user-approved bounded prose" not in text:
+                if "manual line breaks appear only for user-approved bounded table prose" not in text:
                     missing.append(f"{item['id']}:{item['name']} missing manual-line-break assertion")
+                if "exact rendered visible-line-count row height" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing rendered-visible row-height assertion")
             if assertion.get("id") == "XLSX_FONT_HIERARCHY":
                 text = assertion.get("text", "")
                 if "constrained IB hierarchy" not in text:

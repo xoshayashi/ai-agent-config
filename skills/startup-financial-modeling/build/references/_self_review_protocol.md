@@ -91,16 +91,16 @@ heavy process.
   a title, instruction, explanation, bullet, source caveat, or note and the
   right-side cells can remain blank, remove wrapping, clear those overflow
   cells, and let the text read horizontally without merging cells. Keep wrap
-  only for user-approved bounded prose where neighboring cells carry meaningful
-  values, formulas, units, or notes.
+  only for user-approved bounded table prose where neighboring cells carry
+  meaningful values, formulas, units, or notes.
 - Apply the wrap decision ladder before approving any exception: shorten/split
   the copy, widen the role column, reserve blank unstyled overflow cells, move
-  prose to a note/interpretation surface, and only then allow bounded prose
-  wrapping. Confirm horizontal-read text is not trapped at the print/render
-  boundary or blocked by styled overflow cells.
+  prose to a note/interpretation surface, and only then allow bounded table
+  prose wrapping. Confirm horizontal-read text is not trapped at the
+  print/render boundary or blocked by styled overflow cells.
 - If a user-approved exception uses wrapping or manual line breaks, verify the
-  row height is sized to the exact visible line count and the rendered text is
-  neither clipped nor padded into a loose-looking row.
+  row height is sized to the exact rendered visible line count and the rendered
+  text is neither clipped nor padded into a loose-looking row.
 - Inspect the print/render canvas: each sheet should end at the last real value
   row and column, including chart and drawing anchors, with print area bound to
   that rendered range and no styled blank rows or columns extending the visual
