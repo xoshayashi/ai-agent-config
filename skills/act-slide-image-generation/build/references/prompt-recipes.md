@@ -39,6 +39,8 @@ image_delivery_size: 2048x1152; use the same approved slides_final/ PNG masters 
 generation_route: Codex built-in image generation
 builtin_generation_lock: invoke Codex built-in image generation directly and start generating slide PNGs; do not pause for local environment preflight or local artifact-route probing before generation
 codex_image_artifact_rule: the image returned by Codex built-in image generation is the authoritative generated PNG artifact; use the Codex-provided artifact/download/attachment path to materialize approved outputs under slides_final/ when a filesystem path is needed for PPTX packaging
+image_generation_tool_lock: final slide PNG pixels must be produced by Codex built-in image generation, not by repo scripts, local renderers, screenshots, or presentation exports
+script_boundary_lock: prompt builder scripts are planning helpers only; package scripts run only after approved Codex image artifacts exist and must never render, draw, screenshot, export, simulate, or replace final slide PNGs
 local_env_non_blocker: local environment uncertainty is not a blocker and must not be reported as the reason PPTX is unfinished
 credential_setup_blocker: do not create, request, decrypt, configure, inspect, or wait for account credentials, local tokens, SDK setup, or environment variables; use Codex built-in image generation directly
 generation_status: generated_with_builtin_gpt-image-2 / blocked
@@ -224,6 +226,7 @@ ACT slide contract:
 - embedded ACT style is the default, palette, typography, and components
 - use embedded ACT design mechanics
 - use image_model gpt-image-2
+- prompt/package scripts are helpers only: use them to scaffold prompts, validate manifests, or package already-approved Codex image artifacts; never use scripts to render, draw, screenshot, export, simulate, or replace final slide PNGs
 - use generation_mode new_image for new single-slide images or image_edit for screenshot/reference repair
 - use image_size 2048x1152 for generated slide output, review, PPTX packaging, and PDF packaging; do not create separate 1920x1080, 1672x941, draft-size, QHD, or 4K delivery PNG masters
 - treat strict DCI 2K 2048x1080 and DCI 4K 4096x2160 as non-target cinema sizes, not ACT 16:9 slide generation sizes
