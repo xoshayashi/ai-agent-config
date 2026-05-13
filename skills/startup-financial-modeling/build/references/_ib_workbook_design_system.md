@@ -85,7 +85,8 @@ Design for the rendered sheet, not only the xlsx file:
 - Unit labels are consistently right-aligned next to values.
 - Prose cells are left-aligned, while period headers are the main centered text.
 - Empty spacer cells remain truly empty and unstyled, preserving overflow.
-- Freeze panes keep row 5 and all metadata columns visible while values scroll.
+- Do not freeze rows or columns; generated workbooks should open without fixed
+  panes and remain readable through column widths and repeated header structure.
 - The workbook canvas ends at the last rendered row and column on every sheet:
   values, charts, and drawings stay inside the print area, while trailing blank
   rows or columns do not carry fills, borders, or row-height styling.

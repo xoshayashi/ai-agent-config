@@ -1049,7 +1049,7 @@ def test_source_plan_uses_column_based_hierarchy_layout() -> None:
         assert ws.column_dimensions["D"].width == layout.source_width
         assert ws.column_dimensions["E"].width == layout.unit_width
         assert ws.column_dimensions[FIRST_VALUE_LETTER].width == layout.period_width
-        assert ws.freeze_panes == f"{FIRST_VALUE_LETTER}6"
+        assert ws.freeze_panes is None
         assert [ws.cell(5, c).value for c in range(2, FIRST_VALUE_COL + 1)] == [
             "Section",
             "Line item",
@@ -1260,8 +1260,9 @@ def test_source_plan_ib_design_rhythm_and_visibility() -> None:
             expected_title_cols_abs = f"$A:${source_plan.get_column_letter(source_plan.LAYOUT.unit_col)}"
             assert ws.print_title_cols in {expected_title_cols, expected_title_cols_abs}
             assert _column_width(ws, "A") == ib.COL_MARGIN_WIDTH
-            if ws.max_column >= source_plan.LAYOUT.first_hierarchy_col:
-                assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.first_hierarchy_col)) >= ib.COL_HIERARCHY_WIDTH
+            for col in range(source_plan.LAYOUT.first_hierarchy_col, source_plan.LAYOUT.label_col):
+                if ws.max_column >= col:
+                    assert _column_width(ws, source_plan.get_column_letter(col)) >= ib.COL_HIERARCHY_WIDTH
             if ws.max_column >= source_plan.LAYOUT.label_col:
                 assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.label_col)) >= ib.COL_LABEL_WIDTH
             if ws.max_column >= source_plan.LAYOUT.source_col:
@@ -1270,8 +1271,7 @@ def test_source_plan_ib_design_rhythm_and_visibility() -> None:
                 assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.unit_col)) >= ib.COL_UNIT_WIDTH
             assert (ws.row_dimensions[2].height or 0) <= 20
             assert (ws.row_dimensions[5].height or 0) <= 18
-            if ws.cell(5, source_plan.START_PERIOD_COL).value is not None:
-                assert ws.freeze_panes == f"{source_plan.get_column_letter(source_plan.START_PERIOD_COL)}6"
+            assert ws.freeze_panes is None
         assert _column_width(wb["Assumptions"], "C") >= 54
         assert _column_width(wb["Assumptions"], "D") >= 54
     finally:
@@ -1351,6 +1351,24 @@ def test_ib_helpers_do_not_use_native_indent_for_hierarchy() -> None:
 
     assert ws["B2"].alignment.indent == 0
     assert ws["D3"].alignment.indent == 0
+
+
+def test_added_hierarchy_columns_keep_width_20_floor() -> None:
+    wb = Workbook()
+    ws = wb.active
+    original_layout = source_plan.LAYOUT
+    try:
+        source_plan.LAYOUT = source_plan.LayoutSpec(hierarchy_cols=3)
+        source_plan._set_column_widths(ws, {2: 5, 3: 8, 4: 10, 5: 24, 6: 24, 7: 8})
+
+        assert ws.column_dimensions["B"].width == ib.COL_HIERARCHY_WIDTH
+        assert ws.column_dimensions["C"].width == ib.COL_HIERARCHY_WIDTH
+        assert ws.column_dimensions["D"].width == ib.COL_HIERARCHY_WIDTH
+        assert ws.column_dimensions["E"].width >= ib.COL_LABEL_WIDTH
+        assert ws.column_dimensions["F"].width >= ib.COL_SOURCE_WIDTH
+        assert ws.column_dimensions["G"].width >= ib.COL_UNIT_WIDTH
+    finally:
+        source_plan.LAYOUT = original_layout
 
 
 def test_generic_kernel_does_not_promote_domain_specific_mentions_to_sources() -> None:
@@ -1449,6 +1467,7 @@ if __name__ == "__main__":
     test_source_plan_custom_tables_keep_text_columns_readable()
     test_excluded_sheets_cannot_create_broken_references()
     test_ib_helpers_do_not_use_native_indent_for_hierarchy()
+    test_added_hierarchy_columns_keep_width_20_floor()
     test_generic_kernel_does_not_promote_domain_specific_mentions_to_sources()
     test_benchmark_register_uses_evidence_status_not_fake_source_placeholders()
     test_scenario_formulas_are_not_built_with_fragile_substring_replacement()
