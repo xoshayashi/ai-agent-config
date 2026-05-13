@@ -26,9 +26,14 @@
 - Unit columns show compact atomic labels. Monetary rows use `円`, `千円`,
   `百万円`, `$`, `$K`, or `$M`; operational rows use units such as `units`,
   `count`, `customers`, `FTE`, `months`, `%`, or `x`.
-- Generated cells keep `wrap_text` disabled. Long labels, sources, and notes
-  either fit the role column, use a wider table-specific column, or overflow
-  into intentionally empty adjacent cells.
+- No-Wrap Rule: generated cells keep `wrap_text` disabled. Do not use wrapped
+  text as a layout tool in model sheets. Long labels, sources, and notes either
+  fit the role column, use a wider table-specific column, move to a dedicated
+  note / interpretation column, or overflow into intentionally empty adjacent
+  cells.
+- Any proposed `wrap_text=True` change is a design failure unless the user has
+  explicitly requested a prose-heavy workbook exception; prefer restructuring
+  the grid before considering that exception.
 - Spacer cells that support text overflow remain truly blank and unstyled;
   formatting appears where it carries table, header, output, or status meaning.
 - Evidence status cells in period columns must use compact, controlled labels

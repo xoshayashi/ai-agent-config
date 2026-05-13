@@ -594,6 +594,37 @@ def _wrapped_cells(wb) -> list[str]:
     ]
 
 
+def test_ib_helpers_reject_wrap_text_true() -> None:
+    wb = Workbook()
+    ws = wb.active
+
+    for apply_func in (ib.apply_label, ib.apply_comment):
+        try:
+            apply_func(ws["A1"], wrap_text=True)
+        except ValueError as exc:
+            assert "forbids wrap_text=True" in str(exc)
+        else:
+            raise AssertionError(f"{apply_func.__name__} accepted wrap_text=True")
+
+    ib.apply_label(ws["A2"])
+    ib.apply_comment(ws["A3"])
+    assert ws["A2"].alignment.wrap_text is False
+    assert ws["A3"].alignment.wrap_text is False
+
+
+def test_skill_guidance_makes_no_wrap_rule_explicit() -> None:
+    skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    layout_text = (SKILL_DIR / "build" / "references" / "_layout_canonical.md").read_text(encoding="utf-8")
+    design_text = (SKILL_DIR / "build" / "references" / "_ib_workbook_design_system.md").read_text(encoding="utf-8")
+    ib_text = (SCRIPTS_DIR / "ib_format.py").read_text(encoding="utf-8")
+
+    combined = "\n".join([skill_text, layout_text, design_text])
+    assert "No-Wrap Rule" in combined
+    assert "Treat text wrapping as prohibited" in skill_text
+    assert "reject `wrap_text=True`" in design_text
+    assert "明示的に wrap_text=True" not in ib_text
+
+
 def _unit_label_violations(wb) -> list[str]:
     bad_fragments = ("単位:", "単位：", "Unit:", "JPY M", "JPY B")
     return [
@@ -1385,6 +1416,8 @@ if __name__ == "__main__":
     test_balance_sheet_has_opening_capital_counterpart()
     test_mfn_applied_only_for_changed_safe_terms()
     test_cap_table_rebuild_clears_prior_sheet_fills()
+    test_ib_helpers_reject_wrap_text_true()
+    test_skill_guidance_makes_no_wrap_rule_explicit()
     test_source_backed_plan_reaches_generic_kernel_shape()
     test_structured_yaml_currency_and_display_scale_are_generic()
     test_marketplace_source_does_not_emit_unrelated_asset_heavy_template()
