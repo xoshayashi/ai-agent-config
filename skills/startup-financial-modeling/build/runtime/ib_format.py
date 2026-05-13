@@ -116,10 +116,13 @@ IB_CHART_COLORS_WATERFALL_TOTAL: str = "666666" # gray — totals/subtotals
 #     (Office Excel default の Calibri 11pt と混同しないこと)。`_layout_canonical
 #     §3.2` および `00_design_guidelines §2.2` で Arial 10pt を canonical 確定。
 #   - body / data           = 10pt
-#   - section header        = 11pt bold (`01a §5.1`)
+#   - section header        = 10-11pt bold (`01a §5.1`)
 #   - sheet title (B1)      = 14pt bold
 #   - period header         = 10pt bold italic
-#   - comment / footnote    = 9pt italic gray (#808080)
+#   - comment / footnote    = 9pt italic gray (#666666)
+#   - populated worksheet cells stay within 9/10/11/14pt. Do not use 8pt
+#     cells to squeeze content or 16pt+ presentation headings inside model
+#     grids; fix layout, width, or copy length instead.
 #   - 日本語混在は OS fallback に委譲 (Mac=ヒラギノ、Windows=Yu Gothic)、
 #     cell font 指定は Arial のまま (font_family を変えると Latin face が崩れる)。
 # Chart 内部 font (axis tick / title) は本 file の責務外。`apply_chart_palette`
@@ -131,6 +134,19 @@ FONT_SIZE_SMALL = 9        # comment / footnote / unit label
 FONT_SIZE_LARGE = 11       # section header
 FONT_SIZE_TITLE = 14       # cover title
 FONT_SIZE_TINY = 8         # chart axis tick (charts only — cells should not use this)
+FONT_SIZE_ALLOWED_CELLS: tuple[int, ...] = (
+    FONT_SIZE_SMALL,
+    FONT_SIZE_BASE,
+    FONT_SIZE_LARGE,
+    FONT_SIZE_TITLE,
+)
+FONT_SIZE_BEST_PRACTICE = (
+    "IB model cells use a constrained font-size palette: 9pt supporting "
+    "notes/sources/unit helpers, 10pt body/model cells, 11pt compact section "
+    "emphasis, and 14pt sheet titles only. Avoid 8pt worksheet cells, 16pt+ "
+    "presentation headings, and improvised local sizes; repair layout instead "
+    "of shrinking text."
+)
 
 FONT_BODY = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, color=IB_INK)
 FONT_BODY_BOLD = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, bold=True, color=IB_INK)
@@ -434,7 +450,7 @@ FONT_GRAND_TOTAL = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, bold=True, color=
 FONT_COVER_TITLE = Font(name=FONT_FAMILY, size=FONT_SIZE_TITLE, bold=True, color="FFFFFF")
 
 # Public semantic aliases used by builder modules.
-FONT_SECTION = FONT_TITLE
+FONT_SECTION = FONT_SECTION_HEADER
 FONT_SUBSECTION = FONT_BODY_BOLD
 FONT_TOTAL = FONT_SUBTOTAL
 
@@ -1422,7 +1438,12 @@ def write_cover(
     """
     if confidential:
         ws["F2"] = "CONFIDENTIAL"
-        ws["F2"].font = Font(name=FONT_FAMILY, size=FONT_SIZE_TINY, bold=True, color=BRAND_PRIMARY_DEEP)
+        ws["F2"].font = Font(
+            name=FONT_FAMILY,
+            size=FONT_SIZE_SMALL,
+            bold=True,
+            color=BRAND_PRIMARY_DEEP,
+        )
         ws["F2"].alignment = Alignment(horizontal="right")
 
     ws["B6"] = title

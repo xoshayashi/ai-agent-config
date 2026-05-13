@@ -79,6 +79,11 @@ heavy process.
 - Confirm workbook default font and populated cell fonts use the canonical
   design tokens: Arial 10pt body/default, 9pt italic gray notes, 14pt title,
   and compact bold section/header rows.
+- Confirm the populated cell font-size palette is intentionally small: 9pt for
+  supporting notes/sources/unit helpers, 10pt for body/model cells, 11pt for
+  compact section emphasis, and 14pt for sheet titles only. Treat 8pt cell
+  text, 16pt+ model-grid titles, or many improvised local sizes as design
+  defects; fix layout rather than shrinking text.
 - Confirm hierarchy / indentation uses dedicated Google-Sheets-20px columns
   (`2.14` xlsx width), with no native Excel indent, no leading-space
   indentation, and no wrapped generated cells.
@@ -161,9 +166,10 @@ heavy process.
   names unless explicitly required, and mode-specific dependency closure.
 - Run the workbook-design checks that prove visible sheet quality:
   canonical fonts, no wrap/freeze/merge/native indent, Google-Sheets-20px
-  hierarchy columns, role-based left/right/center text alignment, row heights,
-  semantic fill spans, sparse colors/borders, blank-cell style cleanup, print
-  areas, chart anchors, and rendered bounds.
+  hierarchy columns, role-based left/right/center text alignment, constrained
+  9/10/11/14pt cell-size palette, row heights, semantic fill spans, sparse
+  colors/borders, blank-cell style cleanup, print areas, chart anchors, and
+  rendered bounds.
 - Treat command output and rendered screenshots/PDFs as complementary evidence.
   Passing commands do not excuse a visibly poor sheet; a good-looking render
   does not excuse broken formulas, units, sources, or reconciliations.

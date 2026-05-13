@@ -17,7 +17,7 @@ from types import SimpleNamespace
 
 from openpyxl import Workbook
 from openpyxl import load_workbook
-from openpyxl.styles import Alignment, PatternFill
+from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter, range_boundaries
 
 SKILL_DIR = Path(__file__).resolve().parents[2]
@@ -896,6 +896,30 @@ def test_skill_guidance_enforces_ib_text_positioning() -> None:
         assert phrase in combined_flat
 
 
+def test_skill_guidance_enforces_ib_font_size_discipline() -> None:
+    skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    design_text = (SKILL_DIR / "build" / "references" / "_ib_workbook_design_system.md").read_text(encoding="utf-8")
+    self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+    eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
+    ib_text = (RUNTIME_DIR / "ib_format.py").read_text(encoding="utf-8")
+    combined_flat = " ".join("\n".join([skill_text, design_text, self_review_text, eval_text, ib_text]).split())
+
+    for phrase in [
+        "Font size discipline is equally strict",
+        "Investment-banking models should look dense, legible, and standardized",
+        "Use Arial 10pt for ordinary body cells",
+        "Use Arial 9pt italic gray for supporting source, note, unit-helper, footnote",
+        "Use 10-11pt bold for section labels and compact header rows",
+        "Use Arial 14pt bold for sheet titles and cover/title surfaces only",
+        "Keep the generated cell-size set intentionally small: 9, 10, 11, and 14pt",
+        "Do not use 8pt cell text to squeeze content",
+        "constrained 9/10/11/14pt cell-size palette",
+        "FONT_SIZE_ALLOWED_CELLS",
+        "FONT_SIZE_BEST_PRACTICE",
+    ]:
+        assert phrase in combined_flat
+
+
 def test_xlsx_evals_load_full_design_reference_stack() -> None:
     evals = json.loads((SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8"))["evals"]
     required = {"_layout_canonical", "_ib_workbook_design_system", "_self_review_protocol", "_sheet_quality_rubric"}
@@ -909,6 +933,8 @@ def test_xlsx_evals_load_full_design_reference_stack() -> None:
             missing.append(f"{item['id']}:{item['name']} missing XLSX_DESIGN assertion")
         if not any(assertion.get("id") == "XLSX_SHEET_QUALITY" for assertion in assertions):
             missing.append(f"{item['id']}:{item['name']} missing XLSX_SHEET_QUALITY assertion")
+        if not any(assertion.get("id") == "XLSX_FONT_HIERARCHY" for assertion in assertions):
+            missing.append(f"{item['id']}:{item['name']} missing XLSX_FONT_HIERARCHY assertion")
         for assertion in assertions:
             if assertion.get("id") == "XLSX_DESIGN":
                 text = assertion.get("text", "")
@@ -942,12 +968,28 @@ def test_xlsx_evals_load_full_design_reference_stack() -> None:
                     missing.append(f"{item['id']}:{item['name']} missing right value alignment guidance")
                 if "centered period/scenario/matrix headers only" not in text:
                     missing.append(f"{item['id']}:{item['name']} missing centered-header-only guidance")
+                if "IB-style font-size discipline" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing IB font-size guidance")
+                if "9/10/11/14pt generated cell palette" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing constrained font-size palette guidance")
+                if "no 8pt squeezed cell text or 16pt+ presentation headings" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing font-size anti-pattern guidance")
             if assertion.get("id") == "XLSX_SHEET_QUALITY":
                 text = assertion.get("text", "")
                 if "sheet-specific purpose, traceable source/evidence boundary" not in text:
                     missing.append(f"{item['id']}:{item['name']} missing sheet purpose/evidence quality guidance")
                 if "Focused tasks include only sheets needed for the decision" not in text:
                     missing.append(f"{item['id']}:{item['name']} missing focused-sheet restraint guidance")
+            if assertion.get("id") == "XLSX_FONT_HIERARCHY":
+                text = assertion.get("text", "")
+                if "constrained IB hierarchy" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing constrained font hierarchy assertion")
+                if "9pt italic gray supporting source/note/unit-helper cells" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing 9pt support-cell assertion")
+                if "10-11pt bold compact section/header cells" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing compact section/header assertion")
+                if "8pt squeezed text" not in text or "16pt+ presentation headings" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing font-size anti-pattern assertion")
     assert missing == []
 
 
@@ -1327,7 +1369,7 @@ def _border_color_violations(wb) -> list[str]:
 
 def _font_design_violations(wb) -> list[str]:
     violations = []
-    allowed_sizes = {ib.FONT_SIZE_SMALL, ib.FONT_SIZE_BASE, ib.FONT_SIZE_LARGE, ib.FONT_SIZE_TITLE}
+    allowed_sizes = {float(size) for size in ib.FONT_SIZE_ALLOWED_CELLS}
     default_font = wb._fonts[0]
     if default_font.name != ib.FONT_FAMILY or float(default_font.sz) != float(ib.FONT_SIZE_BASE):
         violations.append(f"workbook default font={default_font.name} size={default_font.sz}")
@@ -1341,8 +1383,12 @@ def _font_design_violations(wb) -> list[str]:
                     continue
                 if cell.font.name != ib.FONT_FAMILY:
                     violations.append(f"{ws.title}!{cell.coordinate}: font={cell.font.name}")
-                if cell.font.sz is not None and int(float(cell.font.sz)) not in allowed_sizes:
-                    violations.append(f"{ws.title}!{cell.coordinate}: size={cell.font.sz}")
+                if cell.font.sz is not None:
+                    size = float(cell.font.sz)
+                    if size not in allowed_sizes:
+                        violations.append(f"{ws.title}!{cell.coordinate}: size={cell.font.sz}")
+                    if size == float(ib.FONT_SIZE_TINY):
+                        violations.append(f"{ws.title}!{cell.coordinate}: tiny cell font={cell.font.sz}")
     return violations
 
 
@@ -2226,6 +2272,59 @@ def test_ib_helpers_encode_role_based_alignment_tokens() -> None:
     assert ws["F2"].alignment.horizontal == ib.ALIGN_VALUE
 
 
+def test_ib_helpers_encode_role_based_font_size_tokens() -> None:
+    wb = Workbook()
+    ws = wb.active
+
+    ib.apply_label(ws["B2"])
+    ib.apply_comment(ws["C2"])
+    ib.apply_unit_label(ws["D2"])
+    ib.apply_year_header(ws["E2"], "FY2027")
+    ib.apply_section_header(ws["B4"], "Section")
+    ib.write_cover(ws, title="Cover", subtitle="Subtitle", confidential=True)
+
+    assert ib.FONT_SIZE_ALLOWED_CELLS == (
+        ib.FONT_SIZE_SMALL,
+        ib.FONT_SIZE_BASE,
+        ib.FONT_SIZE_LARGE,
+        ib.FONT_SIZE_TITLE,
+    )
+    assert ib.FONT_SIZE_TINY not in ib.FONT_SIZE_ALLOWED_CELLS
+    assert ib.FONT_SECTION == ib.FONT_SECTION_HEADER
+    assert ib.FONT_COMMENT.color.rgb[-6:] == ib.IB_COMMENT
+    assert ib.IB_COMMENT == "666666"
+    assert "constrained font-size palette" in ib.FONT_SIZE_BEST_PRACTICE
+    assert float(ws["B2"].font.sz) == float(ib.FONT_SIZE_BASE)
+    assert float(ws["C2"].font.sz) == float(ib.FONT_SIZE_SMALL)
+    assert float(ws["D2"].font.sz) == float(ib.FONT_SIZE_SMALL)
+    assert float(ws["E2"].font.sz) == float(ib.FONT_SIZE_BASE)
+    assert float(ws["B4"].font.sz) == float(ib.FONT_SIZE_LARGE)
+    assert float(ws["B6"].font.sz) == float(ib.FONT_SIZE_TITLE)
+    assert float(ws["B8"].font.sz) == float(ib.FONT_SIZE_TITLE)
+    assert float(ws["F2"].font.sz) == float(ib.FONT_SIZE_SMALL)
+
+
+def test_font_design_audit_rejects_tiny_fractional_and_presentation_sizes() -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws["A1"] = "Tiny"
+    ws["A1"].font = Font(name=ib.FONT_FAMILY, size=8)
+    ws["A2"] = "Fractional"
+    ws["A2"].font = Font(name=ib.FONT_FAMILY, size=10.5)
+    ws["A3"] = "Presentation"
+    ws["A3"].font = Font(name=ib.FONT_FAMILY, size=16)
+    ws["A4"] = "Wrong family"
+    ws["A4"].font = Font(name="Times New Roman", size=10)
+    ib.set_workbook_default_font(wb)
+
+    violations = _font_design_violations(wb)
+    assert any("A1" in item and "size=8" in item for item in violations)
+    assert any("A1" in item and "tiny cell font=8" in item for item in violations)
+    assert any("A2" in item and "size=10.5" in item for item in violations)
+    assert any("A3" in item and "size=16" in item for item in violations)
+    assert any("A4" in item and "font=Times New Roman" in item for item in violations)
+
+
 def test_added_hierarchy_columns_use_google_sheets_20px_width() -> None:
     wb = Workbook()
     ws = wb.active
@@ -2337,6 +2436,7 @@ if __name__ == "__main__":
     test_skill_guidance_requires_fix_and_rerun_iteration()
     test_skill_guidance_uses_meaningful_sparse_fills_and_borders()
     test_skill_guidance_enforces_ib_text_positioning()
+    test_skill_guidance_enforces_ib_font_size_discipline()
     test_xlsx_evals_load_full_design_reference_stack()
     test_semantic_fill_helper_uses_rectangular_span_including_blanks()
     test_source_backed_plan_reaches_generic_kernel_shape()
@@ -2362,6 +2462,8 @@ if __name__ == "__main__":
     test_excluded_sheets_cannot_create_broken_references()
     test_ib_helpers_do_not_use_native_indent_for_hierarchy()
     test_ib_helpers_encode_role_based_alignment_tokens()
+    test_ib_helpers_encode_role_based_font_size_tokens()
+    test_font_design_audit_rejects_tiny_fractional_and_presentation_sizes()
     test_added_hierarchy_columns_use_google_sheets_20px_width()
     test_generic_kernel_does_not_promote_domain_specific_mentions_to_sources()
     test_benchmark_register_uses_evidence_status_not_fake_source_placeholders()

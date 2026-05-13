@@ -105,7 +105,7 @@ Use these tokens instead of inventing local formatting:
 | Token | Value | Use |
 |---|---|---|
 | Base font | Arial 10pt | All body cells and generated default workbook font |
-| Comment font | Arial 9pt italic gray `#808080` | Sources, notes, explanations, unit helpers |
+| Comment font | Arial 9pt italic gray `#666666` | Sources, notes, explanations, unit helpers |
 | Title font | Arial 14pt bold | Sheet title row |
 | Section font | Arial 10-11pt bold | Section or block labels |
 | Input font | Blue `#0000FF` | Typed assumptions and source facts |
@@ -125,6 +125,32 @@ Use these tokens instead of inventing local formatting:
 
 The xlsx default font must also be Arial 10pt so newly inserted rows inherit
 the same look after the user opens the workbook.
+
+## Font Size Discipline
+
+Investment-banking models should look dense, legible, and standardized. Font
+size is a small hierarchy system, not a decorative palette:
+
+- Use Arial 10pt for ordinary body cells, labels, inputs, formulas, values,
+  period headers, subtotals, grand totals, and generated default cells. This is
+  the modeler's working size and should carry almost all workbook content.
+- Use Arial 9pt italic gray for supporting source, note, unit-helper, footnote,
+  and interpretation-helper text. Do not use 8pt cell text to squeeze content;
+  widen the column, shorten the copy, or move it to a proper note surface.
+- Use 10-11pt bold for section labels and compact header rows. Prefer bold,
+  sparse fill, or a border to show structure before increasing size.
+- Use Arial 14pt bold for sheet titles and cover/title surfaces only. Do not
+  use 16pt+ title styles inside model grids; the workbook should not feel like
+  a slide deck.
+- Keep the generated cell-size set intentionally small: 9, 10, 11, and 14pt.
+  Chart axis ticks or non-cell drawing labels may use smaller sizes when the
+  chart remains readable, but populated worksheet cells should not.
+- Avoid mixing font sizes within a row or table unless the role changes
+  materially. A row's meaning should come from role, placement, number format,
+  color semantics, and sparse borders/fills, not from local size improvisation.
+- If a render looks crowded at 10pt, fix the layout: column width, row count,
+  table structure, overflow space, print area, or copy length. Do not shrink
+  the model to 8pt or 7pt.
 
 ## Color Roles
 

@@ -62,6 +62,12 @@ headers, scenario/matrix headers, and short column headers are centered. Do not
 center long prose or labels, do not use native indent or spaces for hierarchy,
 and keep the same label/source/unit/value positions across sheets whenever
 possible.
+Font size discipline is equally strict: body/model cells use Arial 10pt,
+source/note/unit helper text uses 9pt italic gray, compact section/header rows
+use 10-11pt bold, and sheet titles use 14pt bold. Do not create presentation
+hierarchy with many font sizes, 8pt footnote cells, oversized 16pt+ titles, or
+large pasted memo text. If something needs emphasis, prefer role, placement,
+bold, sparse fill/border, or whitespace before changing size.
 
 Design gates: `_layout_canonical.md` owns grid, columns, hierarchy widths, units,
 formulas, and layout mechanics. `_ib_workbook_design_system.md` owns visual
