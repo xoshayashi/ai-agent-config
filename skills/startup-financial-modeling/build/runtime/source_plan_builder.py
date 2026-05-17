@@ -186,6 +186,10 @@ def _display_unit(unit: str, fmt: str | None = None, currency: str = "JPY", scal
             return DISPLAY_UNIT_BY_SCALE.get((currency, "thousand"), "千円")
         if fmt == ib.FMT_JPY_HUNDRED_MILLION:
             return DISPLAY_UNIT_BY_SCALE.get((currency, "hundred_million"), "億円")
+        if fmt == ib.FMT_JPY_BILLION:
+            return DISPLAY_UNIT_BY_SCALE.get((currency, "billion"), "十億円")
+        if fmt == ib.FMT_JPY_TRILLION:
+            return DISPLAY_UNIT_BY_SCALE.get((currency, "trillion"), "兆円")
         if fmt in {ib.FMT_MONEY, ib.FMT_MONEY_DECIMAL, ib.FMT_JPY_MILLION, ib.FMT_USD_MILLION}:
             return DISPLAY_UNIT_BY_SCALE.get((currency, scale), DISPLAY_UNIT_BY_SCALE.get((currency, "million"), "百万円"))
         return DISPLAY_UNIT_BY_SCALE.get((currency, "actual"), YEN_DISPLAY_UNITS["JPY"])

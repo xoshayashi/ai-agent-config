@@ -1408,7 +1408,7 @@ def _unit_label_violations(wb) -> list[str]:
 
 
 def _raw_money_scale_formula_violations(wb) -> list[str]:
-    money_units = {"円", "千円", "百万円", "億円", "$", "$K", "$M"}
+    money_units = {"円", "千円", "百万円", "億円", "十億円", "兆円", "$", "$K", "$M"}
     violations = []
     for ws in wb.worksheets:
         for row in ws.iter_rows():
@@ -2151,6 +2151,8 @@ def test_non_money_units_keep_their_own_formats_and_formulas() -> None:
     assert source_plan._display_unit("USD") == "$"
     assert source_plan._display_unit("USD K") == "$K"
     assert source_plan._display_unit("USD M") == "$M"
+    assert source_plan._display_unit("JPY", ib.FMT_JPY_BILLION) == "十億円"
+    assert source_plan._display_unit("JPY", ib.FMT_JPY_TRILLION) == "兆円"
     assert source_plan._format_for_unit("units", ib.FMT_MONEY) == ib.FMT_INTEGER
     assert source_plan._format_for_unit("customers", ib.FMT_MONEY) == ib.FMT_INTEGER
     assert source_plan._format_for_unit("FTE", ib.FMT_MONEY) == ib.FMT_INTEGER
