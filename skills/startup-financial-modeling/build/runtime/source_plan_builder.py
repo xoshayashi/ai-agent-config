@@ -189,6 +189,8 @@ def _display_unit(unit: str, fmt: str | None = None, currency: str = "JPY", scal
         if fmt in {ib.FMT_MONEY, ib.FMT_MONEY_DECIMAL, ib.FMT_JPY_MILLION, ib.FMT_USD_MILLION}:
             return DISPLAY_UNIT_BY_SCALE.get((currency, scale), DISPLAY_UNIT_BY_SCALE.get((currency, "million"), "百万円"))
         return DISPLAY_UNIT_BY_SCALE.get((currency, "actual"), YEN_DISPLAY_UNITS["JPY"])
+    # Non-JPY currency scale variants are encoded in the unit string
+    # (`USD K`, `USD M`) rather than fmt-dispatched from raw `USD`.
     return MONEY_DISPLAY_UNITS.get(unit, unit)
 
 
