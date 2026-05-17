@@ -191,6 +191,21 @@ def test_marketplace_gmv_honors_stated_maturity_target() -> None:
     )
 
 
+def test_marketplace_present_value_gmv_stays_period_zero_base() -> None:
+    """A present-value GMV ("GMV is ¥10B") must seed the base, not the maturity.
+
+    Guards against a maturity-cue false positive silently scaling a stated
+    current GMV down to a small period-0 figure.
+    """
+    facts = kernel.derive_source_facts(
+        "# Marketplace plan\nThe company is a marketplace startup. GMV is ¥10B "
+        "today, take rate is 12%.\nSource: management memo.\n"
+    )
+    assert facts.gmv_yen[0] >= 9_000_000_000, (
+        f"present-value GMV scaled down to period-0 ¥{facts.gmv_yen[0]:,.0f}"
+    )
+
+
 def test_payroll_is_not_absurd_at_maturity() -> None:
     """Mature-period payroll must not dwarf revenue (a sign of grain mixups)."""
     for name, story in ARCHETYPES.items():
@@ -400,6 +415,7 @@ if __name__ == "__main__":
         test_demand_ramp_reaches_stated_arr,
         test_customer_count_reaches_stated_target,
         test_marketplace_gmv_honors_stated_maturity_target,
+        test_marketplace_present_value_gmv_stays_period_zero_base,
         test_payroll_is_not_absurd_at_maturity,
         test_funding_plan_keeps_the_company_solvent,
         test_seed_round_is_positive_across_archetypes,
