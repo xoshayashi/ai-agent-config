@@ -585,31 +585,36 @@ def first_match_float(patterns: Iterable[str], text: str, default: float) -> flo
     return default
 
 
+def money_from_match(match: re.Match) -> int | None:
+    """Scale a regex match (number group 1, optional unit group 2) to raw yen."""
+    raw = match.group(1).replace(",", "").replace("，", "")
+    unit_raw = match.group(2) if len(match.groups()) >= 2 else ""
+    unit = (unit_raw or "").lower()
+    try:
+        value = float(raw)
+    except ValueError:
+        return None
+    if unit in {"兆", "t", "tn", "trillion"}:
+        return int(value * 1_000_000_000_000)
+    if unit in {"億"}:
+        return int(value * 100_000_000)
+    if unit in {"b", "bn", "billion"}:
+        return int(value * 1_000_000_000)
+    if unit in {"百万", "m", "mn", "million"}:
+        return int(value * 1_000_000)
+    if unit in {"万"}:
+        return int(value * 10_000)
+    return int(value)
+
+
 def money_yen(patterns: Iterable[str], text: str, default: int) -> int:
     for pattern in patterns:
         m = re.search(pattern, text, flags=re.IGNORECASE)
         if not m:
             continue
-        raw = m.group(1).replace(",", "").replace("，", "")
-        unit_raw = m.group(2) if len(m.groups()) >= 2 else ""
-        unit = (unit_raw or "").lower()
-        try:
-            value = float(raw)
-        except ValueError:
-            continue
-        if unit in {"兆"}:
-            return int(value * 1_000_000_000_000)
-        if unit in {"t", "tn", "trillion"}:
-            return int(value * 1_000_000_000_000)
-        if unit in {"億"}:
-            return int(value * 100_000_000)
-        if unit in {"b", "bn", "billion"}:
-            return int(value * 1_000_000_000)
-        if unit in {"百万", "m", "mn", "million"}:
-            return int(value * 1_000_000)
-        if unit in {"万"}:
-            return int(value * 10_000)
-        return int(value)
+        scaled = money_from_match(m)
+        if scaled is not None:
+            return scaled
     return default
 
 
@@ -781,19 +786,58 @@ def ramp_to_target(target: int, first: int, periods: int = DEFAULT_FORECAST_PERI
     return ramp
 
 
+# Latin single-letter scale units must not bleed into a following word — a bare
+# "t" in "targets" once parsed as "trillion". Require a non-letter boundary.
+_GMV_UNIT = r"(兆|億|百万|万|trillion|billion|million|bn|tn|mn|[tTbBmM](?![A-Za-z]))"
+_GMV_CJK_UNIT = r"(兆|億|百万|万)"
+_GMV_PATTERNS = [
+    # Keyword first: require an explicit currency mark so prose like
+    # "GMV. Phase 1 targets" cannot be misread as a GMV figure.
+    rf"GMV[^0-9¥$]{{0,24}}[¥$]\s*([0-9,.]+)\s*{_GMV_UNIT}?",
+    rf"流通総額[^0-9¥$]{{0,24}}¥?\s*([0-9,.]+)\s*{_GMV_CJK_UNIT}",
+    # Number first: a scale unit is mandatory so bare prose ("Q2 GMV review")
+    # cannot match — the trailing keyword alone is not a strong enough anchor.
+    rf"[¥$]?\s*([0-9,.]+)\s*{_GMV_UNIT}\s*(?:の)?\s*GMV",
+    rf"[¥$]?\s*([0-9,.]+)\s*{_GMV_CJK_UNIT}\s*(?:の)?\s*流通総額",
+]
+_GMV_MATURITY_CUE = re.compile(
+    r"(maturity|at scale|by\s*(?:FY)?\s*20\d\d|by year|成熟|目標|までに|時点)",
+    flags=re.IGNORECASE,
+)
+
+
 def gmv_ramp(text: str, profile: MechanicProfile, periods: int = DEFAULT_FORECAST_PERIODS) -> list[int]:
-    base = money_yen(
-        [
-            r"GMV[^0-9¥$]{0,24}¥?\s*([0-9,.]+)\s*(兆|億|百万|万|t|T|bn|b|B|m|M)?",
-            r"流通総額[^0-9¥$]{0,24}¥?\s*([0-9,.]+)\s*(兆|億|百万|万|t|T|bn|b|B|m|M)?",
-        ],
-        text,
-        profile.default_gmv_yen,
-    )
-    if base <= 0:
+    """Build the GMV ramp for marketplace-style plans.
+
+    Extracts a stated GMV in either order ("GMV ¥10B" or "¥120億 GMV"). When
+    the figure sits next to maturity language ("at maturity", "by FY2030"), it
+    is treated as the final-period target and the ramp is scaled so the last
+    period lands on it — a stated maturity GMV is a goal, not a period-0 base.
+    """
+    if periods <= 0:
+        return []
+    value = 0
+    context = ""
+    for pattern in _GMV_PATTERNS:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if not match:
+            continue
+        scaled = money_from_match(match)
+        if scaled is None or scaled <= 0:
+            continue
+        value = scaled
+        context = text[max(0, match.start() - 60): match.end() + 60]
+        break
+    is_maturity_figure = value > 0 and bool(_GMV_MATURITY_CUE.search(context))
+    if value <= 0:
+        value = profile.default_gmv_yen
+    if value <= 0:
         return [0 for _ in range(periods)]
     multipliers = _curve(1.0, 8.5, periods)
-    return [int(base * multiple) for multiple in multipliers]
+    if is_maturity_figure:
+        final = multipliers[-1] or 1.0
+        return [int(value * multiple / final) for multiple in multipliers]
+    return [int(value * multiple) for multiple in multipliers]
 
 
 def ending_units(new_units: list[int]) -> list[int]:

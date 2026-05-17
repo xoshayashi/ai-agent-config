@@ -145,8 +145,11 @@ workbook tab is rendered:
 - Stated-margin extraction: a narrative gross-margin figure (`gross margin ...
   78%`, `粗利率 78%`) overrides the profile default.
 - Demand retargeting: a stated maturity ARR or customer count rescales the unit
-  and customer ramps so the plan reaches its own headline scale. A plan that
-  lands an order of magnitude short of its stated target is not investor-grade.
+  and customer ramps so the plan reaches its own headline scale. A marketplace's
+  stated GMV is anchored the same way — extracted in either word order ("GMV
+  ¥10B" or "¥120億 GMV") and, when stated as a maturity figure, mapped to the
+  final period rather than the period-0 base. A plan that lands an order of
+  magnitude short of its stated target is not investor-grade.
 - Funding-plan sizing: equity rounds are sized against a projected free cash
   flow (the P&L / BS / CF chain replayed in the kernel), not a fixed coverage
   ratio. Each round is topped up so projected ending cash clears a runway
