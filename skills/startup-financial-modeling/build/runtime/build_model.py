@@ -102,6 +102,8 @@ DEFAULT_PUBLIC_COMP_TICKERS: dict[str, list[str]] = {
     "Marketplace / transaction": ["UBER", "DASH", "ETSY"],
     "Hardware / asset-heavy": ["ISRG", "ROK", "TSLA"],
     "Fintech / balance-sheet": ["PYPL", "SOFI", "AFRM"],
+    # Public-market data is only a fallback for pre-revenue companies; users
+    # should add private milestone, funding-round, or transaction evidence.
     "Pre-revenue / milestone": ["ISRG", "ROK", "TSLA"],
     "Generic startup": ["CRM", "NOW", "DDOG"],
 }
@@ -393,7 +395,7 @@ def build_model(
     excluded_sheets: list[str] | None = None,
     source_md: Path | None = None,
     live_comps: list[str] | None = None,
-    live_comps_timeout: float = 4.0,
+    live_comps_timeout: float = 8.0,
 ) -> Path:
     """Build a startup finance xlsx model and save to `output_path`.
 
@@ -529,7 +531,7 @@ def _main(argv: list[str] | None = None) -> int:
         help="Override the auto-selected public ticker peers; private/transaction comps come from YAML evidence fields.",
     )
     ap.add_argument(
-        "--live-comps-timeout", type=float, default=4.0,
+        "--live-comps-timeout", type=float, default=8.0,
         help="Timeout in seconds per live public-market comparable request.",
     )
     args = ap.parse_args(argv)

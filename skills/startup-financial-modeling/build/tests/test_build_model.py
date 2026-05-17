@@ -500,6 +500,30 @@ def test_incomplete_provided_comps_are_registered_but_not_used_for_medians() -> 
     assert result.revenue_multiple_median == 12.0
 
 
+def test_sec_ticker_lookup_is_cached_and_errors_are_compact() -> None:
+    original_json_url = live_comps._json_url
+    original_cache = live_comps._SEC_TICKER_LOOKUP_CACHE
+    calls: list[str] = []
+
+    def fake_json_url(url: str, *, timeout: float) -> dict:
+        calls.append(url)
+        return {
+            "0": {"ticker": "CRM", "cik_str": 1108524, "title": "Salesforce, Inc."},
+            "1": {"ticker": "NOW", "cik_str": 1373715, "title": "ServiceNow, Inc."},
+        }
+
+    try:
+        live_comps._SEC_TICKER_LOOKUP_CACHE = None
+        live_comps._json_url = fake_json_url
+        assert live_comps._sec_cik_for_ticker("CRM", timeout=1.0) == ("0001108524", "Salesforce, Inc.")
+        assert live_comps._sec_cik_for_ticker("NOW", timeout=1.0) == ("0001373715", "ServiceNow, Inc.")
+        assert len(calls) == 1
+        assert len(live_comps._compact_error("line one\n" + ("x" * 500), limit=80)) == 80
+    finally:
+        live_comps._json_url = original_json_url
+        live_comps._SEC_TICKER_LOOKUP_CACHE = original_cache
+
+
 def test_failed_live_comps_do_not_pollute_company_specific_sources_or_mark_live_multiples() -> None:
     def fake_failed_comps(tickers: list[str], *, timeout: float = 8.0) -> live_comps.PublicCompsResult:
         comps = [
@@ -2774,6 +2798,7 @@ if __name__ == "__main__":
     test_default_live_comps_match_mechanic_labels_and_cli_overrides_yaml()
     test_private_and_transaction_comps_are_included_in_comparable_evidence()
     test_incomplete_provided_comps_are_registered_but_not_used_for_medians()
+    test_sec_ticker_lookup_is_cached_and_errors_are_compact()
     test_failed_live_comps_do_not_pollute_company_specific_sources_or_mark_live_multiples()
     test_full_model_uses_direct_formula_refs()
     test_intra_sheet_formula_cells_are_black()

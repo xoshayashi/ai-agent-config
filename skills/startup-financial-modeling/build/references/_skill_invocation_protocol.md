@@ -171,7 +171,27 @@ decision needs specific listed peers: `--live-comps CRM NOW DDOG`. For
 non-public companies, funding rounds, M&A transactions, market reports, customer
 benchmarks, or internal/user-provided sources, use YAML `private_comps`,
 `transaction_comps`, or `benchmark_sources` with source date and applicability
-limits.
+limits. `live_comps` / `public_comps` may contain ticker strings and comparable
+evidence mappings in one list; strings are treated as public tickers, mappings
+are treated as provided evidence.
+
+```yaml
+live_comps: [CRM, NOW]
+private_comps:
+  - name: PrivateAI
+    company_type: private
+    source_type: funding round / press release
+    post_money: 12000000000
+    arr: 1000000000
+    as_of_date: 2026-04-30
+    applicability_limits: ARR reported by company; verify security terms
+transaction_comps:
+  - name: Strategic SaaS acquisition
+    enterprise_value: 50000000000
+    revenue: 5000000000
+    source_url: https://example.test/ma-announcement
+    as_of_date: 2025-12-15
+```
 
 Follow `_self_review_protocol.md`. If tests, workbook inspection, render
 checks, or artifact self-review find failures, fix the concrete failed items

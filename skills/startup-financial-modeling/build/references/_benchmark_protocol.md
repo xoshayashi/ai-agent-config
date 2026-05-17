@@ -105,3 +105,9 @@ growth, profitability, and segment-mix differences. For private comps, call out
 round terms, liquidation preferences, security type, disclosure quality, stage,
 growth, margin, geography, and whether revenue/ARR is actual, run-rate, or
 management-reported.
+
+For pre-revenue or milestone companies, listed public peers are usually only a
+conservative fallback anchor. Treat them as a prompt to gather private funding
+rounds, milestone-triggered licensing deals, grants/non-dilutive financing,
+strategic investments, and precedent transactions before relying on a public
+multiple.

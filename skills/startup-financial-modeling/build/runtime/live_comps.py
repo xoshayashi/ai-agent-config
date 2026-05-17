@@ -46,6 +46,7 @@ class PublicCompsResult:
 
 
 _RESULT_CACHE: dict[tuple[tuple[str, ...], float], PublicCompsResult] = {}
+_SEC_TICKER_LOOKUP_CACHE: dict[str, tuple[str, str]] | None = None
 
 
 def _to_float(value: Any) -> float | None:
@@ -181,6 +182,11 @@ def _json_url(url: str, *, timeout: float) -> dict[str, Any]:
         return json.loads(response.read().decode("utf-8"))
 
 
+def _compact_error(value: Any, *, limit: int = 220) -> str:
+    text = " ".join(str(value).split())
+    return text if len(text) <= limit else text[: limit - 1] + "…"
+
+
 def _yahoo_chart_url(ticker: str) -> str:
     return f"https://query1.finance.yahoo.com/v8/finance/chart/{urllib.parse.quote(ticker)}?range=1d&interval=1d"
 
@@ -202,17 +208,28 @@ def _latest_fact_value(payload: dict[str, Any], namespace: str, tag: str, unit: 
     return float(latest["val"])
 
 
-def _sec_cik_for_ticker(ticker: str, *, timeout: float) -> tuple[str, str] | None:
+def _sec_ticker_lookup(*, timeout: float) -> dict[str, tuple[str, str]]:
+    global _SEC_TICKER_LOOKUP_CACHE
+    if _SEC_TICKER_LOOKUP_CACHE is not None:
+        return _SEC_TICKER_LOOKUP_CACHE
     payload = _json_url("https://www.sec.gov/files/company_tickers.json", timeout=timeout)
+    lookup: dict[str, tuple[str, str]] = {}
     for item in payload.values():
-        if isinstance(item, dict) and str(item.get("ticker", "")).upper() == ticker:
-            return f"{int(item['cik_str']):010d}", str(item.get("title") or ticker)
-    return None
+        if isinstance(item, dict) and item.get("ticker") and item.get("cik_str") is not None:
+            normalized = str(item.get("ticker")).upper()
+            lookup[normalized] = (f"{int(item['cik_str']):010d}", str(item.get("title") or normalized))
+    _SEC_TICKER_LOOKUP_CACHE = lookup
+    return lookup
+
+
+def _sec_cik_for_ticker(ticker: str, *, timeout: float) -> tuple[str, str] | None:
+    return _sec_ticker_lookup(timeout=timeout).get(ticker.upper())
 
 
 def _fetch_market_cap_revenue_proxy(ticker: str, *, timeout: float, prior_error: str) -> PublicComp:
     as_of = date.today().isoformat()
     chart_url = _yahoo_chart_url(ticker)
+    compact_prior_error = _compact_error(prior_error)
     try:
         chart = _json_url(chart_url, timeout=timeout)
         result = chart.get("chart", {}).get("result", [{}])[0]
@@ -222,7 +239,7 @@ def _fetch_market_cap_revenue_proxy(ticker: str, *, timeout: float, prior_error:
         name = str(meta.get("longName") or meta.get("shortName") or ticker)
         cik_name = _sec_cik_for_ticker(ticker, timeout=timeout)
         if cik_name is None:
-            return PublicComp(ticker, name, currency, None, None, None, None, chart_url, as_of, "failed", f"{prior_error}; SEC CIK not found")
+            return PublicComp(ticker, name, currency, None, None, None, None, chart_url, as_of, "failed", f"{compact_prior_error}; SEC CIK not found")
         cik, sec_name = cik_name
         sec_url = f"https://data.sec.gov/api/xbrl/companyfacts/CIK{cik}.json"
         sec_payload = _json_url(sec_url, timeout=timeout)
@@ -232,7 +249,7 @@ def _fetch_market_cap_revenue_proxy(ticker: str, *, timeout: float, prior_error:
         )
         shares = _latest_fact_value(sec_payload, "dei", "EntityCommonStockSharesOutstanding", "shares")
         if not (price and shares and revenue and revenue > 0):
-            return PublicComp(ticker, sec_name or name, currency, None, None, None, None, sec_url, as_of, "failed", f"{prior_error}; SEC/Yahoo proxy missing price, shares, or revenue")
+            return PublicComp(ticker, sec_name or name, currency, None, None, None, None, sec_url, as_of, "failed", f"{compact_prior_error}; SEC/Yahoo proxy missing price, shares, or revenue")
         market_cap = price * shares
         return PublicComp(
             ticker=ticker,
@@ -248,7 +265,7 @@ def _fetch_market_cap_revenue_proxy(ticker: str, *, timeout: float, prior_error:
             error="market-cap/revenue proxy; EV and EBITDA unavailable from fallback",
         )
     except Exception as exc:  # noqa: BLE001 - fallback failures should be visible in the workbook.
-        return PublicComp(ticker, "", "", None, None, None, None, chart_url, as_of, "failed", f"{prior_error}; fallback failed: {exc}")
+        return PublicComp(ticker, "", "", None, None, None, None, chart_url, as_of, "failed", f"{compact_prior_error}; fallback failed: {_compact_error(exc)}")
 
 
 def _extract_result(payload: dict[str, Any]) -> dict[str, Any] | None:

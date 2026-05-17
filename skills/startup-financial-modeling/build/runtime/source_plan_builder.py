@@ -98,6 +98,9 @@ class LayoutSpec:
 
 LAYOUT = LayoutSpec()
 START_PERIOD_COL = LAYOUT.first_value_col
+BENCHMARK_REGISTER_START_COL = 2
+BENCHMARK_FRESHNESS_COL = BENCHMARK_REGISTER_START_COL + 5
+BENCHMARK_VALUATION_SUPPORT_ROW = 9
 
 
 def _start_period_col() -> int:
@@ -1581,7 +1584,8 @@ def _build_valuation(wb: Workbook, facts: SourceFacts) -> None:
     segment_last_row = 5 + max(len(facts.segments), 1)
     segment_ev_col = get_column_letter(LAYOUT.label_col + 6)
     _write_values(ws, 23, "SOTP EV", "JPY", [f"=SUM('Segments'!${segment_ev_col}$6:${segment_ev_col}${segment_last_row})" for _ in cols], kind="formula", fmt=ib.FMT_MONEY)
-    _write_values(ws, 24, "Supportability score", "x", [f"=MIN(1.5,MAX(0.5,0.35+IF({get_column_letter(c)}16>0,0.25,0)+IF({get_column_letter(c)}22>0,0.20,0)+IF({get_column_letter(c)}23>0,0.20,0)+IF('Benchmarks'!$G$9=\"current\",0.20,0)))" for c in cols], kind="formula", fmt=ib.FMT_MULTIPLE)
+    benchmark_freshness_cell = f"'Benchmarks'!${get_column_letter(BENCHMARK_FRESHNESS_COL)}${BENCHMARK_VALUATION_SUPPORT_ROW}"
+    _write_values(ws, 24, "Supportability score", "x", [f"=MIN(1.5,MAX(0.5,0.35+IF({get_column_letter(c)}16>0,0.25,0)+IF({get_column_letter(c)}22>0,0.20,0)+IF({get_column_letter(c)}23>0,0.20,0)+IF({benchmark_freshness_cell}=\"current\",0.20,0)))" for c in cols], kind="formula", fmt=ib.FMT_MULTIPLE)
     _write_values(ws, 25, "Selected EV low", "JPY", [f"=MAX(0,MIN({get_column_letter(c)}19,{get_column_letter(c)}22,{get_column_letter(c)}23)*0.9)" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
     _write_values(ws, 26, "Selected EV midpoint", "JPY", [f"=IF({get_column_letter(c)}24<0.9,MEDIAN({get_column_letter(c)}19,{get_column_letter(c)}22,{get_column_letter(c)}23)*0.85,MEDIAN({get_column_letter(c)}19,{get_column_letter(c)}22,{get_column_letter(c)}23))" for c in cols], kind="formula", fmt=ib.FMT_MONEY, bold=True)
     _write_values(ws, 27, "Selected EV high", "JPY", [f"=MAX({get_column_letter(c)}19,{get_column_letter(c)}22,{get_column_letter(c)}23)*IF({get_column_letter(c)}24>=1,1.1,1.0)" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
@@ -1664,7 +1668,7 @@ def _build_benchmarks(wb: Workbook, facts: SourceFacts) -> None:
     _setup_sheet(ws, f"{facts.company} — Benchmarks", "Traceable benchmark and source register for material assumptions.")
     _set_column_widths(ws, {2: 14, 3: 24, 4: 18, 5: 42, 6: 42, 7: 22, 8: 28, 9: 18, 10: 20, 11: 20, 12: 28})
     headers = ["source_id", "Source type", "Date / period", "URL / file / owner", "Applicability limits", "Freshness status", "Linked assumption", "Refresh needed"]
-    for col, header in enumerate(headers, start=2):
+    for col, header in enumerate(headers, start=BENCHMARK_REGISTER_START_COL):
         _apply_text_header(ws.cell(5, col), header)
     source_anchor = "; ".join(facts.source_names or facts.source_urls) if (facts.source_names or facts.source_urls) else "unknown"
     live_comps = list(getattr(facts, "live_comps", []) or [])
@@ -1688,7 +1692,7 @@ def _build_benchmarks(wb: Workbook, facts: SourceFacts) -> None:
         ("SRC-05", "unknown", "unknown", "unresolved evidence", "do not treat as fact", "needs evidence", "financing terms", "yes"),
     ]
     for r, row in enumerate(rows, start=6):
-        for c, value in enumerate(row, start=2):
+        for c, value in enumerate(row, start=BENCHMARK_REGISTER_START_COL):
             ws.cell(r, c, value)
             ib.apply_comment(ws.cell(r, c), wrap_text=False)
     if live_comps:
