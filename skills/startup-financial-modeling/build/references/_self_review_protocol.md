@@ -73,9 +73,10 @@ heavy process.
   handoff target is Google Sheets.
 - Inspect units through formatting as well as values. Monetary cells should
   store raw base-currency amounts while `number_format` controls `円`, `千円`,
-  `百万円`, `$`, `$K`, `$M`, negative-red parentheses, and dash-zero display.
-  Treat formulas that divide by 1,000 or 1,000,000 only for presentation as a
-  defect unless the row is explicitly a ratio or interpretation text surface.
+  `百万円`, `十億円`, `兆円`, `$`, `$K`, `$M`, negative-red parentheses, and
+  dash-zero display. Treat formulas that divide by 1,000, 1,000,000,
+  1,000,000,000, or 1,000,000,000,000 only for presentation as a defect unless
+  the row is explicitly a ratio or interpretation text surface.
   Verify this rule is scoped to money rows only: operational units such as
   units, customers, count, FTE, days, months, percentages, and multiples keep
   their native non-money formats and formulas.

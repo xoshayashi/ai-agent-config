@@ -146,7 +146,8 @@ the same look after the user opens the workbook.
 
 Financial values keep their arithmetic meaning in the cell value. Do not scale
 money by dividing the stored value to make the cell look like thousands,
-millions, or hundred-millions. Store base-currency values and use Excel
+millions, hundred-millions, billions, or trillions.
+Store base-currency values and use Excel display formats for presentation. Use
 `number_format` to control display scale, currency symbol, negative-red
 presentation, parentheses, and dash-zero treatment. The unit label tells the
 reader the displayed scale; the cell value keeps the raw monetary amount.
@@ -158,10 +159,11 @@ Examples:
   format when the sheet unit is `百万円`.
 - `$12000000` stays `12000000`; use `$M` or `$K` display formats as needed.
 
-Avoid formulas such as `=Revenue/1000000` only to change presentation. The same
-rule applies when reading a reference workbook: inspect `number_format`, font
-color, alignment, fill, border, wrap, merged cells, and row/column dimensions
-before concluding what unit or design system the workbook uses.
+Avoid formulas such as `=Revenue/1000`, `=Revenue/1000000`, or
+`=Revenue/1000000000` only to change presentation. The same rule applies when
+reading a reference workbook: inspect `number_format`, font color, alignment,
+fill, border, wrap, merged cells, and row/column dimensions before concluding
+what unit or design system the workbook uses.
 
 This is a money-unit rule, not a blanket numeric rule. Operational quantities
 keep their natural units and formats: `units`, `customers`, `count`, `FTE`,

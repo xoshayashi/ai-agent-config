@@ -1409,6 +1409,12 @@ def _unit_label_violations(wb) -> list[str]:
 
 def _raw_money_scale_formula_violations(wb) -> list[str]:
     money_units = {"円", "千円", "百万円", "億円", "十億円", "兆円", "$", "$K", "$M"}
+    money_scale_factors = {
+        1_000,
+        1_000_000,
+        1_000_000_000,
+        1_000_000_000_000,
+    }
     violations = []
     for ws in wb.worksheets:
         for row in ws.iter_rows():
@@ -1419,7 +1425,7 @@ def _raw_money_scale_formula_violations(wb) -> list[str]:
                 if (
                     isinstance(cell.value, str)
                     and cell.value.startswith("=")
-                    and ("/1000000" in cell.value or "*1000000" in cell.value)
+                    and any(re.search(rf"([*/])\s*{factor}\b", cell.value) for factor in money_scale_factors)
                 ):
                     violations.append(f"{ws.title}!{cell.coordinate}: {cell.value}")
     return violations
@@ -2133,17 +2139,22 @@ units, and hardware cost around ¥8m per unit. Source: management memo.
         tmp.cleanup()
 
 
-def test_non_money_units_keep_their_own_formats_and_formulas() -> None:
+def test_money_and_non_money_units_keep_separate_format_rules() -> None:
     assert source_plan._model_value("=A1/1000000", "units") == "=A1/1000000"
     assert source_plan._model_value("=A1/1000000", "customers") == "=A1/1000000"
     assert source_plan._model_value("=A1/1000000", "FTE") == "=A1/1000000"
     assert source_plan._model_value("=A1/1000000", "%") == "=A1/1000000"
     assert source_plan._model_value("=A1/1000000", "x") == "=A1/1000000"
     assert source_plan._model_value("=A1/1000000", "months") == "=A1/1000000"
+    assert source_plan._model_value("=A1/1000", "units") == "=A1/1000"
+    assert source_plan._model_value("=A1/1000000000", "customers") == "=A1/1000000000"
     assert source_plan._model_value("=A1/1000000", "JPY") == "=A1"
     assert source_plan._model_value("=A1/1000000", "USD") == "=A1"
-    assert source_plan._model_value("=A1/1000", "JPY K") == "=A1/1000"
-    assert source_plan._model_value("=A1/1000", "USD K") == "=A1/1000"
+    assert source_plan._model_value("=A1/1000", "JPY K") == "=A1"
+    assert source_plan._model_value("=A1/1000", "USD K") == "=A1"
+    assert source_plan._model_value("=A1/1000000000", "JPY B") == "=A1"
+    assert source_plan._model_value("=A1/1000000000000", "JPY T") == "=A1"
+    assert source_plan._model_value("=A1 * 1000000", "JPY M") == "=A1"
     assert source_plan._model_value(12, "units") == 12
     assert source_plan._model_value(12, "customers") == 12
     assert source_plan._model_value(12, "JPY M") == 12_000_000
@@ -2937,7 +2948,7 @@ if __name__ == "__main__":
     test_generated_workbook_has_sheet_specific_quality_markers()
     test_structured_yaml_currency_and_display_scale_are_generic()
     test_money_units_are_raw_values_with_number_formats_not_scaled_values()
-    test_non_money_units_keep_their_own_formats_and_formulas()
+    test_money_and_non_money_units_keep_separate_format_rules()
     test_skill_guidance_requires_reading_workbook_formatting_for_units()
     test_benchmark_guidance_covers_material_evidence_lenses()
     test_marketplace_source_does_not_emit_unrelated_asset_heavy_template()

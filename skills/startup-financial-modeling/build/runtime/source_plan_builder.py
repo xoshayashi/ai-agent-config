@@ -177,6 +177,13 @@ MONEY_DISPLAY_UNITS = {
     "USD M": "$M",
 }
 
+MONEY_DISPLAY_SCALE_FACTORS = (
+    1_000_000_000_000,
+    1_000_000_000,
+    1_000_000,
+    1_000,
+)
+
 
 def _display_unit(unit: str, fmt: str | None = None, currency: str = "JPY", scale: str = "million") -> str:
     if unit == "JPY":
@@ -199,10 +206,12 @@ def _display_unit(unit: str, fmt: str | None = None, currency: str = "JPY", scal
 
 
 def _normalise_formula_scale(formula: str) -> str:
-    # Source inputs most often arrive pre-divided for million-scale display.
-    # Thousand-scale money rows should carry the correct number_format via
-    # _format_for_unit instead of formula rewriting.
-    return formula.replace("/1000000", "").replace("*1000000", "")
+    # Money source formulas sometimes arrive pre-scaled for presentation.
+    # Store raw base-currency formulas and let number_format handle display.
+    for factor in MONEY_DISPLAY_SCALE_FACTORS:
+        formula = re.sub(rf"\s*/\s*{factor}\b", "", formula)
+        formula = re.sub(rf"\s*\*\s*{factor}\b", "", formula)
+    return formula
 
 
 def _model_value(value: object, unit: str) -> object:
