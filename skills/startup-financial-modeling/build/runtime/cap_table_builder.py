@@ -1626,6 +1626,47 @@ def build_cap_table_sheet(
 # ============================================================================
 
 
+def _post_round_input(inp: CapTableInput, rr: RoundResult) -> CapTableInput:
+    """Build the post-round cap table for the exit waterfall.
+
+    The waterfall must distribute proceeds over the FDSO that exists *after*
+    the round: converted SAFEs and the new priced round are common-equivalent
+    holders, not absent. Running it on the pre-round input (empty `.preferred`)
+    over-credits founders. Converted SAFEs and the new round are added as
+    standard 1x non-participating preferred; pre-existing preferred carry their
+    current (AD-adjusted) conversion ratios.
+    """
+    breakdown = rr.fdso_breakdown
+    preferred: list[PreferredStockClass] = list(inp.preferred)
+    for conversion in rr.safe_conversions:
+        if conversion.shares_issued > 0:
+            preferred.append(
+                PreferredStockClass(
+                    name=conversion.name,
+                    shares=conversion.shares_issued,
+                    issue_price=conversion.conversion_price,
+                )
+            )
+    if rr.new_round_shares > 0:
+        preferred.append(
+            PreferredStockClass(
+                name=inp.round_label,
+                shares=rr.new_round_shares,
+                issue_price=rr.new_round_price,
+            )
+        )
+    return CapTableInput(
+        company_name=inp.company_name,
+        reporting_currency=inp.reporting_currency,
+        as_of_date=inp.as_of_date,
+        founder_shares=breakdown["founder_shares"],
+        common_pool_issued=breakdown["common_pool_issued"],
+        common_pool_available=breakdown["common_pool_available_pre"]
+        + breakdown["common_pool_topup_new"],
+        preferred=preferred,
+    )
+
+
 def build_cap_table_for_workbook(
     wb: Workbook,
     inp: CapTableInput,
@@ -1644,8 +1685,12 @@ def build_cap_table_for_workbook(
     waterfall_scenarios: list[tuple[float, dict]] | None = None
     if exit_scenarios_money_m:
         waterfall_scenarios = []
+        # When a round occurred, the waterfall must run on the post-round cap
+        # table — pre-round input has empty .preferred, so converted SAFEs and
+        # the new round vanish and founders are over-credited at exit.
+        waterfall_inp = _post_round_input(inp, rr) if rr is not None else inp
         for ev in exit_scenarios_money_m:
-            w = compute_exit_waterfall(inp=inp, exit_value_money_m=ev)
+            w = compute_exit_waterfall(inp=waterfall_inp, exit_value_money_m=ev)
             waterfall_scenarios.append((ev, w))
 
     build_cap_table_sheet(
