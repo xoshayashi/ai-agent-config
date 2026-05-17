@@ -215,6 +215,38 @@ def test_payroll_is_not_absurd_at_maturity() -> None:
         assert ratio < 1.5, f"{name}: mature payroll/revenue ratio {ratio:.2f}"
 
 
+def test_cap_table_exit_waterfall_uses_post_round_cap_table() -> None:
+    """The exit waterfall must distribute proceeds over the post-round FDSO.
+
+    Running it on the pre-round input (empty preferred — converted SAFEs and the
+    new priced round absent) over-credited founders: ~95% of proceeds against a
+    post-round founder FDSO near 54%.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "cap.xlsx"
+        build_model.build_model(None, out, mode="cap_table")
+        wb = load_workbook(out, data_only=False)
+        ws = wb["Ownership"]
+        header = next(
+            (cell for r in ws.iter_rows() for cell in r if cell.value == "Founder %"),
+            None,
+        )
+        assert header is not None, "Exit Waterfall 'Founder %' column not found"
+        founder_pcts = [
+            ws.cell(row, header.column).value
+            for row in range(header.row + 1, header.row + 8)
+            if isinstance(ws.cell(row, header.column).value, (int, float))
+        ]
+        assert founder_pcts, "no exit-waterfall founder-% scenarios found"
+        # Post-round founders hold ~54-60% of the exit-relevant FDSO; a value
+        # near 95% means the waterfall ran on the pre-round cap table.
+        for pct in founder_pcts:
+            assert 0.40 <= pct <= 0.70, (
+                f"exit-waterfall founder % {pct:.3f} is inconsistent with the "
+                f"post-round cap table"
+            )
+
+
 def test_dcf_forecast_fcf_is_not_floored_at_zero() -> None:
     """The explicit-period FCF sum must reflect real burn, not be floored at 0.
 
@@ -489,6 +521,7 @@ if __name__ == "__main__":
         test_marketplace_gmv_honors_stated_maturity_target,
         test_marketplace_present_value_gmv_stays_period_zero_base,
         test_payroll_is_not_absurd_at_maturity,
+        test_cap_table_exit_waterfall_uses_post_round_cap_table,
         test_dcf_forecast_fcf_is_not_floored_at_zero,
         test_dcf_enterprise_value_is_positive_and_method_consistent,
         test_funding_plan_keeps_the_company_solvent,
