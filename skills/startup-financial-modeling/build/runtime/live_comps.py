@@ -34,6 +34,8 @@ class PublicComp:
     stage: str = ""
     geography: str = ""
     applicability_limits: str = ""
+    gross_margin: float | None = None
+    ebitda_margin: float | None = None
 
 
 @dataclass(frozen=True)
@@ -43,6 +45,12 @@ class PublicCompsResult:
     ebitda_multiple_median: float | None
     source_url: str
     as_of_date: str
+    gross_margin_median: float | None = None
+    gross_margin_low: float | None = None
+    gross_margin_high: float | None = None
+    ebitda_margin_median: float | None = None
+    ebitda_margin_low: float | None = None
+    ebitda_margin_high: float | None = None
 
 
 _RESULT_CACHE: dict[tuple[tuple[str, ...], float], PublicCompsResult] = {}
@@ -146,6 +154,13 @@ def provided_comps_from_raw(value: Any) -> list[PublicComp]:
     return comps
 
 
+def _margin_stats(values: list[float]) -> tuple[float | None, float | None, float | None]:
+    """Median, low, and high of a fetched peer-margin sample."""
+    if not values:
+        return (None, None, None)
+    return (statistics.median(values), min(values), max(values))
+
+
 def summarize_comps(comps: list[PublicComp], *, source_url: str = "mixed comparable evidence") -> PublicCompsResult:
     today = date.today().isoformat()
     usable_statuses = {"current", "provided"}
@@ -159,12 +174,32 @@ def summarize_comps(comps: list[PublicComp], *, source_url: str = "mixed compara
         for comp in comps
         if comp.ebitda_multiple and comp.ebitda_multiple > 0 and comp.status in usable_statuses
     ]
+    # Peer operating-margin bands are derived from the live fetch, not hard-coded:
+    # the benchmark for a generated plan is the current public-peer distribution.
+    gross_margin_values = [
+        comp.gross_margin
+        for comp in comps
+        if comp.gross_margin is not None and comp.status in usable_statuses
+    ]
+    ebitda_margin_values = [
+        comp.ebitda_margin
+        for comp in comps
+        if comp.ebitda_margin is not None and comp.status in usable_statuses
+    ]
+    gross_margin_median, gross_margin_low, gross_margin_high = _margin_stats(gross_margin_values)
+    ebitda_margin_median, ebitda_margin_low, ebitda_margin_high = _margin_stats(ebitda_margin_values)
     return PublicCompsResult(
         comps=comps,
         revenue_multiple_median=statistics.median(revenue_values) if revenue_values else None,
         ebitda_multiple_median=statistics.median(ebitda_values) if ebitda_values else None,
         source_url=source_url,
         as_of_date=today,
+        gross_margin_median=gross_margin_median,
+        gross_margin_low=gross_margin_low,
+        gross_margin_high=gross_margin_high,
+        ebitda_margin_median=ebitda_margin_median,
+        ebitda_margin_low=ebitda_margin_low,
+        ebitda_margin_high=ebitda_margin_high,
     )
 
 
@@ -305,6 +340,8 @@ def fetch_public_comp(ticker: str, *, timeout: float = 8.0) -> PublicComp:
             source_url=url,
             as_of_date=as_of,
             status="current",
+            gross_margin=_to_float(financial.get("grossMargins")),
+            ebitda_margin=_to_float(financial.get("ebitdaMargins")),
         )
     except Exception as exc:  # noqa: BLE001 - data retrieval failures must be surfaced, not fatal by default.
         return _fetch_market_cap_revenue_proxy(normalized, timeout=timeout, prior_error=str(exc))
