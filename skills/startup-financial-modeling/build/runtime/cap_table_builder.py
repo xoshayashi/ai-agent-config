@@ -1638,6 +1638,10 @@ def _post_round_input(inp: CapTableInput, rr: RoundResult) -> CapTableInput:
     """
     breakdown = rr.fdso_breakdown
     preferred: list[PreferredStockClass] = list(inp.preferred)
+    # SAFEs convert into the new round's series; place both at least pari passu
+    # with the most senior existing preferred so they are never silently
+    # subordinated in the LP stack (rank 0 when there is no prior preferred).
+    new_rank = max((p.senior_rank for p in inp.preferred), default=0)
     for conversion in rr.safe_conversions:
         if conversion.shares_issued > 0:
             preferred.append(
@@ -1645,6 +1649,7 @@ def _post_round_input(inp: CapTableInput, rr: RoundResult) -> CapTableInput:
                     name=conversion.name,
                     shares=conversion.shares_issued,
                     issue_price=conversion.conversion_price,
+                    senior_rank=new_rank,
                 )
             )
     if rr.new_round_shares > 0:
@@ -1653,6 +1658,7 @@ def _post_round_input(inp: CapTableInput, rr: RoundResult) -> CapTableInput:
                 name=inp.round_label,
                 shares=rr.new_round_shares,
                 issue_price=rr.new_round_price,
+                senior_rank=new_rank,
             )
         )
     return CapTableInput(
