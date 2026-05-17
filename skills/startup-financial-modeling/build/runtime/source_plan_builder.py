@@ -158,6 +158,8 @@ YEN_DISPLAY_UNITS = {
     "JPY T": "兆円",
 }
 
+MONEY_INPUT_UNITS = {"JPY", *YEN_INPUT_SCALES.keys()}
+
 
 def _display_unit(unit: str, fmt: str | None = None, currency: str = "JPY", scale: str = "million") -> str:
     if unit == "JPY":
@@ -179,7 +181,9 @@ def _normalise_formula_scale(formula: str) -> str:
 
 def _model_value(value: object, unit: str) -> object:
     if isinstance(value, str) and value.startswith("="):
-        return _normalise_formula_scale(value)
+        if unit in MONEY_INPUT_UNITS:
+            return _normalise_formula_scale(value)
+        return value
     if isinstance(value, (int, float)) and not isinstance(value, bool):
         scale = YEN_INPUT_SCALES.get(unit)
         if scale:

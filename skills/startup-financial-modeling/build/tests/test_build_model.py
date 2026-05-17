@@ -1408,15 +1408,21 @@ def _unit_label_violations(wb) -> list[str]:
 
 
 def _raw_money_scale_formula_violations(wb) -> list[str]:
-    return [
-        f"{ws.title}!{cell.coordinate}: {cell.value}"
-        for ws in wb.worksheets
-        for row in ws.iter_rows()
-        for cell in row
-        if isinstance(cell.value, str)
-        and cell.value.startswith("=")
-        and ("/1000000" in cell.value or "*1000000" in cell.value)
-    ]
+    money_units = {"円", "千円", "百万円", "億円", "$", "$K", "$M"}
+    violations = []
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            unit = ws.cell(row=row[0].row, column=UNIT_COL).value
+            if unit not in money_units:
+                continue
+            for cell in row:
+                if (
+                    isinstance(cell.value, str)
+                    and cell.value.startswith("=")
+                    and ("/1000000" in cell.value or "*1000000" in cell.value)
+                ):
+                    violations.append(f"{ws.title}!{cell.coordinate}: {cell.value}")
+    return violations
 
 
 def _numbered_section_labels(wb) -> list[str]:
@@ -2094,6 +2100,72 @@ def test_structured_yaml_currency_and_display_scale_are_generic() -> None:
         assert _unit_for_label(wb, "Assumptions", "New primary units") == "units"
         assert _unit_for_label(wb, "People Plan", "Total headcount") == "FTE"
         assert _money_unit_format_mismatches(wb) == []
+        assert _semantic_unit_format_mismatches(wb) == []
+
+
+def test_money_units_are_raw_values_with_number_formats_not_scaled_values() -> None:
+    source_text = """# Unit formatting plan
+
+Asset-heavy startup with monthly price 月額32万円, target deployment of 3,000
+units, and hardware cost around ¥8m per unit. Source: management memo.
+"""
+    tmp, wb = _sample_source_workbook(source_text)
+    try:
+        price_cell = _first_year_cell_for_label(wb, "Assumptions", "Monthly price / unit")
+        revenue_cell = _first_year_cell_for_label(wb, "Revenue Build", "Recurring revenue")
+        total_revenue_cell = _first_year_cell_for_label(wb, "Revenue Build", "Total revenue")
+        capital_stack_cell = _first_year_cell_for_label(wb, "Capital Stack", "Ending cash")
+
+        assert price_cell.value == 320000
+        assert price_cell.number_format == ib.FMT_JPY_YEN
+        assert _unit_for_label(wb, "Assumptions", "Monthly price / unit") == "円"
+        assert isinstance(revenue_cell.value, str) and "/1000000" not in revenue_cell.value
+        assert isinstance(total_revenue_cell.value, str) and "/1000000" not in total_revenue_cell.value
+        assert total_revenue_cell.number_format == ib.FMT_MONEY
+        assert _unit_for_label(wb, "Revenue Build", "Total revenue") == "百万円"
+        assert capital_stack_cell.number_format == ib.FMT_MONEY
+        assert _unit_for_label(wb, "Capital Stack", "Ending cash") == "百万円"
+        assert _raw_money_scale_formula_violations(wb) == []
+        assert _semantic_unit_format_mismatches(wb) == []
+    finally:
+        tmp.cleanup()
+
+
+def test_non_money_units_keep_their_own_formats_and_formulas() -> None:
+    assert source_plan._model_value("=A1/1000000", "units") == "=A1/1000000"
+    assert source_plan._model_value("=A1/1000000", "customers") == "=A1/1000000"
+    assert source_plan._model_value("=A1/1000000", "FTE") == "=A1/1000000"
+    assert source_plan._model_value("=A1/1000000", "%") == "=A1/1000000"
+    assert source_plan._model_value("=A1/1000000", "x") == "=A1/1000000"
+    assert source_plan._model_value("=A1/1000000", "months") == "=A1/1000000"
+    assert source_plan._model_value("=A1/1000000", "JPY") == "=A1"
+    assert source_plan._model_value(12, "units") == 12
+    assert source_plan._model_value(12, "customers") == 12
+    assert source_plan._model_value(12, "JPY M") == 12_000_000
+    assert source_plan._format_for_unit("units", ib.FMT_MONEY) == ib.FMT_INTEGER
+    assert source_plan._format_for_unit("customers", ib.FMT_MONEY) == ib.FMT_INTEGER
+    assert source_plan._format_for_unit("FTE", ib.FMT_MONEY) == ib.FMT_INTEGER
+    assert source_plan._format_for_unit("months", ib.FMT_MONEY) == ib.FMT_NUM
+    assert source_plan._format_for_unit("%", ib.FMT_MONEY) == ib.FMT_PERCENT
+    assert source_plan._format_for_unit("x", ib.FMT_MONEY) == ib.FMT_MULTIPLE
+
+
+def test_skill_guidance_requires_reading_workbook_formatting_for_units() -> None:
+    invocation_text = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
+    design_text = (SKILL_DIR / "build" / "references" / "_ib_workbook_design_system.md").read_text(encoding="utf-8")
+    review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+    rubric_text = (SKILL_DIR / "build" / "references" / "_sheet_quality_rubric.md").read_text(encoding="utf-8")
+    combined = "\n".join([invocation_text, design_text, review_text, rubric_text])
+
+    for phrase in [
+        "Store base-currency values and use Excel",
+        "Do not infer units only from visible text",
+        "Inspect units through formatting as well as values",
+        "visible unit labels must match those formats",
+        "This is a money-unit rule, not a blanket numeric rule",
+        "units, customers, count, FTE, days, months, percentages, and multiples",
+    ]:
+        assert phrase in combined
 
 
 def test_marketplace_source_does_not_emit_unrelated_asset_heavy_template() -> None:
@@ -2827,6 +2899,9 @@ if __name__ == "__main__":
     test_source_backed_plan_reaches_generic_kernel_shape()
     test_generated_workbook_has_sheet_specific_quality_markers()
     test_structured_yaml_currency_and_display_scale_are_generic()
+    test_money_units_are_raw_values_with_number_formats_not_scaled_values()
+    test_non_money_units_keep_their_own_formats_and_formulas()
+    test_skill_guidance_requires_reading_workbook_formatting_for_units()
     test_marketplace_source_does_not_emit_unrelated_asset_heavy_template()
     test_hardware_source_ignores_low_usd_competitor_price_noise()
     test_source_plan_starting_cash_is_hard_input_blue()

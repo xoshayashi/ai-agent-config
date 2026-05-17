@@ -27,6 +27,11 @@ For every generated sheet, verify:
   unknowns should be visibly distinguishable.
 - **Dependency flow:** formulas should flow from source facts and assumptions to
   calculations, checks, outputs, and memo implications.
+- **Unit integrity:** money values should remain raw base-currency numbers,
+  with display scale, currency symbol, negative display, and zero display
+  handled by `number_format`; visible unit labels must match those formats.
+  Non-money units such as units, customers, count, FTE, days, months, `%`, and
+  `x` should keep their own formats and should not be normalized as currency.
 - **Checks:** reconciliation, balance, ownership, cash, unit, or evidence checks
   should exist where an error would change the decision.
 - **Interpretation:** output sheets should state what the result means, not only

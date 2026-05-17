@@ -478,6 +478,7 @@ FONT_TOTAL = FONT_SUBTOTAL
 #   - 千円 / 百万円 / 億円は number_format で表現 (cell value は変えない)
 #   - 負数は赤文字  ([Red] section)
 #   - 通貨記号 (¥, $) を表示形式に含める
+#   - 参照 workbook の単位判定も visible text ではなく number_format を読む
 #
 # Excel section syntax: positive;negative;zero[;text]
 #   - "_)" は positive 後の右余白 (右括弧分の幅を空けて、negative の括弧囲みと
