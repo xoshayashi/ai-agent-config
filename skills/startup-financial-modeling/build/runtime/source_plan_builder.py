@@ -1624,7 +1624,9 @@ def _build_valuation(wb: Workbook, facts: SourceFacts) -> None:
         (8, f"{facts.period_labels[-1]} gross profit", "JPY", f"='Cost Build'!{final_col}13"),
         (9, f"{facts.period_labels[-1]} EBITDA", "JPY", f"='P&L'!{final_col}18"),
         (10, "Discount rate", "%", facts.discount_rate),
-        (11, "Terminal growth", "%", facts.terminal_growth_rate),
+        # 0.85 = a 15% haircut on the exit value for illiquidity and execution
+        # risk; editable by the valuation committee.
+        (11, "Exit value retention", "%", 0.85),
     ]
     for row, label, unit, formula in rows:
         _label(ws, row, label, unit, fmt=ib.FMT_PERCENT if unit == "%" else ib.FMT_MONEY)
@@ -1649,15 +1651,21 @@ def _build_valuation(wb: Workbook, facts: SourceFacts) -> None:
     _write_values(ws, 17, "GP-implied EV", "JPY", [f"=${basis_col}$8*{get_column_letter(c)}14" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
     _write_values(ws, 18, "EBITDA-implied EV", "JPY", [f"=${basis_col}$9*{get_column_letter(c)}15" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
     _write_values(ws, 19, "Primary-method EV", "JPY", [f"=IF(${basis_col}$9>0,{get_column_letter(c)}18,IF(${basis_col}$8>0,{get_column_letter(c)}17,{get_column_letter(c)}16))" for c in cols], kind="formula", fmt=ib.FMT_MONEY, bold=True)
+    # DCF with an exit-multiple terminal value. A Gordon-growth terminal on a
+    # startup's still-negative final-year free cash flow collapses the DCF to
+    # ~0; an exit-multiple terminal (the discounted multiple-based EV, retained
+    # at a conservative haircut) is the reference-endorsed alternative and keeps
+    # the DCF a usable cross-check. The explicit-period FCF sum is NOT floored —
+    # the cash a startup burns is real and must reduce enterprise value.
     pv_forecast = []
     pv_terminal = []
     for idx, col in enumerate(cols, start=1):
         terms = [f"'CF'!{get_column_letter(c)}16/(1+${basis_col}$10)^{offset}" for offset, c in enumerate(cols[:idx], start=1)]
-        pv_forecast.append(f"=MAX(0,SUM({','.join(terms)}))")
-        pv_terminal.append(f"=MAX(0,'CF'!{get_column_letter(col)}16*(1+${basis_col}$11)/MAX(0.01,${basis_col}$10-${basis_col}$11)/(1+${basis_col}$10)^{idx})")
+        pv_forecast.append(f"=SUM({','.join(terms)})")
+        pv_terminal.append(f"={get_column_letter(col)}19*${basis_col}$11/(1+${basis_col}$10)^{idx}")
     _write_values(ws, 20, "PV of forecast FCF", "JPY", pv_forecast, kind="formula", fmt=ib.FMT_MONEY)
-    _write_values(ws, 21, "PV of terminal value", "JPY", pv_terminal, kind="formula", fmt=ib.FMT_MONEY)
-    _write_values(ws, 22, "DCF EV", "JPY", [f"={get_column_letter(c)}20+{get_column_letter(c)}21" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
+    _write_values(ws, 21, "PV of exit value", "JPY", pv_terminal, kind="formula", fmt=ib.FMT_MONEY)
+    _write_values(ws, 22, "DCF EV", "JPY", [f"=MAX(0,{get_column_letter(c)}20+{get_column_letter(c)}21)" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
     segment_last_row = 5 + max(len(facts.segments), 1)
     segment_ev_col = get_column_letter(LAYOUT.label_col + 6)
     _write_values(ws, 23, "SOTP EV", "JPY", [f"=SUM('Segments'!${segment_ev_col}$6:${segment_ev_col}${segment_last_row})" for _ in cols], kind="formula", fmt=ib.FMT_MONEY)

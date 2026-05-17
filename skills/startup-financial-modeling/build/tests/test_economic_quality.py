@@ -215,6 +215,78 @@ def test_payroll_is_not_absurd_at_maturity() -> None:
         assert ratio < 1.5, f"{name}: mature payroll/revenue ratio {ratio:.2f}"
 
 
+def test_dcf_forecast_fcf_is_not_floored_at_zero() -> None:
+    """The explicit-period FCF sum must reflect real burn, not be floored at 0.
+
+    Flooring `SUM(forecast FCF)` at zero discarded the cash a startup actually
+    burns and, with a near-zero terminal value, drove DCF enterprise value to 0.
+    """
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "dcf.xlsx"
+        build_model.build_model(None, out, mode="dcf_only")
+        wb = load_workbook(out, data_only=False)
+        ws = wb["Valuation"]
+        row = next(
+            (cell.row for r in ws.iter_rows() for cell in r
+             if cell.value == "PV of forecast FCF"),
+            None,
+        )
+        assert row is not None, "Valuation sheet missing 'PV of forecast FCF' row"
+        first_col = source_plan.START_PERIOD_COL
+        formulas = [
+            ws.cell(row, c).value
+            for c in range(first_col, ws.max_column + 1)
+            if isinstance(ws.cell(row, c).value, str) and ws.cell(row, c).value.startswith("=")
+        ]
+        assert formulas, "no forecast-FCF formulas found"
+        assert not any("MAX(0" in f for f in formulas), (
+            "forecast FCF is still floored at zero"
+        )
+
+
+def test_dcf_enterprise_value_is_positive_and_method_consistent() -> None:
+    """DCF EV must be a positive, method-consistent figure, not ~0."""
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        pytest.skip("soffice/libreoffice not available")
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "dcf.xlsx"
+        build_model.build_model(None, out, mode="dcf_only")
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(Path(tmp) / "recalc"), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        wb = load_workbook(Path(tmp) / "recalc" / "dcf.xlsx", data_only=True)
+        ws = wb["Valuation"]
+
+        # Derive the last period column from the period header row (row 5).
+        final_col = max(
+            cell.column
+            for cell in ws[5]
+            if cell.column >= source_plan.START_PERIOD_COL and cell.value
+        )
+
+        def final_value(label: str) -> float:
+            row = next(
+                (cell.row for r in ws.iter_rows() for cell in r
+                 if cell.value == label),
+                None,
+            )
+            assert row is not None, f"Valuation sheet missing '{label}' row"
+            return float(ws.cell(row, final_col).value)
+
+        dcf_ev = final_value("DCF EV")
+        primary_ev = final_value("Primary-method EV")
+        assert dcf_ev > 0, f"DCF EV is non-positive: {dcf_ev}"
+        # An exit-multiple DCF should be the same order of magnitude as the
+        # multiple-based EV — not collapsed near zero.
+        assert dcf_ev >= 0.1 * primary_ev, (
+            f"DCF EV {dcf_ev:,.0f} is implausibly small vs primary-method EV "
+            f"{primary_ev:,.0f}"
+        )
+
+
 def test_funding_plan_keeps_the_company_solvent() -> None:
     """The sized funding plan must keep projected ending cash non-negative.
 
@@ -417,6 +489,8 @@ if __name__ == "__main__":
         test_marketplace_gmv_honors_stated_maturity_target,
         test_marketplace_present_value_gmv_stays_period_zero_base,
         test_payroll_is_not_absurd_at_maturity,
+        test_dcf_forecast_fcf_is_not_floored_at_zero,
+        test_dcf_enterprise_value_is_positive_and_method_consistent,
         test_funding_plan_keeps_the_company_solvent,
         test_seed_round_is_positive_across_archetypes,
         test_workbook_recalc_shows_no_insolvency,
