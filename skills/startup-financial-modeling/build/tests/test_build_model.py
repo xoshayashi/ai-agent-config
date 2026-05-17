@@ -1408,15 +1408,27 @@ def _unit_label_violations(wb) -> list[str]:
 
 
 def _raw_money_scale_formula_violations(wb) -> list[str]:
-    return [
-        f"{ws.title}!{cell.coordinate}: {cell.value}"
-        for ws in wb.worksheets
-        for row in ws.iter_rows()
-        for cell in row
-        if isinstance(cell.value, str)
-        and cell.value.startswith("=")
-        and ("/1000000" in cell.value or "*1000000" in cell.value)
-    ]
+    money_units = {"円", "千円", "百万円", "億円", "十億円", "兆円", "$", "$K", "$M"}
+    money_scale_factors = {
+        1_000,
+        1_000_000,
+        1_000_000_000,
+        1_000_000_000_000,
+    }
+    violations = []
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            unit = ws.cell(row=row[0].row, column=UNIT_COL).value
+            if unit not in money_units:
+                continue
+            for cell in row:
+                if (
+                    isinstance(cell.value, str)
+                    and cell.value.startswith("=")
+                    and any(re.search(rf"([*/])\s*{factor}\b", cell.value) for factor in money_scale_factors)
+                ):
+                    violations.append(f"{ws.title}!{cell.coordinate}: {cell.value}")
+    return violations
 
 
 def _numbered_section_labels(wb) -> list[str]:
@@ -1781,6 +1793,8 @@ def _money_unit_format_mismatches(wb) -> list[str]:
         "千円": {ib.FMT_JPY_THOUSAND},
         "百万円": {ib.FMT_MONEY, ib.FMT_MONEY_DECIMAL, ib.FMT_JPY_MILLION},
         "億円": {ib.FMT_JPY_HUNDRED_MILLION},
+        "十億円": {ib.FMT_JPY_BILLION},
+        "兆円": {ib.FMT_JPY_TRILLION},
         "$": {ib.FMT_USD_DOLLAR},
         "$K": {ib.FMT_USD_THOUSAND},
         "$M": {ib.FMT_USD_MILLION},
@@ -2094,6 +2108,112 @@ def test_structured_yaml_currency_and_display_scale_are_generic() -> None:
         assert _unit_for_label(wb, "Assumptions", "New primary units") == "units"
         assert _unit_for_label(wb, "People Plan", "Total headcount") == "FTE"
         assert _money_unit_format_mismatches(wb) == []
+        assert _semantic_unit_format_mismatches(wb) == []
+
+
+def test_money_units_are_raw_values_with_number_formats_not_scaled_values() -> None:
+    source_text = """# Unit formatting plan
+
+Asset-heavy startup with monthly price 月額32万円, target deployment of 3,000
+units, and hardware cost around ¥8m per unit. Source: management memo.
+"""
+    tmp, wb = _sample_source_workbook(source_text)
+    try:
+        price_cell = _first_year_cell_for_label(wb, "Assumptions", "Monthly price / unit")
+        revenue_cell = _first_year_cell_for_label(wb, "Revenue Build", "Recurring revenue")
+        total_revenue_cell = _first_year_cell_for_label(wb, "Revenue Build", "Total revenue")
+        capital_stack_cell = _first_year_cell_for_label(wb, "Capital Stack", "Ending cash")
+
+        assert price_cell.value == 320000
+        assert price_cell.number_format == ib.FMT_JPY_YEN
+        assert _unit_for_label(wb, "Assumptions", "Monthly price / unit") == "円"
+        assert isinstance(revenue_cell.value, str) and "/1000000" not in revenue_cell.value
+        assert isinstance(total_revenue_cell.value, str) and "/1000000" not in total_revenue_cell.value
+        assert total_revenue_cell.number_format == ib.FMT_MONEY
+        assert _unit_for_label(wb, "Revenue Build", "Total revenue") == "百万円"
+        assert capital_stack_cell.number_format == ib.FMT_MONEY
+        assert _unit_for_label(wb, "Capital Stack", "Ending cash") == "百万円"
+        assert _raw_money_scale_formula_violations(wb) == []
+        assert _semantic_unit_format_mismatches(wb) == []
+    finally:
+        tmp.cleanup()
+
+
+def test_money_and_non_money_units_keep_separate_format_rules() -> None:
+    assert source_plan._model_value("=A1/1000000", "units") == "=A1/1000000"
+    assert source_plan._model_value("=A1/1000000", "customers") == "=A1/1000000"
+    assert source_plan._model_value("=A1/1000000", "FTE") == "=A1/1000000"
+    assert source_plan._model_value("=A1/1000000", "%") == "=A1/1000000"
+    assert source_plan._model_value("=A1/1000000", "x") == "=A1/1000000"
+    assert source_plan._model_value("=A1/1000000", "months") == "=A1/1000000"
+    assert source_plan._model_value("=A1/1000", "units") == "=A1/1000"
+    assert source_plan._model_value("=A1/1000000000", "customers") == "=A1/1000000000"
+    assert source_plan._model_value("=A1/1000000", "JPY") == "=A1"
+    assert source_plan._model_value("=A1/1000000", "USD") == "=A1"
+    assert source_plan._model_value("=A1/1000", "JPY K") == "=A1"
+    assert source_plan._model_value("=A1/1000", "USD K") == "=A1"
+    assert source_plan._model_value("=A1/1000000000", "JPY B") == "=A1"
+    assert source_plan._model_value("=A1/1000000000000", "JPY T") == "=A1"
+    assert source_plan._model_value("=A1 * 1000000", "JPY M") == "=A1"
+    assert source_plan._model_value(12, "units") == 12
+    assert source_plan._model_value(12, "customers") == 12
+    assert source_plan._model_value(12, "JPY M") == 12_000_000
+    assert source_plan._model_value(12, "USD M") == 12_000_000
+    assert source_plan._display_unit("USD") == "$"
+    assert source_plan._display_unit("USD K") == "$K"
+    assert source_plan._display_unit("USD M") == "$M"
+    assert source_plan._display_unit("JPY", ib.FMT_JPY_BILLION) == "十億円"
+    assert source_plan._display_unit("JPY", ib.FMT_JPY_TRILLION) == "兆円"
+    assert source_plan._format_for_unit("units", ib.FMT_MONEY) == ib.FMT_INTEGER
+    assert source_plan._format_for_unit("customers", ib.FMT_MONEY) == ib.FMT_INTEGER
+    assert source_plan._format_for_unit("FTE", ib.FMT_MONEY) == ib.FMT_INTEGER
+    assert source_plan._format_for_unit("months", ib.FMT_MONEY) == ib.FMT_NUM
+    assert source_plan._format_for_unit("%", ib.FMT_MONEY) == ib.FMT_PERCENT
+    assert source_plan._format_for_unit("x", ib.FMT_MONEY) == ib.FMT_MULTIPLE
+    assert source_plan._format_for_unit("JPY K", ib.FMT_MONEY) == ib.FMT_JPY_THOUSAND
+    assert source_plan._format_for_unit("JPY M", ib.FMT_MONEY) == ib.FMT_JPY_MILLION
+    assert source_plan._format_for_unit("JPY B", ib.FMT_MONEY) == ib.FMT_JPY_BILLION
+    assert source_plan._format_for_unit("JPY T", ib.FMT_MONEY) == ib.FMT_JPY_TRILLION
+    assert source_plan._format_for_unit("USD", ib.FMT_MONEY) == ib.FMT_USD_MILLION
+    assert source_plan._format_for_unit("USD K", ib.FMT_MONEY) == ib.FMT_USD_THOUSAND
+    assert source_plan._format_for_unit("USD M", ib.FMT_MONEY) == ib.FMT_USD_MILLION
+
+
+def test_skill_guidance_requires_reading_workbook_formatting_for_units() -> None:
+    invocation_text = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
+    design_text = (SKILL_DIR / "build" / "references" / "_ib_workbook_design_system.md").read_text(encoding="utf-8")
+    review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+    rubric_text = (SKILL_DIR / "build" / "references" / "_sheet_quality_rubric.md").read_text(encoding="utf-8")
+    combined = "\n".join([invocation_text, design_text, review_text, rubric_text])
+
+    for phrase in [
+        "Store base-currency values and use Excel",
+        "Do not infer units only from visible text",
+        "Inspect units through formatting as well as values",
+        "visible unit labels must match those formats",
+        "This is a money-unit rule, not a blanket numeric rule",
+        "units, customers, count, FTE, days, months, percentages, and multiples",
+    ]:
+        assert phrase in combined
+
+
+def test_benchmark_guidance_covers_material_evidence_lenses() -> None:
+    benchmark_text = (SKILL_DIR / "build" / "references" / "_benchmark_protocol.md").read_text(encoding="utf-8")
+    invocation_text = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
+    review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+    rubric_text = (SKILL_DIR / "build" / "references" / "_sheet_quality_rubric.md").read_text(encoding="utf-8")
+    combined = "\n".join([benchmark_text, invocation_text, review_text, rubric_text])
+
+    for phrase in [
+        "Material Evidence Lenses",
+        "Labor / HR comps",
+        "Venture equity / funding comps",
+        "Venture debt / non-dilutive capacity",
+        "Pricing / customer ROI comps",
+        "Market / competitive benchmarks",
+        "The gate is not the sheet name",
+    ]:
+        assert phrase in combined
 
 
 def test_marketplace_source_does_not_emit_unrelated_asset_heavy_template() -> None:
@@ -2827,6 +2947,10 @@ if __name__ == "__main__":
     test_source_backed_plan_reaches_generic_kernel_shape()
     test_generated_workbook_has_sheet_specific_quality_markers()
     test_structured_yaml_currency_and_display_scale_are_generic()
+    test_money_units_are_raw_values_with_number_formats_not_scaled_values()
+    test_money_and_non_money_units_keep_separate_format_rules()
+    test_skill_guidance_requires_reading_workbook_formatting_for_units()
+    test_benchmark_guidance_covers_material_evidence_lenses()
     test_marketplace_source_does_not_emit_unrelated_asset_heavy_template()
     test_hardware_source_ignores_low_usd_competitor_price_noise()
     test_source_plan_starting_cash_is_hard_input_blue()
