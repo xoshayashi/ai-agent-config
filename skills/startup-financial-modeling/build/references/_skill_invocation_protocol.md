@@ -82,6 +82,7 @@ reference workbook or generated output, read cell values and formatting
 together: `number_format`, font color, fill, border, alignment, wrapping,
 merged-cell state, row height, and column width are part of the model contract.
 Do not infer units only from visible text.
+
 This money-display rule must not leak into non-money rows. Preserve operational
 units such as units, customers, count, FTE, days, months, percentages, and
 multiples with their own formats and formulas.
@@ -185,6 +186,15 @@ benchmarks, or internal/user-provided sources, use YAML `private_comps`,
 limits. `live_comps` / `public_comps` may contain ticker strings and comparable
 evidence mappings in one list; strings are treated as public tickers, mappings
 are treated as provided evidence.
+
+For deeper investor-ready models, choose evidence lenses from the material
+driver, not from a fixed template. Labor / HR comps support hiring and
+productivity, venture equity / funding comps support round feasibility and
+valuation, venture debt / non-dilutive capacity supports runway and dilution,
+pricing / customer ROI comps support monetization, and market / competitive
+benchmarks support reachability. Lease-specific evidence is optional and only
+needed when asset financing or lease terms are explicitly decision-critical.
+Use a compact register or support sheet only when the lens changes the decision.
 
 ```yaml
 live_comps: [CRM, NOW]

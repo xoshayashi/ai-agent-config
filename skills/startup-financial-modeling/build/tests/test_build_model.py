@@ -2139,15 +2139,23 @@ def test_non_money_units_keep_their_own_formats_and_formulas() -> None:
     assert source_plan._model_value("=A1/1000000", "x") == "=A1/1000000"
     assert source_plan._model_value("=A1/1000000", "months") == "=A1/1000000"
     assert source_plan._model_value("=A1/1000000", "JPY") == "=A1"
+    assert source_plan._model_value("=A1/1000000", "USD") == "=A1"
     assert source_plan._model_value(12, "units") == 12
     assert source_plan._model_value(12, "customers") == 12
     assert source_plan._model_value(12, "JPY M") == 12_000_000
+    assert source_plan._model_value(12, "USD M") == 12_000_000
+    assert source_plan._display_unit("USD") == "$"
+    assert source_plan._display_unit("USD K") == "$K"
+    assert source_plan._display_unit("USD M") == "$M"
     assert source_plan._format_for_unit("units", ib.FMT_MONEY) == ib.FMT_INTEGER
     assert source_plan._format_for_unit("customers", ib.FMT_MONEY) == ib.FMT_INTEGER
     assert source_plan._format_for_unit("FTE", ib.FMT_MONEY) == ib.FMT_INTEGER
     assert source_plan._format_for_unit("months", ib.FMT_MONEY) == ib.FMT_NUM
     assert source_plan._format_for_unit("%", ib.FMT_MONEY) == ib.FMT_PERCENT
     assert source_plan._format_for_unit("x", ib.FMT_MONEY) == ib.FMT_MULTIPLE
+    assert source_plan._format_for_unit("USD", ib.FMT_MONEY) == ib.FMT_USD_MILLION
+    assert source_plan._format_for_unit("USD K", ib.FMT_MONEY) == ib.FMT_USD_THOUSAND
+    assert source_plan._format_for_unit("USD M", ib.FMT_MONEY) == ib.FMT_USD_MILLION
 
 
 def test_skill_guidance_requires_reading_workbook_formatting_for_units() -> None:
@@ -2164,6 +2172,25 @@ def test_skill_guidance_requires_reading_workbook_formatting_for_units() -> None
         "visible unit labels must match those formats",
         "This is a money-unit rule, not a blanket numeric rule",
         "units, customers, count, FTE, days, months, percentages, and multiples",
+    ]:
+        assert phrase in combined
+
+
+def test_benchmark_guidance_covers_material_evidence_lenses() -> None:
+    benchmark_text = (SKILL_DIR / "build" / "references" / "_benchmark_protocol.md").read_text(encoding="utf-8")
+    invocation_text = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
+    review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+    rubric_text = (SKILL_DIR / "build" / "references" / "_sheet_quality_rubric.md").read_text(encoding="utf-8")
+    combined = "\n".join([benchmark_text, invocation_text, review_text, rubric_text])
+
+    for phrase in [
+        "Material Evidence Lenses",
+        "Labor / HR comps",
+        "Venture equity / funding comps",
+        "Venture debt / non-dilutive capacity",
+        "Pricing / customer ROI comps",
+        "Market / competitive benchmarks",
+        "The gate is not the sheet name",
     ]:
         assert phrase in combined
 
@@ -2902,6 +2929,7 @@ if __name__ == "__main__":
     test_money_units_are_raw_values_with_number_formats_not_scaled_values()
     test_non_money_units_keep_their_own_formats_and_formulas()
     test_skill_guidance_requires_reading_workbook_formatting_for_units()
+    test_benchmark_guidance_covers_material_evidence_lenses()
     test_marketplace_source_does_not_emit_unrelated_asset_heavy_template()
     test_hardware_source_ignores_low_usd_competitor_price_noise()
     test_source_plan_starting_cash_is_hard_input_blue()

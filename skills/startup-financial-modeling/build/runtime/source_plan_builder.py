@@ -138,6 +138,16 @@ YEN_INPUT_SCALES = {
     "JPY T": 1_000_000_000_000,
 }
 
+USD_INPUT_SCALES = {
+    "USD K": 1_000,
+    "USD M": 1_000_000,
+}
+
+MONEY_INPUT_SCALES = {
+    **YEN_INPUT_SCALES,
+    **USD_INPUT_SCALES,
+}
+
 DISPLAY_UNIT_BY_SCALE = {
     ("JPY", "actual"): "円",
     ("JPY", "thousand"): "千円",
@@ -158,7 +168,14 @@ YEN_DISPLAY_UNITS = {
     "JPY T": "兆円",
 }
 
-MONEY_INPUT_UNITS = {"JPY", *YEN_INPUT_SCALES.keys()}
+MONEY_INPUT_UNITS = {"JPY", "USD", *MONEY_INPUT_SCALES.keys()}
+
+MONEY_DISPLAY_UNITS = {
+    **YEN_DISPLAY_UNITS,
+    "USD": "$",
+    "USD K": "$K",
+    "USD M": "$M",
+}
 
 
 def _display_unit(unit: str, fmt: str | None = None, currency: str = "JPY", scale: str = "million") -> str:
@@ -172,7 +189,7 @@ def _display_unit(unit: str, fmt: str | None = None, currency: str = "JPY", scal
         if fmt in {ib.FMT_MONEY, ib.FMT_MONEY_DECIMAL, ib.FMT_JPY_MILLION, ib.FMT_USD_MILLION}:
             return DISPLAY_UNIT_BY_SCALE.get((currency, scale), DISPLAY_UNIT_BY_SCALE.get((currency, "million"), "百万円"))
         return DISPLAY_UNIT_BY_SCALE.get((currency, "actual"), YEN_DISPLAY_UNITS["JPY"])
-    return YEN_DISPLAY_UNITS.get(unit, unit)
+    return MONEY_DISPLAY_UNITS.get(unit, unit)
 
 
 def _normalise_formula_scale(formula: str) -> str:
@@ -185,7 +202,7 @@ def _model_value(value: object, unit: str) -> object:
             return _normalise_formula_scale(value)
         return value
     if isinstance(value, (int, float)) and not isinstance(value, bool):
-        scale = YEN_INPUT_SCALES.get(unit)
+        scale = MONEY_INPUT_SCALES.get(unit)
         if scale:
             return int(value * scale) if float(value * scale).is_integer() else value * scale
     return value
@@ -223,6 +240,18 @@ def _format_for_unit(unit: str, requested_fmt: str, facts: SourceFacts | None = 
             if requested_fmt == ib.FMT_JPY_THOUSAND:
                 return ib.fmt_for_currency(facts.currency, "thousand")
         return requested_fmt
+    if unit == "USD":
+        if requested_fmt in {ib.FMT_MONEY, ib.FMT_USD_MILLION}:
+            return ib.FMT_USD_MILLION
+        if requested_fmt in {ib.FMT_JPY_YEN, ib.FMT_USD_DOLLAR}:
+            return ib.FMT_USD_DOLLAR
+        if requested_fmt in {ib.FMT_JPY_THOUSAND, ib.FMT_USD_THOUSAND}:
+            return ib.FMT_USD_THOUSAND
+        return requested_fmt
+    if unit == "USD K":
+        return ib.FMT_USD_THOUSAND
+    if unit == "USD M":
+        return ib.FMT_USD_MILLION
     return requested_fmt
 
 

@@ -54,6 +54,10 @@ heavy process.
   refresh?
 - Are fake source labels avoided?
 - Are source gaps carried into DD questions or validation tests?
+- For material assumptions, has the evidence lens been selected explicitly:
+  labor / HR comps, venture equity or funding comps, venture debt /
+  non-dilutive capacity, pricing / customer ROI comps, market / competitive
+  benchmarks, or another decision-specific lens?
 
 ## Visual and Editability Inspection
 

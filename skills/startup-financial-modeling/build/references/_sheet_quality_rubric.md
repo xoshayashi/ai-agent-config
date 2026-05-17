@@ -64,7 +64,7 @@ For every generated sheet, verify:
 | Sensitivity | Axes come from high-impact weak evidence, are anchored to a scenario, and show the output and threshold that changes the decision. | Decorative 2D grid using arbitrary volume x price defaults. |
 | Valuation | States method credibility, exclusions, scenario range, DCF/multiple/SOTP bridge where relevant, and investor/founder return support. | Averages methods blindly or applies a revenue multiple without quality, margin, or risk context. |
 | Market Support | TAM/SAM/SOM, reachability, source freshness, plan-to-market bridge, and gaps tie market evidence to assumptions. | Market size is a headline number with no source freshness or connection to revenue drivers. |
-| Benchmarks | Each benchmark has source id, type, period, applicability limits, freshness, linked assumption/KPI, and refresh need. | Fake or stale source labels appear without applicability limits or linked driver. |
+| Benchmarks | Each benchmark has source id, type, period, applicability limits, freshness, linked assumption/KPI, and refresh need. Material assumptions use the right evidence lens, such as labor / HR comps, venture equity or funding comps, venture debt / non-dilutive capacity, pricing / customer ROI comps, or market / competitive benchmarks. | Fake or stale source labels appear without applicability limits or linked driver. |
 | IC Memo | Gives recommendation, KPI readout, what must be true, downside triggers, valuation support, financing/ownership implication, DD questions, and source boundary. | Memo summarizes tabs instead of making an investment judgment. |
 
 ## Sheet Inclusion And Omission
