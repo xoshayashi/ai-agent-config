@@ -1414,7 +1414,15 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
         for col, value in enumerate(values, start=start_col):
             ws.cell(row, col, value)
             ib.apply_comment(ws.cell(row, col), wrap_text=False)
-    _build_kpi_peer_comparison(ws, facts, 64 + len(interpretation_rows) + 1)
+    # Resolve KPI rows by label so the peer block tracks any reorder of `rows`.
+    kpi_row_by_label = {label: row for row, label, *_ in rows}
+    _build_kpi_peer_comparison(
+        ws,
+        facts,
+        64 + len(interpretation_rows) + 1,
+        kpi_row_by_label["Gross margin"],
+        kpi_row_by_label["EBITDA margin"],
+    )
 
 
 def _build_scenarios(wb: Workbook, facts: SourceFacts) -> None:
@@ -1732,7 +1740,13 @@ def _build_market_support(wb: Workbook, facts: SourceFacts) -> None:
             ib.apply_link_external(ws.cell(r, 2))
 
 
-def _build_kpi_peer_comparison(ws: Worksheet, facts: SourceFacts, start_row: int) -> None:
+def _build_kpi_peer_comparison(
+    ws: Worksheet,
+    facts: SourceFacts,
+    start_row: int,
+    gross_margin_row: int,
+    ebitda_margin_row: int,
+) -> None:
     """Juxtapose plan KPIs with live-fetched public-peer operating margins.
 
     The comparison axis is the current public-peer distribution retrieved this
@@ -1761,7 +1775,10 @@ def _build_kpi_peer_comparison(ws: Worksheet, facts: SourceFacts, start_row: int
     for offset, header in enumerate(["Plan", "Peer median", "Peer low", "Peer high", "Position"]):
         _apply_text_header(ws.cell(header_row, plan_col + offset), header)
     final_col = _final_period_col(facts)
-    metrics = [("Gross margin", 16, "gross_margin"), ("EBITDA margin", 17, "ebitda_margin")]
+    metrics = [
+        ("Gross margin", gross_margin_row, "gross_margin"),
+        ("EBITDA margin", ebitda_margin_row, "ebitda_margin"),
+    ]
     for offset, (label, kpi_row, key) in enumerate(metrics):
         row = start_row + 2 + offset
         values = sorted(
@@ -1781,7 +1798,7 @@ def _build_kpi_peer_comparison(ws: Worksheet, facts: SourceFacts, start_row: int
                     row, plan_col + 4,
                     f'=IF({plan_ref}<{low_ref},"below",IF({plan_ref}>{high_ref},"above","within"))',
                 ),
-                ib.FMT_NUM,
+                "General",
             )
             ws.cell(row, LAYOUT.source_col, f"live peers: {peer_label or 'n/a'}; as of {as_of or 'n/a'}")
         else:
