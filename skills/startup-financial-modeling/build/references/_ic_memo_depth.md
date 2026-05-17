@@ -20,6 +20,7 @@ evidence, risk, and next action, without carrying template residue.
 Use the sections that fit the decision:
 
 - recommendation or decision framing;
+- price / terms stance and target valuation range;
 - company and model scope;
 - investment thesis;
 - KPI readout and what changed the view;
@@ -28,7 +29,8 @@ Use the sections that fit the decision:
 - financing, runway, dilution, and ownership implications;
 - valuation and return view;
 - benchmark/source support and weak evidence;
-- diligence questions and validation tests;
+- ranked diligence gates and validation tests;
+- walk-away or reprice conditions;
 - open assumptions / placeholders.
 
 For a focused module, keep the memo short but still include the decision,
@@ -58,6 +60,7 @@ If a memo does not answer any of these, the model has not yet been interpreted.
 When the output is a workbook, the memo should pull from model cells where
 practical rather than restating generic guidance. At minimum, surface the final
 or decision-period readout for runway, funding gap, burn multiple, gross margin,
-selected valuation, investor return, dilution, and the weakest evidence items.
-Then translate those outputs into what must be true and what diligence should
-happen next.
+selected valuation range, supportability score, investor return, dilution,
+pricing gate, and the weakest evidence items. Then translate those outputs into
+what must be true, what diligence should happen next, and what condition would
+change the recommendation.

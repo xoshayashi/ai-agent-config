@@ -67,12 +67,28 @@ heavy process.
   When LibreOffice/PDF/screenshot rendering is available, render and inspect
   the visible output. Use an actual Google Sheets import/readback when the
   handoff target is Google Sheets.
+- For generator-produced xlsx files, run `--strict-audit` or the equivalent
+  workbook audit before claiming readiness. Omitted-sheet formulas should be
+  absent because focused outputs include the support sheets needed for live
+  formulas. Compact-mode placeholders are acceptable only for non-decision
+  helper cells and must preserve the original formula for audit.
 - Verify that the workbook renders with readable columns, visible overflow
   where intended, compact row rhythm, semantic fills, no frozen panes,
   source / unit alignment, and calm accent usage.
+- Verify text position role-by-role: labels, sources, notes, titles, memos,
+  and interpretation text are left-aligned; numeric values, formulas, money,
+  percentages, multiples, counts, and unit labels are right-aligned; only period
+  headers, short scenario/matrix headers, and compact column headers are
+  centered. Long prose, line-item labels, source caveats, and memo sentences
+  should not be centered.
 - Confirm workbook default font and populated cell fonts use the canonical
   design tokens: Arial 10pt body/default, 9pt italic gray notes, 14pt title,
   and compact bold section/header rows.
+- Confirm the populated cell font-size palette is intentionally small: 9pt for
+  supporting notes/sources/unit helpers, 10pt for body/model cells, 11pt for
+  compact section emphasis, and 14pt for sheet titles only. Treat 8pt cell
+  text, 16pt+ model-grid titles, or many improvised local sizes as design
+  defects; fix layout rather than shrinking text.
 - Confirm hierarchy / indentation uses dedicated Google-Sheets-20px columns
   (`2.14` xlsx width), with no native Excel indent, no leading-space
   indentation, and no wrapped generated cells.
@@ -80,11 +96,16 @@ heavy process.
   a title, instruction, explanation, bullet, source caveat, or note and the
   right-side cells can remain blank, remove wrapping, clear those overflow
   cells, and let the text read horizontally without merging cells. Keep wrap
-  only for user-approved bounded prose where neighboring cells carry meaningful
-  values, formulas, units, or notes.
+  only for user-approved bounded table prose where neighboring cells carry
+  meaningful values, formulas, units, or notes.
+- Apply the wrap decision ladder before approving any exception: shorten/split
+  the copy, widen the role column, reserve blank unstyled overflow cells, move
+  prose to a note/interpretation surface, and only then allow bounded table
+  prose wrapping. Confirm horizontal-read text is not trapped at the
+  print/render boundary or blocked by styled overflow cells.
 - If a user-approved exception uses wrapping or manual line breaks, verify the
-  row height is sized to the exact visible line count and the rendered text is
-  neither clipped nor padded into a loose-looking row.
+  row height is sized to the exact rendered visible line count and the rendered
+  text is neither clipped nor padded into a loose-looking row.
 - Inspect the print/render canvas: each sheet should end at the last real value
   row and column, including chart and drawing anchors, with print area bound to
   that rendered range and no styled blank rows or columns extending the visual
@@ -149,14 +170,29 @@ heavy process.
 
 ## Command Checks
 
+- Minimum executable closeout for generated xlsx work:
+
+  ```sh
+  PYTHONPYCACHEPREFIX=$(mktemp -d) python3 skills/startup-financial-modeling/build/tests/test_build_model.py
+  python3 skills/startup-financial-modeling/scripts/build_model.py --mode pricing --output /tmp/pricing_check.xlsx
+  python3 skills/startup-financial-modeling/scripts/build_model.py --mode cap_table --output /tmp/cap_table_check.xlsx
+  ```
+
+  When LibreOffice is available, recalculate at least one representative
+  workbook and inspect cached values with `data_only=True` for spreadsheet
+  errors such as `#VALUE!`, `#REF!`, `#DIV/0!`, `#N/A`, and `#NAME?`. Do not
+  treat formula-string inspection as proof that the workbook calculates.
 - Run the narrowest available command checks that prove model quality:
   formula/link integrity, reconciliations, balance/cash/ownership checks,
   unit and display-scale consistency, source/benchmark hygiene, no workbook
   names unless explicitly required, and mode-specific dependency closure.
 - Run the workbook-design checks that prove visible sheet quality:
   canonical fonts, no wrap/freeze/merge/native indent, Google-Sheets-20px
-  hierarchy columns, row heights, semantic fill spans, sparse colors/borders,
-  blank-cell style cleanup, print areas, chart anchors, and rendered bounds.
+  hierarchy columns, role-based left/right/center text alignment, constrained
+  9/10/11/14pt cell-size palette, no horizontal-read wrap, no styled overflow
+  blockers, exact wrap-exception row heights, row heights, semantic fill spans,
+  sparse colors/borders, blank-cell style cleanup, print areas, chart anchors,
+  and rendered bounds.
 - Treat command output and rendered screenshots/PDFs as complementary evidence.
   Passing commands do not excuse a visibly poor sheet; a good-looking render
   does not excuse broken formulas, units, sources, or reconciliations.

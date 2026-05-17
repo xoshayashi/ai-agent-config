@@ -1,0 +1,199 @@
+# Skill Invocation Protocol
+
+This file preserves the full invocation, routing, workbook, design, analysis,
+and closeout gates that should not live in the always-loaded `SKILL.md`.
+
+## Reference Loading
+
+References live in `build/references/`; load the smallest set that covers the
+decision. Start with `_output_modes.md`, `_generic_composition_protocol.md`,
+and `_self_review_protocol.md`. For any xlsx generation or repair, also load
+`_layout_canonical.md`, `_ib_workbook_design_system.md`, and
+`_sheet_quality_rubric.md`. Add `_modeling_kernel.md`,
+`_coverage_universe.md`, `_assumption_decomposition_patterns.md`,
+`_kpi_analytics.md`, `_scenario_sensitivity_playbook.md`,
+`_valuation_and_return_logic.md`, `_ic_memo_depth.md`,
+`_benchmark_protocol.md`, `_terminology.md` for full plans, fundraising, DD,
+or investor outputs.
+
+## Routing Quick Map
+
+| Request signal                                          | Default output shape                                           | Required refs                                                                                   | Skip by default                                  |
+| ------------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| pricing / ROI / willingness-to-pay                      | compact pricing model, assumption register, or validation plan | `_output_modes.md`, `_generic_composition_protocol.md`, `_assumption_decomposition_patterns.md` | BS/CF/cap table unless explicitly needed         |
+| cap table / SAFE / J-KISS / option pool / exit proceeds | cap-table state-machine workbook or ownership audit            | `_output_modes.md`, `_valuation_and_return_logic.md`, `_self_review_protocol.md`                | full P&L/BS/CF unless financing plan requires it |
+| runway / burn / lender plan                             | cash/runway model with downside and financing timing           | `_output_modes.md`, `_scenario_sensitivity_playbook.md`, `_kpi_analytics.md`                    | valuation and IC memo unless requested           |
+| market sizing / comps / benchmark                       | source-backed register or market-support workbook              | `_benchmark_protocol.md`, `_output_modes.md`                                                    | static benchmark truth without refresh date      |
+| fundraising / board / investor-ready model              | integrated decision workbook                                   | full finance reference stack                                                                    | low-value tabs that fail sheet quality           |
+| ambiguous memo or weak evidence                         | model spec, assumption register, DD questions                  | `_generic_composition_protocol.md`, `_assumption_decomposition_patterns.md`                     | xlsx generation until mechanics are clear        |
+
+## Core Pattern
+
+Compose from decision and dependencies; examples, maturity cues, sectors, and
+modes are prompts for reasoning, not templates. Build the driver tree, select
+material variables, keep primitive drivers as assumptions, and calculate
+dependent outputs as formulas or checks.
+
+## Workbook Helper
+
+```sh
+python3 skills/startup-financial-modeling/scripts/build_model.py \
+  --source-md path/to/source.md --output model_output.xlsx
+python3 skills/startup-financial-modeling/scripts/build_model.py \
+  --mode pricing --input model.yaml --output model_output.xlsx
+```
+
+Exact mode values: `full`, `pricing`, `unit_economics`, `cap_table`,
+`ma_exit`, `dcf_only`, `burn_runway`, `three_statement`, `market_sizing`,
+and `comps_only`. Focused modes prioritize formula completeness. Include
+supporting sheets when needed rather than hiding broken dependencies behind
+placeholders.
+
+Structured YAML may define company/currency/display scale/grain/periods,
+segments, operating drivers, financing instruments, and valuation scalars.
+Money inputs are raw base-currency values; `_yen` names are money-driver names.
+
+## Workbook Gates
+
+Workbook gates: blue inputs, black formulas, green internal links, red external
+links, raw money values with display formats, compact unit labels, direct
+formulas, editable grid structure, unnumbered sections, traceable sources, no
+merged cells, Google-Sheets-20px hierarchy / indent columns (`2.14` xlsx
+width), no native indent or leading-space indentation, no frozen panes, and
+generated cells with `wrap_text` off. Treat text wrapping as prohibited for
+generated workbook cells. Classify the cell role before changing wrap settings:
+horizontal-read titles, explanations, instructions, notes, bullets, source
+caveats, and memo lines keep wrap off and read through blank unmerged unstyled
+overflow cells. Use the IB wrap decision ladder before any exception: shorten
+or split the copy, widen the role column, reserve blank unstyled overflow
+cells, or move prose to a dedicated note / interpretation column, source
+register, memo sheet, or separate row. Use a wrapped/manual-line-break
+exception only for user-approved bounded table prose that must stay inside one
+column because adjacent cells carry meaningful values, formulas, units, or
+notes. Do not place horizontal-read text in the final printed/rendered column
+where it cannot overflow visibly. If an exception uses wrapping or manual line
+breaks, set row height to the exact rendered visible line count so text is not
+clipped or padded.
+
+Text position is part of auditability: labels, sources, notes, titles, memos,
+and interpretation text are left-aligned; numeric values, formulas, money,
+percentages, multiples, counts, and unit labels are right-aligned; only period
+headers, scenario/matrix headers, and short column headers are centered. Do not
+center long prose or labels, do not use native indent or spaces for hierarchy,
+and keep the same label/source/unit/value positions across sheets whenever
+possible.
+
+Font size discipline is equally strict: body/model cells use Arial 10pt,
+source/note/unit helper text uses 9pt italic gray, compact section/header rows
+use 10-11pt bold, and sheet titles use 14pt bold. Do not create presentation
+hierarchy with many font sizes, 8pt footnote cells, oversized 16pt+ titles, or
+large pasted memo text. If something needs emphasis, prefer role, placement,
+bold, sparse fill/border, or whitespace before changing size.
+
+## Design Gates
+
+Design gates: `_layout_canonical.md` owns grid, columns, hierarchy widths, units,
+formulas, and layout mechanics. `_ib_workbook_design_system.md` owns visual
+roles, font, color, borders, highlights, charts, and render expectations.
+
+Color discipline is a hard workbook gate, not a polish preference: background
+fills are selective accents for major semantic moments only, filled row
+components use one consistent rectangular column span, and that span is chosen
+from the attached table/block rather than from which cells contain text. Do not
+stop a fill because a cell is blank; do not repeat the same non-heatmap fill on
+adjacent rows; do not color several rows merely because they are nearby.
+Section/block dividers, header/label rows, selected outputs/checks, input
+sections, and caution rows are the normal fill roles. Keep the palette small
+and calm: avoid rainbow palettes, decorative alternating fills, and high-chroma
+backgrounds that compete with the model logic. Use `ib_format.py` semantic
+row-span helpers for generated xlsx fill/border row components instead of
+hand-painting arbitrary cells.
+
+Border discipline follows the same rule and is equally strict: meaningful row
+rules use the same table/block column span as the attached data surface,
+including blank member cells where that keeps the section, header, total, or
+check row aligned. Do not stop a border because a cell is blank, and do not draw
+borders only around populated cells when the data table continues farther right.
+Stop the rule at the edge of the related table/block or comparable row span;
+leave only trailing canvas and unrelated overflow spacer cells borderless.
+Dedicated hierarchy / indent columns stay borderless; draw the rule from the
+row's actual hierarchy-position label/data column, not across earlier 20px
+spacer columns. Memo, source, note, and interpretation cells are usually
+borderless; they read through typography and placement, not grid lines. Borders
+are not row-by-row decoration. Use them mainly before or around meaningful rows
+where a structural accent is needed. As with background fills, avoid repeating
+the same prominent top/bottom rule across adjacent rows unless it is an
+explicitly declared table grid; use typography, spacing, or quiet whitespace
+for supporting rows. Use three border weights by meaning: normal thin for
+ordinary structural breaks, one-step-thicker medium for major section or
+decision boundaries, and normal dotted for soft/provisional separations such
+as optional checks or supporting context. Border colors are black by default.
+Do not introduce gray, colored, or decorative border colors unless the user
+supplies a house style; visual priority comes from sparsity, placement, and
+thin/medium/dotted weight, not from color.
+
+## Analysis Gates
+
+Material assumptions need selected driver, explanatory drivers, implied value,
+support ratio/variance, and evidence status. Weak evidence feeds
+scenario/sensitivity/benchmark/DD. KPI, scenario, valuation, benchmark, and memo
+surfaces interpret the model and connect evidence to next actions. Write memos
+from a clean base rather than preserving legacy layout compatibility; include
+only the necessary and sufficient supplemental context for the current decision.
+For xlsx outputs, each generated sheet must pass the sheet-level quality rubric:
+it needs a distinct purpose, source boundary, dependency flow, checks where
+errors would matter, and interpretation where it is an output surface. Do not
+create a sheet just because it belongs to a canonical full-workbook order.
+Focused modes should remain as compact as possible after formula completeness
+is satisfied. Compact-mode placeholders are a last resort for non-decision
+helper cells, not an acceptable substitute for valuation, runway, pricing,
+scenario, or memo formulas.
+
+## Closeout Gate
+
+Do not treat model construction as completion. Before closeout, run command
+checks and rendered-output inspection for both finance logic and sheet design:
+formulas, reconciliation, unit/scale integrity, source status, styles, layout,
+fonts, fills, borders, print/canvas bounds, and visible readability. Render or
+open the xlsx/PDF/screenshot whenever tooling is available. For xlsx outputs,
+recalculate with a spreadsheet engine such as LibreOffice when available and
+inspect `data_only=True` values for `#VALUE!`, `#REF!`, `#DIV/0!`, and related
+errors; formula-string checks alone are not sufficient. If rendering or
+recalculation is blocked, document the blocker and still run workbook
+inspection commands.
+Use the generator's strict audit option when producing an xlsx for handoff:
+`python build_model.py --source-md input.md --output model.xlsx --strict-audit`.
+It should fail if omitted-sheet references or `#REF!` markers remain.
+The generator attempts public-market comparable refresh by default and records
+current multiples, provided comparable evidence, or retrieval failures in the
+Benchmarks sheet. Override the auto-selected public ticker set only when the
+decision needs specific listed peers: `--live-comps CRM NOW DDOG`. For
+non-public companies, funding rounds, M&A transactions, market reports, customer
+benchmarks, or internal/user-provided sources, use YAML `private_comps`,
+`transaction_comps`, or `benchmark_sources` with source date and applicability
+limits. `live_comps` / `public_comps` may contain ticker strings and comparable
+evidence mappings in one list; strings are treated as public tickers, mappings
+are treated as provided evidence.
+
+```yaml
+live_comps: [CRM, NOW]
+private_comps:
+  - name: PrivateAI
+    company_type: private
+    source_type: funding round / press release
+    post_money: 12000000000
+    arr: 1000000000
+    as_of_date: 2026-04-30
+    applicability_limits: ARR reported by company; verify security terms
+transaction_comps:
+  - name: Strategic SaaS acquisition
+    enterprise_value: 50000000000
+    revenue: 5000000000
+    source_url: https://example.test/ma-announcement
+    as_of_date: 2025-12-15
+```
+
+Follow `_self_review_protocol.md`. If tests, workbook inspection, render
+checks, or artifact self-review find failures, fix the concrete failed items
+and rerun the same checks. Keep iterating until the model logic and the visible
+sheet design are both sufficient, or a real blocker is explicitly documented.

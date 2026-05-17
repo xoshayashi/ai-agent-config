@@ -17,7 +17,7 @@ from types import SimpleNamespace
 
 from openpyxl import Workbook
 from openpyxl import load_workbook
-from openpyxl.styles import Alignment, PatternFill
+from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter, range_boundaries
 
 SKILL_DIR = Path(__file__).resolve().parents[2]
@@ -30,6 +30,7 @@ import build_model  # noqa: E402
 import cap_table_builder as cap_table  # noqa: E402
 import economic_kernel as kernel  # noqa: E402
 import ib_format as ib  # noqa: E402
+import live_comps  # noqa: E402
 import source_plan_builder as source_plan  # noqa: E402
 
 FIRST_VALUE_COL = source_plan.START_PERIOD_COL
@@ -37,6 +38,35 @@ SECOND_VALUE_COL = FIRST_VALUE_COL + 1
 FIRST_VALUE_LETTER = source_plan.get_column_letter(FIRST_VALUE_COL)
 SECOND_VALUE_LETTER = source_plan.get_column_letter(SECOND_VALUE_COL)
 UNIT_COL = source_plan.LAYOUT.unit_col
+
+
+def _fake_public_comps(tickers: list[str], *, timeout: float = 8.0) -> live_comps.PublicCompsResult:
+    comps = [
+        live_comps.PublicComp(
+            ticker=ticker.strip().upper(),
+            name=f"{ticker.strip().upper()} Test Comparable",
+            currency="USD",
+            market_cap=100_000_000_000.0,
+            enterprise_value=110_000_000_000.0,
+            revenue_multiple=8.0 + idx,
+            ebitda_multiple=20.0 + idx,
+            source_url=f"https://example.test/{ticker.strip().upper()}",
+            as_of_date="2026-05-17",
+            status="current",
+        )
+        for idx, ticker in enumerate(tickers)
+        if ticker.strip()
+    ]
+    return live_comps.PublicCompsResult(
+        comps=comps,
+        revenue_multiple_median=9.0 if comps else None,
+        ebitda_multiple_median=21.0 if comps else None,
+        source_url="https://example.test/live-comps",
+        as_of_date="2026-05-17",
+    )
+
+
+build_model.lc.fetch_public_comps = _fake_public_comps
 
 
 def _column_width(ws, column_letter: str) -> float:
@@ -71,8 +101,8 @@ def test_skill_exposes_clean_build_route_only() -> None:
 
     assert not (SCRIPTS_DIR / ("workbook_" + "quality_" + "review.py")).exists()
     assert [(SKILL_DIR / "build" / "references" / name).exists() for name in required_references] == [True] * len(required_references)
-    skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
-    assert [name for name in required_references if name not in skill_text] == []
+    invocation_text = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
+    assert [name for name in required_references if name not in invocation_text] == []
     assert [term for term in forbidden if term in text] == []
 
 
@@ -118,10 +148,11 @@ def test_skill_uses_generic_economic_kernel_not_stage_matrix() -> None:
 
 def test_prompt_guidance_resists_fixed_template_routing() -> None:
     skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    invocation_text = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
     generic_text = (SKILL_DIR / "build" / "references" / "_generic_composition_protocol.md").read_text(encoding="utf-8")
     output_modes_text = (SKILL_DIR / "build" / "references" / "_output_modes.md").read_text(encoding="utf-8")
     kpi_text = (SKILL_DIR / "build" / "references" / "_kpi_analytics.md").read_text(encoding="utf-8")
-    skill_flat = " ".join(skill_text.lower().split())
+    skill_flat = " ".join("\n".join([skill_text, invocation_text]).lower().split())
     generic_flat = " ".join(generic_text.split())
 
     assert "examples, maturity cues, sectors, and modes are prompts for reasoning, not templates" in skill_flat
@@ -133,11 +164,12 @@ def test_prompt_guidance_resists_fixed_template_routing() -> None:
 def test_sheet_quality_rubric_covers_every_generated_sheet() -> None:
     rubric_text = (SKILL_DIR / "build" / "references" / "_sheet_quality_rubric.md").read_text(encoding="utf-8")
     skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    invocation_text = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
     output_modes_text = (SKILL_DIR / "build" / "references" / "_output_modes.md").read_text(encoding="utf-8")
     self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
     eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
     combined_flat = " ".join(
-        "\n".join([rubric_text, skill_text, output_modes_text, self_review_text, eval_text]).split()
+        "\n".join([rubric_text, skill_text, invocation_text, output_modes_text, self_review_text, eval_text]).split()
     )
     for sheet_name in source_plan.SOURCE_PLAN_SHEETS:
         assert f"| {sheet_name} |" in rubric_text
@@ -327,6 +359,214 @@ def test_focused_modes_use_generic_kernel_after_bundle_filter() -> None:
             assert "SaaS Series A" not in all_text
 
 
+def test_focused_modes_are_formula_complete_without_compact_placeholders() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        for mode in build_model.VALID_MODES:
+            out = Path(tmp) / f"{mode}.xlsx"
+            build_model.build_model(None, out, mode=mode)
+            wb = load_workbook(out, data_only=False)
+            assert wb.sheetnames == build_model.resolve_bundle(mode)
+            workbook_text = "\n".join(
+                str(cell.value)
+                for ws in wb.worksheets
+                for row in ws.iter_rows()
+                for cell in row
+                if cell.value is not None
+            )
+            assert "compact mode placeholder" not in workbook_text
+            assert "Original formula omitted from focused bundle" not in workbook_text
+            assert build_model.audit_workbook(wb) == []
+
+
+def test_integrated_model_has_ib_decision_gates_not_just_readouts() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "full.xlsx"
+        build_model.build_model(None, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+
+        sotp_formula = _first_year_cell_for_label(wb, "Valuation", "SOTP EV").value
+        selected_formula = _first_year_cell_for_label(wb, "Valuation", "Selected EV midpoint").value
+        recommendation_formula = wb["IC Memo"].cell(
+            _row_for_label(wb, "IC Memo", "Recommendation") + 1,
+            source_plan.LAYOUT.label_col,
+        ).value
+        exit_headers = [
+            wb["Exit Waterfall"].cell(5, col).value
+            for col in range(2, 14)
+        ]
+
+        assert "Segments" in sotp_formula and "SUM" in sotp_formula
+        assert "MEDIAN" in selected_formula and "Supportability" not in selected_formula
+        assert isinstance(recommendation_formula, str) and "Proceed subject to DD gates" in recommendation_formula
+        assert "Txn costs / escrow" in exit_headers
+        assert "Preference floor" in exit_headers
+        assert "Walk-away signal" in exit_headers
+        assert _row_for_label(wb, "Valuation", "Valuation committee gates")
+        assert _row_for_label(wb, "Pricing", "Pricing validation plan")
+        assert build_model.audit_workbook(wb) == []
+
+
+def test_comparable_evidence_loads_public_peers_by_default_and_overrides_multiples() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "live_comps.xlsx"
+        build_model.build_model(None, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+        benchmark_text = "\n".join(str(cell.value) for row in wb["Benchmarks"].iter_rows() for cell in row if cell.value is not None)
+
+        assert _first_year_cell_for_label(wb, "Valuation", "Revenue multiple").value == 9.0
+        assert _first_year_cell_for_label(wb, "Valuation", "EBITDA multiple").value == 21.0
+        assert "Comparable evidence" in benchmark_text
+        assert "public market data" in benchmark_text
+        assert "current" in benchmark_text
+        assert wb["Benchmarks"]["G9"].value == "current"
+
+
+def test_default_live_comps_match_mechanic_labels_and_cli_overrides_yaml() -> None:
+    recurring = kernel.derive_source_facts("# PLAN\nA recurring software startup with ARR.")
+    marketplace = kernel.derive_source_facts("# PLAN\nMarketplace with GMV and take rate.")
+    hardware = kernel.derive_source_facts("# PLAN\nHardware robot deployment with capex.")
+    fintech = kernel.derive_source_facts("# PLAN\nFintech lending balance sheet with loans.")
+    deeptech = kernel.derive_source_facts("# PLAN\nPre-revenue R&D milestone platform.")
+
+    assert build_model._default_live_comps_for_facts(recurring) == ["CRM", "NOW", "DDOG"]
+    assert build_model._default_live_comps_for_facts(marketplace) == ["UBER", "DASH", "ETSY"]
+    assert build_model._default_live_comps_for_facts(hardware) == ["ISRG", "ROK", "TSLA"]
+    assert build_model._default_live_comps_for_facts(fintech) == ["PYPL", "SOFI", "AFRM"]
+    assert build_model._default_live_comps_for_facts(deeptech) == ["ISRG", "ROK", "TSLA"]
+
+    with tempfile.TemporaryDirectory() as tmp:
+        input_path = Path(tmp) / "comps.yaml"
+        out = Path(tmp) / "override.xlsx"
+        input_path.write_text("live_comps: [BAD1, BAD2]\n", encoding="utf-8")
+        build_model.build_model(input_path, out, mode="full", live_comps=["CRM"])
+        wb = load_workbook(out, data_only=False)
+        text = "\n".join(str(cell.value) for row in wb["Benchmarks"].iter_rows() for cell in row if cell.value is not None)
+        assert "CRM Test Comparable" in text
+        assert "BAD1" not in text
+
+
+def test_private_and_transaction_comps_are_included_in_comparable_evidence() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        input_path = Path(tmp) / "private_comps.yaml"
+        out = Path(tmp) / "private_comps.xlsx"
+        input_path.write_text(
+            "\n".join([
+                "private_comps:",
+                "  - name: PrivateAI",
+                "    company_type: private",
+                "    source_type: funding round / press release",
+                "    stage: Series B",
+                "    geography: Japan",
+                "    post_money: 12000000000",
+                "    arr: 1000000000",
+                "    currency: JPY",
+                "    source_url: https://example.test/privateai-series-b",
+                "    as_of_date: 2026-04-30",
+                "    applicability_limits: ARR reported by company; verify security terms",
+                "transaction_comps:",
+                "  - name: Strategic SaaS acquisition",
+                "    company_type: transaction",
+                "    source_type: M&A announcement",
+                "    enterprise_value: 50000000000",
+                "    revenue: 5000000000",
+                "    ebitda: 2000000000",
+                "    as_of_date: 2025-12-15",
+                "    source_url: https://example.test/ma-announcement",
+            ]),
+            encoding="utf-8",
+        )
+        build_model.build_model(input_path, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+        text = "\n".join(str(cell.value) for row in wb["Benchmarks"].iter_rows() for cell in row if cell.value is not None)
+
+        assert "PrivateAI" in text
+        assert "private" in text
+        assert "Strategic SaaS acquisition" in text
+        assert "transaction" in text
+        assert "ARR reported by company" in text
+        assert _first_year_cell_for_label(wb, "Valuation", "Revenue multiple").value == 10.0
+
+
+def test_incomplete_provided_comps_are_registered_but_not_used_for_medians() -> None:
+    comps = live_comps.provided_comps_from_raw([
+        {"name": "Undated PrivateCo", "post_money": 100_000_000, "arr": 10_000_000},
+        {"name": "Dated PrivateCo", "post_money": 120_000_000, "arr": 10_000_000, "as_of_date": "2026-01-01"},
+    ])
+    result = live_comps.summarize_comps(comps)
+
+    assert comps[0].status == "needs review"
+    assert "missing source date" in comps[0].error
+    assert comps[1].status == "provided"
+    assert result.revenue_multiple_median == 12.0
+
+
+def test_sec_ticker_lookup_is_cached_and_errors_are_compact() -> None:
+    original_json_url = live_comps._json_url
+    original_cache = live_comps._SEC_TICKER_LOOKUP_CACHE
+    calls: list[str] = []
+
+    def fake_json_url(url: str, *, timeout: float) -> dict:
+        calls.append(url)
+        return {
+            "0": {"ticker": "CRM", "cik_str": 1108524, "title": "Salesforce, Inc."},
+            "1": {"ticker": "NOW", "cik_str": 1373715, "title": "ServiceNow, Inc."},
+        }
+
+    try:
+        live_comps._SEC_TICKER_LOOKUP_CACHE = None
+        live_comps._json_url = fake_json_url
+        assert live_comps._sec_cik_for_ticker("CRM", timeout=1.0) == ("0001108524", "Salesforce, Inc.")
+        assert live_comps._sec_cik_for_ticker("NOW", timeout=1.0) == ("0001373715", "ServiceNow, Inc.")
+        assert len(calls) == 1
+        assert len(live_comps._compact_error("line one\n" + ("x" * 500), limit=80)) == 80
+    finally:
+        live_comps._json_url = original_json_url
+        live_comps._SEC_TICKER_LOOKUP_CACHE = original_cache
+
+
+def test_failed_live_comps_do_not_pollute_company_specific_sources_or_mark_live_multiples() -> None:
+    def fake_failed_comps(tickers: list[str], *, timeout: float = 8.0) -> live_comps.PublicCompsResult:
+        comps = [
+            live_comps.PublicComp(
+                ticker=ticker,
+                name="",
+                currency="",
+                market_cap=None,
+                enterprise_value=None,
+                revenue_multiple=None,
+                ebitda_multiple=None,
+                source_url=f"https://example.test/{ticker}",
+                as_of_date="2026-05-17",
+                status="failed",
+                error="HTTP Error 401: Unauthorized",
+            )
+            for ticker in tickers
+        ]
+        return live_comps.PublicCompsResult(
+            comps=comps,
+            revenue_multiple_median=None,
+            ebitda_multiple_median=None,
+            source_url="https://example.test/live-comps",
+            as_of_date="2026-05-17",
+        )
+
+    original_fetch = build_model.lc.fetch_public_comps
+    try:
+        build_model.lc.fetch_public_comps = fake_failed_comps
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "failed.xlsx"
+            build_model.build_model(None, out, mode="full")
+            wb = load_workbook(out, data_only=False)
+            assert _first_year_cell_for_label(wb, "Valuation", "Revenue multiple").value == 4
+            assert wb["Valuation"].cell(_row_for_label(wb, "Valuation", "Revenue multiple"), source_plan.LAYOUT.source_col).value == "benchmark / refresh required"
+            assert wb["Benchmarks"]["G9"].value == "needs refresh"
+            assert wb["Benchmarks"]["E6"].value == "unknown"
+            bench_text = "\n".join(str(cell.value) for row in wb["Benchmarks"].iter_rows() for cell in row if cell.value is not None)
+            assert "HTTP Error 401" in bench_text
+    finally:
+        build_model.lc.fetch_public_comps = original_fetch
+
+
 def _formula_cells(wb) -> list[tuple[str, str, str]]:
     formulas: list[tuple[str, str, str]] = []
     for ws in wb.worksheets:
@@ -335,6 +575,16 @@ def _formula_cells(wb) -> list[tuple[str, str, str]]:
                 if isinstance(cell.value, str) and cell.value.startswith("="):
                     formulas.append((ws.title, cell.coordinate, cell.value))
     return formulas
+
+
+def _formula_error_cells(wb) -> list[str]:
+    errors: list[str] = []
+    for ws in wb.worksheets:
+        for row in ws.iter_rows():
+            for cell in row:
+                if isinstance(cell.value, str) and cell.value.startswith("#"):
+                    errors.append(f"{ws.title}!{cell.coordinate}={cell.value}")
+    return errors
 
 
 def _defined_name_count(wb) -> int:
@@ -454,14 +704,40 @@ def test_cross_sheet_formula_cells_are_green() -> None:
         assert violations == []
 
 
-def test_pricing_bundle_is_intent_sized() -> None:
+def test_pricing_bundle_is_formula_complete() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "pricing.xlsx"
         build_model.build_model(None, out, mode="pricing")
 
         wb = load_workbook(out, data_only=False)
         assert wb.sheetnames == build_model.resolve_bundle("pricing")
+        assert "Pricing" in wb.sheetnames
+        assert "Assumptions" in wb.sheetnames
+        assert "CF" in wb.sheetnames
+        assert "Valuation" in wb.sheetnames
+        all_text = "\n".join(str(cell.value) for ws in wb.worksheets for row in ws.iter_rows() for cell in row if cell.value is not None)
+        assert "compact mode placeholder" not in all_text
+        assert build_model.audit_workbook(wb) == []
         assert _defined_name_count(wb) == 0
+
+
+def test_cap_table_mode_uses_state_machine_not_full_workbook() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "cap_table.xlsx"
+        build_model.build_model(None, out, mode="cap_table")
+
+        wb = load_workbook(out, data_only=False)
+        assert wb.sheetnames == ["Guide", "Kernel", "Ownership"]
+        assert {"P&L", "BS", "CF", "Capital Stack", "Valuation", "IC Memo"}.isdisjoint(wb.sheetnames)
+        ownership_text = "\n".join(
+            str(cell.value)
+            for row in wb["Ownership"].iter_rows()
+            for cell in row
+            if cell.value is not None
+        )
+        assert "Round Event State Machine" in ownership_text
+        assert "SAFE / J-KISS Conversions" in ownership_text
+        assert "Exit Waterfall" in ownership_text
 
 
 def test_all_modes_produce_expected_bundles() -> None:
@@ -475,6 +751,7 @@ def test_all_modes_produce_expected_bundles() -> None:
             assert _defined_name_count(wb) == 0
             assert _merged_count(wb) == 0
             assert _wrapped_cells(wb) == []
+            assert _manual_line_break_violations(wb) == []
             assert _styled_blank_cells(wb) == []
             assert _font_design_violations(wb) == []
             assert _semantic_alignment_violations(wb) == []
@@ -741,16 +1018,57 @@ def test_ib_helpers_reject_wrap_text_true() -> None:
 
     ws["A5"] = "bounded\nprose"
     try:
-        ib.apply_wrapped_exception(ws["A5"], user_approved=False)
+        ib.apply_wrapped_exception(
+            ws["A5"],
+            user_approved=False,
+            bounded_prose=True,
+            adjacent_cells_carry_meaning=True,
+        )
     except ValueError as exc:
         assert "explicit user approval" in str(exc)
     else:
         raise AssertionError("apply_wrapped_exception accepted missing approval")
-    ib.apply_wrapped_exception(ws["A5"], user_approved=True)
+
+    try:
+        ib.apply_wrapped_exception(
+            ws["A5"],
+            user_approved=True,
+            bounded_prose=False,
+            adjacent_cells_carry_meaning=True,
+        )
+    except ValueError as exc:
+        assert "bounded table prose" in str(exc)
+    else:
+        raise AssertionError("apply_wrapped_exception accepted horizontal-read text")
+
+    try:
+        ib.apply_wrapped_exception(
+            ws["A5"],
+            user_approved=True,
+            bounded_prose=True,
+            adjacent_cells_carry_meaning=False,
+        )
+    except ValueError as exc:
+        assert "adjacent table cells carry meaningful" in str(exc)
+    else:
+        raise AssertionError("apply_wrapped_exception accepted blank overflow text")
+
+    ib.apply_wrapped_exception(
+        ws["A5"],
+        user_approved=True,
+        bounded_prose=True,
+        adjacent_cells_carry_meaning=True,
+    )
     assert ws["A5"].alignment.wrap_text is True
     assert ws.row_dimensions[5].height == ib.wrapped_text_row_height(2)
     ws["A6"] = "bounded\nprose"
-    ib.apply_wrapped_exception(ws["A6"], user_approved=True, line_count=0)
+    ib.apply_wrapped_exception(
+        ws["A6"],
+        user_approved=True,
+        bounded_prose=True,
+        adjacent_cells_carry_meaning=True,
+        line_count=0,
+    )
     assert ws.row_dimensions[6].height == ib.wrapped_text_row_height(1)
 
 
@@ -763,6 +1081,7 @@ def test_runtime_builders_do_not_use_wrap_or_merge_layout_shortcuts() -> None:
     for path in runtime_files:
         text = path.read_text(encoding="utf-8")
         assert "wrap_text=True" not in text
+        assert "apply_wrapped_exception(" not in text
         text_without_unmerge = text.replace("unmerge_cells(", "")
         assert ".merge_cells(" not in text_without_unmerge
         assert "merge_cells(" not in text_without_unmerge
@@ -771,45 +1090,61 @@ def test_runtime_builders_do_not_use_wrap_or_merge_layout_shortcuts() -> None:
     ib_text_without_unmerge = ib_text.replace("unmerge_cells(", "")
     assert ".merge_cells(" not in ib_text_without_unmerge
     assert "merge_cells(" not in ib_text_without_unmerge
-    assert "blank overflow cells without merging" in ib.WRAP_TEXT_ERROR
+    assert "blank unstyled overflow cells without merging" in ib.WRAP_TEXT_ERROR
+    assert "use_user_approved_bounded_prose_wrap_only" in ib.WRAP_DECISION_LADDER
+    assert "final print/render column" in ib.WRAP_BEST_PRACTICE
 
 
 def test_skill_guidance_makes_no_wrap_rule_explicit() -> None:
     skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    invocation_text = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
     layout_text = (SKILL_DIR / "build" / "references" / "_layout_canonical.md").read_text(encoding="utf-8")
     design_text = (SKILL_DIR / "build" / "references" / "_ib_workbook_design_system.md").read_text(encoding="utf-8")
     self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
     eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
     ib_text = (SCRIPTS_DIR / "ib_format.py").read_text(encoding="utf-8")
-    skill_flat = " ".join(skill_text.split())
+    skill_full = "\n".join([skill_text, invocation_text])
+    skill_flat = " ".join(skill_full.split())
     layout_flat = " ".join(layout_text.split())
     design_flat = " ".join(design_text.split())
 
-    combined = "\n".join([skill_text, layout_text, design_text, self_review_text, eval_text, ib_text])
+    combined = "\n".join([skill_text, invocation_text, layout_text, design_text, self_review_text, eval_text, ib_text])
     assert "No-Wrap Rule" in combined
-    assert "Treat text wrapping as prohibited" in skill_text
+    assert "Treat text wrapping as prohibited" in skill_full
     assert "no merged cells" in skill_flat
-    assert "without merging cells" in skill_flat
+    assert "blank unmerged unstyled overflow cells" in skill_flat
     assert "reject `wrap_text=True`" in design_text
     assert "Do not use merged cells as the repair" in design_flat
     assert "明示的に wrap_text=True" not in ib_text
-    assert "row height must be set to the exact visible line count" in skill_flat
+    assert "set row height to the exact rendered visible line count" in skill_flat
     assert "clipped text, auto-height guesses, or oversized padded rows are design defects" in layout_flat
     assert "No-Merge Rule" in layout_text
     assert "let the text read horizontally through those blank cells without merging" in layout_flat
-    assert "exact number of visible text lines" in design_text
+    assert "exact rendered visible line count" in design_flat
     assert "wrapped_text_row_height" in ib_text
     assert "set_wrapped_exception_row_height" in ib_text
-    assert "row height matched exactly to visible line count" in eval_text
+    assert "row height matched exactly to the rendered visible line count" in eval_text
     assert "visible wrap/tall-text rows are audited by role" in eval_text
     assert "no unnecessary wrapping on horizontal-read" in eval_text
+    assert "IB wrap decision ladder" in design_text
+    assert "Use the IB wrap decision ladder" in skill_full
+    assert "Horizontal-read rows must also have visual runway" in design_text
+    assert "Manual line breaks are treated as wrapped exceptions" in design_text
+    assert "blank unstyled overflow cells" in combined
+    assert "user-approved prose or table cells" not in combined
+    assert "blank overflow space" not in combined
+    assert "bounded-prose" not in combined
+    assert "bounded table prose" in combined
+    assert "print/render boundary" in combined
+    assert "XLSX_WRAP_DISCIPLINE" in eval_text
 
 
 def test_skill_guidance_requires_fix_and_rerun_iteration() -> None:
     skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    invocation_text = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
     self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
     eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
-    skill_flat = " ".join(skill_text.split())
+    skill_flat = " ".join("\n".join([skill_text, invocation_text]).split())
     self_review_flat = " ".join(self_review_text.split())
     eval_flat = " ".join(eval_text.split())
 
@@ -829,12 +1164,14 @@ def test_skill_guidance_requires_fix_and_rerun_iteration() -> None:
 
 def test_skill_guidance_uses_meaningful_sparse_fills_and_borders() -> None:
     skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    invocation_text = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
     layout_text = (SKILL_DIR / "build" / "references" / "_layout_canonical.md").read_text(encoding="utf-8")
     design_text = (SKILL_DIR / "build" / "references" / "_ib_workbook_design_system.md").read_text(encoding="utf-8")
     self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
     eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
 
-    combined = "\n".join([skill_text, layout_text, design_text, self_review_text, eval_text])
+    skill_full = "\n".join([skill_text, invocation_text])
+    combined = "\n".join([skill_full, layout_text, design_text, self_review_text, eval_text])
     combined_flat = " ".join(combined.split()).lower()
     assert "same non-heatmap fill" in combined_flat
     assert "background fills are selective accents for major semantic moments only" in combined_flat
@@ -847,24 +1184,24 @@ def test_skill_guidance_uses_meaningful_sparse_fills_and_borders() -> None:
     assert "header / label row" in combined_flat
     assert "use one rectangular span per filled row component" in combined_flat
     assert "do not choose the end column only from cells that happen to contain text" in combined_flat
-    assert "do not stop a fill because a cell is blank" in " ".join(skill_text.split()).lower()
+    assert "do not stop a fill because a cell is blank" in " ".join(skill_full.split()).lower()
     assert "for every filled row, name its role and inspect the start column, end column" in " ".join(self_review_text.split()).lower()
     assert "semantic row-span helper in\n`ib_format.py` for fill/border row components" in design_text
     assert "rectangular column-consistent fill and border spans chosen from the attached table/block" in eval_text
     assert "heavy border pattern or ragged populated-cell-only rule" in combined_flat
     assert "prominent borders follow the same meaning-first rule as fills" in combined_flat
-    assert "do not stop a border because a cell is blank" in " ".join(skill_text.split()).lower()
+    assert "do not stop a border because a cell is blank" in " ".join(skill_full.split()).lower()
     assert "draw the rule across that full span, including blank cells inside the component" in combined_flat
     assert "a blank cell inside the table/header/check width still receives the border" in combined_flat
     assert "check border span with the same positive rule as fill span" in combined_flat
-    assert "dedicated hierarchy / indent columns stay borderless" in " ".join(skill_text.split()).lower()
+    assert "dedicated hierarchy / indent columns stay borderless" in " ".join(skill_full.split()).lower()
     assert "b stays borderless and row rules begin at c" in combined_flat
     assert "confirm hierarchy / indent columns are not carrying row rules" in combined_flat
-    assert "avoid repeating the same prominent top/bottom rule across adjacent rows" in " ".join(skill_text.split()).lower()
+    assert "avoid repeating the same prominent top/bottom rule across adjacent rows" in " ".join(skill_full.split()).lower()
     assert "the same prominent border should not repeat on adjacent rows by default" in combined_flat
     assert "check border rhythm exactly as you check color rhythm" in combined_flat
     assert "no adjacent repeated prominent border rows" in eval_text
-    assert "borders are not row-by-row decoration" in " ".join(skill_text.split()).lower()
+    assert "borders are not row-by-row decoration" in " ".join(skill_full.split()).lower()
     assert "memo, source, note, and interpretation cells are usually borderless" in combined_flat
     assert "three border styles by meaning" in combined_flat
     assert "border colors are black by default" in combined_flat
@@ -873,6 +1210,53 @@ def test_skill_guidance_uses_meaningful_sparse_fills_and_borders() -> None:
     assert "no per-row gridline borders" in eval_text
     assert "borderless memo/source/note cells" in eval_text
     assert "black border colors by default" in eval_text
+
+
+def test_skill_guidance_enforces_ib_text_positioning() -> None:
+    skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    invocation_text = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
+    design_text = (SKILL_DIR / "build" / "references" / "_ib_workbook_design_system.md").read_text(encoding="utf-8")
+    self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+    eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
+    ib_text = (RUNTIME_DIR / "ib_format.py").read_text(encoding="utf-8")
+    combined_flat = " ".join("\n".join([skill_text, invocation_text, design_text, self_review_text, eval_text, ib_text]).split())
+
+    for phrase in [
+        "Investment-banking model alignment is functional, not decorative",
+        "labels, sources, notes, titles, memos, and interpretation text are left-aligned",
+        "numeric values, formulas, money, percentages, multiples, counts, and unit labels are right-aligned",
+        "only period headers, scenario/matrix headers, and short column headers are centered",
+        "Do not center long prose or labels",
+        "Hierarchy is expressed with dedicated hierarchy/indent columns",
+        "role-based left/right/center text alignment",
+        "ALIGNMENT_BEST_PRACTICE",
+    ]:
+        assert phrase in combined_flat
+
+
+def test_skill_guidance_enforces_ib_font_size_discipline() -> None:
+    skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
+    invocation_text = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
+    design_text = (SKILL_DIR / "build" / "references" / "_ib_workbook_design_system.md").read_text(encoding="utf-8")
+    self_review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+    eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
+    ib_text = (RUNTIME_DIR / "ib_format.py").read_text(encoding="utf-8")
+    combined_flat = " ".join("\n".join([skill_text, invocation_text, design_text, self_review_text, eval_text, ib_text]).split())
+
+    for phrase in [
+        "Font size discipline is equally strict",
+        "Investment-banking models should look dense, legible, and standardized",
+        "Use Arial 10pt for ordinary body cells",
+        "Use Arial 9pt italic gray for supporting source, note, unit-helper, footnote",
+        "Use 10-11pt bold for section labels and compact header rows",
+        "Use Arial 14pt bold for sheet titles and cover/title surfaces only",
+        "Keep the generated cell-size set intentionally small: 9, 10, 11, and 14pt",
+        "Do not use 8pt cell text to squeeze content",
+        "constrained 9/10/11/14pt cell-size palette",
+        "FONT_SIZE_ALLOWED_CELLS",
+        "FONT_SIZE_BEST_PRACTICE",
+    ]:
+        assert phrase in combined_flat
 
 
 def test_xlsx_evals_load_full_design_reference_stack() -> None:
@@ -888,6 +1272,10 @@ def test_xlsx_evals_load_full_design_reference_stack() -> None:
             missing.append(f"{item['id']}:{item['name']} missing XLSX_DESIGN assertion")
         if not any(assertion.get("id") == "XLSX_SHEET_QUALITY" for assertion in assertions):
             missing.append(f"{item['id']}:{item['name']} missing XLSX_SHEET_QUALITY assertion")
+        if not any(assertion.get("id") == "XLSX_WRAP_DISCIPLINE" for assertion in assertions):
+            missing.append(f"{item['id']}:{item['name']} missing XLSX_WRAP_DISCIPLINE assertion")
+        if not any(assertion.get("id") == "XLSX_FONT_HIERARCHY" for assertion in assertions):
+            missing.append(f"{item['id']}:{item['name']} missing XLSX_FONT_HIERARCHY assertion")
         for assertion in assertions:
             if assertion.get("id") == "XLSX_DESIGN":
                 text = assertion.get("text", "")
@@ -913,12 +1301,48 @@ def test_xlsx_evals_load_full_design_reference_stack() -> None:
                     missing.append(f"{item['id']}:{item['name']} missing black border color guidance")
                 if "sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation" not in text:
                     missing.append(f"{item['id']}:{item['name']} missing sheet-specific quality guidance")
+                if "IB-style text positioning" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing IB text positioning guidance")
+                if "left-aligned labels/sources/notes" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing left text alignment guidance")
+                if "right-aligned values/formulas/units" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing right value alignment guidance")
+                if "centered period/scenario/matrix headers only" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing centered-header-only guidance")
+                if "IB-style font-size discipline" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing IB font-size guidance")
+                if "9/10/11/14pt generated cell palette" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing constrained font-size palette guidance")
+                if "no 8pt squeezed cell text or 16pt+ presentation headings" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing font-size anti-pattern guidance")
             if assertion.get("id") == "XLSX_SHEET_QUALITY":
                 text = assertion.get("text", "")
                 if "sheet-specific purpose, traceable source/evidence boundary" not in text:
                     missing.append(f"{item['id']}:{item['name']} missing sheet purpose/evidence quality guidance")
                 if "Focused tasks include only sheets needed for the decision" not in text:
                     missing.append(f"{item['id']}:{item['name']} missing focused-sheet restraint guidance")
+            if assertion.get("id") == "XLSX_WRAP_DISCIPLINE":
+                text = assertion.get("text", "")
+                if "generated cells keep wrap_text off by default" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing no-wrap default assertion")
+                if "blank unmerged unstyled overflow cells" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing blank overflow assertion")
+                if "final print/render column" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing print/render boundary assertion")
+                if "manual line breaks appear only for user-approved bounded table prose" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing manual-line-break assertion")
+                if "exact rendered visible-line-count row height" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing rendered-visible row-height assertion")
+            if assertion.get("id") == "XLSX_FONT_HIERARCHY":
+                text = assertion.get("text", "")
+                if "constrained IB hierarchy" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing constrained font hierarchy assertion")
+                if "9pt italic gray supporting source/note/unit-helper cells" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing 9pt support-cell assertion")
+                if "10-11pt bold compact section/header cells" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing compact section/header assertion")
+                if "8pt squeezed text" not in text or "16pt+ presentation headings" not in text:
+                    missing.append(f"{item['id']}:{item['name']} missing font-size anti-pattern assertion")
     assert missing == []
 
 
@@ -1298,7 +1722,7 @@ def _border_color_violations(wb) -> list[str]:
 
 def _font_design_violations(wb) -> list[str]:
     violations = []
-    allowed_sizes = {ib.FONT_SIZE_SMALL, ib.FONT_SIZE_BASE, ib.FONT_SIZE_LARGE, ib.FONT_SIZE_TITLE}
+    allowed_sizes = {float(size) for size in ib.FONT_SIZE_ALLOWED_CELLS}
     default_font = wb._fonts[0]
     if default_font.name != ib.FONT_FAMILY or float(default_font.sz) != float(ib.FONT_SIZE_BASE):
         violations.append(f"workbook default font={default_font.name} size={default_font.sz}")
@@ -1312,8 +1736,12 @@ def _font_design_violations(wb) -> list[str]:
                     continue
                 if cell.font.name != ib.FONT_FAMILY:
                     violations.append(f"{ws.title}!{cell.coordinate}: font={cell.font.name}")
-                if cell.font.sz is not None and int(float(cell.font.sz)) not in allowed_sizes:
-                    violations.append(f"{ws.title}!{cell.coordinate}: size={cell.font.sz}")
+                if cell.font.sz is not None:
+                    size = float(cell.font.sz)
+                    if size not in allowed_sizes:
+                        violations.append(f"{ws.title}!{cell.coordinate}: size={cell.font.sz}")
+                    if size == float(ib.FONT_SIZE_TINY):
+                        violations.append(f"{ws.title}!{cell.coordinate}: tiny cell font={cell.font.sz}")
     return violations
 
 
@@ -1582,7 +2010,7 @@ Source: customer discovery memo, market sizing memo, lender discussion notes.
         assert _first_year_cell_for_label(wb, "KPI", "Unit payback").value == f'=IF({FIRST_VALUE_LETTER}9<=0,"N/A",\'Assumptions\'!{FIRST_VALUE_LETTER}38/{FIRST_VALUE_LETTER}9)'
         assert _fill_rgb(wb["BS"].cell(_row_for_label(wb, "BS", "Balance check"), FIRST_VALUE_COL)) == ib.BG_WORKING
         assert _fill_rgb(wb["Ownership"].cell(_row_for_label(wb, "Ownership", "Ownership check"), FIRST_VALUE_COL)) == ib.BG_WORKING
-        assert _fill_rgb(wb["Valuation"].cell(_row_for_label(wb, "Valuation", "Selected EV"), FIRST_VALUE_COL)) == ib.BG_WORKING
+        assert _fill_rgb(wb["Valuation"].cell(_row_for_label(wb, "Valuation", "Selected EV midpoint"), FIRST_VALUE_COL)) == ib.BG_WORKING
 
 
 def test_generated_workbook_has_sheet_specific_quality_markers() -> None:
@@ -1612,10 +2040,10 @@ Source: management memo, customer discovery memo.
         "KPI": ["KPI interpretation register", "IC implication"],
         "Scenarios": ["Scenario interpretation", "Funding gap"],
         "Sensitivity": ["Sensitivity rationale", "Decision implication"],
-        "Valuation": ["Method credibility", "Selected EV"],
+        "Valuation": ["Method credibility", "Selected EV midpoint", "Valuation committee gates"],
         "Market Support": ["TAM / SAM / SOM bridge", "Source anchors"],
         "Benchmarks": ["source_id", "Applicability limits", "Refresh needed"],
-        "IC Memo": ["What must be true", "DD questions", "Source boundary"],
+        "IC Memo": ["Recommendation", "What must be true", "Ranked DD gates", "Walk-away conditions", "Source boundary"],
     }
     with tempfile.TemporaryDirectory() as tmp:
         source_md = Path(tmp) / "asset_deployment_story.md"
@@ -2134,6 +2562,29 @@ def test_representative_workbook_pdf_render_smoke_when_available() -> None:
         assert all(page.stat().st_size > 10_000 for page in pages)
 
 
+def test_representative_workbook_recalculates_without_formula_errors_when_available() -> None:
+    soffice = shutil.which("soffice")
+    if not soffice:
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        tmp_path = Path(tmp)
+        out = tmp_path / "formula_check.xlsx"
+        recalc_dir = tmp_path / "recalc"
+        recalc_dir.mkdir()
+        build_model.build_model(None, out, mode="full")
+        subprocess.run(
+            [soffice, "--headless", "--convert-to", "xlsx", "--outdir", str(recalc_dir), str(out)],
+            check=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+        )
+        recalculated = recalc_dir / out.name
+        assert recalculated.exists()
+        wb = load_workbook(recalculated, data_only=True)
+        assert _formula_error_cells(wb) == []
+
+
 def test_source_plan_custom_tables_keep_text_columns_readable() -> None:
     tmp, wb = _sample_source_workbook(
         "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
@@ -2172,6 +2623,82 @@ def test_ib_helpers_do_not_use_native_indent_for_hierarchy() -> None:
 
     assert ws["B2"].alignment.indent == 0
     assert ws["D3"].alignment.indent == 0
+
+
+def test_ib_helpers_encode_role_based_alignment_tokens() -> None:
+    wb = Workbook()
+    ws = wb.active
+
+    ib.apply_label(ws["B2"])
+    ib.apply_comment(ws["C2"])
+    ib.apply_unit_label(ws["D2"])
+    ib.apply_year_header(ws["E2"], "FY2027")
+    ib.apply_hard_input(ws["F2"])
+
+    assert ib.ALIGN_LABEL == "left"
+    assert ib.ALIGN_SOURCE_NOTE == "left"
+    assert ib.ALIGN_UNIT == "right"
+    assert ib.ALIGN_VALUE == "right"
+    assert ib.ALIGN_PERIOD_HEADER == "center"
+    assert "labels, sources, notes, titles, memos, and interpretation text are left-aligned" in ib.ALIGNMENT_BEST_PRACTICE
+    assert ws["B2"].alignment.horizontal == ib.ALIGN_LABEL
+    assert ws["C2"].alignment.horizontal == ib.ALIGN_SOURCE_NOTE
+    assert ws["D2"].alignment.horizontal == ib.ALIGN_UNIT
+    assert ws["E2"].alignment.horizontal == ib.ALIGN_PERIOD_HEADER
+    assert ws["F2"].alignment.horizontal == ib.ALIGN_VALUE
+
+
+def test_ib_helpers_encode_role_based_font_size_tokens() -> None:
+    wb = Workbook()
+    ws = wb.active
+
+    ib.apply_label(ws["B2"])
+    ib.apply_comment(ws["C2"])
+    ib.apply_unit_label(ws["D2"])
+    ib.apply_year_header(ws["E2"], "FY2027")
+    ib.apply_section_header(ws["B4"], "Section")
+    ib.write_cover(ws, title="Cover", subtitle="Subtitle", confidential=True)
+
+    assert ib.FONT_SIZE_ALLOWED_CELLS == (
+        ib.FONT_SIZE_SMALL,
+        ib.FONT_SIZE_BASE,
+        ib.FONT_SIZE_LARGE,
+        ib.FONT_SIZE_TITLE,
+    )
+    assert ib.FONT_SIZE_TINY not in ib.FONT_SIZE_ALLOWED_CELLS
+    assert ib.FONT_SECTION == ib.FONT_SECTION_HEADER
+    assert ib.FONT_COMMENT.color.rgb[-6:] == ib.IB_COMMENT
+    assert ib.IB_COMMENT == "666666"
+    assert "constrained font-size palette" in ib.FONT_SIZE_BEST_PRACTICE
+    assert float(ws["B2"].font.sz) == float(ib.FONT_SIZE_BASE)
+    assert float(ws["C2"].font.sz) == float(ib.FONT_SIZE_SMALL)
+    assert float(ws["D2"].font.sz) == float(ib.FONT_SIZE_SMALL)
+    assert float(ws["E2"].font.sz) == float(ib.FONT_SIZE_BASE)
+    assert float(ws["B4"].font.sz) == float(ib.FONT_SIZE_LARGE)
+    assert float(ws["B6"].font.sz) == float(ib.FONT_SIZE_TITLE)
+    assert float(ws["B8"].font.sz) == float(ib.FONT_SIZE_TITLE)
+    assert float(ws["F2"].font.sz) == float(ib.FONT_SIZE_SMALL)
+
+
+def test_font_design_audit_rejects_tiny_fractional_and_presentation_sizes() -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws["A1"] = "Tiny"
+    ws["A1"].font = Font(name=ib.FONT_FAMILY, size=8)
+    ws["A2"] = "Fractional"
+    ws["A2"].font = Font(name=ib.FONT_FAMILY, size=10.5)
+    ws["A3"] = "Presentation"
+    ws["A3"].font = Font(name=ib.FONT_FAMILY, size=16)
+    ws["A4"] = "Wrong family"
+    ws["A4"].font = Font(name="Times New Roman", size=10)
+    ib.set_workbook_default_font(wb)
+
+    violations = _font_design_violations(wb)
+    assert any("A1" in item and "size=8" in item for item in violations)
+    assert any("A1" in item and "tiny cell font=8" in item for item in violations)
+    assert any("A2" in item and "size=10.5" in item for item in violations)
+    assert any("A3" in item and "size=16" in item for item in violations)
+    assert any("A4" in item and "font=Times New Roman" in item for item in violations)
 
 
 def test_added_hierarchy_columns_use_google_sheets_20px_width() -> None:
@@ -2265,12 +2792,21 @@ if __name__ == "__main__":
     test_cost_build_does_not_double_count_detailed_service_costs_in_variable_cogs()
     test_orchestrator_routes_through_generic_source_plan_builder()
     test_focused_modes_use_generic_kernel_after_bundle_filter()
+    test_focused_modes_are_formula_complete_without_compact_placeholders()
+    test_integrated_model_has_ib_decision_gates_not_just_readouts()
+    test_comparable_evidence_loads_public_peers_by_default_and_overrides_multiples()
+    test_default_live_comps_match_mechanic_labels_and_cli_overrides_yaml()
+    test_private_and_transaction_comps_are_included_in_comparable_evidence()
+    test_incomplete_provided_comps_are_registered_but_not_used_for_medians()
+    test_sec_ticker_lookup_is_cached_and_errors_are_compact()
+    test_failed_live_comps_do_not_pollute_company_specific_sources_or_mark_live_multiples()
     test_full_model_uses_direct_formula_refs()
     test_intra_sheet_formula_cells_are_black()
     test_ic_memo_dependency_closure_matches_live_formula_readouts()
     test_cash_flow_runway_formula_floors_negative_cash_at_zero()
     test_cross_sheet_formula_cells_are_green()
-    test_pricing_bundle_is_intent_sized()
+    test_pricing_bundle_is_formula_complete()
+    test_cap_table_mode_uses_state_machine_not_full_workbook()
     test_all_modes_produce_expected_bundles()
     test_generated_modes_do_not_reference_removed_sheets()
     test_structured_yaml_controls_grain_periods_and_drivers()
@@ -2284,6 +2820,8 @@ if __name__ == "__main__":
     test_skill_guidance_makes_no_wrap_rule_explicit()
     test_skill_guidance_requires_fix_and_rerun_iteration()
     test_skill_guidance_uses_meaningful_sparse_fills_and_borders()
+    test_skill_guidance_enforces_ib_text_positioning()
+    test_skill_guidance_enforces_ib_font_size_discipline()
     test_xlsx_evals_load_full_design_reference_stack()
     test_semantic_fill_helper_uses_rectangular_span_including_blanks()
     test_source_backed_plan_reaches_generic_kernel_shape()
@@ -2305,9 +2843,13 @@ if __name__ == "__main__":
     test_all_generated_modes_pass_visual_design_invariants()
     test_source_plan_print_canvas_includes_rendered_used_range()
     test_representative_workbook_pdf_render_smoke_when_available()
+    test_representative_workbook_recalculates_without_formula_errors_when_available()
     test_source_plan_custom_tables_keep_text_columns_readable()
     test_excluded_sheets_cannot_create_broken_references()
     test_ib_helpers_do_not_use_native_indent_for_hierarchy()
+    test_ib_helpers_encode_role_based_alignment_tokens()
+    test_ib_helpers_encode_role_based_font_size_tokens()
+    test_font_design_audit_rejects_tiny_fractional_and_presentation_sizes()
     test_added_hierarchy_columns_use_google_sheets_20px_width()
     test_generic_kernel_does_not_promote_domain_specific_mentions_to_sources()
     test_benchmark_register_uses_evidence_status_not_fake_source_placeholders()

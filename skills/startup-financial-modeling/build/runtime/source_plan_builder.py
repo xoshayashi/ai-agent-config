@@ -98,6 +98,9 @@ class LayoutSpec:
 
 LAYOUT = LayoutSpec()
 START_PERIOD_COL = LAYOUT.first_value_col
+BENCHMARK_REGISTER_START_COL = 2
+BENCHMARK_FRESHNESS_COL = BENCHMARK_REGISTER_START_COL + 5
+BENCHMARK_VALUATION_SUPPORT_ROW = 9
 
 
 def _start_period_col() -> int:
@@ -1146,18 +1149,38 @@ def _build_pricing(wb: Workbook, facts: SourceFacts) -> None:
         (7, "Monthly price / unit", "JPY", [f"='Assumptions'!{get_column_letter(c)}11" for c in cols], "pricing anchor", "formula", ib.FMT_JPY_YEN),
         (8, "Customer ROI / year", "JPY", [facts.customer_roi_yen for _ in cols], "customer value estimate", "input", ib.FMT_MONEY),
         (9, "Implementation cost / customer", "JPY", [facts.implementation_cost_yen for _ in cols], "deployment burden", "input", ib.FMT_JPY_YEN),
-        (10, "Monthly unit cost", "JPY", [f"='KPI'!{get_column_letter(c)}8" for c in cols], "cost-to-serve", "formula", ib.FMT_JPY_YEN),
-        (11, "Gross margin", "%", [f"='KPI'!{get_column_letter(c)}10" for c in cols], "unit margin", "formula", ib.FMT_PERCENT),
+        (10, "Monthly unit cost", "JPY", [f"=('Assumptions'!{get_column_letter(c)}25+'Assumptions'!{get_column_letter(c)}26+'Assumptions'!{get_column_letter(c)}27)" for c in cols], "cost-to-serve", "formula", ib.FMT_JPY_YEN),
+        (11, "Gross margin", "%", [f"=IF({get_column_letter(c)}7=0,0,({get_column_letter(c)}7-{get_column_letter(c)}10)/{get_column_letter(c)}7)" for c in cols], "unit margin", "formula", ib.FMT_PERCENT),
         (12, "Customer payback", "months", [f"=IF({get_column_letter(c)}8=0,99,{get_column_letter(c)}9/({get_column_letter(c)}8/12))" for c in cols], "customer ROI", "formula", ib.FMT_NUM),
         (13, "Sales cycle", "months", [facts.sales_cycle_months for _ in cols], "commercial motion", "input", ib.FMT_NUM),
         (14, "Churn / non-renewal risk", "%", [facts.churn_rate for _ in cols], "cohort risk", "input", ib.FMT_PERCENT),
         (15, "Repeat / expansion rate", "%", [facts.repeat_rate for _ in cols], "cohort behavior", "input", ib.FMT_PERCENT),
         (16, "Suggested floor price", "JPY", [f"={get_column_letter(c)}10/(1-MAX(0.01,{get_column_letter(c)}11))" for c in cols], "cost-plus guardrail", "formula", ib.FMT_JPY_YEN),
         (17, "Suggested value price", "JPY", [f"={get_column_letter(c)}8/12*0.25" for c in cols], "ROI share", "formula", ib.FMT_JPY_YEN),
+        (18, "Selected price support ratio", "x", [f"=IF({get_column_letter(c)}7=0,0,{get_column_letter(c)}17/{get_column_letter(c)}7)" for c in cols], "willingness-to-pay headroom", "formula", ib.FMT_MULTIPLE),
+        (19, "Gross-profit payback", "months", [f"=IF(({get_column_letter(c)}7-{get_column_letter(c)}10)<=0,\"N/A\",{get_column_letter(c)}9/({get_column_letter(c)}7-{get_column_letter(c)}10))" for c in cols], "deployment recovery", "formula", ib.FMT_NUM),
+        (20, "Validation hurdle", "x", [1.5 for _ in cols], "minimum WTP / selected price", "input", ib.FMT_MULTIPLE),
+        (21, "Pricing IC gate", "pass / fail", [f"=IF(AND({get_column_letter(c)}18>={get_column_letter(c)}20,{get_column_letter(c)}11>=0.5,{get_column_letter(c)}19<=12),\"pass\",\"DD gate\")" for c in cols], "pricing decision gate", "formula", "General"),
     ]
     for row, label, unit, values, source, kind, fmt in rows:
-        _write_values(ws, row, label, unit, values, source=source, kind=kind, fmt=fmt, bold=row in (7, 16, 17))
-    _highlight_row(ws, 16, _start_period_col() + len(cols) - 1)
+        _write_values(ws, row, label, unit, values, source=source, kind=kind, fmt=fmt, bold=row in (7, 16, 17, 21))
+    _highlight_row(ws, 21, _start_period_col() + len(cols) - 1)
+    start_col = LAYOUT.label_col
+    _set_column_widths(ws, {start_col: 34, start_col + 1: 28, start_col + 2: 18, start_col + 3: 32, start_col + 4: 68})
+    _section(ws, 24, "Pricing validation plan", start_col + 4)
+    headers = ["Test", "Evidence required", "Pass threshold", "Owner / source", "IC implication"]
+    for col, header in enumerate(headers, start=start_col):
+        _apply_text_header(ws.cell(25, col), header)
+    validation_rows = [
+        ("WTP interview / LOI", "named buyer pain, budget owner, procurement trigger", "support ratio >= 1.5x", "customer discovery / pipeline", "price can anchor value share"),
+        ("Pilot conversion", "paid pilot or signed deployment scope", "gross-profit payback <= 12 months", "sales pipeline / contract", "implementation burden is financeable"),
+        ("Packaging ladder", "entry, core, expansion, enterprise SKUs", "no cliff in expansion path", "pricing owner", "avoid under-monetizing high-ROI accounts"),
+        ("Renewal risk", "cohort churn or renewal intent by segment", "churn below downside case", "CS / cohort export", "discount valuation if renewal evidence is weak"),
+    ]
+    for row, values in enumerate(validation_rows, start=26):
+        for col, value in enumerate(values, start=start_col):
+            ws.cell(row, col, value)
+            ib.apply_comment(ws.cell(row, col), wrap_text=False)
 
 
 def _build_financing(wb: Workbook, facts: SourceFacts) -> None:
@@ -1184,54 +1207,95 @@ def _build_financing(wb: Workbook, facts: SourceFacts) -> None:
 
 def _build_exit_waterfall(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Exit Waterfall"]
-    _setup_sheet(ws, f"{facts.company} — Exit Waterfall", "M&A / IPO exit proceeds by valuation case and ownership.")
-    _set_column_widths(ws, {2: 18, 3: 16, 4: 16, 5: 16, 6: 24, 7: 20, 8: 12, 9: 20})
-    headers = ["Case", "Exit EV", "Net debt", "Equity value", "New investor ownership", "Investor proceeds", "MOIC", "Founder proceeds"]
+    _setup_sheet(ws, f"{facts.company} — Exit Waterfall", "M&A / IPO proceeds, deal leakage, preference floor, and buyer-view value bridge.")
+    _set_column_widths(ws, {2: 18, 3: 16, 4: 16, 5: 16, 6: 16, 7: 16, 8: 16, 9: 16, 10: 18, 11: 12, 12: 18, 13: 22})
+    headers = [
+        "Case", "Exit EV", "Net debt", "Txn costs / escrow", "Equity value",
+        "Preference floor", "Common pool", "New investor ownership",
+        "Investor proceeds", "MOIC", "Founder proceeds", "Walk-away signal",
+    ]
     for col, header in enumerate(headers, start=2):
         _apply_text_header(ws.cell(5, col), header)
     cases = [
         ("Downside", f"='Scenarios'!{get_column_letter(_start_period_col())}18"),
-        ("Base", f"='Valuation'!{_final_period_col(facts)}24"),
+        ("Base", f"='Valuation'!{_final_period_col(facts)}26"),
         ("Upside", f"='Scenarios'!{get_column_letter(_start_period_col() + 2)}18"),
     ]
     for row, (label, exit_ev) in enumerate(cases, start=6):
         ws.cell(row, 2, label)
         ws.cell(row, 3, exit_ev)
         ws.cell(row, 4, f"='Capital Stack'!{_final_period_col(facts)}8-'Capital Stack'!{_final_period_col(facts)}12")
-        ws.cell(row, 5, f"=MAX(0,C{row}-D{row})")
-        ws.cell(row, 6, f"='Ownership'!{_final_period_col(facts)}9")
-        ws.cell(row, 7, f"=E{row}*F{row}")
-        ws.cell(row, 8, f"=IF('Valuation'!{_final_period_col(facts)}28=\"-\",\"-\",G{row}/MAX(1,'Valuation'!{_final_period_col(facts)}26))")
-        ws.cell(row, 9, f"=E{row}*'Ownership'!{_final_period_col(facts)}7")
-        for col in range(2, 10):
+        ws.cell(row, 5, f"=MAX(0,C{row}*3%)")
+        ws.cell(row, 6, f"=MAX(0,C{row}-D{row}-E{row})")
+        ws.cell(row, 7, f"=MAX('Capital Stack'!{_final_period_col(facts)}7,0)")
+        ws.cell(row, 8, f"=MAX(0,F{row}-G{row})")
+        ws.cell(row, 9, f"='Ownership'!{_final_period_col(facts)}9")
+        ws.cell(row, 10, f"=MIN(F{row},G{row})+H{row}*I{row}")
+        ws.cell(row, 11, f"=IF('Valuation'!{_final_period_col(facts)}31=\"-\",\"-\",J{row}/MAX(1,'Valuation'!{_final_period_col(facts)}29))")
+        ws.cell(row, 12, f"=H{row}*'Ownership'!{_final_period_col(facts)}7")
+        ws.cell(row, 13, f"=IF(OR(K{row}=\"-\",K{row}<2),\"reprice / reject\",IF(L{row}<J{row},\"terms protect investor\",\"committee case\"))")
+        for col in range(2, 14):
             cell = ws.cell(row, col)
             if col == 2:
                 ib.apply_label(cell, bold=col == 2)
                 continue
-            fmt = ib.FMT_PERCENT if col == 6 else ib.FMT_MULTIPLE if col == 8 else _money_format(facts)
+            fmt = "General" if col == 13 else ib.FMT_PERCENT if col == 9 else ib.FMT_MULTIPLE if col == 11 else _money_format(facts)
             _apply_value_style(cell, fmt)
         if label == "Base":
-            _highlight_row(ws, row, 9)
+            _highlight_row(ws, row, 13)
+    _section(ws, 12, "Buyer-view M&A bridge", 12)
+    bridge_headers = ["Bridge item", "Treatment", "Evidence required", "Risk to value"]
+    for col, header in enumerate(bridge_headers, start=LAYOUT.label_col):
+        _apply_text_header(ws.cell(13, col), header)
+    bridge_rows = [
+        ("Control premium / synergy", "do not add unless buyer-specific", "named buyer logic or comparable transaction", "unsupported premium inflates EV"),
+        ("Debt-like items / NWC peg", "deduct before common proceeds", "debt schedule, leases, working-capital target", "equity value leakage"),
+        ("Escrow / earnout / rollover", "separate certain from contingent proceeds", "SPA terms or precedent range", "MOIC timing and certainty"),
+        ("Retention / transaction fees", "deduct from equity bridge", "advisor, legal, retention, tax estimate", "founder and investor proceeds overstatement"),
+    ]
+    for row, values in enumerate(bridge_rows, start=14):
+        for col, value in enumerate(values, start=LAYOUT.label_col):
+            ws.cell(row, col, value)
+            ib.apply_comment(ws.cell(row, col), wrap_text=False)
 
 
 def _build_segments(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Segments"]
-    _setup_sheet(ws, f"{facts.company} — Segment Lens", "Generic segment allocation for multi-product, geography, or entity models.")
+    _setup_sheet(ws, f"{facts.company} — Segment Lens", "Segment revenue, margin, capital intensity, and SOTP support.")
     start_col = LAYOUT.label_col
-    _set_column_widths(ws, {start_col: 58, start_col + 1: 16, start_col + 2: 16, start_col + 3: 16, start_col + 4: 24, start_col + 5: 58})
-    headers = ["Segment", "Revenue share", "Gross margin", "CapEx share", "Source status", "Decision implication"]
+    _set_column_widths(ws, {start_col: 58, start_col + 1: 16, start_col + 2: 16, start_col + 3: 16, start_col + 4: 18, start_col + 5: 18, start_col + 6: 24, start_col + 7: 58})
+    headers = ["Segment", "Revenue share", "Segment revenue", "Gross margin", "EBITDA proxy", "Segment multiple", "Segment EV", "Source status", "Decision implication"]
     for col, header in enumerate(headers, start=start_col):
         _apply_text_header(ws.cell(5, col), header)
     segment_count = max(len(facts.segments), 1)
     for idx, segment in enumerate(facts.segments, start=6):
         share = 1 / segment_count
-        row = [segment, share, f"='KPI'!{_final_period_col(facts)}16", share, "source / assumption", "Use this row to split drivers when segment economics diverge."]
+        share_col = get_column_letter(start_col + 1)
+        revenue_col = get_column_letter(start_col + 2)
+        gp_col = get_column_letter(start_col + 3)
+        ebitda_col = get_column_letter(start_col + 4)
+        multiple_col = get_column_letter(start_col + 5)
+        row = [
+            segment,
+            share,
+            f"='Revenue Build'!{_final_period_col(facts)}18*{share_col}{idx}",
+            f"='KPI'!{_final_period_col(facts)}16",
+            f"='KPI'!{_final_period_col(facts)}17",
+            f"='Valuation'!{get_column_letter(_start_period_col())}13*(1+{ebitda_col}{idx})",
+            f"=MAX(0,{revenue_col}{idx}*{multiple_col}{idx})",
+            "source / assumption",
+            "Use distinct segment evidence before relying on SOTP as a primary method.",
+        ]
         for col, value in enumerate(row, start=start_col):
             ws.cell(idx, col, value)
-            if col in (start_col + 1, start_col + 3):
+            if col == start_col + 1:
                 ib.apply_hard_input(ws.cell(idx, col), ib.FMT_PERCENT)
-            elif col == start_col + 2:
+            elif col in (start_col + 3, start_col + 4):
                 _apply_value_style(ws.cell(idx, col), ib.FMT_PERCENT)
+            elif col in (start_col + 2, start_col + 6):
+                _apply_value_style(ws.cell(idx, col), _money_format(facts))
+            elif col == start_col + 5:
+                _apply_value_style(ws.cell(idx, col), ib.FMT_MULTIPLE)
             else:
                 ib.apply_comment(ws.cell(idx, col), wrap_text=False)
 
@@ -1473,7 +1537,7 @@ def _build_sensitivity(wb: Workbook, facts: SourceFacts) -> None:
 
 def _build_valuation(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Valuation"]
-    _setup_sheet(ws, f"{facts.company} — Valuation", "Exit value, SOTP lens, and investor return logic.")
+    _setup_sheet(ws, f"{facts.company} — Valuation", "Valuation committee view: method supportability, SOTP, selected range, and investor return logic.")
     _write_period_header(ws, facts)
     cols = _period_cols(facts)
     final_col = _final_period_col(facts)
@@ -1493,9 +1557,16 @@ def _build_valuation(wb: Workbook, facts: SourceFacts) -> None:
         else:
             ib.apply_hard_input(ws.cell(row, _start_period_col()), ib.FMT_PERCENT)
     _section(ws, 12, "Multiple range")
-    _write_values(ws, 13, "Revenue multiple", "x", facts.revenue_multiple, source="benchmark / refresh required", fmt=ib.FMT_MULTIPLE)
-    _write_values(ws, 14, "Gross profit multiple", "x", facts.gross_profit_multiple, source="benchmark / refresh required", fmt=ib.FMT_MULTIPLE)
-    _write_values(ws, 15, "EBITDA multiple", "x", facts.ebitda_multiple, source="benchmark / refresh required", fmt=ib.FMT_MULTIPLE)
+    live_comps = [comp for comp in (getattr(facts, "live_comps", []) or []) if isinstance(comp, dict)]
+    usable_statuses = {"current", "provided"}
+    has_comparable_revenue_multiple = any(comp.get("status") in usable_statuses and comp.get("revenue_multiple") for comp in live_comps)
+    has_comparable_ebitda_multiple = any(comp.get("status") in usable_statuses and comp.get("ebitda_multiple") for comp in live_comps)
+    revenue_source = "comparable evidence" if has_comparable_revenue_multiple else "benchmark / refresh required"
+    ebitda_source = "comparable evidence" if has_comparable_ebitda_multiple else "benchmark / refresh required"
+    gp_source = "derived proxy / refresh required"
+    _write_values(ws, 13, "Revenue multiple", "x", facts.revenue_multiple, source=revenue_source, fmt=ib.FMT_MULTIPLE)
+    _write_values(ws, 14, "Gross profit multiple", "x", facts.gross_profit_multiple, source=gp_source, fmt=ib.FMT_MULTIPLE)
+    _write_values(ws, 15, "EBITDA multiple", "x", facts.ebitda_multiple, source=ebitda_source, fmt=ib.FMT_MULTIPLE)
     basis_col = get_column_letter(_start_period_col())
     _write_values(ws, 16, "Revenue-implied EV", "JPY", [f"=${basis_col}$7*{get_column_letter(c)}13" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
     _write_values(ws, 17, "GP-implied EV", "JPY", [f"=${basis_col}$8*{get_column_letter(c)}14" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
@@ -1510,15 +1581,21 @@ def _build_valuation(wb: Workbook, facts: SourceFacts) -> None:
     _write_values(ws, 20, "PV of forecast FCF", "JPY", pv_forecast, kind="formula", fmt=ib.FMT_MONEY)
     _write_values(ws, 21, "PV of terminal value", "JPY", pv_terminal, kind="formula", fmt=ib.FMT_MONEY)
     _write_values(ws, 22, "DCF EV", "JPY", [f"={get_column_letter(c)}20+{get_column_letter(c)}21" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
-    _write_values(ws, 23, "SOTP EV", "JPY", [f"='Segments'!$C$6*{get_column_letter(c)}19" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
-    _write_values(ws, 24, "Selected EV", "JPY", [f"=IF({get_column_letter(c)}19>0,{get_column_letter(c)}19,IF({get_column_letter(c)}22>0,{get_column_letter(c)}22,{get_column_letter(c)}23))" for c in cols], kind="formula", fmt=ib.FMT_MONEY, bold=True)
-    _highlight_row(ws, 24, _start_period_col() + len(cols) - 1)
+    segment_last_row = 5 + max(len(facts.segments), 1)
+    segment_ev_col = get_column_letter(LAYOUT.label_col + 6)
+    _write_values(ws, 23, "SOTP EV", "JPY", [f"=SUM('Segments'!${segment_ev_col}$6:${segment_ev_col}${segment_last_row})" for _ in cols], kind="formula", fmt=ib.FMT_MONEY)
+    benchmark_freshness_cell = f"'Benchmarks'!${get_column_letter(BENCHMARK_FRESHNESS_COL)}${BENCHMARK_VALUATION_SUPPORT_ROW}"
+    _write_values(ws, 24, "Supportability score", "x", [f"=MIN(1.5,MAX(0.5,0.35+IF({get_column_letter(c)}16>0,0.25,0)+IF({get_column_letter(c)}22>0,0.20,0)+IF({get_column_letter(c)}23>0,0.20,0)+IF({benchmark_freshness_cell}=\"current\",0.20,0)))" for c in cols], kind="formula", fmt=ib.FMT_MULTIPLE)
+    _write_values(ws, 25, "Selected EV low", "JPY", [f"=MAX(0,MIN({get_column_letter(c)}19,{get_column_letter(c)}22,{get_column_letter(c)}23)*0.9)" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
+    _write_values(ws, 26, "Selected EV midpoint", "JPY", [f"=IF({get_column_letter(c)}24<0.9,MEDIAN({get_column_letter(c)}19,{get_column_letter(c)}22,{get_column_letter(c)}23)*0.85,MEDIAN({get_column_letter(c)}19,{get_column_letter(c)}22,{get_column_letter(c)}23))" for c in cols], kind="formula", fmt=ib.FMT_MONEY, bold=True)
+    _write_values(ws, 27, "Selected EV high", "JPY", [f"=MAX({get_column_letter(c)}19,{get_column_letter(c)}22,{get_column_letter(c)}23)*IF({get_column_letter(c)}24>=1,1.1,1.0)" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
+    _highlight_row(ws, 26, _start_period_col() + len(cols) - 1)
     start_col = LAYOUT.label_col
     _set_column_widths(ws, {start_col: 24, start_col + 1: 42, start_col + 2: 34, start_col + 3: 42, start_col + 4: 26})
-    _section(ws, 30, "Method credibility", start_col + 4)
+    _section(ws, 35, "Method credibility", start_col + 4)
     headers = ["Method", "Role", "Use when", "Exclusion / caution", "Linked driver"]
     for col, header in enumerate(headers, start=start_col):
-        _apply_text_header(ws.cell(31, col), header)
+        _apply_text_header(ws.cell(36, col), header)
     method_rows = [
         ("Revenue multiple", "primary if revenue quality is central", "recurring or high-quality growth", "weak margin or non-recurring revenue", "growth / retention"),
         ("GP multiple", "support if cost-to-serve matters", "gross margin is well-defined", "COGS definition is unstable", "gross margin"),
@@ -1526,18 +1603,35 @@ def _build_valuation(wb: Workbook, facts: SourceFacts) -> None:
         ("DCF", "support or cross-check", "cash flows are explainable", "terminal value dominates", "cash flow / discount rate"),
         ("SOTP", "support if segments differ", "segments have distinct economics", "segment allocation is arbitrary", "segment mix"),
     ]
-    for row, values in enumerate(method_rows, start=32):
+    for row, values in enumerate(method_rows, start=37):
         for col, value in enumerate(values, start=start_col):
             ws.cell(row, col, value)
             ib.apply_comment(ws.cell(row, col), wrap_text=False)
-    _section(ws, 25, "Investor return")
-    _write_values(ws, 26, "Equity invested", "JPY", [f"='Capital Stack'!{get_column_letter(c)}7" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
-    _write_values(ws, 27, "New investor ownership", "%", [f"='Capital Stack'!{get_column_letter(c)}16" for c in cols], kind="formula", fmt=ib.FMT_PERCENT)
-    _write_values(ws, 28, "MOIC at selected EV", "x", [f"=IF({get_column_letter(c)}26=0,\"-\",{get_column_letter(c)}24*{get_column_letter(c)}27/{get_column_letter(c)}26)" for c in cols], kind="formula", fmt=ib.FMT_MULTIPLE)
-    _write_values(ws, 29, "Illustrative IRR", "%", [f"=IF({get_column_letter(c)}28=\"-\",\"-\",{get_column_letter(c)}28^(1/{max(idx, 1)})-1)" for idx, c in enumerate(cols, start=1)], kind="formula", fmt=ib.FMT_PERCENT)
-    _highlight_row(ws, 28, _start_period_col() + len(cols) - 1)
+    _section(ws, 28, "Investor return")
+    _write_values(ws, 29, "Equity invested", "JPY", [f"='Capital Stack'!{get_column_letter(c)}7" for c in cols], kind="formula", fmt=ib.FMT_MONEY)
+    _write_values(ws, 30, "New investor ownership", "%", [f"='Capital Stack'!{get_column_letter(c)}16" for c in cols], kind="formula", fmt=ib.FMT_PERCENT)
+    _write_values(ws, 31, "MOIC at selected EV", "x", [f"=IF({get_column_letter(c)}29=0,\"-\",{get_column_letter(c)}26*{get_column_letter(c)}30/{get_column_letter(c)}29)" for c in cols], kind="formula", fmt=ib.FMT_MULTIPLE)
+    _write_values(ws, 32, "Illustrative IRR", "%", [f"=IF({get_column_letter(c)}31=\"-\",\"-\",{get_column_letter(c)}31^(1/{max(idx, 1)})-1)" for idx, c in enumerate(cols, start=1)], kind="formula", fmt=ib.FMT_PERCENT)
+    _highlight_row(ws, 31, _start_period_col() + len(cols) - 1)
+    _section(ws, 45, "Valuation committee gates", start_col + 4)
+    gate_headers = ["Gate", "Threshold", "Current read", "Decision use", "If failed"]
+    for col, header in enumerate(gate_headers, start=start_col):
+        _apply_text_header(ws.cell(46, col), header)
+    gate_rows = [
+        ("Benchmark freshness", "current/provided with limits", "see Benchmarks freshness", "decide whether comps can support price", "refresh or verify comps before external use"),
+        ("Supportability score", ">= 0.9x", f"see {final_col}24", "decide whether midpoint is usable", "haircut selected EV or use downside"),
+        ("Return hurdle", ">= 2.0x MOIC", f"see {final_col}31", "decide price / ownership acceptability", "reprice, resize, or reject"),
+        ("SOTP credibility", "segment evidence not arbitrary", "see Segments source status", "decide if SOTP is primary or support", "keep SOTP as cross-check only"),
+    ]
+    for row, values in enumerate(gate_rows, start=47):
+        for col, value in enumerate(values, start=start_col):
+            ws.cell(row, col, value)
+            if isinstance(value, str) and value.startswith("="):
+                _apply_value_style(ws.cell(row, col), ib.FMT_MULTIPLE if row in (48, 49) else "General")
+            else:
+                ib.apply_comment(ws.cell(row, col), wrap_text=False)
     cats = Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=13)
-    _add_bar_chart(ws, "Exit EV range", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=16, max_row=24), cats, "B40", _money_unit(facts))
+    _add_bar_chart(ws, "Exit EV range", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=16, max_row=27), cats, "B54", _money_unit(facts))
 
 
 def _build_market_support(wb: Workbook, facts: SourceFacts) -> None:
@@ -1572,36 +1666,80 @@ def _build_market_support(wb: Workbook, facts: SourceFacts) -> None:
 def _build_benchmarks(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["Benchmarks"]
     _setup_sheet(ws, f"{facts.company} — Benchmarks", "Traceable benchmark and source register for material assumptions.")
-    _set_column_widths(ws, {2: 14, 3: 24, 4: 18, 5: 34, 6: 42, 7: 22, 8: 28, 9: 18})
+    _set_column_widths(ws, {2: 14, 3: 24, 4: 18, 5: 42, 6: 42, 7: 22, 8: 28, 9: 18, 10: 20, 11: 20, 12: 28})
     headers = ["source_id", "Source type", "Date / period", "URL / file / owner", "Applicability limits", "Freshness status", "Linked assumption", "Refresh needed"]
-    for col, header in enumerate(headers, start=2):
+    for col, header in enumerate(headers, start=BENCHMARK_REGISTER_START_COL):
         _apply_text_header(ws.cell(5, col), header)
     source_anchor = "; ".join(facts.source_names or facts.source_urls) if (facts.source_names or facts.source_urls) else "unknown"
+    live_comps = list(getattr(facts, "live_comps", []) or [])
+    current_revenue_multiple = any(comp.get("status") == "current" and comp.get("revenue_multiple") for comp in live_comps if isinstance(comp, dict))
+    current_ebitda_multiple = any(comp.get("status") == "current" and comp.get("ebitda_multiple") for comp in live_comps if isinstance(comp, dict))
+    provided_multiple = any(comp.get("status") == "provided" and (comp.get("revenue_multiple") or comp.get("ebitda_multiple")) for comp in live_comps if isinstance(comp, dict))
+    live_freshness = (
+        "current"
+        if current_revenue_multiple and current_ebitda_multiple
+        else "provided / verify"
+        if provided_multiple
+        else "partial refresh"
+        if current_revenue_multiple or current_ebitda_multiple
+        else "needs refresh"
+    )
     rows = [
         ("SRC-01", facts.evidence_status, "source period", source_anchor, "company-specific evidence", "needs refresh", "pricing / demand", "yes"),
         ("SRC-02", "estimate", "model date", "modeler estimate", "replace with actual or benchmark", "not externally sourced", "cost-to-serve", "yes"),
         ("SRC-03", "management target", "plan period", "management plan", "depends on execution capacity", "not externally sourced", "headcount / capacity", "yes"),
-        ("SRC-04", "benchmark", "needs refresh", "unresolved external benchmark", "match geography, customer, margin definition", "needs refresh", "valuation support", "yes"),
+        ("SRC-04", "benchmark", "comparable refresh" if live_freshness != "needs refresh" else "needs refresh", "comparable evidence register" if live_freshness != "needs refresh" else "unresolved external benchmark", "public/private comps; validate fit", live_freshness, "valuation support", "no" if live_freshness == "current" else "yes"),
         ("SRC-05", "unknown", "unknown", "unresolved evidence", "do not treat as fact", "needs evidence", "financing terms", "yes"),
     ]
     for r, row in enumerate(rows, start=6):
-        for c, value in enumerate(row, start=2):
+        for c, value in enumerate(row, start=BENCHMARK_REGISTER_START_COL):
             ws.cell(r, c, value)
             ib.apply_comment(ws.cell(r, c), wrap_text=False)
+    if live_comps:
+        _section(ws, 13, "Comparable evidence", 12)
+        comp_headers = ["Ticker", "Company", "Type", "Source type", "Stage / geography", "EV / Revenue", "EV / EBITDA", "As of", "Status", "Applicability", "Source / error"]
+        for col, header in enumerate(comp_headers, start=LAYOUT.label_col):
+            _apply_text_header(ws.cell(14, col), header)
+        for row_idx, comp in enumerate(live_comps, start=15):
+            source_or_error = comp.get("source_url") if comp.get("status") in {"current", "provided"} else comp.get("error")
+            values = [
+                comp.get("ticker"),
+                comp.get("name"),
+                comp.get("company_type") or "public",
+                comp.get("source_type") or "benchmark",
+                " / ".join(str(part) for part in (comp.get("stage"), comp.get("geography")) if part),
+                comp.get("revenue_multiple"),
+                comp.get("ebitda_multiple"),
+                comp.get("as_of_date"),
+                comp.get("status"),
+                comp.get("applicability_limits") or comp.get("error"),
+                source_or_error,
+            ]
+            for col, value in enumerate(values, start=LAYOUT.label_col):
+                ws.cell(row_idx, col, value)
+                if col in (LAYOUT.label_col + 5, LAYOUT.label_col + 6):
+                    _apply_value_style(ws.cell(row_idx, col), ib.FMT_MULTIPLE)
+                elif col == LAYOUT.label_col + 10 and comp.get("status") in {"current", "provided"}:
+                    ib.apply_link_external(ws.cell(row_idx, col))
+                else:
+                    ib.apply_comment(ws.cell(row_idx, col), wrap_text=False)
 
 
 def _build_ic_memo(wb: Workbook, facts: SourceFacts) -> None:
     ws = wb["IC Memo"]
-    _setup_sheet(ws, f"{facts.company} — IC Memo Notes", "Investment committee summary generated from the model and source story.")
+    _setup_sheet(ws, f"{facts.company} — IC Decision Memo", "Investment committee recommendation, valuation stance, risks, and diligence gates generated from the model.")
     final_col = _final_period_col(facts)
     sections = [
+        ("Recommendation", f"=IF(AND('Valuation'!{final_col}31>=2,'Valuation'!{final_col}24>=0.9,'Pricing'!{final_col}21=\"pass\"),\"Proceed subject to DD gates\",\"Do not circulate externally until valuation, pricing, and evidence gates are cleared\")"),
         ("Investment thesis", f"{facts.company} is modeled through an economic kernel described as {facts.mechanics}; use this as a driver composition, not a sector template."),
         ("KPI readout", f"=\"Final runway: \"&TEXT('KPI'!{final_col}20,\"0.0\")&\" months; burn multiple: \"&TEXT('KPI'!{final_col}18,\"0.0x\")&\"; gross margin: \"&TEXT('KPI'!{final_col}16,\"0%\")"),
-        ("Funding and dilution", f"=\"Final funding gap: \"&TEXT('Scenarios'!{get_column_letter(_start_period_col())}19,\"¥#,##0,,M\")&\"; new investor ownership: \"&TEXT('Capital Stack'!{final_col}16,\"0%\")&\"; founder ownership: \"&TEXT('Ownership'!{final_col}7,\"0%\")"),
-        ("Valuation and return", f"=\"Selected EV: \"&TEXT('Valuation'!{final_col}24,\"¥#,##0,,M\")&\"; MOIC: \"&TEXT('Valuation'!{final_col}28,\"0.0x\")&\"; IRR: \"&TEXT('Valuation'!{final_col}29,\"0%\")"),
-        ("What must be true", "Selected demand, pricing, cost-to-serve, capacity, financing, and valuation assumptions must reconcile to their support ratios or be carried as weak evidence."),
-        ("Scenario breakpoint", "Downside is decision-relevant when it creates a funding gap, runway breach, covenant issue, unacceptable dilution, or valuation support break."),
-        ("DD questions", "Prioritize DD around weak-evidence drivers, benchmark freshness, customer ROI proof, retention/cohort behavior, cost-to-serve, capital terms, tax/debt constraints, and exit support."),
+        ("Funding and dilution", f"=\"Final funding gap: JPY \"&ROUND('Scenarios'!{get_column_letter(_start_period_col())}19/10^6,0)&\"M; new investor ownership: \"&TEXT('Capital Stack'!{final_col}16,\"0%\")&\"; founder ownership: \"&TEXT('Ownership'!{final_col}7,\"0%\")"),
+        ("Valuation and return", f"=\"Selected EV midpoint: JPY \"&ROUND('Valuation'!{final_col}26/10^6,0)&\"M; supportability: \"&TEXT('Valuation'!{final_col}24,\"0.0x\")&\"; MOIC: \"&TEXT('Valuation'!{final_col}31,\"0.0x\")&\"; IRR: \"&TEXT('Valuation'!{final_col}32,\"0%\")"),
+        ("Price / terms stance", f"=\"Target price range: JPY \"&ROUND('Valuation'!{final_col}25/10^6,0)&\"M-\"&ROUND('Valuation'!{final_col}27/10^6,0)&\"M EV; pricing gate: \"&'Pricing'!{final_col}21&\"; exit signal: \"&'Exit Waterfall'!M7"),
+        ("What must be true", "Demand, pricing, cost-to-serve, capacity, financing, segment economics, cap-table terms, and valuation support must reconcile to explicit evidence status before external circulation."),
+        ("Scenario breakpoint", "Downside is decision-relevant when it creates a funding gap, runway breach, covenant issue, unacceptable dilution, preference-stack leakage, or valuation support break."),
+        ("Ranked DD gates", "1) benchmark freshness and comps; 2) customer ROI/WTP proof; 3) cohort retention and CAC; 4) cost-to-serve and deployment capacity; 5) financing terms, preference stack, tax/debt constraints, and buyer-view exit support."),
+        ("Walk-away conditions", "Reject or reprice if MOIC stays below hurdle, supportability remains below gate, pricing validation fails, benchmark support is unresolved, or downside financing requires unacceptable dilution."),
         ("Source boundary", "Source fields should contain traceable evidence or evidence status only; refresh material benchmarks before external circulation."),
     ]
     row = 6
@@ -1614,6 +1752,16 @@ def _build_ic_memo(wb: Workbook, facts: SourceFacts) -> None:
             ib.apply_comment(body_cell, wrap_text=False)
         ws.row_dimensions[row + 1].height = ib.ROW_HEIGHT_BASE
         row += 4
+    for label, body in [
+        ("Decision owner", "Assign banker / investor owner before external circulation."),
+        ("Next action", "Refresh sources, rerun strict audit, and update recommendation after DD gates clear."),
+        ("Evidence package", "Attach source register, cohort export, pricing validation, cap-table terms, and buyer-view exit support."),
+    ]:
+        ws.cell(row, LAYOUT.label_col, label)
+        ws.cell(row, LAYOUT.source_col, body)
+        ib.apply_label(ws.cell(row, LAYOUT.label_col))
+        ib.apply_comment(ws.cell(row, LAYOUT.source_col), wrap_text=False)
+        row += 1
 
 
 def build_source_plan_workbook_from_facts(facts: SourceFacts) -> Workbook:
