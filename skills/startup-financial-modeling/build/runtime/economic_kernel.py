@@ -178,7 +178,6 @@ class SourceFacts:
     gross_profit_multiple: list[float]
     ebitda_multiple: list[float]
     discount_rate: float
-    terminal_growth_rate: float
     customer_roi_yen: int
     implementation_cost_yen: int
     sales_cycle_months: int
@@ -1480,7 +1479,6 @@ def derive_source_facts(text: str) -> SourceFacts:
         gross_profit_multiple=[round(value, 1) for value in _curve(8, 16, periods)],
         ebitda_multiple=[round(value, 1) for value in _curve(12, 28, periods)],
         discount_rate=0.18,
-        terminal_growth_rate=0.025,
         customer_roi_yen=max(price * 18, 3_000_000),
         implementation_cost_yen=max(price * 2, 300_000),
         sales_cycle_months=4 if profile.key in {"recurring_software", "marketplace"} else 6,
@@ -1744,7 +1742,6 @@ def derive_source_facts_from_mapping(raw: dict[str, Any]) -> SourceFacts:
         "existing_investors": "existing_investors",
         "strategic_warrant": "strategic_warrant",
         "discount_rate": "discount_rate",
-        "terminal_growth_rate": "terminal_growth_rate",
         "customer_roi_yen": "customer_roi",
         "implementation_cost_yen": "implementation_cost",
         "sales_cycle_months": "sales_cycle_months",
@@ -1763,7 +1760,7 @@ def derive_source_facts_from_mapping(raw: dict[str, Any]) -> SourceFacts:
             continue
         if field.endswith("_yen"):
             overrides[field] = _coerce_int_series(value, 1, [getattr(facts, field)])[0]
-        elif field.endswith("_pct") or field.endswith("_rate") or field in {"founder_ownership", "option_pool", "existing_investors", "strategic_warrant", "terminal_growth_rate"}:
+        elif field.endswith("_pct") or field.endswith("_rate") or field in {"founder_ownership", "option_pool", "existing_investors", "strategic_warrant"}:
             overrides[field] = _coerce_float_series(value, 1, [float(getattr(facts, field))], percent=True)[0]
         elif field == "sales_cycle_months":
             overrides[field] = int(float(value))

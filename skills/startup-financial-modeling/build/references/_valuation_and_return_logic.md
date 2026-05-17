@@ -61,6 +61,14 @@ flows, PV of terminal value, enterprise value, net debt, and equity value. If
 the terminal value dominates or cash flows are not yet explainable, label DCF as
 a cross-check rather than a primary method.
 
+For a startup whose forecast free cash flow is still negative at the end of the
+explicit horizon, a Gordon-growth terminal value collapses the DCF toward zero
+and is not meaningful. Use an exit-multiple terminal value instead — the
+discounted multiple-based enterprise value, retained at a conservative haircut —
+and keep the explicit-period free cash flow sum un-floored so the cash the
+company actually burns reduces enterprise value. The result is a usable
+cross-check rather than a degenerate zero.
+
 The selected value should identify which method is driving it and why. Averaging
 methods without a credibility rationale weakens the model; a clean method
 selection with exclusions is stronger than a broad but unsupported average.
