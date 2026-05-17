@@ -39,6 +39,15 @@ Entrypoints (`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`) route here. `DESIGN.md` 
   worktree before adding new commits.
 - When changing shared instructions or entrypoints in this repository, update matching docs and validation checks in the same pass.
 
+## Autonomous Execution
+
+- These rules apply to unattended or self-driving runs: a goal that loops to completion, a recurring task, headless `-p` / `codex exec`, or a Ralph-style loop.
+- Before starting the loop, surface every item that needs a human decision — credentials and API keys, paid or account-creating signups, irreversible or destructive operations, hard-to-reverse design choices, the canonical branch or directory — and resolve them up front. Record the answers, progress, and blockers in files the loop can re-read, not just in chat, so a fresh context can recover state without the conversation history.
+- Define completion as an observable, verifiable state (a test exit code, a clean lint run, a met acceptance criterion), and pair it with a stop bound such as a max iteration or turn count. Do not report work as done on self-assessment alone.
+- Drive the loop on the environment's ground truth — test exit codes, build results, lint and type checks — and re-check it each iteration, not just at the end. Never weaken, delete, skip, or rewrite tests or acceptance checks to make a completion condition pass; meeting the bar means changing the code, not the check.
+- Mid-run, when you hit something unresolved — a missing credential, an undecided design branch, an irreversible operation, or the same failure repeating with a root cause outside the code — do not guess, do not use placeholder values, and do not silently skip it. Write the situation and the open question to a progress file, stop the loop cleanly, and hand control back.
+- Keep "complete", "needs human input", and "iteration limit reached" as distinct end states; report which one was reached and attach the supporting evidence.
+
 ## Coding Collaboration Defaults
 
 - When context suggests the user is a beginner or non-engineer, inspect the relevant repo/files first, then explain the chosen path in concrete, low-jargon terms.
