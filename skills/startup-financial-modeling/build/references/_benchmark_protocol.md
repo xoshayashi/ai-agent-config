@@ -134,3 +134,56 @@ Support, People Plan, Financing, Pricing, or a user-requested support sheet.
 The gate is not the sheet name; the gate is whether the material assumption has
 traceable evidence, a freshness status, an applicability limit, and a linked
 decision implication.
+
+## Quantitative Reference Bands
+
+Use these as review anchors, not frozen truth: confirm the period basis,
+revenue definition, stage, and vintage before treating any number as a gate,
+and refresh against the cited source before external circulation. Each band is
+Healthy / Warning / Anomaly. Reserve Anomaly for values outside any defensible
+range — a likely modeling error or an unsupported assumption.
+
+Gross margin by business model (report on net revenue for marketplace, on
+subscription revenue for SaaS, on net interest margin for lending):
+
+| Model | Healthy | Warning | Anomaly |
+|---|---|---|---|
+| B2B SaaS (pure software) | 75-85% | 65-75% or 85-90% | <60% or >92% |
+| AI-native software | 50-65% | 40-50% or 65-75% | <35% |
+| Marketplace (on net revenue) | 50-70% | 30-50% | <25% |
+| Hardware / asset-heavy | 30-50% | 20-30% or 50-65% | <15% or >65% |
+| Fintech — software/infra fees | 70-85% | 55-70% | <45% |
+
+A model whose gross margin sits outside its declared vertical's band — a
+"hardware" plan at 85%, a "marketplace" margin computed on GMV not net revenue —
+is a model-vertical mismatch and should be hard-flagged.
+
+Unit economics and capital efficiency (steady-state heuristics; apply stage
+context — early-stage values are legitimately weaker):
+
+| Metric | Healthy | Warning | Anomaly |
+|---|---|---|---|
+| LTV / CAC | 3-5x | 1-3x or >6x | <1x or >10x |
+| CAC payback | <12 mo | 12-24 mo | >24 mo |
+| Net revenue retention | >=110% | 95-110% | <90% |
+| Gross revenue retention | >=90% | 80-90% | <75% |
+| Rule of 40 (growth% + FCF margin%) | >=40% | 0-40% | <-20% |
+| Burn multiple (net burn / net new ARR) | <1.5x | 1.5-3x | >3x or <0 with positive net new ARR |
+| SaaS magic number | >=0.75 | 0.5-0.75 | <0.5 |
+| Revenue (ARR) per FTE at scale | >=$200-250K | 25% below stage median | <$50K beyond seed |
+| Runway at the planned raise | 18-24+ mo | 12-18 mo | <12 mo |
+
+Operating-expense ratios as % of revenue, seed to Series B (R&D dominates OpEx
+until roughly $5-10M ARR, when S&M crosses above it):
+
+| Line | Healthy | Warning | Anomaly |
+|---|---|---|---|
+| R&D | 25-50% | 20-25% or 50-65% | <15% or >75% |
+| S&M | 20-50% | 50-65% | >80% |
+| G&A | 8-20% | 20-30% | >35% |
+
+Sources (refresh before external use): OpenView 2023 SaaS Benchmarks (last
+edition); Bessemer State of the Cloud 2024; ICONIQ Growth 2024-2025; a16z "16
+Startup Metrics" 2015 / Growth Metrics 2022; David Skok / forEntrepreneurs SaaS
+Metrics ~2010; David Sacks "SaaS Metrics That Matter" 2022; Carta State of
+Private Markets 2024; Finro fintech framework 2024-2025.
