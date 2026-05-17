@@ -227,11 +227,18 @@ def test_dcf_forecast_fcf_is_not_floored_at_zero() -> None:
         wb = load_workbook(out, data_only=False)
         ws = wb["Valuation"]
         row = next(
-            cell.row for r in ws.iter_rows() for cell in r
-            if cell.value == "PV of forecast FCF"
+            (cell.row for r in ws.iter_rows() for cell in r
+             if cell.value == "PV of forecast FCF"),
+            None,
         )
-        formulas = [ws.cell(row, c).value for c in range(6, 11)]
-        assert all(isinstance(f, str) and f.startswith("=") for f in formulas)
+        assert row is not None, "Valuation sheet missing 'PV of forecast FCF' row"
+        first_col = source_plan.START_PERIOD_COL
+        formulas = [
+            ws.cell(row, c).value
+            for c in range(first_col, ws.max_column + 1)
+            if isinstance(ws.cell(row, c).value, str) and ws.cell(row, c).value.startswith("=")
+        ]
+        assert formulas, "no forecast-FCF formulas found"
         assert not any("MAX(0" in f for f in formulas), (
             "forecast FCF is still floored at zero"
         )
@@ -253,12 +260,21 @@ def test_dcf_enterprise_value_is_positive_and_method_consistent() -> None:
         wb = load_workbook(Path(tmp) / "recalc" / "dcf.xlsx", data_only=True)
         ws = wb["Valuation"]
 
+        # Derive the last period column from the period header row (row 5).
+        final_col = max(
+            cell.column
+            for cell in ws[5]
+            if cell.column >= source_plan.START_PERIOD_COL and cell.value
+        )
+
         def final_value(label: str) -> float:
             row = next(
-                cell.row for r in ws.iter_rows() for cell in r
-                if cell.value == label
+                (cell.row for r in ws.iter_rows() for cell in r
+                 if cell.value == label),
+                None,
             )
-            return float(ws.cell(row, 10).value)
+            assert row is not None, f"Valuation sheet missing '{label}' row"
+            return float(ws.cell(row, final_col).value)
 
         dcf_ev = final_value("DCF EV")
         primary_ev = final_value("Primary-method EV")
