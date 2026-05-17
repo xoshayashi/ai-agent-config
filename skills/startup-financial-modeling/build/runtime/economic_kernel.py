@@ -746,6 +746,10 @@ def retarget_demand_to_narrative(
     """
     units = list(new_units)
     customers = _pad_series(profile.customers, periods, 0)
+    # Hardware is already anchored by extract_target_units (unit count) and
+    # marketplace by gmv_ramp (GMV); both own their narrative anchor, so an
+    # ARR/customer rescale here would double-count. This guard is what keeps a
+    # hardware story's stated ARR from being applied to the unit ramp.
     if profile.key in {"hardware_asset_heavy", "marketplace"}:
         return units, customers
 

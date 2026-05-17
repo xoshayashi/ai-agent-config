@@ -127,6 +127,34 @@ Store monetary inputs as raw base-currency values and express `actual`,
 unit labels. Operational units such as units, customers, FTE, days, months,
 percentages, and multiples should keep their own non-money units.
 
+## Narrative Anchoring And Governors
+
+Sector profiles carry default ramp shapes and cost-to-serve drivers calibrated
+for a generic company. Applied unchanged to an out-of-profile narrative they
+produce economically incoherent plans (a hardware-priced delivery cost on a
+SaaS seat once yielded a -789% gross margin). The kernel therefore reconciles
+profile defaults against what the narrative actually states, before any
+workbook tab is rendered:
+
+- Gross-margin governor: when a target or stated gross margin exists, rescale
+  the cost-to-serve components (variable COGS %, delivery, cloud, support) by
+  one per-period factor so total COGS lands on `(1 - target gross margin) x
+  revenue`. Scale all components proportionally so the profile's cost *mix* is
+  preserved while its *level* is corrected; each component still reads as an
+  honest decomposition of COGS.
+- Stated-margin extraction: a narrative gross-margin figure (`gross margin ...
+  78%`, `粗利率 78%`) overrides the profile default.
+- Demand retargeting: a stated maturity ARR or customer count rescales the unit
+  and customer ramps so the plan reaches its own headline scale. A plan that
+  lands an order of magnitude short of its stated target is not investor-grade.
+- Conservative grain detection: the forecast architecture is annual (revenue,
+  cost, and comp formulas annualize per period). Only an explicit monthly or
+  quarterly *model* request flips the grain; metric phrases like `monthly burn`
+  or `18-month runway` stay annual.
+
+Keep these reconciliations in the economic-kernel layer, not in sheet
+renderers. They are economic inference, not layout.
+
 ## Best-Practice Benchmark Lens
 
 Use external benchmarks as context for questions, not as frozen truth. Current
