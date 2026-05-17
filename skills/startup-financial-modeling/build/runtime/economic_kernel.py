@@ -781,19 +781,51 @@ def ramp_to_target(target: int, first: int, periods: int = DEFAULT_FORECAST_PERI
     return ramp
 
 
+# Latin single-letter scale units must not bleed into a following word — a bare
+# "t" in "targets" once parsed as "trillion". Require a non-letter boundary.
+_GMV_UNIT = r"(兆|億|百万|万|trillion|billion|million|bn|tn|[tTbBmM](?![A-Za-z]))"
+_GMV_CJK_UNIT = r"(兆|億|百万|万)"
+_GMV_PATTERNS = [
+    # Keyword first: require an explicit currency mark so prose like
+    # "GMV. Phase 1 targets" cannot be misread as a GMV figure.
+    rf"GMV[^0-9¥$]{{0,24}}[¥$]\s*([0-9,.]+)\s*{_GMV_UNIT}?",
+    rf"流通総額[^0-9¥$]{{0,16}}¥?\s*([0-9,.]+)\s*{_GMV_CJK_UNIT}",
+    # Number first: the trailing keyword anchors the figure.
+    rf"[¥$]?\s*([0-9,.]+)\s*{_GMV_UNIT}?\s*(?:の)?\s*GMV",
+    rf"[¥$]?\s*([0-9,.]+)\s*{_GMV_CJK_UNIT}?\s*(?:の)?\s*流通総額",
+]
+_GMV_MATURITY_CUE = re.compile(
+    r"(maturity|at scale|by\s*(?:FY)?\s*20\d\d|by year|成熟|目標|までに|時点)",
+    flags=re.IGNORECASE,
+)
+
+
 def gmv_ramp(text: str, profile: MechanicProfile, periods: int = DEFAULT_FORECAST_PERIODS) -> list[int]:
-    base = money_yen(
-        [
-            r"GMV[^0-9¥$]{0,24}¥?\s*([0-9,.]+)\s*(兆|億|百万|万|t|T|bn|b|B|m|M)?",
-            r"流通総額[^0-9¥$]{0,24}¥?\s*([0-9,.]+)\s*(兆|億|百万|万|t|T|bn|b|B|m|M)?",
-        ],
-        text,
-        profile.default_gmv_yen,
-    )
-    if base <= 0:
+    """Build the GMV ramp for marketplace-style plans.
+
+    Extracts a stated GMV in either order ("GMV ¥10B" or "¥120億 GMV"). When
+    the figure sits next to maturity language ("at maturity", "by FY2030"), it
+    is treated as the final-period target and the ramp is scaled so the last
+    period lands on it — a stated maturity GMV is a goal, not a period-0 base.
+    """
+    value = 0
+    context = ""
+    for pattern in _GMV_PATTERNS:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            value = money_yen([pattern], text, 0)
+            context = text[max(0, match.start() - 60): match.end() + 60]
+            break
+    is_maturity_figure = value > 0 and bool(_GMV_MATURITY_CUE.search(context))
+    if value <= 0:
+        value = profile.default_gmv_yen
+    if value <= 0:
         return [0 for _ in range(periods)]
     multipliers = _curve(1.0, 8.5, periods)
-    return [int(base * multiple) for multiple in multipliers]
+    if is_maturity_figure:
+        final = multipliers[-1] or 1.0
+        return [int(value * multiple / final) for multiple in multipliers]
+    return [int(value * multiple) for multiple in multipliers]
 
 
 def ending_units(new_units: list[int]) -> list[int]:
