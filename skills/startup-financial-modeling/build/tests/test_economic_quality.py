@@ -225,18 +225,20 @@ def test_cap_table_exit_waterfall_uses_post_round_cap_table() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "cap.xlsx"
         build_model.build_model(None, out, mode="cap_table")
-        wb = load_workbook(out, data_only=False)
+        wb = load_workbook(out, data_only=True)
         ws = wb["Ownership"]
         header = next(
             (cell for r in ws.iter_rows() for cell in r if cell.value == "Founder %"),
             None,
         )
         assert header is not None, "Exit Waterfall 'Founder %' column not found"
-        founder_pcts = [
-            ws.cell(row, header.column).value
-            for row in range(header.row + 1, header.row + 8)
-            if isinstance(ws.cell(row, header.column).value, (int, float))
-        ]
+        # Collect contiguous scenario rows below the header until the column ends.
+        founder_pcts = []
+        for row in range(header.row + 1, ws.max_row + 1):
+            value = ws.cell(row, header.column).value
+            if not isinstance(value, (int, float)):
+                break
+            founder_pcts.append(value)
         assert founder_pcts, "no exit-waterfall founder-% scenarios found"
         # Post-round founders hold ~54-60% of the exit-relevant FDSO; a value
         # near 95% means the waterfall ran on the pre-round cap table.
