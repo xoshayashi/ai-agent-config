@@ -1,131 +1,22 @@
 ---
 name: startup-financial-modeling
-description: "Use when the user needs startup-finance xlsx work: financial plans, cap tables, valuation, pricing, runway, unit economics, M&A exit, or IC memo support."
+description: "Use when the user needs startup-finance artifacts, especially xlsx models: financial plans, model specs, assumption registers, workbook audits, cap tables, valuation, pricing, runway, unit economics, M&A exit, or IC memo support."
 ---
 
 # Startup Financial Modeling
 
-Build startup finance outputs from economic primitives. First define the
-decision, model grain, currency, fiscal year, time horizon, entities, and source
-boundary. Separate facts, estimates, assumptions, and unknowns.
+Build from economic primitives and separate facts, estimates, assumptions, and
+unknowns. First read `build/references/_skill_invocation_protocol.md`; then load
+only the smallest needed refs.
 
-References live in `build/references/`; load the smallest set that covers the
-decision. Start with `_output_modes.md`, `_generic_composition_protocol.md`,
-and `_self_review_protocol.md`. For any xlsx generation or repair, also load
-`_layout_canonical.md`, `_ib_workbook_design_system.md`, and
-`_sheet_quality_rubric.md`. Add `_modeling_kernel.md`,
-`_coverage_universe.md`, `_assumption_decomposition_patterns.md`,
-`_kpi_analytics.md`, `_scenario_sensitivity_playbook.md`,
-`_valuation_and_return_logic.md`, `_ic_memo_depth.md`,
-`_benchmark_protocol.md`, `_terminology.md` for full plans, fundraising, DD,
-or investor outputs.
+Use `scripts/build_model.py`: `--source-md` for integrated plans or `--mode` for
+`full`, `pricing`, `unit_economics`, `cap_table`, `ma_exit`, `dcf_only`,
+`burn_runway`, `three_statement`, `market_sizing`, or `comps_only`. Focused
+modes prioritize formula completeness over tiny sheet counts. Comparable
+evidence runs by default for public ticker peers; `--live-comps TICKER...`
+overrides only that public peer set. Use YAML `private_comps`,
+`transaction_comps`, or `benchmark_sources` for private companies, funding
+rounds, M&A comps, market reports, and internal/user-provided evidence.
 
-Core pattern: compose from decision and dependencies; examples, maturity cues,
-sectors, and modes are prompts for reasoning, not templates. Build the driver
-tree, select material variables, keep primitive drivers as assumptions, and
-calculate dependent outputs as formulas or checks.
-
-Workbook helper:
-
-```sh
-python3 skills/startup-financial-modeling/scripts/build_model.py \
-  --source-md path/to/source.md --output model_output.xlsx
-python3 skills/startup-financial-modeling/scripts/build_model.py \
-  --mode pricing --input model.yaml --output model_output.xlsx
-```
-
-Structured YAML may define company/currency/display scale/grain/periods,
-segments, operating drivers, financing instruments, and valuation scalars.
-Money inputs are raw base-currency values; `_yen` names are money-driver names.
-
-Workbook gates: blue inputs, black formulas, green internal links, red external
-links, raw money values with display formats, compact unit labels, direct
-formulas, editable grid structure, unnumbered sections, traceable sources, no
-merged cells, Google-Sheets-20px hierarchy / indent columns (`2.14` xlsx
-width), no native indent or leading-space indentation, no frozen panes, and
-generated cells with `wrap_text` off. Treat text wrapping as prohibited for
-generated workbook cells. Classify the cell role before changing wrap settings:
-horizontal-read titles, explanations, instructions, notes, bullets, source
-caveats, and memo lines keep wrap off and read through blank unmerged unstyled
-overflow cells. Use the IB wrap decision ladder before any exception: shorten
-or split the copy, widen the role column, reserve blank unstyled overflow
-cells, or move prose to a dedicated note / interpretation column, source
-register, memo sheet, or separate row. Use a wrapped/manual-line-break
-exception only for user-approved bounded table prose that must stay inside one
-column because adjacent cells carry meaningful values, formulas, units, or
-notes. Do not place horizontal-read text in the final printed/rendered column
-where it cannot overflow visibly. If an exception uses wrapping or manual line
-breaks, set row height to the exact rendered visible line count so text is not
-clipped or padded.
-Text position is part of auditability: labels, sources, notes, titles, memos,
-and interpretation text are left-aligned; numeric values, formulas, money,
-percentages, multiples, counts, and unit labels are right-aligned; only period
-headers, scenario/matrix headers, and short column headers are centered. Do not
-center long prose or labels, do not use native indent or spaces for hierarchy,
-and keep the same label/source/unit/value positions across sheets whenever
-possible.
-Font size discipline is equally strict: body/model cells use Arial 10pt,
-source/note/unit helper text uses 9pt italic gray, compact section/header rows
-use 10-11pt bold, and sheet titles use 14pt bold. Do not create presentation
-hierarchy with many font sizes, 8pt footnote cells, oversized 16pt+ titles, or
-large pasted memo text. If something needs emphasis, prefer role, placement,
-bold, sparse fill/border, or whitespace before changing size.
-
-Design gates: `_layout_canonical.md` owns grid, columns, hierarchy widths, units,
-formulas, and layout mechanics. `_ib_workbook_design_system.md` owns visual
-roles, font, color, borders, highlights, charts, and render expectations.
-Color discipline is a hard workbook gate, not a polish preference: background
-fills are selective accents for major semantic moments only, filled row
-components use one consistent rectangular column span, and that span is chosen
-from the attached table/block rather than from which cells contain text. Do not
-stop a fill because a cell is blank; do not repeat the same non-heatmap fill on
-adjacent rows; do not color several rows merely because they are nearby.
-Section/block dividers, header/label rows, selected outputs/checks, input
-sections, and caution rows are the normal fill roles. Keep the palette small
-and calm: avoid rainbow palettes, decorative alternating fills, and high-chroma
-backgrounds that compete with the model logic. Use `ib_format.py` semantic row-span helpers
-for generated xlsx fill/border row components instead of hand-painting
-arbitrary cells. Border discipline
-follows the same rule and is equally strict: meaningful row rules use the same
-table/block column span as the attached data surface, including blank member
-cells where that keeps the section, header, total, or check row aligned. Do not
-stop a border because a cell is blank, and do not draw borders only around
-populated cells when the data table continues farther right. Stop the rule at
-the edge of the related table/block or comparable row span; leave only trailing
-canvas and unrelated overflow spacer cells borderless. Dedicated hierarchy /
-indent columns stay borderless; draw the rule from the row's actual
-hierarchy-position label/data column, not across earlier 20px spacer columns.
-Memo, source, note, and interpretation cells are usually borderless; they read
-through typography and placement, not grid lines. Borders are not row-by-row
-decoration. Use them mainly before or around meaningful rows where a structural
-accent is needed. As with background fills, avoid repeating the same prominent
-top/bottom rule across adjacent rows unless it is an explicitly declared table
-grid; use typography, spacing, or quiet whitespace for supporting rows. Use
-three border weights by meaning: normal thin for ordinary structural breaks,
-one-step-thicker medium for major section or decision boundaries, and normal
-dotted for soft/provisional separations such as optional checks or supporting
-context. Border colors are black by default. Do not introduce gray, colored, or
-decorative border colors unless the user supplies a house style; visual priority
-comes from sparsity, placement, and thin/medium/dotted weight, not from color.
-
-Analysis gates: material assumptions need selected driver, explanatory drivers,
-implied value, support ratio/variance, and evidence status. Weak evidence feeds
-scenario/sensitivity/benchmark/DD. KPI, scenario, valuation, benchmark, and memo
-surfaces interpret the model and connect evidence to next actions. Write memos
-from a clean base rather than preserving legacy layout compatibility; include
-only the necessary and sufficient supplemental context for the current decision.
-For xlsx outputs, each generated sheet must pass the sheet-level quality rubric:
-it needs a distinct purpose, source boundary, dependency flow, checks where
-errors would matter, and interpretation where it is an output surface. Do not
-create a sheet just because it belongs to a canonical full-workbook order.
-
-Do not treat model construction as completion. Before closeout, run command
-checks and rendered-output inspection for both finance logic and sheet design:
-formulas, reconciliation, unit/scale integrity, source status, styles, layout,
-fonts, fills, borders, print/canvas bounds, and visible readability. Render or
-open the xlsx/PDF/screenshot whenever tooling is available; if rendering is
-blocked, document the blocker and still run workbook inspection commands.
-Follow `_self_review_protocol.md`. If tests, workbook inspection, render
-checks, or artifact self-review find failures, fix the concrete failed items
-and rerun the same checks. Keep iterating until the model logic and the visible
-sheet design are both sufficient, or a real blocker is explicitly documented.
+For xlsx outputs, run command checks plus rendered/recalculated inspection; when
+possible inspect spreadsheet-engine `data_only=True` values for errors.

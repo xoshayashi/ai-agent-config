@@ -37,6 +37,22 @@ Tie value to model drivers:
 Selected enterprise value should be explainable through these drivers and
 should reconcile to investor return, not only to an exit multiple.
 
+## Valuation Committee View
+
+The generated model should not present a single selected EV as if a formula
+settled the debate. It should expose:
+
+- low / midpoint / high selected EV range;
+- supportability score or equivalent evidence-quality gate;
+- method roles and exclusions;
+- benchmark freshness and source status;
+- SOTP credibility when segments drive the value;
+- investor return and founder/common proceeds at the selected value.
+
+When evidence is weak, haircut the midpoint or keep the method as a
+cross-check. A lower but explainable range is stronger than a precise value
+with unresolved comps or arbitrary segment allocation.
+
 ## DCF And Method Credibility
 
 DCF support should expose the actual bridge: forecast free cash flow, discount
@@ -55,7 +71,8 @@ Investor and founder outcomes should include:
 
 - equity invested, ownership, dilution, and option pool effects;
 - debt, lease, convertible, warrant, and secondary effects when relevant;
-- exit proceeds, net debt, investor proceeds, founder proceeds;
+- exit proceeds, net debt, transaction costs / escrow, preference floor,
+  investor proceeds, founder proceeds;
 - MOIC and, when timing is meaningful, IRR;
 - downside case where the financing plan or valuation support breaks.
 

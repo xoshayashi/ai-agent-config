@@ -67,6 +67,11 @@ heavy process.
   When LibreOffice/PDF/screenshot rendering is available, render and inspect
   the visible output. Use an actual Google Sheets import/readback when the
   handoff target is Google Sheets.
+- For generator-produced xlsx files, run `--strict-audit` or the equivalent
+  workbook audit before claiming readiness. Omitted-sheet formulas should be
+  absent because focused outputs include the support sheets needed for live
+  formulas. Compact-mode placeholders are acceptable only for non-decision
+  helper cells and must preserve the original formula for audit.
 - Verify that the workbook renders with readable columns, visible overflow
   where intended, compact row rhythm, semantic fills, no frozen panes,
   source / unit alignment, and calm accent usage.
@@ -165,6 +170,18 @@ heavy process.
 
 ## Command Checks
 
+- Minimum executable closeout for generated xlsx work:
+
+  ```sh
+  PYTHONPYCACHEPREFIX=$(mktemp -d) python3 skills/startup-financial-modeling/build/tests/test_build_model.py
+  python3 skills/startup-financial-modeling/scripts/build_model.py --mode pricing --output /tmp/pricing_check.xlsx
+  python3 skills/startup-financial-modeling/scripts/build_model.py --mode cap_table --output /tmp/cap_table_check.xlsx
+  ```
+
+  When LibreOffice is available, recalculate at least one representative
+  workbook and inspect cached values with `data_only=True` for spreadsheet
+  errors such as `#VALUE!`, `#REF!`, `#DIV/0!`, `#N/A`, and `#NAME?`. Do not
+  treat formula-string inspection as proof that the workbook calculates.
 - Run the narrowest available command checks that prove model quality:
   formula/link integrity, reconciliations, balance/cash/ownership checks,
   unit and display-scale consistency, source/benchmark hygiene, no workbook

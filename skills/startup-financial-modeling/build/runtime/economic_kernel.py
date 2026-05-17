@@ -121,6 +121,7 @@ class SourceFacts:
     source_summary: str
     source_names: list[str]
     source_urls: list[str]
+    live_comps: list[dict[str, object]]
     market_lines: list[str]
     segments: list[str]
     source_unknowns: list[str]
@@ -924,6 +925,7 @@ def derive_source_facts(text: str) -> SourceFacts:
         source_summary="; ".join(summary_bits),
         source_names=source_names,
         source_urls=source_urls,
+        live_comps=[],
         market_lines=market_lines,
         segments=segments,
         source_unknowns=extract_unknowns(text),

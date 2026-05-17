@@ -85,6 +85,7 @@
         },
         {
           "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
           "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
@@ -152,6 +153,7 @@
         },
         {
           "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
           "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
@@ -220,6 +222,7 @@
         },
         {
           "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
           "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
@@ -295,6 +298,7 @@
         },
         {
           "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
           "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
@@ -362,6 +366,7 @@
         },
         {
           "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
           "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
@@ -425,6 +430,7 @@
         },
         {
           "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
           "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
@@ -484,6 +490,7 @@
         },
         {
           "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
           "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
@@ -563,6 +570,7 @@
         },
         {
           "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
           "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
@@ -622,6 +630,7 @@
         },
         {
           "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
           "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
@@ -679,6 +688,7 @@
         },
         {
           "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
           "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
         }
       ]
