@@ -70,7 +70,8 @@ silently neutralized decision formulas, choose the larger workbook.
 Reject sheet exclusions that would leave remaining formulas pointing to missing
 sheets unless the dependent surfaces are also removed or rewired in the same
 pass. When a user asks for an external-ready xlsx, run the strict audit path so
-omitted-sheet references and `#REF!` markers block handoff.
+omitted-sheet references, `#REF!` markers, missing sheet-quality markers, and
+workbook design regressions block handoff.
 The generator attempts public-market comparable refresh by default. Explicit
 tickers are an override, not a prerequisite; private-company, funding-round,
 transaction, market-report, customer, or internal benchmarks should be supplied
