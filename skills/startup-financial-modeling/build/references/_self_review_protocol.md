@@ -54,6 +54,10 @@ heavy process.
   refresh?
 - Are fake source labels avoided?
 - Are source gaps carried into DD questions or validation tests?
+- For material assumptions, has the evidence lens been selected explicitly:
+  labor / HR comps, venture equity or funding comps, venture debt /
+  non-dilutive capacity, pricing / customer ROI comps, market / competitive
+  benchmarks, or another decision-specific lens?
 
 ## Visual and Editability Inspection
 
@@ -67,6 +71,15 @@ heavy process.
   When LibreOffice/PDF/screenshot rendering is available, render and inspect
   the visible output. Use an actual Google Sheets import/readback when the
   handoff target is Google Sheets.
+- Inspect units through formatting as well as values. Monetary cells should
+  store raw base-currency amounts while `number_format` controls `円`, `千円`,
+  `百万円`, `十億円`, `兆円`, `$`, `$K`, `$M`, negative-red parentheses, and
+  dash-zero display. Treat formulas that divide by 1,000, 1,000,000,
+  1,000,000,000, or 1,000,000,000,000 only for presentation as a defect unless
+  the row is explicitly a ratio or interpretation text surface.
+  Verify this rule is scoped to money rows only: operational units such as
+  units, customers, count, FTE, days, months, percentages, and multiples keep
+  their native non-money formats and formulas.
 - For generator-produced xlsx files, run `--strict-audit` or the equivalent
   workbook audit before claiming readiness. Omitted-sheet formulas should be
   absent because focused outputs include the support sheets needed for live

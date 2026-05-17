@@ -111,3 +111,26 @@ conservative fallback anchor. Treat them as a prompt to gather private funding
 rounds, milestone-triggered licensing deals, grants/non-dilutive financing,
 strategic investments, and precedent transactions before relying on a public
 multiple.
+
+## Material Evidence Lenses
+
+When a driver is material, benchmark support should be organized around the
+kind of decision it informs, not around a fixed company template. Add a compact
+register, table, or separate support sheet only when the evidence changes the
+decision or protects the model from a weak assumption.
+
+Common evidence lenses:
+
+| Lens | Use when material | Minimum fields |
+|---|---|---|
+| Labor / HR comps | headcount, compensation, hiring pace, R&D mix, support capacity, or productivity drives burn or proof timing | company / source, role or function, geography, headcount or comp metric, period, applicability limit |
+| Venture equity / funding comps | round size, valuation, investor quality, dilution, or financing feasibility drives the case | company, round, date, amount, valuation basis, investor, stage/geography, security caveat |
+| Venture debt / non-dilutive capacity | debt, warehouse lines, grants, customer advances, or other non-dilutive financing changes runway or dilution | lender/provider, facility type, size, term, rate, collateral/covenants if relevant, geography, decision implication |
+| Pricing / customer ROI comps | price, value capture, willingness-to-pay, implementation cost, or ROI proof drives revenue quality | customer segment, value metric, price/fee, ROI bridge, source date, contract/proof status |
+| Market / competitive benchmarks | TAM/SAM/SOM, adoption pace, utilization, cost curve, or competitive position supports the plan | source, metric, geography, period, methodology, linked model driver |
+
+The sheet set can remain generic: these lenses may live in Benchmarks, Market
+Support, People Plan, Financing, Pricing, or a user-requested support sheet.
+The gate is not the sheet name; the gate is whether the material assumption has
+traceable evidence, a freshness status, an applicability limit, and a linked
+decision implication.

@@ -75,6 +75,18 @@ where it cannot overflow visibly. If an exception uses wrapping or manual line
 breaks, set row height to the exact rendered visible line count so text is not
 clipped or padded.
 
+Unit and scale discipline is mandatory: monetary cell values stay in raw base
+currency and display scale is handled by Excel `number_format`, not by
+pre-dividing model values or turning numbers into text. When inspecting a
+reference workbook or generated output, read cell values and formatting
+together: `number_format`, font color, fill, border, alignment, wrapping,
+merged-cell state, row height, and column width are part of the model contract.
+Do not infer units only from visible text.
+
+This money-display rule must not leak into non-money rows. Preserve operational
+units such as units, customers, count, FTE, days, months, percentages, and
+multiples with their own formats and formulas.
+
 Text position is part of auditability: labels, sources, notes, titles, memos,
 and interpretation text are left-aligned; numeric values, formulas, money,
 percentages, multiples, counts, and unit labels are right-aligned; only period
@@ -174,6 +186,14 @@ benchmarks, or internal/user-provided sources, use YAML `private_comps`,
 limits. `live_comps` / `public_comps` may contain ticker strings and comparable
 evidence mappings in one list; strings are treated as public tickers, mappings
 are treated as provided evidence.
+
+For deeper investor-ready models, choose evidence lenses from the material
+driver, not from a fixed template. Labor / HR comps support hiring and
+productivity, venture equity / funding comps support round feasibility and
+valuation, venture debt / non-dilutive capacity supports runway and dilution,
+pricing / customer ROI comps support monetization, and market / competitive
+benchmarks support reachability. Use a compact register or support sheet only
+when the lens changes the decision.
 
 ```yaml
 live_comps: [CRM, NOW]

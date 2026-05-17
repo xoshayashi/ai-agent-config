@@ -138,6 +138,16 @@ YEN_INPUT_SCALES = {
     "JPY T": 1_000_000_000_000,
 }
 
+USD_INPUT_SCALES = {
+    "USD K": 1_000,
+    "USD M": 1_000_000,
+}
+
+MONEY_INPUT_SCALES = {
+    **YEN_INPUT_SCALES,
+    **USD_INPUT_SCALES,
+}
+
 DISPLAY_UNIT_BY_SCALE = {
     ("JPY", "actual"): "円",
     ("JPY", "thousand"): "千円",
@@ -158,6 +168,22 @@ YEN_DISPLAY_UNITS = {
     "JPY T": "兆円",
 }
 
+MONEY_INPUT_UNITS = {"JPY", "USD", *MONEY_INPUT_SCALES.keys()}
+
+MONEY_DISPLAY_UNITS = {
+    **YEN_DISPLAY_UNITS,
+    "USD": "$",
+    "USD K": "$K",
+    "USD M": "$M",
+}
+
+MONEY_DISPLAY_SCALE_FACTORS = (
+    1_000_000_000_000,
+    1_000_000_000,
+    1_000_000,
+    1_000,
+)
+
 
 def _display_unit(unit: str, fmt: str | None = None, currency: str = "JPY", scale: str = "million") -> str:
     if unit == "JPY":
@@ -167,21 +193,34 @@ def _display_unit(unit: str, fmt: str | None = None, currency: str = "JPY", scal
             return DISPLAY_UNIT_BY_SCALE.get((currency, "thousand"), "千円")
         if fmt == ib.FMT_JPY_HUNDRED_MILLION:
             return DISPLAY_UNIT_BY_SCALE.get((currency, "hundred_million"), "億円")
+        if fmt == ib.FMT_JPY_BILLION:
+            return DISPLAY_UNIT_BY_SCALE.get((currency, "billion"), "十億円")
+        if fmt == ib.FMT_JPY_TRILLION:
+            return DISPLAY_UNIT_BY_SCALE.get((currency, "trillion"), "兆円")
         if fmt in {ib.FMT_MONEY, ib.FMT_MONEY_DECIMAL, ib.FMT_JPY_MILLION, ib.FMT_USD_MILLION}:
             return DISPLAY_UNIT_BY_SCALE.get((currency, scale), DISPLAY_UNIT_BY_SCALE.get((currency, "million"), "百万円"))
         return DISPLAY_UNIT_BY_SCALE.get((currency, "actual"), YEN_DISPLAY_UNITS["JPY"])
-    return YEN_DISPLAY_UNITS.get(unit, unit)
+    # Non-JPY currency scale variants are encoded in the unit string
+    # (`USD K`, `USD M`) rather than fmt-dispatched from raw `USD`.
+    return MONEY_DISPLAY_UNITS.get(unit, unit)
 
 
 def _normalise_formula_scale(formula: str) -> str:
-    return formula.replace("/1000000", "").replace("*1000000", "")
+    # Money source formulas sometimes arrive pre-scaled for presentation.
+    # Store raw base-currency formulas and let number_format handle display.
+    for factor in MONEY_DISPLAY_SCALE_FACTORS:
+        formula = re.sub(rf"\s*/\s*{factor}\b", "", formula)
+        formula = re.sub(rf"\s*\*\s*{factor}\b", "", formula)
+    return formula
 
 
 def _model_value(value: object, unit: str) -> object:
     if isinstance(value, str) and value.startswith("="):
-        return _normalise_formula_scale(value)
+        if unit in MONEY_INPUT_UNITS:
+            return _normalise_formula_scale(value)
+        return value
     if isinstance(value, (int, float)) and not isinstance(value, bool):
-        scale = YEN_INPUT_SCALES.get(unit)
+        scale = MONEY_INPUT_SCALES.get(unit)
         if scale:
             return int(value * scale) if float(value * scale).is_integer() else value * scale
     return value
@@ -219,6 +258,26 @@ def _format_for_unit(unit: str, requested_fmt: str, facts: SourceFacts | None = 
             if requested_fmt == ib.FMT_JPY_THOUSAND:
                 return ib.fmt_for_currency(facts.currency, "thousand")
         return requested_fmt
+    if unit == "JPY K":
+        return ib.FMT_JPY_THOUSAND
+    if unit == "JPY M":
+        return ib.FMT_JPY_MILLION
+    if unit == "JPY B":
+        return ib.FMT_JPY_BILLION
+    if unit == "JPY T":
+        return ib.FMT_JPY_TRILLION
+    if unit == "USD":
+        if requested_fmt in {ib.FMT_MONEY, ib.FMT_USD_MILLION}:
+            return ib.FMT_USD_MILLION
+        if requested_fmt in {ib.FMT_JPY_YEN, ib.FMT_USD_DOLLAR}:
+            return ib.FMT_USD_DOLLAR
+        if requested_fmt in {ib.FMT_JPY_THOUSAND, ib.FMT_USD_THOUSAND}:
+            return ib.FMT_USD_THOUSAND
+        return requested_fmt
+    if unit == "USD K":
+        return ib.FMT_USD_THOUSAND
+    if unit == "USD M":
+        return ib.FMT_USD_MILLION
     return requested_fmt
 
 
