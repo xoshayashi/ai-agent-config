@@ -368,10 +368,36 @@ def extract_start_year(text: str) -> int:
 
 
 def extract_model_grain(text: str) -> str:
+    """Detect the requested period grain.
+
+    Grain detection is deliberately conservative: bare words like "monthly
+    burn" or "18-month runway" describe metrics, not a request for a
+    month-by-month model. The forecast architecture is annual (revenue, cost,
+    and comp formulas annualize per period), so only an explicit request for a
+    monthly or quarterly *model* flips the grain.
+    """
     lowered = text.lower()
-    if any(token in lowered for token in ("monthly", "month-by-month", "月次", "か月", "ヶ月")):
+    monthly_model = any(
+        token in lowered
+        for token in (
+            "monthly model", "month-by-month model", "month by month model",
+            "monthly financial model", "monthly p&l", "monthly forecast",
+            "monthly build", "monthly cash model", "月次モデル",
+            "月次財務モデル", "月次の財務モデル", "月次計画", "月次で作",
+            "月次で構築", "月次で組",
+        )
+    )
+    if monthly_model:
         return "monthly"
-    if any(token in lowered for token in ("quarterly", "quarter", "四半期", "qoq")):
+    quarterly_model = any(
+        token in lowered
+        for token in (
+            "quarterly model", "quarter-by-quarter", "quarterly forecast",
+            "quarterly p&l", "quarterly build", "四半期モデル",
+            "四半期の財務モデル", "四半期で作",
+        )
+    )
+    if quarterly_model:
         return "quarterly"
     return "annual"
 
@@ -672,6 +698,81 @@ def extract_target_units(text: str, profile: MechanicProfile) -> int:
     return value
 
 
+def extract_target_arr(text: str) -> int:
+    """Extract a stated maturity ARR / recurring-revenue target, in raw yen."""
+    return money_yen(
+        [
+            r"([0-9,.]+)\s*(兆|億|百万|万|t|T|bn|b|B|m|M)?\s*(?:の)?\s*ARR",
+            r"ARR[^0-9¥$]{0,20}(?:of\s+)?¥?\s*([0-9,.]+)\s*(兆|億|百万|万|t|T|bn|b|B|m|M)?",
+            r"(?:recurring revenue|年間経常収益)[^0-9¥$]{0,20}¥?\s*([0-9,.]+)\s*(兆|億|百万|万|t|T|bn|b|B|m|M)?",
+        ],
+        text,
+        0,
+    )
+
+
+def extract_target_customers(text: str) -> int:
+    """Extract a stated maturity customer / account count."""
+    value = int(
+        first_match_float(
+            [
+                r"([0-9,]{1,9})\s*(?:paying\s+)?(?:customers|accounts|logos)",
+                r"([0-9,]{1,9})\s*(?:社|アカウント|顧客)",
+                r"顧客\s*(?:数)?\s*(?:約)?\s*([0-9,]{1,9})",
+            ],
+            text,
+            0,
+        )
+    )
+    return value
+
+
+def retarget_demand_to_narrative(
+    text: str,
+    profile: MechanicProfile,
+    new_units: list[int],
+    monthly_price: int,
+    periods: int,
+) -> tuple[list[int], list[int]]:
+    """Scale the demand ramp so the plan reaches the narrative's stated scale.
+
+    Sector profiles carry default ramp shapes calibrated to a generic company.
+    When the narrative states a maturity ARR or customer count, the plan must
+    honor it — a model that lands an order of magnitude short of its own stated
+    target is not investor-grade. This rescales the unit and customer ramps by
+    single factors, preserving the profile's ramp *shape* while honoring the
+    narrative's *level*. Hardware (unit-count driven) and marketplace (GMV
+    driven) keep their own anchors and are left untouched.
+    """
+    units = list(new_units)
+    customers = _pad_series(profile.customers, periods, 0)
+    # Hardware is already anchored by extract_target_units (unit count) and
+    # marketplace by gmv_ramp (GMV); both own their narrative anchor, so an
+    # ARR/customer rescale here would double-count. This guard is what keeps a
+    # hardware story's stated ARR from being applied to the unit ramp.
+    if profile.key in {"hardware_asset_heavy", "marketplace"}:
+        return units, customers
+
+    ending = ending_units(units)
+    mature_units = ending[-1] if ending else 0
+    target_arr = extract_target_arr(text)
+    unit_scale = 0.0
+    if target_arr > 0 and monthly_price > 0 and mature_units > 0:
+        target_units = target_arr / (monthly_price * 12)
+        unit_scale = target_units / mature_units
+        if unit_scale > 0:
+            units = [max(0, int(round(value * unit_scale))) for value in units]
+
+    target_customers = extract_target_customers(text)
+    profile_mature = profile.customers[-1] if profile.customers else 0
+    if target_customers > 0 and profile_mature > 0:
+        customer_scale = target_customers / profile_mature
+        customers = [max(0, int(round(value * customer_scale))) for value in customers]
+    elif unit_scale > 0:
+        customers = [max(0, int(round(value * unit_scale))) for value in customers]
+    return units, customers
+
+
 def ramp_to_target(target: int, first: int, periods: int = DEFAULT_FORECAST_PERIODS) -> list[int]:
     if periods <= 1:
         return [max(target, 0)]
@@ -835,6 +936,106 @@ def kpi_definitions_for(facts: SourceFacts) -> tuple[KPIDefinition, ...]:
     return tuple(common + list(registry.get(key, registry["generic"])))
 
 
+def extract_target_gross_margin(text: str) -> float | None:
+    """Extract a stated/target gross margin from the narrative, if present.
+
+    Returns a fraction in (0, 1) or None when the narrative gives no figure.
+    Recognises English ("gross margin ... 78%", "78% gross margin") and
+    Japanese ("粗利率 78%", "売上総利益率 78%") phrasings.
+    """
+    patterns = [
+        r"gross\s*margin[^0-9%]{0,28}([0-9]{1,2}(?:\.[0-9])?)\s*%",
+        r"([0-9]{1,2}(?:\.[0-9])?)\s*%[^0-9%]{0,20}gross\s*margin",
+        r"粗利率?[^0-9%]{0,14}([0-9]{1,2}(?:\.[0-9])?)\s*%",
+        r"売上総利益率[^0-9%]{0,14}([0-9]{1,2}(?:\.[0-9])?)\s*%",
+    ]
+    pct = first_match_float(patterns, text, -1.0)
+    if 0.0 < pct < 100.0:
+        return round(pct / 100.0, 4)
+    return None
+
+
+def _profile_target_gross_margin(profile: MechanicProfile, periods: int) -> list[float]:
+    base = (
+        0.55
+        if profile.key == "hardware_asset_heavy"
+        else 0.72
+        if profile.key == "recurring_software"
+        else 0.60
+    )
+    return [base for _ in range(periods)]
+
+
+def resolve_target_gross_margin(
+    text: str, profile: MechanicProfile, periods: int
+) -> list[float]:
+    """Resolve the target gross-margin series: stated narrative figure wins."""
+    stated = extract_target_gross_margin(text)
+    if stated is not None:
+        clamped = min(max(stated, 0.05), 0.95)
+        return [clamped for _ in range(periods)]
+    return _profile_target_gross_margin(profile, periods)
+
+
+def calibrate_cost_stack_to_gross_margin(
+    target_gross_margin: list[float],
+    new_units: list[int],
+    gmv_yen: list[int],
+    monthly_price_yen: list[int],
+    take_rate: list[float],
+    customers: list[int],
+    other_revenue_share: list[float],
+    variable_cogs_pct: list[float],
+    delivery_cost_yen: list[int],
+    cloud_cost_yen: list[int],
+    support_cost_yen: list[int],
+) -> tuple[list[float], list[int], list[int], list[int]]:
+    """Gross-margin governor.
+
+    The cost-to-serve drivers (variable COGS %, delivery, cloud, support) come
+    from sector profiles and are calibrated for a specific price point. Applied
+    unchanged to an out-of-profile price (e.g. a ¥90k/unit hardware delivery
+    cost on a ¥12k SaaS seat) they produce nonsense gross margins.
+
+    This governor rescales the four cost components by one per-period factor so
+    that total COGS lands on (1 - target gross margin) x revenue, using the same
+    revenue and COGS arithmetic as the workbook formulas. Scaling all four
+    proportionally preserves the profile's intended cost *mix* while fixing its
+    *level*; each component still reads as an honest decomposition of COGS.
+    """
+    ending = ending_units(new_units)
+    average = average_units(ending)
+    vc_out: list[float] = []
+    delivery_out: list[int] = []
+    cloud_out: list[int] = []
+    support_out: list[int] = []
+    for idx in range(len(target_gross_margin)):
+        transaction = gmv_yen[idx] * take_rate[idx]
+        recurring = average[idx] * monthly_price_yen[idx] * 12
+        one_time = new_units[idx] * monthly_price_yen[idx] * 3
+        subtotal = transaction + recurring + one_time
+        revenue = subtotal * (1.0 + other_revenue_share[idx])
+        variable = revenue * variable_cogs_pct[idx]
+        delivery = average[idx] * delivery_cost_yen[idx] * 12
+        cloud = average[idx] * cloud_cost_yen[idx] * 12
+        support = customers[idx] * support_cost_yen[idx] * 12
+        base_cogs = variable + delivery + cloud + support
+        gross_margin = min(max(target_gross_margin[idx], 0.05), 0.95)
+        target_cogs = (1.0 - gross_margin) * revenue
+        if revenue <= 0 or base_cogs <= 0:
+            vc_out.append(variable_cogs_pct[idx])
+            delivery_out.append(delivery_cost_yen[idx])
+            cloud_out.append(cloud_cost_yen[idx])
+            support_out.append(support_cost_yen[idx])
+            continue
+        scale = target_cogs / base_cogs
+        vc_out.append(round(variable_cogs_pct[idx] * scale, 6))
+        delivery_out.append(int(round(delivery_cost_yen[idx] * scale)))
+        cloud_out.append(int(round(cloud_cost_yen[idx] * scale)))
+        support_out.append(int(round(support_cost_yen[idx] * scale)))
+    return vc_out, delivery_out, cloud_out, support_out
+
+
 def extract_source_facts(source_md: Path) -> SourceFacts:
     return derive_source_facts(read_source(source_md))
 
@@ -864,6 +1065,10 @@ def derive_source_facts(text: str) -> SourceFacts:
     if profile.key != "marketplace":
         take = 0.0
 
+    new_units, retargeted_customers = retarget_demand_to_narrative(
+        text, profile, new_units, price, periods
+    )
+
     if profile.key != "marketplace":
         gmv = [units * price * 12 for units in ending_units(new_units)]
 
@@ -872,7 +1077,7 @@ def derive_source_facts(text: str) -> SourceFacts:
     gmv = _pad_series(gmv, periods, 0)
     monthly_price = _price_series(price, periods)
     take_rate = _take_rate_series(take, periods)
-    customers = _pad_series(profile.customers, periods, 0)
+    customers = _pad_series(retargeted_customers, periods, 0)
     variable_cogs_pct = _pad_series(profile.variable_cogs_pct, periods, 0.30)
     capex_per_unit = _pad_series(profile.capex_per_unit_yen, periods, 0)
     tam = max(profile.tam_yen, gmv[-1] * 10 if profile.key == "marketplace" else profile.tam_yen)
@@ -885,6 +1090,20 @@ def derive_source_facts(text: str) -> SourceFacts:
     delivery_cost = [int(value) for value in _curve(90_000 if profile.key != "marketplace" else 0, 32_000 if profile.key != "marketplace" else 0, periods)]
     cloud_cost = [int(value) for value in _curve(18_000, 26_000, periods)]
     support_cost = [int(value) for value in _curve(24_000, 16_000, periods)]
+    target_gross_margin = resolve_target_gross_margin(text, profile, periods)
+    variable_cogs_pct, delivery_cost, cloud_cost, support_cost = calibrate_cost_stack_to_gross_margin(
+        target_gross_margin,
+        new_units,
+        gmv,
+        monthly_price,
+        take_rate,
+        customers,
+        [float(value) for value in curves["other_revenue_share"]],
+        variable_cogs_pct,
+        delivery_cost,
+        cloud_cost,
+        support_cost,
+    )
     other_capex = [
         _round_to(
             max(
@@ -991,7 +1210,7 @@ def derive_source_facts(text: str) -> SourceFacts:
         incentive_pct_gmv=0.025 if profile.key == "marketplace" else 0.0,
         fraud_loss_pct_gmv=0.004 if profile.key == "marketplace" else 0.0,
         value_capture_share=[0.18 if profile.key == "marketplace" else 0.25 for _ in range(periods)],
-        target_gross_margin=[0.55 if profile.key == "hardware_asset_heavy" else 0.72 if profile.key == "recurring_software" else 0.60 for _ in range(periods)],
+        target_gross_margin=target_gross_margin,
         support_tickets_per_customer=[18 if profile.key == "hardware_asset_heavy" else 12 for _ in range(periods)],
         minutes_per_support_ticket=[45 if profile.key == "hardware_asset_heavy" else 25 for _ in range(periods)],
         support_fte_capacity_tickets=[5_000 if profile.key == "hardware_asset_heavy" else 7_500 for _ in range(periods)],
