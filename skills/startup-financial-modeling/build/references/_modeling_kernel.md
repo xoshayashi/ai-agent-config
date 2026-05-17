@@ -147,6 +147,12 @@ workbook tab is rendered:
 - Demand retargeting: a stated maturity ARR or customer count rescales the unit
   and customer ramps so the plan reaches its own headline scale. A plan that
   lands an order of magnitude short of its stated target is not investor-grade.
+- Funding-plan sizing: equity rounds are sized against a projected free cash
+  flow (the P&L / BS / CF chain replayed in the kernel), not a fixed coverage
+  ratio. Each round is topped up so projected ending cash clears a runway
+  buffer; a fundraise plan whose own cash goes negative is not investor-grade.
+  Rounds can legitimately be zero once the plan is self-funding, so downstream
+  surfaces must guard divisions by round size or post-money.
 - Conservative grain detection: the forecast architecture is annual (revenue,
   cost, and comp formulas annualize per period). Only an explicit monthly or
   quarterly *model* request flips the grain; metric phrases like `monthly burn`
