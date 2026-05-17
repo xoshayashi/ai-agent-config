@@ -1079,6 +1079,13 @@ def project_free_cash_flow(
     fixed heuristic. Equity financing is intentionally excluded — it does not
     feed operating cash flow (no interest-on-cash is modeled), which keeps
     round sizing a non-circular forward walk.
+
+    Depreciation deliberately mirrors the workbook P&L formula
+    (`Cost Build CapEx / life x 12`), which charges only the current period's
+    CapEx rather than a rolling asset base. This keeps the projection faithful
+    to the rendered workbook; it is also cash-flow neutral here because D&A is
+    added back in operating cash flow. A rolling depreciation schedule would be
+    a separate workbook-and-kernel change.
     """
     periods = len(revenue)
     out: list[dict] = []
