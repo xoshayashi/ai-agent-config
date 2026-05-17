@@ -18,14 +18,14 @@ or investor outputs.
 
 ## Routing Quick Map
 
-| Request signal | Default output shape | Required refs | Skip by default |
-|---|---|---|---|
-| pricing / ROI / willingness-to-pay | compact pricing model, assumption register, or validation plan | `_output_modes.md`, `_generic_composition_protocol.md`, `_assumption_decomposition_patterns.md` | BS/CF/cap table unless explicitly needed |
-| cap table / SAFE / J-KISS / option pool / exit proceeds | cap-table state-machine workbook or ownership audit | `_output_modes.md`, `_valuation_and_return_logic.md`, `_self_review_protocol.md` | full P&L/BS/CF unless financing plan requires it |
-| runway / burn / lender plan | cash/runway model with downside and financing timing | `_output_modes.md`, `_scenario_sensitivity_playbook.md`, `_kpi_analytics.md` | valuation and IC memo unless requested |
-| market sizing / comps / benchmark | source-backed register or market-support workbook | `_benchmark_protocol.md`, `_output_modes.md` | static benchmark truth without refresh date |
-| fundraising / board / investor-ready model | integrated decision workbook | full finance reference stack | low-value tabs that fail sheet quality |
-| ambiguous memo or weak evidence | model spec, assumption register, DD questions | `_generic_composition_protocol.md`, `_assumption_decomposition_patterns.md` | xlsx generation until mechanics are clear |
+| Request signal                                          | Default output shape                                           | Required refs                                                                                   | Skip by default                                  |
+| ------------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------ |
+| pricing / ROI / willingness-to-pay                      | compact pricing model, assumption register, or validation plan | `_output_modes.md`, `_generic_composition_protocol.md`, `_assumption_decomposition_patterns.md` | BS/CF/cap table unless explicitly needed         |
+| cap table / SAFE / J-KISS / option pool / exit proceeds | cap-table state-machine workbook or ownership audit            | `_output_modes.md`, `_valuation_and_return_logic.md`, `_self_review_protocol.md`                | full P&L/BS/CF unless financing plan requires it |
+| runway / burn / lender plan                             | cash/runway model with downside and financing timing           | `_output_modes.md`, `_scenario_sensitivity_playbook.md`, `_kpi_analytics.md`                    | valuation and IC memo unless requested           |
+| market sizing / comps / benchmark                       | source-backed register or market-support workbook              | `_benchmark_protocol.md`, `_output_modes.md`                                                    | static benchmark truth without refresh date      |
+| fundraising / board / investor-ready model              | integrated decision workbook                                   | full finance reference stack                                                                    | low-value tabs that fail sheet quality           |
+| ambiguous memo or weak evidence                         | model spec, assumption register, DD questions                  | `_generic_composition_protocol.md`, `_assumption_decomposition_patterns.md`                     | xlsx generation until mechanics are clear        |
 
 ## Core Pattern
 

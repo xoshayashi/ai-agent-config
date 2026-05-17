@@ -8,12 +8,12 @@ notes to be read in Excel and Google Sheets.
 
 Every sheet follows the same reading rhythm:
 
-| Zone | Design intent |
-|---|---|
-| Title area | Row 2 in the first wide label/text column contains the sheet title; row 3 contains a short gray italic purpose line |
-| Header row | Row 5 anchors metadata columns and period/value columns |
-| Body | Each row has one role: section, line item, source/note, unit, value, or output |
-| Interpretation area | KPI, scenario, sensitivity, valuation, benchmark, and memo sheets include concise judgment rows |
+| Zone                | Design intent                                                                                                       |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| Title area          | Row 2 in the first wide label/text column contains the sheet title; row 3 contains a short gray italic purpose line |
+| Header row          | Row 5 anchors metadata columns and period/value columns                                                             |
+| Body                | Each row has one role: section, line item, source/note, unit, value, or output                                      |
+| Interpretation area | KPI, scenario, sensitivity, valuation, benchmark, and memo sheets include concise judgment rows                     |
 
 The first useful row should be visible without scrolling. The sheet should feel
 compact enough for repeated model review, with blank space used as breathing
@@ -23,15 +23,15 @@ room rather than as decoration.
 
 Use columns to express hierarchy and readability:
 
-| Column role | Width guide | Alignment |
-|---|---:|---|
-| A gutter | 3 | visual margin |
-| Hierarchy columns | 20px in Google Sheets (`2.14` xlsx width) | left |
-| Lowest-level line item | 54 or wider | left |
-| Source / driver | 54 or wider | left, gray italic |
-| Unit | 14 | right, gray |
-| Period / value | 16 | right for numbers, center only for period headers |
-| Notes / interpretation | 60-72 | left, gray italic |
+| Column role            |                               Width guide | Alignment                                         |
+| ---------------------- | ----------------------------------------: | ------------------------------------------------- |
+| A gutter               |                                         3 | visual margin                                     |
+| Hierarchy columns      | 20px in Google Sheets (`2.14` xlsx width) | left                                              |
+| Lowest-level line item |                               54 or wider | left                                              |
+| Source / driver        |                               54 or wider | left, gray italic                                 |
+| Unit                   |                                        14 | right, gray                                       |
+| Period / value         |                                        16 | right for numbers, center only for period headers |
+| Notes / interpretation |                                     60-72 | left, gray italic                                 |
 
 Long labels receive enough width in their role column or move to a dedicated
 notes / interpretation column. Adjacent cells that support text overflow remain
@@ -118,26 +118,26 @@ Before allowing any wrap exception, classify the text row:
 
 Use these tokens instead of inventing local formatting:
 
-| Token | Value | Use |
-|---|---|---|
-| Base font | Arial 10pt | All body cells and generated default workbook font |
-| Comment font | Arial 9pt italic gray `#666666` | Sources, notes, explanations, unit helpers |
-| Title font | Arial 14pt bold | Sheet title row |
-| Section font | Arial 10-11pt bold | Section or block labels |
-| Input font | Blue `#0000FF` | Typed assumptions and source facts |
-| Formula font | Black `#000000` | Same-sheet formulas and calculated values |
-| Internal link font | Green `#008000` | Cross-sheet formulas |
-| External link font | Red `#FF0000` | External file / URL references |
-| Header / label row fill | Light blue `#D9EAF7` | A row that names a model block, matrix, register, or period/value area |
-| Total/check band fill | Pale blue `#EAF2F8` | Totals and reconciliation rows when they need a band |
-| Section band fill | Navy `#1F3A66` | Block/section dividers across the attached block width |
-| Selected output fill | Pale yellow `#FFF9C4` | One chosen output/check/caution row |
-| Body row height | 15pt | Normal model rows |
-| Header row height | 18pt | Row 5 or compact header/label rows |
-| Section row height | 20-22pt | Section/block divider rows |
-| Wrapped exception height | 15pt x visible line count | User-approved wrap/manual-break exceptions only |
-| Money formats | Raw stored values with display formats | `円`, `千円`, `百万円`, `億円`, `$`, `$K`, `$M`; negatives show red and zeros may show dash |
-| Percent / multiple | `%`, `x` formats | Percentages right-aligned, multiples as `0.0x` / `0.00x` |
+| Token                    | Value                                  | Use                                                                                         |
+| ------------------------ | -------------------------------------- | ------------------------------------------------------------------------------------------- |
+| Base font                | Arial 10pt                             | All body cells and generated default workbook font                                          |
+| Comment font             | Arial 9pt italic gray `#666666`        | Sources, notes, explanations, unit helpers                                                  |
+| Title font               | Arial 14pt bold                        | Sheet title row                                                                             |
+| Section font             | Arial 10-11pt bold                     | Section or block labels                                                                     |
+| Input font               | Blue `#0000FF`                         | Typed assumptions and source facts                                                          |
+| Formula font             | Black `#000000`                        | Same-sheet formulas and calculated values                                                   |
+| Internal link font       | Green `#008000`                        | Cross-sheet formulas                                                                        |
+| External link font       | Red `#FF0000`                          | External file / URL references                                                              |
+| Header / label row fill  | Light blue `#D9EAF7`                   | A row that names a model block, matrix, register, or period/value area                      |
+| Total/check band fill    | Pale blue `#EAF2F8`                    | Totals and reconciliation rows when they need a band                                        |
+| Section band fill        | Navy `#1F3A66`                         | Block/section dividers across the attached block width                                      |
+| Selected output fill     | Pale yellow `#FFF9C4`                  | One chosen output/check/caution row                                                         |
+| Body row height          | 15pt                                   | Normal model rows                                                                           |
+| Header row height        | 18pt                                   | Row 5 or compact header/label rows                                                          |
+| Section row height       | 20-22pt                                | Section/block divider rows                                                                  |
+| Wrapped exception height | 15pt x visible line count              | User-approved wrap/manual-break exceptions only                                             |
+| Money formats            | Raw stored values with display formats | `円`, `千円`, `百万円`, `億円`, `$`, `$K`, `$M`; negatives show red and zeros may show dash |
+| Percent / multiple       | `%`, `x` formats                       | Percentages right-aligned, multiples as `0.0x` / `0.00x`                                    |
 
 The xlsx default font must also be Arial 10pt so newly inserted rows inherit
 the same look after the user opens the workbook.
@@ -172,17 +172,17 @@ size is a small hierarchy system, not a decorative palette:
 
 Color should help a reviewer understand the workbook faster:
 
-| Role | Treatment |
-|---|---|
-| Inputs | Blue font for typed assumptions and source facts |
-| Same-sheet formulas | Black font |
-| Cross-sheet formulas | Green font |
-| External links | Red font |
-| Sources / notes / units | Gray, with sources and notes in italic |
-| Header / label rows | Light blue fill with dark text |
-| Section labels | Navy band across the attached table/block width, compact and repeated |
-| Totals / checks / selected outputs | Pale blue or pale yellow fill on the selected semantic row |
-| Caution / placeholder | Pale yellow for a small number of decision-critical cells |
+| Role                               | Treatment                                                             |
+| ---------------------------------- | --------------------------------------------------------------------- |
+| Inputs                             | Blue font for typed assumptions and source facts                      |
+| Same-sheet formulas                | Black font                                                            |
+| Cross-sheet formulas               | Green font                                                            |
+| External links                     | Red font                                                              |
+| Sources / notes / units            | Gray, with sources and notes in italic                                |
+| Header / label rows                | Light blue fill with dark text                                        |
+| Section labels                     | Navy band across the attached table/block width, compact and repeated |
+| Totals / checks / selected outputs | Pale blue or pale yellow fill on the selected semantic row            |
+| Caution / placeholder              | Pale yellow for a small number of decision-critical cells             |
 
 The base grid stays white. Background fills are selective accents for major
 semantic moments only: section band, header/label row, selected output/check,

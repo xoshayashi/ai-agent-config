@@ -8,16 +8,16 @@ economics, evidence, maturity, and investor decision.
 
 For each valuation method, state whether it is primary, secondary, or excluded.
 
-| Method | Use when | Be careful when |
-|---|---|---|
-| Revenue multiple | growth and revenue quality are central | revenue is low quality, low margin, or non-recurring |
-| Gross-profit multiple | gross margin and cost-to-serve matter | COGS definitions are inconsistent |
-| EBITDA multiple | profitability is visible or late-private | EBITDA is immature or distorted by growth investment |
-| DCF | cash flows and terminal assumptions are explainable | far-future cash flows dominate the value |
-| SOTP | segments have different economics or risk | segment allocations are arbitrary |
-| M&A exit / proceeds | exit waterfall, founder proceeds, or acquirer view matters | control premium and buyer synergies are unsupported |
-| IPO support | late-private or pre-IPO readiness matters | public comps are not comparable or stale |
-| Venture return | financing decision depends on MOIC/IRR | ownership, liquidation preference, or dilution is incomplete |
+| Method                | Use when                                                   | Be careful when                                              |
+| --------------------- | ---------------------------------------------------------- | ------------------------------------------------------------ |
+| Revenue multiple      | growth and revenue quality are central                     | revenue is low quality, low margin, or non-recurring         |
+| Gross-profit multiple | gross margin and cost-to-serve matter                      | COGS definitions are inconsistent                            |
+| EBITDA multiple       | profitability is visible or late-private                   | EBITDA is immature or distorted by growth investment         |
+| DCF                   | cash flows and terminal assumptions are explainable        | far-future cash flows dominate the value                     |
+| SOTP                  | segments have different economics or risk                  | segment allocations are arbitrary                            |
+| M&A exit / proceeds   | exit waterfall, founder proceeds, or acquirer view matters | control premium and buyer synergies are unsupported          |
+| IPO support           | late-private or pre-IPO readiness matters                  | public comps are not comparable or stale                     |
+| Venture return        | financing decision depends on MOIC/IRR                     | ownership, liquidation preference, or dilution is incomplete |
 
 Do not include a method merely because it is available. Excluding a method with
 a short reason is better than averaging an irrelevant method.
