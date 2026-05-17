@@ -47,7 +47,6 @@ Entrypoints (`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`) route here. `DESIGN.md` 
 - Drive the loop on the environment's ground truth — test exit codes, build results, lint and type checks — and re-check it each iteration, not just at the end. Never weaken, delete, skip, or rewrite tests or acceptance checks to make a completion condition pass; meeting the bar means changing the code, not the check.
 - Mid-run, when you hit something unresolved — a missing credential, an undecided design branch, an irreversible operation, or the same failure repeating with a root cause outside the code — do not guess, do not use placeholder values, and do not silently skip it. Write the situation and the open question to a progress file, stop the loop cleanly, and hand control back.
 - Keep "complete", "needs human input", and "iteration limit reached" as distinct end states; report which one was reached and attach the supporting evidence.
-- Treat a lengthening run as a quality risk: keep the source of truth in progress files and git commits rather than the conversation, compact or restart context when it grows large, and keep each loop's scope narrow enough to finish before drift sets in.
 
 ## Coding Collaboration Defaults
 
