@@ -450,6 +450,8 @@ def _serialize_live_comp(comp: lc.PublicComp) -> dict[str, object]:
         "enterprise_value": comp.enterprise_value,
         "revenue_multiple": comp.revenue_multiple,
         "ebitda_multiple": comp.ebitda_multiple,
+        "gross_margin": comp.gross_margin,
+        "ebitda_margin": comp.ebitda_margin,
         "source_url": comp.source_url,
         "as_of_date": comp.as_of_date,
         "status": comp.status,
