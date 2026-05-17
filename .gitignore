@@ -24,6 +24,13 @@ gha-creds-*.json
 .claude/
 .codex/
 .gemini/
+.serena/
+# Keep only the repository-owned GitHub workflows; local templates/config stay untracked.
+.github/*
+!.github/
+!.github/workflows/
+!.github/workflows/claude-code-review.yml
+!.github/workflows/validate.yml
 
 # Local CLI-generated instruction entrypoints at repo root (canonical files live under instructions/)
 /CLAUDE.md

@@ -1262,7 +1262,7 @@ def build_cap_table_sheet(
     # Row 1-3: Header
     # ------------------------------------------------------------------
     ws["B1"] = inp.company_name + " — Cap Table"
-    ws["B1"].font = ib.FONT_SECTION
+    ws["B1"].font = ib.FONT_TITLE
     ws["B2"] = f"As of: {inp.as_of_date or 'current'}    Currency: {inp.reporting_currency} ({money_unit})"
     ws["B2"].font = ib.FONT_COMMENT
 

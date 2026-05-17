@@ -116,10 +116,13 @@ IB_CHART_COLORS_WATERFALL_TOTAL: str = "666666" # gray — totals/subtotals
 #     (Office Excel default の Calibri 11pt と混同しないこと)。`_layout_canonical
 #     §3.2` および `00_design_guidelines §2.2` で Arial 10pt を canonical 確定。
 #   - body / data           = 10pt
-#   - section header        = 11pt bold (`01a §5.1`)
+#   - section header        = 10-11pt bold (`01a §5.1`)
 #   - sheet title (B1)      = 14pt bold
 #   - period header         = 10pt bold italic
-#   - comment / footnote    = 9pt italic gray (#808080)
+#   - comment / footnote    = 9pt italic gray (#666666)
+#   - populated worksheet cells stay within 9/10/11/14pt. Do not use 8pt
+#     cells to squeeze content or 16pt+ presentation headings inside model
+#     grids; fix layout, width, or copy length instead.
 #   - 日本語混在は OS fallback に委譲 (Mac=ヒラギノ、Windows=Yu Gothic)、
 #     cell font 指定は Arial のまま (font_family を変えると Latin face が崩れる)。
 # Chart 内部 font (axis tick / title) は本 file の責務外。`apply_chart_palette`
@@ -131,6 +134,19 @@ FONT_SIZE_SMALL = 9        # comment / footnote / unit label
 FONT_SIZE_LARGE = 11       # section header
 FONT_SIZE_TITLE = 14       # cover title
 FONT_SIZE_TINY = 8         # chart axis tick (charts only — cells should not use this)
+FONT_SIZE_ALLOWED_CELLS: tuple[int, ...] = (
+    FONT_SIZE_SMALL,
+    FONT_SIZE_BASE,
+    FONT_SIZE_LARGE,
+    FONT_SIZE_TITLE,
+)
+FONT_SIZE_BEST_PRACTICE = (
+    "IB model cells use a constrained font-size palette: 9pt supporting "
+    "notes/sources/unit helpers, 10pt body/model cells, 11pt compact section "
+    "emphasis, and 14pt sheet titles only. Avoid 8pt worksheet cells, 16pt+ "
+    "presentation headings, and improvised local sizes; repair layout instead "
+    "of shrinking text."
+)
 
 FONT_BODY = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, color=IB_INK)
 FONT_BODY_BOLD = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, bold=True, color=IB_INK)
@@ -139,10 +155,42 @@ WRAP_TEXT_ERROR = (
     "startup-financial-modeling forbids wrap_text=True for generated workbook "
     "cells. Classify the cell role first: titles, instructions, notes, bullets, "
     "and source caveats with empty cells to the right should read horizontally "
-    "through blank overflow cells without merging. Use wider columns, dedicated "
-    "note columns, shorter rows, or blank overflow cells instead. If a "
-    "user-approved bounded-prose exception uses wrapping or manual line breaks, "
-    "set row height to the exact visible line count."
+    "through blank unstyled overflow cells without merging. Use wider columns, "
+    "dedicated note columns, shorter rows, or blank unstyled overflow cells "
+    "instead. If a user-approved bounded table prose exception uses wrapping "
+    "or manual line breaks, set row height to the exact rendered visible line "
+    "count."
+)
+WRAP_DECISION_LADDER: tuple[str, ...] = (
+    "shorten_or_split_copy",
+    "widen_role_column",
+    "reserve_blank_unstyled_overflow_cells",
+    "move_to_note_or_interpretation_surface",
+    "use_user_approved_bounded_prose_wrap_only",
+)
+WRAP_BEST_PRACTICE = (
+    "IB model cells keep wrap_text off by default. Horizontal-read titles, "
+    "instructions, notes, bullets, source caveats, and memo lines should read "
+    "through blank unstyled overflow cells without merging and must not be "
+    "trapped at the final print/render column. Wrapping or manual line breaks "
+    "are reserved for user-approved bounded table prose and require exact "
+    "rendered visible line-count row height."
+)
+
+ALIGN_LABEL = "left"
+ALIGN_SOURCE_NOTE = "left"
+ALIGN_VALUE = "right"
+ALIGN_UNIT = "right"
+ALIGN_PERIOD_HEADER = "center"
+ALIGN_VERTICAL_BODY = "center"
+
+ALIGNMENT_BEST_PRACTICE = (
+    "IB workbook alignment is role-based: labels, sources, notes, titles, "
+    "memos, and interpretation text are left-aligned; numeric values, "
+    "formulas, money, percentages, multiples, counts, and unit labels are "
+    "right-aligned; only period headers, short scenario/matrix headers, and "
+    "compact column headers are centered. Hierarchy uses dedicated columns, "
+    "not native Excel indent or leading spaces."
 )
 
 
@@ -418,7 +466,7 @@ FONT_GRAND_TOTAL = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, bold=True, color=
 FONT_COVER_TITLE = Font(name=FONT_FAMILY, size=FONT_SIZE_TITLE, bold=True, color="FFFFFF")
 
 # Public semantic aliases used by builder modules.
-FONT_SECTION = FONT_TITLE
+FONT_SECTION = FONT_SECTION_HEADER
 FONT_SUBSECTION = FONT_BODY_BOLD
 FONT_TOTAL = FONT_SUBTOTAL
 
@@ -615,7 +663,9 @@ def apply_hard_input(
     """
     cell.font = FONT_HARD_INPUT
     cell.number_format = fmt
-    cell.alignment = Alignment(horizontal="right", vertical="center", wrap_text=False)
+    cell.alignment = Alignment(
+        horizontal=ALIGN_VALUE, vertical=ALIGN_VERTICAL_BODY, wrap_text=False
+    )
 
 
 def apply_formula(
@@ -628,7 +678,9 @@ def apply_formula(
     """
     cell.font = FONT_FORMULA
     cell.number_format = fmt
-    cell.alignment = Alignment(horizontal="right", vertical="center", wrap_text=False)
+    cell.alignment = Alignment(
+        horizontal=ALIGN_VALUE, vertical=ALIGN_VERTICAL_BODY, wrap_text=False
+    )
 
 
 def apply_link_intra(
@@ -641,7 +693,9 @@ def apply_link_intra(
     """
     cell.font = FONT_LINK_INTRA
     cell.number_format = fmt
-    cell.alignment = Alignment(horizontal="right", vertical="center", wrap_text=False)
+    cell.alignment = Alignment(
+        horizontal=ALIGN_VALUE, vertical=ALIGN_VERTICAL_BODY, wrap_text=False
+    )
 
 
 def apply_link_external(
@@ -654,7 +708,9 @@ def apply_link_external(
     """
     cell.font = FONT_LINK_EXTERNAL
     cell.number_format = fmt
-    cell.alignment = Alignment(horizontal="right", vertical="center", wrap_text=False)
+    cell.alignment = Alignment(
+        horizontal=ALIGN_VALUE, vertical=ALIGN_VERTICAL_BODY, wrap_text=False
+    )
 
 
 def apply_label(cell, bold: bool = False, wrap_text: bool = False) -> None:
@@ -668,7 +724,7 @@ def apply_label(cell, bold: bool = False, wrap_text: bool = False) -> None:
     _ensure_no_wrap_text(wrap_text)
     cell.font = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, bold=bold, color=IB_INK)
     cell.alignment = Alignment(
-        horizontal="left", vertical="center", indent=0, wrap_text=False
+        horizontal=ALIGN_LABEL, vertical=ALIGN_VERTICAL_BODY, indent=0, wrap_text=False
     )
 
 
@@ -703,7 +759,9 @@ def write_hierarchical_line_item(
     cell = ws.cell(row=row, column=label_col)
     cell.value = label
     cell.font = Font(name=FONT_FAMILY, size=FONT_SIZE_BASE, bold=bold, color=IB_INK)
-    cell.alignment = Alignment(horizontal="left", vertical="center", wrap_text=False)
+    cell.alignment = Alignment(
+        horizontal=ALIGN_LABEL, vertical=ALIGN_VERTICAL_BODY, wrap_text=False
+    )
     return label_col
 
 
@@ -730,7 +788,7 @@ def apply_section_header(cell, label: str) -> None:
     cell.value = label
     cell.font = Font(name=FONT_FAMILY, size=FONT_SIZE_LARGE, bold=True, color=IB_INK)
     cell.alignment = Alignment(
-        horizontal="left", vertical="center", indent=0, wrap_text=False
+        horizontal=ALIGN_LABEL, vertical=ALIGN_VERTICAL_BODY, indent=0, wrap_text=False
     )
     # 上 thin border は呼び出し側で section row 全体に対し適用する
     # (apply_section_top_border helper を使用)
@@ -773,7 +831,7 @@ def apply_section_header_band(
         name=FONT_FAMILY, size=FONT_SIZE_LARGE, bold=True, color="FFFFFF"
     )
     band_align = Alignment(
-        horizontal="left", vertical="center", wrap_text=False
+        horizontal=ALIGN_LABEL, vertical=ALIGN_VERTICAL_BODY, wrap_text=False
     )
     head = ws.cell(row=row, column=start_col)
     apply_section_header(head, label)
@@ -794,7 +852,11 @@ def apply_year_header(cell, label: str) -> None:
     """期ヘッダ (Y1 / Q1 / Jan-26 等、italic + bold)."""
     cell.value = label
     cell.font = FONT_YEAR_HEADER
-    cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=False)
+    cell.alignment = Alignment(
+        horizontal=ALIGN_PERIOD_HEADER,
+        vertical=ALIGN_VERTICAL_BODY,
+        wrap_text=False,
+    )
 
 
 def apply_subtotal(
@@ -804,7 +866,9 @@ def apply_subtotal(
     """小計セル (top single border + bold)."""
     cell.font = FONT_TOTAL
     cell.number_format = fmt
-    cell.alignment = Alignment(horizontal="right", vertical="center", wrap_text=False)
+    cell.alignment = Alignment(
+        horizontal=ALIGN_VALUE, vertical=ALIGN_VERTICAL_BODY, wrap_text=False
+    )
     cell.border = BORDER_SUBTOTAL
 
 
@@ -815,7 +879,9 @@ def apply_grand_total(
     """合計セル (top thin + bottom medium + bold + total band)."""
     cell.font = FONT_TOTAL
     cell.number_format = fmt
-    cell.alignment = Alignment(horizontal="right", vertical="center", wrap_text=False)
+    cell.alignment = Alignment(
+        horizontal=ALIGN_VALUE, vertical=ALIGN_VERTICAL_BODY, wrap_text=False
+    )
     cell.border = BORDER_GRAND_TOTAL
     cell.fill = PatternFill("solid", fgColor=BG_TOTAL_BAND)
 
@@ -829,7 +895,7 @@ def apply_comment(cell, wrap_text: bool = False) -> None:
     _ensure_no_wrap_text(wrap_text)
     cell.font = FONT_COMMENT
     cell.alignment = Alignment(
-        horizontal="left", vertical="center", wrap_text=False
+        horizontal=ALIGN_SOURCE_NOTE, vertical=ALIGN_VERTICAL_BODY, wrap_text=False
     )
 
 
@@ -913,7 +979,7 @@ def apply_unit_label(cell, currency: str = "JPY", scale: str = "million") -> Non
     """
     cell.value = _UNIT_LABEL_MAP.get((currency, scale), "(単位: 不明)")
     cell.font = Font(name=FONT_FAMILY, size=FONT_SIZE_SMALL, italic=True, color=IB_COMMENT)
-    cell.alignment = Alignment(horizontal="right", vertical="center", wrap_text=False)
+    cell.alignment = Alignment(horizontal=ALIGN_UNIT, vertical=ALIGN_VERTICAL_BODY, wrap_text=False)
 
 
 # ----------------------------------------------------------------------------
@@ -1238,19 +1304,28 @@ def apply_wrapped_exception(
     cell: Cell,
     *,
     user_approved: bool,
+    bounded_prose: bool,
+    adjacent_cells_carry_meaning: bool,
     line_count: int | None = None,
 ) -> None:
-    """Apply the only sanctioned wrap path for bounded prose exceptions.
+    """Apply the only sanctioned wrap path for bounded table prose exceptions.
 
     Normal generated workbook cells must not use wrapping. Call this only after
-    the user has explicitly approved bounded prose that cannot read through
-    blank overflow cells. The helper sets wrapping and exact row height
-    together so the exception cannot clip text or create a loose padded row.
+    the user has explicitly approved bounded table prose that cannot read
+    through blank unstyled overflow cells because neighboring table cells carry
+    meaningful values, formulas, units, or notes. The helper sets wrapping and
+    exact row height together so the exception cannot clip text or create a
+    loose padded row.
     """
     if not user_approved:
         raise ValueError(
             "Wrapped prose exceptions require explicit user approval; use "
-            "blank overflow cells without merging for horizontal-read text."
+            "blank unstyled overflow cells without merging for horizontal-read text."
+        )
+    if not bounded_prose or not adjacent_cells_carry_meaning:
+        raise ValueError(
+            "Wrapped prose exceptions are only for bounded table prose whose "
+            "adjacent table cells carry meaningful values, formulas, units, or notes."
         )
     base = cell.alignment
     count = visible_text_line_count(cell.value) if line_count is None else max(1, int(line_count))
@@ -1388,7 +1463,12 @@ def write_cover(
     """
     if confidential:
         ws["F2"] = "CONFIDENTIAL"
-        ws["F2"].font = Font(name=FONT_FAMILY, size=FONT_SIZE_TINY, bold=True, color=BRAND_PRIMARY_DEEP)
+        ws["F2"].font = Font(
+            name=FONT_FAMILY,
+            size=FONT_SIZE_SMALL,
+            bold=True,
+            color=BRAND_PRIMARY_DEEP,
+        )
         ws["F2"].alignment = Alignment(horizontal="right")
 
     ws["B6"] = title
@@ -1591,13 +1671,19 @@ __all__ = [
     "IB_CHART_COLORS_WATERFALL_TOTAL",
     # Fonts (Arial 10pt 基準 — Google Sheets default + IB de facto standard)
     "FONT_FAMILY", "FONT_SIZE_BASE", "FONT_SIZE_SMALL", "FONT_SIZE_LARGE",
-    "FONT_SIZE_TITLE", "FONT_SIZE_TINY",
+    "FONT_SIZE_TITLE", "FONT_SIZE_TINY", "FONT_SIZE_ALLOWED_CELLS",
+    "FONT_SIZE_BEST_PRACTICE",
     "FONT_BODY", "FONT_BODY_BOLD", "FONT_HARD_INPUT", "FONT_FORMULA",
     "FONT_LINK_INTRA", "FONT_LINK_EXTERNAL",
     "FONT_COMMENT", "FONT_FOOTNOTE", "FONT_SECTION_HEADER", "FONT_TITLE",
     "FONT_YEAR_HEADER", "FONT_SUBTOTAL", "FONT_GRAND_TOTAL", "FONT_COVER_TITLE",
     # Font semantic aliases
     "FONT_SECTION", "FONT_SUBSECTION", "FONT_TOTAL",
+    # Alignment semantics
+    "ALIGN_LABEL", "ALIGN_SOURCE_NOTE", "ALIGN_VALUE", "ALIGN_UNIT",
+    "ALIGN_PERIOD_HEADER", "ALIGN_VERTICAL_BODY", "ALIGNMENT_BEST_PRACTICE",
+    # Wrap semantics
+    "WRAP_TEXT_ERROR", "WRAP_DECISION_LADDER", "WRAP_BEST_PRACTICE",
     # Number formats
     "FMT_JPY_YEN", "FMT_JPY_THOUSAND", "FMT_JPY_MILLION", "FMT_JPY_HUNDRED_MILLION",
     "FMT_USD_DOLLAR", "FMT_USD_THOUSAND", "FMT_USD_MILLION",

@@ -47,16 +47,40 @@ python3 skills/startup-financial-modeling/scripts/build_model.py \
   --mode <mode> --input model.yaml --output model_output.xlsx
 ```
 
-Keep the artifact as small as the decision allows and dependency-complete. If a
-focused sheet contains live formulas, include the upstream or downstream sheets
-needed to audit those formulas. If the user needs a standalone artifact, compose
-or rewire the logic as a compact spec or register so no remaining surface
-depends on omitted sheets. A pricing model may need customer ROI and
-contribution margin; a cap table may need option pool, secondary, tax, and
-financing round mechanics.
+Exact runtime mode values:
+
+| User wording | Mode value | Visible-surface target |
+|---|---|---|
+| full model / fundraising / board plan | `full` | Integrated decision workbook |
+| pricing / ROI / willingness-to-pay | `pricing` | Compact pricing workbook without P&L/BS/CF by default |
+| unit economics | `unit_economics` | KPI and scenario surfaces needed to audit economic unit |
+| cap table / SAFE / J-KISS / option pool | `cap_table` | Ownership state-machine workbook, not a full operating model |
+| M&A / exit | `ma_exit` | Proceeds, valuation, scenarios, sensitivity, memo |
+| DCF / valuation only | `dcf_only` | Valuation and sensitivity with required formula dependencies |
+| burn / runway | `burn_runway` | Cash, financing timing, runway, downside |
+| three-statement | `three_statement` | P&L, BS, CF with required dependencies |
+| market sizing | `market_sizing` | Market support and benchmark register |
+| comparables / comps | `comps_only` | Valuation, market support, benchmark register, memo |
+
+Keep the artifact as small as the decision allows, but never at the expense of
+formula completeness. Focused modes should include supporting sheets when a
+visible output needs them. If the choice is between a larger workbook and
+silently neutralized decision formulas, choose the larger workbook.
+
 Reject sheet exclusions that would leave remaining formulas pointing to missing
 sheets unless the dependent surfaces are also removed or rewired in the same
-pass.
+pass. When a user asks for an external-ready xlsx, run the strict audit path so
+omitted-sheet references and `#REF!` markers block handoff.
+The generator attempts public-market comparable refresh by default. Explicit
+tickers are an override, not a prerequisite; private-company, funding-round,
+transaction, market-report, customer, or internal benchmarks should be supplied
+through structured evidence fields and remain visible in the benchmark
+register. Failed retrieval remains visible and should feed the IC gate.
+Formula dependency is not the same as visible-sheet dependency, but formulas
+that remain in the artifact must be auditable. A pricing request can still
+include CF, valuation, or KPI support if those sheets are needed to preserve
+calculation lineage. A cap-table request should route to the ownership state
+machine unless the user also asks for an operating plan.
 
 Structured inputs should be accepted as first-class model facts, not only as
 free-text narrative. In particular, `currency`, `display_scale`, `grain`,
@@ -70,13 +94,13 @@ Use modes as output shapes, not templates:
 | Request | Candidate depth checks |
 |---|---|
 | pricing | customer ROI, cost-to-serve, selected price, support ratio, margin, sales cycle, risk, validation test |
-| unit economics | true economic unit, price, unit cost, margin, retention/utilization, payback, capacity, benchmark context |
-| burn / runway | cash roll-forward, burn drivers, financing timing, funding gap, runway breakpoint, downside case |
-| cap table | ownership by holder class, option pool, converts, warrants, secondary, dilution, proceeds, exit impact |
-| valuation | method credibility, method exclusions, scenario range, sensitivity, investor/founder return |
-| M&A / exit | exit EV, net debt, proceeds waterfall, investor MOIC/IRR, founder proceeds, tax/secondary if relevant |
-| market sizing | TAM/SAM/SOM method, source freshness, reachability, plan-to-market bridge, source gaps |
-| IC memo | recommendation, KPI readout, what must be true, downside triggers, DD questions, source boundary |
+| unit economics | true economic unit, price, unit cost, margin, retention/utilization, payback, capacity, benchmark context, cohort or channel gap |
+| burn / runway | cash roll-forward, burn drivers, financing timing, funding gap, runway breakpoint, milestone / covenant / facility gap |
+| cap table | ownership by holder class, option pool, converts, warrants, secondary, dilution, proceeds, exit impact, preference-stack caveats |
+| valuation | method credibility, method exclusions, selected range, supportability score, SOTP credibility, investor/founder return |
+| M&A / exit | exit EV, net debt, transaction costs, proceeds waterfall, preference floor, investor MOIC/IRR, founder proceeds, buyer-view caveats |
+| market sizing | TAM/SAM/SOM method, source freshness, reachability, bottom-up plan-to-market bridge, source gaps |
+| IC memo | recommendation, price/terms stance, KPI readout, what must be true, downside triggers, ranked DD gates, walk-away conditions, source boundary |
 
 These are not mandatory bundles. Select, substitute, or omit checks based on the
 user's decision, available evidence, and the selected driver tree. If a request

@@ -22,14 +22,20 @@ Label the evidence type. Do not blur management targets, benchmarks, and facts.
 
 Refresh or explicitly mark benchmark support as stale when:
 
-- pricing, valuation, interest rates, market size, public comps, or funding
-  terms are decision-critical;
+- pricing, valuation, interest rates, market size, comparable evidence, or
+  funding terms are decision-critical;
 - the source date is missing or older than the decision context warrants;
 - the user asks for investor-ready, board, lender, DD, or fundraising output;
 - a weak benchmark is the only support for a material assumption.
 
-When live research is not performed, label the benchmark as placeholder,
-estimate, or needs refresh.
+The workbook generator should attempt public-market comparable refresh by
+default for valuation-facing outputs. If the auto-selected public ticker set is
+not appropriate, override it with explicit ticker symbols. Private-company,
+funding-round, M&A, market-report, customer, and internal benchmarks should be
+accepted through structured evidence fields and kept in the same register with
+source date and applicability limits. If live retrieval fails, keep the failure
+in the Benchmarks sheet and mark the support as needing refresh rather than
+silently falling back to stale multiples.
 
 ## Applicability Check
 
@@ -68,3 +74,40 @@ When benchmarks or source facts are material, keep a compact register with:
 
 Do not create fake entries to make the register look complete. Empty evidence
 should remain visibly unresolved.
+
+## Comparable Evidence Coverage
+
+Do not hard-code the evidence universe to one market-data endpoint. Gather the
+widest relevant set that can be traced and caveated:
+
+- public traded comps from market data, filings, investor materials, and index
+  or sector datasets;
+- private-company comparables from funding rounds, post-money valuations,
+  reported ARR/revenue, credible data-room exports, databases, or press
+  releases;
+- precedent M&A transactions, tender offers, secondary transactions, and
+  strategic investments;
+- market reports, procurement benchmarks, customer ROI studies, pricing surveys,
+  and usage/cohort datasets;
+- internal contracts, pipeline, customer references, invoices, cohort exports,
+  and board-approved operating plans.
+
+For each comparable, capture company/target name, type, source type, source URL
+or file/owner, date or period, geography/stage, revenue or EBITDA multiple when
+available, and explicit applicability limits. Use medians as valuation support
+only when at least one comparable returns or provides a usable multiple. Treat
+private and transaction data as evidence that needs provenance, not as audited
+truth: identify whether the value is enterprise value, equity value, post-money,
+secondary price, or reported headline figure before comparing it to model EV.
+
+For public comps, still call out scale, listing liquidity, accounting policy,
+growth, profitability, and segment-mix differences. For private comps, call out
+round terms, liquidation preferences, security type, disclosure quality, stage,
+growth, margin, geography, and whether revenue/ARR is actual, run-rate, or
+management-reported.
+
+For pre-revenue or milestone companies, listed public peers are usually only a
+conservative fallback anchor. Treat them as a prompt to gather private funding
+rounds, milestone-triggered licensing deals, grants/non-dilutive financing,
+strategic investments, and precedent transactions before relying on a public
+multiple.
