@@ -1624,6 +1624,8 @@ def _build_valuation(wb: Workbook, facts: SourceFacts) -> None:
         (8, f"{facts.period_labels[-1]} gross profit", "JPY", f"='Cost Build'!{final_col}13"),
         (9, f"{facts.period_labels[-1]} EBITDA", "JPY", f"='P&L'!{final_col}18"),
         (10, "Discount rate", "%", facts.discount_rate),
+        # 0.85 = a 15% haircut on the exit value for illiquidity and execution
+        # risk; editable by the valuation committee.
         (11, "Exit value retention", "%", 0.85),
     ]
     for row, label, unit, formula in rows:
