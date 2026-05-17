@@ -245,6 +245,91 @@ def test_workbook_recalc_shows_no_insolvency() -> None:
             )
 
 
+def test_summarize_comps_aggregates_live_peer_margins() -> None:
+    """Peer operating-margin bands are derived from the live fetch, not constants."""
+    import live_comps as lc
+
+    comps = [
+        lc.PublicComp(
+            ticker=ticker, name=ticker, currency="USD", market_cap=1e11,
+            enterprise_value=1e11, revenue_multiple=8.0, ebitda_multiple=20.0,
+            source_url="x", as_of_date="2026-05-17", status="current",
+            gross_margin=gross, ebitda_margin=ebitda,
+        )
+        for ticker, gross, ebitda in [("A", 0.80, 0.25), ("B", 0.75, 0.20), ("C", 0.84, 0.30)]
+    ]
+    result = lc.summarize_comps(comps)
+    assert result.gross_margin_median == 0.80
+    assert result.gross_margin_low == 0.75
+    assert result.gross_margin_high == 0.84
+    assert result.ebitda_margin_median == 0.25
+
+
+def _saas_facts_with_peer_comps():
+    from dataclasses import replace
+
+    facts = kernel.derive_source_facts(SAAS_STORY)
+    return replace(
+        facts,
+        live_comps=[
+            {"ticker": "CRM", "name": "Salesforce", "status": "current",
+             "gross_margin": 0.77, "ebitda_margin": 0.30, "as_of_date": "2026-05-17",
+             "revenue_multiple": 6.0, "ebitda_multiple": 18.0, "company_type": "public",
+             "source_type": "public market data"},
+            {"ticker": "NOW", "name": "ServiceNow", "status": "current",
+             "gross_margin": 0.81, "ebitda_margin": 0.34, "as_of_date": "2026-05-17",
+             "revenue_multiple": 12.0, "ebitda_multiple": 28.0, "company_type": "public",
+             "source_type": "public market data"},
+        ],
+    )
+
+
+def test_kpi_sheet_compares_plan_kpis_to_live_peers() -> None:
+    """The KPI sheet juxtaposes plan KPIs with live-fetched peer margins."""
+    wb = source_plan.build_source_plan_workbook_from_facts(_saas_facts_with_peer_comps())
+    ws = wb["KPI"]
+    texts = [c.value for row in ws.iter_rows() for c in row if isinstance(c.value, str)]
+    assert any("live public peers" in t for t in texts), "peer comparison section missing"
+    # The peer median for the injected SaaS comps (0.77, 0.81) must appear live,
+    # not a hard-coded band.
+    numbers = [c.value for row in ws.iter_rows() for c in row if isinstance(c.value, (int, float))]
+    assert any(abs(n - 0.79) < 1e-6 for n in numbers), "live peer median not written"
+    # No cross-sheet reference: the block must survive focused-bundle pruning.
+    section_rows = [
+        c.row for row in ws.iter_rows() for c in row
+        if isinstance(c.value, str) and "live public peers" in c.value
+    ]
+    formulas = [
+        c.value for row in ws.iter_rows() for c in row
+        if c.row > section_rows[0] and isinstance(c.value, str) and c.value.startswith("=")
+    ]
+    assert formulas, "peer comparison has no live formula"
+    assert all("!" not in f for f in formulas), "peer block leaks a cross-sheet reference"
+
+
+def test_peer_comparison_status_recalculates_without_error() -> None:
+    """The plan-vs-peer status formula must resolve cleanly when recalculated."""
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        pytest.skip("soffice/libreoffice not available")
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "peers.xlsx"
+        source_plan.build_source_plan_workbook_from_facts(_saas_facts_with_peer_comps()).save(out)
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(Path(tmp) / "recalc"), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        wb = load_workbook(Path(tmp) / "recalc" / "peers.xlsx", data_only=True)
+        ws = wb["KPI"]
+        statuses = {"below", "above", "within"}
+        found = [
+            c.value for row in ws.iter_rows() for c in row
+            if isinstance(c.value, str) and c.value in statuses
+        ]
+        assert found, "no resolved plan-vs-peer status found on the KPI sheet"
+
+
 def test_archetype_workbooks_pass_strict_audit() -> None:
     """Each archetype builds end to end and clears the strict audit gate."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -304,6 +389,9 @@ if __name__ == "__main__":
         test_funding_plan_keeps_the_company_solvent,
         test_seed_round_is_positive_across_archetypes,
         test_workbook_recalc_shows_no_insolvency,
+        test_summarize_comps_aggregates_live_peer_margins,
+        test_kpi_sheet_compares_plan_kpis_to_live_peers,
+        test_peer_comparison_status_recalculates_without_error,
         test_archetype_workbooks_pass_strict_audit,
         test_workbook_recalc_reconciles_with_kernel_gross_margin,
     ]
