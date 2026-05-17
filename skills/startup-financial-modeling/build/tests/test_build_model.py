@@ -759,6 +759,33 @@ def test_all_modes_produce_expected_bundles() -> None:
                 assert ws.freeze_panes is None
 
 
+def test_strict_audit_blocks_workbook_design_regressions() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "full.xlsx"
+        build_model.build_model(None, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+        assert build_model.audit_workbook(wb) == []
+
+        ws = wb["Guide"]
+        ws.freeze_panes = "C6"
+        ws.merge_cells("K1:L1")
+        # B10 holds "Workbook map" in the generated Guide sheet.
+        ws["B10"].value = "Removed marker"
+        ws["B7"].alignment = Alignment(wrap_text=True)
+        ws["B7"].font = Font(name=ib.FONT_FAMILY, size=16)
+        ws["K2"].value = "manual\nline break"
+        wb["P&L"]["F7"].alignment = Alignment(horizontal="left")
+
+        issues = build_model.audit_workbook(wb)
+        assert any("Guide has frozen panes" in issue for issue in issues)
+        assert any("Guide has merged cell range" in issue for issue in issues)
+        assert any("Guide is missing sheet-quality marker" in issue and "Workbook map" in issue for issue in issues)
+        assert any("B7 has wrap_text enabled" in issue for issue in issues)
+        assert any("B7 uses non-standard font size" in issue for issue in issues)
+        assert any("K2 contains a manual line break" in issue for issue in issues)
+        assert any("P&L!F7 numeric/formula cell is left" in issue for issue in issues)
+
+
 def test_generated_modes_do_not_reference_removed_sheets() -> None:
     sheet_ref = re.compile(r"'([^']+)'!")
     with tempfile.TemporaryDirectory() as tmp:
@@ -1760,7 +1787,7 @@ def _font_design_violations(wb) -> list[str]:
 def _semantic_alignment_violations(wb) -> list[str]:
     violations = []
     for ws in wb.worksheets:
-        if not source_plan._uses_default_layout(ws):
+        if not source_plan.uses_default_layout(ws):
             continue
         for row in ws.iter_rows():
             for cell in row:
@@ -2843,7 +2870,7 @@ def test_added_hierarchy_columns_use_google_sheets_20px_width() -> None:
         assert ws.cell(5, source_plan.LAYOUT.source_col).value == "Source / driver"
         assert ws.cell(5, source_plan.LAYOUT.unit_col).value == "Unit"
         assert ws.cell(5, source_plan.LAYOUT.first_value_col).value == facts.period_labels[0]
-        assert source_plan._uses_default_layout(ws) is True
+        assert source_plan.uses_default_layout(ws) is True
         assert ws.freeze_panes is None
     finally:
         source_plan.LAYOUT = original_layout
@@ -2937,6 +2964,7 @@ if __name__ == "__main__":
     test_cap_table_sheet_uses_canonical_design_surface()
     test_ib_helpers_reject_wrap_text_true()
     test_runtime_builders_do_not_use_wrap_or_merge_layout_shortcuts()
+    test_strict_audit_blocks_workbook_design_regressions()
     test_skill_guidance_makes_no_wrap_rule_explicit()
     test_skill_guidance_requires_fix_and_rerun_iteration()
     test_skill_guidance_uses_meaningful_sparse_fills_and_borders()
