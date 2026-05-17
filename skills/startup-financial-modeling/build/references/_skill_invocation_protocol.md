@@ -192,9 +192,8 @@ driver, not from a fixed template. Labor / HR comps support hiring and
 productivity, venture equity / funding comps support round feasibility and
 valuation, venture debt / non-dilutive capacity supports runway and dilution,
 pricing / customer ROI comps support monetization, and market / competitive
-benchmarks support reachability. Lease-specific evidence is optional and only
-needed when asset financing or lease terms are explicitly decision-critical.
-Use a compact register or support sheet only when the lens changes the decision.
+benchmarks support reachability. Use a compact register or support sheet only
+when the lens changes the decision.
 
 ```yaml
 live_comps: [CRM, NOW]
