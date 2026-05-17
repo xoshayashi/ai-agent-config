@@ -1565,6 +1565,14 @@ def _build_sensitivity(wb: Workbook, facts: SourceFacts) -> None:
     _section(ws, 15, "Founder ownership — valuation x round size")
     values = [0.70, 0.85, 1.00, 1.20, 1.45]
     rounds = [0.75, 0.90, 1.00, 1.15, 1.35]
+    # Anchor the dilution sensitivity on the latest period that carries an
+    # actual equity round; rounds can be zero in mature periods once the plan
+    # is self-funding, and post-money there is zero.
+    round_idx = max(
+        (idx for idx, value in enumerate(facts.equity_raise_yen) if value > 0),
+        default=0,
+    )
+    round_col = get_column_letter(_start_period_col() + round_idx)
     _label(ws, 17, "Valuation scale", "x")
     _label(ws, 18, "Round size scale", "x")
     for idx, value in zip(matrix_cols, values):
@@ -1575,7 +1583,7 @@ def _build_sensitivity(wb: Workbook, facts: SourceFacts) -> None:
         ib.apply_hard_input(ws.cell(r, _start_period_col() - 1), ib.FMT_MULTIPLE)
         for c in matrix_cols:
             col = get_column_letter(c)
-            ws.cell(r, c, f"='Ownership'!{final_col}7*(1-('Capital Stack'!{final_col}7*${row_axis_col}{r})/('Capital Stack'!{final_col}15*{col}$17))")
+            ws.cell(r, c, f"='Ownership'!{round_col}7*(1-IF('Capital Stack'!{round_col}15=0,0,('Capital Stack'!{round_col}7*${row_axis_col}{r})/('Capital Stack'!{round_col}15*{col}$17)))")
             _apply_value_style(ws.cell(r, c), ib.FMT_PERCENT)
     ib.apply_heatmap_3color(ws, f"{get_column_letter(matrix_cols[0])}18:{get_column_letter(matrix_cols[-1])}22")
     start_col = LAYOUT.label_col
