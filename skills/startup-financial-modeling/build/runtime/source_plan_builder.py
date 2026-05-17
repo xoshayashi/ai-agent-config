@@ -546,7 +546,7 @@ def _is_highlight_row(ws: Worksheet, row: int) -> bool:
     return fill.fill_type == "solid" and isinstance(value, str) and value.endswith(ib.BG_WORKING)
 
 
-def _uses_default_layout(ws: Worksheet) -> bool:
+def uses_default_layout(ws: Worksheet) -> bool:
     hierarchy_values = [
         ws.cell(row=5, column=col).value
         for col in range(LAYOUT.first_hierarchy_col, LAYOUT.label_col)
@@ -577,7 +577,7 @@ def _row_rule_start_col(ws: Worksheet) -> int:
 def _apply_design_surface(wb: Workbook) -> None:
     header_row_fill = PatternFill("solid", fgColor=ib.BG_TABLE_HEADER)
     for ws in wb.worksheets:
-        uses_default_layout = _uses_default_layout(ws)
+        default_layout = uses_default_layout(ws)
         max_col = max(ws.max_column, 9)
         max_row = max(ws.max_row, 5)
         ws.freeze_panes = None
@@ -599,11 +599,11 @@ def _apply_design_surface(wb: Workbook) -> None:
                     cell.fill = header_row_fill
                     if col >= LAYOUT.label_col:
                         cell.border = _merge_border(cell.border, bottom=ib.THIN_LINE)
-                if uses_default_layout and col == LAYOUT.source_col and row != 5:
+                if default_layout and col == LAYOUT.source_col and row != 5:
                     ib.apply_comment(cell, wrap_text=False)
-                elif uses_default_layout and col == LAYOUT.unit_col and row != 5:
+                elif default_layout and col == LAYOUT.unit_col and row != 5:
                     _apply_unit_cell(cell)
-                elif uses_default_layout and col in (LAYOUT.first_hierarchy_col, LAYOUT.label_col) and row != 5:
+                elif default_layout and col in (LAYOUT.first_hierarchy_col, LAYOUT.label_col) and row != 5:
                     ib.apply_label(cell, bold=cell.font.bold is True)
 
 def _apply_value_style(cell, fmt: str) -> None:

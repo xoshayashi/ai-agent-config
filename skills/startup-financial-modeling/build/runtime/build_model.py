@@ -80,6 +80,7 @@ SHEET_DEPENDENCIES: dict[str, list[str]] = {
     "BS": ["Assumptions", "Revenue Build", "Cost Build", "P&L", "CF", "Capital Stack", "Financing"],
     "CF": ["Assumptions", "Cost Build", "P&L", "BS", "Capital Stack", "Financing"],
     "Capital Stack": ["CF", "Revenue Build", "Financing"],
+    # Empty by design: pure data sheet; the cap-table route replaces it with state-machine rows.
     "Ownership": [],
     "Pricing": ["Assumptions"],
     "Financing": ["Capital Stack", "Scenarios"],
@@ -235,20 +236,137 @@ def _neutralize_removed_sheet_references(wb: Any) -> int:
     return touched
 
 
-def audit_workbook(wb: Any) -> list[str]:
-    """Return generation issues that should block an IB-ready handoff."""
+REQUIRED_SHEET_MARKERS: dict[str, list[str]] = {
+    "Guide": ["Purpose", "Workbook map", "Sheet-level acceptance criteria"],
+    "Kernel": ["Decision", "Model grain", "Mechanics", "Unknowns"],
+    "Assumptions": ["Volume and demand", "Revenue adjuncts", "Unit cost and delivery"],
+    "Driver Tree": ["Demand", "Monetization", "Delivery", "Value"],
+    "Revenue Build": ["Revenue drivers", "Revenue streams"],
+    "Cost Build": ["Gross profit bridge", "Gross margin"],
+    "People Plan": ["Total headcount", "Revenue / FTE"],
+    "P&L": ["Total revenue", "EBITDA", "Net income"],
+    "BS": ["Total assets", "Balance check"],
+    "CF": ["Operating cash flow", "Ending cash", "Free cash flow"],
+    "Capital Stack": ["Runway", "New investor ownership", "Debt / revenue"],
+    # Empty by design: pure data sheet; no prose section markers are required.
+    "Ownership": [],
+    "Pricing": ["Customer ROI / year", "Pricing validation plan"],
+    "Financing": ["Financing cash inflow", "Downside funding gap"],
+    "Exit Waterfall": ["Buyer-view M&A bridge", "Preference floor", "Walk-away signal"],
+    "Segments": ["Segment revenue", "EBITDA proxy", "Segment EV"],
+    "KPI": ["KPI interpretation register", "Evidence coverage"],
+    "Scenarios": ["Scenario interpretation", "DD action"],
+    "Sensitivity": ["Sensitivity rationale", "Decision implication"],
+    "Valuation": ["Method credibility", "Selected EV midpoint", "Valuation committee gates"],
+    "Market Support": ["Source anchors", "TAM / SAM / SOM bridge"],
+    # The generator intentionally emits the source-register key as a column header.
+    "Benchmarks": ["source_id", "Comparable evidence", "Refresh needed"],
+    "IC Memo": ["Recommendation", "KPI readout", "Ranked DD gates"],
+}
+
+
+def _defined_name_count(wb: Any) -> int:
+    count = len(wb.defined_names)
+    for ws in wb.worksheets:
+        count += len(ws.defined_names)
+    return count
+
+
+def _font_rgb(cell: Any) -> str | None:
+    color = cell.font.color
+    if color is None:
+        return None
+    rgb = getattr(color, "rgb", None)
+    return rgb[-6:].upper() if isinstance(rgb, str) else None
+
+
+def _sheet_values(ws: Any) -> set[str]:
+    return {
+        str(cell.value)
+        for row in ws.iter_rows()
+        for cell in row
+        if cell.value not in (None, "")
+    }
+
+
+def _audit_font_design(wb: Any) -> list[str]:
     issues: list[str] = []
-    available = set(wb.sheetnames)
+    allowed_sizes = {float(size) for size in ibf.FONT_SIZE_ALLOWED_CELLS}
     for ws in wb.worksheets:
         for row in ws.iter_rows():
             for cell in row:
+                if cell.value is None:
+                    continue
+                if cell.font.name is not None and cell.font.name != ibf.FONT_FAMILY:
+                    issues.append(f"{ws.title}!{cell.coordinate} uses non-standard font {cell.font.name}")
+                if cell.font.sz is not None and float(cell.font.sz) not in allowed_sizes:
+                    issues.append(f"{ws.title}!{cell.coordinate} uses non-standard font size {cell.font.sz}")
+    return issues
+
+
+def _audit_semantic_alignment(wb: Any) -> list[str]:
+    issues: list[str] = []
+    for ws in wb.worksheets:
+        if not spb.uses_default_layout(ws):
+            continue
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.value is None:
+                    continue
+                alignment = cell.alignment
+                horizontal = alignment.horizontal
+                indent = getattr(alignment, "indent", 0)
+                if cell.row == 5 and cell.column >= spb.LAYOUT.first_value_col and horizontal not in (None, "center"):
+                    issues.append(f"{ws.title}!{cell.coordinate} period/header cell is {horizontal}, expected center")
+                elif cell.row != 5 and cell.column == spb.LAYOUT.source_col:
+                    rgb = _font_rgb(cell)
+                    if horizontal not in (None, "left") or not cell.font.italic or (rgb is not None and rgb != ibf.IB_COMMENT):
+                        issues.append(f"{ws.title}!{cell.coordinate} source cell alignment/font is non-standard")
+                elif cell.row != 5 and cell.column == spb.LAYOUT.unit_col:
+                    rgb = _font_rgb(cell)
+                    if horizontal not in (None, "right") or (rgb is not None and rgb != ibf.IB_COMMENT):
+                        issues.append(f"{ws.title}!{cell.coordinate} unit cell alignment/font is non-standard")
+                elif cell.row != 5 and cell.column in (spb.LAYOUT.first_hierarchy_col, spb.LAYOUT.label_col):
+                    if horizontal not in (None, "left") or indent:
+                        issues.append(f"{ws.title}!{cell.coordinate} label cell is {horizontal} indent={indent}, expected left/no indent")
+                elif cell.row != 5 and cell.column >= spb.LAYOUT.first_value_col:
+                    value = cell.value
+                    if isinstance(value, (int, float)) or (isinstance(value, str) and value.startswith("=")):
+                        if horizontal not in (None, "right"):
+                            issues.append(f"{ws.title}!{cell.coordinate} numeric/formula cell is {horizontal}, expected right")
+    return issues
+
+
+def audit_workbook(wb: Any) -> list[str]:
+    """Return generation issues that should block an investor-ready handoff."""
+    issues: list[str] = []
+    available = set(wb.sheetnames)
+    if _defined_name_count(wb):
+        issues.append("workbook must not contain workbook-scoped or sheet-scoped defined names")
+    for ws in wb.worksheets:
+        if ws.freeze_panes is not None:
+            issues.append(f"{ws.title} has frozen panes")
+        if ws.merged_cells.ranges:
+            issues.append(f"{ws.title} has merged cell range(s): {', '.join(str(rng) for rng in ws.merged_cells.ranges)}")
+        sheet_values = _sheet_values(ws)
+        missing_markers = [marker for marker in REQUIRED_SHEET_MARKERS.get(ws.title, []) if marker not in sheet_values]
+        if missing_markers:
+            issues.append(f"{ws.title} is missing sheet-quality marker(s): {', '.join(missing_markers)}")
+        for row in ws.iter_rows():
+            for cell in row:
                 value = cell.value
+                if cell.alignment is not None and cell.alignment.wrap_text is True:
+                    issues.append(f"{ws.title}!{cell.coordinate} has wrap_text enabled")
+                if isinstance(value, str) and "\n" in value:
+                    issues.append(f"{ws.title}!{cell.coordinate} contains a manual line break")
                 if isinstance(value, str) and value.startswith("="):
                     missing = sorted(set(_SHEET_REF_RE.findall(value)) - available)
                     if missing:
                         issues.append(f"{ws.title}!{cell.coordinate} references omitted sheet(s): {', '.join(missing)}")
                 if isinstance(value, str) and "#REF!" in value:
                     issues.append(f"{ws.title}!{cell.coordinate} contains #REF!")
+    issues.extend(_audit_font_design(wb))
+    issues.extend(_audit_semantic_alignment(wb))
     return issues
 
 
@@ -524,7 +642,10 @@ def _main(argv: list[str] | None = None) -> int:
     )
     ap.add_argument(
         "--strict-audit", action="store_true",
-        help="Reopen the generated workbook and fail if omitted-sheet refs or #REF! markers remain.",
+        help=(
+            "Reopen the generated workbook and fail on broken references, "
+            "missing sheet-quality markers, or IB workbook design violations."
+        ),
     )
     ap.add_argument(
         "--live-comps", nargs="*", default=[], metavar="TICKER",

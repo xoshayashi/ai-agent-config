@@ -81,10 +81,13 @@ heavy process.
   units, customers, count, FTE, days, months, percentages, and multiples keep
   their native non-money formats and formulas.
 - For generator-produced xlsx files, run `--strict-audit` or the equivalent
-  workbook audit before claiming readiness. Omitted-sheet formulas should be
-  absent because focused outputs include the support sheets needed for live
-  formulas. Compact-mode placeholders are acceptable only for non-decision
-  helper cells and must preserve the original formula for audit.
+  workbook audit before claiming readiness. Strict audit blocks broken sheet
+  references, `#REF!`, missing sheet-quality markers, merged cells, frozen
+  panes, generated wrapping/manual line breaks, non-standard fonts, and
+  semantic alignment regressions. Omitted-sheet formulas should be absent
+  because focused outputs include the support sheets needed for live formulas.
+  Compact-mode placeholders are acceptable only for non-decision helper cells
+  and must preserve the original formula for audit.
 - Verify that the workbook renders with readable columns, visible overflow
   where intended, compact row rhythm, semantic fills, no frozen panes,
   source / unit alignment, and calm accent usage.
