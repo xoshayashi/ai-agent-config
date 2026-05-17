@@ -193,6 +193,9 @@ def _display_unit(unit: str, fmt: str | None = None, currency: str = "JPY", scal
 
 
 def _normalise_formula_scale(formula: str) -> str:
+    # Source inputs most often arrive pre-divided for million-scale display.
+    # Thousand-scale money rows should carry the correct number_format via
+    # _format_for_unit instead of formula rewriting.
     return formula.replace("/1000000", "").replace("*1000000", "")
 
 
@@ -240,6 +243,12 @@ def _format_for_unit(unit: str, requested_fmt: str, facts: SourceFacts | None = 
             if requested_fmt == ib.FMT_JPY_THOUSAND:
                 return ib.fmt_for_currency(facts.currency, "thousand")
         return requested_fmt
+    if unit == "JPY K":
+        return ib.FMT_JPY_THOUSAND
+    if unit == "JPY M":
+        return ib.FMT_JPY_MILLION
+    if unit in {"JPY B", "JPY T"}:
+        return ib.FMT_JPY_HUNDRED_MILLION
     if unit == "USD":
         if requested_fmt in {ib.FMT_MONEY, ib.FMT_USD_MILLION}:
             return ib.FMT_USD_MILLION

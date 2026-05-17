@@ -2140,6 +2140,8 @@ def test_non_money_units_keep_their_own_formats_and_formulas() -> None:
     assert source_plan._model_value("=A1/1000000", "months") == "=A1/1000000"
     assert source_plan._model_value("=A1/1000000", "JPY") == "=A1"
     assert source_plan._model_value("=A1/1000000", "USD") == "=A1"
+    assert source_plan._model_value("=A1/1000", "JPY K") == "=A1/1000"
+    assert source_plan._model_value("=A1/1000", "USD K") == "=A1/1000"
     assert source_plan._model_value(12, "units") == 12
     assert source_plan._model_value(12, "customers") == 12
     assert source_plan._model_value(12, "JPY M") == 12_000_000
@@ -2153,6 +2155,9 @@ def test_non_money_units_keep_their_own_formats_and_formulas() -> None:
     assert source_plan._format_for_unit("months", ib.FMT_MONEY) == ib.FMT_NUM
     assert source_plan._format_for_unit("%", ib.FMT_MONEY) == ib.FMT_PERCENT
     assert source_plan._format_for_unit("x", ib.FMT_MONEY) == ib.FMT_MULTIPLE
+    assert source_plan._format_for_unit("JPY K", ib.FMT_MONEY) == ib.FMT_JPY_THOUSAND
+    assert source_plan._format_for_unit("JPY M", ib.FMT_MONEY) == ib.FMT_JPY_MILLION
+    assert source_plan._format_for_unit("JPY B", ib.FMT_MONEY) == ib.FMT_JPY_HUNDRED_MILLION
     assert source_plan._format_for_unit("USD", ib.FMT_MONEY) == ib.FMT_USD_MILLION
     assert source_plan._format_for_unit("USD K", ib.FMT_MONEY) == ib.FMT_USD_THOUSAND
     assert source_plan._format_for_unit("USD M", ib.FMT_MONEY) == ib.FMT_USD_MILLION
