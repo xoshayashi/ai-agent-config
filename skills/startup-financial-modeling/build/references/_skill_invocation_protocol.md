@@ -175,7 +175,9 @@ recalculation is blocked, document the blocker and still run workbook
 inspection commands.
 Use the generator's strict audit option when producing an xlsx for handoff:
 `python build_model.py --source-md input.md --output model.xlsx --strict-audit`.
-It should fail if omitted-sheet references or `#REF!` markers remain.
+It should fail if omitted-sheet references, `#REF!` markers, missing
+sheet-quality markers, merged cells, frozen panes, generated wrapping/manual
+line breaks, non-standard fonts, or semantic alignment regressions remain.
 The generator attempts public-market comparable refresh by default and records
 current multiples, provided comparable evidence, or retrieval failures in the
 Benchmarks sheet. Override the auto-selected public ticker set only when the
