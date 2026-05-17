@@ -177,6 +177,20 @@ def test_customer_count_reaches_stated_target() -> None:
     )
 
 
+def test_marketplace_gmv_honors_stated_maturity_target() -> None:
+    """A marketplace story's stated maturity GMV must anchor the GMV ramp.
+
+    The marketplace narrative states ¥120億 GMV at maturity. The ramp must land
+    on that figure, not treat it as a period-0 base (which inflated it ~700x).
+    """
+    facts = kernel.derive_source_facts(MARKETPLACE_STORY)
+    target = 12_000_000_000
+    mature_gmv = facts.gmv_yen[-1]
+    assert 0.7 * target <= mature_gmv <= 1.5 * target, (
+        f"mature GMV ¥{mature_gmv:,.0f} is far from stated ¥{target:,.0f} target"
+    )
+
+
 def test_payroll_is_not_absurd_at_maturity() -> None:
     """Mature-period payroll must not dwarf revenue (a sign of grain mixups)."""
     for name, story in ARCHETYPES.items():
@@ -385,6 +399,7 @@ if __name__ == "__main__":
         test_explicit_monthly_model_request_is_still_detected,
         test_demand_ramp_reaches_stated_arr,
         test_customer_count_reaches_stated_target,
+        test_marketplace_gmv_honors_stated_maturity_target,
         test_payroll_is_not_absurd_at_maturity,
         test_funding_plan_keeps_the_company_solvent,
         test_seed_round_is_positive_across_archetypes,
