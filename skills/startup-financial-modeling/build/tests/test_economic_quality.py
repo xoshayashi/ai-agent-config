@@ -18,6 +18,7 @@ import sys
 import tempfile
 from pathlib import Path
 
+import pytest
 from openpyxl import load_workbook
 
 SKILL_DIR = Path(__file__).resolve().parents[2]
@@ -185,6 +186,65 @@ def test_payroll_is_not_absurd_at_maturity() -> None:
         assert ratio < 1.5, f"{name}: mature payroll/revenue ratio {ratio:.2f}"
 
 
+def test_funding_plan_keeps_the_company_solvent() -> None:
+    """The sized funding plan must keep projected ending cash non-negative.
+
+    A generated fundraise plan whose own cash goes negative is not
+    investor-grade: the equity rounds must be sized against the projected
+    free cash flow, not a fixed heuristic.
+    """
+    for name, story in ARCHETYPES.items():
+        facts = kernel.derive_source_facts(story)
+        projection = kernel.project_plan_free_cash_flow(facts)
+        for i, period in enumerate(projection):
+            assert period["ending_cash"] >= 0, (
+                f"{name} period {i}: insolvent, ending cash "
+                f"¥{period['ending_cash']:,.0f}"
+            )
+
+
+def test_seed_round_is_positive_across_archetypes() -> None:
+    """Period 0 must always carry a positive round (the current raise)."""
+    for name, story in ARCHETYPES.items():
+        facts = kernel.derive_source_facts(story)
+        assert facts.equity_raise_yen[0] > 0, f"{name}: no period-0 round"
+
+
+def test_workbook_recalc_shows_no_insolvency() -> None:
+    """The recalculated workbook must not go cash-negative in any period."""
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        pytest.skip("soffice/libreoffice not available")
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "saas.md"
+        out = Path(tmp) / "saas.xlsx"
+        src.write_text(SAAS_STORY, encoding="utf-8")
+        source_plan.build_source_plan_workbook(src, out)
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(Path(tmp) / "recalc"), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        wb = load_workbook(Path(tmp) / "recalc" / "saas.xlsx", data_only=True)
+        ws = wb["CF"]
+        first_col = source_plan.START_PERIOD_COL
+        facts = kernel.derive_source_facts(SAAS_STORY)
+        cash_row = next(
+            (cell.row for row in ws.iter_rows() for cell in row
+             if cell.value == "Ending cash"),
+            None,
+        )
+        assert cash_row is not None, "CF sheet missing 'Ending cash' row"
+        # Allow a small tolerance for kernel/workbook working-capital timing
+        # rounding; reject genuine insolvency.
+        tolerance = 0.02 * 3_500_000_000
+        for idx in range(len(facts.years)):
+            cash = ws.cell(cash_row, first_col + idx).value
+            assert cash is not None and float(cash) >= -tolerance, (
+                f"period {idx}: workbook ending cash ¥{cash:,.0f} is insolvent"
+            )
+
+
 def test_archetype_workbooks_pass_strict_audit() -> None:
     """Each archetype builds end to end and clears the strict audit gate."""
     with tempfile.TemporaryDirectory() as tmp:
@@ -202,8 +262,7 @@ def test_workbook_recalc_reconciles_with_kernel_gross_margin() -> None:
     """The recalculated workbook gross margin must match the kernel's intent."""
     soffice = shutil.which("soffice") or shutil.which("libreoffice")
     if soffice is None:
-        print("[skip] soffice/libreoffice not available")
-        return
+        pytest.skip("soffice/libreoffice not available")
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / "saas.md"
         out = Path(tmp) / "saas.xlsx"
@@ -217,11 +276,11 @@ def test_workbook_recalc_reconciles_with_kernel_gross_margin() -> None:
         wb = load_workbook(Path(tmp) / "recalc" / "saas.xlsx", data_only=True)
         ws = wb["Cost Build"]
         gm_row = next(
-            cell.row
-            for row in ws.iter_rows()
-            for cell in row
-            if cell.value == "Gross margin"
+            (cell.row for row in ws.iter_rows() for cell in row
+             if cell.value == "Gross margin"),
+            None,
         )
+        assert gm_row is not None, "Cost Build sheet missing 'Gross margin' row"
         first_col = source_plan.START_PERIOD_COL
         facts = kernel.derive_source_facts(SAAS_STORY)
         for idx in range(len(facts.years)):
@@ -234,13 +293,24 @@ def test_workbook_recalc_reconciles_with_kernel_gross_margin() -> None:
 
 
 if __name__ == "__main__":
-    test_gross_margin_tracks_target_across_archetypes()
-    test_stated_gross_margin_is_extracted_from_narrative()
-    test_monthly_burn_phrasing_does_not_flip_model_grain()
-    test_explicit_monthly_model_request_is_still_detected()
-    test_demand_ramp_reaches_stated_arr()
-    test_customer_count_reaches_stated_target()
-    test_payroll_is_not_absurd_at_maturity()
-    test_archetype_workbooks_pass_strict_audit()
-    test_workbook_recalc_reconciles_with_kernel_gross_margin()
-    print("ok")
+    _tests = [
+        test_gross_margin_tracks_target_across_archetypes,
+        test_stated_gross_margin_is_extracted_from_narrative,
+        test_monthly_burn_phrasing_does_not_flip_model_grain,
+        test_explicit_monthly_model_request_is_still_detected,
+        test_demand_ramp_reaches_stated_arr,
+        test_customer_count_reaches_stated_target,
+        test_payroll_is_not_absurd_at_maturity,
+        test_funding_plan_keeps_the_company_solvent,
+        test_seed_round_is_positive_across_archetypes,
+        test_workbook_recalc_shows_no_insolvency,
+        test_archetype_workbooks_pass_strict_audit,
+        test_workbook_recalc_reconciles_with_kernel_gross_margin,
+    ]
+    for _test in _tests:
+        try:
+            _test()
+            print(f"ok    {_test.__name__}")
+        except pytest.skip.Exception as exc:  # soffice unavailable, etc.
+            print(f"skip  {_test.__name__}: {exc}")
+    print("done")

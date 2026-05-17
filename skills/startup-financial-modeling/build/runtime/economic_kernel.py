@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import re
 from dataclasses import dataclass
 from datetime import date
@@ -550,30 +551,25 @@ def _operating_assumption_curves(profile: MechanicProfile, periods: int) -> dict
     }
 
 
-def _capital_plan(
+def _debt_plan(
     profile: MechanicProfile,
-    revenue: list[int],
     new_units: list[int],
     capex_per_unit: list[int],
     other_capex: list[int],
-    total_headcount: list[int],
-    avg_comp: list[int],
-) -> tuple[list[int], list[int], list[int]]:
-    equity: list[int] = []
+) -> list[int]:
+    """Asset-backed debt capacity per period (unchanged level heuristic)."""
+    asset_debt_share = (
+        0.35
+        if profile.key == "hardware_asset_heavy"
+        else 0.20
+        if profile.key == "fintech_balance_sheet"
+        else 0.05
+    )
     debt: list[int] = []
-    post_money: list[int] = []
-    ownership_targets = _curve(0.22, 0.10, len(revenue))
-    asset_debt_share = 0.35 if profile.key == "hardware_asset_heavy" else 0.20 if profile.key == "fintech_balance_sheet" else 0.05
-    for idx, revenue_yen in enumerate(revenue):
-        people_build = total_headcount[idx] * avg_comp[idx] * (0.55 if idx == 0 else 0.35)
+    for idx in range(len(new_units)):
         growth_investment = max(0, new_units[idx] * capex_per_unit[idx]) + other_capex[idx]
-        cash_need = people_build + growth_investment + max(0, revenue_yen * (0.10 if idx < 3 else 0.04))
-        eq = _round_to(cash_need * (0.80 if idx < len(revenue) - 1 else 0.25), 100_000_000)
-        de = _round_to(growth_investment * asset_debt_share, 100_000_000)
-        equity.append(eq)
-        debt.append(de)
-        post_money.append(_round_to(eq / ownership_targets[idx], 100_000_000) if eq else 0)
-    return equity, debt, post_money
+        debt.append(_round_to(growth_investment * asset_debt_share, 100_000_000))
+    return debt
 
 
 def first_match_float(patterns: Iterable[str], text: str, default: float) -> float:
@@ -1036,6 +1032,203 @@ def calibrate_cost_stack_to_gross_margin(
     return vc_out, delivery_out, cloud_out, support_out
 
 
+def plan_revenue_series(
+    new_units: list[int],
+    gmv_yen: list[int],
+    monthly_price_yen: list[int],
+    take_rate: list[float],
+    other_revenue_share: list[float],
+) -> list[float]:
+    """Per-period total revenue, mirroring the Revenue Build sheet formulas."""
+    ending = ending_units(new_units)
+    average = average_units(ending)
+    revenue: list[float] = []
+    for idx in range(len(new_units)):
+        transaction = gmv_yen[idx] * take_rate[idx]
+        recurring = average[idx] * monthly_price_yen[idx] * 12
+        one_time = new_units[idx] * monthly_price_yen[idx] * 3
+        subtotal = transaction + recurring + one_time
+        revenue.append(subtotal * (1.0 + other_revenue_share[idx]))
+    return revenue
+
+
+def project_free_cash_flow(
+    revenue: list[float],
+    target_gross_margin: list[float],
+    total_headcount: list[int],
+    avg_comp_yen: list[int],
+    product_headcount: list[int],
+    sm_pct_revenue: list[float],
+    rd_program_per_product_fte_yen: list[int],
+    rd_program_floor_yen: list[int],
+    ga_pct_revenue: list[float],
+    fixed_ga_yen: list[int],
+    capex_yen: list[int],
+    depreciation_life_months: list[int],
+    debt_raise_yen: list[int],
+    debt_interest_rate: list[float],
+    ar_days: list[int],
+    ap_days: list[int],
+    deferred_revenue_share: list[float],
+    inventory_wip_pct_capex: list[float],
+    tax_rate: list[float],
+) -> list[dict]:
+    """Project per-period free cash flow, mirroring the P&L / BS / CF sheets.
+
+    Used to size the funding plan against real projected burn rather than a
+    fixed heuristic. Equity financing is intentionally excluded — it does not
+    feed operating cash flow (no interest-on-cash is modeled), which keeps
+    round sizing a non-circular forward walk.
+
+    Depreciation deliberately mirrors the workbook P&L formula
+    (`Cost Build CapEx / life x 12`), which charges only the current period's
+    CapEx rather than a rolling asset base. This keeps the projection faithful
+    to the rendered workbook; it is also cash-flow neutral here because D&A is
+    added back in operating cash flow. A rolling depreciation schedule would be
+    a separate workbook-and-kernel change.
+    """
+    periods = len(revenue)
+    out: list[dict] = []
+    ar_prev = inventory_prev = ap_deferred_prev = 0.0
+    debt_balance = 0.0
+    for idx in range(periods):
+        cogs = revenue[idx] * (1.0 - target_gross_margin[idx])
+        gross_profit = revenue[idx] - cogs
+        people = total_headcount[idx] * avg_comp_yen[idx]
+        sales_marketing = revenue[idx] * sm_pct_revenue[idx]
+        rd = max(
+            rd_program_floor_yen[idx],
+            product_headcount[idx] * rd_program_per_product_fte_yen[idx],
+        )
+        ga = revenue[idx] * ga_pct_revenue[idx] + fixed_ga_yen[idx]
+        opex = people + sales_marketing + rd + ga
+        ebitda = gross_profit - opex
+        life = depreciation_life_months[idx] or 60
+        depreciation = capex_yen[idx] / life * 12
+        ebit = ebitda - depreciation
+        debt_balance += debt_raise_yen[idx]
+        interest = debt_balance * debt_interest_rate[idx]
+        ebt = ebit - interest
+        tax = max(0.0, ebt * tax_rate[idx])
+        net_income = ebt - tax
+        accounts_receivable = revenue[idx] * ar_days[idx] / 365
+        inventory = capex_yen[idx] * inventory_wip_pct_capex[idx]
+        ap_deferred = (
+            cogs * ap_days[idx] / 365 + revenue[idx] * deferred_revenue_share[idx]
+        )
+        working_capital = (
+            (ar_prev - accounts_receivable)
+            + (inventory_prev - inventory)
+            + (ap_deferred - ap_deferred_prev)
+        )
+        operating_cf = net_income + depreciation + working_capital
+        free_cash_flow = operating_cf - capex_yen[idx]
+        ar_prev, inventory_prev, ap_deferred_prev = (
+            accounts_receivable,
+            inventory,
+            ap_deferred,
+        )
+        out.append(
+            {
+                "revenue": revenue[idx],
+                "ebitda": ebitda,
+                "net_income": net_income,
+                "depreciation": depreciation,
+                "free_cash_flow": free_cash_flow,
+            }
+        )
+    return out
+
+
+def size_equity_rounds(
+    beginning_cash_yen: int,
+    free_cash_flow: list[float],
+    debt_raise_yen: list[int],
+    target_runway_months: int = 12,
+    round_unit: int = 100_000_000,
+) -> list[int]:
+    """Size each period's equity round so projected ending cash stays solvent.
+
+    Walks the cash balance forward; whenever cash before equity would fall
+    below a runway buffer (``target_runway_months`` of the period's own burn),
+    the round is topped up — rounded up to ``round_unit`` — to clear it. The
+    final period keeps a half-period cushion: there is no successor round to
+    fund, but ending the horizon at exactly zero cash is not investor-grade.
+    """
+    periods = len(free_cash_flow)
+    equity: list[int] = []
+    cash = float(beginning_cash_yen)
+    for idx in range(periods):
+        cash_before_equity = cash + free_cash_flow[idx] + debt_raise_yen[idx]
+        burn = max(0.0, -free_cash_flow[idx])
+        runway_factor = (
+            target_runway_months / 12.0 if idx < periods - 1 else 0.5
+        )
+        buffer = burn * runway_factor
+        shortfall = buffer - cash_before_equity
+        raised = math.ceil(shortfall / round_unit) * round_unit if shortfall > 0 else 0
+        equity.append(int(raised))
+        cash = cash_before_equity + raised
+    return equity
+
+
+def project_plan_free_cash_flow(facts: SourceFacts) -> list[dict]:
+    """Project free cash flow and ending cash for a fully built plan.
+
+    Mirrors the workbook P&L / BS / CF chain. Ending cash adds equity and
+    debt financing to free cash flow; generic source plans carry no other
+    financing instruments, so those terms are omitted.
+    """
+    revenue = plan_revenue_series(
+        facts.new_units,
+        facts.gmv_yen,
+        facts.monthly_price_yen,
+        facts.take_rate,
+        facts.other_revenue_share,
+    )
+    total_headcount = [
+        facts.product_headcount[i]
+        + facts.gtm_headcount[i]
+        + facts.operations_headcount[i]
+        + facts.ga_headcount[i]
+        for i in range(len(revenue))
+    ]
+    capex = [
+        facts.new_units[i] * facts.capex_per_unit_yen[i] + facts.other_capex_yen[i]
+        for i in range(len(revenue))
+    ]
+    projection = project_free_cash_flow(
+        revenue,
+        facts.target_gross_margin,
+        total_headcount,
+        facts.avg_comp_yen,
+        facts.product_headcount,
+        facts.sm_pct_revenue,
+        facts.rd_program_per_product_fte_yen,
+        facts.rd_program_floor_yen,
+        facts.ga_pct_revenue,
+        facts.fixed_ga_yen,
+        capex,
+        facts.depreciation_life_months,
+        facts.debt_raise_yen,
+        facts.debt_interest_rate,
+        facts.ar_days,
+        facts.ap_days,
+        facts.deferred_revenue_share,
+        facts.inventory_wip_pct_capex,
+        facts.tax_rate,
+    )
+    cash = float(facts.beginning_cash_yen)
+    for idx, period in enumerate(projection):
+        cash += (
+            period["free_cash_flow"]
+            + facts.debt_raise_yen[idx]
+            + facts.equity_raise_yen[idx]
+        )
+        period["ending_cash"] = cash
+    return projection
+
+
 def extract_source_facts(source_md: Path) -> SourceFacts:
     return derive_source_facts(read_source(source_md))
 
@@ -1114,15 +1307,58 @@ def derive_source_facts(text: str) -> SourceFacts:
         )
         for idx in range(periods)
     ]
-    equity_raise, debt_raise, post_money = _capital_plan(
-        profile,
-        gmv,
+    rd_program_per_product_fte = [4_500_000 for _ in range(periods)]
+    rd_program_floor = [
+        _round_to(max(gmv[idx] * 0.015, 60_000_000), 10_000_000) for idx in range(periods)
+    ]
+    fixed_ga = [
+        _round_to(max(total_hc[idx] * 1_200_000, 50_000_000), 10_000_000)
+        for idx in range(periods)
+    ]
+    beginning_cash = _round_to(
+        max(300_000_000, avg_comp[0] * max(total_hc[0], 1) * 0.50), 100_000_000
+    )
+    capex_total = [
+        new_units[idx] * capex_per_unit[idx] + other_capex[idx] for idx in range(periods)
+    ]
+    debt_raise = _debt_plan(profile, new_units, capex_per_unit, other_capex)
+    plan_revenue = plan_revenue_series(
         new_units,
-        capex_per_unit,
-        other_capex,
+        gmv,
+        monthly_price,
+        take_rate,
+        [float(value) for value in curves["other_revenue_share"]],
+    )
+    fcf_projection = project_free_cash_flow(
+        plan_revenue,
+        target_gross_margin,
         total_hc,
         avg_comp,
+        product_hc,
+        [float(value) for value in curves["sm_pct_revenue"]],
+        rd_program_per_product_fte,
+        rd_program_floor,
+        [float(value) for value in curves["ga_pct_revenue"]],
+        fixed_ga,
+        capex_total,
+        [int(value) for value in curves["depreciation_life_months"]],
+        debt_raise,
+        [float(value) for value in curves["debt_interest_rate"]],
+        [int(value) for value in curves["ar_days"]],
+        [int(value) for value in curves["ap_days"]],
+        [float(value) for value in curves["deferred_revenue_share"]],
+        [float(value) for value in curves["inventory_wip_pct_capex"]],
+        [float(value) for value in curves["tax_rate"]],
     )
+    free_cash_flow = [period["free_cash_flow"] for period in fcf_projection]
+    equity_raise = size_equity_rounds(beginning_cash, free_cash_flow, debt_raise)
+    ownership_targets = _curve(0.22, 0.10, periods)
+    post_money = [
+        _round_to(equity_raise[idx] / ownership_targets[idx], 100_000_000)
+        if equity_raise[idx]
+        else 0
+        for idx in range(periods)
+    ]
     summary_bits = [
         profile.label,
         f"{profile.primary_unit_name}: {ending[-1]:,}",
@@ -1183,12 +1419,12 @@ def derive_source_facts(text: str) -> SourceFacts:
         ar_days=[int(value) for value in curves["ar_days"]],
         ap_days=[int(value) for value in curves["ap_days"]],
         tax_rate=[float(value) for value in curves["tax_rate"]],
-        beginning_cash_yen=max(500_000_000, _round_to(max(equity_raise[0] * 0.15, avg_comp[0] * max(total_hc[0], 1) * 0.50), 100_000_000)),
+        beginning_cash_yen=beginning_cash,
         sm_pct_revenue=[float(value) for value in curves["sm_pct_revenue"]],
-        rd_program_per_product_fte_yen=[4_500_000 for _ in range(periods)],
-        rd_program_floor_yen=[_round_to(max(gmv[idx] * 0.015, 60_000_000), 10_000_000) for idx in range(periods)],
+        rd_program_per_product_fte_yen=rd_program_per_product_fte,
+        rd_program_floor_yen=rd_program_floor,
         ga_pct_revenue=[float(value) for value in curves["ga_pct_revenue"]],
-        fixed_ga_yen=[_round_to(max(total_hc[idx] * 1_200_000, 50_000_000), 10_000_000) for idx in range(periods)],
+        fixed_ga_yen=fixed_ga,
         inventory_wip_pct_capex=[float(value) for value in curves["inventory_wip_pct_capex"]],
         grants_yen=[0 for _ in range(periods)],
         convertibles_yen=[0 for _ in range(periods)],
