@@ -1787,6 +1787,8 @@ def _money_unit_format_mismatches(wb) -> list[str]:
         "千円": {ib.FMT_JPY_THOUSAND},
         "百万円": {ib.FMT_MONEY, ib.FMT_MONEY_DECIMAL, ib.FMT_JPY_MILLION},
         "億円": {ib.FMT_JPY_HUNDRED_MILLION},
+        "十億円": {ib.FMT_JPY_BILLION},
+        "兆円": {ib.FMT_JPY_TRILLION},
         "$": {ib.FMT_USD_DOLLAR},
         "$K": {ib.FMT_USD_THOUSAND},
         "$M": {ib.FMT_USD_MILLION},
@@ -2157,7 +2159,8 @@ def test_non_money_units_keep_their_own_formats_and_formulas() -> None:
     assert source_plan._format_for_unit("x", ib.FMT_MONEY) == ib.FMT_MULTIPLE
     assert source_plan._format_for_unit("JPY K", ib.FMT_MONEY) == ib.FMT_JPY_THOUSAND
     assert source_plan._format_for_unit("JPY M", ib.FMT_MONEY) == ib.FMT_JPY_MILLION
-    assert source_plan._format_for_unit("JPY B", ib.FMT_MONEY) == ib.FMT_JPY_HUNDRED_MILLION
+    assert source_plan._format_for_unit("JPY B", ib.FMT_MONEY) == ib.FMT_JPY_BILLION
+    assert source_plan._format_for_unit("JPY T", ib.FMT_MONEY) == ib.FMT_JPY_TRILLION
     assert source_plan._format_for_unit("USD", ib.FMT_MONEY) == ib.FMT_USD_MILLION
     assert source_plan._format_for_unit("USD K", ib.FMT_MONEY) == ib.FMT_USD_THOUSAND
     assert source_plan._format_for_unit("USD M", ib.FMT_MONEY) == ib.FMT_USD_MILLION

@@ -491,6 +491,8 @@ FONT_TOTAL = FONT_SUBTOTAL
 FMT_JPY_YEN              = '¥#,##0_);[Red](¥#,##0);"-"_)'
 FMT_JPY_THOUSAND         = '¥#,##0,_);[Red](¥#,##0,);"-"_)'      # 千円表示
 FMT_JPY_MILLION          = '¥#,##0,,_);[Red](¥#,##0,,);"-"_)'    # 百万円表示
+FMT_JPY_BILLION          = '¥#,##0,,,_)"十億円";[Red](¥#,##0,,,)"十億円";"-"_)'
+FMT_JPY_TRILLION         = '¥#,##0,,,,_)"兆円";[Red](¥#,##0,,,,)"兆円";"-"_)'
 # 億円: ",," = ÷1M (百万単位の表示) + "億" 接尾。厳密な ÷1億 を Excel の数値
 # format で実現する手段は存在しない (comma scale は 3 桁単位)。よって
 # 「百万円のまま億接尾」となる近似である点に caller は注意。
@@ -949,6 +951,8 @@ def fmt_for_currency(currency: str = "JPY", scale: str = "million") -> str:
         ("JPY", "thousand"): FMT_JPY_THOUSAND,
         ("JPY", "million"): FMT_JPY_MILLION,
         ("JPY", "hundred_million"): FMT_JPY_HUNDRED_MILLION,
+        ("JPY", "billion"): FMT_JPY_BILLION,
+        ("JPY", "trillion"): FMT_JPY_TRILLION,
         ("USD", "actual"): FMT_USD_DOLLAR,
         ("USD", "thousand"): FMT_USD_THOUSAND,
         ("USD", "million"): FMT_USD_MILLION,
@@ -1686,7 +1690,8 @@ __all__ = [
     # Wrap semantics
     "WRAP_TEXT_ERROR", "WRAP_DECISION_LADDER", "WRAP_BEST_PRACTICE",
     # Number formats
-    "FMT_JPY_YEN", "FMT_JPY_THOUSAND", "FMT_JPY_MILLION", "FMT_JPY_HUNDRED_MILLION",
+    "FMT_JPY_YEN", "FMT_JPY_THOUSAND", "FMT_JPY_MILLION", "FMT_JPY_BILLION",
+    "FMT_JPY_TRILLION", "FMT_JPY_HUNDRED_MILLION",
     "FMT_USD_DOLLAR", "FMT_USD_THOUSAND", "FMT_USD_MILLION",
     "FMT_NUM", "FMT_NUM_THOUSAND", "FMT_NUM_MILLION",
     "FMT_PCT_0", "FMT_PCT_1", "FMT_PCT_2",

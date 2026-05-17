@@ -249,8 +249,10 @@ def _format_for_unit(unit: str, requested_fmt: str, facts: SourceFacts | None = 
         return ib.FMT_JPY_THOUSAND
     if unit == "JPY M":
         return ib.FMT_JPY_MILLION
-    if unit in {"JPY B", "JPY T"}:
-        return ib.FMT_JPY_HUNDRED_MILLION
+    if unit == "JPY B":
+        return ib.FMT_JPY_BILLION
+    if unit == "JPY T":
+        return ib.FMT_JPY_TRILLION
     if unit == "USD":
         if requested_fmt in {ib.FMT_MONEY, ib.FMT_USD_MILLION}:
             return ib.FMT_USD_MILLION
