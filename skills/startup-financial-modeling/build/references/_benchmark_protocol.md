@@ -187,3 +187,12 @@ edition); Bessemer State of the Cloud 2024; ICONIQ Growth 2024-2025; a16z "16
 Startup Metrics" 2015 / Growth Metrics 2022; David Skok / forEntrepreneurs SaaS
 Metrics ~2010; David Sacks "SaaS Metrics That Matter" 2022; Carta State of
 Private Markets 2024; Finro fintech framework 2024-2025.
+
+The bands above are review anchors for the modeler, not the generator's
+evaluation axis. The generated KPI sheet carries a `KPI vs live public peers`
+block whose comparison axis is fetched at generation time: peer gross-margin
+and EBITDA-margin median / low / high come from the live public comparable
+retrieval, and the plan-vs-peer verdict is a formula against that fetched
+range. Do not hard-code benchmark constants into the generator or the
+workbook; when live peer margins cannot be retrieved, mark the block for
+refresh rather than back-filling a stale number.

@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import sys
 import re
+import statistics
 from copy import copy
 from pathlib import Path
 from dataclasses import dataclass
@@ -1413,6 +1414,7 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
         for col, value in enumerate(values, start=start_col):
             ws.cell(row, col, value)
             ib.apply_comment(ws.cell(row, col), wrap_text=False)
+    _build_kpi_peer_comparison(ws, facts, 64 + len(interpretation_rows) + 1)
 
 
 def _build_scenarios(wb: Workbook, facts: SourceFacts) -> None:
@@ -1728,6 +1730,64 @@ def _build_market_support(wb: Workbook, facts: SourceFacts) -> None:
         for r, url in enumerate(facts.source_urls[:8], start=27):
             ws.cell(r, 2, url)
             ib.apply_link_external(ws.cell(r, 2))
+
+
+def _build_kpi_peer_comparison(ws: Worksheet, facts: SourceFacts, start_row: int) -> None:
+    """Juxtapose plan KPIs with live-fetched public-peer operating margins.
+
+    The comparison axis is the current public-peer distribution retrieved this
+    run, never a band hard-coded into the skill: peer median / low / high are
+    written from the live fetch, the plan value is a live in-sheet reference to
+    the KPI row, and the verdict is a formula against the fetched range. When no
+    live peer margin data is available the row is marked for refresh rather than
+    back-filled with a stale constant. References stay inside the KPI sheet so
+    the block survives focused-bundle pruning without dangling sheet links.
+    """
+    comps = [comp for comp in (getattr(facts, "live_comps", []) or []) if isinstance(comp, dict)]
+    usable = [comp for comp in comps if comp.get("status") in {"current", "provided"}]
+    as_of = max((str(comp.get("as_of_date") or "") for comp in usable), default="")
+    peer_label = ", ".join(
+        str(comp.get("ticker") or comp.get("name"))
+        for comp in usable
+        if comp.get("ticker") or comp.get("name")
+    )
+    # Lay the block out on the standard label / source / unit / period grid so
+    # _apply_design_surface styles each column for its intended role; value
+    # columns start at the first period column to avoid the source/unit cells.
+    label_col = LAYOUT.label_col
+    plan_col = _start_period_col()
+    _section(ws, start_row, "KPI vs live public peers", plan_col + 4)
+    header_row = start_row + 1
+    for offset, header in enumerate(["Plan", "Peer median", "Peer low", "Peer high", "Position"]):
+        _apply_text_header(ws.cell(header_row, plan_col + offset), header)
+    final_col = _final_period_col(facts)
+    metrics = [("Gross margin", 16, "gross_margin"), ("EBITDA margin", 17, "ebitda_margin")]
+    for offset, (label, kpi_row, key) in enumerate(metrics):
+        row = start_row + 2 + offset
+        values = sorted(
+            float(comp[key]) for comp in usable if isinstance(comp.get(key), (int, float))
+        )
+        ws.cell(row, label_col, f"{label} — plan vs live peers")
+        ws.cell(row, LAYOUT.unit_col, "%")
+        _apply_value_style(ws.cell(row, plan_col, f"={final_col}{kpi_row}"), ib.FMT_PERCENT)
+        if values:
+            for col_offset, value in ((1, statistics.median(values)), (2, values[0]), (3, values[-1])):
+                _apply_value_style(ws.cell(row, plan_col + col_offset, round(value, 4)), ib.FMT_PERCENT)
+            plan_ref = f"{get_column_letter(plan_col)}{row}"
+            low_ref = f"{get_column_letter(plan_col + 2)}{row}"
+            high_ref = f"{get_column_letter(plan_col + 3)}{row}"
+            _apply_value_style(
+                ws.cell(
+                    row, plan_col + 4,
+                    f'=IF({plan_ref}<{low_ref},"below",IF({plan_ref}>{high_ref},"above","within"))',
+                ),
+                ib.FMT_NUM,
+            )
+            ws.cell(row, LAYOUT.source_col, f"live peers: {peer_label or 'n/a'}; as of {as_of or 'n/a'}")
+        else:
+            ws.cell(row, plan_col + 4, "no live peer data")
+            ib.apply_comment(ws.cell(row, plan_col + 4), wrap_text=False)
+            ws.cell(row, LAYOUT.source_col, "no live peer margin data — refresh before circulation")
 
 
 def _build_benchmarks(wb: Workbook, facts: SourceFacts) -> None:
