@@ -30,15 +30,19 @@ accountable counterparty, parts shipped.**
 
 Investment highlights:
 
-1. **A two-sided marketplace past its cold start.** 2,400 buyers and 600 shops
+1. **The contrarian core.** The industry treats machining *capacity* as the
+   binding constraint and races to add it; Forgeline's bet is that capacity was
+   never scarce — *matching* was. Instant quoting removed the real bottleneck,
+   and the winner is whoever clears the market, not whoever owns the machines.
+2. **A two-sided marketplace past its cold start.** 2,400 buyers and 600 shops
    transact on the platform `[fact]`; the liquidity that makes a marketplace
    hard to start now works *for* Forgeline, not against it.
-2. **The flywheel is showing in the numbers.** GMV grew from $14M to $48M
-   annualized in twelve months `[fact]` at an 18% take rate `[fact]`; buyer net
-   revenue retention is 140% `[fact]` — the installed base compounds on its own.
-3. **A why-now in instant quoting.** Automated geometry analysis made it
-   possible to quote a custom part in seconds instead of days — the step that
-   used to make this marketplace impossible to run.
+3. **The flywheel is showing in the numbers.** GMV grew from $14M to $48M
+   annualized in twelve months `[fact]` — a 3.4× year, against the ~40–60%
+   typical for a marketplace at this size `[estimate]` — at an 18% take rate
+   `[fact]`; buyer net revenue retention is 140% `[fact]`, well above the
+   ~110% B2B-marketplace median `[estimate]` — the installed base compounds on
+   its own.
 4. **Founder-market fit on both sides.** The founders ran operations at a
    contract manufacturer and marketplace operations at a logistics platform —
    the supply side and the marketplace mechanics this business fuses.
@@ -46,8 +50,13 @@ Investment highlights:
    metal, injection molding and finishing are the same buyers, the same shops,
    the same engine.
 
-> Annotation: five highlights, each one sentence, each a *load-bearing* reason —
-> not a feature list. Highlight 5 is the wedge→category arc in miniature.
+**Carry-home:** *Forgeline is the demand layer for custom manufacturing — the
+constraint was never the machines, it was the matching.*
+
+> Annotation: highlight 1 states the contrarian core in one plain sentence — the
+> belief the thesis bets against. Highlight 3 puts each load-bearing number next
+> to a benchmark, so the reader can weigh it. The carry-home compresses the whole
+> thesis into one line a reader can repeat intact.
 
 ## Why now
 
@@ -266,5 +275,9 @@ diligence item for the financial model.
 - Strategy frameworks (marketplace flywheel, network effects, Aggregation
   Theory, switching costs) are named and tied to evidence, with the honest risk
   stated — see `strategy-frameworks.md`.
+- The **contrarian core** (highlight 1) states in one plain sentence the belief
+  the thesis bets against; the **carry-home** compresses the whole thesis to one
+  repeatable line. Load-bearing numbers appear next to a benchmark, not naked —
+  see `narrative-craft.md`.
 - This example is Series B and US; for IPO/public-market framing see
   `stage-playbooks.md`, and for a Japanese IPO see `japan-ipo.md`.
