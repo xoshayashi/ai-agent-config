@@ -36,8 +36,10 @@ claims depend on. Organize the work by what each finding feeds.
 - **Customer and demand evidence.** The strongest evidence is primary: what
   customers actually do and say. Where the story leans on demand or retention,
   seek evidence that does not come only from a management-curated list — a
-  curated reference list is a designed selection bias. Channel and industry
-  signals corroborate or contradict the commercial claims.
+  curated reference list is a designed selection bias. Sources that sidestep
+  that bias: public review platforms, industry-specific forums and user
+  communities, and channel checks with distributors, resellers or implementation
+  partners. These corroborate or contradict the commercial claims.
 - **Regulatory and structural landscape.** Licensing regimes, compliance
   obligations, and pending regulatory change — especially when the business
   model, or an adjacency the growth story depends on, operates in a regulated
@@ -67,9 +69,9 @@ direct searches, each scoped as if it were a subagent brief.
 - **Decide whether to split the work.** A single fact — one figure, one date —
   is a direct lookup; do it inline. Split into parallel lines when the research
   divides into *independent* sub-questions that can be pursued at once without
-  depending on each other's results. Parallel research costs materially more
-  effort than a single search — reserve it for genuine breadth, not for one
-  question.
+  depending on each other's results. Parallel research costs materially more —
+  in tokens and tool calls — than a single search; reserve it for genuine
+  breadth, not for one question.
 - **Scale the number of research lines to the work.** A focused comparison needs
   two to four parallel lines; a broad research front needs more. Give each a
   distinct slice — by sub-question, industry segment, or source type — so no two
@@ -85,7 +87,9 @@ direct searches, each scoped as if it were a subagent brief.
 - **Steer to source quality explicitly.** Left unguided, search drifts to
   SEO-optimized content farms over authoritative material. Prefer primary
   sources, name the issuing body and date, and treat any load-bearing figure as
-  unverified until checked against its origin.
+  unverified until checked against its origin. When a primary source and a
+  secondary restatement of it disagree, use the primary figure and note the
+  discrepancy — do not silently carry the aggregator's number.
 - **Synthesize, don't concatenate.** The orchestrator integrates the findings
   into one picture: keep each claim tied to its source, surface contradictions
   between lines rather than silently choosing one, and judge

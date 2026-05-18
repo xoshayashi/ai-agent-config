@@ -89,9 +89,10 @@ the assumption; only ask the user when an answer materially changes the thesis.
 5. **The ask** — round size / offering, valuation or range, and the milestones
    the money buys.
 
-Then identify the **gaps that matter** — the load-bearing claims that rest on
-facts no one has verified: the "why now" evidence, the market data, the real
-competitive set, comparable-company multiples, the regulatory landscape. A
+Once you have what the user can supply, turn to **the gaps that matter** — the
+load-bearing claims that rest on facts no one has verified: the "why now"
+evidence, the market data, the real competitive set, comparable-company
+multiples, the regulatory landscape. A
 thorough story *researches* those gaps; it does not assert through them.
 `references/research-playbook.md` sets out what to research and how to do it
 efficiently with parallel research. Match the research effort to the stakes, but
