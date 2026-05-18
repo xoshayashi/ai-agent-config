@@ -1343,13 +1343,10 @@ def audit_economic_coherence(
             else 0.0
         )
         if abs(gross_margin[idx] - target) > gross_margin_tolerance:
+            detail = " (negative)" if gross_margin[idx] < 0 else ""
             issues.append(
                 f"{_label(idx)}: cost stack implies gross margin "
-                f"{gross_margin[idx]:.1%}, off target {target:.1%}"
-            )
-        if target > 0 and gross_margin[idx] < 0:
-            issues.append(
-                f"{_label(idx)}: negative gross margin on a positive-margin plan"
+                f"{gross_margin[idx]:.1%}{detail}, off target {target:.1%}"
             )
 
     for idx, period in enumerate(projection):
@@ -1359,7 +1356,7 @@ def audit_economic_coherence(
                 f"(ending cash {period['ending_cash']:,.0f})"
             )
 
-    if facts.equity_raise_yen and facts.equity_raise_yen[0] <= 0:
+    if not facts.equity_raise_yen or facts.equity_raise_yen[0] <= 0:
         issues.append(f"{_label(0)}: no funding round sized for the first period")
     return issues
 
