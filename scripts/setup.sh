@@ -286,6 +286,30 @@ move_existing_skill_backups() {
   move_skill_backups_out_of_root "$legacy_agents_home/skills" "$legacy_agents_home/skill-backups"
 }
 
+install_notification_hooks() {
+  helper="$config_home/scripts/install-notifications.py"
+  if [ ! -f "$helper" ]; then
+    warn "missing $helper; skip notification hook setup"
+    return 0
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    warn "python3 not found; skip notification hook setup"
+    return 0
+  fi
+  # A function's positional parameters are local in POSIX sh and restored on
+  # return, so building the helper's argv with `set --` does not affect $@
+  # in the caller.
+  set -- --mode install \
+    --config-home "$config_home" \
+    --claude-home "$claude_home" \
+    --codex-home "$codex_home" \
+    --gemini-home "$gemini_home"
+  if [ "$dry_run" = "1" ]; then
+    set -- "$@" --dry-run
+  fi
+  python3 "$helper" "$@"
+}
+
 say "AI agent config setup (instructions only)"
 say "config: $config_home"
 say "codex home: $codex_home"
@@ -296,5 +320,6 @@ move_existing_skill_backups
 install_instruction_links
 remove_retired_skill_links
 install_skill_links
+install_notification_hooks
 
 say "setup complete"
