@@ -167,6 +167,10 @@ def test_stated_churn_rate_is_extracted_and_annualized() -> None:
     assert kernel.extract_churn_rate(
         "Employee churn is 20%. Customer churn is 8%."
     ) == 0.08, "employee churn was taken instead of customer churn"
+    # An unrelated percentage before the churn keyword is not the churn rate.
+    assert kernel.extract_churn_rate(
+        "We offer a 5% discount; logo churn is 12%."
+    ) == 0.12, "an unrelated percentage was read as the churn rate"
     facts = kernel.derive_source_facts(
         "# SaaS plan\n\nA SaaS platform priced at 月額1.2万円. Customer "
         "churn is about 9%. 5-year plan, seed round. Source: memo.\n"

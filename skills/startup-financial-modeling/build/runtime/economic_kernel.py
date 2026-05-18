@@ -1297,7 +1297,7 @@ def extract_churn_rate(text: str) -> float | None:
     """
     for pattern in (
         r"churn[^0-9%\n]{0,24}?([0-9]{1,2}(?:\.[0-9])?)\s*%",
-        r"([0-9]{1,2}(?:\.[0-9])?)\s*%[^.\n]{0,28}?churn",
+        r"([0-9]{1,2}(?:\.[0-9])?)\s*%[^0-9%.\n]{0,28}?churn",
     ):
         for match in re.finditer(pattern, text, flags=re.IGNORECASE):
             window = text[max(0, match.start() - 24): match.end() + 24]
