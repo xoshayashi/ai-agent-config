@@ -677,7 +677,7 @@ def test_ic_memo_dependency_closure_matches_live_formula_readouts() -> None:
     assert "Valuation" in bundle
 
 
-def test_cash_flow_runway_formula_floors_negative_cash_at_zero() -> None:
+def test_cash_flow_runway_formula_floors_and_caps_runway() -> None:
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "full.xlsx"
         build_model.build_model(None, out, mode="full")
@@ -685,7 +685,9 @@ def test_cash_flow_runway_formula_floors_negative_cash_at_zero() -> None:
         wb = load_workbook(out, data_only=False)
         formula = _first_year_cell_for_label(wb, "CF", "Runway months").value
 
-        assert formula == f"=IF({FIRST_VALUE_LETTER}16>=0,99,MAX(0,{FIRST_VALUE_LETTER}31)/ABS({FIRST_VALUE_LETTER}16/12))"
+        # Negative cash is floored at zero; a near-zero-negative free cash
+        # flow is capped at 99 months so runway never blows up to thousands.
+        assert formula == f"=IF({FIRST_VALUE_LETTER}16>=0,99,MIN(99,MAX(0,{FIRST_VALUE_LETTER}31)/ABS({FIRST_VALUE_LETTER}16/12)))"
 
 
 def test_cross_sheet_formula_cells_are_green() -> None:
@@ -2950,7 +2952,7 @@ if __name__ == "__main__":
     test_full_model_uses_direct_formula_refs()
     test_intra_sheet_formula_cells_are_black()
     test_ic_memo_dependency_closure_matches_live_formula_readouts()
-    test_cash_flow_runway_formula_floors_negative_cash_at_zero()
+    test_cash_flow_runway_formula_floors_and_caps_runway()
     test_cross_sheet_formula_cells_are_green()
     test_pricing_bundle_is_formula_complete()
     test_cap_table_mode_uses_state_machine_not_full_workbook()

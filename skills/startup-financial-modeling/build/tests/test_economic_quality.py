@@ -749,6 +749,94 @@ def test_workbook_recalc_reconciles_with_kernel_gross_margin() -> None:
             )
 
 
+def test_burn_multiple_does_not_explode_in_period_zero() -> None:
+    """Period-0 burn multiple uses the full period-0 revenue as net-new
+    revenue, not a zero year-over-year difference that forces the
+    denominator and explodes the ratio to hundreds of millions."""
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        pytest.skip("soffice/libreoffice not available")
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "saas.md"
+        out = Path(tmp) / "saas.xlsx"
+        src.write_text(SAAS_STORY, encoding="utf-8")
+        source_plan.build_source_plan_workbook(src, out)
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(Path(tmp) / "recalc"), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        wb = load_workbook(Path(tmp) / "recalc" / "saas.xlsx", data_only=True)
+        ws = wb["KPI"]
+        first_col = source_plan.START_PERIOD_COL
+        burn_row = next(
+            (cell.row for row in ws.iter_rows() for cell in row
+             if cell.value == "Burn multiple"),
+            None,
+        )
+        assert burn_row is not None, "KPI sheet missing 'Burn multiple' row"
+        facts = kernel.derive_source_facts(SAAS_STORY)
+        for idx in range(len(facts.years)):
+            val = ws.cell(burn_row, first_col + idx).value
+            if isinstance(val, str):  # "N/A" — no revenue growth to fund
+                continue
+            # A deliberately loose regression bound: it must reliably catch
+            # the ~415,000,000x denominator-collapse explosion. A tighter
+            # business band (burn multiple is "good" below ~2x) is not
+            # asserted here because an early-stage period can legitimately
+            # carry a high ratio; that judgement belongs to the audit, not
+            # this guard.
+            assert val is not None and abs(float(val)) < 50.0, (
+                f"period {idx}: burn multiple {val} is not a sane ratio"
+            )
+
+
+def _row_for_label(ws, label: str) -> int:
+    """Return the row index whose first labelled cell matches `label`."""
+    row = next(
+        (cell.row for r in ws.iter_rows() for cell in r if cell.value == label),
+        None,
+    )
+    assert row is not None, f"{ws.title} sheet missing '{label}' row"
+    return row
+
+
+def test_runway_months_is_capped_at_99() -> None:
+    """A near-zero-negative free cash flow against a large cash balance must
+    not blow runway to thousands of months — the formula caps it at 99."""
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        pytest.skip("soffice/libreoffice not available")
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "runway.xlsx"
+        facts = kernel.derive_source_facts(SAAS_STORY)
+        wb = source_plan.build_source_plan_workbook_from_facts(facts)
+        ws = wb["CF"]
+        first_col = source_plan.START_PERIOD_COL
+        # Force a tiny-negative free cash flow against a large cash balance:
+        # the uncapped ratio would yield tens of millions of months. Rows are
+        # resolved by label so a CF layout shift cannot silently mis-target.
+        fcf_row = _row_for_label(ws, "Free cash flow")
+        cash_row = _row_for_label(ws, "Ending cash")
+        ws.cell(fcf_row, first_col).value = -1000
+        ws.cell(cash_row, first_col).value = 5_000_000_000
+        wb.save(out)
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(Path(tmp) / "recalc"), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        wb2 = load_workbook(Path(tmp) / "recalc" / "runway.xlsx", data_only=True)
+        ws2 = wb2["CF"]
+        runway_row = _row_for_label(ws2, "Runway months")
+        # The MIN(99,...) cap is applied uniformly, so verify every period.
+        for idx in range(len(facts.years)):
+            runway = ws2.cell(runway_row, first_col + idx).value
+            assert runway is not None and float(runway) <= 99.0, (
+                f"period {idx}: runway {runway} months is not capped at 99"
+            )
+
+
 if __name__ == "__main__":
     _tests = [
         test_gross_margin_tracks_target_across_archetypes,
@@ -784,6 +872,8 @@ if __name__ == "__main__":
         test_peer_comparison_status_recalculates_without_error,
         test_archetype_workbooks_pass_strict_audit,
         test_workbook_recalc_reconciles_with_kernel_gross_margin,
+        test_burn_multiple_does_not_explode_in_period_zero,
+        test_runway_months_is_capped_at_99,
     ]
     for _test in _tests:
         try:
