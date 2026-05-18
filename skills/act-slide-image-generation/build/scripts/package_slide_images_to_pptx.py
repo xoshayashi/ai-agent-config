@@ -193,25 +193,26 @@ APPROVED_STATUSES = {
     "design_breakage_blocker_status",
 }
 
-SLIDE_APPROVED_STATUSES = (
-    "image_review_status",
-    "final_image_quality_status",
-    "content_quality_status",
-    "design_quality_status",
-    "deck_unity_status",
-    "post_generation_design_balance_status",
-    "whitespace_occupancy_balance_status",
-    "density_balance_status",
-    "typography_balance_status",
-    "color_consistency_status",
-    "outer_padding_consistency_status",
-    "header_integrity_status",
-    "multimodal_design_review_status",
-    "design_balance_gate_status",
-    "occupancy_density_fit_status",
-    "font_scale_unity_status",
-    "palette_role_unity_status",
-    "design_breakage_blocker_status",
+SLIDE_APPROVED_STATUSES = frozenset(
+    {
+        "image_review_status",
+        "final_image_quality_status",
+        "content_quality_status",
+        "design_quality_status",
+        "post_generation_design_balance_status",
+        "whitespace_occupancy_balance_status",
+        "density_balance_status",
+        "typography_balance_status",
+        "color_consistency_status",
+        "outer_padding_consistency_status",
+        "header_integrity_status",
+        "multimodal_design_review_status",
+        "design_balance_gate_status",
+        "occupancy_density_fit_status",
+        "font_scale_unity_status",
+        "palette_role_unity_status",
+        "design_breakage_blocker_status",
+    }
 )
 
 
