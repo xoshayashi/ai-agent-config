@@ -264,8 +264,9 @@ a diligence item. Naming the open items is what makes the rest credible.
 
 Tie every recommendation to the reader's decision criteria (price, ROI, cost
 structure, growth, durability). Follow `DESIGN.md` for tone: quiet, specific,
-no hype, no unsupported superlatives. See `references/examples.md` for a
-compact worked equity story that shows the whole arc end to end.
+no hype, no unsupported superlatives. See `references/examples.md` for two
+compact, annotated worked equity stories showing the full arc end to end
+(Example 1: US Series B; Example 2: Japan Growth IPO).
 
 ## Self-review checklist
 
