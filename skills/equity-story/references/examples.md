@@ -4,7 +4,9 @@ A compact, annotated equity story for a **fictional** Series B company. It shows
 the full arc end to end and the evidence-tagging convention. `> Annotation:`
 lines explain *why* each move is made — they are not part of the deliverable.
 
-The company, figures and people below are invented for illustration.
+**"Forgeline" is a fictional company.** Its name, figures, founders and metrics
+are all invented for illustration — it is not, and does not refer to, any real
+business.
 
 ---
 
