@@ -1104,7 +1104,7 @@ def test_hardware_revenue_is_units_times_sale_price() -> None:
         )
     soffice = shutil.which("soffice") or shutil.which("libreoffice")
     if soffice is None:
-        return
+        pytest.skip("LibreOffice not installed; skipping workbook recalc check")
     with tempfile.TemporaryDirectory() as tmp:
         src = Path(tmp) / "hw.md"
         out = Path(tmp) / "hw.xlsx"
