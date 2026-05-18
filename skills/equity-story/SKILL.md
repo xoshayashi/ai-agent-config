@@ -100,9 +100,12 @@ build it before drafting prose.
 
 - **Why now** — *Why is this possible now and not five years ago?* Nature
   abhors a vacuum: if the opportunity is real, something changed — technology
-  cost, regulation, behaviour, a crossed adoption threshold. Name the
-  inflection and quantify it. A story without a credible "why now" cannot
-  explain why the window is open. Place it early.
+  cost, regulation, behaviour, a crossed adoption threshold. Name the inflection
+  and quantify it. Often it is not one inflection but several independent curves
+  crossing at once — name each and show why *together* they open the window now;
+  separate supply-side from demand-side pressure where both apply. A story
+  without a credible "why now" cannot explain why the window is open. Place it
+  early.
 - **Why us** — *Why will this team win this market?* Investors back people.
   Use concrete, verifiable achievements and a genuine unfair advantage
   (founder-market fit), not titles or biographies.
@@ -153,6 +156,10 @@ Numbers belong *next to the claim they prove*, never in a standalone pile.
 - **Unit economics** prove *Why this price* and durability. Use verifiable
   actuals — CAC, LTV, gross margin, payback, burn multiple, NRR. Their weight
   in the story rises with stage.
+- **Primary sources.** For macro and market claims, cite the **primary source**
+  — the issuing agency or research body, the specific publication, and its date
+  — not a secondary aggregator. A sourced statistic outweighs an asserted one
+  and gives a diligence reader a path to verify.
 
 For each major claim, identify the one **load-bearing number** — the figure
 that, if it were false, would break the claim — and present it **in context**,
@@ -290,7 +297,10 @@ a gap to fix before iterating.
    seed; unit economics for growth; cash flow/comparables/governance for IPO)?
 9. **Grounded in reality** — does the thesis hold without asking the reader to
    ignore the unit economics, the comparable set, or the cash runway?
-10. **Retellable accurately, survives a sceptic** — could a third party read it
+10. **Reversal triggers named** — for the two or three load-bearing assumptions,
+    does the story state what observation would falsify each? An `[open]` tag
+    marks what is unknown; this marks what would prove the thesis wrong.
+11. **Retellable accurately, survives a sceptic** — could a third party read it
     alone, stress-test it, and still retell the thesis to a sceptical partner in
     thirty seconds without drifting?
 
@@ -298,18 +308,18 @@ a gap to fix before iterating.
 
 See `references/narrative-craft.md` for how to fix a "no" here.
 
-11. **Carry-home** — is there a single phrase or image the reader walks out
+12. **Carry-home** — is there a single phrase or image the reader walks out
     holding and can hand on intact?
-12. **Contrarian core** — can the one non-obvious idea the thesis bets on — what
+13. **Contrarian core** — can the one non-obvious idea the thesis bets on — what
     most informed people believe that this story bets against — be stated in
     one plain sentence, and is it visible in the story?
-13. **Insider detail** — does each major claim carry at least one concrete
+14. **Insider detail** — does each major claim carry at least one concrete
     detail an outsider with no operating experience could not have written?
-14. **Numbers in context** — does each major claim's load-bearing number appear
+15. **Numbers in context** — does each major claim's load-bearing number appear
     with a comparison (prior period, benchmark, or cohort), not naked?
-15. **Hook and ending** — does the first line create tension rather than define
+16. **Hook and ending** — does the first line create tension rather than define
     a term, and is the strongest line at the end?
-16. **No empty superlatives** — is every "leading / best-in-class /
+17. **No empty superlatives** — is every "leading / best-in-class /
     transforming"-type word either earned by an adjacent verifiable fact or cut?
 
 ### Final gate

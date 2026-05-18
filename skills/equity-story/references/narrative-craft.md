@@ -74,6 +74,9 @@ remembered (a reader weighs an experience by its peak and its end).
   document.
 - **Don't:** open with a definition or background. Don't end on a summary or an
   administrative sign-off — a weak ending drags down the memory of the whole.
+- **Reframe, then return.** One high-yield opening is to *reframe the category
+  itself* — zoom out and recast the problem space before naming the company.
+  Closing on that same frame creates a circular structure the reader remembers.
 - **Pacing:** vary sentence length. Short sentences create speed and emphasis;
   longer ones invite reflection. Put a short sentence right before the point
   that must land. Uniform rhythm makes a reader disengage.
@@ -120,6 +123,22 @@ becomes hype.
 The craft and the honesty are not in tension. Technique is a vessel for the
 facts; the moment the vessel misrepresents its contents, every technique in the
 document works against you.
+
+**Advanced credibility moves — earn trust by self-limiting.** Three moves push a
+story from merely honest to *credible*:
+
+- **Define the terms a reader will over-read.** Words like "autonomous",
+  "profitable" or "platform", and any coined milestone ("Day 1"), invite an
+  inflated reading. State plainly what the term means *and what it does not* —
+  pre-empting the generous reading is more credible than letting it stand.
+- **Name your reversal triggers.** For the two or three assumptions the thesis
+  rests on, state what observation would *falsify* each. An `[open]` tag marks
+  what is *unknown*; a reversal trigger marks what would prove the thesis
+  *wrong* — naming your own kill criteria is the single strongest credibility
+  signal a sceptical reader can be given.
+- **State what you are explicitly not claiming.** Naming the ground you do
+  *not* fight on — a rival's strength you will not match, a market you will not
+  chase — sharpens the claim you do make and signals you understand the game.
 
 ## 7. Banned-without-evidence phrases
 
