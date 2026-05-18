@@ -202,6 +202,8 @@ bracketed text describes what each section holds; replace it.
 
 > Evidence legend: [fact] supplied/verified · [derived] computed from facts ·
 > [estimate]/[assumption] inferred · [open] a diligence question.
+> Reversal triggers are written as plain sentences ("if X is observed, the
+> thesis fails"), not as inline tags — they have their own section below.
 
 ## Thesis in brief
 [The company in one declarative sentence. Then 3–5 investment highlights —
@@ -241,6 +243,13 @@ strategy frameworks. Opportunity size and durability kept distinct.]
 
 ## Vision
 [The wedge → category arc: take the wedge, earn the right to the category.]
+
+## What would change our mind
+[The two or three load-bearing assumptions, each with the observation that
+would falsify it — plain sentences ("if X is observed for Y consecutive
+quarters, the durability thesis fails"), not inline tags. Distinct from [open]
+items, which mark what is *unknown* rather than what would prove the thesis
+*wrong*.]
 
 ## Anticipated investor questions
 [The toughest questions for this stage/geography, each with a direct answer.]
@@ -282,10 +291,11 @@ a gap to fix before iterating.
    answered, and is "why now" anchored to a real, quantified inflection?
 3. **Problem before solution** — does the reader feel the pain before seeing
    the product?
-4. **Evidence attached, trajectory shown** — is every material number next to
-   the claim it proves, is every load-bearing claim backed by something
-   verifiable, and is progress shown as a trajectory (deltas over time), not a
-   single dot?
+4. **Evidence attached, trajectory shown, sourced** — is every material number
+   next to the claim it proves, is every load-bearing claim backed by something
+   verifiable, are macro and market claims attributed to a primary source
+   (issuing agency / publication / date), and is progress shown as a trajectory
+   (deltas over time), not a single dot?
 5. **Bottom-up market** — is TAM built bottom-up with the calculation visible,
    not an unsourced top-down billion?
 6. **Competition & moat done right** — are opportunity size and durability
