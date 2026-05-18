@@ -471,6 +471,66 @@ def test_yaml_can_override_the_fx_rate() -> None:
     assert facts.avg_comp_yen[0] > other.avg_comp_yen[0]
 
 
+def test_structured_currency_scales_default_costs_consistently() -> None:
+    """A structured `currency:` field — not an incidental token in the company
+    name — must determine how default cost primitives are FX-scaled.
+
+    `avg_comp` and `capex_per_unit` defaults were materialized during
+    extraction using the currency detected from the (for `--input`,
+    synthetic) narrative. A USD plan whose company string lacked a "USD"
+    token kept yen-scale loaded comp (¥16M against USD revenue) — a ~150x
+    incoherence that drove the model insolvent.
+    """
+    base = {
+        "mechanics": "payments and lending fintech",
+        "currency": "USD",
+        "periods": 5,
+        "customers": [400, 1200, 3000, 6000, 10000],
+        "monthly_price_yen": [90, 90, 90, 90, 90],
+    }
+    plain = kernel.derive_source_facts_from_mapping(
+        {**base, "company": "PayStream Fintech"}
+    )
+    tokened = kernel.derive_source_facts_from_mapping(
+        {**base, "company": "PayStream USD Inc"}
+    )
+    # An incidental "USD" token in the company name must not move the scale.
+    assert plain.avg_comp_yen == tokened.avg_comp_yen, (
+        f"company name shifted avg_comp: {plain.avg_comp_yen[0]:,} vs "
+        f"{tokened.avg_comp_yen[0]:,}"
+    )
+    assert plain.capex_per_unit_yen == tokened.capex_per_unit_yen, (
+        "company name shifted capex_per_unit"
+    )
+    # The USD default loaded comp is the yen default divided by the FX rate.
+    expected = 16_000_000 / kernel.DEFAULT_JPY_PER_USD
+    assert abs(plain.avg_comp_yen[0] - expected) <= 0.02 * expected, (
+        f"USD plan kept a yen-scale loaded comp: {plain.avg_comp_yen[0]:,} "
+        f"(expected ~{expected:,.0f})"
+    )
+    # A model with currency-consistent cost primitives is economically coherent.
+    assert kernel.audit_economic_coherence(plain) == [], (
+        f"structured USD plan is not coherent: {kernel.audit_economic_coherence(plain)}"
+    )
+    # An explicit avg_comp / capex in the input still takes precedence over
+    # the FX-scaled default.
+    overridden = kernel.derive_source_facts_from_mapping(
+        {
+            **base,
+            "company": "PayStream Fintech",
+            "avg_comp_yen": [200_000] * 5,
+            "capex_per_unit_yen": [50_000] * 5,
+        }
+    )
+    assert overridden.avg_comp_yen[0] == 200_000, (
+        f"an explicit avg_comp override was not honored: {overridden.avg_comp_yen[0]:,}"
+    )
+    assert overridden.capex_per_unit_yen[0] == 50_000, (
+        f"an explicit capex_per_unit override was not honored: "
+        f"{overridden.capex_per_unit_yen[0]:,}"
+    )
+
+
 def test_payroll_is_not_absurd_at_maturity() -> None:
     """Mature-period payroll must not dwarf revenue (a sign of grain mixups)."""
     for name, story in ARCHETYPES.items():
@@ -1666,6 +1726,7 @@ if __name__ == "__main__":
         test_usd_narrative_produces_a_coherent_usd_plan,
         test_jpy_narratives_are_not_misdetected_as_usd,
         test_yaml_can_override_the_fx_rate,
+        test_structured_currency_scales_default_costs_consistently,
         test_payroll_is_not_absurd_at_maturity,
         test_stated_rd_team_size_anchors_the_headcount_plan,
         test_economic_audit_passes_for_healthy_archetypes,
