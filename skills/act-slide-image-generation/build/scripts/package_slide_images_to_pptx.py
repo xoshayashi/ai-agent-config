@@ -121,11 +121,11 @@ def collect_images(inputs: Iterable[str]) -> list[Path]:
     seen_images: set[Path] = set()
     for image in images:
         validate_master_image_path(image)
-        validate_image_file(image)
         resolved = image.resolve()
         if resolved in seen_images:
             raise SystemExit(f"Duplicate slide image input: {image}")
         seen_images.add(resolved)
+        validate_image_file(image)
     return images
 
 
@@ -277,7 +277,7 @@ def validate_review_manifest(manifest_file: str | None, images: list[Path]) -> N
         if path is None:
             raise SystemExit(f"review_manifest slide {idx} is missing png_path.")
         if path in manifest_paths:
-            raise SystemExit(f"review_manifest slide {idx} has duplicate png_path: {path}")
+            raise SystemExit(f"Duplicate png_path in review_manifest slide {idx}: {path}")
         manifest_paths.add(path)
 
     if manifest_paths != expected_paths:
