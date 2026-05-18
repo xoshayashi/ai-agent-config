@@ -471,7 +471,12 @@
     "speaker_notes_signpost",
     "notes_hook",
     "notes_objection_preempt",
-    "notes_delivery_markers"
+    "notes_delivery_markers",
+    "density_balance_status",
+    "density balance against the planned density tier",
+    "occupancy is observable",
+    "freeze one exact value",
+    "overcrowding is not solved with more density"
   ],
   "helper_checks": [
     {
@@ -562,7 +567,9 @@
         "speaker_notes_landing",
         "speaker_notes_signpost",
         "notes_hook",
-        "notes_objection_preempt"
+        "notes_objection_preempt",
+        "occupancy is observable",
+        "overcrowding is not solved with more density"
       ],
       "must_not_contain": [
         "ATOM",
@@ -606,7 +613,9 @@
         "notes_objection_preempt",
         "speaker_notes_depth_lock",
         "message_sharpness_lock",
-        "evidence_compression_ladder"
+        "evidence_compression_ladder",
+        "occupancy is observable",
+        "overcrowding is not solved with more density"
       ],
       "must_not_contain": [
         "ATOM",
@@ -792,7 +801,12 @@
         "notes_hook",
         "notes_objection_preempt",
         "benchmark_reference_line",
-        "predecessor_question"
+        "predecessor_question",
+        "density_balance_status",
+        "density balance against the planned density tier",
+        "occupancy is observable",
+        "freeze one exact value",
+        "overcrowding is not solved with more density"
       ],
       "must_not_contain": [
         "ATOM",
