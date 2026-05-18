@@ -913,6 +913,34 @@ def test_rule_of_40_is_growth_plus_ebitda_margin() -> None:
             )
 
 
+def test_kpi_dashboard_omits_vc_block_for_an_ambiguous_mechanic() -> None:
+    """The VC metrics block is gated: an ambiguous-mechanic plan gets the
+    generic KPI set and keeps the original (unshifted) dashboard layout."""
+    story = (
+        "# Ambiguous plan\n\nA new venture with unclear revenue mechanics "
+        "and weak evidence. 5-year plan, seed round. Source: management memo."
+    )
+    facts = kernel.derive_source_facts(story)
+    assert kernel.mechanic_key(facts) == "generic"
+    ws = source_plan.build_source_plan_workbook_from_facts(facts)["KPI"]
+    labels = [
+        c.value for row in ws.iter_rows() for c in row
+        if isinstance(c.value, str)
+    ]
+    assert "VC decision metrics" not in labels, (
+        "VC metrics section leaked into an ambiguous-mechanic plan"
+    )
+    for metric in ("Rule of 40", "Customer acquisition cost", "Magic number"):
+        assert metric not in labels, (
+            f"{metric} leaked into an ambiguous-mechanic plan"
+        )
+    # The layout is unshifted: the interpretation register stays at its base.
+    assert any(
+        c.value == "KPI interpretation register" and c.row == 62
+        for row in ws.iter_rows() for c in row
+    ), "ambiguous-mechanic KPI layout should not shift"
+
+
 if __name__ == "__main__":
     _tests = [
         test_gross_margin_tracks_target_across_archetypes,
@@ -952,6 +980,7 @@ if __name__ == "__main__":
         test_runway_months_is_capped_at_99,
         test_kpi_dashboard_carries_vc_decision_metrics,
         test_rule_of_40_is_growth_plus_ebitda_margin,
+        test_kpi_dashboard_omits_vc_block_for_an_ambiguous_mechanic,
     ]
     for _test in _tests:
         try:

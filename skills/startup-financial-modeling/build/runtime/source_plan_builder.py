@@ -1384,12 +1384,15 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
     # net retention) is rendered only for profiles with a real customer-
     # acquisition and recurring/transaction motion. An ambiguous-mechanic
     # plan gets generic KPIs instead, and a pre-revenue plan has no customer
-    # base to compute them against — both keep the original layout. Rows
-    # below the operating KPIs shift down by VC_BLOCK_OFFSET when the block
-    # is present (one section header + five metric rows).
+    # base to compute them against — both keep the original layout.
     vc_metrics_apply = mechanic_key(facts) not in (
         "generic", "pre_revenue_milestone",
     )
+    # VC_BLOCK_OFFSET: the block occupies rows 24-29 (one section header plus
+    # five metric rows). Rows 23-27 were already blank, so the block pushes
+    # only two rows (28-29) past the original chart anchor at row 28; with a
+    # one-row gap the charts and the register below shift down by 3.
+    CAC_ROW = 27
     VC_BLOCK_OFFSET = 3 if vc_metrics_apply else 0
     rows = [
         (7, "Monthly price / unit", "JPY", "='Assumptions'!{c}11", ib.FMT_JPY_YEN),
@@ -1454,10 +1457,12 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
             cac.append(
                 f"=IF(({new_customers})<=0,\"N/A\",'P&L'!{c}14/({new_customers}))"
             )
-            # CAC payback: months of per-customer gross profit to recover CAC.
+            # CAC payback: months of per-customer gross profit to recover the
+            # CAC on the same KPI sheet (row CAC_ROW).
+            cac_cell = f"{c}{CAC_ROW}"
             cac_payback.append(
-                f"=IF(OR({c}27=\"N/A\",'Revenue Build'!{c}21<=0,'P&L'!{c}10<=0),"
-                f"\"N/A\",{c}27/('Revenue Build'!{c}21*'P&L'!{c}10/12))"
+                f"=IF(OR({cac_cell}=\"N/A\",'Revenue Build'!{c}21<=0,'P&L'!{c}10<=0),"
+                f"\"N/A\",{cac_cell}/('Revenue Build'!{c}21*'P&L'!{c}10/12))"
             )
             # Magic number: net new revenue over the prior period's S&M spend;
             # period 0 has no prior S&M base.
@@ -1468,7 +1473,7 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
             )
         _write_values(ws, 25, "Rule of 40", "%", rule_of_40, kind="formula", fmt=ib.FMT_PERCENT)
         _write_values(ws, 26, "Net revenue retention", "%", nrr, kind="formula", fmt=ib.FMT_PERCENT)
-        _write_values(ws, 27, "Customer acquisition cost", "JPY", cac, kind="formula", fmt=ib.FMT_JPY_YEN)
+        _write_values(ws, CAC_ROW, "Customer acquisition cost", "JPY", cac, kind="formula", fmt=ib.FMT_JPY_YEN)
         _write_values(ws, 28, "CAC payback", "months", cac_payback, kind="formula", fmt=ib.FMT_NUM)
         _write_values(ws, 29, "Magic number", "x", magic, kind="formula", fmt=ib.FMT_MULTIPLE)
     cats = Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=5)
