@@ -281,6 +281,8 @@
     "design_breakage_blocker_status",
     "PPTX/PDF package gate requires an approved review manifest",
     "validate_review_manifest",
+    "duplicate image input",
+    "duplicate png_path",
     "header_identity_lock: header is always the same compact left vertical line + H1 + subtitle system, never a slide-specific decoration surface",
     "header_integrity_blocker_lock: malformed, missing, oversized, recolored, right-decorated, or intruded header is a blocker and must be repaired before other polish",
     "deck_tone_signature_lock: preserve one material system across the deck for base, typography, rules, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior while varying only message-led layouts",
