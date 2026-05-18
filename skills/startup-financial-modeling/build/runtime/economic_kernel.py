@@ -1009,11 +1009,20 @@ def retarget_demand_to_narrative(
 
     target_customers = extract_target_customers(text)
     profile_mature = profile.customers[-1] if profile.customers else 0
+    customer_scale = 0.0
     if target_customers > 0 and profile_mature > 0:
         customer_scale = target_customers / profile_mature
         customers = [max(0, int(round(value * customer_scale))) for value in customers]
     elif unit_scale > 0:
         customers = [max(0, int(round(value * unit_scale))) for value in customers]
+    # The unit ramp drives revenue; for these profiles a "unit" and a
+    # "customer" are the same economic entity. When the narrative pins the
+    # customer count but states no ARR, scale the unit ramp by the customer
+    # factor too — otherwise revenue is computed off the profile-default
+    # unit ramp and diverges from the stated customer scale by orders of
+    # magnitude. A stated ARR, when present, keeps priority for the units.
+    if unit_scale == 0.0 and customer_scale > 0.0:
+        units = [max(0, int(round(value * customer_scale))) for value in units]
     return units, customers
 
 
