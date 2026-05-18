@@ -459,6 +459,7 @@ regenerate_until_quality_approved:
 generation_block_rule:
 nonconforming_existing_png_regeneration_lock:
 review_manifest:
+schema_version: 1
 review_manifest_status: approved
 validate_review_manifest:
 slides_final_master_path:
