@@ -903,10 +903,15 @@ def test_rule_of_40_is_growth_plus_ebitda_margin() -> None:
         facts = kernel.derive_source_facts(SAAS_STORY)
         for idx in range(len(facts.years)):
             got = kpi.cell(r40, first_col + idx).value
-            expected = (
-                float(rb.cell(growth, first_col + idx).value)
-                + float(pl.cell(ebitda_margin, first_col + idx).value)
+            growth_val = rb.cell(growth, first_col + idx).value
+            margin_val = pl.cell(ebitda_margin, first_col + idx).value
+            # A clean failure if the recalc did not resolve a cell, rather
+            # than a confusing TypeError from float(None).
+            assert None not in (got, growth_val, margin_val), (
+                f"period {idx}: a Rule of 40 input did not recalculate "
+                f"(rule={got}, growth={growth_val}, margin={margin_val})"
             )
+            expected = float(growth_val) + float(margin_val)
             assert abs(float(got) - expected) < 1e-6, (
                 f"period {idx}: Rule of 40 {got} != growth + EBITDA margin "
                 f"{expected}"
