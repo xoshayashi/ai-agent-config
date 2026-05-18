@@ -260,6 +260,25 @@ def valid_png_bytes(rgb: tuple[int, int, int] = (255, 255, 255), width: int = 20
 
 
 def approved_review_manifest(images: list[Path]) -> dict[str, object]:
+    deck_only_design_statuses = {
+        "deck_tone_consistency_status": "approved",
+        "illustration_consistency_status": "approved",
+    }
+    approved_design_statuses = {
+        "post_generation_design_balance_status": "approved",
+        "whitespace_occupancy_balance_status": "approved",
+        "density_balance_status": "approved",
+        "typography_balance_status": "approved",
+        "color_consistency_status": "approved",
+        "outer_padding_consistency_status": "approved",
+        "header_integrity_status": "approved",
+        "multimodal_design_review_status": "approved",
+        "design_balance_gate_status": "approved",
+        "occupancy_density_fit_status": "approved",
+        "font_scale_unity_status": "approved",
+        "palette_role_unity_status": "approved",
+        "design_breakage_blocker_status": "approved",
+    }
     return {
         "all_generated_images_reviewed": True,
         "weak_slide_regeneration_queue": [],
@@ -269,12 +288,17 @@ def approved_review_manifest(images: list[Path]) -> dict[str, object]:
         "deck_unity_status": "approved",
         "completion_ready_status": "approved",
         "review_manifest_status": "approved",
+        **deck_only_design_statuses,
+        **approved_design_statuses,
         "slides": [
             {
                 "slide_id": str(idx),
                 "png_path": str(image),
                 "image_review_status": "approved",
                 "final_image_quality_status": "approved",
+                "content_quality_status": "approved",
+                "design_quality_status": "approved",
+                **approved_design_statuses,
                 "blockers": [],
                 "majors": [],
             }
