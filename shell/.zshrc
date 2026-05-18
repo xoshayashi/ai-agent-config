@@ -57,8 +57,10 @@ alias gl='git log --oneline --graph --decorate'
 eval "$(starship init zsh)"
 
 alias c='clear'
-alias codex='codex --dangerously-bypass-approvals-and-sandbox'
 alias gemini='gemini --yolo'
+alias codex='codex --dangerously-bypass-approvals-and-sandbox'
+# Use an explicit permissive alias so shell launches match the repo-managed CLI defaults.
+alias claude='claude --dangerously-skip-permissions'
 export COPILOT_ALLOW_ALL=true
 alias copilot='copilot --allow-all'
 
@@ -66,11 +68,6 @@ alias copilot='copilot --allow-all'
 export OLLAMA_CONTEXT_LENGTH=16384
 export COPILOT_PROVIDER_MAX_PROMPT_TOKENS=8192
 export COPILOT_PROVIDER_MAX_OUTPUT_TOKENS=8192
-
-
-# --- Claude Code ---
-# Auto permission mode is set globally via ~/.claude/settings.json
-# (permissions.defaultMode = "auto"), so no shell wrapper is needed.
 
 # --- zsh-syntax-highlighting（コマンド色分け、必ず最後に読み込む）---
 source $(brew --prefix)/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh
