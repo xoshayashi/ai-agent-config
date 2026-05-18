@@ -2026,10 +2026,15 @@ def _extract_source_primitives(
     # primitive drivers; a structured input overrides them before derivation.
     monthly_price = _price_series(price, periods)
     take_rate = _take_rate_series(take, periods)
-    capex_per_unit = _pad_series(
-        [int(value * money_scale) for value in profile.capex_per_unit_yen], periods, 0
-    )
-    avg_comp = [int(value * money_scale) for value in _curve(16_000_000, 14_500_000, periods)]
+    # capex_per_unit and avg_comp are profile / curve defaults, not extracted
+    # facts. Materializing them here would bake in the *narrative*-detected
+    # currency — and for a structured `--input` plan that narrative is
+    # synthetic, so its currency can be wrong. They are left empty;
+    # _derive_facts_from_primitives applies the FX-scaled default with the
+    # authoritative money_scale, which derive_source_facts_from_mapping has by
+    # then corrected to the structured `currency:` field.
+    capex_per_unit: list[int] = []
+    avg_comp: list[int] = []
     variable_cogs_pct = _pad_series(profile.variable_cogs_pct, periods, 0.30)
     # The cost-to-serve drivers are not FX-scaled: calibrate_cost_stack_to_gross_margin
     # rescales all four COGS components to hit the target gross margin, so their
@@ -2152,7 +2157,10 @@ def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
     gmv = _pad_series(gmv, periods, 0)
     customers = _pad_series(retargeted_customers, periods, 0)
     variable_cogs_pct = _pad_series(prims.variable_cogs_pct, periods, 0.30)
-    capex_per_unit = _pad_series(prims.capex_per_unit, periods, 0)
+    # FX-scaled default: applied here, not at extraction, so it follows the
+    # authoritative money_scale rather than a narrative-detected currency.
+    capex_default = [int(value * money_scale) for value in profile.capex_per_unit_yen]
+    capex_per_unit = _pad_series(prims.capex_per_unit or capex_default, periods, 0)
     tam_default = int(profile.tam_yen * money_scale)
     tam = max(tam_default, gmv[-1] * 10 if profile.key == "marketplace" else tam_default)
     sam = max(int(tam * 0.18), int(1_000_000_000 * money_scale))
@@ -2183,7 +2191,14 @@ def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
         product_hc = [max(1, int(round(value * factor))) for value in product_hc]
     total_hc = [a + b + c + d for a, b, c, d in zip(product_hc, gtm_hc, ops_hc, ga_hc)]
     curves = _operating_assumption_curves(profile, periods)
-    avg_comp = _pad_series(prims.avg_comp, periods, int(15_000_000 * money_scale))
+    # FX-scaled default: see the capex_per_unit note above.
+    avg_comp_default = [
+        int(value * money_scale)
+        for value in _curve(16_000_000, 14_500_000, periods)
+    ]
+    avg_comp = _pad_series(
+        prims.avg_comp or avg_comp_default, periods, int(15_000_000 * money_scale)
+    )
     delivery_cost = _pad_series(prims.delivery_cost, periods, 0)
     cloud_cost = _pad_series(prims.cloud_cost, periods, 0)
     support_cost = _pad_series(prims.support_cost, periods, 0)
@@ -2666,12 +2681,17 @@ def derive_source_facts_from_mapping(raw: dict[str, Any]) -> SourceFacts:
     prims.support_cost = _coerce_int_series(
         _first_present(raw, ("support_cost_yen", "support_cost")), periods, prims.support_cost,
     )
-    prims.capex_per_unit = _coerce_int_series(
-        _first_present(raw, ("capex_per_unit_yen", "capex_per_unit")), periods, prims.capex_per_unit,
-    )
-    prims.avg_comp = _coerce_int_series(
-        _first_present(raw, ("avg_comp_yen", "avg_comp")), periods, prims.avg_comp,
-    )
+    # capex_per_unit and avg_comp arrive empty from extraction (their FX-scaled
+    # default is applied later, against the authoritative money_scale). Only
+    # override when the YAML actually states them — coercing an absent field
+    # would replace the empty "unset" marker with a zero series and suppress
+    # the default.
+    capex_raw = _first_present(raw, ("capex_per_unit_yen", "capex_per_unit"))
+    if capex_raw is not None:
+        prims.capex_per_unit = _coerce_int_series(capex_raw, periods, prims.capex_per_unit)
+    avg_comp_raw = _first_present(raw, ("avg_comp_yen", "avg_comp"))
+    if avg_comp_raw is not None:
+        prims.avg_comp = _coerce_int_series(avg_comp_raw, periods, prims.avg_comp)
     # Stated driver-level financing inputs.
     beginning_cash_raw = _first_present(raw, ("beginning_cash_yen", "beginning_cash"))
     if beginning_cash_raw is not None:
