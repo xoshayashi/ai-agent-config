@@ -743,32 +743,37 @@ def extract_price(text: str, profile: MechanicProfile, currency: str = "JPY") ->
         return 0
     # (pattern, always_annual) — `月額` is monthly; ACV is annual by definition;
     # the other patterns are annual only when annual cues sit next to them.
-    # An explicit "sells/sold for $X" is the strongest price statement, so it
-    # is matched before the keyword-cue pattern — a hardware unit price must
-    # win over an incidental attach-revenue mention ("a support subscription
-    # at $X/year"). It requires a currency mark, so a volume or duration after
-    # the verb ("sold for 3 years") is not read as a price. The number-first
-    # "$X per <unit-noun>" form covers phrasing no cue keyword sits next to;
-    # its `s?\b` matches the plural and blocks a partial-word match.
-    candidates: list[tuple[str, bool | None]] = [
-        (rf"月額\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*円?", False),
-        (
-            rf"(?:sells?|sold)\s+(?:for|at)[^0-9¥$]{{0,16}}[¥$]\s*"
-            rf"([0-9,.]+)\s*{_PRICE_UNIT}?",
-            None,
-        ),
-        (
-            rf"(?:price|pricing|fee|subscription|lease|rental|unit price|"
-            rf"単価|価格|利用料)"
-            rf"[^0-9¥$]{{0,32}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?",
-            None,
-        ),
-        (
-            rf"[¥$]\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*(?:per|/|あたり)\s*"
-            rf"(?:{_UNIT_NOUN})s?\b",
-            None,
-        ),
-    ]
+    # `sells/sold for|at` requires a currency mark, so a volume or duration
+    # after the verb ("sold for 3 years") is not read as a price. The
+    # number-first "$X per <unit-noun>" form covers phrasing no cue keyword
+    # sits next to; its `s?\b` matches the plural and blocks a partial-word
+    # match.
+    month = (rf"月額\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*円?", False)
+    sells = (
+        rf"(?:sells?|sold)\s+(?:for|at)[^0-9¥$]{{0,16}}[¥$]\s*"
+        rf"([0-9,.]+)\s*{_PRICE_UNIT}?",
+        None,
+    )
+    keyword = (
+        rf"(?:price|pricing|fee|subscription|lease|rental|unit price|"
+        rf"単価|価格|利用料)"
+        rf"[^0-9¥$]{{0,32}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?",
+        None,
+    )
+    per_unit = (
+        rf"[¥$]\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*(?:per|/|あたり)\s*"
+        rf"(?:{_UNIT_NOUN})s?\b",
+        None,
+    )
+    # For hardware, the unit sale is the primary revenue: an explicit
+    # "sells/sold for $X" outranks an incidental attach-revenue keyword
+    # ("a support subscription at $X/year"). Every other profile keeps the
+    # keyword cue first — its subscription / fee price is the primary one.
+    candidates: list[tuple[str, bool | None]] = (
+        [month, sells, keyword, per_unit]
+        if profile.key == "hardware_asset_heavy"
+        else [month, keyword, sells, per_unit]
+    )
     if profile.key != "hardware_asset_heavy":
         candidates.append(
             (rf"ACV[^0-9¥$]{{0,24}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?", True),

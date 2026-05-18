@@ -1329,6 +1329,8 @@ def test_hardware_unit_sale_survives_an_attach_subscription() -> None:
         zip(facts.new_units, facts.monthly_price_yen)
     ):
         unit_sale = units * price
+        # The 1.3x headroom is the other-revenue uplift (attach revenue
+        # layered on the unit sale) — not a recurring x12 figure.
         assert unit_sale <= revenue[idx] <= unit_sale * 1.3, (
             f"period {idx}: revenue {revenue[idx]:,.0f} is not a unit-sale "
             f"figure (units x price = {unit_sale:,.0f})"
