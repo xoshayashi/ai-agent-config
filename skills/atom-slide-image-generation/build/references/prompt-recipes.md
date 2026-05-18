@@ -115,6 +115,12 @@ visual_subject_open_set:
 message_led_composition_lock:
 region_balance_policy:
 composition_fit_plan:
+design_balance_gate:
+occupancy_density_fit_lock:
+font_scale_unity_lock:
+palette_role_unity_lock:
+multimodal_design_review_lock:
+design_breakage_blocker_lock:
 secondary_region_integrity_lock:
 body_silhouette_lock:
 post_generation_design_balance_check:
@@ -311,6 +317,10 @@ ATOM slide contract:
 - imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation
 - editorial_polish_repair_loop: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm
 - visual_subject_open_set, message_led_composition_lock, and composition_fit_plan: choose the visual subject, focal relationship, and canvas occupancy from the argument before image prompting; occupancy is observable - no quadrant of the body content area is conspicuously empty and no major region overflows its grid track
+- design_balance_gate: freeze planned body occupancy, useful whitespace role, content-area weight, text-role sizes, background role, and accent role before generation; approve only when the actual PNG matches those choices
+- occupancy_density_fit_lock: body occupancy must fit the selected density_tier without dead zones, margin crush, overcrowding, or density created by shrinking body text below 18pt equivalent
+- font_scale_unity_lock: reuse one deck-level type scale for H1, subtitle, body, data labels, table labels, Source, and optional Insight; repair size/weight/color drift before packaging
+- palette_role_unity_lock: keep ATOM colors in stable roles across canvas, panels/cards, text, footnotes, Deep Blue accent, and rare Honey signal; repair arbitrary background, text, accent, or saturation drift
 - region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette
 - secondary_region_integrity_lock: in split or auxiliary-region layouts, design the secondary region as a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field
 - body_silhouette_lock: make the body read as one closed visual block with aligned outer edges, lower edges, and footer clearance
@@ -599,13 +609,16 @@ Priority:
 2. Keep ATOM header fixed: H1 30-34pt #2D332E, subtitle 21-23pt #4D544E, exact header-block left accent, header_left_accent_reference_lock, header_left_accent_no_protrusion_rule, header_left_accent_top_protrusion_blocker, header_identity_lock, header_integrity_blocker_lock, and no header ranges in the final prompt.
 3. Rebuild grid_mode, column_spans, row_tracks, column_tracks, separator_x, outer_padding, and shared_edges.
 4. Add coordinate_inventory_1672 and master_components if missing.
-5. Remove repeated explanation and weak labels.
-6. Use headings, numbers, rules, spacing, and comparison axes for reading order.
-7. Reduce equal-strength regions.
-8. Add, change, or remove Insight component based on interpretation need and the embedded ATOM design system.
-9. Keep every message-box/Insight text smaller than H1; repair oversized boxes before other visual polish.
-10. Split the slide if the message or structure is overloaded.
-11. Clean source policy.
+5. Apply design_balance_gate: set body occupancy, useful whitespace, content-area weight, text-role sizes, background role, and accent role explicitly.
+6. Apply occupancy_density_fit_lock: repair accidental empty zones, weak body occupancy, crushed margins, overcrowding, or density created by smaller text.
+7. Apply font_scale_unity_lock and palette_role_unity_lock: restore the deck type scale and ATOM color roles before any decorative polish.
+8. Remove repeated explanation and weak labels.
+9. Use headings, numbers, rules, spacing, and comparison axes for reading order.
+10. Reduce equal-strength regions.
+11. Add, change, or remove Insight component based on interpretation need and the embedded ATOM design system.
+12. Keep every message-box/Insight text smaller than H1; repair oversized boxes before other visual polish.
+13. Split the slide if the message or structure is overloaded.
+14. Clean source policy.
 
 Output:
 - revised canonical planning block
@@ -644,6 +657,12 @@ Layout:
 - header_left_accent_top_protrusion_blocker passes: no visible accent pixel sits above the first visible H1 glyph/title top, outside header_safe_area, detached from H1/subtitle, or inside body_start_y
 - header_integrity_blocker_lock passes: no malformed, missing, oversized, recolored, right-decorated, or intruded header remains
 - Whitespace and occupancy balance is intentional: no accidental empty dead zone, no overcrowded canvas, no content crushing the margins
+- design_balance_gate passes: intended body occupancy, whitespace role, content-area weight, type-role sizes, background role, and accent role were frozen before generation and match the actual PNG
+- occupancy_density_fit_lock passes: body occupancy matches the selected density_tier without dead zones, margin crush, overcrowding, or smaller-than-18pt body text
+- font_scale_unity_lock passes: one deck-level type scale holds across H1, subtitle, body, data labels, table labels, Source, and optional Insight
+- palette_role_unity_lock passes: ATOM colors keep stable roles across canvas, panels/cards, text, footnotes, Deep Blue accent, and rare Honey signal
+- multimodal_design_review_lock passes: actual PNGs were inspected multimodally for layout collapse, occupancy/density imbalance, font-size/color drift, background/accent mismatch, and deck-unity drift
+- design_breakage_blocker_lock passes: no layout collapse, accidental empty zone, overcrowding, inconsistent font scale, wrong text color, wrong background color, excessive/random accent use, or off-system illustration tone remains
 - Secondary regions in split or auxiliary-region layouts read as complete decision panels, not loose leftover areas
 - Body silhouette is closed: main and secondary regions share intentional outer edges, lower edges, and footer clearance
 - Outer padding is consistent with the deck master and does not drift between slides
