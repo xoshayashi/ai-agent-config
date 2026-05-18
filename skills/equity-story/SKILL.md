@@ -232,7 +232,10 @@ enough that a reader repeats it intact to partners who were not in the room.]
 [Concrete, verifiable founder-market fit and unfair advantage.]
 
 ## Market
-[Bottom-up TAM / SAM / SOM with the calculation shown. SOM → TAM.]
+[Bottom-up TAM / SAM / SOM with the calculation shown. SOM → TAM. For IPO /
+late-stage / headline-number arguments, apply `references/market-sizing.md` —
+triangulated TAM, budget-source SAM with a Gross→Net discount, four-scenario
+SOM, comparable-company cross-check.]
 
 ## Business model & unit economics
 [How it makes money; CAC / LTV / margin / payback / NRR as actuals or
