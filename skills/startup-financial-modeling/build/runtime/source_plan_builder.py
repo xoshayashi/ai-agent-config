@@ -1143,7 +1143,7 @@ def _build_cf(wb: Workbook, facts: SourceFacts) -> None:
         (23, "Net cash flow", "JPY", [f"={get_column_letter(c)}16+SUM({get_column_letter(c)}19:{get_column_letter(c)}22)" for c in cols]),
         (30, "Beginning cash", "JPY", [f"='Assumptions'!{get_column_letter(c)}47" for c in cols]),
         (31, "Ending cash", "JPY", [f"={get_column_letter(c)}30+{get_column_letter(c)}23" for c in cols]),
-        (32, "Runway months", "months", [f"=IF({get_column_letter(c)}16>=0,99,MAX(0,{get_column_letter(c)}31)/ABS({get_column_letter(c)}16/12))" for c in cols]),
+        (32, "Runway months", "months", [f"=IF({get_column_letter(c)}16>=0,99,MIN(99,MAX(0,{get_column_letter(c)}31)/ABS({get_column_letter(c)}16/12)))" for c in cols]),
     ]
     for row, label, unit, values in rows:
         fmt = ib.FMT_NUM if unit == "months" else ib.FMT_MONEY
@@ -1390,7 +1390,6 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
         (15, "Revenue", "JPY", "='Revenue Build'!{c}18", ib.FMT_MONEY),
         (16, "Gross margin", "%", "='P&L'!{c}10", ib.FMT_PERCENT),
         (17, "EBITDA margin", "%", "='P&L'!{c}19", ib.FMT_PERCENT),
-        (18, "Burn multiple", "x", "=IF({c}15=0,0,ABS('CF'!{c}16)/MAX(1,{c}15-{prev}15))", ib.FMT_MULTIPLE),
         (19, "Revenue / FTE", "JPY", "='People Plan'!{c}15", ib.FMT_MONEY),
         (20, "Runway", "months", "='CF'!{c}32", ib.FMT_NUM),
         (21, "New investor ownership", "%", "='Capital Stack'!{c}16", ib.FMT_PERCENT),
@@ -1403,6 +1402,21 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
             prev = get_column_letter(cols[idx - 1]) if idx else c
             vals.append(formula.format(c=c, prev=prev))
         _write_values(ws, row, label, unit, vals, kind="formula", fmt=fmt, bold=row in (13, 15, 20))
+    # Burn multiple = net cash burn / net new revenue. Period 0 has no prior
+    # period, so its net-new revenue is the full period-0 revenue — taking a
+    # zero year-over-year difference there would force the denominator and
+    # explode the ratio. Non-burning periods (free cash flow >= 0) read 0;
+    # periods with no revenue growth to fund read "N/A" rather than dividing
+    # by a non-positive base.
+    burn_vals = []
+    for idx, col in enumerate(cols):
+        c = get_column_letter(col)
+        net_new = f"{c}15" if idx == 0 else f"{c}15-{get_column_letter(cols[idx - 1])}15"
+        burn_vals.append(
+            f"=IF('CF'!{c}16>=0,0,IF(({net_new})<=0,\"N/A\","
+            f"ABS('CF'!{c}16)/({net_new})))"
+        )
+    _write_values(ws, 18, "Burn multiple", "x", burn_vals, kind="formula", fmt=ib.FMT_MULTIPLE)
     cats = Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=5)
     _add_line_chart(ws, "Operating scale", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=13, max_row=13), cats, "B28", "units")
     _add_line_chart(ws, "Economic value", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=14, max_row=15), cats, "J28", _money_unit(facts))
