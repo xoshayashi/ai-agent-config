@@ -337,11 +337,13 @@ def test_depreciation_uses_the_accumulated_asset_base() -> None:
         assert accumulated_da <= cumulative_capex + 1.0, (
             f"period {idx}: accumulated D&A exceeds gross PP&E"
         )
-    final = projection[-1]
+    # Accumulated-base depreciation charges materially more over the horizon
+    # than the old single-period model (each period's CapEx / life), which
+    # would total cumulative-CapEx / life.
     life = facts.depreciation_life_months[-1] or 60
-    single_period = final["capex"] * 12.0 / life
-    assert final["depreciation"] > single_period, (
-        "mature D&A does not reflect the accumulated asset base"
+    single_period_total = cumulative_capex * 12.0 / life
+    assert accumulated_da > single_period_total, (
+        "D&A does not reflect the accumulated asset base"
     )
 
 
