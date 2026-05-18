@@ -296,6 +296,9 @@ install_notification_hooks() {
     warn "python3 not found; skip notification hook setup"
     return 0
   fi
+  # A function's positional parameters are local in POSIX sh and restored on
+  # return, so building the helper's argv with `set --` does not affect $@
+  # in the caller.
   set -- --mode install \
     --config-home "$config_home" \
     --claude-home "$claude_home" \
