@@ -140,6 +140,31 @@ def test_stated_gross_margin_is_extracted_from_narrative() -> None:
     )
 
 
+def test_annual_pricing_is_converted_to_a_monthly_figure() -> None:
+    """An ACV or explicitly annual price must be divided to a monthly price.
+
+    The model drives recurring revenue off a monthly price; a ¥7M/year ACV
+    read as ¥7M/month overstates revenue twelvefold.
+    """
+    acv = kernel.derive_source_facts(
+        "# SaaS plan\nB2B SaaS. ACV is ¥7,200,000 per customer per year.\n"
+        "Source: memo.\n"
+    )
+    assert acv.monthly_price_yen[0] == 600_000, (
+        f"ACV not converted to a monthly price: {acv.monthly_price_yen[0]}"
+    )
+    annual = kernel.derive_source_facts(
+        "# SaaS plan\nB2B SaaS. The subscription price is ¥1,200,000 per year.\n"
+        "Source: memo.\n"
+    )
+    assert annual.monthly_price_yen[0] == 100_000, (
+        f"annual price not converted: {annual.monthly_price_yen[0]}"
+    )
+    # A monthly price stays monthly.
+    monthly = kernel.derive_source_facts(SAAS_STORY)
+    assert monthly.monthly_price_yen[0] == 12_000
+
+
 def test_monthly_burn_phrasing_does_not_flip_model_grain() -> None:
     """'monthly burn' is a metric, not a request for a month-by-month model."""
     assert kernel.extract_model_grain(SAAS_STORY) == "annual"
@@ -713,6 +738,7 @@ if __name__ == "__main__":
     _tests = [
         test_gross_margin_tracks_target_across_archetypes,
         test_stated_gross_margin_is_extracted_from_narrative,
+        test_annual_pricing_is_converted_to_a_monthly_figure,
         test_monthly_burn_phrasing_does_not_flip_model_grain,
         test_explicit_monthly_model_request_is_still_detected,
         test_demand_ramp_reaches_stated_arr,

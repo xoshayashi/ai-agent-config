@@ -708,21 +708,51 @@ def extract_currency(text: str) -> str:
 _PRICE_UNIT = r"(万|億|百万|[mMbB](?![A-Za-z]))"
 
 
+# Markers that a stated price is annual, so it must be divided to a monthly
+# figure. ACV (Annual Contract Value) is annual by definition.
+_ANNUAL_PRICE_CUE = re.compile(
+    r"per\s*year|/\s*year|per\s*annum|p\.?a\.?|annual(?:ly)?|年額|年間|/\s*年|年契約",
+    flags=re.IGNORECASE,
+)
+
+
 def extract_price(text: str, profile: MechanicProfile, currency: str = "JPY") -> int:
+    """Extract a monthly per-unit price; annual figures (ACV, "per year") /12.
+
+    The model drives recurring revenue off a *monthly* price. A stated ACV or
+    an explicitly annual price is divided to a monthly figure so a ¥7M/year
+    contract is not modeled as ¥7M/month.
+    """
     if profile.key == "marketplace":
         return 0
-    patterns = [
-        rf"月額\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*円?",
-        rf"(?:price|pricing|fee|subscription|lease|rental|unit price|単価|価格|利用料)[^0-9¥$]{{0,32}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?",
+    # (pattern, always_annual) — `月額` is monthly; ACV is annual by definition;
+    # the generic price pattern is annual only when annual cues sit next to it.
+    candidates: list[tuple[str, bool]] = [
+        (rf"月額\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*円?", False),
+        (
+            rf"(?:price|pricing|fee|subscription|lease|rental|unit price|単価|価格|利用料)[^0-9¥$]{{0,32}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?",
+            None,
+        ),
     ]
     if profile.key != "hardware_asset_heavy":
-        patterns.extend(
-            [
-                rf"ACV[^0-9¥$]{{0,24}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?",
-            ]
+        candidates.append(
+            (rf"ACV[^0-9¥$]{{0,24}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?", True),
         )
     default_price = max(1, int(profile.default_monthly_price_yen * money_scale_for_currency(currency)))
-    price = money_yen(patterns, text, default_price)
+    price = default_price
+    for pattern, always_annual in candidates:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if not match:
+            continue
+        value = money_from_match(match)
+        if value is None or value <= 0:
+            continue
+        is_annual = always_annual
+        if is_annual is None:
+            context = text[max(0, match.start() - 40): match.end() + 40]
+            is_annual = bool(_ANNUAL_PRICE_CUE.search(context))
+        price = value // 12 if is_annual else value
+        break
     # The noise floor is currency-relative: a valid USD per-seat price ($80) is
     # far below any sane JPY price floor, but the floor must still reject a
     # near-zero spurious match — hence $10, not $1.
