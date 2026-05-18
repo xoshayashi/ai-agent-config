@@ -281,6 +281,12 @@ inference at a glance. Never invent a number to fill a gap; tag it `[open]` and
 name it as a diligence item. Naming the open items is what makes the rest
 credible.
 
+**Define the terms a reader would over-read.** Where the story first uses a word
+or coined milestone a reader will inflate — "platform", "autonomous",
+"profitable", a coined product or category name — state plainly what it means
+*and what it does not*. Pre-empting the generous reading is more credible than
+letting it stand (see `references/narrative-craft.md` §6).
+
 Tie every recommendation to the reader's decision criteria (price, ROI, cost
 structure, growth, durability). Follow `DESIGN.md` for tone: quiet, specific,
 no hype, no unsupported superlatives. See `references/examples.md` for two
@@ -342,7 +348,10 @@ See `references/narrative-craft.md` for how to fix a "no" here.
     with a comparison (prior period, benchmark, or cohort), not naked?
 16. **Hook and ending** — does the first line create tension rather than define
     a term, and is the strongest line at the end?
-17. **No empty superlatives** — is every "leading / best-in-class /
+17. **Over-readable terms defined** — does every term or coined milestone a
+    reader would inflate ("platform", "autonomous", a coined name) state plainly
+    what it means *and what it does not*, at first use?
+18. **No empty superlatives** — is every "leading / best-in-class /
     transforming"-type word either earned by an adjacent verifiable fact or cut?
 
 ### Final gate
