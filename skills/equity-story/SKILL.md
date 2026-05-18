@@ -39,6 +39,10 @@ Three failure modes recur. Watch for them throughout:
   ignore the unit economics, the comparable set, or the cash position will be
   found out. Stories that survive are the ones grounded in the numbers.
 
+The craft and substance standards in this skill are **universal** — they apply
+at every stage and in every geography. What the stage playbooks adjust is the
+*depth and kind of evidence*, not the quality bar.
+
 ## Inputs to gather first
 
 Before writing anything, establish these five things. Infer small gaps and state
@@ -147,6 +151,13 @@ Numbers belong *next to the claim they prove*, never in a standalone pile.
   actuals — CAC, LTV, gross margin, payback, burn multiple, NRR. Their weight
   in the story rises with stage.
 
+For each major claim, identify the one **load-bearing number** — the figure
+that, if it were false, would break the claim — and present it **in context**,
+never naked. A number alone is arithmetic; a number against a comparison is
+evidence. Pair it with a prior-period delta, an industry benchmark, or a cohort
+cut so the reader can judge its weight ("NRR 128%, vs. a 110% SaaS median",
+not "NRR 128%").
+
 ### 5. Preempt the objections
 
 Read `references/investor-objections.md`. A strong equity story does not hide
@@ -157,7 +168,10 @@ collect the sharpest ones into an explicit anticipated-Q&A section.
 
 ### 6. Draft the equity story
 
-Produce the output in the format below.
+Produce the output in the format below. As you draft, read
+`references/narrative-craft.md` and apply it — the logic alone does not make a
+story get read to the end, remembered, and retold accurately to partners who
+were not in the room. Craft carries the logic; it never fakes it.
 
 ### 7. Self-review and iterate
 
@@ -178,7 +192,10 @@ but keep this order — it *is* the narrative spine made visible:
 
 ## Thesis in brief
 [The company in one declarative sentence. Then 3–5 investment highlights —
-the load-bearing reasons to invest, each one sentence.]
+the load-bearing reasons to invest, each one sentence. One highlight should
+state the contrarian core: what most informed people believe that this thesis
+bets against. Close with the carry-home — the single phrase or image compact
+enough that a reader repeats it intact to partners who were not in the room.]
 
 ## Why now
 [The inflection. Quantified.]
@@ -241,7 +258,11 @@ compact worked equity story that shows the whole arc end to end.
 
 ## Self-review checklist
 
-Score the draft against every item. Any "no" is a gap to fix before iterating.
+Score the draft against every item. A story has to be both *correct* and
+*persuasive* — the two axes below are scored separately, and a "no" on either is
+a gap to fix before iterating.
+
+### A. Substance — is the argument correct?
 
 1. **One-sentence test** — can the company be defined in one sentence a
    non-expert understands, with no jargon?
@@ -265,8 +286,32 @@ Score the draft against every item. Any "no" is a gap to fix before iterating.
     ignore the unit economics, the comparable set, or the cash runway?
 11. **Trajectory not snapshot** — is progress shown as a line (deltas over
     time), not a single dot?
-12. **Defensible to a sceptic** — could a sharp reviewer read it alone and
-    repeat the thesis in two sentences without the author present?
+12. **Retellable accurately** — could a third party read it alone and retell the
+    thesis to a partner in thirty seconds without drifting?
+
+### B. Craft & persuasion — will it get read, remembered, retold?
+
+See `references/narrative-craft.md` for how to fix a "no" here.
+
+13. **Carry-home** — is there a single phrase or image the reader walks out
+    holding and can hand on intact?
+14. **Contrarian core** — can the one non-obvious idea the thesis bets on — what
+    most informed people believe that this story bets against — be stated in
+    one plain sentence, and is it visible in the story?
+15. **Insider detail** — does each major claim carry at least one concrete
+    detail an outsider with no operating experience could not have written?
+16. **Numbers in context** — does each major claim's load-bearing number appear
+    with a comparison (prior period, benchmark, or cohort), not naked?
+17. **Hook and ending** — does the first line create tension rather than define
+    a term, and is the strongest line at the end?
+18. **No empty superlatives** — is every "leading / best-in-class /
+    transforming"-type word either earned by an adjacent verifiable fact or cut?
+
+### Final gate
+
+In one line, score the honest outcome: **would this win a second meeting, or be
+set aside?** If "set aside", the draft is not done — find which axis failed and
+iterate.
 
 ## References
 
@@ -283,6 +328,9 @@ Load these as the workflow reaches them, not all at once:
   想定問答集, the Growth→Prime path, comparable-company valuation practice.
 - `references/investor-objections.md` — catalogue of tough investor questions
   by topic, with how to preempt each one inside the story.
+- `references/narrative-craft.md` — the craft that makes a sound thesis get
+  read, remembered and retold: tension, concreteness, the carry-home, the
+  honesty boundary, and the banned-without-evidence phrases. Read while drafting.
 - `references/examples.md` — a compact, annotated worked equity story
   (fictional growth-stage company) showing the full arc, the evidence-tagging
   convention, and how the framework choices land in practice.
