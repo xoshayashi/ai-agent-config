@@ -749,6 +749,79 @@ def test_workbook_recalc_reconciles_with_kernel_gross_margin() -> None:
             )
 
 
+def test_burn_multiple_does_not_explode_in_period_zero() -> None:
+    """Period-0 burn multiple uses the full period-0 revenue as net-new
+    revenue, not a zero year-over-year difference that forces the
+    denominator and explodes the ratio to hundreds of millions."""
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        pytest.skip("soffice/libreoffice not available")
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "saas.md"
+        out = Path(tmp) / "saas.xlsx"
+        src.write_text(SAAS_STORY, encoding="utf-8")
+        source_plan.build_source_plan_workbook(src, out)
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(Path(tmp) / "recalc"), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        wb = load_workbook(Path(tmp) / "recalc" / "saas.xlsx", data_only=True)
+        ws = wb["KPI"]
+        first_col = source_plan.START_PERIOD_COL
+        burn_row = next(
+            (cell.row for row in ws.iter_rows() for cell in row
+             if cell.value == "Burn multiple"),
+            None,
+        )
+        assert burn_row is not None, "KPI sheet missing 'Burn multiple' row"
+        facts = kernel.derive_source_facts(SAAS_STORY)
+        for idx in range(len(facts.years)):
+            val = ws.cell(burn_row, first_col + idx).value
+            if isinstance(val, str):  # "N/A" — no revenue growth to fund
+                continue
+            assert val is not None and abs(float(val)) < 50.0, (
+                f"period {idx}: burn multiple {val} is not a sane ratio"
+            )
+
+
+def test_runway_months_is_capped_at_99() -> None:
+    """A near-zero-negative free cash flow against a large cash balance must
+    not blow runway to thousands of months — the formula caps it at 99."""
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        pytest.skip("soffice/libreoffice not available")
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "runway.xlsx"
+        wb = source_plan.build_source_plan_workbook_from_facts(
+            kernel.derive_source_facts(SAAS_STORY)
+        )
+        ws = wb["CF"]
+        first_col = source_plan.START_PERIOD_COL
+        # Force a tiny-negative free cash flow against a large cash balance:
+        # the uncapped ratio would yield tens of millions of months.
+        ws.cell(16, first_col).value = -1000          # Free cash flow
+        ws.cell(31, first_col).value = 5_000_000_000  # Ending cash
+        wb.save(out)
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(Path(tmp) / "recalc"), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        wb2 = load_workbook(Path(tmp) / "recalc" / "runway.xlsx", data_only=True)
+        ws2 = wb2["CF"]
+        runway_row = next(
+            (cell.row for row in ws2.iter_rows() for cell in row
+             if cell.value == "Runway months"),
+            None,
+        )
+        assert runway_row is not None, "CF sheet missing 'Runway months' row"
+        runway = ws2.cell(runway_row, first_col).value
+        assert runway is not None and float(runway) <= 99.0, (
+            f"runway {runway} months is not capped at 99"
+        )
+
+
 if __name__ == "__main__":
     _tests = [
         test_gross_margin_tracks_target_across_archetypes,
@@ -784,6 +857,8 @@ if __name__ == "__main__":
         test_peer_comparison_status_recalculates_without_error,
         test_archetype_workbooks_pass_strict_audit,
         test_workbook_recalc_reconciles_with_kernel_gross_margin,
+        test_burn_multiple_does_not_explode_in_period_zero,
+        test_runway_months_is_capped_at_99,
     ]
     for _test in _tests:
         try:
