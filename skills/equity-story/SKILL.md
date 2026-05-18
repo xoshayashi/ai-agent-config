@@ -61,7 +61,9 @@ validates becomes the load-bearing claims of the equity story once the user is
 ready. A story built on an un-articulated strategy is the deepest form of the
 third failure mode above — narrative detached from reality. When the request is
 ambiguous, infer from how settled the user's own thesis sounds, and state the
-assumption.
+assumption. In diagnostic mode, gather inputs 1–3 below; inputs 4–5 (audience
+and the ask) often do not exist yet and can be deferred until the strategy is
+settled.
 
 Before writing anything, establish these five things. Infer small gaps and state
 the assumption; only ask the user when an answer materially changes the thesis.
@@ -164,8 +166,11 @@ the catalogue gives, consult the dedicated skill rather than re-deriving it.
 
 **Diagnostic mode.** When the user is upstream (see *Inputs to gather first*) —
 the strategy itself is not yet articulated — use these same frameworks
-differently: to generate *competing hypotheses*, not to assert one. The verdict
-the equity story needs ("this is our moat") is the *output* of strategy work,
+differently: to generate *competing hypotheses*, not to assert one. Steps 1–2
+are deferred in this mode: step 1's stage playbook still gives useful context,
+but the narrative spine of step 2 is what the diagnostic *produces*, not an
+input to it. The verdict the equity story needs ("this is our moat") is the
+*output* of strategy work,
 not its input; supplying a verdict the user has not earned is how a story
 detaches from reality. So produce a **strategy diagnostic** in place of the
 equity-story document, with this spine:
@@ -178,7 +183,8 @@ equity-story document, with this spine:
 - positioning options with their trade-offs left open — not collapsed to one;
 - the beachhead questions the team must answer to pick where to win first;
 - an explicit "what we will not do";
-- the verification actions for the months before the raise.
+- the verification actions to run before the next major commitment (a raise, a
+  key hire, or a go-to-market bet).
 
 Tag claims `[fact]` / `[hypothesis]` / `[open]` — a hypothesis honestly marked
 unproven is the credibility move here, exactly as `[open]` is in the story. Do
@@ -410,6 +416,11 @@ See `references/narrative-craft.md` for how to fix a "no" here.
 In one line, score the honest outcome: **would this win a second meeting, or be
 set aside?** If "set aside", the draft is not done — find which axis failed and
 iterate.
+
+In **diagnostic mode** the gate is different — the deliverable is not a pitch:
+does the diagnostic give the user falsifiable moat hypotheses, honest positioning
+options, and a clear set of verification actions to run before the strategy is
+committed? If not, iterate.
 
 ## References
 
