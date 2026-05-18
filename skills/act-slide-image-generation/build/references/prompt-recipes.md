@@ -138,6 +138,7 @@ completion_ready_status:
 regenerate_until_quality_approved:
 generation_block_rule:
 review_manifest:
+schema_version: 1
 review_manifest_status: approved
 review_manifest_design_status_gate:
 validate_review_manifest:
@@ -748,7 +749,7 @@ Deck:
 - content_quality_status, design_quality_status, and deck_unity_status are approved across the full generated image set
 - regenerate_until_quality_approved has been used for every slide with weak content, weak design, tone inconsistency, text/source/header issues, or poor deck unity
 - generation_block_rule passes: if generation or repair is blocked, completion_ready_status is blocked and PPTX packaging does not start
-- review_manifest_status is approved after validate_review_manifest confirms every generated PNG is covered exactly once, rejects duplicate image input and duplicate png_path entries, and all quality gates are approved
+- review_manifest_status is approved after validate_review_manifest confirms schema_version: 1, exact manifest keys, exact slide keys, sequential slide_id values, every generated PNG is covered exactly once in package order, rejects duplicate image input and duplicate png_path entries, and all quality gates are approved
 - deck_tone_consistency_status is approved after comparing first, middle, and last thirds
 - visual design quality traits stay consistent from first to last slide: line weight, pale surfaces, card radius, icon family, illustration density, Petrol role, Honey treatment, and outer padding
 - no mechanical card-only repetition
