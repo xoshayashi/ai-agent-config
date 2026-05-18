@@ -36,11 +36,24 @@ dependent outputs as formulas or checks.
 
 ## Workbook Helper
 
+`--input` structured YAML is the primary path. You read the source — a
+narrative, a brief, a conversation — with full understanding, decide the
+economic drivers, and write them as YAML. Do not delegate that reading to the
+generator: `--source-md` is a best-effort fallback whose regex extraction
+silently misses a figure stated apart from its count noun — a maturity target
+phrased "... to 9,000 by FY2031" (a number, then a date, with no adjacent
+"customers" / "units") is read as the current count. When you only have a
+narrative, extract it to YAML yourself, then build from the YAML.
+
 ```sh
+# Primary: build from drivers you extracted into structured YAML.
 python3 skills/startup-financial-modeling/scripts/build_model.py \
-  --source-md path/to/source.md --output model_output.xlsx
+  --input model.yaml --output model_output.xlsx
 python3 skills/startup-financial-modeling/scripts/build_model.py \
   --mode pricing --input model.yaml --output model_output.xlsx
+# Fallback only: let the generator regex-extract a raw narrative.
+python3 skills/startup-financial-modeling/scripts/build_model.py \
+  --source-md path/to/source.md --output model_output.xlsx
 ```
 
 Exact mode values: `full`, `pricing`, `unit_economics`, `cap_table`,
@@ -52,6 +65,16 @@ placeholders.
 Structured YAML may define company/currency/display scale/grain/periods,
 segments, operating drivers, financing instruments, and valuation scalars.
 Money inputs are raw base-currency values; `_yen` names are money-driver names.
+Carry every figure the source states — especially the demand driver as a
+per-period list (`customers` for subscription/account models, `new_units` for
+unit-sale models), pricing (`monthly_price_yen`), `target_gross_margin`,
+`churn_rate`, and the first round (`equity_raise_yen`, `post_money_yen`); a
+marketplace adds `gmv_yen` and `take_rate`. Give the list one value per period
+so the stated current figure and the stated maturity figure are both pinned —
+that is how a maturity target is honored. When you must fall back to
+`--source-md`, the regex extractor can silently read an interim or current
+figure as the target; `_self_review_protocol.md` requires you to check the
+built model's terminal demand against the source before closeout.
 
 ## Workbook Gates
 

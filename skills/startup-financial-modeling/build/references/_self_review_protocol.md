@@ -22,6 +22,13 @@ heavy process.
   questions?
 - Are dependent outputs calculated from primitive drivers rather than assumed
   independently?
+- Does the built model honor every driver the source states — above all the
+  maturity demand target (customers, units, or GMV) and pricing? Read the
+  source figures yourself and compare them to the model's terminal-period
+  drivers and revenue. When you built from `--source-md`, its regex extraction
+  can silently read a current or interim figure as the target; if a terminal
+  driver diverges from what the source states, re-extract the drivers into
+  structured YAML and rebuild with `--input`.
 - Do balance, cash, ownership, valuation, and return logic reconcile?
 
 ## Analysis Depth

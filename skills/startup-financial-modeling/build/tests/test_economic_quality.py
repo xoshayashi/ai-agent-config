@@ -649,6 +649,39 @@ def test_strict_audit_fails_on_economic_incoherence() -> None:
         build_model.ek.audit_economic_coherence = original
 
 
+def test_maturity_cue_after_the_figure_is_detected() -> None:
+    """A target / maturity cue marks the figure on either side of it.
+
+    When the cue trails the figure ("25,000 operating units at maturity")
+    the extractor must still prefer that maturity figure over an earlier
+    interim figure whose cue happens to lead ("targets ... 3,000 units").
+    Reading only the lead read the interim 3,000 as the plan's target and
+    understated the model ~8x against its own stated maturity.
+    """
+    profile = kernel.profile_for_text("hardware robot manufacturing plan")
+    text = (
+        "Phase 1 targets cumulative deployments of 3,000 units in three "
+        "years and about 25,000 operating units at maturity."
+    )
+    assert kernel.extract_target_units(text, profile) == 25_000, (
+        "a maturity figure cued only by trailing text was missed"
+    )
+    # A trailing cue must not be misattributed across a clause boundary: the
+    # cue after the ';' belongs to 2,500, not to the 1万台 before it.
+    cross_clause = "Today 1万台 operate; we target 2,500 units by year five."
+    assert kernel.extract_target_units(cross_clause, profile) == 2_500, (
+        "a trailing cue leaked across a clause boundary onto an earlier figure"
+    )
+    # A prefix cue ("target") points forward to a *later* figure. When it sits
+    # in an earlier figure's trailing window — no punctuation between them — a
+    # contraction plan must still take the stated target, not the larger
+    # current figure.
+    contraction = "Currently 10,000 units and we target 2,500 units by year five."
+    assert kernel.extract_target_units(contraction, profile) == 2_500, (
+        "a prefix cue trailing an earlier figure was misread as its target"
+    )
+
+
 def test_cap_table_exit_waterfall_uses_post_round_cap_table() -> None:
     """The exit waterfall must distribute proceeds over the post-round FDSO.
 
@@ -1619,6 +1652,7 @@ if __name__ == "__main__":
         test_economic_audit_flags_an_unbalanced_sheet,
         test_workbook_balance_sheet_balances_when_recalculated,
         test_strict_audit_fails_on_economic_incoherence,
+        test_maturity_cue_after_the_figure_is_detected,
         test_cap_table_exit_waterfall_uses_post_round_cap_table,
         test_dcf_forecast_fcf_is_not_floored_at_zero,
         test_dcf_enterprise_value_is_positive_and_method_consistent,

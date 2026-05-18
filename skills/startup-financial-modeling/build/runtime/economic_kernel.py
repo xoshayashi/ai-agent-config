@@ -832,8 +832,10 @@ def extract_price(text: str, profile: MechanicProfile, currency: str = "JPY") ->
 
 # A narrative states a current / year-one figure before the maturity target
 # ("currently 30 customers and target 1,200"; "ship 40 units ... target
-# 2,500"). A target / maturity cue precedes the figure the plan should ramp
-# to, so the extractor must prefer it over a plain first match.
+# 2,500"). A target / maturity cue marks the figure the plan should ramp to,
+# so the extractor must prefer it over a plain first match. The cue can sit
+# on either side of the figure — it leads ("target 1,200") as often as it
+# trails ("25,000 operating units at maturity") — so both sides are scanned.
 # `までに` ("by / no later than") carries the temporal-target sense; bare
 # `まで` is excluded because it is also a present-state particle (`今まで`,
 # "until now").
@@ -841,6 +843,15 @@ _TARGET_CUE = re.compile(
     r"(target|reach(?:ing)?|grow(?:ing)?\s+to|scal(?:e|ing)\s+to|ramp\s+to|"
     r"by\s+year|by\s+(?:FY)?\s*20\d\d|at\s+maturity|maturity|"
     r"目標|までに|成熟)",
+    flags=re.IGNORECASE,
+)
+# A prefix cue ("target", "grow to") points forward to a *later* figure; a
+# postfix cue trails the figure it marks ("25,000 units at maturity"). Only
+# this postfix subset may be matched in a figure's trailing window — a prefix
+# cue found after a figure belongs to the next number, not this one.
+_TRAILING_TARGET_CUE = re.compile(
+    r"at\s+maturity|maturity|by\s+year|by\s+the\s+end|"
+    r"成熟|目標|までに|最終年|時点",
     flags=re.IGNORECASE,
 )
 
@@ -851,9 +862,9 @@ def _maturity_count(
     """Pick the count tied to a maturity / target cue from all matches.
 
     A plain first match grabs the current or year-one figure stated before
-    the target. This prefers a figure a target / maturity cue precedes;
-    failing that the largest match (a maturity target is almost always the
-    larger number); failing that the default.
+    the target. This prefers a figure a target / maturity cue marks — on
+    either side of the figure; failing that the largest match (a maturity
+    target is almost always the larger number); failing that the default.
 
     Each pattern carries a unit multiplier so a scale word is normalised on
     the *selected* match (e.g. `万台` -> x10,000) — never document-wide.
@@ -871,7 +882,16 @@ def _maturity_count(
                 continue
             any_best = value if any_best is None else max(any_best, value)
             lead = text[max(0, m.start() - 48): m.start()]
-            if _TARGET_CUE.search(lead):
+            # The trailing window is clipped at the first clause boundary or
+            # digit, so a postfix cue that belongs to a *later* figure
+            # ("10,000 units and we target 2,500 ... by year five") cannot
+            # reach back to this one. The comma is a boundary on purpose — it
+            # separates the common "current, target" figure pair — at the
+            # cost of missing a cue a narrative states after a comma.
+            trail = re.split(
+                r"[.;,。；、，\n0-9]", text[m.end(): m.end() + 48], maxsplit=1
+            )[0]
+            if _TARGET_CUE.search(lead) or _TRAILING_TARGET_CUE.search(trail):
                 cue_best = value if cue_best is None else max(cue_best, value)
     if cue_best is not None:
         return cue_best
