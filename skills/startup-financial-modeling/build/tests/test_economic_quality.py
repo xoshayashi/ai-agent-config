@@ -335,6 +335,30 @@ def test_customer_count_reaches_stated_target() -> None:
     )
 
 
+def test_saas_revenue_tracks_the_stated_customer_count() -> None:
+    """A SaaS plan stating a customer count but no total ARR must drive
+    revenue off that customer count — not the profile-default unit ramp,
+    which diverged ~6x from the stated scale."""
+    facts = kernel.derive_source_facts(
+        "# Seed SaaS plan\n\nA B2B SaaS company. The subscription price is "
+        "¥100,000 per customer per month. We have 18 customers today and "
+        "target 320 customers by year five. Gross margin 80%. 5-year plan, "
+        "seed round. Source: investor memo.\n"
+    )
+    assert kernel.mechanic_key(facts) == "recurring_software"
+    revenue = kernel.plan_revenue_series(
+        facts.new_units, facts.gmv_yen, facts.monthly_price_yen,
+        facts.take_rate, facts.other_revenue_share, facts.revenue_mode,
+    )
+    # 320 customers x the mature monthly price x 12; the model's one-time and
+    # other-revenue components are headroom, but not a 6x default-ramp blowup.
+    customers_x_acv = facts.customers[-1] * facts.monthly_price_yen[-1] * 12
+    assert 0.8 * customers_x_acv <= revenue[-1] <= 1.4 * customers_x_acv, (
+        f"mature revenue ¥{revenue[-1]:,.0f} is not customer-count-driven "
+        f"(customers x ACV = ¥{customers_x_acv:,.0f})"
+    )
+
+
 def test_marketplace_gmv_honors_stated_maturity_target() -> None:
     """A marketplace story's stated maturity GMV must anchor the GMV ramp.
 
@@ -1472,6 +1496,7 @@ if __name__ == "__main__":
         test_start_year_takes_the_start_of_a_range,
         test_demand_ramp_reaches_stated_arr,
         test_customer_count_reaches_stated_target,
+        test_saas_revenue_tracks_the_stated_customer_count,
         test_marketplace_gmv_honors_stated_maturity_target,
         test_marketplace_present_value_gmv_stays_period_zero_base,
         test_marketplace_gmv_end_of_plan_phrasing_is_a_maturity_target,
