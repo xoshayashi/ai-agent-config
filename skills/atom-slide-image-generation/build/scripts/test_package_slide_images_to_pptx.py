@@ -70,7 +70,6 @@ def approved_manifest(image_paths: list[Path]) -> dict[str, object]:
                 "final_image_quality_status": "approved",
                 "content_quality_status": "approved",
                 "design_quality_status": "approved",
-                "deck_unity_status": "approved",
                 **approved_design_statuses,
                 "blockers": [],
                 "majors": [],
@@ -148,6 +147,22 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             images = pptx_packager.collect_images([str(image)])
 
             with self.assertRaisesRegex(SystemExit, "post_generation_design_balance_status must be approved"):
+                pptx_packager.validate_review_manifest(str(manifest), images)
+
+    def test_rejects_missing_deck_only_design_manifest_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
+            manifest = root / "review.json"
+            image.write_bytes(png_bytes())
+            data = approved_manifest([image])
+            del data["deck_tone_consistency_status"]
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+            images = pptx_packager.collect_images([str(image)])
+
+            with self.assertRaisesRegex(SystemExit, "deck_tone_consistency_status must be approved"):
                 pptx_packager.validate_review_manifest(str(manifest), images)
 
     def test_rejects_unapproved_slide_multimodal_design_review(self) -> None:

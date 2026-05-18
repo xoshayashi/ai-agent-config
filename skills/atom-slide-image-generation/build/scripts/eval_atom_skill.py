@@ -295,7 +295,6 @@ def approved_review_manifest(images: list[Path]) -> dict[str, object]:
                 "final_image_quality_status": "approved",
                 "content_quality_status": "approved",
                 "design_quality_status": "approved",
-                "deck_unity_status": "approved",
                 **approved_design_statuses,
                 "blockers": [],
                 "majors": [],
