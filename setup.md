@@ -71,3 +71,23 @@ sh scripts/validate-repo.sh
 `skill-backups/` へ移動し、バックアップが skill として読み込まれないようにします。
 旧 skill root として残っている `~/.agents/skills/*.backup-*` も同じく
 `~/.agents/skill-backups/` へ移動します。
+
+## 通知 hook
+
+`setup.sh` は通知 hook も設定します。各 CLI がターンを終えたとき、入力や承認を
+待つときに、共有スクリプト `notifications/notify.sh` がデスクトップ通知（macOS）
+または端末ベル（その他 OS）を出します。
+
+| CLI | 設定ファイル | イベント |
+|---|---|---|
+| Claude Code | `~/.claude/settings.json` | `Stop` / `Notification` |
+| Codex | `~/.codex/hooks.json` | `Stop` / `PermissionRequest` |
+| Gemini CLI | `~/.gemini/settings.json` | `AfterAgent` / `Notification` |
+
+`~/.claude/settings.json` と `~/.gemini/settings.json` は通知以外の設定も持つため、
+`scripts/install-notifications.py` が hook 部分だけを冪等にマージします（書き換え前に
+`*.bak-<timestamp>` を作成）。`~/.codex/hooks.json` は hook 専用ファイルとして
+生成します。`python3` が無い環境では、この処理は skip されます。
+
+除去は `uninstall.sh` が同じヘルパーで行い、このリポジトリが入れた hook だけを
+外します。`AI_AGENT_DRY_RUN=1` を付けると、設定を書き換えずにマージ差分を表示します。

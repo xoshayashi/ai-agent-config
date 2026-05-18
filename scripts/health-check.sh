@@ -141,6 +141,17 @@ skills_status_for() {
   printf '%s' "$status"
 }
 
+notify_status_for() {
+  config_file=$1
+  if [ ! -f "$config_file" ]; then
+    printf missing
+  elif grep -Fq "/notifications/notify.sh" "$config_file" 2>/dev/null; then
+    printf ok
+  else
+    printf missing
+  fi
+}
+
 default_config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
 config_home=$(expand_home "${AI_AGENT_CONFIG_HOME:-$default_config_home}")
 codex_home=$(expand_home "${AI_AGENT_CODEX_HOME:-$HOME/.codex}")
@@ -191,10 +202,15 @@ gemini_shared_status=$(link_status_for "$gemini_home/AI_AGENT_INSTRUCTIONS.md" "
 gemini_design_status=$(link_status_for "$gemini_home/DESIGN.md" "$config_home/instructions/DESIGN.md")
 gemini_skills_status=$(skills_status_for "$gemini_home")
 
+codex_notify_status=$(notify_status_for "$codex_home/hooks.json")
+claude_notify_status=$(notify_status_for "$claude_home/settings.json")
+gemini_notify_status=$(notify_status_for "$gemini_home/settings.json")
+
 for status in \
   "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status" \
   "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status" \
-  "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status"; do
+  "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status" \
+  "$codex_notify_status" "$claude_notify_status" "$gemini_notify_status"; do
   [ "$status" = "ok" ] || mark_status warn
 done
 
@@ -212,7 +228,8 @@ if [ "$format" = "json" ]; then
   printf '    "codex_AGENTS.md": "%s", "codex_AI_AGENT_INSTRUCTIONS.md": "%s", "codex_DESIGN.md": "%s", "codex_skills": "%s",\n' "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status"
   printf '    "claude_CLAUDE.md": "%s", "claude_AI_AGENT_INSTRUCTIONS.md": "%s", "claude_DESIGN.md": "%s", "claude_skills": "%s",\n' "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status"
   printf '    "gemini_GEMINI.md": "%s", "gemini_AI_AGENT_INSTRUCTIONS.md": "%s", "gemini_DESIGN.md": "%s", "gemini_skills": "%s"\n' "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status"
-  printf '  }\n'
+  printf '  },\n'
+  printf '  "notifications": {"codex": "%s", "claude": "%s", "gemini": "%s"}\n' "$codex_notify_status" "$claude_notify_status" "$gemini_notify_status"
   printf '}\n'
 else
   printf 'AI Agent Config health: %s\n' "$(overall_status)"
@@ -224,6 +241,8 @@ else
     "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status" \
     "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status" \
     "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status"
+  printf 'notifications: codex=%s claude=%s gemini=%s\n' \
+    "$codex_notify_status" "$claude_notify_status" "$gemini_notify_status"
 fi
 
 if [ "$strict" = "1" ] && [ "$(overall_status)" != "ok" ]; then
