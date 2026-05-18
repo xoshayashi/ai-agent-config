@@ -118,9 +118,14 @@ def collect_images(inputs: Iterable[str]) -> list[Path]:
             raise SystemExit(f"Unsupported image input: {item}")
     if not images:
         raise SystemExit("No PNG slide images were provided.")
+    seen_images: set[Path] = set()
     for image in images:
         validate_master_image_path(image)
         validate_image_file(image)
+        resolved = image.resolve()
+        if resolved in seen_images:
+            raise SystemExit(f"Duplicate slide image input: {image}")
+        seen_images.add(resolved)
     return images
 
 
@@ -271,6 +276,8 @@ def validate_review_manifest(manifest_file: str | None, images: list[Path]) -> N
         path = normalize_manifest_path(slide.get("png_path"), base)
         if path is None:
             raise SystemExit(f"review_manifest slide {idx} is missing png_path.")
+        if path in manifest_paths:
+            raise SystemExit(f"review_manifest slide {idx} has duplicate png_path: {path}")
         manifest_paths.add(path)
 
     if manifest_paths != expected_paths:
