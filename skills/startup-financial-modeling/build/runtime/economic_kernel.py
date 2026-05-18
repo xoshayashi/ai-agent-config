@@ -1883,9 +1883,89 @@ def detect_revenue_mode(text: str, profile: MechanicProfile) -> str:
     return "recurring"
 
 
-def derive_source_facts(
+@dataclass
+class SourcePrimitives:
+    """The *primitive drivers* of a plan, before any quantity is derived.
+
+    `derive_source_facts` once interleaved primitive extraction (regex parses
+    of the narrative) with derivation (ramps, gmv, cost-stack calibration,
+    funding sizing, ...). That made the structured `--input` path impossible
+    to do cleanly: it could only shallow-merge YAML values onto an already
+    fully-derived SourceFacts, leaving every derived quantity stale relative
+    to the structured drivers.
+
+    Splitting the two lets a structured input override the primitives *before*
+    derivation runs, so gmv / take_rate / new_units / cost calibration /
+    funding all see the structured drivers. `_extract_source_primitives`
+    produces this from narrative text; `derive_source_facts_from_mapping`
+    produces it from narrative text and then overrides it with the structured
+    YAML values; `_derive_facts_from_primitives` turns either into a full
+    SourceFacts.
+
+    The mutable fields are exactly the drivers a structured input may state.
+    `text` is retained because a few derivation steps (demand retargeting,
+    R&D-headcount anchoring) still parse the narrative for *scale anchors*;
+    when a structured input pins the demand ramp those anchors are bypassed.
+    """
+
+    text: str
+    jpy_per_usd: float
+    grain: str
+    periods: int
+    years: list[int]
+    period_labels: list[str]
+    profile: MechanicProfile
+    revenue_mode: str
+    company: str
+    currency: str
+    source_names: list[str]
+    source_urls: list[str]
+    market_lines: list[Any]
+    segments: list[str]
+    source_unknowns: list[str]
+    # Demand / monetization drivers. The monetization quantities are carried
+    # as full per-period series: a structured input that states an explicit
+    # `monthly_price_yen` / `take_rate` series must land exactly, not be
+    # re-ramped from a scalar.
+    new_units: list[int]
+    customers: list[int]
+    price: int
+    take: float
+    gmv: list[int]
+    monthly_price: list[int]
+    take_rate: list[float]
+    target_gross_margin: list[float]
+    money_scale: float
+    # Capital / people drivers that feed the free-cash-flow projection and
+    # funding sizing. Carried as series so a structured input flows through.
+    capex_per_unit: list[int]
+    avg_comp: list[int]
+    variable_cogs_pct: list[float]
+    delivery_cost: list[int]
+    cloud_cost: list[int]
+    support_cost: list[int]
+    beginning_cash: int | None = None
+    # True when the demand ramp is pinned by a structured input, so the
+    # narrative-scale retargeting step must not rescale it.
+    demand_pinned: bool = False
+    # Stated financing inputs honored as-is during derivation. ``None`` means
+    # "derive it"; a value means "use this stated input".
+    stated_first_round: int | None = None
+    stated_post_money: int | None = None
+    stated_churn: float | None = None
+    stated_rd_headcount: int = 0
+
+
+def _extract_source_primitives(
     text: str, *, jpy_per_usd: float = DEFAULT_JPY_PER_USD
-) -> SourceFacts:
+) -> SourcePrimitives:
+    """Parse the *primitive drivers* of a plan from narrative text.
+
+    This is step (a) of derivation: only regex extraction, no derived
+    quantities. `derive_source_facts` runs this then `_derive_facts_from_primitives`;
+    the structured `--input` path runs this, overrides the primitives with the
+    YAML values, then derives — so the structured drivers reach the pipeline.
+    """
     grain = extract_model_grain(text)
     periods = extract_forecast_periods(text, grain)
     years, period_labels = forecast_axis(extract_start_year(text), periods, grain)
@@ -1896,15 +1976,14 @@ def derive_source_facts(
     source_names, source_urls = extract_sources(text)
     market_lines = extract_market_lines(text)
     segments = extract_segments(text)
+    currency = extract_currency(text)
+    money_scale = money_scale_for_currency(currency, jpy_per_usd)
     if profile.key == "hardware_asset_heavy":
         target_units = extract_target_units(text, profile)
         new_units = ramp_to_target(target_units, profile.first_units, periods)
     else:
         new_units = ramp_to_target(profile.customers[-1], max(25, profile.customers[0]), periods)
-    currency = extract_currency(text)
-    money_scale = money_scale_for_currency(currency, jpy_per_usd)
-    round_10m = max(1, int(10_000_000 * money_scale))
-    round_100m = max(1, int(100_000_000 * money_scale))
+    customers = _pad_series(profile.customers, periods, 0)
     gmv = gmv_ramp(text, profile, periods, money_scale)
     price = extract_price(text, profile, currency)
     take = first_match_float(
@@ -1914,10 +1993,111 @@ def derive_source_facts(
     ) / 100
     if profile.key != "marketplace":
         take = 0.0
-
-    new_units, retargeted_customers = retarget_demand_to_narrative(
-        text, profile, new_units, price, periods
+    target_gross_margin = resolve_target_gross_margin(text, profile, periods)
+    # Monetization and cost-stack base series. These act as the *default*
+    # primitive drivers; a structured input overrides them before derivation.
+    monthly_price = _price_series(price, periods)
+    take_rate = _take_rate_series(take, periods)
+    capex_per_unit = _pad_series(
+        [int(value * money_scale) for value in profile.capex_per_unit_yen], periods, 0
     )
+    avg_comp = [int(value * money_scale) for value in _curve(16_000_000, 14_500_000, periods)]
+    variable_cogs_pct = _pad_series(profile.variable_cogs_pct, periods, 0.30)
+    # The cost-to-serve drivers are not FX-scaled: calibrate_cost_stack_to_gross_margin
+    # rescales all four COGS components to hit the target gross margin, so their
+    # starting values act only as relative weights, not currency amounts.
+    delivery_cost = [int(value) for value in _curve(90_000 if profile.key != "marketplace" else 0, 32_000 if profile.key != "marketplace" else 0, periods)]
+    cloud_cost = [int(value) for value in _curve(18_000, 26_000, periods)]
+    support_cost = [int(value) for value in _curve(24_000, 16_000, periods)]
+    return SourcePrimitives(
+        text=text,
+        jpy_per_usd=jpy_per_usd,
+        grain=grain,
+        periods=periods,
+        years=years,
+        period_labels=period_labels,
+        profile=profile,
+        revenue_mode=revenue_mode,
+        company=company,
+        currency=currency,
+        source_names=source_names,
+        source_urls=source_urls,
+        market_lines=market_lines,
+        segments=segments,
+        source_unknowns=extract_unknowns(text),
+        new_units=new_units,
+        customers=customers,
+        price=price,
+        take=take,
+        gmv=gmv,
+        monthly_price=monthly_price,
+        take_rate=take_rate,
+        target_gross_margin=target_gross_margin,
+        money_scale=money_scale,
+        capex_per_unit=capex_per_unit,
+        avg_comp=avg_comp,
+        variable_cogs_pct=variable_cogs_pct,
+        delivery_cost=delivery_cost,
+        cloud_cost=cloud_cost,
+        support_cost=support_cost,
+        beginning_cash=None,
+        demand_pinned=False,
+        stated_first_round=extract_raise_size(text, currency) or None,
+        stated_post_money=extract_post_money(text, currency) or None,
+        stated_churn=extract_churn_rate(text),
+        stated_rd_headcount=extract_rd_headcount(text),
+    )
+
+
+def derive_source_facts(
+    text: str, *, jpy_per_usd: float = DEFAULT_JPY_PER_USD
+) -> SourceFacts:
+    """Full SourceFacts from narrative text: extract primitives, then derive."""
+    return _derive_facts_from_primitives(
+        _extract_source_primitives(text, jpy_per_usd=jpy_per_usd)
+    )
+
+
+def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
+    """Step (b) of derivation: turn primitive drivers into a full SourceFacts.
+
+    Computes ramps, gmv recomputation, demand retargeting, cost-stack
+    calibration, capex, debt, the free-cash-flow projection, funding sizing,
+    ownership, and TAM/SAM/SOM — all off the (possibly structured-overridden)
+    primitive drivers, never a post-hoc shallow merge.
+    """
+    text = prims.text
+    jpy_per_usd = prims.jpy_per_usd
+    grain = prims.grain
+    periods = prims.periods
+    years = prims.years
+    period_labels = prims.period_labels
+    profile = prims.profile
+    revenue_mode = prims.revenue_mode
+    company = prims.company
+    source_names = prims.source_names
+    source_urls = prims.source_urls
+    market_lines = prims.market_lines
+    segments = prims.segments
+    currency = prims.currency
+    money_scale = prims.money_scale
+    round_10m = max(1, int(10_000_000 * money_scale))
+    round_100m = max(1, int(100_000_000 * money_scale))
+    new_units = list(prims.new_units)
+    gmv = list(prims.gmv)
+    price = prims.price
+    take = prims.take
+    monthly_price = _pad_series(prims.monthly_price, periods, price)
+    take_rate = _pad_series(prims.take_rate, periods, take)
+
+    if prims.demand_pinned:
+        # A structured input pinned the demand ramp; the narrative-scale
+        # retargeting step would rescale it against stale narrative anchors.
+        retargeted_customers = _pad_series(prims.customers, periods, 0)
+    else:
+        new_units, retargeted_customers = retarget_demand_to_narrative(
+            text, profile, new_units, price, periods
+        )
 
     if profile.key == "pre_revenue_milestone":
         # A pre-revenue / milestone plan has no product revenue by definition
@@ -1926,25 +2106,25 @@ def derive_source_facts(
         # capex, grants, and the equity round still drive the cash forecast.
         # Milestone units and customers are kept: they drive capex and cost.
         price = 0
-
-    if revenue_mode == "unit_sale":
-        # Hardware: gmv tracks annual unit-sale revenue (new units shipped x
-        # price), so the downstream capex / headcount / R&D sizing scales off
-        # real revenue, not a 12x recurring proxy.
-        gmv = [units * price for units in new_units]
-    elif profile.key != "marketplace":
-        gmv = [units * price * 12 for units in ending_units(new_units)]
+        monthly_price = [0 for _ in range(periods)]
 
     new_units = _pad_series(new_units, periods, 0)
     ending = ending_units(new_units)
+    if revenue_mode == "unit_sale":
+        # Hardware: gmv tracks annual unit-sale revenue (new units shipped x
+        # monthly price), so the downstream capex / headcount / R&D sizing
+        # scales off real revenue, not a 12x recurring proxy.
+        gmv = [units * monthly_price[idx] for idx, units in enumerate(new_units)]
+    elif profile.key != "marketplace":
+        gmv = [
+            units * monthly_price[idx] * 12
+            for idx, units in enumerate(ending_units(new_units))
+        ]
+
     gmv = _pad_series(gmv, periods, 0)
-    monthly_price = _price_series(price, periods)
-    take_rate = _take_rate_series(take, periods)
     customers = _pad_series(retargeted_customers, periods, 0)
-    variable_cogs_pct = _pad_series(profile.variable_cogs_pct, periods, 0.30)
-    capex_per_unit = _pad_series(
-        [int(value * money_scale) for value in profile.capex_per_unit_yen], periods, 0
-    )
+    variable_cogs_pct = _pad_series(prims.variable_cogs_pct, periods, 0.30)
+    capex_per_unit = _pad_series(prims.capex_per_unit, periods, 0)
     tam_default = int(profile.tam_yen * money_scale)
     tam = max(tam_default, gmv[-1] * 10 if profile.key == "marketplace" else tam_default)
     sam = max(int(tam * 0.18), int(1_000_000_000 * money_scale))
@@ -1969,20 +2149,17 @@ def derive_source_facts(
     # auto-derived ramp scales with revenue / units, which badly understates
     # an R&D-heavy plan (a 32-person team modeled as 4) and so understates
     # its people-cost burn.
-    stated_rd_headcount = extract_rd_headcount(text)
+    stated_rd_headcount = prims.stated_rd_headcount
     if stated_rd_headcount > 0 and product_hc and product_hc[0] > 0:
         factor = stated_rd_headcount / product_hc[0]
         product_hc = [max(1, int(round(value * factor))) for value in product_hc]
     total_hc = [a + b + c + d for a, b, c, d in zip(product_hc, gtm_hc, ops_hc, ga_hc)]
     curves = _operating_assumption_curves(profile, periods)
-    avg_comp = [int(value * money_scale) for value in _curve(16_000_000, 14_500_000, periods)]
-    # The cost-to-serve drivers are not FX-scaled: calibrate_cost_stack_to_gross_margin
-    # rescales all four COGS components to hit the target gross margin, so their
-    # starting values act only as relative weights, not currency amounts.
-    delivery_cost = [int(value) for value in _curve(90_000 if profile.key != "marketplace" else 0, 32_000 if profile.key != "marketplace" else 0, periods)]
-    cloud_cost = [int(value) for value in _curve(18_000, 26_000, periods)]
-    support_cost = [int(value) for value in _curve(24_000, 16_000, periods)]
-    target_gross_margin = resolve_target_gross_margin(text, profile, periods)
+    avg_comp = _pad_series(prims.avg_comp, periods, int(15_000_000 * money_scale))
+    delivery_cost = _pad_series(prims.delivery_cost, periods, 0)
+    cloud_cost = _pad_series(prims.cloud_cost, periods, 0)
+    support_cost = _pad_series(prims.support_cost, periods, 0)
+    target_gross_margin = _pad_series(prims.target_gross_margin, periods, 0.78)
     variable_cogs_pct, delivery_cost, cloud_cost, support_cost = calibrate_cost_stack_to_gross_margin(
         target_gross_margin,
         new_units,
@@ -2030,10 +2207,16 @@ def derive_source_facts(
         )
         for idx in range(periods)
     ]
-    beginning_cash = _round_to(
-        max(int(300_000_000 * money_scale), avg_comp[0] * max(total_hc[0], 1) * 0.50),
-        round_100m,
-    )
+    # A structured input may state the opening cash balance; it then feeds
+    # the funding-round sizing directly. Otherwise size it from the people
+    # base so the plan opens with a credible runway.
+    if prims.beginning_cash is not None:
+        beginning_cash = int(prims.beginning_cash)
+    else:
+        beginning_cash = _round_to(
+            max(int(300_000_000 * money_scale), avg_comp[0] * max(total_hc[0], 1) * 0.50),
+            round_100m,
+        )
     capex_total = [
         new_units[idx] * capex_per_unit[idx] + other_capex[idx] for idx in range(periods)
     ]
@@ -2069,10 +2252,12 @@ def derive_source_facts(
     )
     free_cash_flow = [period["free_cash_flow"] for period in fcf_projection]
     # Honor a stated first-round size and post-money valuation; follow-on
-    # rounds are still auto-sized to keep the plan solvent.
-    stated_raise = extract_raise_size(text, currency)
-    stated_post_money = extract_post_money(text, currency)
-    stated_churn = extract_churn_rate(text)
+    # rounds are still auto-sized to keep the plan solvent. A structured
+    # input that states an explicit first-round equity raise reaches the
+    # sizing here through `prims.stated_first_round`.
+    stated_raise = prims.stated_first_round
+    stated_post_money = prims.stated_post_money
+    stated_churn = prims.stated_churn
     equity_raise = size_equity_rounds(
         beginning_cash, free_cash_flow, debt_raise, round_unit=round_100m,
         stated_first_round=stated_raise or None,
@@ -2084,7 +2269,7 @@ def derive_source_facts(
         else 0
         for idx in range(periods)
     ]
-    if stated_post_money > 0:
+    if stated_post_money and stated_post_money > 0:
         post_money[0] = stated_post_money
     currency_symbol = "$" if currency == "USD" else "¥"
     summary_bits = [
@@ -2320,8 +2505,44 @@ def extract_unknowns(text: str) -> list[str]:
     return unknowns or ["pricing validation", "cost-to-serve evidence", "financing terms"]
 
 
+def _ending_to_new_units(customers: list[int]) -> list[int]:
+    """Invert `ending_units`: back out the new-unit series from an ending series.
+
+    A structured input commonly states `customers` as the *ending* installed
+    base per period. `ending_units` rolls new units forward with churn
+    (`churn = running * (0.02 + idx*0.005)`); this inverts that walk so the
+    derived new-unit ramp reproduces the stated ending series — the demand
+    primitive the rest of derivation consumes.
+    """
+    new_units: list[int] = []
+    prior = 0
+    for idx, ending in enumerate(customers):
+        if idx == 0:
+            value = max(0, int(ending))
+        else:
+            churn = int(prior * (0.02 + idx * 0.005))
+            value = max(0, int(ending) - prior + churn)
+        new_units.append(value)
+        prior = max(0, int(ending))
+    return new_units
+
+
 def derive_source_facts_from_mapping(raw: dict[str, Any]) -> SourceFacts:
-    """Build facts from structured YAML, falling back to narrative inference."""
+    """Build facts from a structured YAML mapping.
+
+    The structured drivers flow through the full derivation pipeline: this
+    extracts the primitive drivers from any narrative the mapping carries,
+    *overrides* those primitives with the structured values, then derives the
+    whole SourceFacts. So gmv, take rate, the demand ramp, cost-stack
+    calibration, and funding sizing all see the structured drivers — never a
+    post-hoc shallow merge that leaves derived quantities stale.
+
+    Pure stated *outputs* (financing schedules, headcount, operating-curve
+    overrides, multiples, market-size scalars, ...) — fields nothing
+    downstream consumes — are applied as a final override on the derived
+    facts. An explicitly-stated driver-level input (a first-round equity raise,
+    an opening cash balance, ...) is honored as a stated input to derivation.
+    """
     narrative = ""
     for key in ("source_text", "narrative", "story", "memo", "description"):
         value = raw.get(key)
@@ -2334,71 +2555,143 @@ def derive_source_facts_from_mapping(raw: dict[str, Any]) -> SourceFacts:
         narrative = f"# {company}\nGeneric financial model for a {mechanics}."
 
     fx_raw = raw.get("jpy_per_usd") or raw.get("fx_rate")
-    facts = derive_source_facts(
-        narrative,
-        jpy_per_usd=float(fx_raw) if fx_raw else DEFAULT_JPY_PER_USD,
-    )
+    jpy_per_usd = float(fx_raw) if fx_raw else DEFAULT_JPY_PER_USD
+
+    # --- Step 1: primitive drivers from the narrative -----------------------
+    prims = _extract_source_primitives(narrative, jpy_per_usd=jpy_per_usd)
+
+    # --- Step 2: resolve the forecast axis from the structured input --------
     periods_raw = raw.get("periods") or raw.get("horizon_periods") or raw.get("horizon")
-    grain = str(raw.get("grain") or raw.get("model_grain") or facts.grain).lower()
+    grain = str(raw.get("grain") or raw.get("model_grain") or prims.grain).lower()
     if isinstance(periods_raw, str):
         period_match = re.search(r"([0-9]{1,2})", periods_raw)
-        periods = int(period_match.group(1)) if period_match else len(facts.years)
+        periods = int(period_match.group(1)) if period_match else len(prims.years)
         if "year" in periods_raw.lower() or "年" in periods_raw:
             periods = periods * (12 if grain.startswith("month") else 4 if grain.startswith("quarter") else 1)
     elif isinstance(periods_raw, (int, float)) and not isinstance(periods_raw, bool):
         periods = int(periods_raw)
     else:
-        periods = len(facts.years)
+        periods = len(prims.years)
     periods = min(max(periods, 1), MAX_FORECAST_PERIODS)
-    start_year = int(raw.get("start_year") or raw.get("fiscal_year") or facts.years[0])
+    start_year = int(raw.get("start_year") or raw.get("fiscal_year") or prims.years[0])
     years, labels = forecast_axis(start_year, periods, grain)
+    currency = str(raw.get("currency") or "JPY").upper()
 
-    overrides = dict(
-        years=years,
-        period_labels=_as_list(raw.get("period_labels"))[:periods] or labels,
-        grain=grain,
-        currency=str(raw.get("currency") or "JPY").upper(),
+    prims.grain = grain
+    prims.periods = periods
+    prims.years = years
+    prims.period_labels = _as_list(raw.get("period_labels"))[:periods] or labels
+    prims.currency = currency
+    prims.money_scale = money_scale_for_currency(currency, jpy_per_usd)
+    prims.company = str(company)
+    prims.segments = [str(v) for v in _as_list(raw.get("segments")) if str(v).strip()] or prims.segments
+    prims.source_unknowns = [str(v) for v in _as_list(raw.get("unknowns")) if str(v).strip()] or prims.source_unknowns
+
+    # --- Step 3: override the primitive drivers -----------------------------
+    # Demand. A stated customer / new-unit series pins the ramp; the
+    # narrative-scale retargeting step is then bypassed. When only the ending
+    # `customers` series is stated, the new-unit ramp is inverted from it so
+    # revenue (driven by the installed base) tracks the stated count.
+    raw_new_units = _first_present(raw, ("new_units",))
+    raw_customers = _first_present(raw, ("customers",))
+    if raw_new_units is not None:
+        prims.new_units = _coerce_int_series(raw_new_units, periods, prims.new_units)
+        prims.demand_pinned = True
+        if raw_customers is not None:
+            prims.customers = _coerce_int_series(raw_customers, periods, prims.customers)
+        else:
+            prims.customers = ending_units(prims.new_units)
+    elif raw_customers is not None:
+        prims.customers = _coerce_int_series(raw_customers, periods, prims.customers)
+        prims.new_units = _ending_to_new_units(prims.customers)
+        prims.demand_pinned = True
+    else:
+        prims.new_units = _pad_series(prims.new_units, periods, 0)
+        prims.customers = _pad_series(prims.customers, periods, 0)
+
+    # Monetization drivers (carried as series).
+    prims.monthly_price = _coerce_int_series(
+        _first_present(raw, ("monthly_price_yen", "monthly_price")),
+        periods, prims.monthly_price,
+    )
+    prims.price = prims.monthly_price[0] if prims.monthly_price else prims.price
+    prims.gmv = _coerce_int_series(
+        _first_present(raw, ("gmv_yen", "gmv")), periods, prims.gmv,
+    )
+    prims.take_rate = _coerce_float_series(
+        _first_present(raw, ("take_rate", "take")), periods, prims.take_rate, percent=True,
+    )
+    prims.take = prims.take_rate[0] if prims.take_rate else prims.take
+    prims.target_gross_margin = _coerce_float_series(
+        _first_present(raw, ("target_gross_margin",)), periods, prims.target_gross_margin, percent=True,
+    )
+    # Cost-stack and capital drivers that feed calibration / FCF / funding.
+    prims.variable_cogs_pct = _coerce_float_series(
+        _first_present(raw, ("variable_cogs_pct", "variable_cogs")), periods, prims.variable_cogs_pct, percent=True,
+    )
+    prims.delivery_cost = _coerce_int_series(
+        _first_present(raw, ("delivery_cost_yen", "delivery_cost")), periods, prims.delivery_cost,
+    )
+    prims.cloud_cost = _coerce_int_series(
+        _first_present(raw, ("cloud_cost_yen", "cloud_cost")), periods, prims.cloud_cost,
+    )
+    prims.support_cost = _coerce_int_series(
+        _first_present(raw, ("support_cost_yen", "support_cost")), periods, prims.support_cost,
+    )
+    prims.capex_per_unit = _coerce_int_series(
+        _first_present(raw, ("capex_per_unit_yen", "capex_per_unit")), periods, prims.capex_per_unit,
+    )
+    prims.avg_comp = _coerce_int_series(
+        _first_present(raw, ("avg_comp_yen", "avg_comp")), periods, prims.avg_comp,
+    )
+    # Stated driver-level financing inputs.
+    beginning_cash_raw = _first_present(raw, ("beginning_cash_yen", "beginning_cash"))
+    if beginning_cash_raw is not None:
+        prims.beginning_cash = _coerce_int_series(beginning_cash_raw, 1, [prims.beginning_cash or 0])[0]
+    equity_raise_raw = _first_present(raw, ("equity_raise_yen", "equity_raise"))
+    if equity_raise_raw is not None:
+        first_round = _coerce_int_series(equity_raise_raw, 1, [0])[0]
+        if first_round > 0:
+            prims.stated_first_round = first_round
+    post_money_raw = _first_present(raw, ("post_money_yen", "post_money"))
+    if post_money_raw is not None:
+        stated_pm = _coerce_int_series(post_money_raw, 1, [0])[0]
+        if stated_pm > 0:
+            prims.stated_post_money = stated_pm
+    churn_raw = _first_present(raw, ("churn_rate", "churn"))
+    if churn_raw is not None:
+        prims.stated_churn = _coerce_float_series(churn_raw, 1, [prims.stated_churn or 0.0], percent=True)[0]
+
+    # --- Step 4: derive the full SourceFacts from the structured drivers ----
+    facts = _derive_facts_from_primitives(prims)
+
+    # --- Step 5: apply stated outputs nothing downstream consumes -----------
+    overrides: dict[str, Any] = dict(
         display_scale=str(raw.get("display_scale") or raw.get("scale") or "million").lower(),
-        company=str(company),
         mechanics=str(mechanics),
         product=str(raw.get("product") or facts.product),
         primary_unit_name=str(raw.get("primary_unit_name") or raw.get("unit_name") or facts.primary_unit_name),
-        segments=[str(v) for v in _as_list(raw.get("segments")) if str(v).strip()] or facts.segments,
-        source_unknowns=[str(v) for v in _as_list(raw.get("unknowns")) if str(v).strip()] or facts.source_unknowns,
     )
-
-    series_map = {
-        "new_units": ("new_units", "units"),
-        "gmv_yen": ("gmv_yen", "money"),
-        "monthly_price_yen": ("monthly_price_yen", "money"),
-        "customers": ("customers", "units"),
-        "delivery_cost_yen": ("delivery_cost_yen", "money"),
-        "cloud_cost_yen": ("cloud_cost_yen", "money"),
-        "support_cost_yen": ("support_cost_yen", "money"),
-        "capex_per_unit_yen": ("capex_per_unit_yen", "money"),
-        "avg_comp_yen": ("avg_comp_yen", "money"),
-        "equity_raise_yen": ("equity_raise_yen", "money"),
-        "debt_raise_yen": ("debt_raise_yen", "money"),
-        "grants_yen": ("grants_yen", "money"),
-        "convertibles_yen": ("convertibles_yen", "money"),
-        "lease_financing_yen": ("lease_financing_yen", "money"),
-        "customer_advances_yen": ("customer_advances_yen", "money"),
-        "secondary_yen": ("secondary_yen", "money"),
-        "nol_yen": ("nol_yen", "money"),
-        "product_headcount": ("product_headcount", "units"),
-        "gtm_headcount": ("gtm_headcount", "units"),
-        "operations_headcount": ("operations_headcount", "units"),
-        "ga_headcount": ("ga_headcount", "units"),
-        "other_capex_yen": ("other_capex_yen", "money"),
-        "fixed_ga_yen": ("fixed_ga_yen", "money"),
-        "rd_program_floor_yen": ("rd_program_floor_yen", "money"),
-        "rd_program_per_product_fte_yen": ("rd_program_per_product_fte_yen", "money"),
-    }
-    pct_map = {
-        "take_rate": True,
-        "variable_cogs_pct": True,
+    # Financing schedules and other stated output series — these do not feed
+    # the derivation, so a direct override does not leave anything stale.
+    output_money_series = (
+        "debt_raise_yen", "grants_yen", "convertibles_yen", "lease_financing_yen",
+        "customer_advances_yen", "secondary_yen", "nol_yen", "other_capex_yen",
+        "fixed_ga_yen", "rd_program_floor_yen", "rd_program_per_product_fte_yen",
+    )
+    for field in output_money_series:
+        raw_value = _first_present(raw, (field, field.replace("_yen", "")))
+        if raw_value is not None:
+            overrides[field] = _coerce_int_series(raw_value, periods, getattr(facts, field))
+    output_unit_series = (
+        "product_headcount", "gtm_headcount", "operations_headcount", "ga_headcount",
+    )
+    for field in output_unit_series:
+        raw_value = _first_present(raw, (field,))
+        if raw_value is not None:
+            overrides[field] = _coerce_int_series(raw_value, periods, getattr(facts, field))
+    output_pct_series = {
         "value_capture_share": True,
-        "target_gross_margin": True,
         "debt_interest_rate": True,
         "option_pool_refresh": True,
         "secondary_warrant_dilution": True,
@@ -2415,22 +2708,20 @@ def derive_source_facts_from_mapping(raw: dict[str, Any]) -> SourceFacts:
         "gross_profit_multiple": False,
         "ebitda_multiple": False,
     }
-    for field, (_, kind) in series_map.items():
-        raw_value = _first_present(raw, (field, field.replace("_yen", ""), field.replace("_pct", "")))
-        default = getattr(facts, field)
-        overrides[field] = _coerce_int_series(raw_value, periods, default) if kind == "money" or kind == "units" else default
-    for field, is_percent in pct_map.items():
+    for field, is_percent in output_pct_series.items():
         raw_value = _first_present(raw, (field, field.replace("_pct", ""), field.replace("_rate", "")))
-        overrides[field] = _coerce_float_series(raw_value, periods, getattr(facts, field), percent=is_percent)
-    for field in ("depreciation_life_months", "ar_days", "ap_days"):
-        overrides[field] = _coerce_int_series(raw.get(field), periods, getattr(facts, field))
-    for field in ("support_tickets_per_customer", "minutes_per_support_ticket", "support_fte_capacity_tickets", "product_squad_size", "target_min_runway_months"):
-        overrides[field] = _coerce_int_series(raw.get(field), periods, getattr(facts, field))
+        if raw_value is not None:
+            overrides[field] = _coerce_float_series(raw_value, periods, getattr(facts, field), percent=is_percent)
+    for field in ("depreciation_life_months", "ar_days", "ap_days",
+                  "support_tickets_per_customer", "minutes_per_support_ticket",
+                  "support_fte_capacity_tickets", "product_squad_size",
+                  "target_min_runway_months"):
+        if raw.get(field) is not None:
+            overrides[field] = _coerce_int_series(raw.get(field), periods, getattr(facts, field))
     if raw.get("evidence_status") is not None:
         overrides["evidence_status"] = str(raw.get("evidence_status"))
 
     scalar_overrides = {
-        "beginning_cash_yen": "beginning_cash",
         "founder_ownership": "founder_ownership",
         "option_pool": "option_pool",
         "existing_investors": "existing_investors",
@@ -2439,7 +2730,6 @@ def derive_source_facts_from_mapping(raw: dict[str, Any]) -> SourceFacts:
         "customer_roi_yen": "customer_roi",
         "implementation_cost_yen": "implementation_cost",
         "sales_cycle_months": "sales_cycle_months",
-        "churn_rate": "churn_rate",
         "repeat_rate": "repeat_rate",
         "payment_fee_pct": "payment_fee_pct",
         "incentive_pct_gmv": "incentive_pct_gmv",
@@ -2454,7 +2744,7 @@ def derive_source_facts_from_mapping(raw: dict[str, Any]) -> SourceFacts:
             continue
         if field.endswith("_yen"):
             overrides[field] = _coerce_int_series(value, 1, [getattr(facts, field)])[0]
-        elif field.endswith("_pct") or field.endswith("_rate") or field in {"founder_ownership", "option_pool", "existing_investors", "strategic_warrant"}:
+        elif field.endswith("_pct") or field in {"founder_ownership", "option_pool", "existing_investors", "strategic_warrant"}:
             overrides[field] = _coerce_float_series(value, 1, [float(getattr(facts, field))], percent=True)[0]
         elif field == "sales_cycle_months":
             overrides[field] = int(float(value))
