@@ -1766,6 +1766,17 @@ def derive_source_facts(
         support_cost,
         revenue_mode,
     )
+    if profile.key == "pre_revenue_milestone":
+        # A pre-revenue plan sells nothing, so it has no cost of goods sold:
+        # the cost-to-serve drivers are zeroed alongside the zeroed price
+        # (the gross-margin calibration above no-ops on zero revenue and
+        # would otherwise leave the raw profile defaults, making the Cost
+        # Build sheet book COGS and a negative gross profit on zero
+        # revenue). Prototype build cost stays in capex; R&D stays in OpEx.
+        variable_cogs_pct = [0.0 for _ in range(periods)]
+        delivery_cost = [0 for _ in range(periods)]
+        cloud_cost = [0 for _ in range(periods)]
+        support_cost = [0 for _ in range(periods)]
     other_capex = [
         _round_to(
             max(
