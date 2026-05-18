@@ -805,7 +805,7 @@ def _maturity_count(
             if value <= 0:
                 continue
             any_best = value if any_best is None else max(any_best, value)
-            lead = text[max(0, m.start() - 28): m.start()]
+            lead = text[max(0, m.start() - 48): m.start()]
             if _TARGET_CUE.search(lead):
                 cue_best = value if cue_best is None else max(cue_best, value)
     if cue_best is not None:
