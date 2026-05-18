@@ -619,6 +619,8 @@ def money_from_match(match: re.Match) -> int | None:
         return int(value * 1_000_000)
     if unit in {"万"}:
         return int(value * 10_000)
+    if unit in {"千", "k", "thousand"}:
+        return int(value * 1_000)
     return int(value)
 
 
@@ -861,6 +863,74 @@ def extract_target_units(text: str, profile: MechanicProfile) -> int:
         ],
         text,
         profile.default_target_units,
+    )
+
+
+# Scale words for a stated capital figure (raise size, post-money).
+_CAPITAL_SCALE = r"(兆|億|百万|万|千|t|T|bn|b|B|m|M|k|K)"
+
+
+def _capital_figure(matched: str, scale: str | None, currency: str) -> bool:
+    """A stated capital figure must carry a magnitude marker — a currency
+    symbol or a scale word — so a bare number ("5" from "5-year plan") is
+    not read as a raise. A `$` figure belongs to a USD plan and a `¥` figure
+    to a yen plan."""
+    if "$" in matched and currency != "USD":
+        return False
+    if "¥" in matched and currency == "USD":
+        return False
+    return "$" in matched or "¥" in matched or bool(scale)
+
+
+def _first_capital_figure(
+    patterns: list[str], text: str, currency: str
+) -> int:
+    """First marker-bearing, currency-consistent capital figure, or 0."""
+    for pattern in patterns:
+        for m in re.finditer(pattern, text, flags=re.IGNORECASE):
+            scale = m.group(2) if m.lastindex and m.lastindex >= 2 else None
+            if not _capital_figure(m.group(0), scale, currency):
+                continue
+            value = money_from_match(m)
+            if value and value > 0:
+                return value
+    return 0
+
+
+def extract_raise_size(text: str, currency: str = "JPY") -> int:
+    """Stated size of the first (seed / Series A-E) equity round, raw currency.
+
+    Returns 0 when nothing is stated, when the figure carries no magnitude
+    marker, or when its currency mark contradicts the model currency — in
+    each case the funding plan falls back to auto-sizing the round.
+    """
+    round_cue = r"seed|pre-seed|series\s+[a-e]|round|equity|financing"
+    return _first_capital_figure(
+        [
+            rf"rais\w*\s+(?:a\s+)?(?:[¥$]\s*)?([0-9,.]+)\s*{_CAPITAL_SCALE}?"
+            rf"[^0-9.\n]{{0,20}}?(?:{round_cue})",
+            rf"[¥$]\s*([0-9,.]+)\s*{_CAPITAL_SCALE}?\s*(?:{round_cue})\b",
+            rf"(?:{round_cue})\s+(?:round\s+)?of\s+(?:[¥$]\s*)?"
+            rf"([0-9,.]+)\s*{_CAPITAL_SCALE}?",
+        ],
+        text,
+        currency,
+    )
+
+
+def extract_post_money(text: str, currency: str = "JPY") -> int:
+    """Stated post-money valuation, raw currency; 0 when absent, unmarked, or
+    when the figure's currency mark contradicts the model currency."""
+    return _first_capital_figure(
+        [
+            rf"(?:[¥$]\s*)?([0-9,.]+)\s*{_CAPITAL_SCALE}?\s*post[- ]?money",
+            rf"post[- ]?money[^0-9¥$\n]{{0,24}}?(?:[¥$]\s*)?([0-9,.]+)\s*"
+            rf"{_CAPITAL_SCALE}?",
+            rf"valu\w+\s+(?:at\s+)?(?:a\s+)?(?:[¥$]\s*)?([0-9,.]+)\s*"
+            rf"{_CAPITAL_SCALE}?\s*(?:post[- ]?money|valuation)",
+        ],
+        text,
+        currency,
     )
 
 
@@ -1412,6 +1482,7 @@ def size_equity_rounds(
     debt_raise_yen: list[int],
     target_runway_months: int = 12,
     round_unit: int = 100_000_000,
+    stated_first_round: int | None = None,
 ) -> list[int]:
     """Size each period's equity round so projected ending cash stays solvent.
 
@@ -1420,19 +1491,31 @@ def size_equity_rounds(
     the round is topped up — rounded up to ``round_unit`` — to clear it. The
     final period keeps a half-period cushion: there is no successor round to
     fund, but ending the horizon at exactly zero cash is not investor-grade.
+
+    When the narrative states the first round's size, ``stated_first_round``
+    is used for period 0 exactly as given — the user's fundraising terms are
+    honored, not overridden. Follow-on rounds are still auto-sized; if the
+    stated raise is too small the next period carries the shortfall, which is
+    the honest outcome to surface.
     """
     periods = len(free_cash_flow)
     equity: list[int] = []
     cash = float(beginning_cash_yen)
     for idx in range(periods):
         cash_before_equity = cash + free_cash_flow[idx] + debt_raise_yen[idx]
-        burn = max(0.0, -free_cash_flow[idx])
-        runway_factor = (
-            target_runway_months / 12.0 if idx < periods - 1 else 0.5
-        )
-        buffer = burn * runway_factor
-        shortfall = buffer - cash_before_equity
-        raised = math.ceil(shortfall / round_unit) * round_unit if shortfall > 0 else 0
+        if idx == 0 and stated_first_round is not None:
+            raised: int = int(stated_first_round)
+        else:
+            burn = max(0.0, -free_cash_flow[idx])
+            runway_factor = (
+                target_runway_months / 12.0 if idx < periods - 1 else 0.5
+            )
+            buffer = burn * runway_factor
+            shortfall = buffer - cash_before_equity
+            raised = (
+                math.ceil(shortfall / round_unit) * round_unit
+                if shortfall > 0 else 0
+            )
         equity.append(int(raised))
         cash = cash_before_equity + raised
     return equity
@@ -1862,8 +1945,13 @@ def derive_source_facts(
         [float(value) for value in curves["tax_rate"]],
     )
     free_cash_flow = [period["free_cash_flow"] for period in fcf_projection]
+    # Honor a stated first-round size and post-money valuation; follow-on
+    # rounds are still auto-sized to keep the plan solvent.
+    stated_raise = extract_raise_size(text, currency)
+    stated_post_money = extract_post_money(text, currency)
     equity_raise = size_equity_rounds(
-        beginning_cash, free_cash_flow, debt_raise, round_unit=round_100m
+        beginning_cash, free_cash_flow, debt_raise, round_unit=round_100m,
+        stated_first_round=stated_raise or None,
     )
     ownership_targets = _curve(0.22, 0.10, periods)
     post_money = [
@@ -1872,6 +1960,8 @@ def derive_source_facts(
         else 0
         for idx in range(periods)
     ]
+    if stated_post_money > 0:
+        post_money[0] = stated_post_money
     currency_symbol = "$" if currency == "USD" else "¥"
     summary_bits = [
         profile.label,
