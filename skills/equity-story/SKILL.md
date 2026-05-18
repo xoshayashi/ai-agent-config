@@ -275,7 +275,7 @@ a gap to fix before iterating.
    answered, and is "why now" anchored to a real, quantified inflection?
 3. **Problem before solution** — does the reader feel the pain before seeing
    the product?
-4. **Evidence attached, shown as a line** — is every material number next to
+4. **Evidence attached, trajectory shown** — is every material number next to
    the claim it proves, is every load-bearing claim backed by something
    verifiable, and is progress shown as a trajectory (deltas over time), not a
    single dot?
@@ -323,7 +323,8 @@ iterate.
 Load these as the workflow reaches them, not all at once:
 
 - `references/stage-playbooks.md` — how the argument shifts across VC seed,
-  growth, late-stage, IPO, public-market IR and M&A exit; valuation framing.
+  growth, late-stage, IPO, public-market IR and M&A exit; valuation framing;
+  stage-specific failure modes.
 - `references/strategy-frameworks.md` — moat, positioning and business-model
   frameworks (essence / when to use / proof / pitfalls) with a dispatch table,
   plus section D industry-specific proof anchors for non-SaaS businesses.
