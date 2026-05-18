@@ -2031,8 +2031,9 @@ def _extract_source_primitives(
     # currency — and for a structured `--input` plan that narrative is
     # synthetic, so its currency can be wrong. They are left empty;
     # _derive_facts_from_primitives applies the FX-scaled default with the
-    # authoritative money_scale, which derive_source_facts_from_mapping has by
-    # then corrected to the structured `currency:` field.
+    # authoritative money_scale. For a structured input,
+    # derive_source_facts_from_mapping has by then corrected money_scale to
+    # the declared `currency:` field; the narrative path needs no correction.
     capex_per_unit: list[int] = []
     avg_comp: list[int] = []
     variable_cogs_pct = _pad_series(profile.variable_cogs_pct, periods, 0.30)

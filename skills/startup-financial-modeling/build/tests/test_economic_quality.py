@@ -512,6 +512,13 @@ def test_structured_currency_scales_default_costs_consistently() -> None:
     assert kernel.audit_economic_coherence(plain) == [], (
         f"structured USD plan is not coherent: {kernel.audit_economic_coherence(plain)}"
     )
+    # An explicit avg_comp in the input still takes precedence over the default.
+    overridden = kernel.derive_source_facts_from_mapping(
+        {**base, "company": "PayStream Fintech", "avg_comp_yen": [200_000] * 5}
+    )
+    assert overridden.avg_comp_yen[0] == 200_000, (
+        f"an explicit avg_comp override was not honored: {overridden.avg_comp_yen[0]:,}"
+    )
 
 
 def test_payroll_is_not_absurd_at_maturity() -> None:
