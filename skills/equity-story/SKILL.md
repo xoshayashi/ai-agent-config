@@ -28,27 +28,19 @@ So the test of an equity story is not "is it polished" but: **can a sceptical
 reader follow the logic alone, find the risks already addressed, and repeat the
 thesis in two sentences afterwards?** Optimize for that, never for decoration.
 
-Three failure modes recur. Watch for them throughout:
-- **Solution-first.** Leading with the product before the reader feels the
-  problem leaves the thesis with no emotional anchor — it reads as a product
-  tour, not an investment case.
-- **Claims without evidence, or evidence without claims.** A number only
-  persuades when it is attached to the specific assertion it proves. Standalone
-  metric slides are a sign of a weak narrative.
-- **Narrative detached from economic reality.** A story that needs the reader to
-  ignore the unit economics, the comparable set, or the cash position will be
-  found out. Stories that survive are the ones grounded in the numbers.
+Three failure modes recur — watch for them throughout:
+- **Solution-first** — leading with the product before the reader feels the
+  problem; it reads as a tour, not an investment case.
+- **Claims without evidence, or evidence without claims** — a number persuades
+  only when attached to the specific assertion it proves.
+- **Narrative detached from economic reality** — a story that needs the reader
+  to ignore the unit economics, the comparable set, or the cash position.
 
-The craft and substance standards in this skill are **universal** — they apply
-at every stage and in every geography. What the stage playbooks adjust is the
-*depth and kind of evidence*, not the quality bar. The two worked examples lean
-toward SaaS and marketplace businesses, but the principles are model-agnostic:
-`references/strategy-frameworks.md` section D adds industry-specific proof
-anchors for biotech, hardware / deep tech, fintech, consumer / D2C, climate &
-energy infrastructure and healthcare services — where the load-bearing evidence
-is a clinical milestone, a cost-curve, a credit-loss rate, cohort contribution
-margin, a contracted-offtake share or per-site economics rather than NRR — so
-reach for those when the business is not SaaS-shaped.
+The craft and substance standards here are **universal**. Stage playbooks adjust
+the *depth and kind of evidence*, not the quality bar. When the business is not
+SaaS-shaped (biotech, hardware / deep tech, fintech, consumer / D2C, climate &
+energy infrastructure, healthcare services), reach for the industry-specific
+proof anchors in `references/strategy-frameworks.md` section D.
 
 ## Inputs to gather first
 
@@ -257,13 +249,11 @@ sections that correspond to official documents — the 成長可能性資料 gro
 disclosure, the 想定問答集, prospectus-equivalent text — **in Japanese**, since
 those are written in Japanese by convention.
 
-**Mark the evidence status of every material figure.** A reader — and a
-diligence team — must be able to tell a verified fact from an inference at a
-glance. Use a short, explicit convention and a one-line legend at the top of the
-document, for example: `[fact]` supplied or verified, `[derived]` computed from
-facts, `[estimate]`/`[assumption]` inferred, `[open]` an unresolved question for
-diligence. Never invent a number to fill a gap — tag it `[open]` and name it as
-a diligence item. Naming the open items is what makes the rest credible.
+**Mark the evidence status of every material figure** with the legend shown in
+the template — a reader, and a diligence team, must tell a verified fact from an
+inference at a glance. Never invent a number to fill a gap; tag it `[open]` and
+name it as a diligence item. Naming the open items is what makes the rest
+credible.
 
 Tie every recommendation to the reader's decision criteria (price, ROI, cost
 structure, growth, durability). Follow `DESIGN.md` for tone: quiet, specific,
@@ -285,23 +275,22 @@ a gap to fix before iterating.
    answered, and is "why now" anchored to a real, quantified inflection?
 3. **Problem before solution** — does the reader feel the pain before seeing
    the product?
-4. **Evidence attached** — is every material number next to the claim it
-   proves, and is every load-bearing claim backed by something verifiable?
+4. **Evidence attached, trajectory shown** — is every material number next to
+   the claim it proves, is every load-bearing claim backed by something
+   verifiable, and is progress shown as a trajectory (deltas over time), not a
+   single dot?
 5. **Bottom-up market** — is TAM built bottom-up with the calculation visible,
    not an unsourced top-down billion?
-6. **Opportunity vs. durability separated** — does the story name *both* how
-   big the prize is *and* a specific reason the company keeps winning?
-7. **Differentiation is concrete** — is the moat tied to a named framework and
-   to evidence, not asserted as "first mover" or "better product"?
-8. **Objections preempted** — are the obvious investor objections for this
+6. **Competition & moat done right** — are opportunity size and durability
+   named *separately*, and is the moat tied to a named framework and evidence,
+   not asserted as "first mover" or "better product"?
+7. **Objections preempted** — are the obvious investor objections for this
    stage/geography addressed inside the story, not left for the reader to raise?
-9. **Stage fit** — does the centre of gravity match the stage (team/insight for
+8. **Stage fit** — does the centre of gravity match the stage (team/insight for
    seed; unit economics for growth; cash flow/comparables/governance for IPO)?
-10. **Grounded in reality** — does the thesis hold without asking the reader to
-    ignore the unit economics, the comparable set, or the cash runway?
-11. **Trajectory not snapshot** — is progress shown as a line (deltas over
-    time), not a single dot?
-12. **Retellable accurately, survives a sceptic** — could a third party read it
+9. **Grounded in reality** — does the thesis hold without asking the reader to
+   ignore the unit economics, the comparable set, or the cash runway?
+10. **Retellable accurately, survives a sceptic** — could a third party read it
     alone, stress-test it, and still retell the thesis to a sceptical partner in
     thirty seconds without drifting?
 
@@ -309,18 +298,18 @@ a gap to fix before iterating.
 
 See `references/narrative-craft.md` for how to fix a "no" here.
 
-13. **Carry-home** — is there a single phrase or image the reader walks out
+11. **Carry-home** — is there a single phrase or image the reader walks out
     holding and can hand on intact?
-14. **Contrarian core** — can the one non-obvious idea the thesis bets on — what
+12. **Contrarian core** — can the one non-obvious idea the thesis bets on — what
     most informed people believe that this story bets against — be stated in
     one plain sentence, and is it visible in the story?
-15. **Insider detail** — does each major claim carry at least one concrete
+13. **Insider detail** — does each major claim carry at least one concrete
     detail an outsider with no operating experience could not have written?
-16. **Numbers in context** — does each major claim's load-bearing number appear
+14. **Numbers in context** — does each major claim's load-bearing number appear
     with a comparison (prior period, benchmark, or cohort), not naked?
-17. **Hook and ending** — does the first line create tension rather than define
+15. **Hook and ending** — does the first line create tension rather than define
     a term, and is the strongest line at the end?
-18. **No empty superlatives** — is every "leading / best-in-class /
+16. **No empty superlatives** — is every "leading / best-in-class /
     transforming"-type word either earned by an adjacent verifiable fact or cut?
 
 ### Final gate
@@ -334,24 +323,19 @@ iterate.
 Load these as the workflow reaches them, not all at once:
 
 - `references/stage-playbooks.md` — how the argument shifts across VC seed,
-  VC growth, late-stage, IPO and public-market IR; valuation and
-  comparable-company framing; stage-specific failure modes.
-- `references/strategy-frameworks.md` — catalogue of moat, positioning and
-  business-model frameworks, each with essence / when to use / proof investors
-  expect / pitfalls, plus a situation→framework dispatch table and (section D)
-  industry-specific proof anchors for non-SaaS businesses — biotech, hardware /
-  deep tech, fintech, consumer / D2C, climate & energy infrastructure and
-  healthcare services.
+  growth, late-stage, IPO, public-market IR and M&A exit; valuation framing;
+  stage-specific failure modes.
+- `references/strategy-frameworks.md` — moat, positioning and business-model
+  frameworks (essence / when to use / proof / pitfalls) with a dispatch table,
+  plus section D industry-specific proof anchors for non-SaaS businesses.
 - `references/japan-ipo.md` — Japanese IPO and fundraising conventions:
-  underwriter review, the 成長可能性資料 growth disclosure, prospectus drafting,
-  想定問答集, the Growth→Prime path, comparable-company valuation practice.
-- `references/investor-objections.md` — catalogue of tough investor questions
-  by topic, with how to preempt each one inside the story.
+  underwriter review, the 成長可能性資料 disclosure, 想定問答集, the Growth→Prime
+  path, comparable-company valuation practice.
+- `references/investor-objections.md` — tough investor questions by topic, and
+  how to preempt each one inside the story.
 - `references/narrative-craft.md` — the craft that makes a sound thesis get
-  read, remembered and retold: tension, concreteness, the carry-home, the
-  honesty boundary, and the banned-without-evidence phrases. Read while drafting.
-- `references/examples.md` — two compact, annotated worked equity stories
-  showing the full arc end to end: Example 1, a US Series B marketplace
-  (Forgeline); Example 2, a Japan TSE Growth IPO vertical SaaS (ヤモリ), which
-  adds the 成長可能性資料 disclosure mapping, 想定問答, PSR valuation, and
+  read, remembered and retold; read while drafting (workflow step 6).
+- `references/examples.md` — two annotated worked equity stories: Example 1, a
+  US Series B marketplace (Forgeline); Example 2, a Japan TSE Growth IPO vertical
+  SaaS (ヤモリ) that adds the 成長可能性資料 mapping, 想定問答, PSR valuation, and
   Japanese-language generation.
