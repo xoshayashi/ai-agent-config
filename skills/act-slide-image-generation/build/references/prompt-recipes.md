@@ -300,7 +300,7 @@ ACT slide contract:
 - icon_restraint_lock: icons are sparse wayfinding or evidence markers, not the primary content layer; remove generic icon rows, icon wallpaper, and icons that replace clearer text or structure
 - icon_density_budget: default to 0-3 purposeful icons per slide and keep icon count below semantic text units unless the visual logic demands otherwise
 - structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
-- structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
+- structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits; add layers only until the body silhouette is filled with deliberate content, then split rather than overcrowd
 - use issue trees, driver trees, 2x2 matrices, value chains, funnels, waterfalls, KPI bridges, decision tables, before/after bridges, or hypothesis-evidence-implication rows when they improve the reader's decision path; skip them when they would clutter the focal message
 - structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation
 - add density through decision-relevant comparisons, benchmarks, units, denominators, assumptions, annotations, evidence strips, supporting context regions, small multiples, and source cues; never through smaller type or decorative illustration detail
@@ -310,7 +310,7 @@ ACT slide contract:
 - when a chart shows a level or trend, add one thin labeled reference line (target, prior period, or peer benchmark) so the value reads as above or below a meaningful bar
 - imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation
 - editorial_polish_repair_loop: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm
-- visual_subject_open_set, message_led_composition_lock, and composition_fit_plan: choose the visual subject, focal relationship, and canvas occupancy from the argument before image prompting
+- visual_subject_open_set, message_led_composition_lock, and composition_fit_plan: choose the visual subject, focal relationship, and canvas occupancy from the argument before image prompting; occupancy is observable - no quadrant of the body content area is conspicuously empty and no major region overflows its grid track
 - region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette
 - secondary_region_integrity_lock: in split or auxiliary-region layouts, design the secondary region as a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field
 - body_silhouette_lock: make the body read as one closed visual block with aligned outer edges, lower edges, and footer clearance
@@ -713,7 +713,7 @@ Deck:
 - layouts vary naturally
 - layout_diversity_plan and layout_rotation_guard are reflected in the generated image sequence
 - visible priority, rhythm, and breathing room
-- post_generation_design_balance_check is approved for generated PNGs before PPTX/PDF packaging
+- post_generation_design_balance_check is approved for generated PNGs before PPTX/PDF packaging, including density balance against the planned density tier
 - post_generation_full_deck_review_loop has reviewed every actual generated image before completion
 - all_generated_images_reviewed is true, weak_slide_regeneration_queue is empty, and completion_ready_status is approved
 - content_quality_status, design_quality_status, and deck_unity_status are approved across the full generated image set
