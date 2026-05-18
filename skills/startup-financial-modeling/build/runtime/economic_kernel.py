@@ -875,7 +875,10 @@ def _maturity_count(
             lead = text[max(0, m.start() - 48): m.start()]
             # The trailing window is clipped at the first clause boundary so a
             # cue that belongs to a *later* figure ("1万台 operate; we target
-            # 2,500") is not misattributed to this one.
+            # 2,500"; "12,000 today, target 5,000") is not misattributed to
+            # this one. The comma is treated as a boundary on purpose — it
+            # separates the common "current, target" figure pair — at the
+            # cost of missing a cue a narrative states after a comma.
             trail = re.split(
                 r"[.;,。；、，\n]", text[m.end(): m.end() + 48], maxsplit=1
             )[0]

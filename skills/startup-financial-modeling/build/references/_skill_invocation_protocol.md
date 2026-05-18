@@ -40,10 +40,10 @@ dependent outputs as formulas or checks.
 narrative, a brief, a conversation — with full understanding, decide the
 economic drivers, and write them as YAML. Do not delegate that reading to the
 generator: `--source-md` is a best-effort fallback whose regex extraction
-silently misses any figure not lexically adjacent to its keyword (a maturity
-target phrased "... grow to 9,000 by FY2031" is read as the current count).
-When you only have a narrative, extract it to YAML yourself, then build from
-the YAML.
+silently misses a figure stated apart from its count noun — a maturity target
+phrased "... to 9,000 by FY2031" (a number, then a date, with no adjacent
+"customers" / "units") is read as the current count. When you only have a
+narrative, extract it to YAML yourself, then build from the YAML.
 
 ```sh
 # Primary: build from drivers you extracted into structured YAML.
