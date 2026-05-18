@@ -223,6 +223,21 @@ def test_hyphenated_year_horizon_is_honored() -> None:
     )
 
 
+def test_start_year_takes_the_start_of_a_range() -> None:
+    """A hyphenated year range ("forecast (2026-2031)") sets the start year
+    to the first year, not the last."""
+    assert kernel.extract_start_year(
+        "We model a 6-year forecast horizon (2026-2031)."
+    ) == 2026, "start year took the end of the range, not the start"
+    facts = kernel.derive_source_facts(
+        "# Deep-tech plan\n\nA deep-tech company. We model a forecast "
+        "horizon (2026-2031).\nSource: roadmap memo.\n"
+    )
+    assert facts.years[0] == 2026, (
+        f"plan starts at FY{facts.years[0]}, not the stated 2026"
+    )
+
+
 def test_demand_ramp_reaches_stated_arr() -> None:
     """A narrative ARR target must anchor the demand ramp, not be ignored.
 
@@ -1262,6 +1277,7 @@ if __name__ == "__main__":
         test_monthly_burn_phrasing_does_not_flip_model_grain,
         test_explicit_monthly_model_request_is_still_detected,
         test_hyphenated_year_horizon_is_honored,
+        test_start_year_takes_the_start_of_a_range,
         test_demand_ramp_reaches_stated_arr,
         test_customer_count_reaches_stated_target,
         test_marketplace_gmv_honors_stated_maturity_target,

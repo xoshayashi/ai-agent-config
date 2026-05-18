@@ -359,8 +359,11 @@ def _profile(key: str) -> MechanicProfile:
 
 def extract_start_year(text: str) -> int:
     """Infer forecast start year only from explicit model/fiscal-year signals."""
+    # `[^\n]{0,24}?` is non-greedy: it captures the first year after the cue,
+    # so a hyphenated range ("(2026-2031)") yields the start year 2026, not
+    # the end year 2031.
     patterns = [
-        r"(?:model|forecast|plan|fiscal|FY|開始|初年度|計画)[^\n]{0,24}(20\d{2})",
+        r"(?:model|forecast|plan|fiscal|FY|開始|初年度|計画)[^\n]{0,24}?(20\d{2})",
         r"(20\d{2})\s*(?:forecast|plan|model|年度開始|開始)",
     ]
     for pattern in patterns:
