@@ -1254,11 +1254,14 @@ def extract_target_gross_margin(text: str) -> float | None:
     Recognises English ("gross margin ... 78%", "78% gross margin") and
     Japanese ("粗利率 78%", "売上総利益率 78%") phrasings.
     """
+    # The gap windows are wide enough for a qualifying clause ("gross margin
+    # on the subscription is about 82%"); `[^0-9%]` keeps any intervening
+    # number out, so a wide window cannot capture an unrelated percentage.
     patterns = [
-        r"gross\s*margin[^0-9%]{0,28}([0-9]{1,2}(?:\.[0-9])?)\s*%",
-        r"([0-9]{1,2}(?:\.[0-9])?)\s*%[^0-9%]{0,20}gross\s*margin",
-        r"粗利率?[^0-9%]{0,14}([0-9]{1,2}(?:\.[0-9])?)\s*%",
-        r"売上総利益率[^0-9%]{0,14}([0-9]{1,2}(?:\.[0-9])?)\s*%",
+        r"gross\s*margin[^0-9%]{0,44}([0-9]{1,2}(?:\.[0-9])?)\s*%",
+        r"([0-9]{1,2}(?:\.[0-9])?)\s*%[^0-9%]{0,32}gross\s*margin",
+        r"粗利率?[^0-9%]{0,20}([0-9]{1,2}(?:\.[0-9])?)\s*%",
+        r"売上総利益率[^0-9%]{0,20}([0-9]{1,2}(?:\.[0-9])?)\s*%",
     ]
     pct = first_match_float(patterns, text, -1.0)
     if 0.0 < pct < 100.0:
