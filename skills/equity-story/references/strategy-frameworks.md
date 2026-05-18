@@ -266,6 +266,12 @@ Each entry below names what the load-bearing evidence actually is for that
 industry. Use it to decide *what proof the story must carry*, then still draw
 the durable advantage from a section A moat framework.
 
+The six entries are the most common non-SaaS archetypes, not an exhaustive list.
+For an industry not named here, apply the nearest anchor together with the
+model-agnostic frameworks in sections A–C: the load-bearing evidence simply
+changes — a clinical milestone, a cost-curve, a credit-loss rate, a cohort
+margin — while the discipline of naming it does not.
+
 ### 17. Biotech / Pharma — the clinical-pipeline thesis
 **Essence.** The thesis values an *un-approved* clinical pipeline as
 risk-adjusted future value. The standard tool is **rNPV** — each phase's
