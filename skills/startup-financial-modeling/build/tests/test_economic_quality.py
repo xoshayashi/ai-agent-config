@@ -547,6 +547,31 @@ def test_economic_audit_catches_non_positive_revenue() -> None:
     assert any("non-positive revenue" in issue for issue in issues), issues
 
 
+def test_operations_headcount_does_not_explode_at_high_account_count() -> None:
+    """A high-count, low-ARPU plan must staff operations off revenue, not the
+    raw account count.
+
+    Operations FTE once carried a `scale / ops_divisor` term — one customer
+    equalled a fixed slice of operations staff regardless of price. A consumer
+    plan with 260k accounts at a low monthly price drew an operations org of
+    hundreds of FTE, pushing people cost past revenue and EBITDA deeply
+    negative while every other audit check still passed.
+    """
+    facts = kernel.derive_source_facts_from_mapping(
+        {
+            "company": "MassMarket",
+            "customers": [20_000, 70_000, 140_000, 210_000, 260_000],
+            "monthly_price_yen": 400,
+        }
+    )
+    rows = _implied(facts)
+    ratio = rows[-1]["people_cost"] / rows[-1]["revenue"]
+    assert ratio < 0.8, (
+        f"mature people cost is {ratio:.2f}x revenue — operations headcount "
+        f"is scaling off raw account count, not revenue"
+    )
+
+
 def test_balance_sheet_balances_in_the_kernel_projection() -> None:
     """The projected balance sheet must satisfy A = L + E every period."""
     for name, story in ARCHETYPES.items():
@@ -1647,6 +1672,7 @@ if __name__ == "__main__":
         test_economic_audit_catches_a_broken_cost_stack,
         test_economic_audit_catches_insolvency,
         test_economic_audit_catches_non_positive_revenue,
+        test_operations_headcount_does_not_explode_at_high_account_count,
         test_balance_sheet_balances_in_the_kernel_projection,
         test_depreciation_uses_the_accumulated_asset_base,
         test_economic_audit_flags_an_unbalanced_sheet,

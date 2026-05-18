@@ -71,7 +71,11 @@ unit-sale models), pricing (`monthly_price_yen`), `target_gross_margin`,
 `churn_rate`, and the first round (`equity_raise_yen`, `post_money_yen`); a
 marketplace adds `gmv_yen` and `take_rate`. Give the list one value per period
 so the stated current figure and the stated maturity figure are both pinned —
-that is how a maturity target is honored. When you must fall back to
+that is how a maturity target is honored. Staffing scales with revenue by
+default; state `product_headcount` / `gtm_headcount` / `operations_headcount` /
+`ga_headcount` as per-period lists when a plan's headcount is known — the
+revenue-scaled default runs lean for a high-volume, low-price business. When
+you must fall back to
 `--source-md`, the regex extractor can silently read an interim or current
 figure as the target; `_self_review_protocol.md` requires you to check the
 built model's terminal demand against the source before closeout.
