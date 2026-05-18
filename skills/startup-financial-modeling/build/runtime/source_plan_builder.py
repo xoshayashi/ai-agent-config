@@ -1389,12 +1389,13 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
     _setup_sheet(ws, f"{facts.company} — KPI Dashboard", "Decision metrics: scale, margin, runway, capital efficiency, ownership, and valuation.")
     _write_period_header(ws, facts)
     cols = _period_cols(facts)
+    profile_key = mechanic_key(facts)
     # The VC decision-metrics block (CAC, payback, magic number, Rule of 40,
     # net retention) is rendered only for profiles with a real customer-
     # acquisition and recurring/transaction motion. An ambiguous-mechanic
     # plan gets generic KPIs instead, and a pre-revenue plan has no customer
     # base to compute them against — both keep the original layout.
-    vc_metrics_apply = mechanic_key(facts) not in (
+    vc_metrics_apply = profile_key not in (
         "generic", "pre_revenue_milestone",
     )
     # VC_BLOCK_OFFSET: the block occupies rows 24-29 (one section header plus
@@ -1407,7 +1408,7 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
     # per-seat subscription price, so the per-unit subscription rows would
     # read price 0, negative unit gross profit, and "N/A" payback — which
     # misreads as a broken business. A marketplace gets a transaction lens.
-    if mechanic_key(facts) == "marketplace":
+    if profile_key == "marketplace":
         unit_economics_rows = [
             (7, "Take rate", "%", "='Assumptions'!{c}12", ib.FMT_PERCENT),
             (8, "GMV per customer", "JPY", "=IF('Revenue Build'!{c}20=0,0,{c}14/'Revenue Build'!{c}20)", ib.FMT_JPY_YEN),
