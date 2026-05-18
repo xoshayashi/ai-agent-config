@@ -260,9 +260,11 @@ def valid_png_bytes(rgb: tuple[int, int, int] = (255, 255, 255), width: int = 20
 
 
 def approved_review_manifest(images: list[Path]) -> dict[str, object]:
-    approved_design_statuses = {
+    deck_only_design_statuses = {
         "deck_tone_consistency_status": "approved",
         "illustration_consistency_status": "approved",
+    }
+    approved_design_statuses = {
         "post_generation_design_balance_status": "approved",
         "whitespace_occupancy_balance_status": "approved",
         "density_balance_status": "approved",
@@ -286,6 +288,7 @@ def approved_review_manifest(images: list[Path]) -> dict[str, object]:
         "deck_unity_status": "approved",
         "completion_ready_status": "approved",
         "review_manifest_status": "approved",
+        **deck_only_design_statuses,
         **approved_design_statuses,
         "slides": [
             {
