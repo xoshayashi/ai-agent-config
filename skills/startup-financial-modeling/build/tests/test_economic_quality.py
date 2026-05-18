@@ -672,6 +672,14 @@ def test_maturity_cue_after_the_figure_is_detected() -> None:
     assert kernel.extract_target_units(cross_clause, profile) == 2_500, (
         "a trailing cue leaked across a clause boundary onto an earlier figure"
     )
+    # A prefix cue ("target") points forward to a *later* figure. When it sits
+    # in an earlier figure's trailing window — no punctuation between them — a
+    # contraction plan must still take the stated target, not the larger
+    # current figure.
+    contraction = "Currently 10,000 units and we target 2,500 units by year five."
+    assert kernel.extract_target_units(contraction, profile) == 2_500, (
+        "a prefix cue trailing an earlier figure was misread as its target"
+    )
 
 
 def test_cap_table_exit_waterfall_uses_post_round_cap_table() -> None:

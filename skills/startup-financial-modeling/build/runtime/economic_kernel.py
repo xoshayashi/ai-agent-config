@@ -845,6 +845,15 @@ _TARGET_CUE = re.compile(
     r"目標|までに|成熟)",
     flags=re.IGNORECASE,
 )
+# A prefix cue ("target", "grow to") points forward to a *later* figure; a
+# postfix cue trails the figure it marks ("25,000 units at maturity"). Only
+# this postfix subset may be matched in a figure's trailing window — a prefix
+# cue found after a figure belongs to the next number, not this one.
+_TRAILING_TARGET_CUE = re.compile(
+    r"at\s+maturity|maturity|by\s+year|by\s+the\s+end|"
+    r"成熟|目標|までに|最終年|時点",
+    flags=re.IGNORECASE,
+)
 
 
 def _maturity_count(
@@ -873,16 +882,16 @@ def _maturity_count(
                 continue
             any_best = value if any_best is None else max(any_best, value)
             lead = text[max(0, m.start() - 48): m.start()]
-            # The trailing window is clipped at the first clause boundary so a
-            # cue that belongs to a *later* figure ("1万台 operate; we target
-            # 2,500"; "12,000 today, target 5,000") is not misattributed to
-            # this one. The comma is treated as a boundary on purpose — it
+            # The trailing window is clipped at the first clause boundary or
+            # digit, so a postfix cue that belongs to a *later* figure
+            # ("10,000 units and we target 2,500 ... by year five") cannot
+            # reach back to this one. The comma is a boundary on purpose — it
             # separates the common "current, target" figure pair — at the
             # cost of missing a cue a narrative states after a comma.
             trail = re.split(
-                r"[.;,。；、，\n]", text[m.end(): m.end() + 48], maxsplit=1
+                r"[.;,。；、，\n0-9]", text[m.end(): m.end() + 48], maxsplit=1
             )[0]
-            if _TARGET_CUE.search(lead) or _TARGET_CUE.search(trail):
+            if _TARGET_CUE.search(lead) or _TRAILING_TARGET_CUE.search(trail):
                 cue_best = value if cue_best is None else max(cue_best, value)
     if cue_best is not None:
         return cue_best
