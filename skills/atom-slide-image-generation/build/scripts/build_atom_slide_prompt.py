@@ -51,6 +51,12 @@ REQUIRED_PROMPT_FIELDS = [
     "message_led_composition_lock",
     "region_balance_policy",
     "composition_fit_plan",
+    "design_balance_gate",
+    "occupancy_density_fit_lock",
+    "font_scale_unity_lock",
+    "palette_role_unity_lock",
+    "multimodal_design_review_lock",
+    "design_breakage_blocker_lock",
     "secondary_region_integrity_lock",
     "body_silhouette_lock",
     "layout_family",
@@ -285,6 +291,12 @@ def canonical_planning_block(
   typography_balance_status: pending / approved / repair_required
   color_consistency_status: pending / approved / repair_required
   outer_padding_consistency_status: pending / approved / repair_required
+  design_balance_gate: before generation, freeze the intended body occupancy, whitespace role, content-area weight, text-role sizes, background role, and accent role; after generation, approve only if the actual PNG matches those frozen choices
+  occupancy_density_fit_lock: the body area must feel deliberately occupied for the selected density_tier; repair dead zones, weak occupancy, crushed margins, overcrowding, or density added by shrinking text below 18pt equivalent
+  font_scale_unity_lock: one deck-level type scale is reused for H1, subtitle, body, data labels, table labels, source, and optional Insight; repair slide-level font-size drift, weight drift, low-contrast text, or any body/label text that competes with the header
+  palette_role_unity_lock: each color keeps one role across the deck: #FCFBF8/#F4F3EF canvas, #DDE3EA/#D6E1EE panels/cards, #2D332E main text, #4D544E subtitle, #6E756E footnotes, #0B2F5B structural accent, #FBF3D7/#C49A2C rare Honey signal; repair arbitrary background, text, accent, or saturation drift
+  multimodal_design_review_lock: actual generated PNGs must be opened and reviewed multimodally for layout collapse, whitespace/occupancy imbalance, information-density weakness, font-size/color drift, background/accent mismatch, and deck-unity drift before approval
+  design_breakage_blocker_lock: any generated PNG with layout collapse, accidental empty zones, overcrowding, inconsistent font scale, wrong text color, wrong background color, excessive or random accent use, or off-system illustration tone is repair_required and cannot be packaged
   header_identity_lock: header is always the same compact left vertical line + H1 + subtitle system, never a slide-specific decoration surface
   header_integrity_blocker_lock: malformed, missing, oversized, recolored, right-decorated, or intruded header is a blocker and must be repaired before other polish
   header_integrity_status: pending / approved / repair_required
@@ -341,6 +353,12 @@ def canonical_planning_block(
   message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements
   region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette
   composition_fit_plan: [main visual field, supporting regions, whitespace role, Insight footprint, and intended occupancy; occupancy is observable - no quadrant of the body content area is conspicuously empty and no major region overflows its grid track]
+  design_balance_gate: [planned body occupancy percentage band, useful whitespace role, content-area weight, type-role sizes, background role, accent role, and repair trigger]
+  occupancy_density_fit_lock: body occupancy must match density_tier without dead zones, margin crush, overcrowding, or smaller-than-18pt body text
+  font_scale_unity_lock: freeze and reuse the deck-level type scale for all text roles; repair per-slide size/weight/color drift
+  palette_role_unity_lock: use each ATOM color in one stable role across the deck; repair background, text, and accent drift before packaging
+  multimodal_design_review_lock: approve only after actual generated PNG review checks layout collapse, occupancy, density, font scale, text color, background, accent role, and deck unity
+  design_breakage_blocker_lock: layout collapse, accidental empty zones, overcrowding, inconsistent font scale, wrong text color, wrong background color, excessive/random accent use, or off-system illustration tone blocks completion
   content_area_priority_lock: allocate height to the body, figure, table, or diagram first; size any optional Insight/message-box from the remaining calculated space so it supports rather than compresses the main content area
   secondary_region_integrity_lock: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field
   body_silhouette_lock: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions
@@ -614,8 +632,9 @@ final_generation_prompt_payload:
   exact_visible_text: render only the strings listed under exact_text; no lock names, field names, file paths, audit labels, route/status fields, manifests, or speaker notes.
   layout_and_reading_path: use selected layout_family, 12-column grid, fixed header/source anchors, one primary focal point, and a clear path from H1 to main structure to evidence/context to optional Insight to Source.
   visual_structure: choose the message-led chart, table, matrix, map, flow, evidence strip, or domain-matched editorial illustration that makes the argument observable.
+  design_balance: freeze the body occupancy, whitespace role, content-area weight, text-role sizes, background role, and accent role; keep type, background, and accent roles consistent with the embedded ATOM design system.
   source_rendering: render Source only when source_line contains real traceable sources; if source_line is none, leave the footer source area blank and draw no separator.
-  focused_blockers: wrong image size, missing/malformed header, invented/garbled text, invented Source, Source separator line, broken chart semantics, unreadable body text, visible workflow metadata, or out-of-scope repair.
+  focused_blockers: wrong image size, missing/malformed header, invented/garbled text, invented Source, Source separator line, broken chart semantics, unreadable body text, layout collapse, accidental empty zones, overcrowding, font scale drift, wrong text/background/accent color, visible workflow metadata, or out-of-scope repair.
 
 non_rendered_workflow_qa:
   Use the fields below only for planning, review, packaging, and QA. Do not include them as visible slide content or in the final image prompt payload.
@@ -627,6 +646,9 @@ draft_image_prompt_scaffold:
   Apply render_contract_lock: pass drawing-relevant instructions to image generation; keep PPTX packaging, file paths, manifests, credentials, contact sheets, speaker notes, and audit/status fields outside visible slide content.
   Apply visible_text_only_lock: render only exact_text strings on the slide; do not render lock names, YAML keys, route/status fields, audit labels, speaker notes, file paths, or workflow instructions.
   Apply positive_quality_lock: state the desired calm editorial slide quality before blockers: clear figure-ground separation, exact text, compact fixed header, one dominant structure, grouped evidence, stable line weight, restrained accent area, and a concrete visual anchor.
+  Apply design_balance_gate: freeze intended body occupancy, useful whitespace role, content-area weight, text-role sizes, background role, and accent role before generation.
+  Apply occupancy_density_fit_lock: body occupancy must match density_tier without dead zones, margin crush, overcrowding, or smaller-than-18pt body text.
+  Apply font_scale_unity_lock and palette_role_unity_lock: reuse one deck-level type scale and one stable ATOM color-role system; repair font, text color, background, or accent drift before approval.
   PPTX is a delivery wrapper only. Never create final PNGs by exporting, rendering, or screenshotting a PPTX.
   Prompt builder scripts are planning helpers only; they must never render, draw, screenshot, export, or simulate final slide PNGs.
   Package scripts run only after approved Codex built-in image artifacts exist, and package scripts must not be used as a workaround for missing image generation.
@@ -745,6 +767,7 @@ negative_prompt_hard_blockers:
   icon-and-keyword-only slide, noun-only card grid, generic icon grid, icon wallpaper, repeated decorative icon row, one-icon-per-card habit, icon-only composition with no explanatory sentence layer,
   patterned or textured message box, oversized message box, full-width banner-like Insight, message-box text competing with H1/subtitle,
   saturated yellow message box, deck tone drift, mixed illustration tone, inconsistent face detail or body proportion, inconsistent icon family, inconsistent card/table surface weight, decorative pseudo-3D depth, rough sketch aesthetic,
+  layout collapse, accidental empty zones, weak body occupancy, overcrowded canvas, font scale drift, wrong text color, wrong background color, excessive or random accent use, off-system illustration tone,
   mechanical repeated composition without narrative or comparison purpose, generic icon-only composition, dated template composition, slide number, title kicker, logo in upper-right clear zone
 
 post_generation_audit:
@@ -788,6 +811,12 @@ post_generation_audit:
   - message_led_composition_lock is fulfilled: one focal relationship carries the argument before supporting elements
   - region_balance_policy is fulfilled: region weight follows the slide message, evidence shape, reading path, and body silhouette rather than a fixed template
   - composition_fit_plan is fulfilled: the main visual field, supporting regions, whitespace role, and Insight footprint feel intentionally balanced
+  - design_balance_gate is approved: intended body occupancy, whitespace role, content-area weight, type-role sizes, background role, and accent role were frozen before generation and match the actual PNG
+  - occupancy_density_fit_lock is fulfilled: the body area is deliberately occupied for the selected density_tier, with no accidental dead zones, crushed margins, overcrowding, or density added by shrinking body text below 18pt equivalent
+  - font_scale_unity_lock is fulfilled: one deck-level type scale holds across H1, subtitle, body, data labels, table labels, source, and optional Insight, with no slide-level size/weight/color drift
+  - palette_role_unity_lock is fulfilled: ATOM colors keep stable roles across canvas, panels/cards, text, footnotes, Deep Blue accent, and rare Honey signal; arbitrary background, text, accent, or saturation drift is absent
+  - multimodal_design_review_lock is complete: actual generated PNGs were opened and reviewed multimodally for layout collapse, whitespace/occupancy imbalance, density weakness, font-size/color drift, background/accent mismatch, and deck-unity drift
+  - design_breakage_blocker_lock is clear: no layout collapse, accidental empty zone, overcrowding, inconsistent font scale, wrong text color, wrong background color, excessive/random accent use, or off-system illustration tone remains
   - content_area_priority_lock is fulfilled: the body, figure, table, or diagram gets the needed height first, and any optional Insight/message-box is sized from the remaining calculated space
   - secondary_region_integrity_lock is fulfilled: any split or auxiliary region reads as a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field
   - body_silhouette_lock is fulfilled: the body reads as one closed visual block with aligned outer edges, lower edges, and footer clearance
@@ -871,6 +900,8 @@ pre_package_image_review:
   - Score illustration_consistency_status across all generated PNGs after every generation or repair batch.
   - Score content_quality_status, design_quality_status, and deck_unity_status; queue any slide that feels content-weak, design-weak, inconsistent, or below the deck bar.
   - Score post_generation_design_balance_check: whitespace/occupancy balance, density balance against the planned density tier, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
+  - Apply multimodal_design_review_lock: inspect each actual PNG for layout collapse, accidental empty zones, weak occupancy, overcrowding, font-scale drift, wrong text color, wrong background color, excessive or random Deep Blue/Honey use, and off-system illustration tone.
+  - Apply design_breakage_blocker_lock: if any of those issues are present as blocker or major, mark the slide repair_required and keep it out of packaging.
   - Classify each finding as blocker, major, minor, or accepted.
   - If any blocker, major, deck-consistency, content-quality, design-quality, or deck-unity issue exists, create image_repair_prompt, add the slide to weak_slide_regeneration_queue, regenerate or edit the PNG, replace the output file, and repeat this review.
   - Apply edit_scope_lock in every repair prompt: issue_observed, change_only, preserve, re_check, and no global restyle unless explicitly required.
