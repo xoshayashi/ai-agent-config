@@ -157,6 +157,7 @@ config_home=$(expand_home "${AI_AGENT_CONFIG_HOME:-$default_config_home}")
 codex_home=$(expand_home "${AI_AGENT_CODEX_HOME:-$HOME/.codex}")
 claude_home=$(expand_home "${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}")
 gemini_home=$(expand_home "${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}")
+home_dir=$(expand_home "${AI_AGENT_HOME:-$HOME}")
 skill_source_root="$config_home/skills"
 
 git_status=$(command_status git)
@@ -202,6 +203,8 @@ gemini_shared_status=$(link_status_for "$gemini_home/AI_AGENT_INSTRUCTIONS.md" "
 gemini_design_status=$(link_status_for "$gemini_home/DESIGN.md" "$config_home/instructions/DESIGN.md")
 gemini_skills_status=$(skills_status_for "$gemini_home")
 
+shell_zshrc_status=$(link_status_for "$home_dir/.zshrc" "$config_home/shell/.zshrc")
+
 codex_notify_status=$(notify_status_for "$codex_home/hooks.json")
 claude_notify_status=$(notify_status_for "$claude_home/settings.json")
 gemini_notify_status=$(notify_status_for "$gemini_home/settings.json")
@@ -210,6 +213,7 @@ for status in \
   "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status" \
   "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status" \
   "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status" \
+  "$shell_zshrc_status" \
   "$codex_notify_status" "$claude_notify_status" "$gemini_notify_status"; do
   [ "$status" = "ok" ] || mark_status warn
 done
@@ -227,7 +231,8 @@ if [ "$format" = "json" ]; then
   printf '  "links": {\n'
   printf '    "codex_AGENTS.md": "%s", "codex_AI_AGENT_INSTRUCTIONS.md": "%s", "codex_DESIGN.md": "%s", "codex_skills": "%s",\n' "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status"
   printf '    "claude_CLAUDE.md": "%s", "claude_AI_AGENT_INSTRUCTIONS.md": "%s", "claude_DESIGN.md": "%s", "claude_skills": "%s",\n' "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status"
-  printf '    "gemini_GEMINI.md": "%s", "gemini_AI_AGENT_INSTRUCTIONS.md": "%s", "gemini_DESIGN.md": "%s", "gemini_skills": "%s"\n' "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status"
+  printf '    "gemini_GEMINI.md": "%s", "gemini_AI_AGENT_INSTRUCTIONS.md": "%s", "gemini_DESIGN.md": "%s", "gemini_skills": "%s",\n' "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status"
+  printf '    "shell_.zshrc": "%s"\n' "$shell_zshrc_status"
   printf '  },\n'
   printf '  "notifications": {"codex": "%s", "claude": "%s", "gemini": "%s"}\n' "$codex_notify_status" "$claude_notify_status" "$gemini_notify_status"
   printf '}\n'
@@ -243,6 +248,7 @@ else
     "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status"
   printf 'notifications: codex=%s claude=%s gemini=%s\n' \
     "$codex_notify_status" "$claude_notify_status" "$gemini_notify_status"
+  printf 'shell: zshrc=%s\n' "$shell_zshrc_status"
 fi
 
 if [ "$strict" = "1" ] && [ "$(overall_status)" != "ok" ]; then

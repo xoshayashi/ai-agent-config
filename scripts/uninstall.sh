@@ -43,6 +43,7 @@ config_home=$(expand_home "${AI_AGENT_CONFIG_HOME:-$default_config_home}")
 codex_home=$(expand_home "${AI_AGENT_CODEX_HOME:-$HOME/.codex}")
 claude_home=$(expand_home "${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}")
 gemini_home=$(expand_home "${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}")
+home_dir=$(expand_home "${AI_AGENT_HOME:-$HOME}")
 skill_source_root="$config_home/skills"
 retired_skill_names="daily-llm-history-instruction-review"
 
@@ -126,6 +127,10 @@ remove_retired_skill_links() {
   done
 }
 
+remove_shell_links() {
+  remove_managed_link "$home_dir/.zshrc" "$config_home/shell/.zshrc" "shell dotfile link"
+}
+
 remove_notification_hooks() {
   helper="$config_home/scripts/install-notifications.py"
   if [ ! -f "$helper" ]; then
@@ -157,7 +162,7 @@ remove_notification_hooks() {
   fi
 }
 
-say "AI agent config uninstall (instructions only)"
+say "AI agent config uninstall"
 say "config: $config_home"
 
 src_root="$config_home/instructions"
@@ -172,6 +177,8 @@ remove_managed_link "$claude_home/DESIGN.md" "$src_root/DESIGN.md" "instruction 
 remove_managed_link "$gemini_home/GEMINI.md" "$src_root/GEMINI.md" "instruction link"
 remove_managed_link "$gemini_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "instruction link"
 remove_managed_link "$gemini_home/DESIGN.md" "$src_root/DESIGN.md" "instruction link"
+
+remove_shell_links
 
 # Preserve skill-backups directories. They may contain user files moved out of
 # active skill roots so backup folders are not loaded as skills.

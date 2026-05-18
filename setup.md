@@ -1,6 +1,6 @@
 # Setup
 
-このリポジトリは、Claude Code / Codex / Gemini CLI のグローバル instruction files と共有 skill links を管理します。
+このリポジトリは、Claude Code / Codex / Gemini CLI のグローバル instruction files、共有 skill links、シェル設定 (`~/.zshrc`) を管理します。
 
 ## インストール内容
 
@@ -18,6 +18,7 @@
 | `~/.gemini/AI_AGENT_INSTRUCTIONS.md` | `instructions/AI_AGENT_INSTRUCTIONS.md` |
 | `~/.gemini/DESIGN.md` | `instructions/DESIGN.md` |
 | `~/.gemini/skills/<name>` | `skills/<name>` |
+| `~/.zshrc` | `shell/.zshrc` |
 
 ## 基本コマンド
 
@@ -71,6 +72,19 @@ sh scripts/validate-repo.sh
 `skill-backups/` へ移動し、バックアップが skill として読み込まれないようにします。
 旧 skill root として残っている `~/.agents/skills/*.backup-*` も同じく
 `~/.agents/skill-backups/` へ移動します。
+
+## Shell 設定
+
+`setup.sh` は `shell/.zshrc` を `~/.zshrc` にリンクします。`.zshrc` の正本は
+このリポジトリにあり、編集はリポジトリ側で行います。
+
+既存の `~/.zshrc` を初めて symlink に切り替えるときは、通常ファイルが残っていると
+既定 (`skip`) ではリンクが作られません。次のように `replace` を指定すると、元の
+`~/.zshrc` を `~/.zshrc.backup-<timestamp>` に退避してからリンクを作成します。
+
+```sh
+AI_AGENT_CONFLICT_MODE=replace sh scripts/setup.sh
+```
 
 ## 通知 hook
 

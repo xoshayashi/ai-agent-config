@@ -20,6 +20,9 @@ Claude Code / Codex / Gemini CLI に共通の Instructions を配布するため
 さらに、`skills/` 配下の共有 skill も各 CLI のグローバル `skills/`
 フォルダーへリンクします。
 
+加えて、シェル設定 `shell/.zshrc` を `~/.zshrc` へリンクします。`.zshrc` の正本は
+このリポジトリ側にあり、`~/.zshrc` はそのシンボリックリンクになります。
+
 このリポジトリでは、CLI や `/init` 系コマンドがローカルに生成しうる root-level `AGENTS.md`、`CLAUDE.md`、`GEMINI.md` は canonical ではありません。正本は `instructions/` 配下です。
 
 ## 通知 hook
@@ -48,9 +51,13 @@ Claude Code / Codex / Gemini CLI に共通の Instructions を配布するため
 sh /path/to/ai-agent-config/scripts/setup.sh
 ```
 
-`setup.sh` は instruction links と skill links を作成します。既存ファイルがある場合は既定で skip します。置き換える場合は `AI_AGENT_CONFLICT_MODE=replace` を指定します。
+`setup.sh` は instruction links、skill links、シェル設定 link を作成します。既存ファイルがある場合は既定で skip します。置き換える場合は `AI_AGENT_CONFLICT_MODE=replace` を指定します。
 置換時の skill backup は各 CLI home の `skill-backups/` に移し、`skills/`
 直下には残しません。
+
+既存の `~/.zshrc` を symlink へ切り替える初回は `AI_AGENT_CONFLICT_MODE=replace`
+を指定してください。元の `~/.zshrc` は同じフォルダーに
+`.zshrc.backup-<timestamp>` として退避されます。
 
 CLI の存在チェックを省く場合:
 
@@ -84,10 +91,10 @@ AI_AGENT_HEALTH_REDACT=0 sh scripts/health-check.sh
 sh /path/to/ai-agent-config/scripts/uninstall.sh
 ```
 
-`uninstall.sh` は、このリポジトリが管理する instruction symlink だけを `trash` へ移します。ユーザーが手で作った通常ファイルや別 target の symlink は触りません。
+`uninstall.sh` は、このリポジトリが管理する symlink（instruction / skill / シェル設定）だけを `trash` へ移します。ユーザーが手で作った通常ファイルや別 target の symlink は触りません。
 
 ## 保守方針
 
-- 構成は `instructions/`、`scripts/`、`notifications/`、必要に応じた `skills/`、最小 docs、CI validation、on-demand PR review workflow に絞ります。
+- 構成は `instructions/`、`scripts/`、`notifications/`、`shell/`、必要に応じた `skills/`、最小 docs、CI validation、on-demand PR review workflow に絞ります。
 - 初心者向けの coding support は `instructions/AI_AGENT_INSTRUCTIONS.md` の `Coding Collaboration Defaults` に集約し、長い個別プロンプト例を常時ロードしないようにします。
 - Instruction の構造を変えたら、`README.md`、`setup.md`、`scripts/validate-repo.sh` も同じ変更で合わせます。
