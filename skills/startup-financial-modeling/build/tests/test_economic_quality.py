@@ -160,9 +160,24 @@ def test_annual_pricing_is_converted_to_a_monthly_figure() -> None:
     assert annual.monthly_price_yen[0] == 100_000, (
         f"annual price not converted: {annual.monthly_price_yen[0]}"
     )
-    # A monthly price stays monthly.
+    # Japanese annual cue (年額).
+    jp = kernel.derive_source_facts(
+        "# SaaS計画\nB2B SaaS。利用料は年額240万円。\nSource: メモ。\n"
+    )
+    assert jp.monthly_price_yen[0] == 200_000, (
+        f"年額 price not converted: {jp.monthly_price_yen[0]}"
+    )
+    # A monthly price stays monthly, and an explicit 月額 wins over a later
+    # ACV mention in the same document.
     monthly = kernel.derive_source_facts(SAAS_STORY)
     assert monthly.monthly_price_yen[0] == 12_000
+    both = kernel.derive_source_facts(
+        "# SaaS plan\nB2B SaaS priced at 月額50,000円. ACV is ¥1,200,000.\n"
+        "Source: memo.\n"
+    )
+    assert both.monthly_price_yen[0] == 50_000, (
+        f"月額 should win over ACV: {both.monthly_price_yen[0]}"
+    )
 
 
 def test_monthly_burn_phrasing_does_not_flip_model_grain() -> None:
