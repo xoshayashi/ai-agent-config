@@ -159,6 +159,14 @@ def test_stated_churn_rate_is_extracted_and_annualized() -> None:
         f"1.5% monthly churn was not annualized: {monthly}"
     )
     assert kernel.extract_churn_rate("No churn figure stated here.") is None
+    # A nearby "monthly price" sentence must not annualize an annual churn.
+    assert kernel.extract_churn_rate(
+        "Churn is 8%. Monthly price is $50."
+    ) == 0.08, "an unrelated 'monthly' token wrongly annualized churn"
+    # Employee churn is an HR metric — the customer churn figure wins.
+    assert kernel.extract_churn_rate(
+        "Employee churn is 20%. Customer churn is 8%."
+    ) == 0.08, "employee churn was taken instead of customer churn"
     facts = kernel.derive_source_facts(
         "# SaaS plan\n\nA SaaS platform priced at 月額1.2万円. Customer "
         "churn is about 9%. 5-year plan, seed round. Source: memo.\n"
