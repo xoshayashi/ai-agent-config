@@ -26,6 +26,7 @@ except ImportError:
 import ib_format as ibf  # noqa: E402
 import source_plan_builder as spb  # noqa: E402
 import cap_table_builder as ctb  # noqa: E402
+import economic_kernel as ek  # noqa: E402
 import live_comps as lc  # noqa: E402
 
 # ============================================================================
@@ -674,6 +675,17 @@ def _main(argv: list[str] | None = None) -> int:
         from openpyxl import load_workbook
 
         audit_issues = audit_workbook(load_workbook(output, data_only=False))
+        # Structural audit cannot see broken economics; the economic-coherence
+        # audit replays the kernel projection and is profile/mode independent.
+        if args.source_md is not None:
+            audit_facts = spb.extract_source_facts(args.source_md)
+        elif args.input:
+            audit_facts = spb.derive_source_facts_from_mapping(load_yaml(args.input))
+        else:
+            audit_facts = spb.derive_source_facts(_default_source_text())
+        audit_issues += [
+            f"economic: {issue}" for issue in ek.audit_economic_coherence(audit_facts)
+        ]
         if audit_issues:
             for issue in audit_issues:
                 print(f"[audit] {issue}", file=sys.stderr)

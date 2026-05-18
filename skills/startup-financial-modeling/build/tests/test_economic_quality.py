@@ -215,6 +215,49 @@ def test_payroll_is_not_absurd_at_maturity() -> None:
         assert ratio < 1.5, f"{name}: mature payroll/revenue ratio {ratio:.2f}"
 
 
+def test_economic_audit_passes_for_healthy_archetypes() -> None:
+    """The economic-coherence audit must clear a sound plan, every archetype."""
+    for name, story in ARCHETYPES.items():
+        facts = kernel.derive_source_facts(story)
+        issues = kernel.audit_economic_coherence(facts)
+        assert issues == [], f"{name}: unexpected economic-audit issues {issues}"
+
+
+def test_economic_audit_catches_a_broken_cost_stack() -> None:
+    """Inflating the cost drivers must surface a gross-margin violation."""
+    from dataclasses import replace
+
+    facts = kernel.derive_source_facts(SAAS_STORY)
+    broken = replace(
+        facts, delivery_cost_yen=[cost * 60 for cost in facts.delivery_cost_yen]
+    )
+    issues = kernel.audit_economic_coherence(broken)
+    assert any("gross margin" in issue for issue in issues), issues
+
+
+def test_economic_audit_catches_insolvency() -> None:
+    """A plan stripped of its funding must be flagged as insolvent."""
+    from dataclasses import replace
+
+    facts = kernel.derive_source_facts(SAAS_STORY)
+    broken = replace(facts, equity_raise_yen=[0 for _ in facts.equity_raise_yen])
+    issues = kernel.audit_economic_coherence(broken)
+    assert any("insolven" in issue for issue in issues), issues
+
+
+def test_strict_audit_fails_on_economic_incoherence() -> None:
+    """An economically incoherent plan must fail the strict-audit gate (rc 2)."""
+    original = build_model.ek.audit_economic_coherence
+    build_model.ek.audit_economic_coherence = lambda facts: ["forced economic issue"]
+    try:
+        with tempfile.TemporaryDirectory() as tmp:
+            out = Path(tmp) / "m.xlsx"
+            rc = build_model._main(["--output", str(out), "--strict-audit"])
+            assert rc == 2, f"strict audit did not fail on an economic issue (rc={rc})"
+    finally:
+        build_model.ek.audit_economic_coherence = original
+
+
 def test_cap_table_exit_waterfall_uses_post_round_cap_table() -> None:
     """The exit waterfall must distribute proceeds over the post-round FDSO.
 
@@ -523,6 +566,10 @@ if __name__ == "__main__":
         test_marketplace_gmv_honors_stated_maturity_target,
         test_marketplace_present_value_gmv_stays_period_zero_base,
         test_payroll_is_not_absurd_at_maturity,
+        test_economic_audit_passes_for_healthy_archetypes,
+        test_economic_audit_catches_a_broken_cost_stack,
+        test_economic_audit_catches_insolvency,
+        test_strict_audit_fails_on_economic_incoherence,
         test_cap_table_exit_waterfall_uses_post_round_cap_table,
         test_dcf_forecast_fcf_is_not_floored_at_zero,
         test_dcf_enterprise_value_is_positive_and_method_consistent,

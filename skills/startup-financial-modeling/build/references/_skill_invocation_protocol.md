@@ -178,6 +178,12 @@ Use the generator's strict audit option when producing an xlsx for handoff:
 It should fail if omitted-sheet references, `#REF!` markers, missing
 sheet-quality markers, merged cells, frozen panes, generated wrapping/manual
 line breaks, non-standard fonts, or semantic alignment regressions remain.
+Strict audit also runs a profile-independent economic-coherence check: the plan
+fails the gate if implied gross margin diverges from its target, if projected
+ending cash goes negative, if any period has non-positive revenue, or if the
+first period carries no funding round. Structural cleanliness is necessary but
+not sufficient — a workbook can pass every layout check while the economics are
+incoherent.
 The generator attempts public-market comparable refresh by default and records
 current multiples, provided comparable evidence, or retrieval failures in the
 Benchmarks sheet. Override the auto-selected public ticker set only when the
