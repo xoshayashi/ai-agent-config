@@ -343,6 +343,8 @@ Load these as the workflow reaches them, not all at once:
 - `references/narrative-craft.md` — the craft that makes a sound thesis get
   read, remembered and retold: tension, concreteness, the carry-home, the
   honesty boundary, and the banned-without-evidence phrases. Read while drafting.
-- `references/examples.md` — a compact, annotated worked equity story
-  (fictional growth-stage company) showing the full arc, the evidence-tagging
-  convention, and how the framework choices land in practice.
+- `references/examples.md` — two compact, annotated worked equity stories
+  showing the full arc end to end: Example 1, a US Series B marketplace
+  (Forgeline); Example 2, a Japan TSE Growth IPO vertical SaaS (ヤモリ), which
+  adds the 成長可能性資料 disclosure mapping, 想定問答, PSR valuation, and
+  Japanese-language generation.

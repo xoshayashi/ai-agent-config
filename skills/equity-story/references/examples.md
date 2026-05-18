@@ -404,8 +404,9 @@ diligence item for the financial model.
 
 SaaS利用料(月額)が現在の主柱。家賃の収納・送金に連動した組込型決済が拡張の
 柱で、直近に開始したばかり。NRR 116% `[fact]`(ベストインクラス120〜125%帯
-`[estimate]` の一歩手前)、低い解約率 `[fact]`。`[open]` CAC・回収期間・粗利率・
-GRR は財務モデル(`startup-financial-modeling`)で確定すべき項目。
+`[estimate]` の一歩手前)、解約率は低い `[fact]`(会社の定性情報 — 定量的な
+GRRは下記のとおり `[open]`)。`[open]` CAC・回収期間・粗利率・GRR は財務モデル
+(`startup-financial-modeling`)で確定すべき項目。
 
 > Annotation: unit economics not supplied are tagged `[open]` and handed to the
 > financial-modeling skill — not invented.
@@ -422,7 +423,9 @@ GRR は財務モデル(`startup-financial-modeling`)で確定すべき項目。
 
 ## 事業計画・財務トラジェクトリと資金使途
 
-**トラジェクトリ。** ARR 12億円、前年比 約48%成長 `[fact]`。NRR 116%、低解約。
+**トラジェクトリ。** ARR 12億円、前年比 約48%成長 `[fact]`(国内バーティカル
+SaaSの中規模帯の成長中央値の目安 概ね30〜40% `[estimate]` を上回る)。NRR 116%、
+低解約。
 
 **価格の考え方。** 上場価格は主として国内の類似上場企業比準法で形成する。利益率
 が公開市場基準では未確定の段階のため、日本の市場慣行に従い **PSR(株価売上高
@@ -454,6 +457,17 @@ GRR は財務モデル(`startup-financial-modeling`)で確定すべき項目。
 > Annotation: 成長可能性資料 項目⑤ リスク情報. The plan is built bottom-up — the
 > single most common 引受審査 finding is a "stretch-target" budget; this section
 > pre-empts it. Weaknesses are named with their countermeasures, not hidden.
+
+## ビジョン
+
+楔は中小賃貸管理会社の業務SaaS。カテゴリーはその先にある — **賃貸管理の「業務と
+お金」がヤモリの上で完結する状態**である。家賃の収納・送金を握り、管理データが
+蓄積するほど、オーナー向けの収支・与信・資金繰り支援といった、ソフトウェアを
+超えた価値が開く。東証グロース上場は、この弧の通過点であって到達点ではない。
+
+> Annotation: the Vision section is kept — the output template has it for every
+> stage. At IPO stage it is tight and already consistent with highlight 5 and
+> the Growth→Prime path, but it is still stated, not dropped.
 
 ## 想定問答(抜粋)
 
