@@ -2296,7 +2296,7 @@ def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
         live_comps=[],
         market_lines=market_lines,
         segments=segments,
-        source_unknowns=extract_unknowns(text),
+        source_unknowns=prims.source_unknowns,
         new_units=new_units,
         gmv_yen=gmv,
         monthly_price_yen=monthly_price,
@@ -2648,6 +2648,9 @@ def derive_source_facts_from_mapping(raw: dict[str, Any]) -> SourceFacts:
     beginning_cash_raw = _first_present(raw, ("beginning_cash_yen", "beginning_cash"))
     if beginning_cash_raw is not None:
         prims.beginning_cash = _coerce_int_series(beginning_cash_raw, 1, [prims.beginning_cash or 0])[0]
+    # Only the first stated round is pinned; follow-on rounds always
+    # auto-size for solvency. A multi-round YAML schedule is read as its
+    # period-0 value — the funding plan owns the follow-on cadence.
     equity_raise_raw = _first_present(raw, ("equity_raise_yen", "equity_raise"))
     if equity_raise_raw is not None:
         first_round = _coerce_int_series(equity_raise_raw, 1, [0])[0]
@@ -2744,7 +2747,7 @@ def derive_source_facts_from_mapping(raw: dict[str, Any]) -> SourceFacts:
             continue
         if field.endswith("_yen"):
             overrides[field] = _coerce_int_series(value, 1, [getattr(facts, field)])[0]
-        elif field.endswith("_pct") or field in {"founder_ownership", "option_pool", "existing_investors", "strategic_warrant"}:
+        elif field.endswith("_pct") or field in {"founder_ownership", "option_pool", "existing_investors", "strategic_warrant", "discount_rate", "repeat_rate"}:
             overrides[field] = _coerce_float_series(value, 1, [float(getattr(facts, field))], percent=True)[0]
         elif field == "sales_cycle_months":
             overrides[field] = int(float(value))
