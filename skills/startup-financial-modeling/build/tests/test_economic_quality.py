@@ -1505,6 +1505,89 @@ def test_marketplace_kpi_uses_a_transaction_lens() -> None:
             )
 
 
+def test_structured_yaml_revenue_tracks_the_stated_customer_count() -> None:
+    """A structured `--input` YAML must drive the full derivation pipeline.
+
+    The structured path once shallow-merged YAML values onto a regex-derived
+    base SourceFacts, leaving every *derived* quantity stale: revenue ran ~6x
+    customers x ACV, new_units kept the regex ramp, gmv / take_rate kept stale
+    base values, the cost stack was calibrated for the regex base (gross
+    margin reading several hundred percent negative), and the equity round
+    was sized for the wrong plan (insolvency). This pins the structured
+    drivers flowing through derivation: maturity revenue tracks
+    customers x monthly price x 12, and the plan clears the economic audit.
+    """
+    customers = [18, 60, 130, 220, 320]
+    monthly_price = 2000
+    yaml_text = (
+        "company: Helios SaaS\n"
+        "mechanics: recurring software (SaaS)\n"
+        "currency: USD\n"
+        "grain: annual\n"
+        "periods: 5\n"
+        f"customers: {customers}\n"
+        f"monthly_price_yen: [{', '.join([str(monthly_price)] * 5)}]\n"
+        "target_gross_margin: [0.80, 0.80, 0.81, 0.82, 0.82]\n"
+    )
+    expected_mature = customers[-1] * monthly_price * 12
+    with tempfile.TemporaryDirectory() as tmp:
+        ypath = Path(tmp) / "helios.yaml"
+        out = Path(tmp) / "helios.xlsx"
+        ypath.write_text(yaml_text, encoding="utf-8")
+        raw = build_model.load_yaml(ypath)
+        facts = kernel.derive_source_facts_from_mapping(raw)
+        # The structured customer count reaches the derivation pipeline: the
+        # ending installed base tracks the stated series, not the regex ramp.
+        ending = kernel.ending_units(facts.new_units)
+        assert abs(ending[-1] - customers[-1]) <= 0.10 * customers[-1], (
+            f"derived ending customers {ending[-1]} ignores the stated "
+            f"maturity count {customers[-1]}"
+        )
+        revenue = kernel.plan_revenue_series(
+            facts.new_units, facts.gmv_yen, facts.monthly_price_yen,
+            facts.take_rate, facts.other_revenue_share, facts.revenue_mode,
+        )
+        assert abs(revenue[-1] - expected_mature) <= 0.20 * expected_mature, (
+            f"maturity revenue {revenue[-1]:,.0f} does not track customers x "
+            f"price x 12 = {expected_mature:,.0f} (structured drivers stale)"
+        )
+        # The cost stack and the funding plan are derived from the structured
+        # drivers, so the plan is economically coherent.
+        assert kernel.audit_economic_coherence(facts) == [], (
+            "structured-YAML plan is not economically coherent"
+        )
+        # The full build path clears the strict economic audit.
+        rc = build_model._main(
+            ["--input", str(ypath), "--output", str(out), "--strict-audit"]
+        )
+        assert rc == 0, "structured-YAML build failed --strict-audit"
+        soffice = shutil.which("soffice") or shutil.which("libreoffice")
+        if soffice is None:
+            pytest.skip("LibreOffice not installed; skipping workbook recalc check")
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(Path(tmp) / "recalc"), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        wb = load_workbook(Path(tmp) / "recalc" / "helios.xlsx", data_only=True)
+        ws = wb["Revenue Build"]
+        rev_row = _row_for_label(ws, "Total revenue")
+        first_col = source_plan.START_PERIOD_COL
+        for idx, row in enumerate(ws.iter_rows()):
+            for cell in row:
+                if cell.value is None or not isinstance(cell.value, str):
+                    continue
+                assert not cell.value.startswith("#"), (
+                    f"recalc error {cell.value} in Revenue Build"
+                )
+        recalced_mature = ws.cell(rev_row, first_col + len(customers) - 1).value
+        assert recalced_mature is not None, "Total revenue not recalculated"
+        assert abs(float(recalced_mature) - expected_mature) <= 0.20 * expected_mature, (
+            f"recalculated maturity revenue {recalced_mature:,.0f} does not "
+            f"track customers x price x 12 = {expected_mature:,.0f}"
+        )
+
+
 if __name__ == "__main__":
     _tests = [
         test_gross_margin_tracks_target_across_archetypes,
@@ -1563,6 +1646,7 @@ if __name__ == "__main__":
         test_monthly_priced_hardware_stays_recurring,
         test_hardware_unit_sale_survives_an_attach_subscription,
         test_marketplace_kpi_uses_a_transaction_lens,
+        test_structured_yaml_revenue_tracks_the_stated_customer_count,
     ]
     for _test in _tests:
         try:
