@@ -524,12 +524,14 @@ def extract_rd_headcount(text: str) -> int:
     team") pins the people-cost base; the auto-derived ramp would size it
     from revenue / units and badly understate an R&D-heavy plan.
     """
+    # Every pattern requires explicit "team" framing — a bare "N engineers"
+    # is dropped, as it would match a hiring plan ("hire 15 engineers next
+    # year") or an incidental count ("a network of 500 researchers").
     role = r"R&D|research|engineering|product|technical|dev(?:elopment)?"
     patterns = [
         rf"([0-9]{{1,4}})[-\s]person\s+(?:{role})\s+team",
         rf"(?:{role})\s+team\s+of\s+([0-9]{{1,4}})",
         rf"team\s+of\s+([0-9]{{1,4}})\s+(?:engineers|researchers|developers)",
-        r"([0-9]{1,4})\s+(?:engineers|researchers)\b",
     ]
     for pattern in patterns:
         match = re.search(pattern, text, flags=re.IGNORECASE)

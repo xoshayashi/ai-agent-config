@@ -486,12 +486,15 @@ def test_stated_rd_team_size_anchors_the_headcount_plan() -> None:
     assert kernel.extract_rd_headcount("We run a 32-person R&D team.") == 32
     assert kernel.extract_rd_headcount("An engineering team of 25.") == 25
     assert kernel.extract_rd_headcount("No team size stated.") == 0
+    # A bare "N engineers" with no team framing is not a team size.
+    assert kernel.extract_rd_headcount("We plan to hire 15 engineers.") == 0
     facts = kernel.derive_source_facts(
         "# Deep-tech plan\n\nA pre-revenue deep-tech company. There is no "
         "product revenue during the plan. We run a 32-person R&D team. "
         "5-year plan, seed round. Source: roadmap memo.\n"
     )
-    assert abs(facts.product_headcount[0] - 32) <= 3, (
+    # Scaling pins period 0 exactly on the stated team size.
+    assert facts.product_headcount[0] == 32, (
         f"a stated 32-person R&D team was ignored; period-0 product "
         f"headcount = {facts.product_headcount[0]}"
     )
