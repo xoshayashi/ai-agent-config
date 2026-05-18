@@ -711,7 +711,7 @@ _PRICE_UNIT = r"(万|億|百万|[mMbB](?![A-Za-z]))"
 # Markers that a stated price is annual, so it must be divided to a monthly
 # figure. ACV (Annual Contract Value) is annual by definition.
 _ANNUAL_PRICE_CUE = re.compile(
-    r"per\s*year|/\s*year|per\s*annum|p\.?a\.?|annual(?:ly)?|年額|年間|/\s*年|年契約",
+    r"per\s*year|/\s*year|per\s*annum|\bp\.a\.|annual(?:ly)?|年額|年間|/\s*年|年契約",
     flags=re.IGNORECASE,
 )
 
@@ -727,7 +727,7 @@ def extract_price(text: str, profile: MechanicProfile, currency: str = "JPY") ->
         return 0
     # (pattern, always_annual) — `月額` is monthly; ACV is annual by definition;
     # the generic price pattern is annual only when annual cues sit next to it.
-    candidates: list[tuple[str, bool]] = [
+    candidates: list[tuple[str, bool | None]] = [
         (rf"月額\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*円?", False),
         (
             rf"(?:price|pricing|fee|subscription|lease|rental|unit price|単価|価格|利用料)[^0-9¥$]{{0,32}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?",
@@ -739,6 +739,10 @@ def extract_price(text: str, profile: MechanicProfile, currency: str = "JPY") ->
             (rf"ACV[^0-9¥$]{{0,24}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?", True),
         )
     default_price = max(1, int(profile.default_monthly_price_yen * money_scale_for_currency(currency)))
+    # The noise floor is currency-relative: a valid USD per-seat price ($80) is
+    # far below any sane JPY price floor, but the floor must still reject a
+    # near-zero spurious match — hence $10, not $1.
+    floor = 10 if currency == "USD" else max(10_000, int(profile.default_monthly_price_yen * 0.05))
     price = default_price
     for pattern, always_annual in candidates:
         match = re.search(pattern, text, flags=re.IGNORECASE)
@@ -751,14 +755,13 @@ def extract_price(text: str, profile: MechanicProfile, currency: str = "JPY") ->
         if is_annual is None:
             context = text[max(0, match.start() - 40): match.end() + 40]
             is_annual = bool(_ANNUAL_PRICE_CUE.search(context))
-        price = value // 12 if is_annual else value
+        # Apply the noise floor to the as-stated figure so a valid-but-small
+        # annual contract (¥120k/year -> ¥10k/month) is not discarded after
+        # the division; a sub-floor match is noise — keep searching.
+        if value < floor * (12 if is_annual else 1):
+            continue
+        price = int(round(value / 12)) if is_annual else value
         break
-    # The noise floor is currency-relative: a valid USD per-seat price ($80) is
-    # far below any sane JPY price floor, but the floor must still reject a
-    # near-zero spurious match — hence $10, not $1.
-    floor = 10 if currency == "USD" else max(10_000, int(profile.default_monthly_price_yen * 0.05))
-    if price < floor:
-        return default_price
     return price
 
 
