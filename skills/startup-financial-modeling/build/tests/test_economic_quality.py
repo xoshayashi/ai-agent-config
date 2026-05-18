@@ -329,19 +329,35 @@ def test_marketplace_present_value_gmv_stays_period_zero_base() -> None:
 
 
 def test_marketplace_gmv_end_of_plan_phrasing_is_a_maturity_target() -> None:
-    """A maturity GMV stated as "by the end of the plan" must anchor the ramp
-    end — not be used as the period-0 base and ramped an order of magnitude
-    past itself. A separate "today" figure does not displace it."""
-    facts = kernel.derive_source_facts(
-        "# Marketplace plan\n\nA two-sided marketplace, take rate 15% on "
-        "GMV. GMV is ¥4B today and we scale to roughly ¥120B GMV by the end "
-        "of the plan. 5-year plan, seed round. Source: cohort memo.\n"
-    )
+    """A maturity GMV stated by phrasing other than "at maturity" must anchor
+    the ramp end — not be used as the period-0 base and ramped an order of
+    magnitude past itself. A separate "today" figure does not displace it."""
     target = 120_000_000_000
-    mature_gmv = facts.gmv_yen[-1]
-    assert 0.7 * target <= mature_gmv <= 1.3 * target, (
-        f"mature GMV ¥{mature_gmv:,.0f} is far from the stated ¥{target:,.0f} "
-        f"'by the end of the plan' target"
+    for phrase in (
+        "¥120B GMV by the end of the plan",
+        "¥120B GMV in the final year",
+        "最終年に¥120B GMV",
+    ):
+        facts = kernel.derive_source_facts(
+            f"# Marketplace plan\n\nA two-sided marketplace, take rate 15% "
+            f"on GMV. GMV is ¥4B today; {phrase}. 5-year plan, seed round. "
+            f"Source: cohort memo.\n"
+        )
+        mature_gmv = facts.gmv_yen[-1]
+        assert 0.7 * target <= mature_gmv <= 1.3 * target, (
+            f"[{phrase}] mature GMV ¥{mature_gmv:,.0f} is far from the "
+            f"stated ¥{target:,.0f} maturity target"
+        )
+    # An operational-scaling phrase near the period-0 base must NOT make the
+    # current GMV a maturity target.
+    base = kernel.derive_source_facts(
+        "# Marketplace plan\n\nA two-sided marketplace, take rate 15% on "
+        "GMV. GMV is ¥4B today; we plan to scale to 3 new cities. 5-year "
+        "plan, seed round. Source: cohort memo.\n"
+    )
+    assert base.gmv_yen[0] >= 3_500_000_000, (
+        f"a 'scale to 3 cities' phrase wrongly anchored GMV to maturity: "
+        f"period-0 ¥{base.gmv_yen[0]:,.0f}"
     )
 
 

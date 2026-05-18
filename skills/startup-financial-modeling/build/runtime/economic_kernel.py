@@ -1044,7 +1044,7 @@ _GMV_PATTERNS = [
     rf"[¥$]?\s*([0-9,.]+)\s*{_GMV_CJK_UNIT}\s*(?:の)?\s*流通総額",
 ]
 _GMV_MATURITY_CUE = re.compile(
-    r"maturity|at\s+(?:full\s+)?scale|scal\w+\s+(?:up\s+)?to|"
+    r"maturity|at\s+(?:full\s+)?scale|"
     r"by\s*(?:FY)?\s*20\d\d|by\s+year|by\s+(?:the\s+)?end\s+of|"
     r"end\s+of\s+the\s+(?:plan|forecast|horizon|period|model)|final\s+year|"
     r"成熟|目標|までに|時点|最終年",
