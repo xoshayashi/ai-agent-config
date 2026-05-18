@@ -5,11 +5,16 @@ description: >-
   investor should back this company, at this price, now. Use this whenever the user needs
   an investor-facing narrative: a fundraising story, pitch narrative, investment thesis,
   IPO equity story, IR / roadshow message, growth-potential disclosure (成長可能性資料),
-  or wants to sharpen "why invest in us". Trigger even when the user only says
-  "equity story", "エクイティストーリー", "investor narrative", "fundraising story", or asks
-  how to frame their company for investors — for VC rounds (seed to growth), late-stage,
-  or IPO, in Japan or the US. This skill produces the narrative and strategic framing;
-  for the financial model and projections use startup-financial-modeling, and for
+  or wants to sharpen "why invest in us". It also covers the work *upstream* of the
+  story: when the user is still working out why the company wins — its competitive
+  strategy, moat, or market positioning — use this skill to build that strategic
+  foundation first. Trigger even when the user only says "equity story",
+  "エクイティストーリー", "investor narrative", "fundraising story", "competitive
+  strategy", "moat", "なぜ勝てるのか", or asks how to frame their company for
+  investors — for VC rounds (seed to growth), late-stage, or IPO, in Japan or the US.
+  This skill produces both the investor narrative and the strategic framing beneath
+  it — either as a standalone strategy diagnostic or as the full equity story.
+  For the financial model and projections use startup-financial-modeling, and for
   finished slide images use the slide-image skills.
 ---
 
@@ -45,6 +50,20 @@ anchors in `references/strategy-frameworks.md` section D. For an industry not
 named there, apply the nearest anchor and the model-agnostic frameworks.
 
 ## Inputs to gather first
+
+**First, recognize which of two things the user needs.** Most requests are for
+the equity story itself — the investor-facing thesis. But some users come
+*upstream* of that: they cannot yet say plainly *why their company wins* — where
+the moat is, how to position — and an investor document would be premature. For
+them the deliverable is a **strategy diagnostic** (workflow step 3, diagnostic
+mode), not the full story. The diagnostic is not a detour: the strategy it
+validates becomes the load-bearing claims of the equity story once the user is
+ready. A story built on an un-articulated strategy is the deepest form of the
+third failure mode above — narrative detached from reality. When the request is
+ambiguous, infer from how settled the user's own thesis sounds, and state the
+assumption. In diagnostic mode, gather inputs 1–3 below; inputs 4–5 (audience
+and the ask) often do not exist yet and can be deferred until the strategy is
+settled.
 
 Before writing anything, establish these five things. Infer small gaps and state
 the assumption; only ask the user when an answer materially changes the thesis.
@@ -145,6 +164,38 @@ This repository's host environment may also expose strategy skills
 `obviously-awesome`, and others). When a framework needs deeper treatment than
 the catalogue gives, consult the dedicated skill rather than re-deriving it.
 
+**Diagnostic mode.** When the user is upstream (see *Inputs to gather first*) —
+the strategy itself is not yet articulated — use these same frameworks
+differently: to generate *competing hypotheses*, not to assert one. Steps 1–2
+are deferred in this mode: step 1's stage playbook still gives useful context,
+but the narrative spine of step 2 is what the diagnostic *produces*, not an
+input to it. The verdict the equity story needs ("this is our moat") is the
+*output* of strategy work,
+not its input; supplying a verdict the user has not earned is how a story
+detaches from reality. So produce a **strategy diagnostic** in place of the
+equity-story document, with this spine:
+
+- an honest competitive map — who each rival really is and the job the customer
+  hires the product to do, since miscast competitors blur the whole strategy;
+- two or three moat *hypotheses*, each tied to a named framework **and** to the
+  observable signal in the user's own data that would confirm or falsify it,
+  and an honest list of the moats the company does *not* yet have;
+- positioning options with their trade-offs left open — not collapsed to one;
+- the beachhead questions the team must answer to pick where to win first;
+- an explicit "what we will not do";
+- the verification actions to run before the next major commitment (a raise, a
+  key hire, or a go-to-market bet).
+
+Tag claims `[fact]` / `[hypothesis]` / `[open]` — a hypothesis honestly marked
+unproven is the credibility move here, exactly as `[open]` is in the story. Do
+not force a framework label onto a real advantage that does not fit one; name
+the advantage plainly and make it a hypothesis to test. When the diagnostic is
+done, its validated hypotheses feed the narrative spine (step 2) and the proof
+points (step 4), and the rest of the workflow proceeds normally. The substance
+checklist items below — competition/moat separated (A6), falsification named
+(A10), contrarian core (B13), terms defined (B17), no empty superlatives (B18) —
+apply to the diagnostic too.
+
 ### 4. Place proof points as evidence
 
 Numbers belong *next to the claim they prove*, never in a standalone pile.
@@ -199,6 +250,10 @@ first pass — score it honestly, fix the gaps, and iterate until it passes or a
 concrete blocker remains. This discipline is the point of the skill.
 
 ## Output format
+
+In **diagnostic mode** (workflow step 3) the deliverable is the strategy
+diagnostic spelled out there — not the skeleton below, which is the equity-story
+format.
 
 Default to a structured Markdown document. The block below is a **skeleton**,
 not a literal script: keep the section order — it *is* the narrative spine made
@@ -361,6 +416,11 @@ See `references/narrative-craft.md` for how to fix a "no" here.
 In one line, score the honest outcome: **would this win a second meeting, or be
 set aside?** If "set aside", the draft is not done — find which axis failed and
 iterate.
+
+In **diagnostic mode** the gate is different — the deliverable is not a pitch:
+does the diagnostic give the user falsifiable moat hypotheses, honest positioning
+options, and a clear set of verification actions to run before the strategy is
+committed? If not, iterate.
 
 ## References
 
