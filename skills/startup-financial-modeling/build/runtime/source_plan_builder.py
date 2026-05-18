@@ -837,7 +837,12 @@ def _build_assumptions(wb: Workbook, facts: SourceFacts) -> None:
     _write_values(ws, 15, "Utilization / conversion", "%", facts.utilization_conversion, source="operational leverage", fmt=ib.FMT_PERCENT)
 
     _section(ws, 18, "Revenue adjuncts")
-    _write_values(ws, 19, "One-time revenue / new unit", "JPY", [f"={get_column_letter(c)}11*3" for c in cols], kind="formula", fmt=ib.FMT_JPY_YEN)
+    # Unit-sale (hardware): the one-time revenue per new unit is the full sale
+    # price. Recurring: a 3-month onboarding / setup fee.
+    one_time_per_unit = (
+        "={c}11" if facts.revenue_mode == "unit_sale" else "={c}11*3"
+    )
+    _write_values(ws, 19, "One-time revenue / new unit", "JPY", [one_time_per_unit.format(c=get_column_letter(c)) for c in cols], kind="formula", fmt=ib.FMT_JPY_YEN)
     _write_values(ws, 20, "Other revenue / total revenue", "%", facts.other_revenue_share, source="services / add-ons", fmt=ib.FMT_PERCENT)
     _write_values(ws, 21, "Deferred revenue share", "%", facts.deferred_revenue_share, source="billing timing", fmt=ib.FMT_PERCENT)
 
@@ -954,9 +959,13 @@ def _build_revenue(wb: Workbook, facts: SourceFacts) -> None:
     for row, label, unit, formula, fmt in rows:
         _write_values(ws, row, label, unit, [formula.format(c=get_column_letter(c)) for c in cols], kind="formula", fmt=fmt)
     _section(ws, 13, "Revenue streams")
+    # A unit-sale (hardware) plan has no recurring billing on the installed
+    # base: revenue is new units shipped x the one-time sale price, carried
+    # by the one-time stream. A recurring plan bills the installed base.
+    recurring_formula = "=0" if facts.revenue_mode == "unit_sale" else "={c}9*{c}11*12"
     for row, label, unit, formula in [
         (14, "Transaction revenue", "JPY", "={c}7*{c}10"),
-        (15, "Recurring revenue", "JPY", "={c}9*{c}11*12"),
+        (15, "Recurring revenue", "JPY", recurring_formula),
         (16, "One-time revenue", "JPY", "={c}8*'Assumptions'!{c}19"),
         (17, "Other revenue", "JPY", "=({c}14+{c}15+{c}16)*'Assumptions'!{c}20"),
         (18, "Total revenue", "JPY", "=SUM({c}14:{c}17)"),
