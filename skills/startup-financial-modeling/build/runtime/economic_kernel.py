@@ -1044,7 +1044,10 @@ _GMV_PATTERNS = [
     rf"[¥$]?\s*([0-9,.]+)\s*{_GMV_CJK_UNIT}\s*(?:の)?\s*流通総額",
 ]
 _GMV_MATURITY_CUE = re.compile(
-    r"(maturity|at scale|by\s*(?:FY)?\s*20\d\d|by year|成熟|目標|までに|時点)",
+    r"maturity|at\s+(?:full\s+)?scale|scal\w+\s+(?:up\s+)?to|"
+    r"by\s*(?:FY)?\s*20\d\d|by\s+year|by\s+(?:the\s+)?end\s+of|"
+    r"end\s+of\s+the\s+(?:plan|forecast|horizon|period|model)|final\s+year|"
+    r"成熟|目標|までに|時点|最終年",
     flags=re.IGNORECASE,
 )
 
@@ -1066,21 +1069,28 @@ def gmv_ramp(
     """
     if periods <= 0:
         return []
-    value = 0
-    context = ""
+    # A narrative may state both a period-0 base ("¥4B GMV today") and a
+    # maturity target ("scaling to ¥120B by the end of the plan"). Scan every
+    # GMV figure: one tied to a maturity cue is the final-period target and
+    # wins; otherwise the first plain figure is the period-0 base.
+    base_value = 0
+    maturity_value = 0
     for pattern in _GMV_PATTERNS:
-        match = re.search(pattern, text, flags=re.IGNORECASE)
-        if not match:
-            continue
-        scaled = money_from_match(match)
-        if scaled is None or scaled <= 0:
-            continue
-        value = scaled
-        context = text[max(0, match.start() - 60): match.end() + 60]
-        break
-    is_maturity_figure = value > 0 and bool(_GMV_MATURITY_CUE.search(context))
-    if value <= 0:
-        value = int(profile.default_gmv_yen * money_scale)
+        for match in re.finditer(pattern, text, flags=re.IGNORECASE):
+            scaled = money_from_match(match)
+            if scaled is None or scaled <= 0:
+                continue
+            context = text[max(0, match.start() - 60): match.end() + 60]
+            if _GMV_MATURITY_CUE.search(context):
+                maturity_value = max(maturity_value, scaled)
+            elif base_value == 0:
+                base_value = scaled
+    if maturity_value > 0:
+        value, is_maturity_figure = maturity_value, True
+    elif base_value > 0:
+        value, is_maturity_figure = base_value, False
+    else:
+        value, is_maturity_figure = int(profile.default_gmv_yen * money_scale), False
     if value <= 0:
         return [0 for _ in range(periods)]
     multipliers = _curve(1.0, 8.5, periods)

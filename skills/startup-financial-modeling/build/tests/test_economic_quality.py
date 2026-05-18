@@ -328,6 +328,23 @@ def test_marketplace_present_value_gmv_stays_period_zero_base() -> None:
     )
 
 
+def test_marketplace_gmv_end_of_plan_phrasing_is_a_maturity_target() -> None:
+    """A maturity GMV stated as "by the end of the plan" must anchor the ramp
+    end — not be used as the period-0 base and ramped an order of magnitude
+    past itself. A separate "today" figure does not displace it."""
+    facts = kernel.derive_source_facts(
+        "# Marketplace plan\n\nA two-sided marketplace, take rate 15% on "
+        "GMV. GMV is ¥4B today and we scale to roughly ¥120B GMV by the end "
+        "of the plan. 5-year plan, seed round. Source: cohort memo.\n"
+    )
+    target = 120_000_000_000
+    mature_gmv = facts.gmv_yen[-1]
+    assert 0.7 * target <= mature_gmv <= 1.3 * target, (
+        f"mature GMV ¥{mature_gmv:,.0f} is far from the stated ¥{target:,.0f} "
+        f"'by the end of the plan' target"
+    )
+
+
 USD_STORY = """# Seed B2B SaaS equity story (USD)
 
 A US-based B2B SaaS company. The model must support a seed fundraise: 5-year
@@ -1404,6 +1421,7 @@ if __name__ == "__main__":
         test_customer_count_reaches_stated_target,
         test_marketplace_gmv_honors_stated_maturity_target,
         test_marketplace_present_value_gmv_stays_period_zero_base,
+        test_marketplace_gmv_end_of_plan_phrasing_is_a_maturity_target,
         test_usd_narrative_produces_a_coherent_usd_plan,
         test_jpy_narratives_are_not_misdetected_as_usd,
         test_yaml_can_override_the_fx_rate,
