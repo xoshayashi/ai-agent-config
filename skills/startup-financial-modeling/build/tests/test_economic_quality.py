@@ -184,6 +184,23 @@ def test_annual_pricing_is_converted_to_a_monthly_figure() -> None:
     )
 
 
+def test_unit_price_is_extracted_from_natural_phrasing() -> None:
+    """A unit price reached by natural phrasing — "sells for $X", a bare
+    "$X per robot" with no cue word — is extracted, not dropped to the
+    profile default."""
+    hw = kernel.profile_for_text(
+        "hardware robot manufacturing plan with significant capex"
+    )
+    assert hw.key == "hardware_asset_heavy"
+    assert kernel.extract_price(
+        "Each robot sells for $48,000.", hw, "USD"
+    ) == 48000, "'sells for $X' unit price was not extracted"
+    # No cue keyword at all — the number-first "$X per <unit>" form.
+    assert kernel.extract_price(
+        "Ships at $48,000 per unit.", hw, "USD"
+    ) == 48000, "'$X per unit' unit price was not extracted"
+
+
 def test_monthly_burn_phrasing_does_not_flip_model_grain() -> None:
     """'monthly burn' is a metric, not a request for a month-by-month model."""
     assert kernel.extract_model_grain(SAAS_STORY) == "annual"
@@ -1278,6 +1295,7 @@ if __name__ == "__main__":
         test_gross_margin_tracks_target_across_archetypes,
         test_stated_gross_margin_is_extracted_from_narrative,
         test_annual_pricing_is_converted_to_a_monthly_figure,
+        test_unit_price_is_extracted_from_natural_phrasing,
         test_monthly_burn_phrasing_does_not_flip_model_grain,
         test_explicit_monthly_model_request_is_still_detected,
         test_hyphenated_year_horizon_is_honored,

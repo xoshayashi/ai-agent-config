@@ -737,11 +737,21 @@ def extract_price(text: str, profile: MechanicProfile, currency: str = "JPY") ->
     if profile.key == "marketplace":
         return 0
     # (pattern, always_annual) — `月額` is monthly; ACV is annual by definition;
-    # the generic price pattern is annual only when annual cues sit next to it.
+    # the other patterns are annual only when annual cues sit next to them.
+    # `sells/sold for|at` and the number-first "$X per <unit-noun>" form cover
+    # natural unit-price phrasing that no cue keyword sits next to.
+    unit_noun = r"unit|robot|device|machine|vehicle|drone|seat|user|customer|台"
     candidates: list[tuple[str, bool | None]] = [
         (rf"月額\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*円?", False),
         (
-            rf"(?:price|pricing|fee|subscription|lease|rental|unit price|単価|価格|利用料)[^0-9¥$]{{0,32}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?",
+            rf"(?:price|pricing|fee|subscription|lease|rental|unit price|"
+            rf"(?:sells?|sold)\s+(?:for|at)|単価|価格|利用料)"
+            rf"[^0-9¥$]{{0,32}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?",
+            None,
+        ),
+        (
+            rf"[¥$]\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*(?:per|/|あたり)\s*"
+            rf"(?:{unit_noun})",
             None,
         ),
     ]
