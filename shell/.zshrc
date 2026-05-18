@@ -141,7 +141,7 @@ done
 unset _gs_entry _gs_name _gs_var _gs_val
 
 # bun completions
-[ -s "/Users/sh/.bun/_bun" ] && source "/Users/sh/.bun/_bun"
+[ -s "$HOME/.bun/_bun" ] && source "$HOME/.bun/_bun"
 
 # bun
 export BUN_INSTALL="$HOME/.bun"
