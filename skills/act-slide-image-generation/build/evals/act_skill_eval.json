@@ -325,6 +325,8 @@
     "design_breakage_blocker_status",
     "PPTX/PDF package gate requires an approved review manifest",
     "validate_review_manifest",
+    "duplicate image input",
+    "duplicate png_path",
     "header_identity_lock: header is always the same compact left vertical line + H1 + subtitle system, never a slide-specific decoration surface",
     "header_footer_text_color_lock",
     "header_line_top_rule",
