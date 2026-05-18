@@ -1488,9 +1488,20 @@ def audit_economic_coherence(
     def _label(idx: int) -> str:
         return labels[idx] if idx < len(labels) else f"period {idx}"
 
+    # Read the profile from `facts.mechanics`, which `derive_source_facts`
+    # stamps from `profile.label` — the same profile object whose `.key`
+    # drove the revenue-zeroing decision. Re-deriving via `_mechanic_key`
+    # would traverse a separate keyword set that can diverge on edge cases.
+    is_pre_revenue = facts.mechanics == _profile("pre_revenue_milestone").label
     for idx in range(len(revenue)):
         if revenue[idx] <= 0:
-            issues.append(f"{_label(idx)}: non-positive revenue ({revenue[idx]:,.0f})")
+            # A pre-revenue / milestone plan legitimately carries zero product
+            # revenue; for any other profile a non-positive period is a
+            # coherence failure.
+            if not is_pre_revenue:
+                issues.append(
+                    f"{_label(idx)}: non-positive revenue ({revenue[idx]:,.0f})"
+                )
             continue
         target = (
             facts.target_gross_margin[idx]
@@ -1563,6 +1574,14 @@ def derive_source_facts(
     new_units, retargeted_customers = retarget_demand_to_narrative(
         text, profile, new_units, price, periods
     )
+
+    if profile.key == "pre_revenue_milestone":
+        # A pre-revenue / milestone plan has no product revenue by definition
+        # — it is a milestone-driven burn and runway model. Zero the
+        # monetization so revenue is 0 across the plan; R&D OpEx, prototype
+        # capex, grants, and the equity round still drive the cash forecast.
+        # Milestone units and customers are kept: they drive capex and cost.
+        price = 0
 
     if profile.key != "marketplace":
         gmv = [units * price * 12 for units in ending_units(new_units)]
