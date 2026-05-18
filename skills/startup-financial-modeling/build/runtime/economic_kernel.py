@@ -1488,7 +1488,11 @@ def audit_economic_coherence(
     def _label(idx: int) -> str:
         return labels[idx] if idx < len(labels) else f"period {idx}"
 
-    is_pre_revenue = _mechanic_key(facts) == "pre_revenue_milestone"
+    # Read the profile from `facts.mechanics`, which `derive_source_facts`
+    # stamps from `profile.label` — the same profile object whose `.key`
+    # drove the revenue-zeroing decision. Re-deriving via `_mechanic_key`
+    # would traverse a separate keyword set that can diverge on edge cases.
+    is_pre_revenue = facts.mechanics == _profile("pre_revenue_milestone").label
     for idx in range(len(revenue)):
         if revenue[idx] <= 0:
             # A pre-revenue / milestone plan legitimately carries zero product
