@@ -275,11 +275,11 @@ breakthrough, accelerated approval).
 **When to use.** Drug-development companies, and any thesis where value turns on
 clinical milestones and regulatory exclusivity rather than on revenue.
 **Proof investors expect.** Clinical data (effect size, safety, statistical
-significance vs. control); phase-specific PoS, read against base rates (overall
-single-digit-to-low-double-digit percent from Phase 1 to approval, lower in
-oncology, higher in rare disease); regulator interactions (end-of-phase meeting
-minutes, agreed endpoints, Fast Track / Breakthrough designations); IP runway
-and the overlap of patent and regulatory exclusivity; KOL support; an explicit
+significance vs. control); phase-specific PoS, read against base rates (roughly
+10% overall from Phase 1 to approval — lower in oncology, materially higher in
+rare disease); regulator interactions (end-of-phase meeting minutes, agreed
+endpoints, Fast Track / Breakthrough designations); IP runway and the overlap of
+patent and regulatory exclusivity; KOL (key-opinion-leader) support; an explicit
 rNPV build.
 **Pitfalls.** Single-asset dependence (one data readout can erase the company);
 optimistic PoS that ignores the base rate for the indication; a TAM inflated to
@@ -352,6 +352,7 @@ while ignoring its capital and compliance cost.
 - Biotech valuation (rNPV, platform vs. asset) — https://www.alacrita.com/whitepapers/valuing-pharmaceutical-assets-when-to-use-npv-vs-rnpv ; https://www.altitudelab.org/articles/why-investors-tend-to-fund-platforms-over-assets ; https://www.drugpatentwatch.com/blog/the-dual-shields-a-strategic-analysis-of-orphan-drug-exclusivity-and-patent-protection-in-the-modern-pharmaceutical-landscape/
 - Hardware / deep tech (FOAK→NOAK, learning curve) — https://www.ctvc.co/from-foak-to-noak/ ; https://climatedrift.substack.com/p/the-foak-field-guide ; https://ourworldindata.org/learning-curve
 - Fintech (take-rate vs. balance-sheet, moats, regulation) — https://notes.mtb.xyz/p/fintechs-moats-dont-compile ; https://www.qedinvestors.com/blog/fintechs-next-chapter-scaled-winners-and-emerging-disruptors-2 ; https://ibinterviewquestions.com/guides/fig-investment-banking/fintech-valuation-revenue-multiples-unit-economics
+- Insurtech (loss / combined ratio, MGA vs. full-stack) — https://www.finrofca.com/news/insurtech-revenue-multiples-2025
 
 Note: industry benchmarks (probabilities of success, exclusivity periods,
 learning rates, valuation multiples) shift by year, region and segment — verify
