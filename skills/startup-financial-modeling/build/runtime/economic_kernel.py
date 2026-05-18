@@ -128,6 +128,8 @@ class SourceFacts:
     source_unknowns: list[str]
     new_units: list[int]
     gmv_yen: list[int]
+    # Monthly subscription price under `recurring`; the one-time per-unit
+    # sale price under `revenue_mode == "unit_sale"` (see _period_subtotal_revenue).
     monthly_price_yen: list[int]
     take_rate: list[float]
     customers: list[int]
@@ -197,6 +199,7 @@ class SourceFacts:
     tam_yen: int
     sam_yen: int
     som_yen: int
+    revenue_mode: str = "recurring"
 
 
 MECHANIC_PROFILES: tuple[MechanicProfile, ...] = (
@@ -1180,6 +1183,7 @@ def calibrate_cost_stack_to_gross_margin(
     delivery_cost_yen: list[int],
     cloud_cost_yen: list[int],
     support_cost_yen: list[int],
+    revenue_mode: str = "recurring",
 ) -> tuple[list[float], list[int], list[int], list[int]]:
     """Gross-margin governor.
 
@@ -1201,12 +1205,14 @@ def calibrate_cost_stack_to_gross_margin(
     cloud_out: list[int] = []
     support_out: list[int] = []
     for idx in range(len(target_gross_margin)):
-        transaction = gmv_yen[idx] * take_rate[idx]
-        recurring = average[idx] * monthly_price_yen[idx] * 12
-        one_time = new_units[idx] * monthly_price_yen[idx] * 3
-        subtotal = transaction + recurring + one_time
+        subtotal = _period_subtotal_revenue(
+            idx, new_units, average, gmv_yen, monthly_price_yen,
+            take_rate, revenue_mode,
+        )
         revenue = subtotal * (1.0 + other_revenue_share[idx])
         variable = revenue * variable_cogs_pct[idx]
+        # Field-service cost accrues on deployed units every period (post-sale
+        # maintenance), independent of the revenue model.
         delivery = average[idx] * delivery_cost_yen[idx] * 12
         cloud = average[idx] * cloud_cost_yen[idx] * 12
         support = customers[idx] * support_cost_yen[idx] * 12
@@ -1227,22 +1233,46 @@ def calibrate_cost_stack_to_gross_margin(
     return vc_out, delivery_out, cloud_out, support_out
 
 
+def _period_subtotal_revenue(
+    idx: int,
+    new_units: list[int],
+    average: list[int],
+    gmv_yen: list[int],
+    monthly_price_yen: list[int],
+    take_rate: list[float],
+    revenue_mode: str,
+) -> float:
+    """Pre-`other revenue` subtotal for one period, by revenue model.
+
+    `unit_sale` (hardware): the price is a one-time per-unit sale price, so
+    revenue is new units shipped x price — no recurring billing on the
+    installed base. `recurring` (default): transaction take + a monthly
+    subscription billed on the installed base + a one-time onboarding fee.
+    """
+    if revenue_mode == "unit_sale":
+        return new_units[idx] * monthly_price_yen[idx]
+    transaction = gmv_yen[idx] * take_rate[idx]
+    recurring = average[idx] * monthly_price_yen[idx] * 12
+    one_time = new_units[idx] * monthly_price_yen[idx] * 3
+    return transaction + recurring + one_time
+
+
 def plan_revenue_series(
     new_units: list[int],
     gmv_yen: list[int],
     monthly_price_yen: list[int],
     take_rate: list[float],
     other_revenue_share: list[float],
+    revenue_mode: str = "recurring",
 ) -> list[float]:
     """Per-period total revenue, mirroring the Revenue Build sheet formulas."""
-    ending = ending_units(new_units)
-    average = average_units(ending)
+    average = average_units(ending_units(new_units))
     revenue: list[float] = []
     for idx in range(len(new_units)):
-        transaction = gmv_yen[idx] * take_rate[idx]
-        recurring = average[idx] * monthly_price_yen[idx] * 12
-        one_time = new_units[idx] * monthly_price_yen[idx] * 3
-        subtotal = transaction + recurring + one_time
+        subtotal = _period_subtotal_revenue(
+            idx, new_units, average, gmv_yen, monthly_price_yen,
+            take_rate, revenue_mode,
+        )
         revenue.append(subtotal * (1.0 + other_revenue_share[idx]))
     return revenue
 
@@ -1391,6 +1421,7 @@ def project_plan_free_cash_flow(facts: SourceFacts) -> list[dict]:
         facts.monthly_price_yen,
         facts.take_rate,
         facts.other_revenue_share,
+        facts.revenue_mode,
     )
     total_headcount = [
         facts.product_headcount[i]
@@ -1490,6 +1521,7 @@ def implied_gross_margin_series(facts: SourceFacts) -> list[float]:
         facts.monthly_price_yen,
         facts.take_rate,
         facts.other_revenue_share,
+        facts.revenue_mode,
     )
     ending = ending_units(facts.new_units)
     average = average_units(ending)
@@ -1500,6 +1532,8 @@ def implied_gross_margin_series(facts: SourceFacts) -> list[float]:
             margins.append(0.0)
             continue
         variable = rev * facts.variable_cogs_pct[idx]
+        # Field-service cost accrues on deployed units every period (post-sale
+        # maintenance), independent of the revenue model.
         delivery = average[idx] * facts.delivery_cost_yen[idx] * 12
         cloud = average[idx] * facts.cloud_cost_yen[idx] * 12
         support = facts.customers[idx] * facts.support_cost_yen[idx] * 12
@@ -1528,6 +1562,7 @@ def audit_economic_coherence(
         facts.monthly_price_yen,
         facts.take_rate,
         facts.other_revenue_share,
+        facts.revenue_mode,
     )
     gross_margin = implied_gross_margin_series(facts)
     projection = project_plan_free_cash_flow(facts)
@@ -1587,6 +1622,40 @@ def extract_source_facts(source_md: Path) -> SourceFacts:
     return derive_source_facts(read_source(source_md))
 
 
+# Asset-heavy hardware spans two revenue models: outright unit sales and
+# recurring leasing / robot-as-a-service. A unit-sale narrative names a
+# per-unit sale price; a recurring cue (lease, RaaS, 月額, ARR, subscription)
+# keeps the default recurring model.
+_UNIT_SALE_CUE = re.compile(
+    r"sells?\s+for|sale\s+price|unit\s+price|price\s+per\s+"
+    r"(?:unit|robot|device|machine|vehicle|drone)|per-unit\s+price|"
+    r"販売価格|1\s*台\s*あたり",
+    flags=re.IGNORECASE,
+)
+_RECURRING_CUE = re.compile(
+    r"recurring|leas(?:e|ing)|subscription|RaaS|as\s+a\s+service|"
+    r"monthly\s+(?:fee|charge|billing|subscription|price|rate|lease|rental)|"
+    r"per\s+month|/\s*mo(?:nth)?\b|"
+    r"\bARR\b|\bMRR\b|月額|リース|サブスク",
+    flags=re.IGNORECASE,
+)
+
+
+def detect_revenue_mode(text: str, profile: MechanicProfile) -> str:
+    """Revenue-recognition model for the plan.
+
+    Asset-heavy hardware is sold outright in some plans and leased / offered
+    as a service in others. A narrative that names a per-unit sale price and
+    carries no recurring cue is modeled as ``unit_sale`` (revenue = units
+    shipped x price); every other plan stays ``recurring``.
+    """
+    if profile.key != "hardware_asset_heavy":
+        return "recurring"
+    if _UNIT_SALE_CUE.search(text) and not _RECURRING_CUE.search(text):
+        return "unit_sale"
+    return "recurring"
+
+
 def derive_source_facts(
     text: str, *, jpy_per_usd: float = DEFAULT_JPY_PER_USD
 ) -> SourceFacts:
@@ -1595,6 +1664,7 @@ def derive_source_facts(
     years, period_labels = forecast_axis(extract_start_year(text), periods, grain)
     periods = len(years)
     profile = profile_for_text(text)
+    revenue_mode = detect_revenue_mode(text, profile)
     company = extract_company(text)
     source_names, source_urls = extract_sources(text)
     market_lines = extract_market_lines(text)
@@ -1630,7 +1700,12 @@ def derive_source_facts(
         # Milestone units and customers are kept: they drive capex and cost.
         price = 0
 
-    if profile.key != "marketplace":
+    if revenue_mode == "unit_sale":
+        # Hardware: gmv tracks annual unit-sale revenue (new units shipped x
+        # price), so the downstream capex / headcount / R&D sizing scales off
+        # real revenue, not a 12x recurring proxy.
+        gmv = [units * price for units in new_units]
+    elif profile.key != "marketplace":
         gmv = [units * price * 12 for units in ending_units(new_units)]
 
     new_units = _pad_series(new_units, periods, 0)
@@ -1646,8 +1721,19 @@ def derive_source_facts(
     tam_default = int(profile.tam_yen * money_scale)
     tam = max(tam_default, gmv[-1] * 10 if profile.key == "marketplace" else tam_default)
     sam = max(int(tam * 0.18), int(1_000_000_000 * money_scale))
+    # Implied mature revenue: recurring billing on the installed base, or a
+    # single unit-sale year. A unit-sale plan recognises only the final
+    # year's shipments (new_units[-1]) x price, not the cumulative installed
+    # base — that would inflate SOM as deployments accumulate.
+    mature_units = (
+        new_units[-1] if revenue_mode == "unit_sale"
+        else ending_units(new_units)[-1]
+    )
+    implied_mature_revenue = mature_units * monthly_price[-1] * (
+        1 if revenue_mode == "unit_sale" else 12
+    )
     som = max(
-        max(gmv[-1], ending_units(new_units)[-1] * monthly_price[-1] * 12),
+        max(gmv[-1], implied_mature_revenue),
         int(1_000_000_000 * money_scale),
     )
     product_hc, gtm_hc, ops_hc, ga_hc = _headcount_plan(profile, ending, gmv)
@@ -1673,6 +1759,7 @@ def derive_source_facts(
         delivery_cost,
         cloud_cost,
         support_cost,
+        revenue_mode,
     )
     other_capex = [
         _round_to(
@@ -1710,6 +1797,7 @@ def derive_source_facts(
         monthly_price,
         take_rate,
         [float(value) for value in curves["other_revenue_share"]],
+        revenue_mode,
     )
     fcf_projection = project_free_cash_flow(
         plan_revenue,
@@ -1840,6 +1928,7 @@ def derive_source_facts(
         tam_yen=tam,
         sam_yen=sam,
         som_yen=som,
+        revenue_mode=revenue_mode,
     )
 
 
