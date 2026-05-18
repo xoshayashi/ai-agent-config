@@ -286,8 +286,9 @@ a gap to fix before iterating.
     ignore the unit economics, the comparable set, or the cash runway?
 11. **Trajectory not snapshot** — is progress shown as a line (deltas over
     time), not a single dot?
-12. **Retellable accurately** — could a third party read it alone and retell the
-    thesis to a partner in thirty seconds without drifting?
+12. **Retellable accurately, survives a sceptic** — could a third party read it
+    alone, stress-test it, and still retell the thesis to a sceptical partner in
+    thirty seconds without drifting?
 
 ### B. Craft & persuasion — will it get read, remembered, retold?
 

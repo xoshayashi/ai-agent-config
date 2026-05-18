@@ -35,7 +35,8 @@ description.
 ## 2. Transportation — make the reader see it
 
 A reader who can *picture* the situation is absorbed, argues back less, and
-remembers more. Absorption comes from concrete, sensory detail and from
+remembers more — the effect that narrative-transportation research (Green &
+Brock) documents. Absorption comes from concrete, sensory detail and from
 connecting to something the reader already knows — not from abstraction. One
 specific customer in one specific Monday-morning situation transports a reader;
 "a large addressable market with strong tailwinds" does not.
@@ -50,9 +51,11 @@ specific customer in one specific Monday-morning situation transports a reader;
 
 A few durable devices, used sparingly:
 
-- **Rule of three.** Three reasons, three highlights, three proof points read as
+- **Rule of three.** Three reasons, three proof points, three options read as
   complete and persuasive; two feel thin, five blur. Group load-bearing points
-  in threes — but never pad to a third item that is not real.
+  in threes — but never pad to a third item that is not real. (This is a
+  *within-section* device; it does not cap the 3–5 investment highlights, which
+  is a separate range chosen for coverage.)
 - **Contrast.** Difference lands hardest in parallel structure: *"Incumbents
   sell X; we sell Y."* Use it to make differentiation sharp.
 - **Abstract ↔ concrete, deliberately.** Move between the two: an abstract claim,
@@ -133,7 +136,7 @@ practised reader discounts the sentence on sight.
   next-generation platform transforming the industry") — density of hype is
   inversely correlated with substance.
 
-## Applying this — the engagement pass
+## Applying this — the craft review pass
 
 After the logical draft exists, read back over it once for craft:
 
@@ -147,3 +150,11 @@ After the logical draft exists, read back over it once for craft:
    banned-without-evidence phrases all either earned or gone?
 
 These map directly to axis B of the SKILL.md self-review checklist.
+
+## Sources
+
+- Narrative transportation theory — Green, M.C. & Brock, T.C. (2000), "The Role of Transportation in the Persuasiveness of Public Narratives," *Journal of Personality and Social Psychology* 79
+- Made to Stick / the SUCCES model — Chip & Dan Heath, https://heathbrothers.com/the-books/made-to-stick/
+- Peak–end rule — Daniel Kahneman, *Thinking, Fast and Slow*; https://en.wikipedia.org/wiki/Peak%E2%80%93end_rule
+- Narrative discipline and the possible/plausible/probable test — Aswath Damodaran, *Narrative and Numbers*, https://aswathdamodaran.blogspot.com/2014/07/possible-plausible-and-probable-big.html
+- Storytelling for fundraising — NfX, "The 23 Rules of Storytelling for Fundraising," https://www.nfx.com/post/23-rules-storytelling-fundraising
