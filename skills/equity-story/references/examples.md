@@ -394,8 +394,16 @@ diligence item for the financial model.
 の入金から送金までを握れば、管理業務は一本につながり、そこは決済が走るレールに
 なる。ヤモリは管理SaaSとして入り、家賃決済をその上に載せた。
 
+なお、本書でいう**「組込型決済」**は、家賃の収納・送金がヤモリの管理画面の中で
+完結することを指す。ヤモリ自身が資金移動業の免許を保有して与信や為替取引を担う
+ことは意味しない — 決済処理は提携する決済事業者を通す。読み手が「本格的な
+フィンテック企業」と過大に読まないよう、ここで語の範囲を限定しておく。
+
 > Annotation: problem before solution, told from the manager's side; the insight
 > names the non-obvious truth (the flow of money is the centre, not the admin).
+> A coined, over-readable term — "組込型決済" — is defined at first use: what it
+> means *and what it does not*, so a reader does not inflate ヤモリ into a
+> licensed fintech. This is the `narrative-craft.md` §6 move.
 
 ## なぜこのチームか
 
