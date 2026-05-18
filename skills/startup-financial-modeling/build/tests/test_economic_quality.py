@@ -322,6 +322,31 @@ def test_balance_sheet_balances_in_the_kernel_projection() -> None:
             )
 
 
+def test_depreciation_uses_the_accumulated_asset_base() -> None:
+    """D&A depreciates the accumulated asset base, capped at gross PP&E.
+
+    The prior model charged only the current period's CapEx; mature-period D&A
+    must now exceed that, and accumulated D&A may never exceed gross PP&E.
+    """
+    facts = kernel.derive_source_facts(HARDWARE_STORY)
+    projection = kernel.project_plan_free_cash_flow(facts)
+    cumulative_capex = accumulated_da = 0.0
+    for idx, period in enumerate(projection):
+        cumulative_capex += period["capex"]
+        accumulated_da += period["depreciation"]
+        assert accumulated_da <= cumulative_capex + 1.0, (
+            f"period {idx}: accumulated D&A exceeds gross PP&E"
+        )
+    # Accumulated-base depreciation charges materially more over the horizon
+    # than the old single-period model (each period's CapEx / life), which
+    # would total cumulative-CapEx / life.
+    life = facts.depreciation_life_months[-1] or 60
+    single_period_total = cumulative_capex * 12.0 / life
+    assert accumulated_da > single_period_total, (
+        "D&A does not reflect the accumulated asset base"
+    )
+
+
 def test_economic_audit_flags_an_unbalanced_sheet() -> None:
     """The audit must surface a balance sheet that does not balance."""
     facts = kernel.derive_source_facts(SAAS_STORY)
@@ -703,6 +728,7 @@ if __name__ == "__main__":
         test_economic_audit_catches_insolvency,
         test_economic_audit_catches_non_positive_revenue,
         test_balance_sheet_balances_in_the_kernel_projection,
+        test_depreciation_uses_the_accumulated_asset_base,
         test_economic_audit_flags_an_unbalanced_sheet,
         test_workbook_balance_sheet_balances_when_recalculated,
         test_strict_audit_fails_on_economic_incoherence,

@@ -1184,17 +1184,18 @@ def project_free_cash_flow(
     feed operating cash flow (no interest-on-cash is modeled), which keeps
     round sizing a non-circular forward walk.
 
-    Depreciation deliberately mirrors the workbook P&L formula
-    (`Cost Build CapEx / life x 12`), which charges only the current period's
-    CapEx rather than a rolling asset base. This keeps the projection faithful
-    to the rendered workbook; it is also cash-flow neutral here because D&A is
-    added back in operating cash flow. A rolling depreciation schedule would be
-    a separate workbook-and-kernel change.
+    Depreciation mirrors the workbook P&L formula: straight-line on the
+    accumulated asset base — gross PP&E (cumulative CapEx) divided by the
+    depreciation life — capped so accumulated depreciation never exceeds gross
+    PP&E. It is cash-flow neutral here (D&A is added back in operating cash
+    flow), so it does not change funding sizing; it sharpens EBIT, net income,
+    accumulated depreciation, and net PP&E.
     """
     periods = len(revenue)
     out: list[dict] = []
     ar_prev = inventory_prev = ap_deferred_prev = 0.0
     debt_balance = 0.0
+    cumulative_capex = accumulated_da = 0.0
     for idx in range(periods):
         cogs = revenue[idx] * (1.0 - target_gross_margin[idx])
         gross_profit = revenue[idx] - cogs
@@ -1208,7 +1209,11 @@ def project_free_cash_flow(
         opex = people + sales_marketing + rd + ga
         ebitda = gross_profit - opex
         life = depreciation_life_months[idx] or 60
-        depreciation = capex_yen[idx] / life * 12
+        cumulative_capex += capex_yen[idx]
+        depreciation = min(
+            cumulative_capex * 12.0 / life, cumulative_capex - accumulated_da
+        )
+        accumulated_da += depreciation
         ebit = ebitda - depreciation
         debt_balance += debt_raise_yen[idx]
         interest = debt_balance * debt_interest_rate[idx]
