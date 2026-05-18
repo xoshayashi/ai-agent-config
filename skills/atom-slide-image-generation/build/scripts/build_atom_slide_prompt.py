@@ -281,11 +281,13 @@ def canonical_planning_block(
   generation_block_rule: if Codex built-in generation or repair is actually blocked by the image tool, mark completion_ready_status: blocked and do not package or report complete; do not use local environment uncertainty as the blocker
   review_manifest: required JSON record covering every generated PNG before PPTX packaging
   review_manifest_status: approved only when every image path is covered and all quality statuses are approved
+  review_manifest_design_status_gate: deck-level and slide-level review_manifest entries must approve post_generation_design_balance_status, whitespace_occupancy_balance_status, density_balance_status, typography_balance_status, color_consistency_status, outer_padding_consistency_status, header_integrity_status, multimodal_design_review_status, design_balance_gate_status, occupancy_density_fit_status, font_scale_unity_status, palette_role_unity_status, and design_breakage_blocker_status before PPTX/PDF packaging
   validate_review_manifest: run before PPTX packaging; reject missing, partial, pending, blocked, weak-slide, or duplicate-loose-PNG manifests
   deck_tone_consistency_review: [first third vs middle third vs last third tone comparison after generation]
   deck_tone_consistency_status: pending / approved / repair_required
   deck_tone_repair_plan: [slides to regenerate or edit if tone drift appears]
   post_generation_design_balance_check: required on actual generated PNGs before PPTX/PDF packaging; checks whitespace/occupancy balance, density balance against the planned density tier, typography size/weight balance, color consistency, outer padding consistency, and header integrity
+  post_generation_design_balance_status: pending / approved / repair_required
   whitespace_occupancy_balance_status: pending / approved / repair_required
   density_balance_status: pending / approved / repair_required
   typography_balance_status: pending / approved / repair_required
@@ -296,7 +298,9 @@ def canonical_planning_block(
   font_scale_unity_lock: one deck-level type scale is reused for H1, subtitle, body, data labels, table labels, source, and optional Insight; repair slide-level font-size drift, weight drift, low-contrast text, or any body/label text that competes with the header
   palette_role_unity_lock: each color keeps one role across the deck: #FCFBF8/#F4F3EF canvas, #DDE3EA/#D6E1EE panels/cards, #2D332E main text, #4D544E subtitle, #6E756E footnotes, #0B2F5B structural accent, #FBF3D7/#C49A2C rare Honey signal; repair arbitrary background, text, accent, or saturation drift
   multimodal_design_review_lock: actual generated PNGs must be opened and reviewed multimodally for layout collapse, whitespace/occupancy imbalance, information-density weakness, font-size/color drift, background/accent mismatch, and deck-unity drift before approval
+  multimodal_design_review_status: pending / approved / repair_required
   design_breakage_blocker_lock: any generated PNG with layout collapse, accidental empty zones, overcrowding, inconsistent font scale, wrong text color, wrong background color, excessive or random accent use, or off-system illustration tone is repair_required and cannot be packaged
+  design_breakage_blocker_status: pending / approved / repair_required
   header_identity_lock: header is always the same compact left vertical line + H1 + subtitle system, never a slide-specific decoration surface
   header_integrity_blocker_lock: malformed, missing, oversized, recolored, right-decorated, or intruded header is a blocker and must be repaired before other polish
   header_integrity_status: pending / approved / repair_required
@@ -354,9 +358,13 @@ def canonical_planning_block(
   region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette
   composition_fit_plan: [main visual field, supporting regions, whitespace role, Insight footprint, and intended occupancy; occupancy is observable - no quadrant of the body content area is conspicuously empty and no major region overflows its grid track]
   design_balance_gate: [planned body occupancy percentage band, useful whitespace role, content-area weight, type-role sizes, background role, accent role, and repair trigger]
+  design_balance_gate_status: pending / approved / repair_required
   occupancy_density_fit_lock: body occupancy must match density_tier without dead zones, margin crush, overcrowding, or smaller-than-18pt body text
+  occupancy_density_fit_status: pending / approved / repair_required
   font_scale_unity_lock: freeze and reuse the deck-level type scale for all text roles; repair per-slide size/weight/color drift
+  font_scale_unity_status: pending / approved / repair_required
   palette_role_unity_lock: use each ATOM color in one stable role across the deck; repair background, text, and accent drift before packaging
+  palette_role_unity_status: pending / approved / repair_required
   multimodal_design_review_lock: approve only after actual generated PNG review checks layout collapse, occupancy, density, font scale, text color, background, accent role, and deck unity
   design_breakage_blocker_lock: layout collapse, accidental empty zones, overcrowding, inconsistent font scale, wrong text color, wrong background color, excessive/random accent use, or off-system illustration tone blocks completion
   content_area_priority_lock: allocate height to the body, figure, table, or diagram first; size any optional Insight/message-box from the remaining calculated space so it supports rather than compresses the main content area

@@ -176,7 +176,43 @@ APPROVED_STATUSES = {
     "deck_unity_status",
     "completion_ready_status",
     "review_manifest_status",
+    "deck_tone_consistency_status",
+    "illustration_consistency_status",
+    "post_generation_design_balance_status",
+    "whitespace_occupancy_balance_status",
+    "density_balance_status",
+    "typography_balance_status",
+    "color_consistency_status",
+    "outer_padding_consistency_status",
+    "header_integrity_status",
+    "multimodal_design_review_status",
+    "design_balance_gate_status",
+    "occupancy_density_fit_status",
+    "font_scale_unity_status",
+    "palette_role_unity_status",
+    "design_breakage_blocker_status",
 }
+
+SLIDE_APPROVED_STATUSES = (
+    "image_review_status",
+    "final_image_quality_status",
+    "content_quality_status",
+    "design_quality_status",
+    "deck_unity_status",
+    "post_generation_design_balance_status",
+    "whitespace_occupancy_balance_status",
+    "density_balance_status",
+    "typography_balance_status",
+    "color_consistency_status",
+    "outer_padding_consistency_status",
+    "header_integrity_status",
+    "multimodal_design_review_status",
+    "design_balance_gate_status",
+    "occupancy_density_fit_status",
+    "font_scale_unity_status",
+    "palette_role_unity_status",
+    "design_breakage_blocker_status",
+)
 
 
 def normalize_manifest_path(value: object, base: Path) -> Path | None:
@@ -224,7 +260,7 @@ def validate_review_manifest(manifest_file: str | None, images: list[Path]) -> N
     for idx, slide in enumerate(slides, 1):
         if not isinstance(slide, dict):
             raise SystemExit(f"review_manifest slide {idx} must be an object.")
-        for key in ("image_review_status", "final_image_quality_status"):
+        for key in SLIDE_APPROVED_STATUSES:
             if slide.get(key) != "approved":
                 raise SystemExit(f"review_manifest slide {idx} {key} must be approved.")
         for key in ("blockers", "majors"):
