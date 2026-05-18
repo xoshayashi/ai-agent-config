@@ -204,26 +204,6 @@ real risk to the network-effects claim and should be diligenced.
 > is tied to named frameworks and to evidence; the honest risk (multi-homing) is
 > stated, per `strategy-frameworks.md`'s warning on network effects.
 
-## What would change our mind
-
-The thesis rests on three load-bearing assumptions. For each, the observation
-that would prove it wrong:
-
-- **If**, after a credible attempt to retain them, more than ~30% of new buyer
-  cohorts route the majority of their next-12-month volume off-platform within
-  six months of first transaction, **then** the two-sided network-effects thesis
-  fails — the marketplace is a lead-gen tool, not a network.
-- **If** the take rate compresses below 12% under competitive pressure with no
-  matching rise in shop-side financial-services revenue, **then** the
-  demand-aggregation thesis is wrong and the business is a thin broker.
-- **If** buyer NRR retreats below ~110% (the B2B-marketplace median) over two
-  consecutive quarters, **then** the embedded-switching-costs claim is overstated.
-
-> Annotation: these are not `[open]` items. `[open]` lists what we *don't yet
-> know* and would diligence; a reversal trigger names what, if *observed*, would
-> prove the thesis *wrong*. Naming your own kill criteria is the strongest
-> credibility signal — see `narrative-craft.md` §6.
-
 ## Traction
 
 Shown as a line, not a dot. All figures `[fact]`.
@@ -262,6 +242,27 @@ custom manufacturing** — any process, any part, one accountable marketplace.
 Win machining completely enough to be the obvious default, and the same engine —
 instant quote, vetted supply, accountable delivery — extends to every adjacent
 process.
+
+## What would change our mind
+
+The thesis rests on three load-bearing assumptions. For each, the observation
+that would prove it wrong:
+
+- If, after a credible attempt to retain them, more than ~30% of new buyer
+  cohorts route the majority of their next-12-month volume off-platform within
+  six months of first transaction, the two-sided network-effects thesis fails —
+  the marketplace is a lead-gen tool, not a network.
+- If the take rate compresses below 12% under competitive pressure with no
+  matching rise in shop-side financial-services revenue, the demand-aggregation
+  thesis is wrong and the business is a thin broker.
+- If buyer NRR retreats below ~110% (the B2B-marketplace median) over two
+  consecutive quarters, the embedded-switching-costs claim is overstated.
+
+> Annotation: placed after Vision and before the Q&A, per the output template.
+> These are not `[open]` items — `[open]` lists what we *don't yet know* and
+> would diligence; a reversal trigger names what, if *observed*, would prove the
+> thesis *wrong*. Each trigger here is numeric because a figure exists to anchor
+> it; name a direction and tag the threshold `[open]` when one does not.
 
 ## Anticipated investor questions
 
