@@ -55,9 +55,10 @@ sh /path/to/ai-agent-config/scripts/setup.sh
 置換時の skill backup は各 CLI home の `skill-backups/` に移し、`skills/`
 直下には残しません。
 
-既存の `~/.zshrc` を symlink へ切り替える初回は `AI_AGENT_CONFLICT_MODE=replace`
-を指定してください。元の `~/.zshrc` は同じフォルダーに
-`.zshrc.backup-<timestamp>` として退避されます。
+既存の `~/.zshrc` を symlink へ切り替える初回は、`~/.zshrc` だけを対象に手動で
+退避・リンクします（`AI_AGENT_CONFLICT_MODE=replace` は instruction / skill を
+含む全 link に効く global フラグのため、この初回切り替えには使いません）。
+具体的な手順は `setup.md` の「Shell 設定」を参照してください。
 
 CLI の存在チェックを省く場合:
 

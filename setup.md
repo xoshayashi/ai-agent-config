@@ -78,13 +78,20 @@ sh scripts/validate-repo.sh
 `setup.sh` は `shell/.zshrc` を `~/.zshrc` にリンクします。`.zshrc` の正本は
 このリポジトリにあり、編集はリポジトリ側で行います。
 
-既存の `~/.zshrc` を初めて symlink に切り替えるときは、通常ファイルが残っていると
-既定 (`skip`) ではリンクが作られません。次のように `replace` を指定すると、元の
-`~/.zshrc` を `~/.zshrc.backup-<timestamp>` に退避してからリンクを作成します。
+既存の `~/.zshrc` が通常ファイルとして残っていると、既定 (`skip`) では
+リンクが作られません。`AI_AGENT_CONFLICT_MODE=replace` は instruction や
+skill を含む全 link 対象に効く global フラグなので、`~/.zshrc` だけを初めて
+切り替えるときは、対象を絞って手動で退避・リンクします。
 
 ```sh
-AI_AGENT_CONFLICT_MODE=replace sh scripts/setup.sh
+cd /path/to/ai-agent-config
+mv ~/.zshrc ~/.zshrc.backup-$(date +%Y%m%d-%H%M%S)
+ln -s "$(pwd)/shell/.zshrc" ~/.zshrc
 ```
+
+以降は `sh scripts/setup.sh`（既定の `skip` モード）が、正しい symlink に
+なった `~/.zshrc` をそのまま検出します。`sh scripts/health-check.sh` の
+`shell: zshrc=ok` で状態を確認できます。
 
 ## 通知 hook
 
