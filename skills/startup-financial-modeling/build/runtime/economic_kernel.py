@@ -555,6 +555,7 @@ def _debt_plan(
     new_units: list[int],
     capex_per_unit: list[int],
     other_capex: list[int],
+    round_unit: int = 100_000_000,
 ) -> list[int]:
     """Asset-backed debt capacity per period (unchanged level heuristic)."""
     asset_debt_share = (
@@ -567,7 +568,7 @@ def _debt_plan(
     debt: list[int] = []
     for idx in range(len(new_units)):
         growth_investment = max(0, new_units[idx] * capex_per_unit[idx]) + other_capex[idx]
-        debt.append(_round_to(growth_investment * asset_debt_share, 100_000_000))
+        debt.append(_round_to(growth_investment * asset_debt_share, round_unit))
     return debt
 
 
@@ -659,22 +660,70 @@ def extract_market_lines(text: str) -> list[str]:
     return lines
 
 
-def extract_price(text: str, profile: MechanicProfile) -> int:
+# Nominal JPY-per-USD rate. The economic kernel carries JPY-denominated default
+# magnitudes (comp, capital floors, capex, G&A); for a USD model they are
+# divided by this rate so a dollar plan reads in plausible dollar magnitudes.
+DEFAULT_JPY_PER_USD = 150.0
+
+
+def money_scale_for_currency(currency: str, jpy_per_usd: float = DEFAULT_JPY_PER_USD) -> float:
+    """Factor that converts a JPY-denominated default into the model currency."""
+    if currency == "USD" and jpy_per_usd > 0:
+        return 1.0 / jpy_per_usd
+    return 1.0
+
+
+def extract_currency(text: str) -> str:
+    """Detect the model currency from the narrative; default to JPY.
+
+    The skill is JPY-primary, so this flips to USD only on a strong USD signal
+    with no competing JPY signal — a JPY plan that merely cites a dollar-priced
+    competitor or comparable stays JPY.
+    """
+    usd_figures = re.findall(r"\$\s?[0-9]", text)
+    usd_word = bool(
+        re.search(r"\bUSD\b|US\s?dollar|US-based|米ドル|ドル建", text, flags=re.IGNORECASE)
+    )
+    has_jpy = bool(
+        re.search(
+            r"[¥円]|\bJPY\b|\byen\b|月額|[0-9]\s*(?:万|億|百万|兆)",
+            text,
+            flags=re.IGNORECASE,
+        )
+    )
+    # USD needs a strong signal — an explicit USD word or at least two dollar
+    # figures. A lone "$NNN" (typically a competitor reference) is not enough.
+    strong_usd = usd_word or len(usd_figures) >= 2
+    if strong_usd and not has_jpy:
+        return "USD"
+    return "JPY"
+
+
+# Single-letter Latin scale units must not bleed into a following word — the
+# "b" of "but" once parsed as "billion" (cf. the same fix for GMV extraction).
+_PRICE_UNIT = r"(万|億|百万|[mMbB](?![A-Za-z]))"
+
+
+def extract_price(text: str, profile: MechanicProfile, currency: str = "JPY") -> int:
     if profile.key == "marketplace":
         return 0
     patterns = [
-        r"月額\s*([0-9,.]+)\s*(万|億|百万|m|M|b|B)?\s*円?",
-        r"(?:price|pricing|fee|subscription|lease|rental|unit price|単価|価格|利用料)[^0-9¥$]{0,32}¥?\s*([0-9,.]+)\s*(万|億|百万|m|M|b|B)?",
+        rf"月額\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*円?",
+        rf"(?:price|pricing|fee|subscription|lease|rental|unit price|単価|価格|利用料)[^0-9¥$]{{0,32}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?",
     ]
     if profile.key != "hardware_asset_heavy":
         patterns.extend(
             [
-                r"ACV[^0-9¥$]{0,24}¥?\s*([0-9,.]+)\s*(万|億|百万|m|M|b|B)?",
+                rf"ACV[^0-9¥$]{{0,24}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?",
             ]
         )
-    price = money_yen(patterns, text, profile.default_monthly_price_yen)
-    if price < max(10_000, profile.default_monthly_price_yen * 0.05):
-        return profile.default_monthly_price_yen
+    default_price = max(1, int(profile.default_monthly_price_yen * money_scale_for_currency(currency)))
+    price = money_yen(patterns, text, default_price)
+    # The noise floor is currency-relative: a valid USD per-seat price ($80) is
+    # far below any sane JPY price floor and must not be rejected as noise.
+    floor = 1 if currency == "USD" else max(10_000, int(profile.default_monthly_price_yen * 0.05))
+    if price < floor:
+        return default_price
     return price
 
 
@@ -805,13 +854,20 @@ _GMV_MATURITY_CUE = re.compile(
 )
 
 
-def gmv_ramp(text: str, profile: MechanicProfile, periods: int = DEFAULT_FORECAST_PERIODS) -> list[int]:
+def gmv_ramp(
+    text: str,
+    profile: MechanicProfile,
+    periods: int = DEFAULT_FORECAST_PERIODS,
+    money_scale: float = 1.0,
+) -> list[int]:
     """Build the GMV ramp for marketplace-style plans.
 
     Extracts a stated GMV in either order ("GMV ¥10B" or "¥120億 GMV"). When
     the figure sits next to maturity language ("at maturity", "by FY2030"), it
     is treated as the final-period target and the ramp is scaled so the last
     period lands on it — a stated maturity GMV is a goal, not a period-0 base.
+    A stated GMV is taken in the model currency as written; only the
+    profile-default fallback is FX-scaled.
     """
     if periods <= 0:
         return []
@@ -829,7 +885,7 @@ def gmv_ramp(text: str, profile: MechanicProfile, periods: int = DEFAULT_FORECAS
         break
     is_maturity_figure = value > 0 and bool(_GMV_MATURITY_CUE.search(context))
     if value <= 0:
-        value = profile.default_gmv_yen
+        value = int(profile.default_gmv_yen * money_scale)
     if value <= 0:
         return [0 for _ in range(periods)]
     multipliers = _curve(1.0, 8.5, periods)
@@ -1365,7 +1421,9 @@ def extract_source_facts(source_md: Path) -> SourceFacts:
     return derive_source_facts(read_source(source_md))
 
 
-def derive_source_facts(text: str) -> SourceFacts:
+def derive_source_facts(
+    text: str, *, jpy_per_usd: float = DEFAULT_JPY_PER_USD
+) -> SourceFacts:
     grain = extract_model_grain(text)
     periods = extract_forecast_periods(text, grain)
     years, period_labels = forecast_axis(extract_start_year(text), periods, grain)
@@ -1380,8 +1438,12 @@ def derive_source_facts(text: str) -> SourceFacts:
         new_units = ramp_to_target(target_units, profile.first_units, periods)
     else:
         new_units = ramp_to_target(profile.customers[-1], max(25, profile.customers[0]), periods)
-    gmv = gmv_ramp(text, profile, periods)
-    price = extract_price(text, profile)
+    currency = extract_currency(text)
+    money_scale = money_scale_for_currency(currency, jpy_per_usd)
+    round_10m = max(1, int(10_000_000 * money_scale))
+    round_100m = max(1, int(100_000_000 * money_scale))
+    gmv = gmv_ramp(text, profile, periods, money_scale)
+    price = extract_price(text, profile, currency)
     take = first_match_float(
         [r"take rate[^0-9]{0,12}([0-9.]+)%", r"手数料率[^0-9]{0,12}([0-9.]+)%"],
         text,
@@ -1404,14 +1466,20 @@ def derive_source_facts(text: str) -> SourceFacts:
     take_rate = _take_rate_series(take, periods)
     customers = _pad_series(retargeted_customers, periods, 0)
     variable_cogs_pct = _pad_series(profile.variable_cogs_pct, periods, 0.30)
-    capex_per_unit = _pad_series(profile.capex_per_unit_yen, periods, 0)
-    tam = max(profile.tam_yen, gmv[-1] * 10 if profile.key == "marketplace" else profile.tam_yen)
-    sam = max(int(tam * 0.18), 1_000_000_000)
-    som = max(max(gmv[-1], ending_units(new_units)[-1] * monthly_price[-1] * 12), 1_000_000_000)
+    capex_per_unit = _pad_series(
+        [int(value * money_scale) for value in profile.capex_per_unit_yen], periods, 0
+    )
+    tam_default = int(profile.tam_yen * money_scale)
+    tam = max(tam_default, gmv[-1] * 10 if profile.key == "marketplace" else tam_default)
+    sam = max(int(tam * 0.18), int(1_000_000_000 * money_scale))
+    som = max(
+        max(gmv[-1], ending_units(new_units)[-1] * monthly_price[-1] * 12),
+        int(1_000_000_000 * money_scale),
+    )
     product_hc, gtm_hc, ops_hc, ga_hc = _headcount_plan(profile, ending, gmv)
     total_hc = [a + b + c + d for a, b, c, d in zip(product_hc, gtm_hc, ops_hc, ga_hc)]
     curves = _operating_assumption_curves(profile, periods)
-    avg_comp = [int(value) for value in _curve(16_000_000, 14_500_000, periods)]
+    avg_comp = [int(value * money_scale) for value in _curve(16_000_000, 14_500_000, periods)]
     delivery_cost = [int(value) for value in _curve(90_000 if profile.key != "marketplace" else 0, 32_000 if profile.key != "marketplace" else 0, periods)]
     cloud_cost = [int(value) for value in _curve(18_000, 26_000, periods)]
     support_cost = [int(value) for value in _curve(24_000, 16_000, periods)]
@@ -1433,27 +1501,32 @@ def derive_source_facts(text: str) -> SourceFacts:
         _round_to(
             max(
                 gmv[idx] * (0.025 if profile.key != "marketplace" else 0.010),
-                total_hc[idx] * 1_500_000,
+                total_hc[idx] * int(1_500_000 * money_scale),
             ),
-            10_000_000,
+            round_10m,
         )
         for idx in range(periods)
     ]
-    rd_program_per_product_fte = [4_500_000 for _ in range(periods)]
+    rd_program_per_product_fte = [int(4_500_000 * money_scale) for _ in range(periods)]
     rd_program_floor = [
-        _round_to(max(gmv[idx] * 0.015, 60_000_000), 10_000_000) for idx in range(periods)
+        _round_to(max(gmv[idx] * 0.015, int(60_000_000 * money_scale)), round_10m)
+        for idx in range(periods)
     ]
     fixed_ga = [
-        _round_to(max(total_hc[idx] * 1_200_000, 50_000_000), 10_000_000)
+        _round_to(
+            max(total_hc[idx] * int(1_200_000 * money_scale), int(50_000_000 * money_scale)),
+            round_10m,
+        )
         for idx in range(periods)
     ]
     beginning_cash = _round_to(
-        max(300_000_000, avg_comp[0] * max(total_hc[0], 1) * 0.50), 100_000_000
+        max(int(300_000_000 * money_scale), avg_comp[0] * max(total_hc[0], 1) * 0.50),
+        round_100m,
     )
     capex_total = [
         new_units[idx] * capex_per_unit[idx] + other_capex[idx] for idx in range(periods)
     ]
-    debt_raise = _debt_plan(profile, new_units, capex_per_unit, other_capex)
+    debt_raise = _debt_plan(profile, new_units, capex_per_unit, other_capex, round_100m)
     plan_revenue = plan_revenue_series(
         new_units,
         gmv,
@@ -1483,27 +1556,30 @@ def derive_source_facts(text: str) -> SourceFacts:
         [float(value) for value in curves["tax_rate"]],
     )
     free_cash_flow = [period["free_cash_flow"] for period in fcf_projection]
-    equity_raise = size_equity_rounds(beginning_cash, free_cash_flow, debt_raise)
+    equity_raise = size_equity_rounds(
+        beginning_cash, free_cash_flow, debt_raise, round_unit=round_100m
+    )
     ownership_targets = _curve(0.22, 0.10, periods)
     post_money = [
-        _round_to(equity_raise[idx] / ownership_targets[idx], 100_000_000)
+        _round_to(equity_raise[idx] / ownership_targets[idx], round_100m)
         if equity_raise[idx]
         else 0
         for idx in range(periods)
     ]
+    currency_symbol = "$" if currency == "USD" else "¥"
     summary_bits = [
         profile.label,
         f"{profile.primary_unit_name}: {ending[-1]:,}",
-        f"FY{years[-1]} revenue basis: ¥{som:,.0f}",
+        f"FY{years[-1]} revenue basis: {currency_symbol}{som:,.0f}",
     ]
     if price > 0:
-        summary_bits.append(f"Monthly price: ¥{price:,.0f}")
+        summary_bits.append(f"Monthly price: {currency_symbol}{price:,.0f}")
 
     return SourceFacts(
         years=years,
         period_labels=period_labels,
         grain=grain,
-        currency="JPY",
+        currency=currency,
         display_scale="million",
         company=company,
         product=profile.product,
@@ -1568,8 +1644,8 @@ def derive_source_facts(text: str) -> SourceFacts:
         gross_profit_multiple=[round(value, 1) for value in _curve(8, 16, periods)],
         ebitda_multiple=[round(value, 1) for value in _curve(12, 28, periods)],
         discount_rate=0.18,
-        customer_roi_yen=max(price * 18, 3_000_000),
-        implementation_cost_yen=max(price * 2, 300_000),
+        customer_roi_yen=max(price * 18, int(3_000_000 * money_scale)),
+        implementation_cost_yen=max(price * 2, int(300_000 * money_scale)),
         sales_cycle_months=4 if profile.key in {"recurring_software", "marketplace"} else 6,
         churn_rate=0.08 if profile.key != "marketplace" else 0.18,
         repeat_rate=0.40 if profile.key == "marketplace" else 0.75,
@@ -1732,7 +1808,11 @@ def derive_source_facts_from_mapping(raw: dict[str, Any]) -> SourceFacts:
     if not narrative:
         narrative = f"# {company}\nGeneric financial model for a {mechanics}."
 
-    facts = derive_source_facts(narrative)
+    fx_raw = raw.get("jpy_per_usd") or raw.get("fx_rate")
+    facts = derive_source_facts(
+        narrative,
+        jpy_per_usd=float(fx_raw) if fx_raw else DEFAULT_JPY_PER_USD,
+    )
     periods_raw = raw.get("periods") or raw.get("horizon_periods") or raw.get("horizon")
     grain = str(raw.get("grain") or raw.get("model_grain") or facts.grain).lower()
     if isinstance(periods_raw, str):

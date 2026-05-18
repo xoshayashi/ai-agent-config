@@ -206,6 +206,56 @@ def test_marketplace_present_value_gmv_stays_period_zero_base() -> None:
     )
 
 
+USD_STORY = """# Seed B2B SaaS equity story (USD)
+
+A US-based B2B SaaS company. The model must support a seed fundraise: 5-year
+integrated plan, runway, unit economics, and dilution. Pricing is a per-seat
+subscription at $80 per seat per month. Phase 1 targets $12M ARR at maturity.
+Gross margin target is about 80%.
+
+Source: customer discovery memo, investor benchmark notes.
+"""
+
+
+def test_usd_narrative_produces_a_coherent_usd_plan() -> None:
+    """A USD narrative is modeled in USD, at the stated scale, with USD-scale costs."""
+    facts = kernel.derive_source_facts(USD_STORY)
+    assert facts.currency == "USD", f"currency not detected as USD: {facts.currency}"
+    assert facts.monthly_price_yen[0] == 80, (
+        f"per-seat price '$80' not extracted: {facts.monthly_price_yen[0]}"
+    )
+    # JPY default magnitudes must be FX-scaled — a USD plan cannot carry a
+    # ¥16M loaded comp read as $16M, nor a ¥300M cash floor read as $300M.
+    assert facts.avg_comp_yen[0] < 1_000_000, (
+        f"loaded comp not FX-scaled for USD: {facts.avg_comp_yen[0]}"
+    )
+    assert facts.beginning_cash_yen < 50_000_000, (
+        f"beginning cash not FX-scaled for USD: {facts.beginning_cash_yen}"
+    )
+    assert kernel.audit_economic_coherence(facts) == [], (
+        "USD plan is not economically coherent"
+    )
+
+
+def test_jpy_narratives_are_not_misdetected_as_usd() -> None:
+    """JPY stories — including ones citing a dollar-priced competitor — stay JPY."""
+    for name, story in ARCHETYPES.items():
+        facts = kernel.derive_source_facts(story)
+        assert facts.currency == "JPY", f"{name} misdetected as {facts.currency}"
+        # JPY magnitudes are unchanged (no FX scaling).
+        assert facts.avg_comp_yen[0] >= 10_000_000, f"{name}: JPY comp was scaled"
+    mixed = "# 計画\n月額1.2万円のSaaS。競合は $499/月。Source: メモ。"
+    assert kernel.extract_currency(mixed) == "JPY"
+
+
+def test_yaml_can_override_the_fx_rate() -> None:
+    """The JPY-per-USD rate is overridable for USD plans via structured input."""
+    facts = kernel.derive_source_facts(USD_STORY, jpy_per_usd=100.0)
+    other = kernel.derive_source_facts(USD_STORY, jpy_per_usd=200.0)
+    # A smaller divisor leaves larger USD magnitudes.
+    assert facts.avg_comp_yen[0] > other.avg_comp_yen[0]
+
+
 def test_payroll_is_not_absurd_at_maturity() -> None:
     """Mature-period payroll must not dwarf revenue (a sign of grain mixups)."""
     for name, story in ARCHETYPES.items():
@@ -580,6 +630,9 @@ if __name__ == "__main__":
         test_customer_count_reaches_stated_target,
         test_marketplace_gmv_honors_stated_maturity_target,
         test_marketplace_present_value_gmv_stays_period_zero_base,
+        test_usd_narrative_produces_a_coherent_usd_plan,
+        test_jpy_narratives_are_not_misdetected_as_usd,
+        test_yaml_can_override_the_fx_rate,
         test_payroll_is_not_absurd_at_maturity,
         test_economic_audit_passes_for_healthy_archetypes,
         test_economic_audit_catches_a_broken_cost_stack,
