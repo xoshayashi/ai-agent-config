@@ -18,8 +18,8 @@ Do only what the claim requires — but do that part properly.
 ## 2. Bottom-up first
 
 Build the market from **customers × price**, with the calculation visible. State
-it SOM → SAM → TAM: the wedge the company can take, then the served market, then
-the category the wedge opens. A top-down "the market is $X billion" as the
+it SOM → SAM → TAM (or SOM → TAM when SAM is implicit): the wedge the company can
+take, then the served market, then the category the wedge opens. A top-down "the market is $X billion" as the
 headline reads as hand-waving and draws the most scrutiny — TAM is context for
 ambition; the round is underwritten on the SOM. This is the floor. Everything
 below raises a headline-number argument from plausible to defensible.
@@ -112,13 +112,13 @@ A fictional B2B compliance-automation company, at IPO:
   **Net SAM ~$2.7B**. `[derived]`
 - **SOM, four scenarios** (5-year), each with penetration vs. Net SAM:
   Conservative $34M (1.3%) · Base $68M (2.5%) · Target $120M (4.4%) · Upside
-  $190M (7.0%). Base's 2.5% sits within the IPO-era penetration two named
-  comparable B2B-software companies reached; Upside exceeds it and is flagged as
-  the bull case. `[estimate]`
+  $190M (7.0%). Cross-check: two B2B-software comparables reached ~2.1% and
+  ~2.8% of their stated SAM at IPO — Base's 2.5% sits within that range; Upside
+  (7.0%) exceeds it and is flagged as the bull case. `[estimate]`
 
 ## Sources
 
-- Aswath Damodaran, *Narrative and Numbers* — discipline on tying market
+- Aswath Damodaran, *Narrative and Numbers* (2017) — discipline on tying market
   narrative to defensible numbers.
 - Comparable-company S-1 filings and annual reports — the primary source for the
   cross-check in section 6 (customer counts, ARR, TAM penetration at IPO).

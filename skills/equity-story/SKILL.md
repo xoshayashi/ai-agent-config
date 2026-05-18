@@ -151,11 +151,11 @@ Numbers belong *next to the claim they prove*, never in a standalone pile.
   (customers × price) with the calculation shown. Top-down billions read as
   hand-waving and draw the most scrutiny. Order it SOM → TAM: the wedge you can
   take, then the category it opens. For higher-stakes documents (IPO,
-  late-stage, or any argument resting on a headline market number), apply the
-  disciplines in `references/market-sizing.md` — triangulate TAM from
-  independent routes, build SAM by buyer budget source with a stated Gross→Net
-  overlap discount, and present SOM in four scenarios cross-checked against
-  named comparable companies. Match the depth to the stage; do not pad.
+  late-stage, or any argument resting on a headline market number), read
+  `references/market-sizing.md` and apply its disciplines — TAM triangulation
+  from independent routes, SAM by buyer budget source with a Gross→Net overlap
+  discount, SOM in four scenarios cross-checked against named comparable
+  companies. Match the depth to the stage; do not pad.
 - **Traction** is the empirical proof that *Why now* and *Why us* were right.
   Always time-stamped ("0 → 1,000 in 8 weeks", not "1,000 users"). Investors
   back momentum, not absolute numbers. If traction is weak, omit the section
@@ -303,12 +303,10 @@ a gap to fix before iterating.
    verifiable, are macro and market claims attributed to a primary source
    (issuing agency / publication / date), and is progress shown as a trajectory
    (deltas over time), not a single dot?
-5. **Market sized rigorously** — is TAM built bottom-up with the calculation
-   visible (not an unsourced top-down billion); and for a headline-number
-   argument, is TAM triangulated from independent routes, is SAM built by buyer
-   budget source with a Gross→Net overlap discount, and is SOM presented in
-   scenarios cross-checked against named comparable companies?
-   (See `references/market-sizing.md`.)
+5. **Market sized rigorously** — is TAM bottom-up with the calculation visible?
+   For a headline-number argument: is TAM triangulated from independent routes,
+   SAM built by budget source with a Gross→Net discount, and SOM in four
+   scenarios with comparable-company benchmarks? (See `references/market-sizing.md`.)
 6. **Competition & moat done right** — are opportunity size and durability
    named *separately*, and is the moat tied to a named framework and evidence,
    not asserted as "first mover" or "better product"?
