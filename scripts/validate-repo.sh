@@ -72,6 +72,7 @@ require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"
 require_file "instructions/AI_AGENT_INSTRUCTIONS.md"
 require_file "instructions/DESIGN.md"
+require_file "shell/.zshrc"
 require_file ".github/workflows/validate.yml"
 require_file ".github/workflows/claude-code-review.yml"
 
@@ -157,6 +158,12 @@ grep -Fq 'remove_notification_hooks' "$repo_root/scripts/uninstall.sh" \
   || fail "uninstall.sh must remove notification hooks"
 grep -Fq 'notify_status_for' "$repo_root/scripts/health-check.sh" \
   || fail "health-check.sh must report notification hooks"
+grep -Fq 'install_shell_links' "$repo_root/scripts/setup.sh" \
+  || fail "setup.sh must install the shell dotfile link"
+grep -Fq 'remove_shell_links' "$repo_root/scripts/uninstall.sh" \
+  || fail "uninstall.sh must remove the shell dotfile link"
+grep -Fq 'shell_zshrc_status' "$repo_root/scripts/health-check.sh" \
+  || fail "health-check.sh must report the shell dotfile link"
 
 say "validate: health-check runs"
 AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/health-check.sh" --json >/dev/null
