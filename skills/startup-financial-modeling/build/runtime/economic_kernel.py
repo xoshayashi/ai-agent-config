@@ -1746,14 +1746,17 @@ def extract_source_facts(source_md: Path) -> SourceFacts:
 # ("unit price") could be a monthly rate, so it yields unit_sale only when no
 # recurring cue competes. A recurring cue (lease, RaaS, 月額, ARR, ...) is the
 # default model.
+# `sells/sold for` is an unambiguous one-time sale. `sold/sells at` is left
+# out of the strong set — "sold at a monthly rate" is recurring — and lands
+# in the ambiguous set, which defers to the recurring-cue check.
 _STRONG_SALE_CUE = re.compile(
-    r"(?:sells?|sold)\s+(?:for|at)|sale\s+price|販売価格",
+    r"(?:sells?|sold)\s+for|sale\s+price|販売価格",
     flags=re.IGNORECASE,
 )
 _UNIT_PRICE_CUE = re.compile(
     r"unit\s+price|price\s+per\s+"
     r"(?:unit|robot|device|machine|vehicle|drone)|per-unit\s+price|"
-    r"1\s*台\s*あたり",
+    r"(?:sells?|sold)\s+at|1\s*台\s*あたり",
     flags=re.IGNORECASE,
 )
 _RECURRING_CUE = re.compile(
