@@ -19,6 +19,9 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Start with a high-signal opening thesis, not a title-only first slide. The opener can use the deck's main phrase, but it should also carry the core thesis, 2-4 proof/tension points, a visible market-shift / matrix / causal-map / wedge structure, and a bridge into the next section.
 - Put the conclusion or recommendation early enough for an intended decision-maker to understand the point before details.
 - Every slide needs a role in the story: set context, prove urgency, explain a solution, compare options, show differentiation, summarize evidence, explain operations, teach a concept, size impact, prove traction/plan, handle risk, or close the thesis.
+- Apply `pyramid_logic_lock: state one governing thought, ladder each action title to the question its predecessor raises, and prove each title with a named exhibit element`. Write the deck's single governing thought before drafting titles; every action title must answer a question that governing thought provokes, and each title must answer the question its predecessor's title raises so the title read-through is one connected argument rather than a parallel list. For each slide, name the exact exhibit element (a bar, delta, slope, cell, row, or node) that proves the action title, and confirm the title claims nothing the exhibit cannot show. Move any slide that does not answer a governing-thought question to `appendix_candidates` or cut it.
+- Apply `mece_support_gate: a slide's supporting points are mutually exclusive and collectively exhaustive, and each slide declares body_logic as inductive or deductive`. A slide's 2-4 supporting points must not overlap and must together fully support the action title; close a real gap by adding the point, narrowing the claim, or moving the gap to `open_questions`. Declare `body_logic` as `inductive` (parallel MECE reasons supporting the claim) or `deductive` (a premise chain). Prefer inductive for recommendation and evidence slides; reserve deductive for mechanism or causal slides where the chain is the message and every premise is independently defensible.
+- For a decision or recommendation deck, the opener (or slide 2) must also state the explicit ask/next step and name the single most likely objection or dependency, so an executive can act from that page alone.
 - Treat message, evidence, visual, and source as separate jobs: message says `so what`, evidence says `why believe`, visual says `how to see`, and source says `can we trust it`.
 - Map each message to evidence and source policy before image prompting. Unsupported facts are either removed from the slide or marked as research/source needs.
 - Convert prose into visual grammar: comparison, table, flow, roadmap, loop, matrix, KPI strip, architecture stack, or signature visual. Avoid prose boxes as the default.
@@ -62,6 +65,9 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Apply `exact_text_fidelity_lock`: freeze every visible H1, subtitle, label, number, source string, and optional Insight as quoted `exact_text`; generated copy that is missing, invented, garbled, duplicated, or rewritten is repair_required.
 - Apply `revised_prompt_review_lock`: when the image tool exposes a revised or rewritten prompt, compare it against `exact_text`, source policy, header master, and visible/non-visible boundaries before approving the PNG.
 - Apply `chart_semantic_integrity_lock`: chart/table/matrix/flow/map structures should explain what is compared, which unit/denominator/period applies, and how rows, columns, axes, arrows, or legends connect; decorative pseudo-data is a major issue.
+- Apply `chart_emphasis_lock: gray out non-focal data, place the decision-carrying number as a direct on-mark label, and label series directly instead of using a legend`. Render non-focal series, bars, rows, and nodes in one quiet neutral gray so the accent color marks only the element the action title is about; put the decision-carrying number as a bold direct label on the exact mark it describes, with a short verdict clause; label series at the line end, bar, or segment, and use a separate legend only when 5+ series force it.
+- Apply `encoding_consistency_lock: same meaning keeps the same fill/color/shape and scale across the deck, and no distinction relies on hue alone`. Lock a deck-level encoding legend so each scenario (actual/plan/forecast), variance sign, and category keeps one fixed fill, color, and shape on every slide, and any repeated unit uses one consistent non-truncated scale; pair every color-encoded distinction with a label, shape, fill pattern, or position cue so it survives grayscale and thumbnail review.
+- Apply `number_format_normalization_lock: normalize decimal precision, magnitude abbreviation, axis ticks, and period notation before freezing exact_text`. Before freezing `exact_text`, give each metric one decimal-precision rule, one magnitude-abbreviation style, rounded axis ticks, and explicit period notation, so the same metric formats identically across the deck.
 - Apply `thumbnail_legibility_lock` and `reading_path_lock`: the main claim, focal structure, region boundaries, and key numbers should remain understandable in slide-sorter/contact-sheet review, with a clear path from H1 to main visual, evidence/context, optional Insight, and Source.
 - Apply `insight_absence_default_lock`: start each slide with `insight_decision: none`; keep no message box unless the slide has a specific interpretation gap, decision signal, or reading bridge that the title, visual structure, and labels cannot already carry.
 - Apply `insight_justification_required`: when an Insight/message-box is kept, record the exact reason, the non-redundant sentence, and why it improves reading speed or decision clarity. If the reason is weak, repetitive, decorative, or simply fills space, remove the component.
@@ -88,6 +94,8 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Reduce prose before generation. Keep H1, subtitle, short labels, decision-relevant numbers, and one Insight sentence when needed; remove only unsupported, redundant, unreadable, or decorative numbers.
 - Freeze display text before generation. Put all on-slide strings in quoted `exact_text` fields; do not let image generation invent or rewrite slide copy.
 - Draft speaker notes as part of slide structure, before image generation. Apply `speaker_notes_depth_lock`: notes should help the presenter say the argument clearly without adding unsupported messages, using 4-7 substantive Japanese sentences or roughly 180-320 Japanese chars per slide unless the user requests brief notes. Include framing, 2-3 evidence/assumption cues, implication, source caveat when needed, and transition cue.
+- Apply `speaker_notes_persuasion_lock: notes stage current-state vs intended-future tension, balance logos with selective ethos and pathos, end with a landing sentence and signpost transition, and may add a justified hook, objection pre-empt, or delivery markers`. The framing sentence should stage the gap between the current state (cost, risk of inaction) and the intended future; balance evidence (logos) with selective credibility cues (ethos: why this source or team can be trusted) and, on 2-4 pivotal slides per deck, one pathos beat naming a concrete human or operational consequence. End each note with a landing sentence that crystallizes the takeaway in one memorable breath, then a signpost transition that opens a curiosity loop or calls back an earlier slide. Use at most one rhetorical device per note (rhetorical question, rule of three, or before/after contrast), and on pivotal evidence slides translate one key statistic into a concrete imageable sentence. Justified optional additions only: `notes_hook` (one attention-grabbing line on the opener, chapter turns, and turning points), `notes_objection_preempt` (one sentence naming the most likely objection and its answer on contestable-claim slides), and up to two deck-language delivery markers per note for deliberate pause, emphasis, or slower pace (e.g. 【一拍】【強調】【ゆっくり】 in Japanese, `[beat]` `[emphasis]` `[slow]` in English). Keep the persuasion layer tasteful and professional; it never overrides the no-unsupported-facts and no-invented-sources rules.
+- Record a deck-level `notes_persuasion_arc`: the deck's current-state to intended-future through-line and its one big-idea sentence, so individual notes stay consistent with the overall persuasive arc.
 - Create a text budget per slide. If the visual would need dense paragraphs, split the slide or move detail to notes.
 - Use a pilot-first process for image generation: generate 1-2 representative slides, audit quality, then expand.
 
@@ -109,6 +117,8 @@ Use this reference when the input is a long memo, strategy narrative, research n
    - Split the input into chapters, paragraphs, data points, quotes, assumptions, and uncertainties. Assign stable `source_span_id` values when source tracing matters.
 
 2. **Storyline Frame**
+   - State the deck's single `governing_thought`: the one sentence the whole deck exists to prove. Run `governing_thought_gate`: every later action title must answer a question this sentence raises; a slide that does not goes to `appendix_candidates` or is cut.
+   - Record `notes_persuasion_arc`: the current-state to intended-future through-line and the deck's one big-idea sentence.
    - Choose one frame:
      - `SCQA`: situation, complication, question, answer.
      - `problem-solution-evidence`: pain, solution, proof, next step.
@@ -122,11 +132,14 @@ Use this reference when the input is a long memo, strategy narrative, research n
    - Prefer concrete nouns, active verbs, and useful sourced numbers.
    - Reject topic labels such as `Market`, `Solution`, `Roadmap`, or `Differentiation` unless they are part of a full message.
    - Apply `message_sharpness_lock`: every action title should name what changed, who/what is affected, and why the reader should care. Repair titles that read like a section label, vague benefit, or slogan.
+   - Apply `pyramid_logic_lock`: build a `vertical_logic_chain` over the drafted titles. For each adjacent pair, write the one-line question slide N raises and confirm slide N+1's action title answers it; flag any title that introduces a topic no prior title set up.
    - Set slide 1 as `opening_thesis_slide` and record `first_slide_not_title_only: true`.
-   - Run `opening_density_gate`: repair slide 1 before generation if it only contains a brand/name/slogan, lacks proof or tension, lacks a real visual structure, or does not bridge into the deck.
+   - Run `opening_density_gate`: repair slide 1 before generation if it only contains a brand/name/slogan, lacks proof or tension, lacks a real visual structure, or does not bridge into the deck. For decision/recommendation decks also confirm `ask_present` (an explicit ask or next step) and `top_risk_named` (the single most likely objection or dependency) on the opener or slide 2.
 
 4. **Message To Evidence Map**
    - For each slide, list evidence type: sourced fact, user assumption, analogy, forecast, operating model, or strategic interpretation.
+   - Apply `mece_support_gate`: run `mece_check` on every multi-point slide — list the supporting points, confirm no two cover the same ground, and confirm together they fully support the action title; close a real gap by adding a point, narrowing the claim, or moving the gap to `open_questions`.
+   - Declare `body_logic` per slide: `inductive` or `deductive`. Prefer inductive for recommendation and evidence slides; for any deductive slide confirm each premise is independently defensible.
    - Keep `message_backlog`, `evidence_ledger`, `source_ledger`, `appendix_candidates`, and `open_questions` separate from final slide text.
    - Decide `source_line`: `Source: ...` with real traceable source names / `none` only when no traceable source exists / research needed.
    - Do not drop real source names to reduce visual density; shorten or group source names instead.
@@ -149,6 +162,8 @@ Use this reference when the input is a long memo, strategy narrative, research n
    - Assign `creative_variance`: `low`, `medium`, or `high`.
    - Assign `human_designed_illustration_style` for slides where the audience should remember a clear designed illustration, not just a metric.
    - Assign `illustration_tone_lock` and `illustration_style_sheet` before image prompting whenever any slide in the deck uses people, devices, document objects, UI panels, icon badges, or workflow scenes.
+   - Run `title_exhibit_proof_match`: name the exact element in the chosen exhibit (the bar, delta, slope, cell, or row) that proves the action title, and confirm the title makes no claim the exhibit cannot show. If they mismatch, fix the title or change the exhibit.
+   - Apply `encoding_consistency_lock`: define the deck-level encoding legend now — fixed fill/color/shape per scenario, variance sign, and category, and one consistent non-truncated scale per repeated unit — so every chart slide reuses it.
    - If illustration competes with the chart/diagram, reduce intensity or split the slide.
 
 6. **Density And Split Gate**
@@ -160,6 +175,8 @@ Use this reference when the input is a long memo, strategy narrative, research n
    - Use `semantic_copy_gate` to rewrite `exact_text.body_labels` before freezing copy; do not rely on image generation to invent explanatory text.
    - Use `icon_restraint_lock` and `icon_density_budget` to remove decorative or redundant icons before adding any new ones.
    - Use `evidence_compression_ladder` to choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation.
+   - Apply `number_format_normalization_lock` before freezing `exact_text`: normalize decimal precision per metric, magnitude abbreviation, axis ticks, and period notation so the same metric formats identically across the deck.
+   - When a chart shows a level or trend, add one thin labeled reference line (target, prior period, or peer benchmark) so the value reads as above or below a meaningful bar rather than in isolation.
    - Use `structure_choice_bias` and `structured_density_bias` to add issue-tree, driver-tree, matrix, value-chain, KPI-bridge, or decision-table structure only when it improves the reader's decision path.
    - Use `structure_first_visual_mix` to choose a chart, table, matrix, flow, map, comparison axis, or evidence strip when that structure gives the reader a clearer path than a standalone illustration.
    - Use `imageability_lock` to convert abstract messages into concrete visual anchors that make the message observable.
@@ -180,6 +197,7 @@ Use this reference when the input is a long memo, strategy narrative, research n
    - Draft `speaker_notes_text` for every deck slide before image prompting, with `speaker_notes_depth_lock` so PPT notes are substantial enough to present from.
    - Use the deck language unless the user specifies otherwise.
    - Notes should include: the spoken message in plain language, the evidence or assumption to mention, source caveat or confidence level when relevant, and a transition to the next slide.
+   - Apply `speaker_notes_persuasion_lock`: order each note as framing/tension, evidence cues, implication, landing sentence, then signpost transition. Stage current-state vs intended-future tension, balance logos with selective ethos and a pathos beat on 2-4 pivotal slides, and keep at most one rhetorical device per note. Add `notes_hook` only on the opener, chapter turns, and turning points; add `notes_objection_preempt` only on contestable-claim slides; add up to two deck-language delivery markers per note. Keep every note consistent with `notes_persuasion_arc`.
    - Keep notes out of `exact_text` and out of the image prompt's on-slide text. Speaker notes belong in PPTX or PPTX speaker notes after image generation.
    - Do not add unsupported facts, invented sources, internal prompt notes, file paths, or production-route language to speaker notes.
 
@@ -221,6 +239,7 @@ For every slide, answer:
 - Table row grouping, column grouping, and visible unit/denominator labels.
 - Enough numeric detail to make the comparison credible, as long as labels remain legible and grouped.
 - Micro annotations on charts or flows instead of separate prose boxes.
+- One thin labeled benchmark, target, or prior-period reference line on a level or trend chart.
 - Source cue and table note baseline separated from interpretation text.
 
 ### Failure Signs
@@ -236,11 +255,17 @@ For every slide, answer:
 
 ```text
 deck_thesis:
+governing_thought:
+governing_thought_gate:
+notes_persuasion_arc:
+vertical_logic_chain:
 audience_decision:
 opening_slide_rule:
   opening_slide_role: opening_thesis_slide
   first_slide_not_title_only: true
   opening_density_gate:
+  ask_present:
+  top_risk_named:
   low_density_opener_repair:
 primary_guideline:
 guideline_priority:
@@ -259,6 +284,12 @@ opening_slide_role:
 first_slide_not_title_only:
 opening_density_gate:
 reader_question_answered:
+pyramid_logic_lock:
+predecessor_question:
+title_exhibit_proof_match:
+mece_support_gate:
+mece_check:
+body_logic:
 message_type:
 supporting_evidence:
 evidence_strength:
@@ -276,9 +307,16 @@ source_separator_lock:
 source_line:
 source_urls:
 assumptions:
+speaker_notes_depth_lock:
+speaker_notes_persuasion_lock:
 speaker_notes_text:
 speaker_notes_source_cues:
 speaker_notes_transition:
+speaker_notes_landing:
+speaker_notes_signpost:
+notes_hook:
+notes_objection_preempt:
+notes_delivery_markers:
 visual_structure:
 visual_richness_role:
 signature_visual_plan:
@@ -358,6 +396,10 @@ illustration_style_sheet:
 illustration_consistency_status:
 structure_choice_bias:
 structured_density_bias:
+chart_emphasis_lock:
+encoding_consistency_lock:
+number_format_normalization_lock:
+benchmark_reference_line:
 sentence_density_lift_lock:
 semantic_copy_gate:
 icon_restraint_lock:
@@ -432,7 +474,9 @@ These practices synthesize common professional-presentation guidance:
 - Keep one retained contact sheet by default: `render_check/contact_sheet_review.png` from `slides_final/`.
 - If delivery QA needs generated-vs-package-vs-PDF comparison, create one `render_check/contact_sheet_delivery_compare.png` or `render_check/render_diff_report.json`; do not retain parallel `contact_sheet_generated*`, `contact_sheet_package*`, and `contact_sheet_pdf_render*` files for the same slide set.
 
-- IBCS SUCCESS emphasizes saying a clear message, structuring content, simplifying clutter, and condensing information into high-density business communication: `https://www.ibcs.com/IBCS/`
+- IBCS SUCCESS emphasizes saying a clear message, structuring content, simplifying clutter, and condensing information into high-density business communication; its semantic-notation rule "things that mean the same must look the same" is operationalized here as `encoding_consistency_lock`: `https://www.ibcs.com/IBCS/`
+- Barbara Minto's Pyramid Principle is operationalized as `pyramid_logic_lock` (governing thought, vertical Q&A laddering) and `mece_support_gate` (MECE supporting points, inductive vs deductive body logic): `https://www.mckinsey.com/alumni/news-and-events/global-news/alumni-news/barbara-minto-mece-i-invented-it-so-i-get-to-say-how-to-pronounce-it`
+- Nancy Duarte's persuasive-presentation arc (current-state vs intended-future oscillation, one big idea) and TED-style delivery craft are operationalized as `speaker_notes_persuasion_lock`: `https://www.duarte.com/presentation-skills-resources/the-secret-structure-of-great-talks/`
 - Assertion-evidence guidance supports a message headline plus visual proof instead of dense prose: `https://www.writing.engr.psu.edu/guidelines_AE_slides.pdf`
 - PLOS "Ten simple rules for effective presentation slides" emphasizes one message, less unnecessary information, and cognitive-load-aware slide construction: `https://journals.plos.org/ploscompbiol/article?id=10.1371/journal.pcbi.1009554`
 - Purdue OWL data visualization presentation guidance emphasizes chart choice, audience fit, clear labels, and source context: `https://owl.purdue.edu/owl/general_writing/visual_rhetoric/data_visualization/data_visualization_presentation.html`
