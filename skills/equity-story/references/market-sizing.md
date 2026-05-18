@@ -124,3 +124,5 @@ A fictional B2B compliance-automation company, at IPO:
   cross-check in section 6 (customer counts, ARR, TAM penetration at IPO).
 - `stage-playbooks.md` — comparable-company *valuation* framing (distinct from
   the customer-count cross-check here).
+- `examples.md` Example 2 (ヤモリ) — the Japan-IPO worked example that
+  demonstrates these disciplines applied end to end.
