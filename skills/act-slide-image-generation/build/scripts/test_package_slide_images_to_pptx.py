@@ -296,7 +296,7 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             data = approved_manifest([image, image])
             manifest.write_text(json.dumps(data), encoding="utf-8")
 
-            with self.assertRaisesRegex(SystemExit, "duplicate png_path"):
+            with self.assertRaisesRegex(SystemExit, "Duplicate png_path"):
                 pptx_packager.validate_review_manifest(str(manifest), [image, image])
 
 
