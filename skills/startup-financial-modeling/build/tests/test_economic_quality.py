@@ -236,13 +236,28 @@ def test_economic_audit_catches_a_broken_cost_stack() -> None:
 
 
 def test_economic_audit_catches_insolvency() -> None:
-    """A plan stripped of its funding must be flagged as insolvent."""
+    """A plan stripped of its funding must be flagged insolvent and round-less."""
     from dataclasses import replace
 
     facts = kernel.derive_source_facts(SAAS_STORY)
     broken = replace(facts, equity_raise_yen=[0 for _ in facts.equity_raise_yen])
     issues = kernel.audit_economic_coherence(broken)
     assert any("insolven" in issue for issue in issues), issues
+    assert any("funding round" in issue for issue in issues), issues
+
+
+def test_economic_audit_catches_non_positive_revenue() -> None:
+    """A period with no economic volume must be flagged as non-positive revenue."""
+    from dataclasses import replace
+
+    facts = kernel.derive_source_facts(SAAS_STORY)
+    broken = replace(
+        facts,
+        new_units=[0 for _ in facts.new_units],
+        gmv_yen=[0 for _ in facts.gmv_yen],
+    )
+    issues = kernel.audit_economic_coherence(broken)
+    assert any("non-positive revenue" in issue for issue in issues), issues
 
 
 def test_strict_audit_fails_on_economic_incoherence() -> None:
@@ -569,6 +584,7 @@ if __name__ == "__main__":
         test_economic_audit_passes_for_healthy_archetypes,
         test_economic_audit_catches_a_broken_cost_stack,
         test_economic_audit_catches_insolvency,
+        test_economic_audit_catches_non_positive_revenue,
         test_strict_audit_fails_on_economic_incoherence,
         test_cap_table_exit_waterfall_uses_post_round_cap_table,
         test_dcf_forecast_fcf_is_not_floored_at_zero,
