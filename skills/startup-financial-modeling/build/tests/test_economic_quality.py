@@ -142,6 +142,11 @@ def test_stated_gross_margin_is_extracted_from_narrative() -> None:
     assert abs(facts.target_gross_margin[-1] - 0.78) <= 0.01, (
         f"stated 78% gross margin not extracted: {facts.target_gross_margin[-1]}"
     )
+    # A qualifying clause between "gross margin" and the figure must not
+    # push the percentage out of the extractor's reach.
+    assert kernel.extract_target_gross_margin(
+        "Gross margin on the subscription is about 82%."
+    ) == 0.82, "a qualified gross-margin phrase was dropped"
 
 
 def test_annual_pricing_is_converted_to_a_monthly_figure() -> None:
