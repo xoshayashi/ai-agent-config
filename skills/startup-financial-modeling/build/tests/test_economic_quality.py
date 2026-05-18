@@ -197,6 +197,19 @@ def test_explicit_monthly_model_request_is_still_detected() -> None:
     assert kernel.extract_model_grain("月次モデルでシード計画を作る") == "monthly"
 
 
+def test_hyphenated_year_horizon_is_honored() -> None:
+    """A hyphenated horizon ("6-year plan") sets the forecast length — it
+    must not fall silently to the default because of the hyphen."""
+    assert kernel.extract_forecast_periods("We model a 6-year plan.", "annual") == 6
+    facts = kernel.derive_source_facts(
+        "# Deep-tech plan\n\nA deep-tech company. We model a 6-year "
+        "forecast.\nSource: roadmap memo.\n"
+    )
+    assert len(facts.years) == 6, (
+        f"a stated 6-year horizon produced {len(facts.years)} periods"
+    )
+
+
 def test_demand_ramp_reaches_stated_arr() -> None:
     """A narrative ARR target must anchor the demand ramp, not be ignored.
 
@@ -1205,6 +1218,7 @@ if __name__ == "__main__":
         test_annual_pricing_is_converted_to_a_monthly_figure,
         test_monthly_burn_phrasing_does_not_flip_model_grain,
         test_explicit_monthly_model_request_is_still_detected,
+        test_hyphenated_year_horizon_is_honored,
         test_demand_ramp_reaches_stated_arr,
         test_customer_count_reaches_stated_target,
         test_marketplace_gmv_honors_stated_maturity_target,

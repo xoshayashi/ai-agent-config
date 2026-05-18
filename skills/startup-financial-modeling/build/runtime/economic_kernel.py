@@ -407,10 +407,13 @@ def extract_model_grain(text: str) -> str:
 
 def extract_forecast_periods(text: str, grain: str) -> int:
     lowered = text.lower()
+    # The years pattern allows a hyphen ("6-year plan") as well as a space.
+    # Months / quarters keep the spaced form only: a hyphenated "18-month
+    # runway" is a metric phrase, not a request for an 18-period horizon.
     patterns = [
         r"([0-9]{1,2})\s*(?:months|month|か月|ヶ月)",
         r"([0-9]{1,2})\s*(?:quarters|quarter|四半期)",
-        r"([0-9]{1,2})\s*(?:years|year|年)",
+        r"([0-9]{1,2})[\s-]*(?:years|year|年)",
     ]
     for pattern in patterns:
         match = re.search(pattern, lowered, flags=re.IGNORECASE)
