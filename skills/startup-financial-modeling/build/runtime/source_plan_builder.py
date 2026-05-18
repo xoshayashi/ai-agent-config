@@ -1053,13 +1053,13 @@ def _build_pl(wb: Workbook, facts: SourceFacts) -> None:
     da_formulas = []
     for idx, col in enumerate(cols):
         c = get_column_letter(col)
-        cum_capex = f"SUM('Cost Build'!${first}$16:{c}16)"
+        cum_capex = f"SUM('Cost Build'!${first}$16:{c}$16)"
         annual = f"{cum_capex}*12/'Assumptions'!{c}39"
         if idx == 0:
             da_formulas.append(f"=MIN({annual},{cum_capex})")
         else:
             prev = get_column_letter(cols[idx - 1])
-            da_formulas.append(f"=MIN({annual},{cum_capex}-SUM(${first}$21:{prev}21))")
+            da_formulas.append(f"=MIN({annual},{cum_capex}-SUM(${first}$21:{prev}$21))")
     _write_values(ws, 21, "D&A", "JPY", da_formulas, kind="formula", fmt=ib.FMT_MONEY)
 
 
