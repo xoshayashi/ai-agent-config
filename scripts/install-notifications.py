@@ -16,6 +16,7 @@ import argparse
 import datetime as _dt
 import difflib
 import json
+import os
 import shlex
 import sys
 from pathlib import Path
@@ -131,6 +132,11 @@ def dump_json(data: dict) -> str:
 
 def apply_to_cli(cli: str, target: Path, notify_script: Path, mode: str, dry_run: bool) -> int:
     """Apply install/uninstall to one CLI. Return 0 on success, 1 on error."""
+    if mode == "uninstall" and not target.exists():
+        # Nothing was installed here; never create a file just to uninstall.
+        print("{}: not present ({})".format(cli, target))
+        return 0
+
     existing, error = load_json(target)
     if error is not None:
         print("error: {}".format(error), file=sys.stderr)
@@ -168,9 +174,27 @@ def apply_to_cli(cli: str, target: Path, notify_script: Path, mode: str, dry_run
         while backup.exists():
             backup = target.with_name("{}.bak-{}.{}".format(target.name, stamp, suffix))
             suffix += 1
-        backup.write_text(old_text, encoding="utf-8")
+        try:
+            backup.write_text(old_text, encoding="utf-8")
+        except OSError as exc:
+            print("error: cannot write backup {}: {}".format(backup, exc), file=sys.stderr)
+            return 1
         print("{}: backup {}".format(cli, backup))
-    target.write_text(new_text, encoding="utf-8")
+
+    # Write to a sibling temp file and rename, so an interrupted run never
+    # leaves a partially written config behind.
+    tmp = target.with_name(target.name + ".tmp")
+    try:
+        tmp.write_text(new_text, encoding="utf-8")
+        os.replace(tmp, target)
+    except OSError as exc:
+        print("error: cannot write {}: {}".format(target, exc), file=sys.stderr)
+        try:
+            tmp.unlink()
+        except OSError:
+            pass
+        return 1
+
     verb = "installed" if mode == "install" else "removed"
     print("{}: notification hook {} ({}) [{}]".format(cli, verb, target, events))
     return 0
