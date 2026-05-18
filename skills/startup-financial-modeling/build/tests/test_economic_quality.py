@@ -664,6 +664,54 @@ def test_seed_round_is_positive_across_archetypes() -> None:
         assert facts.equity_raise_yen[0] > 0, f"{name}: no period-0 round"
 
 
+def test_stated_raise_size_and_post_money_are_honored() -> None:
+    """A narrative that states the round size and post-money valuation must
+    drive the cap table — not an auto-sized round that contradicts it."""
+    story = (
+        "# Seed SaaS plan\n\nA B2B SaaS company. Per-seat subscription at "
+        "$80 per seat per month, $12M ARR at maturity. We are raising a "
+        "$3.5M seed round at a $14M post-money valuation. 5-year plan. "
+        "Source: investor memo.\n"
+    )
+    facts = kernel.derive_source_facts(story)
+    assert facts.equity_raise_yen[0] == 3_500_000, (
+        f"stated $3.5M raise was not honored: {facts.equity_raise_yen[0]}"
+    )
+    assert facts.post_money_yen[0] == 14_000_000, (
+        f"stated $14M post-money was not honored: {facts.post_money_yen[0]}"
+    )
+    # A dollar figure in a yen-denominated plan must not be applied.
+    assert kernel.extract_raise_size("Raising a $5M seed round.", "JPY") == 0, (
+        "a $-denominated raise leaked into a yen plan"
+    )
+    # Timeline prose must not be misread: the "m" in "month" is not "5M".
+    assert kernel.extract_raise_size(
+        "Raising a 5 month runway seed round.", "USD"
+    ) == 0, "a bare timeline number was misread as a raise size"
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        pytest.skip("LibreOffice not installed; skipping workbook recalc check")
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "raise.md"
+        out = Path(tmp) / "raise.xlsx"
+        src.write_text(story, encoding="utf-8")
+        source_plan.build_source_plan_workbook(src, out)
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(Path(tmp) / "recalc"), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        ws = load_workbook(Path(tmp) / "recalc" / "raise.xlsx", data_only=True)["Capital Stack"]
+        first_col = source_plan.START_PERIOD_COL
+        own_row = _row_for_label(ws, "New investor ownership")
+        ownership = ws.cell(own_row, first_col).value
+        # $3.5M into a $14M post-money is a 25% round.
+        assert ownership is not None and abs(float(ownership) - 0.25) < 0.01, (
+            f"new-investor ownership {ownership} does not reflect the stated "
+            f"$3.5M / $14M terms"
+        )
+
+
 def test_workbook_recalc_shows_no_insolvency() -> None:
     """The recalculated workbook must not go cash-negative in any period."""
     soffice = shutil.which("soffice") or shutil.which("libreoffice")
@@ -1338,6 +1386,7 @@ if __name__ == "__main__":
         test_dcf_enterprise_value_is_positive_and_method_consistent,
         test_funding_plan_keeps_the_company_solvent,
         test_seed_round_is_positive_across_archetypes,
+        test_stated_raise_size_and_post_money_are_honored,
         test_workbook_recalc_shows_no_insolvency,
         test_summarize_comps_aggregates_live_peer_margins,
         test_kpi_sheet_compares_plan_kpis_to_live_peers,
