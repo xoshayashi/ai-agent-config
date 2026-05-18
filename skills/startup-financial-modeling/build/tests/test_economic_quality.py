@@ -89,10 +89,14 @@ def _implied(facts) -> list[dict]:
     average = kernel.average_units(ending)
     rows: list[dict] = []
     for i in range(len(facts.years)):
-        txn = facts.gmv_yen[i] * facts.take_rate[i]
-        recurring = average[i] * facts.monthly_price_yen[i] * 12
-        one_time = facts.new_units[i] * facts.monthly_price_yen[i] * 3
-        subtotal = txn + recurring + one_time
+        if facts.revenue_mode == "unit_sale":
+            # Hardware: one-time per-unit sale, no recurring billing.
+            subtotal = facts.new_units[i] * facts.monthly_price_yen[i]
+        else:
+            txn = facts.gmv_yen[i] * facts.take_rate[i]
+            recurring = average[i] * facts.monthly_price_yen[i] * 12
+            one_time = facts.new_units[i] * facts.monthly_price_yen[i] * 3
+            subtotal = txn + recurring + one_time
         revenue = subtotal + subtotal * facts.other_revenue_share[i]
         variable = revenue * facts.variable_cogs_pct[i]
         delivery = average[i] * facts.delivery_cost_yen[i] * 12
@@ -1069,6 +1073,62 @@ def test_unit_target_extraction_handles_mixed_scale_phrasing() -> None:
     assert kernel.extract_target_units(cued, profile) == 2500
 
 
+HARDWARE_UNIT_SALE_STORY = """# Robotics hardware plan
+
+The company manufactures asset-heavy industrial robots (hardware /
+manufacturing). The unit price is ¥9,000,000 per robot. We expect to ship
+40 units in year one and target 600 units shipped by year five. Gross margin
+target is 38%. 5-year plan, Series B. Source: management forecast.
+"""
+
+
+def test_hardware_revenue_is_units_times_sale_price() -> None:
+    """A hardware unit-sale plan recognises revenue as units shipped x the
+    one-time sale price — not as monthly recurring billing x 12."""
+    facts = kernel.derive_source_facts(HARDWARE_UNIT_SALE_STORY)
+    assert kernel.mechanic_key(facts) == "hardware_asset_heavy"
+    assert facts.revenue_mode == "unit_sale"
+    revenue = kernel.plan_revenue_series(
+        facts.new_units, facts.gmv_yen, facts.monthly_price_yen,
+        facts.take_rate, facts.other_revenue_share, facts.revenue_mode,
+    )
+    for idx, (units, price) in enumerate(
+        zip(facts.new_units, facts.monthly_price_yen)
+    ):
+        unit_sale = units * price
+        # Revenue is unit sales plus a modest other-revenue uplift — within
+        # ~30% of units x price, never the ~10x a recurring x 12 model gives.
+        assert unit_sale <= revenue[idx] <= unit_sale * 1.3, (
+            f"period {idx}: revenue {revenue[idx]:,.0f} is not a unit-sale "
+            f"figure (units x price = {unit_sale:,.0f})"
+        )
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "hw.md"
+        out = Path(tmp) / "hw.xlsx"
+        src.write_text(HARDWARE_UNIT_SALE_STORY, encoding="utf-8")
+        rc = build_model._main(
+            ["--source-md", str(src), "--output", str(out), "--strict-audit"]
+        )
+        assert rc == 0, f"hardware plan failed strict audit (rc={rc})"
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(Path(tmp) / "recalc"), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        ws = load_workbook(Path(tmp) / "recalc" / "hw.xlsx", data_only=True)["P&L"]
+        first_col = source_plan.START_PERIOD_COL
+        rev_row = _row_for_label(ws, "Total revenue")
+        period_0 = ws.cell(rev_row, first_col).value
+        # 40 units x ¥9M ≈ ¥360M (plus other-revenue uplift); the recurring
+        # model would have booked it ~10x higher.
+        assert 3.0e8 <= float(period_0) <= 5.5e8, (
+            f"hardware period-0 revenue {period_0} is not a unit-sale figure"
+        )
+
+
 if __name__ == "__main__":
     _tests = [
         test_gross_margin_tracks_target_across_archetypes,
@@ -1114,6 +1174,7 @@ if __name__ == "__main__":
         test_customer_target_is_the_maturity_figure_not_the_current_count,
         test_hardware_unit_ramp_honors_the_stated_maturity_target,
         test_unit_target_extraction_handles_mixed_scale_phrasing,
+        test_hardware_revenue_is_units_times_sale_price,
     ]
     for _test in _tests:
         try:
