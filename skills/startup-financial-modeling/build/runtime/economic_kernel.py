@@ -1269,6 +1269,33 @@ def extract_target_gross_margin(text: str) -> float | None:
     return None
 
 
+def extract_churn_rate(text: str) -> float | None:
+    """Stated customer / logo churn as an annual fraction.
+
+    A monthly churn figure is annualized by compounding
+    (1 - (1 - monthly)^12); returns None when no churn figure is stated.
+    """
+    for pattern in (
+        r"churn[^0-9%\n]{0,24}?([0-9]{1,2}(?:\.[0-9])?)\s*%",
+        r"([0-9]{1,2}(?:\.[0-9])?)\s*%[^.\n]{0,28}?churn",
+    ):
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if not match:
+            continue
+        try:
+            pct = float(match.group(1)) / 100.0
+        except ValueError:
+            continue
+        if not 0.0 < pct < 1.0:
+            continue
+        window = text[max(0, match.start() - 36): match.end() + 36]
+        if re.search(r"monthly|per\s+month|/\s*mo\b|月次|月間|毎月",
+                     window, flags=re.IGNORECASE):
+            pct = 1.0 - (1.0 - pct) ** 12
+        return round(pct, 4)
+    return None
+
+
 def _profile_target_gross_margin(profile: MechanicProfile, periods: int) -> list[float]:
     base = (
         0.55
@@ -1983,6 +2010,7 @@ def derive_source_facts(
     # rounds are still auto-sized to keep the plan solvent.
     stated_raise = extract_raise_size(text, currency)
     stated_post_money = extract_post_money(text, currency)
+    stated_churn = extract_churn_rate(text)
     equity_raise = size_equity_rounds(
         beginning_cash, free_cash_flow, debt_raise, round_unit=round_100m,
         stated_first_round=stated_raise or None,
@@ -2077,7 +2105,11 @@ def derive_source_facts(
         customer_roi_yen=max(price * 18, int(3_000_000 * money_scale)),
         implementation_cost_yen=max(price * 2, int(300_000 * money_scale)),
         sales_cycle_months=4 if profile.key in {"recurring_software", "marketplace"} else 6,
-        churn_rate=0.08 if profile.key != "marketplace" else 0.18,
+        churn_rate=(
+            stated_churn
+            if stated_churn is not None
+            else (0.08 if profile.key != "marketplace" else 0.18)
+        ),
         repeat_rate=0.40 if profile.key == "marketplace" else 0.75,
         payment_fee_pct=0.025 if profile.key == "marketplace" else 0.0,
         incentive_pct_gmv=0.025 if profile.key == "marketplace" else 0.0,
