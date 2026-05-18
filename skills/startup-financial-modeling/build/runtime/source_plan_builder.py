@@ -36,6 +36,7 @@ from economic_kernel import (  # noqa: E402
     ending_units as _ending_units,
     extract_source_facts,
     kpi_definitions_for,
+    mechanic_key,
     scenario_drivers_for,
 )
 
@@ -1379,6 +1380,17 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
     _setup_sheet(ws, f"{facts.company} — KPI Dashboard", "Decision metrics: scale, margin, runway, capital efficiency, ownership, and valuation.")
     _write_period_header(ws, facts)
     cols = _period_cols(facts)
+    # The VC decision-metrics block (CAC, payback, magic number, Rule of 40,
+    # net retention) is rendered only for profiles with a real customer-
+    # acquisition and recurring/transaction motion. An ambiguous-mechanic
+    # plan gets generic KPIs instead, and a pre-revenue plan has no customer
+    # base to compute them against — both keep the original layout. Rows
+    # below the operating KPIs shift down by VC_BLOCK_OFFSET when the block
+    # is present (one section header + five metric rows).
+    vc_metrics_apply = mechanic_key(facts) not in (
+        "generic", "pre_revenue_milestone",
+    )
+    VC_BLOCK_OFFSET = 3 if vc_metrics_apply else 0
     rows = [
         (7, "Monthly price / unit", "JPY", "='Assumptions'!{c}11", ib.FMT_JPY_YEN),
         (8, "Monthly unit cost", "JPY", "=('Assumptions'!{c}25+'Assumptions'!{c}26+'Assumptions'!{c}27)", ib.FMT_JPY_YEN),
@@ -1417,16 +1429,58 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
             f"ABS('CF'!{c}16)/({net_new})))"
         )
     _write_values(ws, 18, "Burn multiple", "x", burn_vals, kind="formula", fmt=ib.FMT_MULTIPLE)
+    # --- VC decision metrics ---------------------------------------------
+    # Capital-efficiency and retention metrics a venture investor reads
+    # straight off the dashboard. Each is derived from existing model cells —
+    # no new drivers. The block sits after the operating KPIs, so the charts
+    # and the interpretation register below shift down by VC_BLOCK_OFFSET.
+    # LTV/CAC and gross revenue retention are deliberately omitted: both need
+    # a churn / customer-lifetime driver the kernel does not yet carry.
+    if vc_metrics_apply:
+        _section(ws, 24, "VC decision metrics")
+        rule_of_40, nrr, cac, cac_payback, magic = [], [], [], [], []
+        for idx, col in enumerate(cols):
+            c = get_column_letter(col)
+            prev = get_column_letter(cols[idx - 1]) if idx else c
+            new_customers = (
+                f"'Revenue Build'!{c}20" if idx == 0
+                else f"'Revenue Build'!{c}20-'Revenue Build'!{prev}20"
+            )
+            # Rule of 40: revenue growth plus EBITDA margin.
+            rule_of_40.append(f"='Revenue Build'!{c}19+'P&L'!{c}19")
+            # Net revenue retention surfaced from the cohort assumption.
+            nrr.append(f"='Assumptions'!{c}14")
+            # CAC: sales & marketing spend per net new customer.
+            cac.append(
+                f"=IF(({new_customers})<=0,\"N/A\",'P&L'!{c}14/({new_customers}))"
+            )
+            # CAC payback: months of per-customer gross profit to recover CAC.
+            cac_payback.append(
+                f"=IF(OR({c}27=\"N/A\",'Revenue Build'!{c}21<=0,'P&L'!{c}10<=0),"
+                f"\"N/A\",{c}27/('Revenue Build'!{c}21*'P&L'!{c}10/12))"
+            )
+            # Magic number: net new revenue over the prior period's S&M spend;
+            # period 0 has no prior S&M base.
+            magic.append(
+                "=\"N/A\"" if idx == 0
+                else f"=IF('P&L'!{prev}14<=0,\"N/A\","
+                     f"('Revenue Build'!{c}18-'Revenue Build'!{prev}18)/'P&L'!{prev}14)"
+            )
+        _write_values(ws, 25, "Rule of 40", "%", rule_of_40, kind="formula", fmt=ib.FMT_PERCENT)
+        _write_values(ws, 26, "Net revenue retention", "%", nrr, kind="formula", fmt=ib.FMT_PERCENT)
+        _write_values(ws, 27, "Customer acquisition cost", "JPY", cac, kind="formula", fmt=ib.FMT_JPY_YEN)
+        _write_values(ws, 28, "CAC payback", "months", cac_payback, kind="formula", fmt=ib.FMT_NUM)
+        _write_values(ws, 29, "Magic number", "x", magic, kind="formula", fmt=ib.FMT_MULTIPLE)
     cats = Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=5)
-    _add_line_chart(ws, "Operating scale", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=13, max_row=13), cats, "B28", "units")
-    _add_line_chart(ws, "Economic value", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=14, max_row=15), cats, "J28", _money_unit(facts))
-    _add_line_chart(ws, "Margin and ownership", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=16, max_row=22), cats, "B44", "%")
+    _add_line_chart(ws, "Operating scale", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=13, max_row=13), cats, f"B{28 + VC_BLOCK_OFFSET}", "units")
+    _add_line_chart(ws, "Economic value", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=14, max_row=15), cats, f"J{28 + VC_BLOCK_OFFSET}", _money_unit(facts))
+    _add_line_chart(ws, "Margin and ownership", Reference(ws, min_col=cols[0], max_col=cols[-1], min_row=16, max_row=22), cats, f"B{44 + VC_BLOCK_OFFSET}", "%")
     start_col = LAYOUT.label_col
     _set_column_widths(ws, {start_col: 24, start_col + 1: 42, start_col + 2: 36, start_col + 3: 38, start_col + 4: 40, start_col + 5: 48})
-    _section(ws, 62, "KPI interpretation register", start_col + 5)
+    _section(ws, 62 + VC_BLOCK_OFFSET, "KPI interpretation register", start_col + 5)
     headers = ["KPI", "Formula / driver", "Applies when", "Source context", "Downside trigger", "IC implication"]
     for col, header in enumerate(headers, start=start_col):
-        _apply_text_header(ws.cell(63, col), header)
+        _apply_text_header(ws.cell(63 + VC_BLOCK_OFFSET, col), header)
     interpretation_rows = [
         (
             item.name,
@@ -1438,7 +1492,7 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
         )
         for item in kpi_definitions_for(facts)
     ]
-    for row, values in enumerate(interpretation_rows, start=64):
+    for row, values in enumerate(interpretation_rows, start=64 + VC_BLOCK_OFFSET):
         for col, value in enumerate(values, start=start_col):
             ws.cell(row, col, value)
             ib.apply_comment(ws.cell(row, col), wrap_text=False)
@@ -1447,7 +1501,7 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
     _build_kpi_peer_comparison(
         ws,
         facts,
-        64 + len(interpretation_rows) + 1,
+        64 + VC_BLOCK_OFFSET + len(interpretation_rows) + 1,
         kpi_row_by_label["Gross margin"],
         kpi_row_by_label["EBITDA margin"],
     )
