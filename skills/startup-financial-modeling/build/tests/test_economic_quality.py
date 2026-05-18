@@ -946,6 +946,74 @@ def test_kpi_dashboard_omits_vc_block_for_an_ambiguous_mechanic() -> None:
     ), "ambiguous-mechanic KPI layout should not shift"
 
 
+PRE_REVENUE_STORY = """# Helios — pre-revenue deep-tech plan
+
+Helios is a pre-revenue deep-tech company pursuing compact fusion-energy
+milestones. This is a pre-revenue, milestone-driven company: there is no
+product revenue during the plan; value is created by hitting technical
+milestones and prototype proof points. The company is R&D intensive and
+burns cash against a seed round and grant commitments over a 5-year horizon.
+
+Source: technical roadmap memo, grant award letter.
+"""
+
+
+def test_pre_revenue_plan_has_no_product_revenue() -> None:
+    """A plan classified pre-revenue / milestone carries zero product revenue
+    across every period — it is a burn / runway model, not a revenue ramp."""
+    facts = kernel.derive_source_facts(PRE_REVENUE_STORY)
+    assert kernel.mechanic_key(facts) == "pre_revenue_milestone", (
+        "story did not resolve to the pre-revenue profile"
+    )
+    revenue = kernel.plan_revenue_series(
+        facts.new_units, facts.gmv_yen, facts.monthly_price_yen,
+        facts.take_rate, facts.other_revenue_share,
+    )
+    assert all(r == 0 for r in revenue), (
+        f"pre-revenue plan still carries product revenue: {revenue}"
+    )
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        return
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "pre.md"
+        out = Path(tmp) / "pre.xlsx"
+        src.write_text(PRE_REVENUE_STORY, encoding="utf-8")
+        source_plan.build_source_plan_workbook(src, out)
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(Path(tmp) / "recalc"), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        ws = load_workbook(Path(tmp) / "recalc" / "pre.xlsx", data_only=True)["P&L"]
+        first_col = source_plan.START_PERIOD_COL
+        rev_row = _row_for_label(ws, "Total revenue")
+        for idx in range(len(facts.years)):
+            value = ws.cell(rev_row, first_col + idx).value
+            assert value in (0, 0.0, None), (
+                f"period {idx}: P&L total revenue {value} is not zero"
+            )
+
+
+def test_pre_revenue_audit_tolerates_zero_revenue() -> None:
+    """Zero product revenue is economically coherent for a pre-revenue plan:
+    the audit must not flag it, and strict audit must pass."""
+    facts = kernel.derive_source_facts(PRE_REVENUE_STORY)
+    issues = kernel.audit_economic_coherence(facts)
+    assert not any("non-positive revenue" in issue for issue in issues), (
+        f"pre-revenue plan wrongly flagged for zero revenue: {issues}"
+    )
+    assert issues == [], f"pre-revenue plan is not economically coherent: {issues}"
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "pre.md"
+        out = Path(tmp) / "pre.xlsx"
+        src.write_text(PRE_REVENUE_STORY, encoding="utf-8")
+        rc = build_model._main(
+            ["--source-md", str(src), "--output", str(out), "--strict-audit"]
+        )
+        assert rc == 0, f"pre-revenue plan failed strict audit (rc={rc})"
+
+
 if __name__ == "__main__":
     _tests = [
         test_gross_margin_tracks_target_across_archetypes,
@@ -986,6 +1054,8 @@ if __name__ == "__main__":
         test_kpi_dashboard_carries_vc_decision_metrics,
         test_rule_of_40_is_growth_plus_ebitda_margin,
         test_kpi_dashboard_omits_vc_block_for_an_ambiguous_mechanic,
+        test_pre_revenue_plan_has_no_product_revenue,
+        test_pre_revenue_audit_tolerates_zero_revenue,
     ]
     for _test in _tests:
         try:
