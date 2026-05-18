@@ -1174,6 +1174,8 @@ def project_free_cash_flow(
         out.append(
             {
                 "revenue": revenue[idx],
+                "cogs": cogs,
+                "gross_margin": gross_profit / revenue[idx] if revenue[idx] else 0.0,
                 "ebitda": ebitda,
                 "net_income": net_income,
                 "depreciation": depreciation,
@@ -1270,6 +1272,96 @@ def project_plan_free_cash_flow(facts: SourceFacts) -> list[dict]:
         )
         period["ending_cash"] = cash
     return projection
+
+
+def implied_gross_margin_series(facts: SourceFacts) -> list[float]:
+    """Per-period gross margin implied by the calibrated cost drivers.
+
+    Mirrors the workbook's Cost Build COGS (variable % plus per-unit delivery,
+    cloud, and support) so a coherence check can verify the cost stack actually
+    delivers the target margin — independently of the FCF projection, which
+    takes `(1 - target margin)` as a shortcut.
+    """
+    revenue = plan_revenue_series(
+        facts.new_units,
+        facts.gmv_yen,
+        facts.monthly_price_yen,
+        facts.take_rate,
+        facts.other_revenue_share,
+    )
+    ending = ending_units(facts.new_units)
+    average = average_units(ending)
+    margins: list[float] = []
+    for idx in range(len(revenue)):
+        rev = revenue[idx]
+        if rev <= 0:
+            margins.append(0.0)
+            continue
+        variable = rev * facts.variable_cogs_pct[idx]
+        delivery = average[idx] * facts.delivery_cost_yen[idx] * 12
+        cloud = average[idx] * facts.cloud_cost_yen[idx] * 12
+        support = facts.customers[idx] * facts.support_cost_yen[idx] * 12
+        margins.append((rev - (variable + delivery + cloud + support)) / rev)
+    return margins
+
+
+def audit_economic_coherence(
+    facts: SourceFacts, *, gross_margin_tolerance: float = 0.03
+) -> list[str]:
+    """Profile-agnostic economic-coherence audit for a generated plan.
+
+    Structural workbook audits (omitted-sheet references, fonts, merged cells)
+    do not catch a plan whose *economics* are broken — a -789% gross margin, a
+    plan that runs cash-negative, a zero-revenue forecast. This generalizes
+    that whole class of failure into one reusable gate that holds for any
+    sector profile or output mode: it replays the kernel's own revenue, cost,
+    and cash projection and returns human-readable violations. An empty list
+    means the plan is economically coherent.
+    """
+    issues: list[str] = []
+    labels = facts.period_labels
+    revenue = plan_revenue_series(
+        facts.new_units,
+        facts.gmv_yen,
+        facts.monthly_price_yen,
+        facts.take_rate,
+        facts.other_revenue_share,
+    )
+    gross_margin = implied_gross_margin_series(facts)
+    projection = project_plan_free_cash_flow(facts)
+
+    def _label(idx: int) -> str:
+        return labels[idx] if idx < len(labels) else f"period {idx}"
+
+    for idx in range(len(revenue)):
+        if revenue[idx] <= 0:
+            issues.append(f"{_label(idx)}: non-positive revenue ({revenue[idx]:,.0f})")
+            continue
+        target = (
+            facts.target_gross_margin[idx]
+            if idx < len(facts.target_gross_margin)
+            else 0.0
+        )
+        if abs(gross_margin[idx] - target) > gross_margin_tolerance:
+            issues.append(
+                f"{_label(idx)}: cost stack implies gross margin "
+                f"{gross_margin[idx]:.1%}, off target {target:.1%}"
+            )
+        if target > 0 and gross_margin[idx] < 0:
+            issues.append(
+                f"{_label(idx)}: negative gross margin on a positive-margin plan"
+            )
+
+    for idx, period in enumerate(projection):
+        if period["ending_cash"] < 0:
+            issues.append(
+                f"{_label(idx)}: projected insolvency "
+                f"(ending cash {period['ending_cash']:,.0f})"
+            )
+
+    if facts.equity_raise_yen and facts.equity_raise_yen[0] <= 0:
+        issues.append(f"{_label(0)}: no funding round sized for the first period")
+    return issues
 
 
 def extract_source_facts(source_md: Path) -> SourceFacts:
