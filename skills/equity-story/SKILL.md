@@ -44,9 +44,11 @@ at every stage and in every geography. What the stage playbooks adjust is the
 *depth and kind of evidence*, not the quality bar. The two worked examples lean
 toward SaaS and marketplace businesses, but the principles are model-agnostic:
 `references/strategy-frameworks.md` section D adds industry-specific proof
-anchors for biotech, hardware / deep tech and fintech — where the load-bearing
-evidence is a clinical milestone, a cost-curve or a credit-loss rate rather than
-NRR — so reach for those when the business is not SaaS-shaped.
+anchors for biotech, hardware / deep tech, fintech, consumer / D2C, climate &
+energy infrastructure and healthcare services — where the load-bearing evidence
+is a clinical milestone, a cost-curve, a credit-loss rate, cohort contribution
+margin, a contracted-offtake share or per-site economics rather than NRR — so
+reach for those when the business is not SaaS-shaped.
 
 ## Inputs to gather first
 
@@ -337,7 +339,9 @@ Load these as the workflow reaches them, not all at once:
 - `references/strategy-frameworks.md` — catalogue of moat, positioning and
   business-model frameworks, each with essence / when to use / proof investors
   expect / pitfalls, plus a situation→framework dispatch table and (section D)
-  industry-specific proof anchors for biotech, hardware / deep tech and fintech.
+  industry-specific proof anchors for non-SaaS businesses — biotech, hardware /
+  deep tech, fintech, consumer / D2C, energy infrastructure and healthcare
+  services.
 - `references/japan-ipo.md` — Japanese IPO and fundraising conventions:
   underwriter review, the 成長可能性資料 growth disclosure, prospectus drafting,
   想定問答集, the Growth→Prime path, comparable-company valuation practice.
