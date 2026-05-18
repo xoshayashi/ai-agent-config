@@ -103,9 +103,11 @@ slogan bolted on top — it is the thesis compressed to its smallest true form.
 The danger in any persuasive document is that the craft outruns the substance.
 Discipline it: a narrative gives direction, the numbers give the constraint, and
 a story that contradicts its own numbers must be changed — change the story, not
-the numbers. Keep the thesis in the territory of the *probable*, not merely the
-*possible*; a possible story dressed as a probable one is exactly where honest
-appeal becomes hype.
+the numbers. Keep the thesis in the territory of the *probable* — not merely the *possible*,
+and not merely the *plausible* (Damodaran's three tiers: a possible story is one
+of countless, a plausible one is rarer, a probable one rarer still). A possible
+or plausible story dressed as a probable one is exactly where honest appeal
+becomes hype.
 
 - **Do:** tie every device to something real — the tension to a genuine market
   window, the vivid instance to an actual customer, the urgency to a real

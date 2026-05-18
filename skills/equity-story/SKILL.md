@@ -41,7 +41,11 @@ Three failure modes recur. Watch for them throughout:
 
 The craft and substance standards in this skill are **universal** — they apply
 at every stage and in every geography. What the stage playbooks adjust is the
-*depth and kind of evidence*, not the quality bar.
+*depth and kind of evidence*, not the quality bar. The worked examples and the
+strategy-framework dispatch table lean toward SaaS and marketplace businesses;
+the principles are model-agnostic — for biotech, hardware, deep tech or fintech,
+apply them by analogy (the load-bearing proof simply changes: a clinical
+milestone, a gross-margin curve, regulatory capital).
 
 ## Inputs to gather first
 
@@ -55,10 +59,14 @@ the assumption; only ask the user when an answer materially changes the thesis.
    playbook materially).
 3. **What is known** — traction, financials, market data, unit economics. If a
    financial model spreadsheet (xlsx) exists, pull unit economics, NRR, runway
-   and comparable-company multiples from it and **cite it as the source**; if a
-   model is needed and missing, build it with `startup-financial-modeling`
-   first. Without a model, mark figures as estimates or assumptions and keep
-   them separable from facts.
+   and comparable-company multiples from it and **cite it as the source**.
+   Without a model, mark figures as estimates or assumptions and keep them
+   separable from facts — and tag the gaps `[open]`. Pause to build a model with
+   `startup-financial-modeling` first only when the equity story cannot be
+   honestly written without it — i.e. when the thesis turns on unit economics or
+   a valuation the user has not supplied (typically growth stage and later);
+   for an early-stage story carried by team and insight, a model is not a
+   prerequisite.
 4. **Audience** — who reads this (seed VC, growth fund, crossover investor,
    IPO institutional book, retail). The audience sets how much vision vs. proof
    the story should carry.
@@ -181,8 +189,11 @@ concrete blocker remains. This discipline is the point of the skill.
 
 ## Output format
 
-Default to a structured Markdown document. Adjust depth to stage and audience,
-but keep this order — it *is* the narrative spine made visible:
+Default to a structured Markdown document. The block below is a **skeleton**,
+not a literal script: keep the section order — it *is* the narrative spine made
+visible — but translate and adapt the headings to the working language and
+stage, and adjust the depth of each section to the stage and audience. The
+bracketed text describes what each section holds; replace it.
 
 ```markdown
 # Equity Story — [Company]
@@ -253,8 +264,9 @@ a diligence item. Naming the open items is what makes the rest credible.
 
 Tie every recommendation to the reader's decision criteria (price, ROI, cost
 structure, growth, durability). Follow `DESIGN.md` for tone: quiet, specific,
-no hype, no unsupported superlatives. See `references/examples.md` for a
-compact worked equity story that shows the whole arc end to end.
+no hype, no unsupported superlatives. See `references/examples.md` for two
+compact, annotated worked equity stories showing the full arc end to end
+(Example 1: US Series B; Example 2: Japan Growth IPO).
 
 ## Self-review checklist
 
@@ -332,6 +344,8 @@ Load these as the workflow reaches them, not all at once:
 - `references/narrative-craft.md` — the craft that makes a sound thesis get
   read, remembered and retold: tension, concreteness, the carry-home, the
   honesty boundary, and the banned-without-evidence phrases. Read while drafting.
-- `references/examples.md` — a compact, annotated worked equity story
-  (fictional growth-stage company) showing the full arc, the evidence-tagging
-  convention, and how the framework choices land in practice.
+- `references/examples.md` — two compact, annotated worked equity stories
+  showing the full arc end to end: Example 1, a US Series B marketplace
+  (Forgeline); Example 2, a Japan TSE Growth IPO vertical SaaS (ヤモリ), which
+  adds the 成長可能性資料 disclosure mapping, 想定問答, PSR valuation, and
+  Japanese-language generation.
