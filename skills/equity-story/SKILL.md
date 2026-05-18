@@ -103,7 +103,9 @@ build it before drafting prose.
   cost, regulation, behaviour, a crossed adoption threshold. Name the inflection
   and quantify it. Often it is not one inflection but several independent curves
   crossing at once — name each and show why *together* they open the window now;
-  separate supply-side from demand-side pressure where both apply. A story
+  separate supply-side from demand-side pressure where both apply. Also address
+  why no incumbent has already won the resulting category — a credible "why now"
+  includes the absence of a clear winner at the same intersection. A story
   without a credible "why now" cannot explain why the window is open. Place it
   early.
 - **Why us** — *Why will this team win this market?* Investors back people.
@@ -148,7 +150,12 @@ Numbers belong *next to the claim they prove*, never in a standalone pile.
 - **TAM / SAM / SOM** proves *Why this* (the size). Build it **bottom-up**
   (customers × price) with the calculation shown. Top-down billions read as
   hand-waving and draw the most scrutiny. Order it SOM → TAM: the wedge you can
-  take, then the category it opens.
+  take, then the category it opens. For higher-stakes documents (IPO,
+  late-stage, or any argument resting on a headline market number), apply the
+  disciplines in `references/market-sizing.md` — triangulate TAM from
+  independent routes, build SAM by buyer budget source with a stated Gross→Net
+  overlap discount, and present SOM in four scenarios cross-checked against
+  named comparable companies. Match the depth to the stage; do not pad.
 - **Traction** is the empirical proof that *Why now* and *Why us* were right.
   Always time-stamped ("0 → 1,000 in 8 weeks", not "1,000 users"). Investors
   back momentum, not absolute numbers. If traction is weak, omit the section
@@ -296,8 +303,12 @@ a gap to fix before iterating.
    verifiable, are macro and market claims attributed to a primary source
    (issuing agency / publication / date), and is progress shown as a trajectory
    (deltas over time), not a single dot?
-5. **Bottom-up market** — is TAM built bottom-up with the calculation visible,
-   not an unsourced top-down billion?
+5. **Market sized rigorously** — is TAM built bottom-up with the calculation
+   visible (not an unsourced top-down billion); and for a headline-number
+   argument, is TAM triangulated from independent routes, is SAM built by buyer
+   budget source with a Gross→Net overlap discount, and is SOM presented in
+   scenarios cross-checked against named comparable companies?
+   (See `references/market-sizing.md`.)
 6. **Competition & moat done right** — are opportunity size and durability
    named *separately*, and is the moat tied to a named framework and evidence,
    not asserted as "first mover" or "better product"?
@@ -349,6 +360,10 @@ Load these as the workflow reaches them, not all at once:
 - `references/strategy-frameworks.md` — moat, positioning and business-model
   frameworks (essence / when to use / proof / pitfalls) with a dispatch table,
   plus section D industry-specific proof anchors for non-SaaS businesses.
+- `references/market-sizing.md` — investment-grade market sizing: bottom-up
+  discipline, TAM triangulation, budget-source SAM with a Gross→Net discount,
+  four-scenario SOM, and comparable-company cross-checks. Read for
+  headline-number arguments (IPO, late-stage).
 - `references/japan-ipo.md` — Japanese IPO and fundraising conventions:
   underwriter review, the 成長可能性資料 disclosure, 想定問答集, the Growth→Prime
   path, comparable-company valuation practice.
