@@ -26,6 +26,7 @@ except ImportError:
 import ib_format as ibf  # noqa: E402
 import source_plan_builder as spb  # noqa: E402
 import cap_table_builder as ctb  # noqa: E402
+import economic_kernel as ek  # noqa: E402
 import live_comps as lc  # noqa: E402
 
 # ============================================================================
@@ -507,6 +508,22 @@ def _default_live_comps_for_facts(facts: Any) -> list[str]:
 # ============================================================================
 
 
+def _facts_for_inputs(
+    input_path: Path | None, source_md: Path | None
+) -> tuple[Any, dict[str, Any]]:
+    """Derive SourceFacts (and the raw YAML mapping) from CLI inputs.
+
+    Single source of truth so the build path and the strict-audit economic
+    coherence check operate on identical facts.
+    """
+    raw: dict[str, Any] = load_yaml(input_path) if input_path else {}
+    if source_md is not None:
+        return spb.extract_source_facts(source_md), raw
+    if raw:
+        return spb.derive_source_facts_from_mapping(raw), raw
+    return spb.derive_source_facts(_default_source_text()), raw
+
+
 def build_model(
     input_path: Path | None,
     output_path: Path,
@@ -537,13 +554,7 @@ def build_model(
     """
     bundle = resolve_bundle(mode, additional_sheets, excluded_sheets)
 
-    raw: dict[str, Any] = load_yaml(input_path) if input_path else {}
-    if source_md is not None:
-        facts = spb.extract_source_facts(source_md)
-    elif raw:
-        facts = spb.derive_source_facts_from_mapping(raw)
-    else:
-        facts = spb.derive_source_facts(_default_source_text())
+    facts, raw = _facts_for_inputs(input_path, source_md)
     raw_live_comps = raw.get("live_comps") or raw.get("public_comps") or []
     cli_live_comps = [str(item) for item in (live_comps or []) if str(item).strip()]
     yaml_live_comps = _ticker_list_from_raw(raw_live_comps)
@@ -674,6 +685,12 @@ def _main(argv: list[str] | None = None) -> int:
         from openpyxl import load_workbook
 
         audit_issues = audit_workbook(load_workbook(output, data_only=False))
+        # Structural audit cannot see broken economics; the economic-coherence
+        # audit replays the kernel projection and is profile/mode independent.
+        audit_facts, _ = _facts_for_inputs(args.input, args.source_md)
+        audit_issues += [
+            f"economic: {issue}" for issue in ek.audit_economic_coherence(audit_facts)
+        ]
         if audit_issues:
             for issue in audit_issues:
                 print(f"[audit] {issue}", file=sys.stderr)
