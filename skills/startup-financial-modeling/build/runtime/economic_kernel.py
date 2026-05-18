@@ -866,8 +866,10 @@ def extract_target_units(text: str, profile: MechanicProfile) -> int:
     )
 
 
-# Scale words for a stated capital figure (raise size, post-money).
-_CAPITAL_SCALE = r"(兆|億|百万|万|千|t|T|bn|b|B|m|M|k|K)"
+# Scale words for a stated capital figure (raise size, post-money). A
+# single Latin letter must not bleed into a following word — the `m` in
+# "5 month" is not a "5M" magnitude — so it requires a non-letter boundary.
+_CAPITAL_SCALE = r"(兆|億|百万|万|千|bn|[tTbBmMkK](?![A-Za-z]))"
 
 
 def _capital_figure(matched: str, scale: str | None, currency: str) -> bool:

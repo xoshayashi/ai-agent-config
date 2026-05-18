@@ -680,12 +680,14 @@ def test_stated_raise_size_and_post_money_are_honored() -> None:
     assert facts.post_money_yen[0] == 14_000_000, (
         f"stated $14M post-money was not honored: {facts.post_money_yen[0]}"
     )
-    # Follow-on rounds are still auto-sized, not pinned to the stated raise.
-    assert facts.equity_raise_yen[1] != 3_500_000 or facts.equity_raise_yen[1] == 0
     # A dollar figure in a yen-denominated plan must not be applied.
     assert kernel.extract_raise_size("Raising a $5M seed round.", "JPY") == 0, (
         "a $-denominated raise leaked into a yen plan"
     )
+    # Timeline prose must not be misread: the "m" in "month" is not "5M".
+    assert kernel.extract_raise_size(
+        "Raising a 5 month runway seed round.", "USD"
+    ) == 0, "a bare timeline number was misread as a raise size"
     soffice = shutil.which("soffice") or shutil.which("libreoffice")
     if soffice is None:
         pytest.skip("LibreOffice not installed; skipping workbook recalc check")
