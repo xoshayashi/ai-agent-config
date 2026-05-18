@@ -316,6 +316,22 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "schema_version must be 1"):
                 pptx_packager.validate_review_manifest(str(manifest), images)
 
+    def test_rejects_wrong_review_manifest_schema_version(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
+            manifest = root / "review.json"
+            image.write_bytes(png_bytes())
+            data = approved_manifest([image])
+            data["schema_version"] = 2
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+            images = pptx_packager.collect_images([str(image)])
+
+            with self.assertRaisesRegex(SystemExit, "schema_version must be 1"):
+                pptx_packager.validate_review_manifest(str(manifest), images)
+
     def test_rejects_unknown_review_manifest_keys(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -346,6 +362,22 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             images = pptx_packager.collect_images([str(image)])
 
             with self.assertRaisesRegex(SystemExit, "slide 1 unknown key"):
+                pptx_packager.validate_review_manifest(str(manifest), images)
+
+    def test_rejects_missing_review_manifest_slide_keys(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
+            manifest = root / "review.json"
+            image.write_bytes(png_bytes())
+            data = approved_manifest([image])
+            del data["slides"][0]["blockers"]
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+            images = pptx_packager.collect_images([str(image)])
+
+            with self.assertRaisesRegex(SystemExit, "slide 1 missing required key: blockers"):
                 pptx_packager.validate_review_manifest(str(manifest), images)
 
     def test_rejects_out_of_order_review_manifest_paths(self) -> None:
