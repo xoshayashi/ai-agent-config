@@ -201,6 +201,15 @@ def test_hyphenated_year_horizon_is_honored() -> None:
     """A hyphenated horizon ("6-year plan") sets the forecast length — it
     must not fall silently to the default because of the hyphen."""
     assert kernel.extract_forecast_periods("We model a 6-year plan.", "annual") == 6
+    # The hyphen fix carries through the monthly-grain multiplier (capped
+    # at MAX_FORECAST_PERIODS).
+    assert kernel.extract_forecast_periods("6-year plan", "monthly") == min(
+        6 * 12, kernel.MAX_FORECAST_PERIODS
+    )
+    # A company-age adjective is not a horizon and must not be matched.
+    assert kernel.extract_forecast_periods("a 6-year-old startup", "annual") != 6, (
+        "company age was misread as a forecast horizon"
+    )
     facts = kernel.derive_source_facts(
         "# Deep-tech plan\n\nA deep-tech company. We model a 6-year "
         "forecast.\nSource: roadmap memo.\n"
