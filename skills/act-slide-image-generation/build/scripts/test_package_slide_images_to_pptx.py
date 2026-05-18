@@ -274,6 +274,31 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 pptx_packager.collect_images([str(image)])
 
+    def test_rejects_duplicate_image_inputs(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
+            image.write_bytes(png_bytes())
+
+            with self.assertRaisesRegex(SystemExit, "Duplicate slide image input"):
+                pptx_packager.collect_images([str(image), str(image)])
+
+    def test_rejects_duplicate_manifest_png_paths(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
+            manifest = root / "review.json"
+            image.write_bytes(png_bytes())
+            data = approved_manifest([image, image])
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+
+            with self.assertRaisesRegex(SystemExit, "duplicate png_path"):
+                pptx_packager.validate_review_manifest(str(manifest), [image, image])
+
 
 if __name__ == "__main__":
     unittest.main()
