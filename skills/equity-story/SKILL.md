@@ -140,8 +140,14 @@ build it before drafting prose.
 - **Why this price** — *Why does this valuation make sense?* Justify it as
   *risk already retired × upside still to come*. For private rounds: the
   concrete milestones the round funds over the next 18–24 months, and why the
-  next round will be priced higher. For IPO/public: comparable-company logic
-  and multiple discipline (see stage playbook). Show progress as **a line, not
+  next round will be priced higher. When the round is priced, also defend the
+  entry multiple against a **named set of comparable companies** — a valuation
+  asserted without a comp set is among the first things an investment committee
+  challenges. Compare like with like: if the price rests on forward metrics,
+  benchmark the forward multiples of similar-growth companies — pricing growth
+  in and then applying a slower-growth comp counts it twice. For IPO/public:
+  comparable-company logic and multiple discipline
+  carry the whole argument (see stage playbook). Show progress as **a line, not
   a dot** — the trajectory since the last raise, not a single snapshot.
 
 ### 3. Select the strategic framing
@@ -236,14 +242,27 @@ Walk the objection catalogue, pull the questions a real investor at this stage
 and geography would ask, and fold the answers into the body of the story. Then
 collect the sharpest ones into an explicit anticipated-Q&A section.
 
-### 6. Draft the equity story
+### 6. Prepare for diligence
+
+Read `references/diligence-readiness.md`. Winning the meeting is not winning the
+deal: after it come due diligence, the IC memo and the partnership vote, and a
+persuasive story can still die there. The equity story is the **front door to
+the data room** — each load-bearing claim needs a verification path (the
+artifact or system of record that would prove it); the structural and legal
+landmines a diligence team will find should be disclosed before it finds them;
+and the story should carry a quantified bear case the deal partner can lift into
+an IC memo. Match the depth to the stage — seed diligence is light, growth and
+IPO are not. This step is distinct from step 5: step 5 answers the objections an
+investor *asks*; this step prepares for what a diligence team *verifies*.
+
+### 7. Draft the equity story
 
 Produce the output in the format below. As you draft, read
 `references/narrative-craft.md` and apply it — the logic alone does not make a
 story get read to the end, remembered, and retold accurately to partners who
 were not in the room. Craft carries the logic; it never fakes it.
 
-### 7. Self-review and iterate
+### 8. Self-review and iterate
 
 Run the self-review checklist. Do **not** present the story as finished on the
 first pass — score it honestly, fix the gaps, and iterate until it passes or a
@@ -266,6 +285,9 @@ bracketed text describes what each section holds; replace it.
 
 > Evidence legend: [fact] supplied/verified · [derived] computed from facts ·
 > [estimate]/[assumption] inferred · [open] a diligence question.
+> For each load-bearing [fact], make the verification path clear — the artifact
+> or system of record a diligence team would check (see
+> `references/diligence-readiness.md`).
 > Reversal triggers are written as plain sentences ("if X is observed, the
 > thesis fails"), not as inline tags — they have their own section below.
 
@@ -296,7 +318,10 @@ SOM, comparable-company cross-check.]
 
 ## Business model & unit economics
 [How it makes money; CAC / LTV / margin / payback / NRR as actuals or
-clearly-marked estimates.]
+clearly-marked estimates, each stated with its definition (e.g. payback on
+fully-loaded CAC). For growth stage and later, also show cash efficiency —
+burn, runway, burn multiple or magic number — since a growth investment
+committee underwrites efficiency as hard as growth.]
 
 ## Competition & moat
 [Honest competitive map. The named sources of durable advantage from the
@@ -310,6 +335,13 @@ strategy frameworks. Opportunity size and durability kept distinct.]
 
 ## Vision
 [The wedge → category arc: take the wedge, earn the right to the category.]
+
+## Bear case
+[The downside scenario, named and roughly sized: what the loss looks like if the
+thesis underperforms, and what is recoverable. One honest paragraph a deal
+partner could lift into an IC memo. Defer the full model to
+startup-financial-modeling — carry the narrative of the downside, not the
+spreadsheet. Scale the depth to the stage.]
 
 ## What would change our mind
 [The two or three load-bearing assumptions, each with the observation that
@@ -352,9 +384,9 @@ compact, annotated worked equity stories showing the full arc end to end
 
 ## Self-review checklist
 
-Score the draft against every item. A story has to be both *correct* and
-*persuasive* — the two axes below are scored separately, and a "no" on either is
-a gap to fix before iterating.
+Score the draft against every item. A story has to be *correct*, *persuasive*,
+and able to *survive verification* — the three axes below are scored separately,
+and a "no" on any is a gap to fix before iterating.
 
 ### A. Substance — is the argument correct?
 
@@ -411,11 +443,30 @@ See `references/narrative-craft.md` for how to fix a "no" here.
 18. **No empty superlatives** — is every "leading / best-in-class /
     transforming"-type word either earned by an adjacent verifiable fact or cut?
 
+### C. Diligence readiness — will it survive the investment-evaluation phase?
+
+See `references/diligence-readiness.md` for how to fix a "no" here. Score these
+at the depth the stage warrants — seed diligence is light; growth and IPO are
+not.
+
+19. **Verification paths** — does each load-bearing claim point to the artifact
+    or system of record a diligence team would check, and is every material
+    metric stated with its definition (so it is not recomputed adversarially)?
+20. **Landmines disclosed, downside quantified** — are the structural and legal
+    landmines (IP ownership, cap table, customer concentration, runway, revenue
+    structure, key-person) disclosed before diligence would find them, and does
+    the story carry a quantified bear case a deal partner could lift into a
+    defensible IC memo?
+
 ### Final gate
 
-In one line, score the honest outcome: **would this win a second meeting, or be
-set aside?** If "set aside", the draft is not done — find which axis failed and
-iterate.
+Score the honest outcome against two bars. First: **would this win a second
+meeting, or be set aside?** Second, the higher bar: **would it survive the
+investment-evaluation phase** — could a diligence team verify the load-bearing
+claims from the paths the story gives, find no deal-killing surprise, and could
+the deal partner write a defensible IC memo with a quantified downside? Winning
+the meeting is necessary; surviving diligence is what closes the deal. If either
+bar fails, the draft is not done — find which axis failed and iterate.
 
 In **diagnostic mode** the gate is different — the deliverable is not a pitch:
 does the diagnostic give the user falsifiable moat hypotheses, honest positioning
@@ -441,8 +492,12 @@ Load these as the workflow reaches them, not all at once:
   path, comparable-company valuation practice.
 - `references/investor-objections.md` — tough investor questions by topic, and
   how to preempt each one inside the story.
+- `references/diligence-readiness.md` — how to make the story survive the
+  investment-evaluation phase: verification paths, the data-room index, the
+  diligence workstreams, landmine disclosure, and the quantified bear case the
+  IC memo needs. Read at workflow step 6.
 - `references/narrative-craft.md` — the craft that makes a sound thesis get
-  read, remembered and retold; read while drafting (workflow step 6).
+  read, remembered and retold; read while drafting (workflow step 7).
 - `references/examples.md` — two annotated worked equity stories: Example 1, a
   US Series B marketplace (Forgeline); Example 2, a Japan TSE Growth IPO vertical
   SaaS (ヤモリ) that adds the 成長可能性資料 mapping, 想定問答, PSR valuation, and
