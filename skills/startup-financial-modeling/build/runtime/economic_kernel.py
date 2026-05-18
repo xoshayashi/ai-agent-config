@@ -765,20 +765,60 @@ def extract_price(text: str, profile: MechanicProfile, currency: str = "JPY") ->
     return price
 
 
+# A narrative states a current / year-one figure before the maturity target
+# ("currently 30 customers and target 1,200"; "ship 40 units ... target
+# 2,500"). A target / maturity cue precedes the figure the plan should ramp
+# to, so the extractor must prefer it over a plain first match.
+_TARGET_CUE = re.compile(
+    r"(target|reach(?:ing)?|grow(?:ing)?\s+to|scal(?:e|ing)\s+to|ramp\s+to|"
+    r"by\s+year|by\s+(?:FY)?\s*20\d\d|at\s+maturity|maturity|"
+    r"目標|までに|まで|成熟)",
+    flags=re.IGNORECASE,
+)
+
+
+def _maturity_count(patterns: Iterable[str], text: str, default: int) -> int:
+    """Pick the count tied to a maturity / target cue from all matches.
+
+    A plain first match grabs the current or year-one figure stated before
+    the target. This prefers a figure a target / maturity cue precedes;
+    failing that the largest match (a maturity target is almost always the
+    larger number); failing that the default.
+    """
+    cue_best: int | None = None
+    any_best: int | None = None
+    for pattern in patterns:
+        for m in re.finditer(pattern, text, flags=re.IGNORECASE):
+            raw = m.group(1).replace(",", "").replace("，", "")
+            try:
+                value = int(float(raw))
+            except ValueError:
+                continue
+            if value <= 0:
+                continue
+            any_best = value if any_best is None else max(any_best, value)
+            lead = text[max(0, m.start() - 28): m.start()]
+            if _TARGET_CUE.search(lead):
+                cue_best = value if cue_best is None else max(cue_best, value)
+    if cue_best is not None:
+        return cue_best
+    if any_best is not None:
+        return any_best
+    return default
+
+
 def extract_target_units(text: str, profile: MechanicProfile) -> int:
     if profile.key == "marketplace":
         return 0
-    value = int(
-        first_match_float(
-            [
-                r"([0-9,.]+)\s*万?\s*台",
-                r"([0-9,.]+)\s*operating",
-                r"([0-9,.]+)\s*customers",
-                r"([0-9,.]+)\s*units",
-            ],
-            text,
-            profile.default_target_units,
-        )
+    value = _maturity_count(
+        [
+            r"([0-9,.]+)\s*万?\s*台",
+            r"([0-9,.]+)\s*operating",
+            r"([0-9,.]+)\s*customers",
+            r"([0-9,.]+)\s*units",
+        ],
+        text,
+        profile.default_target_units,
     )
     if re.search(r"([0-9,.]+)\s*万\s*台", text):
         value *= 10_000
@@ -799,19 +839,20 @@ def extract_target_arr(text: str) -> int:
 
 
 def extract_target_customers(text: str) -> int:
-    """Extract a stated maturity customer / account count."""
-    value = int(
-        first_match_float(
-            [
-                r"([0-9,]{1,9})\s*(?:paying\s+)?(?:customers|accounts|logos)",
-                r"([0-9,]{1,9})\s*(?:社|アカウント|顧客)",
-                r"顧客\s*(?:数)?\s*(?:約)?\s*([0-9,]{1,9})",
-            ],
-            text,
-            0,
-        )
+    """Extract a stated maturity customer / account count.
+
+    Prefers the figure a target / maturity cue precedes — a narrative states
+    the current count first ("currently 30 customers and target 1,200").
+    """
+    return _maturity_count(
+        [
+            r"([0-9,]{1,9})\s*(?:paying\s+)?(?:customers|accounts|logos)",
+            r"([0-9,]{1,9})\s*(?:社|アカウント|顧客)",
+            r"顧客\s*(?:数)?\s*(?:約)?\s*([0-9,]{1,9})",
+        ],
+        text,
+        0,
     )
-    return value
 
 
 def retarget_demand_to_narrative(

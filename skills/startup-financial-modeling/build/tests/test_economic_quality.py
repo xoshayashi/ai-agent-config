@@ -1014,6 +1014,48 @@ def test_pre_revenue_audit_tolerates_zero_revenue() -> None:
         assert rc == 0, f"pre-revenue plan failed strict audit (rc={rc})"
 
 
+def test_customer_target_is_the_maturity_figure_not_the_current_count() -> None:
+    """'currently 30 customers and target 1,200' must ramp the plan to the
+    1,200 maturity target, not freeze it at the current count of 30."""
+    story = (
+        "# SaaS plan\n\nThe business is a recurring software SaaS platform. "
+        "Annual contract value is about ¥1,200,000 per customer. We "
+        "currently have 30 customers and target 1,200 customers by year "
+        "five. Gross margin target is 80%. 5-year plan, seed round. "
+        "Source: board memo.\n"
+    )
+    assert kernel.extract_target_customers(story) == 1200, (
+        "extractor took the current count, not the stated target"
+    )
+    facts = kernel.derive_source_facts(story)
+    assert facts.customers[-1] >= 1000, (
+        f"plan ramps customers to {facts.customers[-1]}, not the stated 1,200"
+    )
+
+
+def test_hardware_unit_ramp_honors_the_stated_maturity_target() -> None:
+    """'ship 40 units ... target 2,500 units by year five' must ramp units to
+    the 2,500 target, not collapse on the year-one figure of 40."""
+    story = (
+        "# Robotics plan\n\nThe company manufactures asset-heavy industrial "
+        "robots (hardware / manufacturing). We expect to ship 40 units in "
+        "year one and target 2,500 units shipped by year five. Gross margin "
+        "target is 38%. 5-year plan, Series A. Source: management forecast.\n"
+    )
+    profile = kernel.profile_for_text(story)
+    assert kernel.extract_target_units(story, profile) == 2500, (
+        "extractor took the year-one figure, not the stated target"
+    )
+    facts = kernel.derive_source_facts(story)
+    assert sum(facts.new_units) >= 2000, (
+        f"hardware plan ships {sum(facts.new_units)} units, not the stated 2,500"
+    )
+    # The ramp must be non-degenerate growth, not e.g. [50, 250, 4, 10, 0].
+    assert facts.new_units[-1] > facts.new_units[0], (
+        f"hardware unit ramp is degenerate: {facts.new_units}"
+    )
+
+
 if __name__ == "__main__":
     _tests = [
         test_gross_margin_tracks_target_across_archetypes,
@@ -1056,6 +1098,8 @@ if __name__ == "__main__":
         test_kpi_dashboard_omits_vc_block_for_an_ambiguous_mechanic,
         test_pre_revenue_plan_has_no_product_revenue,
         test_pre_revenue_audit_tolerates_zero_revenue,
+        test_customer_target_is_the_maturity_figure_not_the_current_count,
+        test_hardware_unit_ramp_honors_the_stated_maturity_target,
     ]
     for _test in _tests:
         try:
