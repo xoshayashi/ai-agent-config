@@ -1145,6 +1145,59 @@ def test_monthly_priced_hardware_stays_recurring() -> None:
     )
 
 
+def test_marketplace_kpi_uses_a_transaction_lens() -> None:
+    """A GMV / take-rate marketplace shows transaction economics on the KPI
+    dashboard — not per-seat subscription rows that read price 0, negative
+    unit gross profit, and "N/A" payback."""
+    story = (
+        "# Marketplace plan\n\nThe company runs a two-sided marketplace. "
+        "Revenue is a take rate of 18% on gross merchandise value. Phase 1 "
+        "targets ¥120億 GMV at maturity. 5-year plan, seed round. "
+        "Source: cohort analysis memo.\n"
+    )
+    facts = kernel.derive_source_facts(story)
+    assert kernel.mechanic_key(facts) == "marketplace"
+    ws = source_plan.build_source_plan_workbook_from_facts(facts)["KPI"]
+    # Restrict to the metric area; the interpretation register far below
+    # also names "Take rate" and would mask a missing metric row.
+    metric_labels = [
+        c.value for row in ws.iter_rows() for c in row
+        if isinstance(c.value, str) and c.row <= 12
+    ]
+    for per_seat in (
+        "Monthly price / unit", "Monthly unit gross profit", "Unit payback",
+    ):
+        assert per_seat not in metric_labels, (
+            f"{per_seat} leaked into a marketplace KPI dashboard"
+        )
+    for metric in ("Take rate", "GMV per customer", "Contribution margin"):
+        assert metric in metric_labels, (
+            f"{metric} missing from the marketplace KPI dashboard"
+        )
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        pytest.skip("LibreOffice not installed; skipping workbook recalc check")
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "mkt.md"
+        out = Path(tmp) / "mkt.xlsx"
+        src.write_text(story, encoding="utf-8")
+        source_plan.build_source_plan_workbook(src, out)
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(Path(tmp) / "recalc"), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        recalced = load_workbook(Path(tmp) / "recalc" / "mkt.xlsx", data_only=True)["KPI"]
+        first_col = source_plan.START_PERIOD_COL
+        cm_row = _row_for_label(recalced, "Contribution margin")
+        for idx in range(len(facts.years)):
+            margin = recalced.cell(cm_row, first_col + idx).value
+            assert margin is not None and 0.0 < float(margin) < 1.0, (
+                f"period {idx}: marketplace contribution margin {margin} is "
+                f"not a sane positive fraction"
+            )
+
+
 if __name__ == "__main__":
     _tests = [
         test_gross_margin_tracks_target_across_archetypes,
@@ -1192,6 +1245,7 @@ if __name__ == "__main__":
         test_unit_target_extraction_handles_mixed_scale_phrasing,
         test_hardware_revenue_is_units_times_sale_price,
         test_monthly_priced_hardware_stays_recurring,
+        test_marketplace_kpi_uses_a_transaction_lens,
     ]
     for _test in _tests:
         try:
