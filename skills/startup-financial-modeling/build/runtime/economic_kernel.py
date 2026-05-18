@@ -586,7 +586,11 @@ def first_match_float(patterns: Iterable[str], text: str, default: float) -> flo
 
 
 def money_from_match(match: re.Match) -> int | None:
-    """Scale a regex match (number group 1, optional unit group 2) to raw yen."""
+    """Parse a monetary regex match into an integer in the model currency.
+
+    Number is group 1, optional scale unit (万/億/兆/m/b/t...) is group 2. The
+    result is a raw amount; the caller decides the currency.
+    """
     raw = match.group(1).replace(",", "").replace("，", "")
     unit_raw = match.group(2) if len(match.groups()) >= 2 else ""
     unit = (unit_raw or "").lower()
@@ -720,8 +724,9 @@ def extract_price(text: str, profile: MechanicProfile, currency: str = "JPY") ->
     default_price = max(1, int(profile.default_monthly_price_yen * money_scale_for_currency(currency)))
     price = money_yen(patterns, text, default_price)
     # The noise floor is currency-relative: a valid USD per-seat price ($80) is
-    # far below any sane JPY price floor and must not be rejected as noise.
-    floor = 1 if currency == "USD" else max(10_000, int(profile.default_monthly_price_yen * 0.05))
+    # far below any sane JPY price floor, but the floor must still reject a
+    # near-zero spurious match — hence $10, not $1.
+    floor = 10 if currency == "USD" else max(10_000, int(profile.default_monthly_price_yen * 0.05))
     if price < floor:
         return default_price
     return price
@@ -1480,6 +1485,9 @@ def derive_source_facts(
     total_hc = [a + b + c + d for a, b, c, d in zip(product_hc, gtm_hc, ops_hc, ga_hc)]
     curves = _operating_assumption_curves(profile, periods)
     avg_comp = [int(value * money_scale) for value in _curve(16_000_000, 14_500_000, periods)]
+    # The cost-to-serve drivers are not FX-scaled: calibrate_cost_stack_to_gross_margin
+    # rescales all four COGS components to hit the target gross margin, so their
+    # starting values act only as relative weights, not currency amounts.
     delivery_cost = [int(value) for value in _curve(90_000 if profile.key != "marketplace" else 0, 32_000 if profile.key != "marketplace" else 0, periods)]
     cloud_cost = [int(value) for value in _curve(18_000, 26_000, periods)]
     support_cost = [int(value) for value in _curve(24_000, 16_000, periods)]
