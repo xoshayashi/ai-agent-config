@@ -41,7 +41,11 @@ Three failure modes recur. Watch for them throughout:
 
 The craft and substance standards in this skill are **universal** — they apply
 at every stage and in every geography. What the stage playbooks adjust is the
-*depth and kind of evidence*, not the quality bar.
+*depth and kind of evidence*, not the quality bar. The worked examples and the
+strategy-framework dispatch table lean toward SaaS and marketplace businesses;
+the principles are model-agnostic — for biotech, hardware, deep tech or fintech,
+apply them by analogy (the load-bearing proof simply changes: a clinical
+milestone, a gross-margin curve, regulatory capital).
 
 ## Inputs to gather first
 
@@ -55,10 +59,14 @@ the assumption; only ask the user when an answer materially changes the thesis.
    playbook materially).
 3. **What is known** — traction, financials, market data, unit economics. If a
    financial model spreadsheet (xlsx) exists, pull unit economics, NRR, runway
-   and comparable-company multiples from it and **cite it as the source**; if a
-   model is needed and missing, build it with `startup-financial-modeling`
-   first. Without a model, mark figures as estimates or assumptions and keep
-   them separable from facts.
+   and comparable-company multiples from it and **cite it as the source**.
+   Without a model, mark figures as estimates or assumptions and keep them
+   separable from facts — and tag the gaps `[open]`. Pause to build a model with
+   `startup-financial-modeling` first only when the equity story cannot be
+   honestly written without it — i.e. when the thesis turns on unit economics or
+   a valuation the user has not supplied (typically growth stage and later);
+   for an early-stage story carried by team and insight, a model is not a
+   prerequisite.
 4. **Audience** — who reads this (seed VC, growth fund, crossover investor,
    IPO institutional book, retail). The audience sets how much vision vs. proof
    the story should carry.
@@ -181,8 +189,11 @@ concrete blocker remains. This discipline is the point of the skill.
 
 ## Output format
 
-Default to a structured Markdown document. Adjust depth to stage and audience,
-but keep this order — it *is* the narrative spine made visible:
+Default to a structured Markdown document. The block below is a **skeleton**,
+not a literal script: keep the section order — it *is* the narrative spine made
+visible — but translate and adapt the headings to the working language and
+stage, and adjust the depth of each section to the stage and audience. The
+bracketed text describes what each section holds; replace it.
 
 ```markdown
 # Equity Story — [Company]
