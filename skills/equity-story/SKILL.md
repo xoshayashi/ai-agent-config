@@ -340,8 +340,8 @@ Load these as the workflow reaches them, not all at once:
   business-model frameworks, each with essence / when to use / proof investors
   expect / pitfalls, plus a situation→framework dispatch table and (section D)
   industry-specific proof anchors for non-SaaS businesses — biotech, hardware /
-  deep tech, fintech, consumer / D2C, energy infrastructure and healthcare
-  services.
+  deep tech, fintech, consumer / D2C, climate & energy infrastructure and
+  healthcare services.
 - `references/japan-ipo.md` — Japanese IPO and fundraising conventions:
   underwriter review, the 成長可能性資料 growth disclosure, prospectus drafting,
   想定問答集, the Growth→Prime path, comparable-company valuation practice.
