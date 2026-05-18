@@ -1056,6 +1056,19 @@ def test_hardware_unit_ramp_honors_the_stated_maturity_target() -> None:
     )
 
 
+def test_unit_target_extraction_handles_mixed_scale_phrasing() -> None:
+    """The 万台 (x10,000) multiplier normalises the match it came from, never
+    the document; without a target cue the largest match wins."""
+    profile = kernel.profile_for_text("hardware robot manufacturing plan")
+    # No target cue: 1万台 = 10,000 units is the larger match and wins via
+    # the fallback — it must not be corrupted to 2,500 x 10,000.
+    mixed = "The fleet has 1万台 operating and the plan covers 2,500 units."
+    assert kernel.extract_target_units(mixed, profile) == 10_000
+    # A target cue overrides size: the cued 2,500 wins over the 万台 figure.
+    cued = "Today 1万台 operate; we target 2,500 units by year five."
+    assert kernel.extract_target_units(cued, profile) == 2500
+
+
 if __name__ == "__main__":
     _tests = [
         test_gross_margin_tracks_target_across_archetypes,
@@ -1100,6 +1113,7 @@ if __name__ == "__main__":
         test_pre_revenue_audit_tolerates_zero_revenue,
         test_customer_target_is_the_maturity_figure_not_the_current_count,
         test_hardware_unit_ramp_honors_the_stated_maturity_target,
+        test_unit_target_extraction_handles_mixed_scale_phrasing,
     ]
     for _test in _tests:
         try:
