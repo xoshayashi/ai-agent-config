@@ -41,11 +41,12 @@ Three failure modes recur. Watch for them throughout:
 
 The craft and substance standards in this skill are **universal** — they apply
 at every stage and in every geography. What the stage playbooks adjust is the
-*depth and kind of evidence*, not the quality bar. The worked examples and the
-strategy-framework dispatch table lean toward SaaS and marketplace businesses;
-the principles are model-agnostic — for biotech, hardware, deep tech or fintech,
-apply them by analogy (the load-bearing proof simply changes: a clinical
-milestone, a gross-margin curve, regulatory capital).
+*depth and kind of evidence*, not the quality bar. The two worked examples lean
+toward SaaS and marketplace businesses, but the principles are model-agnostic:
+`references/strategy-frameworks.md` section D adds industry-specific proof
+anchors for biotech, hardware / deep tech and fintech — where the load-bearing
+evidence is a clinical milestone, a cost-curve or a credit-loss rate rather than
+NRR — so reach for those when the business is not SaaS-shaped.
 
 ## Inputs to gather first
 
@@ -335,7 +336,8 @@ Load these as the workflow reaches them, not all at once:
   comparable-company framing; stage-specific failure modes.
 - `references/strategy-frameworks.md` — catalogue of moat, positioning and
   business-model frameworks, each with essence / when to use / proof investors
-  expect / pitfalls, plus a situation→framework dispatch table.
+  expect / pitfalls, plus a situation→framework dispatch table and (section D)
+  industry-specific proof anchors for biotech, hardware / deep tech and fintech.
 - `references/japan-ipo.md` — Japanese IPO and fundraising conventions:
   underwriter review, the 成長可能性資料 growth disclosure, prospectus drafting,
   想定問答集, the Growth→Prime path, comparable-company valuation practice.
