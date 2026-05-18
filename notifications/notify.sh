@@ -17,6 +17,7 @@ set -u
 label=${1:-AI Agent}
 category=${2:-done}
 
+# Notification text is Japanese by default; edit the messages here to localize.
 case "$category" in
   attention)
     message="承認または入力を待っています"
