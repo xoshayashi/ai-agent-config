@@ -126,6 +126,26 @@ with the response strategy — evasion is penalised immediately.
 - **Supply/governance neglect** — thin float, poor lock-up design, founder
   control or conflicts of interest sink the story before the thesis is heard.
 
+## Public-company IR (post-listing)
+
+Once listed, the equity story does not end — it becomes an ongoing IR narrative
+the company must *deliver against* every quarter. The audience already owns or
+covers the stock; what they reward is consistency and credibility over time.
+
+- **Delivery vs. guidance is the story.** The single most powerful IR asset is a
+  track record of meeting or beating the guidance the company set. Each
+  beat-and-raise compounds credibility; each miss-and-lower destroys it. Set
+  guidance conservatively enough to keep the beat-and-raise cadence intact.
+- **The capital-allocation narrative.** As cash flow matures, investors want a
+  clear story on what the company does with its cash — reinvestment, M&A,
+  buybacks, dividends — and why that allocation maximises long-run value.
+- **Consistency of message.** The thesis, the KPIs and the framing should stay
+  stable across quarters. Investors notice when the metrics a company emphasises
+  shift to flatter whatever the latest quarter looked like.
+- **Don't** restate the thesis every quarter or chase the latest narrative
+  fashion; don't surprise the market — pre-empt bad news the way the equity
+  story pre-empts objections.
+
 ## M&A exit / strategic-buyer narrative
 
 When the audience is a **strategic acquirer** rather than a financial investor,

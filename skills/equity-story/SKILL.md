@@ -46,8 +46,9 @@ the assumption; only ask the user when an answer materially changes the thesis.
 
 1. **Company & product** — what it does, in one plain sentence a non-expert
    understands. If you cannot write that sentence, the story is not ready.
-2. **Stage & context** — VC seed / VC growth / late-stage-private / IPO / public
-   IR. And the geography: **Japan or US** (this changes the playbook materially).
+2. **Stage & context** — VC seed / VC growth / late-stage-private / IPO /
+   public IR / M&A exit. And the geography: **Japan or US** (this changes the
+   playbook materially).
 3. **What is known** — traction, financials, market data, unit economics. If a
    financial model spreadsheet (xlsx) exists, pull unit economics, NRR, runway
    and comparable-company multiples from it and **cite it as the source**; if a
@@ -62,8 +63,8 @@ the assumption; only ask the user when an answer materially changes the thesis.
 
 ## Workflow
 
-Work through these steps in order. Each step has a reference file to load when
-you reach it — do not load them all upfront.
+Work through these steps in order. Most steps point to a reference file to load
+when you reach it — load them just in time, not all upfront.
 
 ### 1. Choose the stage playbook
 
@@ -171,6 +172,9 @@ but keep this order — it *is* the narrative spine made visible:
 
 ```markdown
 # Equity Story — [Company]
+
+> Evidence legend: [fact] supplied/verified · [derived] computed from facts ·
+> [estimate]/[assumption] inferred · [open] a diligence question.
 
 ## Thesis in brief
 [The company in one declarative sentence. Then 3–5 investment highlights —

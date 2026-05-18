@@ -111,8 +111,8 @@ advantage.
 ### 6. Category Design / Category King
 **Essence.** Rather than compete inside an existing category, *design a new
 one*, fix a point of view (POV) about the problem in customers' minds, and seize
-it with a "lightning strike." The category king captures ~76% of category
-market value.
+it with a "lightning strike." Per Play Bigger's research, the category king
+captures roughly three-quarters (~76%) of the category's market value.
 **When to use.** New-market-creation stories; markets that cannot yet be
 measured; justifying a premium valuation.
 **Proof investors expect.** A clear POV (the problem defined, a future painted);
@@ -211,8 +211,9 @@ large accounts; NRR inflated by price increases; a hidden weak GRR.
 
 ### 14. Product-Led Growth (PLG)
 **Essence.** The product itself is the acquisition, conversion and expansion
-engine; freemium/trials let users discover value themselves. PLG companies grow
-roughly 2× faster; product-qualified leads convert 5–6× better than MQLs.
+engine; freemium/trials let users discover value themselves. Per OpenView's PLG
+benchmarks, PLG companies grow roughly 2× faster, and product-qualified leads
+convert 5–6× better than MQLs.
 **When to use.** Explaining low CAC, fast growth, efficient GTM; the bottom-up
 adoption story.
 **Proof investors expect.** Free→paid conversion (PQL→paid 20–30%);
@@ -256,4 +257,5 @@ inferior to specialists on each feature. Ignoring re-bundling counterattacks.
 - Geoffrey Moore, Crossing the Chasm — https://www.lennysnewsletter.com/p/geoffrey-moore-on-finding-your-beachhead
 - Jobs to Be Done, Christensen Institute — https://www.christenseninstitute.org/theory/jobs-to-be-done/ ; https://online.hbs.edu/blog/post/jobs-to-be-done-examples
 - NRR / PLG / usage-based benchmarks — https://www.growthunhinged.com/p/2025-saas-benchmarks-report ; https://www.feinternational.com/blog/net-revenue-retention-saas-valuation
+- PLG growth / PQL conversion benchmarks — OpenView "Product Benchmarks" research (verify against the latest figures before citing in a live document)
 - Vertical SaaS / embedded fintech — https://www.fractalsoftware.com/perspectives/the-vertical-saas-fintech-playbook ; https://upper90.medium.com/vertical-operating-systems-and-embedded-fintech-6d0cabfd144c

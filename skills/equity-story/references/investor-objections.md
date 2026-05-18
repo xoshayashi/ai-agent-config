@@ -42,6 +42,18 @@ The most over-claimed moat.
 - Pre-empt: show accuracy gains from more data are not yet diminishing, and the
   data is proprietary and not buyable. Otherwise drop the claim.
 
+**"Isn't your AI product just a wrapper on an LLM?"**
+One of the most common objections to current AI fundraises — if the product is a
+thin call to a third-party model, anyone (including the model provider) can copy
+it, and the model provider captures the margin.
+- Pre-empt: locate the defensibility *outside* the model call. Name what is
+  proprietary — a unique dataset or fine-tuning corpus, a deep workflow
+  integration and the switching costs it creates, an evals/quality layer, a
+  distribution or regulatory advantage. Show the product is the system around
+  the model, not the model. If the only differentiation is the prompt, the
+  honest answer is that there is no moat yet — say so and show the plan to build
+  one. See the Data Moats and 7 Powers entries in `strategy-frameworks.md`.
+
 ## Unit economics & business model
 
 **"Do the unit economics work?"**
