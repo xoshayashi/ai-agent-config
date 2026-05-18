@@ -1129,6 +1129,22 @@ def test_hardware_revenue_is_units_times_sale_price() -> None:
         )
 
 
+def test_monthly_priced_hardware_stays_recurring() -> None:
+    """A hardware narrative that prices per unit *per month* is a recurring
+    (lease / RaaS) plan — the per-month cue must keep it out of unit_sale."""
+    story = (
+        "# Robotics deployment plan\n\nThe company deploys asset-heavy "
+        "industrial robots. The price per robot is ¥320,000 per month. We "
+        "expect 40 units in year one and target 600 units by year five. "
+        "Gross margin target is 38%. 5-year plan. Source: management memo.\n"
+    )
+    facts = kernel.derive_source_facts(story)
+    assert kernel.mechanic_key(facts) == "hardware_asset_heavy"
+    assert facts.revenue_mode == "recurring", (
+        "monthly-priced hardware was misclassified as a one-time unit sale"
+    )
+
+
 if __name__ == "__main__":
     _tests = [
         test_gross_margin_tracks_target_across_archetypes,
@@ -1175,6 +1191,7 @@ if __name__ == "__main__":
         test_hardware_unit_ramp_honors_the_stated_maturity_target,
         test_unit_target_extraction_handles_mixed_scale_phrasing,
         test_hardware_revenue_is_units_times_sale_price,
+        test_monthly_priced_hardware_stays_recurring,
     ]
     for _test in _tests:
         try:

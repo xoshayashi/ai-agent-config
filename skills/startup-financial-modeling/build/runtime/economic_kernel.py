@@ -1628,6 +1628,7 @@ _UNIT_SALE_CUE = re.compile(
 )
 _RECURRING_CUE = re.compile(
     r"recurring|leas(?:e|ing)|subscription|RaaS|as\s+a\s+service|"
+    r"monthly|per\s+month|/\s*mo(?:nth)?\b|"
     r"\bARR\b|\bMRR\b|月額|リース|サブスク",
     flags=re.IGNORECASE,
 )
@@ -1714,8 +1715,14 @@ def derive_source_facts(
     tam = max(tam_default, gmv[-1] * 10 if profile.key == "marketplace" else tam_default)
     sam = max(int(tam * 0.18), int(1_000_000_000 * money_scale))
     # Implied mature revenue: recurring billing on the installed base, or a
-    # single unit-sale year for a hardware plan (no x12 recurring multiple).
-    implied_mature_revenue = ending_units(new_units)[-1] * monthly_price[-1] * (
+    # single unit-sale year. A unit-sale plan recognises only the final
+    # year's shipments (new_units[-1]) x price, not the cumulative installed
+    # base — that would inflate SOM as deployments accumulate.
+    mature_units = (
+        new_units[-1] if revenue_mode == "unit_sale"
+        else ending_units(new_units)[-1]
+    )
+    implied_mature_revenue = mature_units * monthly_price[-1] * (
         1 if revenue_mode == "unit_sale" else 12
     )
     som = max(
