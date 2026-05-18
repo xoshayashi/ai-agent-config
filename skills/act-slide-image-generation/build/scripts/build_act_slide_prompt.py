@@ -276,10 +276,10 @@ def canonical_planning_block(
   regenerate_until_quality_approved: keep regenerating or editing weak slides until completion_ready_status is approved
   completion_blocker: do not report complete while any generated slide has blocker, major, deck-consistency, content-quality, or design-quality issues
   generation_block_rule: if Codex built-in generation or repair is actually blocked by the image tool, mark completion_ready_status: blocked and do not package or report complete; do not use local environment uncertainty as the blocker
-  review_manifest: required JSON record covering every generated PNG before PPTX packaging
-  review_manifest_status: approved only when every image path is covered and all quality statuses are approved
+  review_manifest: required schema_version: 1 JSON record covering every generated PNG before PPTX packaging with exact top-level and slide keys only
+  review_manifest_status: approved only when every image path is covered exactly once, slide_id is sequential, png_path order matches package image order, and all quality statuses are approved
   review_manifest_design_status_gate: deck-level and slide-level review_manifest entries must approve post_generation_design_balance_status, whitespace_occupancy_balance_status, density_balance_status, typography_balance_status, color_consistency_status, outer_padding_consistency_status, header_integrity_status, multimodal_design_review_status, design_balance_gate_status, occupancy_density_fit_status, font_scale_unity_status, palette_role_unity_status, and design_breakage_blocker_status before PPTX/PDF packaging
-  validate_review_manifest: run before PPTX packaging; reject missing, partial, pending, blocked, weak-slide, duplicate image input, or duplicate png_path manifests
+  validate_review_manifest: run before PPTX packaging; reject wrong schema_version, unknown keys, missing keys, non-sequential slide_id, out-of-order png_path, pending, blocked, weak-slide, duplicate image input, or duplicate png_path manifests
   deck_tone_consistency_review: [first third vs middle third vs last third tone comparison after generation]
   deck_tone_consistency_status: pending / approved / repair_required
   deck_tone_repair_plan: [slides to regenerate or edit if tone drift appears]
@@ -890,7 +890,7 @@ post_generation_audit:
   - completion_blocker: do not report complete while any generated slide has blocker, major, deck-consistency, content-quality, or design-quality issues
   - generation_block_rule: only if Codex built-in generation or repair is actually blocked by the image tool, mark completion_ready_status: blocked and do not package or report complete; do not use local environment uncertainty as the blocker
   - credential_setup_blocker: no account credential, local token, SDK setup, or environment-variable workflow is part of the route
-  - review_manifest_status: approved after validate_review_manifest covers every generated PNG path exactly once, rejects duplicate image input and duplicate png_path entries, confirms slides_final/ master paths are used, confirms weak_slide_regeneration_queue is empty, and confirms all final/content/design/deck-unity/completion statuses are approved
+  - review_manifest_status: approved after validate_review_manifest confirms schema_version: 1, exact manifest keys, exact slide keys, sequential slide_id values, every generated PNG path exactly once in package order, no duplicate image input or duplicate png_path entries, slides_final/ master paths, empty weak_slide_regeneration_queue, and all final/content/design/deck-unity/completion statuses approved
   - post_generation_design_balance_check is approved on actual generated PNGs: whitespace/occupancy balance, density balance against the planned density tier, typography size/weight balance, color consistency, outer padding consistency, header integrity, card/table height equalization, line-weight consistency, icon-family consistency, Petrol scatter, Honey strength, and human-designed operational diagram feel
   - pre_package_image_review has inspected the actual generated PNG, not only the prompt
   - image_review_status is approved only when there are no blocker or major issues
