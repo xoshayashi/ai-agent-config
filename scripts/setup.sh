@@ -82,6 +82,7 @@ config_home=$(abs_existing_dir "${AI_AGENT_CONFIG_HOME:-$default_config_home}")
 codex_home=$(abs_dir "${AI_AGENT_CODEX_HOME:-$HOME/.codex}")
 claude_home=$(abs_dir "${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}")
 gemini_home=$(abs_dir "${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}")
+home_dir=$(abs_dir "${AI_AGENT_HOME:-$HOME}")
 timestamp=$(date +%Y%m%d-%H%M%S)
 skill_source_root="$config_home/skills"
 retired_skill_names="daily-llm-history-instruction-review"
@@ -215,6 +216,10 @@ install_instruction_links() {
   install_link "$src_root/DESIGN.md" "$gemini_home/DESIGN.md"
 }
 
+install_shell_links() {
+  install_link "$config_home/shell/.zshrc" "$home_dir/.zshrc"
+}
+
 install_skill_links() {
   [ -d "$skill_source_root" ] || return 0
 
@@ -310,14 +315,16 @@ install_notification_hooks() {
   python3 "$helper" "$@"
 }
 
-say "AI agent config setup (instructions only)"
+say "AI agent config setup"
 say "config: $config_home"
 say "codex home: $codex_home"
 say "claude home: $claude_home"
 say "gemini home: $gemini_home"
+say "home: $home_dir"
 
 move_existing_skill_backups
 install_instruction_links
+install_shell_links
 remove_retired_skill_links
 install_skill_links
 install_notification_hooks
