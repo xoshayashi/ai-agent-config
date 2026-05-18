@@ -27,12 +27,21 @@ quantified proof point behind every claim.
 | The quantitative backbone: capital efficiency, compounding | Land & Expand / NRR; PLG; Usage-Based Pricing |
 | The skeleton of the whole moat section | 7 Powers (tie each line to ≥1 Power) |
 | Durability of an AI / data product | Data Network Effects (mind diminishing returns) |
+| Drug development; value turns on clinical milestones, not revenue | Biotech / Pharma clinical-pipeline thesis |
+| Hardware / deep tech; the path to manufacturing economics | Hardware / Deep Tech cost-curve thesis |
+| Fintech; which revenue structure sets the valuation frame | Fintech: take-rate vs. balance-sheet |
 
 ## Contents
 
 - A. Moat & competitive-advantage theory: [7 Powers](#1-7-powers), [Counter-Positioning](#2-counter-positioning), [Network Effects](#3-network-effects), [Data Moats](#4-data-moats--data-network-effects), [Aggregation Theory](#5-aggregation-theory)
 - B. Market & positioning archetypes: [Category Design](#6-category-design--category-king), [Blue Ocean](#7-blue-ocean-strategy), [Crossing the Chasm](#8-crossing-the-chasm--beachhead), [Jobs-to-be-Done](#9-jobs-to-be-done)
 - C. Business-model & growth archetypes: [Platform / Flywheel](#10-platform--marketplace-flywheel), [Vertical SaaS](#11-vertical-saas), [Picks & Shovels](#12-picks-and-shovels), [Land & Expand / NRR](#13-land--expand--net-revenue-retention), [PLG](#14-product-led-growth-plg), [Usage-Based Pricing](#15-usage-based-pricing), [Bundling / Unbundling](#16-bundling--unbundling)
+- D. Industry-specific proof anchors: [Biotech / Pharma](#17-biotech--pharma--the-clinical-pipeline-thesis), [Hardware / Deep Tech](#18-hardware--deep-tech--the-path-to-manufacturing-economics), [Fintech](#19-fintech--take-rate-vs-balance-sheet)
+
+Sections A–C are model-agnostic. Section D is for businesses whose proof is not
+SaaS-shaped — where the load-bearing evidence is a clinical milestone, a
+cost-curve, or a credit-loss rate rather than NRR. Use a section D entry to
+*anchor what proof to bring*, then still draw the moat from sections A–C.
 
 ---
 
@@ -246,6 +255,87 @@ inferior to specialists on each feature. Ignoring re-bundling counterattacks.
 
 ---
 
+## D. Industry-specific proof anchors
+
+These are not moats — they are *proof anchors*. A SaaS-shaped equity story rests
+on NRR, payback and a flywheel; a drug, a hardware company or a lender does not.
+Each entry below names what the load-bearing evidence actually is for that
+industry. Use it to decide *what proof the story must carry*, then still draw
+the durable advantage from a section A moat framework.
+
+### 17. Biotech / Pharma — the clinical-pipeline thesis
+**Essence.** The thesis values an *un-approved* clinical pipeline as
+risk-adjusted future value. The standard tool is **rNPV** — each phase's
+probability of success (PoS) multiplied into future cash flows, then discounted.
+Investors fund **de-risking** — what the *next* phase transition will prove —
+not the end state. Two narrative axes: single-asset (reaches clinical data fast,
+market-resilient) vs. platform (sells the *repeatability* of one engine across
+many assets); and the mechanism of action plus the regulatory path (orphan,
+breakthrough, accelerated approval).
+**When to use.** Drug-development companies, and any thesis where value turns on
+clinical milestones and regulatory exclusivity rather than on revenue.
+**Proof investors expect.** Clinical data (effect size, safety, statistical
+significance vs. control); phase-specific PoS, read against base rates (roughly
+10% overall from Phase 1 to approval — lower in oncology, materially higher in
+rare disease); regulator interactions (end-of-phase meeting minutes, agreed
+endpoints, Fast Track / Breakthrough designations); IP runway and the overlap of
+patent and regulatory exclusivity; KOL (key-opinion-leader) support; an explicit
+rNPV build.
+**Pitfalls.** Single-asset dependence (one data readout can erase the company);
+optimistic PoS that ignores the base rate for the indication; a TAM inflated to
+the whole prevalent population with no diagnosis / access / share haircut; an
+empty "platform" claim with no asset yet in the clinic. Investors want a
+**clinical line of sight** — an asset past the early, highest-risk gate.
+
+### 18. Hardware / Deep Tech — the path to manufacturing economics
+**Essence.** The thesis is not "is the technology better" — it is the *economic
+path to manufacturing it at scale*. Backbone: a durable technical edge; the
+cost-curve from **FOAK** (first-of-a-kind, high cost) to **NOAK** (Nth-of-a-kind,
+low cost); the gross-margin ramp; and capex with a path to mature unit
+economics. The central concept is the **learning curve** (Wright's Law) — unit
+cost falls a roughly fixed percentage with each doubling of cumulative output.
+**When to use.** Hardware, deep tech, climate, and other manufacturing-heavy
+businesses.
+**Proof investors expect.** Technical-validation milestones (technology
+readiness level, third-party replication, bench → pilot → commercial data);
+**yield** (good-unit rate) and a credible plan to improve it; the cost curve —
+unit cost today vs. at the next round, with the learning-rate assumption stated;
+backlog and LOIs (evidence a buyer exists, not just that the tech works);
+secured manufacturing partners and supply chain; certifications.
+**Pitfalls.** Expecting software multiples on a capex-heavy, slow-margin
+business; underestimating capex (hidden install / logistics / commissioning
+costs run well above the headline) and the difficulty of scale; conflating
+technical risk with market risk — both must be retired separately; overclaiming
+"deep tech" for what is a routine recombination of known parts.
+
+### 19. Fintech — take-rate vs. balance-sheet
+**Essence.** Fintech is not one business model, and the first move is to state
+**which revenue structure** it is — because that sets the valuation frame.
+*Take-rate / fee revenue* (payments, embedded finance, BaaS) is capital-light,
+scales like software, and earns a higher multiple. *Balance-sheet / spread
+revenue* (lending, parts of neobanking, full-stack insurance) funds assets off
+its own balance sheet, carries credit risk and regulatory capital, and is valued
+on risk-adjusted spread or book value — *not* on revenue multiples. The thesis
+states the current mix and shows an evidenced path toward the higher-multiple
+structure. The moat is "**fin, not tech**" — regulatory licences, risk-bearing
+capacity, transaction data and funding-cost advantage, not UI; a licence is both
+a moat and a constraint, so frame the compliance apparatus as evidence of
+operating maturity and quantify the capital drag on returns.
+**When to use.** Payments, lending, neobanks, embedded finance, insurtech.
+**Proof investors expect.** The volume → revenue bridge stated explicitly
+(transaction volume × take-rate = revenue — TPV is *not* revenue); risk-adjusted
+unit economics; for any lending or insurance balance-sheet exposure — the
+credit-loss rate, cohort / vintage delinquency, funding cost, regulatory-capital
+adequacy, and behaviour modelled through a full credit cycle; a path to
+profitability.
+**Pitfalls.** Presenting GMV / TPV (or gross written premium) as if it were
+revenue; optimistic credit-loss assumptions, or low loss rates from immature
+vintages shown as steady-state; a credit model never tested through a downturn;
+applying SaaS multiples to spread revenue; treating a licence only as a moat
+while ignoring its capital and compliance cost.
+
+---
+
 ## Sources
 
 - 7 Powers — https://7powers.com/ ; https://quartr.com/insights/edge/diving-deep-into-helmers-7-powers-using-company-examples
@@ -259,3 +349,11 @@ inferior to specialists on each feature. Ignoring re-bundling counterattacks.
 - NRR / PLG / usage-based benchmarks — https://www.growthunhinged.com/p/2025-saas-benchmarks-report ; https://www.feinternational.com/blog/net-revenue-retention-saas-valuation
 - PLG growth / PQL conversion benchmarks — OpenView "Product Benchmarks" research (verify against the latest figures before citing in a live document)
 - Vertical SaaS / embedded fintech — https://www.fractalsoftware.com/perspectives/the-vertical-saas-fintech-playbook ; https://upper90.medium.com/vertical-operating-systems-and-embedded-fintech-6d0cabfd144c
+- Biotech valuation (rNPV, platform vs. asset) — https://www.alacrita.com/whitepapers/valuing-pharmaceutical-assets-when-to-use-npv-vs-rnpv ; https://www.altitudelab.org/articles/why-investors-tend-to-fund-platforms-over-assets ; https://www.drugpatentwatch.com/blog/the-dual-shields-a-strategic-analysis-of-orphan-drug-exclusivity-and-patent-protection-in-the-modern-pharmaceutical-landscape/
+- Hardware / deep tech (FOAK→NOAK, learning curve) — https://www.ctvc.co/from-foak-to-noak/ ; https://climatedrift.substack.com/p/the-foak-field-guide ; https://ourworldindata.org/learning-curve
+- Fintech (take-rate vs. balance-sheet, moats, regulation) — https://notes.mtb.xyz/p/fintechs-moats-dont-compile ; https://www.qedinvestors.com/blog/fintechs-next-chapter-scaled-winners-and-emerging-disruptors-2 ; https://ibinterviewquestions.com/guides/fig-investment-banking/fintech-valuation-revenue-multiples-unit-economics
+- Insurtech (loss / combined ratio, MGA vs. full-stack) — https://www.finrofca.com/news/insurtech-revenue-multiples-2025
+
+Note: industry benchmarks (probabilities of success, exclusivity periods,
+learning rates, valuation multiples) shift by year, region and segment — verify
+against current data before citing a specific figure in a live document.
