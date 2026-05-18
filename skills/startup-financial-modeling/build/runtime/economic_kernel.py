@@ -743,32 +743,37 @@ def extract_price(text: str, profile: MechanicProfile, currency: str = "JPY") ->
         return 0
     # (pattern, always_annual) — `月額` is monthly; ACV is annual by definition;
     # the other patterns are annual only when annual cues sit next to them.
-    # `sells/sold for|at` and the number-first "$X per <unit-noun>" form cover
-    # natural unit-price phrasing that no cue keyword sits next to. The
-    # `s?\b` after the unit noun matches the plural and blocks a partial-word
-    # match (e.g. `seat` inside `seating`).
-    candidates: list[tuple[str, bool | None]] = [
-        (rf"月額\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*円?", False),
-        (
-            rf"(?:price|pricing|fee|subscription|lease|rental|unit price|"
-            rf"単価|価格|利用料)"
-            rf"[^0-9¥$]{{0,32}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?",
-            None,
-        ),
-        # `sells/sold for|at` requires an explicit currency mark, so a volume
-        # or duration after the verb ("sold for 3 years") is not read as a
-        # price.
-        (
-            rf"(?:sells?|sold)\s+(?:for|at)[^0-9¥$]{{0,16}}[¥$]\s*"
-            rf"([0-9,.]+)\s*{_PRICE_UNIT}?",
-            None,
-        ),
-        (
-            rf"[¥$]\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*(?:per|/|あたり)\s*"
-            rf"(?:{_UNIT_NOUN})s?\b",
-            None,
-        ),
-    ]
+    # `sells/sold for|at` requires a currency mark, so a volume or duration
+    # after the verb ("sold for 3 years") is not read as a price. The
+    # number-first "$X per <unit-noun>" form covers phrasing no cue keyword
+    # sits next to; its `s?\b` matches the plural and blocks a partial-word
+    # match.
+    month = (rf"月額\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*円?", False)
+    sells = (
+        rf"(?:sells?|sold)\s+(?:for|at)[^0-9¥$]{{0,16}}[¥$]\s*"
+        rf"([0-9,.]+)\s*{_PRICE_UNIT}?",
+        None,
+    )
+    keyword = (
+        rf"(?:price|pricing|fee|subscription|lease|rental|unit price|"
+        rf"単価|価格|利用料)"
+        rf"[^0-9¥$]{{0,32}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?",
+        None,
+    )
+    per_unit = (
+        rf"[¥$]\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*(?:per|/|あたり)\s*"
+        rf"(?:{_UNIT_NOUN})s?\b",
+        None,
+    )
+    # For hardware, the unit sale is the primary revenue: an explicit
+    # "sells/sold for $X" outranks an incidental attach-revenue keyword
+    # ("a support subscription at $X/year"). Every other profile keeps the
+    # keyword cue first — its subscription / fee price is the primary one.
+    candidates: list[tuple[str, bool | None]] = (
+        [month, sells, keyword, per_unit]
+        if profile.key == "hardware_asset_heavy"
+        else [month, keyword, sells, per_unit]
+    )
     if profile.key != "hardware_asset_heavy":
         candidates.append(
             (rf"ACV[^0-9¥$]{{0,24}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?", True),
@@ -1738,13 +1743,25 @@ def extract_source_facts(source_md: Path) -> SourceFacts:
 
 
 # Asset-heavy hardware spans two revenue models: outright unit sales and
-# recurring leasing / robot-as-a-service. A unit-sale narrative names a
-# per-unit sale price; a recurring cue (lease, RaaS, 月額, ARR, subscription)
-# keeps the default recurring model.
-_UNIT_SALE_CUE = re.compile(
-    r"sells?\s+for|sale\s+price|unit\s+price|price\s+per\s+"
+# recurring leasing / robot-as-a-service.
+#
+# A strong sale cue names an unambiguous one-time sale ("sells for $X"); it
+# establishes a unit-sale business on its own — a mention of attach revenue
+# (a support subscription) does not override it. An ambiguous unit-price cue
+# ("unit price") could be a monthly rate, so it yields unit_sale only when no
+# recurring cue competes. A recurring cue (lease, RaaS, 月額, ARR, ...) is the
+# default model.
+# `sells/sold for` is an unambiguous one-time sale. `sold/sells at` is left
+# out of the strong set — "sold at a monthly rate" is recurring — and lands
+# in the ambiguous set, which defers to the recurring-cue check.
+_STRONG_SALE_CUE = re.compile(
+    r"(?:sells?|sold)\s+for|sale\s+price|販売価格",
+    flags=re.IGNORECASE,
+)
+_UNIT_PRICE_CUE = re.compile(
+    r"unit\s+price|price\s+per\s+"
     r"(?:unit|robot|device|machine|vehicle|drone)|per-unit\s+price|"
-    r"販売価格|1\s*台\s*あたり",
+    r"(?:sells?|sold)\s+at|1\s*台\s*あたり",
     flags=re.IGNORECASE,
 )
 _RECURRING_CUE = re.compile(
@@ -1760,13 +1777,15 @@ def detect_revenue_mode(text: str, profile: MechanicProfile) -> str:
     """Revenue-recognition model for the plan.
 
     Asset-heavy hardware is sold outright in some plans and leased / offered
-    as a service in others. A narrative that names a per-unit sale price and
-    carries no recurring cue is modeled as ``unit_sale`` (revenue = units
-    shipped x price); every other plan stays ``recurring``.
+    as a service in others. A strong one-time sale cue makes it ``unit_sale``
+    outright; an ambiguous unit-price cue makes it ``unit_sale`` only when no
+    recurring cue competes. Every other plan stays ``recurring``.
     """
     if profile.key != "hardware_asset_heavy":
         return "recurring"
-    if _UNIT_SALE_CUE.search(text) and not _RECURRING_CUE.search(text):
+    if _STRONG_SALE_CUE.search(text):
+        return "unit_sale"
+    if _UNIT_PRICE_CUE.search(text) and not _RECURRING_CUE.search(text):
         return "unit_sale"
     return "recurring"
 

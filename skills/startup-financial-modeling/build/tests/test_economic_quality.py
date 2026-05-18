@@ -1301,6 +1301,42 @@ def test_monthly_priced_hardware_stays_recurring() -> None:
     )
 
 
+def test_hardware_unit_sale_survives_an_attach_subscription() -> None:
+    """A hardware plan that sells units outright stays a unit-sale business
+    even when it mentions an attach support subscription — one recurring
+    word must not flip the revenue model, nor steal the unit price."""
+    story = (
+        "# Robotics hardware plan\n\nThe company manufactures industrial "
+        "robots. Each unit sells for $48,000, with an attached firmware-"
+        "support subscription at $1,800 per unit per year. We ship 50 units "
+        "in year one and target 600 units by year five. Gross margin target "
+        "is 38%. 5-year plan, Series B. Source: management forecast.\n"
+    )
+    facts = kernel.derive_source_facts(story)
+    assert kernel.mechanic_key(facts) == "hardware_asset_heavy"
+    assert facts.revenue_mode == "unit_sale", (
+        "an attach subscription flipped the unit-sale plan to recurring"
+    )
+    assert facts.monthly_price_yen[0] == 48000, (
+        f"the attach price was taken instead of the $48,000 sale price: "
+        f"{facts.monthly_price_yen[0]}"
+    )
+    revenue = kernel.plan_revenue_series(
+        facts.new_units, facts.gmv_yen, facts.monthly_price_yen,
+        facts.take_rate, facts.other_revenue_share, facts.revenue_mode,
+    )
+    for idx, (units, price) in enumerate(
+        zip(facts.new_units, facts.monthly_price_yen)
+    ):
+        unit_sale = units * price
+        # The 1.3x headroom is the other-revenue uplift (attach revenue
+        # layered on the unit sale) — not a recurring x12 figure.
+        assert unit_sale <= revenue[idx] <= unit_sale * 1.3, (
+            f"period {idx}: revenue {revenue[idx]:,.0f} is not a unit-sale "
+            f"figure (units x price = {unit_sale:,.0f})"
+        )
+
+
 def test_marketplace_kpi_uses_a_transaction_lens() -> None:
     """A GMV / take-rate marketplace shows transaction economics on the KPI
     dashboard — not per-seat subscription rows that read price 0, negative
@@ -1406,6 +1442,7 @@ if __name__ == "__main__":
         test_unit_target_extraction_handles_mixed_scale_phrasing,
         test_hardware_revenue_is_units_times_sale_price,
         test_monthly_priced_hardware_stays_recurring,
+        test_hardware_unit_sale_survives_an_attach_subscription,
         test_marketplace_kpi_uses_a_transaction_lens,
     ]
     for _test in _tests:
