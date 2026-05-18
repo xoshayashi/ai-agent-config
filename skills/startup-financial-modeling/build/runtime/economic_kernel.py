@@ -718,6 +718,9 @@ def extract_currency(text: str) -> str:
 # "b" of "but" once parsed as "billion" (cf. the same fix for GMV extraction).
 _PRICE_UNIT = r"(万|億|百万|[mMbB](?![A-Za-z]))"
 
+# Economic-unit nouns for the number-first "$X per <unit>" price pattern.
+_UNIT_NOUN = r"unit|robot|device|machine|vehicle|drone|seat|user|customer|台"
+
 
 # Markers that a stated price is annual, so it must be divided to a monthly
 # figure. ACV (Annual Contract Value) is annual by definition.
@@ -739,8 +742,9 @@ def extract_price(text: str, profile: MechanicProfile, currency: str = "JPY") ->
     # (pattern, always_annual) — `月額` is monthly; ACV is annual by definition;
     # the other patterns are annual only when annual cues sit next to them.
     # `sells/sold for|at` and the number-first "$X per <unit-noun>" form cover
-    # natural unit-price phrasing that no cue keyword sits next to.
-    unit_noun = r"unit|robot|device|machine|vehicle|drone|seat|user|customer|台"
+    # natural unit-price phrasing that no cue keyword sits next to. The
+    # `s?\b` after the unit noun matches the plural and blocks a partial-word
+    # match (e.g. `seat` inside `seating`).
     candidates: list[tuple[str, bool | None]] = [
         (rf"月額\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*円?", False),
         (
@@ -751,7 +755,7 @@ def extract_price(text: str, profile: MechanicProfile, currency: str = "JPY") ->
         ),
         (
             rf"[¥$]\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*(?:per|/|あたり)\s*"
-            rf"(?:{unit_noun})",
+            rf"(?:{_UNIT_NOUN})s?\b",
             None,
         ),
     ]

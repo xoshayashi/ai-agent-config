@@ -195,10 +195,18 @@ def test_unit_price_is_extracted_from_natural_phrasing() -> None:
     assert kernel.extract_price(
         "Each robot sells for $48,000.", hw, "USD"
     ) == 48000, "'sells for $X' unit price was not extracted"
+    assert kernel.extract_price(
+        "Each robot is sold at $48,000.", hw, "USD"
+    ) == 48000, "'sold at $X' unit price was not extracted"
     # No cue keyword at all — the number-first "$X per <unit>" form.
     assert kernel.extract_price(
         "Ships at $48,000 per unit.", hw, "USD"
     ) == 48000, "'$X per unit' unit price was not extracted"
+    # The unit noun is word-bounded: "seat" inside "seating" must not match,
+    # so "$900 per seating chart" is not read as a $900 unit price.
+    assert kernel.extract_price(
+        "$900 per seating chart.", hw, "USD"
+    ) != 900, "word-boundary guard failed: a partial-word unit noun matched"
 
 
 def test_monthly_burn_phrasing_does_not_flip_model_grain() -> None:
