@@ -517,6 +517,31 @@ def _take_rate_series(take: float, periods: int) -> list[float]:
     return [min(take + 0.004 * idx, 0.25) for idx in range(periods)]
 
 
+def extract_rd_headcount(text: str) -> int:
+    """Stated current R&D / engineering / product team size, or 0.
+
+    A narrative that states the team it already runs ("a 32-person R&D
+    team") pins the people-cost base; the auto-derived ramp would size it
+    from revenue / units and badly understate an R&D-heavy plan.
+    """
+    # Every pattern requires explicit "team" framing — a bare "N engineers"
+    # is dropped, as it would match a hiring plan ("hire 15 engineers next
+    # year") or an incidental count ("a network of 500 researchers").
+    role = r"R&D|research|engineering|product|technical|dev(?:elopment)?"
+    patterns = [
+        rf"([0-9]{{1,4}})[-\s]person\s+(?:{role})\s+team",
+        rf"(?:{role})\s+team\s+of\s+([0-9]{{1,4}})",
+        rf"team\s+of\s+([0-9]{{1,4}})\s+(?:engineers|researchers|developers)",
+    ]
+    for pattern in patterns:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            count = int(match.group(1))
+            if 0 < count < 10_000:
+                return count
+    return 0
+
+
 def _headcount_plan(profile: MechanicProfile, ending: list[int], revenue: list[int]) -> tuple[list[int], list[int], list[int], list[int]]:
     """Create editable staffing assumptions from scale, not a company example."""
     asset_heavy = profile.key in {"hardware_asset_heavy", "fintech_balance_sheet"}
@@ -1939,6 +1964,15 @@ def derive_source_facts(
         int(1_000_000_000 * money_scale),
     )
     product_hc, gtm_hc, ops_hc, ga_hc = _headcount_plan(profile, ending, gmv)
+    # Honor a stated current R&D / engineering team size: scale the product
+    # headcount ramp so period 0 lands on it, preserving the ramp shape. The
+    # auto-derived ramp scales with revenue / units, which badly understates
+    # an R&D-heavy plan (a 32-person team modeled as 4) and so understates
+    # its people-cost burn.
+    stated_rd_headcount = extract_rd_headcount(text)
+    if stated_rd_headcount > 0 and product_hc and product_hc[0] > 0:
+        factor = stated_rd_headcount / product_hc[0]
+        product_hc = [max(1, int(round(value * factor))) for value in product_hc]
     total_hc = [a + b + c + d for a, b, c, d in zip(product_hc, gtm_hc, ops_hc, ga_hc)]
     curves = _operating_assumption_curves(profile, periods)
     avg_comp = [int(value * money_scale) for value in _curve(16_000_000, 14_500_000, periods)]

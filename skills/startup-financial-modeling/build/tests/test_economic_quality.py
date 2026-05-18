@@ -480,6 +480,28 @@ def test_payroll_is_not_absurd_at_maturity() -> None:
         assert ratio < 1.5, f"{name}: mature payroll/revenue ratio {ratio:.2f}"
 
 
+def test_stated_rd_team_size_anchors_the_headcount_plan() -> None:
+    """A stated current R&D team size pins the people-cost base — the
+    auto-derived ramp must not size an R&D-heavy plan from revenue alone."""
+    assert kernel.extract_rd_headcount("We run a 32-person R&D team.") == 32
+    assert kernel.extract_rd_headcount("An engineering team of 25.") == 25
+    assert kernel.extract_rd_headcount("No team size stated.") == 0
+    # A bare "N engineers" with no team framing is not a team size.
+    assert kernel.extract_rd_headcount("We plan to hire 15 engineers.") == 0
+    facts = kernel.derive_source_facts(
+        "# Deep-tech plan\n\nA pre-revenue deep-tech company. There is no "
+        "product revenue during the plan. We run a 32-person R&D team. "
+        "5-year plan, seed round. Source: roadmap memo.\n"
+    )
+    # Scaling pins period 0 exactly on the stated team size.
+    assert facts.product_headcount[0] == 32, (
+        f"a stated 32-person R&D team was ignored; period-0 product "
+        f"headcount = {facts.product_headcount[0]}"
+    )
+    # The ramp shape is preserved — headcount still grows.
+    assert facts.product_headcount[-1] > facts.product_headcount[0]
+
+
 def test_economic_audit_passes_for_healthy_archetypes() -> None:
     """The economic-coherence audit must clear a sound plan, every archetype."""
     for name, story in ARCHETYPES.items():
@@ -1504,6 +1526,7 @@ if __name__ == "__main__":
         test_jpy_narratives_are_not_misdetected_as_usd,
         test_yaml_can_override_the_fx_rate,
         test_payroll_is_not_absurd_at_maturity,
+        test_stated_rd_team_size_anchors_the_headcount_plan,
         test_economic_audit_passes_for_healthy_archetypes,
         test_economic_audit_catches_a_broken_cost_stack,
         test_economic_audit_catches_insolvency,
