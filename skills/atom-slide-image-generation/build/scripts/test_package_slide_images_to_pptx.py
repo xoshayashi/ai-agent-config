@@ -35,6 +35,25 @@ def png_bytes(width: int = 2048, height: int = 1152) -> bytes:
 
 
 def approved_manifest(image_paths: list[Path]) -> dict[str, object]:
+    deck_only_design_statuses = {
+        "deck_tone_consistency_status": "approved",
+        "illustration_consistency_status": "approved",
+    }
+    approved_design_statuses = {
+        "post_generation_design_balance_status": "approved",
+        "whitespace_occupancy_balance_status": "approved",
+        "density_balance_status": "approved",
+        "typography_balance_status": "approved",
+        "color_consistency_status": "approved",
+        "outer_padding_consistency_status": "approved",
+        "header_integrity_status": "approved",
+        "multimodal_design_review_status": "approved",
+        "design_balance_gate_status": "approved",
+        "occupancy_density_fit_status": "approved",
+        "font_scale_unity_status": "approved",
+        "palette_role_unity_status": "approved",
+        "design_breakage_blocker_status": "approved",
+    }
     return {
         "all_generated_images_reviewed": True,
         "weak_slide_regeneration_queue": [],
@@ -44,12 +63,17 @@ def approved_manifest(image_paths: list[Path]) -> dict[str, object]:
         "deck_unity_status": "approved",
         "completion_ready_status": "approved",
         "review_manifest_status": "approved",
+        **deck_only_design_statuses,
+        **approved_design_statuses,
         "slides": [
             {
                 "slide_id": str(idx),
                 "png_path": str(path),
                 "image_review_status": "approved",
                 "final_image_quality_status": "approved",
+                "content_quality_status": "approved",
+                "design_quality_status": "approved",
+                **approved_design_statuses,
                 "blockers": [],
                 "majors": [],
             }
@@ -110,6 +134,54 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             images = pptx_packager.collect_images([str(image)])
 
             with self.assertRaises(SystemExit):
+                pptx_packager.validate_review_manifest(str(manifest), images)
+
+    def test_rejects_missing_design_balance_manifest_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
+            manifest = root / "review.json"
+            image.write_bytes(png_bytes())
+            data = approved_manifest([image])
+            del data["post_generation_design_balance_status"]
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+            images = pptx_packager.collect_images([str(image)])
+
+            with self.assertRaisesRegex(SystemExit, "post_generation_design_balance_status must be approved"):
+                pptx_packager.validate_review_manifest(str(manifest), images)
+
+    def test_rejects_missing_deck_only_design_manifest_status(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
+            manifest = root / "review.json"
+            image.write_bytes(png_bytes())
+            data = approved_manifest([image])
+            del data["deck_tone_consistency_status"]
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+            images = pptx_packager.collect_images([str(image)])
+
+            with self.assertRaisesRegex(SystemExit, "deck_tone_consistency_status must be approved"):
+                pptx_packager.validate_review_manifest(str(manifest), images)
+
+    def test_rejects_unapproved_slide_multimodal_design_review(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
+            manifest = root / "review.json"
+            image.write_bytes(png_bytes())
+            data = approved_manifest([image])
+            data["slides"][0]["multimodal_design_review_status"] = "repair_required"
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+            images = pptx_packager.collect_images([str(image)])
+
+            with self.assertRaisesRegex(SystemExit, "slide 1 multimodal_design_review_status must be approved"):
                 pptx_packager.validate_review_manifest(str(manifest), images)
 
     def test_rejects_derived_png_input_paths(self) -> None:

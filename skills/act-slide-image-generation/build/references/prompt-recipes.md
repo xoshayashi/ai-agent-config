@@ -124,6 +124,7 @@ design_breakage_blocker_lock:
 secondary_region_integrity_lock:
 body_silhouette_lock:
 post_generation_design_balance_check:
+post_generation_design_balance_status:
 pre_package_image_review:
 post_generation_full_deck_review_loop:
 all_generated_images_reviewed:
@@ -138,12 +139,20 @@ regenerate_until_quality_approved:
 generation_block_rule:
 review_manifest:
 review_manifest_status: approved
+review_manifest_design_status_gate:
 validate_review_manifest:
 whitespace_occupancy_balance_status:
+density_balance_status:
 typography_balance_status:
 color_consistency_status:
 outer_padding_consistency_status:
 header_integrity_status:
+multimodal_design_review_status:
+design_balance_gate_status:
+occupancy_density_fit_status:
+font_scale_unity_status:
+palette_role_unity_status:
+design_breakage_blocker_status:
 deck_header_master_lock:
   coordinate_basis:
   status: exact_required_before_generation
@@ -715,6 +724,7 @@ Content:
 - source_placeholder_blocklist passes: no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions appears as Source text
 - nonconforming_existing_png_regeneration_lock passes: any existing/source PNG at 1672x941 or another non-approved package size was not treated as a final blocker or converted locally; a new 2048x1152 Codex built-in gpt-image-2 master was generated from the approved specification before packaging
 - output_artifact_mastering_lock passes: `slides_final/` is the only loose-PNG master and package/render-check artifacts reference it
+- review_manifest_design_status_gate passes: deck-level and slide-level manifest entries approve post_generation_design_balance_status, whitespace_occupancy_balance_status, density_balance_status, typography_balance_status, color_consistency_status, outer_padding_consistency_status, header_integrity_status, multimodal_design_review_status, design_balance_gate_status, occupancy_density_fit_status, font_scale_unity_status, palette_role_unity_status, and design_breakage_blocker_status
 - pdf_export_source_lock passes: PDF outputs are created from `slides_final/` master PNGs; `render_check/pdf_pages/` is rendered-back QA only
 - no_duplicate_png_output_lock passes: no duplicate loose final PNG copies remain across `slides_final/`, `slides_package/`, and `render_check/pdf_pages/`
 - contact_sheet_mastering_lock passes: only one retained contact sheet exists by default, unless one explicit delivery comparison sheet or render diff report is needed
