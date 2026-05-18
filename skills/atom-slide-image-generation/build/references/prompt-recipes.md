@@ -57,10 +57,26 @@ pptx_image_mapping:
 pptx_speaker_notes_mapping:
 speaker_notes_plan:
 speaker_notes_status:
+speaker_notes_depth_lock:
+speaker_notes_persuasion_lock:
 speaker_notes_text:
+speaker_notes_landing:
+speaker_notes_signpost:
+notes_hook:
+notes_objection_preempt:
+notes_delivery_markers:
+notes_persuasion_arc:
 opening_slide_role:
 first_slide_not_title_only:
 opening_density_gate:
+ask_present:
+top_risk_named:
+governing_thought:
+pyramid_logic_lock:
+predecessor_question:
+title_exhibit_proof_match:
+mece_support_gate:
+body_logic:
 layout_archetype:
 layout_family:
 composition_family:
@@ -84,6 +100,10 @@ master_components:
 deck_master_refs:
 deck_tone_master_lock:
 visual_design_quality_traits:
+chart_emphasis_lock:
+encoding_consistency_lock:
+number_format_normalization_lock:
+benchmark_reference_line:
 imageability_lock:
 concrete_visual_anchor:
 observable_scene_or_object:
@@ -177,7 +197,7 @@ density_design:
   semantic_copy_gate: [major body labels use meaningful clauses/sentences; noun-only labels are allowed only for headers, axes, or category names]
   icon_restraint_plan: [necessary icons, why they clarify, and which icon candidates were removed because text/structure communicates better]
   icon_density_budget: [default 0-3 purposeful icons per slide and keep icon count below semantic text units unless the visual logic demands otherwise]
-  density_levers: [KPI strip, supporting context region, evidence strip, small multiples, annotations, benchmark/context column, source cue]
+  density_levers: [KPI strip, supporting context region, evidence strip, small multiples, annotations, benchmark/context column, benchmark/target/prior-period reference line, source cue]
   overload_controls: [one dominant structure, max three major regions, body >=18pt equivalent, grouped labels, no decorative density]
 information_unit_budget:
 density_number_policy: no default cap on decision-relevant numbers; remove only unsupported, redundant, unreadable, or decorative numbers
@@ -271,6 +291,7 @@ ATOM slide contract:
 - contact_sheet_mastering_lock: one retained contact_sheet_review.png by default; comparison sheet only when delivery QA requires it
 - Do not drop real source names to reduce visual density; shorten or group source names instead.
 - draft speaker_notes_text for every deck slide before image generation; keep notes off the slide image and out of the exact on-slide text
+- speaker_notes_persuasion_lock: notes stage current-state vs intended-future tension, balance logos with selective ethos and pathos, end with a landing sentence and signpost transition, and may add a justified hook, objection pre-empt, or delivery markers; keep this persuasion layer off the slide image
 - assign visual_richness_role, illustration_intensity, creative_variance, and density_tier before generation
 - define density_design before generation: reader_mode, decision_question, information_units, density_levers, overload_controls, information_unit_budget, and density_guardrails
 - density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
@@ -283,6 +304,10 @@ ATOM slide contract:
 - use issue trees, driver trees, 2x2 matrices, value chains, funnels, waterfalls, KPI bridges, decision tables, before/after bridges, or hypothesis-evidence-implication rows when they improve the reader's decision path; skip them when they would clutter the focal message
 - structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation
 - add density through decision-relevant comparisons, benchmarks, units, denominators, assumptions, annotations, evidence strips, supporting context regions, small multiples, and source cues; never through smaller type or decorative illustration detail
+- chart_emphasis_lock: gray out non-focal data, place the decision-carrying number as a direct on-mark label, and label series directly instead of using a legend; render non-focal series/bars/rows/nodes in one quiet neutral gray so the accent color marks only the element the action title is about, and use a separate legend only when 5+ series force it
+- encoding_consistency_lock: same meaning keeps the same fill/color/shape and scale across the deck, and no distinction relies on hue alone; reuse one deck-level encoding legend for scenario (actual/plan/forecast), variance sign, and category, keep one non-truncated scale per repeated unit, and pair every color difference with a label, shape, fill pattern, or position cue
+- number_format_normalization_lock: normalize decimal precision, magnitude abbreviation, axis ticks, and period notation before freezing exact_text so the same metric formats identically across the deck
+- when a chart shows a level or trend, add one thin labeled reference line (target, prior period, or peer benchmark) so the value reads as above or below a meaningful bar
 - imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation
 - editorial_polish_repair_loop: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm
 - visual_subject_open_set, message_led_composition_lock, and composition_fit_plan: choose the visual subject, focal relationship, and canvas occupancy from the argument before image prompting
@@ -339,11 +364,11 @@ Convert the following long text into a guideline-aware slide-image deck structur
 Process:
 1. Extract the deck thesis and audience decision.
 2. Create intake_map with source_span_id values for chapters, facts, quotes, assumptions, and uncertainties.
-3. Choose one storyline frame: SCQA, problem-solution-evidence, past-present-future, context-problem-solution-differentiation, or thesis-risk-milestones.
-4. Draft slide-level action titles as standalone messages. No topic labels; slide 1 should be an opening_thesis_slide, not a title-only opener.
-5. Apply message_sharpness_lock: each action title names actor/topic, change/tension, and implication; repair vague labels, slogans, or generic benefit claims.
-6. Build message_backlog, evidence_ledger, source_ledger, appendix_candidates, and open_questions.
-7. For each message, assign supporting evidence, source policy, visual structure, visual richness role, illustration intensity, creative variance, density tier, and density risk.
+3. Choose one storyline frame: SCQA, problem-solution-evidence, past-present-future, context-problem-solution-differentiation, or thesis-risk-milestones. State the deck's single governing_thought and run governing_thought_gate so every action title answers a question that thought raises; record notes_persuasion_arc.
+4. Draft slide-level action titles as standalone messages. No topic labels; slide 1 should be an opening_thesis_slide, not a title-only opener. For decision/recommendation decks confirm ask_present and top_risk_named on the opener or slide 2.
+5. Apply message_sharpness_lock: each action title names actor/topic, change/tension, and implication; repair vague labels, slogans, or generic benefit claims. Apply pyramid_logic_lock: build a vertical_logic_chain so each title answers the question its predecessor raises.
+6. Build message_backlog, evidence_ledger, source_ledger, appendix_candidates, and open_questions. Apply mece_support_gate: run mece_check on multi-point slides and declare body_logic as inductive or deductive.
+7. For each message, assign supporting evidence, source policy, visual structure, visual richness role, illustration intensity, creative variance, density tier, and density risk. Run title_exhibit_proof_match: name the exhibit element that proves the action title. Apply chart_emphasis_lock, encoding_consistency_lock, and number_format_normalization_lock on chart/table slides.
 8. Run impact_clarity_density_gate: each slide has one unmistakable takeaway, one dominant visual structure, a useful evidence layer, and a simple reading path; repair slides that feel flat, vague, thin, or cluttered.
 9. Run a density design gate for each slide: set reader_mode, decision_question, information_units, semantic_sentence_layer, semantic_copy_gate, icon_restraint_plan, icon_density_budget, density_levers, overload_controls, information_unit_budget, and density_guardrails.
 10. Apply sentence_density_lift_lock, semantic_copy_gate, icon_restraint_lock, and icon_density_budget before image prompting: if the slide reads as icons plus noun labels, add compact explanatory clauses/sentences and reduce icons until the argument is understandable without narration.
@@ -353,11 +378,15 @@ Process:
 14. Define deck_header_master_lock, invisible footer alignment baseline, Insight surface master, and repeated table/card/icon masters before image generation.
 15. Read only the action titles in order and repair logical gaps before image generation.
 16. Freeze quoted exact_text for every slide; do not leave copywriting to image generation.
-17. Draft speaker_notes_text for every slide: talk track, evidence/assumption cue, source caveat when relevant, and transition cue.
+17. Draft speaker_notes_text for every slide: talk track, evidence/assumption cue, source caveat when relevant, and transition cue. Apply speaker_notes_persuasion_lock: stage current-state vs intended-future tension, balance logos with selective ethos and pathos, end with a landing sentence and a signpost transition, and add a justified notes_hook, notes_objection_preempt, or delivery markers only where they help.
 18. For each final slide, produce the canonical planning block and then the image prompt.
 
 Output:
 - deck_thesis:
+- governing_thought:
+- governing_thought_gate:
+- notes_persuasion_arc:
+- vertical_logic_chain:
 - audience_decision:
 - primary_guideline:
 - guideline_priority:
@@ -374,9 +403,17 @@ Output:
     chapter:
     action_title:
     message_sharpness_lock:
+    pyramid_logic_lock:
+    predecessor_question:
+    title_exhibit_proof_match:
+    mece_support_gate:
+    mece_check:
+    body_logic:
     opening_slide_role:
     first_slide_not_title_only:
     opening_density_gate:
+    ask_present:
+    top_risk_named:
     reader_question_answered:
     message_type:
     evidence_items:
@@ -395,9 +432,16 @@ Output:
     source_line:
     source_urls:
     assumptions:
+    speaker_notes_depth_lock:
+    speaker_notes_persuasion_lock:
     speaker_notes_text:
     speaker_notes_source_cues:
     speaker_notes_transition:
+    speaker_notes_landing:
+    speaker_notes_signpost:
+    notes_hook:
+    notes_objection_preempt:
+    notes_delivery_markers:
     visual_structure:
     visual_richness_role:
     signature_visual_plan:
@@ -415,6 +459,10 @@ Output:
       density_levers:
       overload_controls:
     evidence_compression_ladder:
+    chart_emphasis_lock:
+    encoding_consistency_lock:
+    number_format_normalization_lock:
+    benchmark_reference_line:
     information_unit_budget:
     density_guardrails:
     deck_header_master_lock:
@@ -459,9 +507,9 @@ Priority:
 Design constraints:
 
 Process:
-1. Define the deck thesis.
+1. Define the deck thesis and the single governing_thought; run governing_thought_gate and record notes_persuasion_arc.
 2. Read and apply the embedded ATOM design system first; use bundled ATOM mechanics only where compatible.
-3. Define each slide message as one sentence, with slide 1 as an opening_thesis_slide that passes opening_density_gate.
+3. Define each slide message as one sentence, with slide 1 as an opening_thesis_slide that passes opening_density_gate. Apply pyramid_logic_lock so each title answers the question its predecessor raises; for decision decks confirm ask_present and top_risk_named. Apply mece_support_gate on multi-point slides and declare body_logic as inductive or deductive.
 4. Select one layout_archetype, layout_family, and grid_mode for each slide.
 5. Create layout_diversity_plan and layout_rotation_guard so the sequence can use full-field, asymmetric main/supporting-context, balanced comparison, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase families where useful.
 6. Define the deck_header_master_lock with exact selected x/y/w/h/color/font values and carry it verbatim into every slide prompt.
@@ -470,12 +518,12 @@ Process:
 9. Ensure sentence_density_lift_lock, semantic_copy_gate, icon_restraint_lock, and icon_density_budget are satisfied before the final prompt: body content should read as meaningful clauses/sentences, while icons remain sparse support.
 10. Assign visual_design_quality_traits as visual treatment only: compact fixed header, thin structural lines, pale cards/tables, restrained icons, explanatory line drawings, stable outer padding, concrete visual anchor, and crisp focal hierarchy.
 11. Assign Insight components selectively across the deck only when they add non-redundant interpretation, decision weight, or reading speed. Start each slide from `insight_decision: none`, and keep a component only when `insight_justification_required` is satisfied. Apply `honey_selective_signal_lock`: Honey remains rare, purposeful, and bottom-bar-only.
-12. Vary dominant structures so the deck feels edited around the argument.
+12. Vary dominant structures so the deck feels edited around the argument. On chart/table slides apply chart_emphasis_lock, encoding_consistency_lock, and number_format_normalization_lock, and run title_exhibit_proof_match.
 13. Mark restrained illustration candidates where the idea becomes more memorable or fresh without becoming a rough sketch or glossy hero illustration.
 14. Flag slides that should split because density would force body below 18pt equivalent or create competing major regions.
 15. Define source policy per slide: none / real source list.
 16. Define deck-level master refs: header, invisible footer alignment baseline, Insight surface skeleton, table/card masters, icon circle sizes.
-17. Draft speaker_notes_text for every slide before generation. Each note should support presentation delivery, not duplicate all visible text: short talk track, key evidence or assumption to mention, source caveat if needed, and transition to the next slide.
+17. Draft speaker_notes_text for every slide before generation. Each note should support presentation delivery, not duplicate all visible text: short talk track, key evidence or assumption to mention, source caveat if needed, and transition to the next slide. Apply speaker_notes_persuasion_lock: stage current-state vs intended-future tension, balance logos with selective ethos and pathos, end with a landing sentence and signpost transition, and add a justified notes_hook, notes_objection_preempt, or delivery markers only where they help.
 18. Run Guideline/Brand, Header Master, Layout, Typography, Visual Richness, Density, Content, and Deck gates.
 ```
 
@@ -620,6 +668,12 @@ Typography:
 Content:
 - one message
 - title is a message, subtitle supports
+- pyramid_logic_lock passes: a single governing thought is stated, each action title answers the question its predecessor raises, and the title read-through is one connected argument
+- title_exhibit_proof_match passes: a named exhibit element proves the action title and the title claims nothing the exhibit cannot show
+- mece_support_gate passes: supporting points are mutually exclusive and collectively exhaustive, and body_logic is declared inductive or deductive
+- chart_emphasis_lock passes: non-focal data is grayed out, the decision-carrying number is a direct on-mark label, and series are labeled directly unless 5+ series force a legend
+- encoding_consistency_lock passes: scenario/variance/category encodings and repeated-unit scales are constant across the deck, and no distinction relies on hue alone
+- number_format_normalization_lock passes: decimal precision, magnitude abbreviation, axis ticks, and period notation are normalized for each metric
 - density_design answers a clear decision_question and does not rely on smaller type or decorative detail
 - structure_choice_bias and structured_density_bias are applied selectively: structure and density increase the decision value without turning every slide into a rigid template
 - sentence_density_lift_lock is applied: the slide uses compact meaningful clauses/sentences where the reader needs relationships, reasons, consequences, or decision relevance, and is not an icon-and-keyword-only composition
@@ -664,6 +718,7 @@ Deck:
 - Insight components are selective and compatible with the embedded ATOM design system
 - PPTX/PDF roll-up contains exactly one full-bleed generated PNG per slide, in order
 - speaker notes exist on every slide and match the slide message, evidence, caveats, and transition
+- speaker_notes_persuasion_lock passes: notes stage current-state vs intended-future tension, balance logos with selective ethos and pathos, end with a landing sentence and signpost transition, stay consistent with notes_persuasion_arc, and add hook/objection-preempt/delivery markers only where justified
 
 For every fail:
 1. Explain the issue.
