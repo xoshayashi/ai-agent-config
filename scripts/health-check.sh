@@ -246,9 +246,9 @@ else
     "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status" \
     "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status" \
     "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status"
+  printf 'shell: zshrc=%s\n' "$shell_zshrc_status"
   printf 'notifications: codex=%s claude=%s gemini=%s\n' \
     "$codex_notify_status" "$claude_notify_status" "$gemini_notify_status"
-  printf 'shell: zshrc=%s\n' "$shell_zshrc_status"
 fi
 
 if [ "$strict" = "1" ] && [ "$(overall_status)" != "ok" ]; then
