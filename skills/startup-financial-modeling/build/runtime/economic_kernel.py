@@ -128,6 +128,8 @@ class SourceFacts:
     source_unknowns: list[str]
     new_units: list[int]
     gmv_yen: list[int]
+    # Monthly subscription price under `recurring`; the one-time per-unit
+    # sale price under `revenue_mode == "unit_sale"` (see _period_subtotal_revenue).
     monthly_price_yen: list[int]
     take_rate: list[float]
     customers: list[int]
@@ -1209,6 +1211,8 @@ def calibrate_cost_stack_to_gross_margin(
         )
         revenue = subtotal * (1.0 + other_revenue_share[idx])
         variable = revenue * variable_cogs_pct[idx]
+        # Field-service cost accrues on deployed units every period (post-sale
+        # maintenance), independent of the revenue model.
         delivery = average[idx] * delivery_cost_yen[idx] * 12
         cloud = average[idx] * cloud_cost_yen[idx] * 12
         support = customers[idx] * support_cost_yen[idx] * 12
@@ -1528,6 +1532,8 @@ def implied_gross_margin_series(facts: SourceFacts) -> list[float]:
             margins.append(0.0)
             continue
         variable = rev * facts.variable_cogs_pct[idx]
+        # Field-service cost accrues on deployed units every period (post-sale
+        # maintenance), independent of the revenue model.
         delivery = average[idx] * facts.delivery_cost_yen[idx] * 12
         cloud = average[idx] * facts.cloud_cost_yen[idx] * 12
         support = facts.customers[idx] * facts.support_cost_yen[idx] * 12
@@ -1628,7 +1634,8 @@ _UNIT_SALE_CUE = re.compile(
 )
 _RECURRING_CUE = re.compile(
     r"recurring|leas(?:e|ing)|subscription|RaaS|as\s+a\s+service|"
-    r"monthly|per\s+month|/\s*mo(?:nth)?\b|"
+    r"monthly\s+(?:fee|charge|billing|subscription|price|rate|lease|rental)|"
+    r"per\s+month|/\s*mo(?:nth)?\b|"
     r"\bARR\b|\bMRR\b|月額|リース|サブスク",
     flags=re.IGNORECASE,
 )
