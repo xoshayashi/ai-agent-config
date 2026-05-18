@@ -1044,6 +1044,36 @@ def test_pre_revenue_audit_tolerates_zero_revenue() -> None:
         assert rc == 0, f"pre-revenue plan failed strict audit (rc={rc})"
 
 
+def test_pre_revenue_plan_books_no_cogs() -> None:
+    """A pre-revenue plan sells nothing, so the workbook must book zero cost
+    of goods sold — not a negative gross profit on zero revenue."""
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        pytest.skip("LibreOffice not installed; skipping workbook recalc check")
+    facts = kernel.derive_source_facts(PRE_REVENUE_STORY)
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "pre.md"
+        out = Path(tmp) / "pre.xlsx"
+        src.write_text(PRE_REVENUE_STORY, encoding="utf-8")
+        source_plan.build_source_plan_workbook(src, out)
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(Path(tmp) / "recalc"), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        wb = load_workbook(Path(tmp) / "recalc" / "pre.xlsx", data_only=True)
+        first_col = source_plan.START_PERIOD_COL
+        for sheet in ("Cost Build", "P&L"):
+            ws = wb[sheet]
+            gp_row = _row_for_label(ws, "Gross profit")
+            for idx in range(len(facts.years)):
+                gp = ws.cell(gp_row, first_col + idx).value
+                assert gp in (0, 0.0, None), (
+                    f"{sheet} period {idx}: gross profit {gp} — a pre-revenue "
+                    f"plan must book zero COGS, not a loss on zero revenue"
+                )
+
+
 def test_customer_target_is_the_maturity_figure_not_the_current_count() -> None:
     """'currently 30 customers and target 1,200' must ramp the plan to the
     1,200 maturity target, not freeze it at the current count of 30."""
@@ -1267,6 +1297,7 @@ if __name__ == "__main__":
         test_kpi_dashboard_omits_vc_block_for_an_ambiguous_mechanic,
         test_pre_revenue_plan_has_no_product_revenue,
         test_pre_revenue_audit_tolerates_zero_revenue,
+        test_pre_revenue_plan_books_no_cogs,
         test_customer_target_is_the_maturity_figure_not_the_current_count,
         test_hardware_unit_ramp_honors_the_stated_maturity_target,
         test_unit_target_extraction_handles_mixed_scale_phrasing,
