@@ -49,6 +49,10 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Apply `message_led_composition_lock`: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements.
 - Apply `region_balance_policy`: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette.
 - Apply `composition_fit_plan`: set the main visual field, supporting regions, whitespace role, and Insight footprint before generation so the canvas has deliberate occupancy and breathing room. Occupancy is observable: no quadrant of the body content area is conspicuously empty and no major region overflows its grid track.
+- Apply `design_balance_gate`: freeze body occupancy, useful whitespace role, content-area weight, text-role sizes, background role, and accent role before generation; generated PNG approval depends on matching those choices.
+- Apply `occupancy_density_fit_lock`: body occupancy must match the selected density tier without accidental dead zones, crushed margins, overcrowding, or density created by shrinking body text below 18pt equivalent.
+- Apply `font_scale_unity_lock`: one deck-level type scale governs H1, subtitle, body, data labels, table labels, Source, and optional Insight; slide-level size, weight, or text-color drift is repair_required.
+- Apply `palette_role_unity_lock`: ACT colors keep stable roles across canvas, panels/cards, text, footnotes, Petrol accent, and rare Honey signal; arbitrary background, text, accent, or saturation drift is repair_required.
 - Apply `secondary_region_integrity_lock`: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field.
 - Apply `body_silhouette_lock`: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions.
 - Plan visual richness before prompt writing, with the argument-carrying structure as the reader's path. Long decks can stay varied through data visuals, matrices, flows, evidence strips, and small diagram-embedded illustrations; restrained human-designed editorial illustrations work best on chapter openers, turning points, and final vision slides, while quiet tables serve truly tabular arguments.
@@ -88,7 +92,7 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Apply `header_footer_text_color_lock`: H1 `#2D332E`, subtitle `#4D544E`, footer/source/table-note text `#6E756E`. Do not use Petrol, Honey, yellow, or arbitrary gray for header/footer text.
 - Define `deck_tone_master_lock` before image generation and check generated images for whole-deck tone consistency before PPTX/PDF packaging. Freeze one exact value (not a range) for outer_padding, footer baseline x/y, card radius, and each text-role point size at deck-master time and reuse it verbatim on every slide, exactly as the header master is frozen.
 - Check `illustration_consistency_status` after image generation by comparing first, middle, and last thirds for stroke weight, fill opacity, face/detail level, object treatment, and illustration density.
-- After image generation, run `post_generation_design_balance_check` on actual PNGs: whitespace/occupancy balance, density balance against the planned density tier, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
+- After image generation, run `post_generation_design_balance_check`, `multimodal_design_review_lock`, and `design_breakage_blocker_lock` on actual PNGs: whitespace/occupancy balance, density balance against the planned density tier, typography size/weight balance, color consistency, background role, accent role, outer padding consistency, header integrity, layout collapse, accidental empty zones, overcrowding, and off-system illustration tone.
 - Use `visual_asset_judgment`: add illustration/icons only when they help understanding, memory, comparison, or navigation; do not add them by quota.
 - Keep long-text overflow outside the slide: use `message_backlog`, `evidence_ledger`, and `appendix_candidates` rather than cramming all extracted points into the canvas.
 - Reduce prose before generation. Keep H1, subtitle, short labels, decision-relevant numbers, and one Insight sentence when needed; remove only unsupported, redundant, unreadable, or decorative numbers.
@@ -180,7 +184,7 @@ Use this reference when the input is a long memo, strategy narrative, research n
    - Use `structure_choice_bias` and `structured_density_bias` to add issue-tree, driver-tree, matrix, value-chain, KPI-bridge, or decision-table structure only when it improves the reader's decision path.
    - Use `structure_first_visual_mix` to choose a chart, table, matrix, flow, map, comparison axis, or evidence strip when that structure gives the reader a clearer path than a standalone illustration.
    - Use `imageability_lock` to convert abstract messages into concrete visual anchors that make the message observable.
-   - Use `visual_subject_open_set`, `message_led_composition_lock`, `region_balance_policy`, and `composition_fit_plan` before image prompting so the selected subject, region balance, focal relationship, and canvas occupancy are designed from the argument.
+   - Use `visual_subject_open_set`, `message_led_composition_lock`, `region_balance_policy`, `composition_fit_plan`, `design_balance_gate`, `occupancy_density_fit_lock`, `font_scale_unity_lock`, and `palette_role_unity_lock` before image prompting so the selected subject, region balance, focal relationship, canvas occupancy, density tier fit, type scale, background, and accent role are designed from the argument.
    - Use `secondary_region_integrity_lock` and `body_silhouette_lock` for split or auxiliary-region layouts so the supporting region has a complete role and the body closes as one designed block.
    - Use `editorial_polish_repair_loop` to improve specificity, proportion, rhythm, and focal hierarchy.
    - For `T3_dense`, define density layers explicitly: main figure/table, evidence strip, context panel/legend, comparison baseline, annotations, source cues, and optional Insight. Keep paragraph text out.
@@ -203,7 +207,7 @@ Use this reference when the input is a long memo, strategy narrative, research n
 
 9. **Image Prompt Handoff**
    - For each slide, output: action title, subtitle, exact text, visual structure, visual richness role, illustration intensity, density tier, coordinates, source policy, Insight decision, and negative prompt.
-   - Block generation until `layout_archetype`, `layout_family`, `layout_diversity_plan`, `layout_rotation_guard`, `grid_mode`, `visual_richness_role`, `illustration_intensity`, `creative_variance`, `density_tier`, `source_policy`, `exact_text`, `speaker_notes_depth_lock`, `speaker_notes_text`, `near_white_slide_base_lock`, `deck_header_master_lock`, `header_identity_lock`, `header_left_accent_reference_lock`, `header_left_accent_no_protrusion_rule`, `header_left_accent_top_protrusion_blocker`, `header_integrity_blocker_lock`, `deck_tone_signature_lock`, `illustration_tone_lock`, `illustration_style_sheet`, `header_line_top_rule`, `message_box_compactness_blocker_lock`, and `coordinate_inventory_1672` are resolved.
+   - Block generation until `layout_archetype`, `layout_family`, `layout_diversity_plan`, `layout_rotation_guard`, `grid_mode`, `visual_richness_role`, `illustration_intensity`, `creative_variance`, `density_tier`, `source_policy`, `exact_text`, `speaker_notes_depth_lock`, `speaker_notes_text`, `near_white_slide_base_lock`, `deck_header_master_lock`, `header_identity_lock`, `header_left_accent_reference_lock`, `header_left_accent_no_protrusion_rule`, `header_left_accent_top_protrusion_blocker`, `header_integrity_blocker_lock`, `deck_tone_signature_lock`, `illustration_tone_lock`, `illustration_style_sheet`, `header_line_top_rule`, `message_box_compactness_blocker_lock`, `design_balance_gate`, `occupancy_density_fit_lock`, `font_scale_unity_lock`, `palette_role_unity_lock`, and `coordinate_inventory_1672` are resolved.
    - Generate pilot slides first for any deck over 3 slides.
 
 ## Density Design Best Practices
@@ -388,6 +392,12 @@ visual_subject_open_set:
 message_led_composition_lock:
 region_balance_policy:
 composition_fit_plan:
+design_balance_gate:
+occupancy_density_fit_lock:
+font_scale_unity_lock:
+palette_role_unity_lock:
+multimodal_design_review_lock:
+design_breakage_blocker_lock:
 secondary_region_integrity_lock:
 body_silhouette_lock:
 deck_tone_master_lock:
@@ -408,6 +418,7 @@ icon_density_budget:
 structure_choice_status:
 post_generation_design_balance_check:
 whitespace_occupancy_balance_status:
+density_balance_status:
 typography_balance_status:
 color_consistency_status:
 outer_padding_consistency_status:
