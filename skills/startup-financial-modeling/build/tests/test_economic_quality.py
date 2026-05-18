@@ -512,12 +512,22 @@ def test_structured_currency_scales_default_costs_consistently() -> None:
     assert kernel.audit_economic_coherence(plain) == [], (
         f"structured USD plan is not coherent: {kernel.audit_economic_coherence(plain)}"
     )
-    # An explicit avg_comp in the input still takes precedence over the default.
+    # An explicit avg_comp / capex in the input still takes precedence over
+    # the FX-scaled default.
     overridden = kernel.derive_source_facts_from_mapping(
-        {**base, "company": "PayStream Fintech", "avg_comp_yen": [200_000] * 5}
+        {
+            **base,
+            "company": "PayStream Fintech",
+            "avg_comp_yen": [200_000] * 5,
+            "capex_per_unit_yen": [50_000] * 5,
+        }
     )
     assert overridden.avg_comp_yen[0] == 200_000, (
         f"an explicit avg_comp override was not honored: {overridden.avg_comp_yen[0]:,}"
+    )
+    assert overridden.capex_per_unit_yen[0] == 50_000, (
+        f"an explicit capex_per_unit override was not honored: "
+        f"{overridden.capex_per_unit_yen[0]:,}"
     )
 
 

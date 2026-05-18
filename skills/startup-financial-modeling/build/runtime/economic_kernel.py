@@ -2198,7 +2198,7 @@ def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
         for value in _curve(16_000_000, 14_500_000, periods)
     ]
     avg_comp = _pad_series(
-        prims.avg_comp or avg_comp_default, periods, int(15_000_000 * money_scale)
+        prims.avg_comp or avg_comp_default, periods, avg_comp_default[-1]
     )
     delivery_cost = _pad_series(prims.delivery_cost, periods, 0)
     cloud_cost = _pad_series(prims.cloud_cost, periods, 0)
