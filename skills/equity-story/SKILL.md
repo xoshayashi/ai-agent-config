@@ -89,6 +89,20 @@ the assumption; only ask the user when an answer materially changes the thesis.
 5. **The ask** — round size / offering, valuation or range, and the milestones
    the money buys.
 
+Once you have what the user can supply, turn to **the gaps that matter** — the
+load-bearing claims that rest on facts no one has verified: the "why now"
+evidence, the market data, the real competitive set, comparable-company
+multiples, the regulatory landscape. A
+thorough story *researches* those gaps; it does not assert through them.
+`references/research-playbook.md` sets out what to research and how to do it
+efficiently with parallel research. Match the research effort to the stakes, but
+never let a load-bearing claim stand on an unresearched assumption; what
+genuinely cannot be researched stays tagged `[open]`. When research still leaves
+the *core* load-bearing claims open — typically company-specific facts only the
+user holds, such as traction, team and unit economics — say so plainly: deliver
+the researched draft together with a structured list of what only they can
+supply, not a document whose completeness is an illusion.
+
 ## Workflow
 
 Work through these steps in order. Most steps point to a reference file to load
@@ -128,7 +142,8 @@ build it before drafting prose.
   why no incumbent has already won the resulting category — a credible "why now"
   includes the absence of a clear winner at the same intersection. A story
   without a credible "why now" cannot explain why the window is open. Place it
-  early.
+  early. Each inflection needs a dated, quantified signal behind it — research
+  them (`references/research-playbook.md`) when the inputs do not supply them.
 - **Why us** — *Why will this team win this market?* Investors back people.
   Use concrete, verifiable achievements and a genuine unfair advantage
   (founder-market fit), not titles or biographies.
@@ -163,7 +178,9 @@ situation, reach for this"). Use it to answer two *separate* questions:
 Keep these distinct. Opportunity frameworks do not prove durability — pair them
 with a moat framework so the story explains both the prize *and* the reason a
 fast follower or incumbent cannot take it. Tie each business line to at least
-one named source of durable advantage.
+one named source of durable advantage. The frameworks interpret the competitive
+set and the comparables — but those facts have to be *researched*, not guessed;
+when they are thin, gather them via `references/research-playbook.md`.
 
 This repository's host environment may also expose strategy skills
 (`jobs-to-be-done`, `crossing-the-chasm`, `blue-ocean-strategy`,
@@ -225,7 +242,9 @@ Numbers belong *next to the claim they prove*, never in a standalone pile.
 - **Primary sources.** For macro and market claims, cite the **primary source**
   — the issuing agency or research body, the specific publication, and its date
   — not a secondary aggregator. A sourced statistic outweighs an asserted one
-  and gives a diligence reader a path to verify.
+  and gives a diligence reader a path to verify. When the inputs do not supply
+  those sources, research them — `references/research-playbook.md` covers source
+  quality and how to gather them efficiently.
 
 For each major claim, identify the one **load-bearing number** — the figure
 that, if it were false, would break the claim — and present it **in context**,
@@ -481,6 +500,10 @@ Load these as the workflow reaches them, not all at once:
 - `references/stage-playbooks.md` — how the argument shifts across VC seed,
   growth, late-stage, IPO, public-market IR and M&A exit; valuation framing;
   stage-specific failure modes.
+- `references/research-playbook.md` — what to research for a strategy or equity
+  story (the "why now" evidence, market, competitors, comparables, regulatory
+  landscape) and how to do it efficiently with parallel research subagents. Use
+  at *Inputs to gather first* and whenever a load-bearing claim is thin.
 - `references/strategy-frameworks.md` — moat, positioning and business-model
   frameworks (essence / when to use / proof / pitfalls) with a dispatch table,
   plus section D industry-specific proof anchors for non-SaaS businesses.
