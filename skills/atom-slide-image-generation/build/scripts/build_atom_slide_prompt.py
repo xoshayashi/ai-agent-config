@@ -241,7 +241,14 @@ def canonical_planning_block(
   speaker_notes_plan: one substantial note per deck slide, drafted before image generation and inserted into PPTX after image roll-up when the packaging route supports notes
   speaker_notes_status: drafted / inserted / blocked
   speaker_notes_depth_lock: [PPT talk script should be 4-7 substantive Japanese sentences or roughly 180-320 Japanese chars per slide unless the user requests brief notes; include opening framing, 2-3 evidence/assumption talking points, implication, caveat when relevant, and transition; do not invent facts]
+  speaker_notes_persuasion_lock: notes stage current-state vs intended-future tension, balance logos with selective ethos and pathos, end with a landing sentence and signpost transition, and may add a justified hook, objection pre-empt, or delivery markers
   speaker_notes_text: [substantial PPT talk script + evidence/assumption cue + source caveat if relevant + transition cue; keep off slide image]
+  speaker_notes_landing: [one sentence crystallizing the slide takeaway in a memorable breath, placed before the transition]
+  speaker_notes_signpost: [transition that opens a curiosity loop or calls back an earlier slide; keeps the deck reading as one argument]
+  notes_hook: [optional one attention-grabbing line; use only on the opener, chapter turns, and turning points]
+  notes_objection_preempt: [optional one sentence naming the most likely objection and its answer; use only on contestable-claim slides]
+  notes_delivery_markers: [up to two deck-language pause/emphasis/slow cues per note, e.g. 【一拍】【強調】【ゆっくり】 (Japanese) or [beat] [emphasis] [slow] (English)]
+  notes_persuasion_arc: [deck-level current-state to intended-future through-line and one big-idea sentence; keep every note consistent with it]
   opening_slide_role: opening_thesis_slide / standard_story_slide
   first_slide_not_title_only: true / N/A
   opening_density_gate: slide 1 has core thesis, 2-4 proof/tension points, visible market-shift/matrix/causal-map/wedge structure, and bridge
@@ -377,7 +384,19 @@ def canonical_planning_block(
     overload_controls: [one dominant structure, max three major regions, body >=18pt equivalent, grouped labels, no decorative density]
   impact_clarity_density_gate: [one unmistakable takeaway, one dominant visual structure, one useful evidence layer, simple reading path, clear hierarchy]
   message_sharpness_lock: action title names actor/topic, change/tension, and implication; repair generic labels, vague benefit claims, or slogans before image prompting
+  pyramid_logic_lock: state one governing thought, ladder each action title to the question its predecessor raises, and prove each title with a named exhibit element
+  governing_thought: [the single sentence the whole deck exists to prove]
+  predecessor_question: [the one-line question the previous slide's action title raises that this slide answers]
+  title_exhibit_proof_match: [name the exact exhibit element (bar, delta, slope, cell, row, node) that proves the action title; the title claims nothing the exhibit cannot show]
+  mece_support_gate: a slide's supporting points are mutually exclusive and collectively exhaustive, and each slide declares body_logic as inductive or deductive
+  body_logic: inductive (parallel MECE reasons) / deductive (premise chain with each premise independently defensible)
+  ask_present: [for a decision/recommendation deck, the explicit ask or next step is on the opener or slide 2]
+  top_risk_named: [for a decision/recommendation deck, the single most likely objection or dependency is named on the opener or slide 2]
   evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation
+  chart_emphasis_lock: gray out non-focal data, place the decision-carrying number as a direct on-mark label, and label series directly instead of using a legend
+  encoding_consistency_lock: same meaning keeps the same fill/color/shape and scale across the deck, and no distinction relies on hue alone
+  number_format_normalization_lock: normalize decimal precision, magnitude abbreviation, axis ticks, and period notation before freezing exact_text
+  benchmark_reference_line: none / [one thin labeled target, prior-period, or peer-benchmark line on a level or trend chart]
   density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
   sentence_density_lift_lock: raise density one step with compact meaningful clauses or short sentences in body labels, rows, annotations, and optional Insight; avoid icon-and-keyword-only slides
   semantic_copy_gate: major body labels use meaningful clauses/sentences; noun-only labels are allowed only for headers, axes, or category names
@@ -466,6 +485,10 @@ def mode_guidance(mode: str) -> str:
   - Plan slide 1 as opening_thesis_slide, not a title-only opener: include the core thesis, 2-4 proof/tension points, a real visual structure, and a narrative bridge.
   - Map every message to evidence, source_policy, visual_structure, layout_archetype, grid_mode, exact_text_budget, and split_merge_decision.
   - Apply message_sharpness_lock: rewrite each action title until it names actor/topic, change/tension, and implication; reject generic labels, vague positive claims, and slogans.
+  - Apply pyramid_logic_lock: state one governing thought, run governing_thought_gate, build a vertical_logic_chain so each title answers the question its predecessor raises, and confirm title_exhibit_proof_match for every slide.
+  - Apply mece_support_gate: run mece_check on multi-point slides and declare body_logic as inductive or deductive; for decision/recommendation decks confirm ask_present and top_risk_named on the opener or slide 2.
+  - Apply chart_emphasis_lock, encoding_consistency_lock, and number_format_normalization_lock on chart/table/matrix slides before freezing exact_text.
+  - Apply speaker_notes_persuasion_lock: stage current-state vs intended-future tension, balance logos with selective ethos and pathos, end with a landing sentence and signpost transition, record notes_persuasion_arc, and add a justified notes_hook, notes_objection_preempt, or delivery markers only where they help.
   - Apply source_real_only_lock and source_line_lock: render Source: ... only for real traceable external/provided sources; use source_line: none and draw no Source footer when no real source exists.
   - Apply output_artifact_mastering_lock, single_final_png_master_lock, and no_duplicate_png_output_lock: use slides_final/ as the single loose-PNG master; slides_package/ stores PPTX/notes/manifest only; render_check/pdf_pages/ is disposable QA output only.
   - Apply contact_sheet_mastering_lock and single_contact_sheet_policy: keep one retained contact sheet from slides_final/ by default; generate a comparison contact sheet only when delivery/render QA needs it.
@@ -494,6 +517,9 @@ def mode_guidance(mode: str) -> str:
         return """mode_guidance:
   - Define deck thesis and one primary message per slide.
   - Apply message_sharpness_lock: each slide message should name actor/topic, change/tension, and implication; repair section-label or slogan-like messages before prompt writing.
+  - Apply pyramid_logic_lock and mece_support_gate: state one governing thought, ladder each title to the question its predecessor raises, prove each title with a named exhibit element, keep within-slide supporting points MECE, and declare body_logic as inductive or deductive.
+  - Apply chart_emphasis_lock, encoding_consistency_lock, and number_format_normalization_lock on chart/table/matrix slides.
+  - Apply speaker_notes_persuasion_lock: stage current-state vs intended-future tension, balance logos with selective ethos and pathos, end with a landing sentence and signpost transition, and record notes_persuasion_arc.
   - Use the embedded ATOM design system in SKILL.md; do not load an external ATOM pattern file.
   - Apply builtin_generation_lock: invoke Codex built-in image generation directly for gpt-image-2 slide PNGs, without local environment preflight or local artifact-route probing before generation.
   - Apply image_generation_tool_lock and script_boundary_lock: prompt/package scripts may plan, validate, or wrap approved artifacts, but final PNG pixels must come from Codex built-in image generation, never from scripts, screenshots, local renderers, or presentation exports.
@@ -671,10 +697,16 @@ draft_image_prompt_scaffold:
   Apply structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide. Good candidates include issue tree, driver tree, 2x2 matrix, value chain, funnel, waterfall, KPI bridge, decision table, before/after bridge, and hypothesis-evidence-implication rows.
   Apply structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits; keep hierarchy readable and intentionally skip the added structure when it would dilute the focal message.
   Apply structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation.
+  Apply chart_emphasis_lock: render non-focal series, bars, rows, and nodes in one quiet neutral gray so the accent color marks only the element the action title is about; place the decision-carrying number as a bold direct label on the exact mark it describes with a short verdict clause; label series directly at the line end, bar, or segment, and use a separate legend only when 5+ series force it.
+  Apply encoding_consistency_lock: reuse one deck-level encoding legend so each scenario (actual/plan/forecast), variance sign, and category keeps one fixed fill, color, and shape on every slide, and any repeated unit uses one consistent non-truncated scale; pair every color-encoded distinction with a label, shape, fill pattern, or position cue so it survives grayscale and thumbnail review.
+  Apply number_format_normalization_lock: before freezing exact_text, give each metric one decimal-precision rule, one magnitude-abbreviation style, rounded axis ticks, and explicit period notation so the same metric formats identically across the deck.
+  When a chart shows a level or trend, add one thin labeled reference line (target, prior period, or peer benchmark) so the value reads as above or below a meaningful bar rather than in isolation.
+  Apply pyramid_logic_lock and mece_support_gate as planning checks before prompting: the deck has one governing thought, each action title answers the question its predecessor raises and is proven by a named exhibit element, and within-slide supporting points are MECE with a declared inductive or deductive body_logic.
   When creative_variance is high, vary composition, viewpoint, crop, asymmetric region balance, visual metaphor, and layout rhythm; keep brand, header, exact text, grid, and source policy locked.
   Let the planned chart/table/matrix/roadmap carry the argument where it is the clearest reader path; illustration adds memory, wayfinding, and selective emphasis through a clear focal motif, useful supporting details, clean controlled linework, crisp silhouettes, restrained fills, rounded UI panels, small icon badges, and short annotations.
   Make abstract messages imageable by naming the concrete visual anchor and visible details: an operating view, workflow handoff, document stack, data row, map route, queue, machine cell, screen state, evidence artifact, or customer moment that fits the message.
   Apply speaker_notes_depth_lock: for PPTX decks, write speaker notes as a substantial Japanese talk script, normally 4-7 sentences or roughly 180-320 Japanese characters per slide unless the user requests brief notes. Include opening framing, 2-3 evidence or assumption talking points, the implication to say aloud, caveat/source context when relevant, and a transition to the next slide.
+  Apply speaker_notes_persuasion_lock: order each note as framing/tension, evidence cues, implication, landing sentence, then signpost transition. The framing should stage the gap between the current state and the intended future; balance evidence (logos) with selective ethos and, on 2-4 pivotal slides, one pathos beat naming a concrete human or operational consequence; end with a landing sentence that crystallizes the takeaway in one memorable breath, then a signpost transition that opens a curiosity loop or calls back an earlier slide. Use at most one rhetorical device per note, and translate one key statistic into a concrete imageable sentence on pivotal evidence slides. Add notes_hook only on the opener, chapter turns, and turning points; add notes_objection_preempt only on contestable-claim slides; add up to two deck-language delivery markers per note. Keep every note consistent with notes_persuasion_arc and bound by the no-unsupported-facts and no-invented-sources rules.
   Keep speaker notes out of the slide image. Speaker notes are inserted later into PPTXs and should not appear as visible on-slide text.
   Do not hard-code one visual grammar across slides. Select the projection, viewpoint, abstraction level, motif, and level of detail from the slide message; use depth or spatial perspective only when it carries meaning. Do not use decorative trapezoid planes, fake perspective floors, isometric boxes, tilted architectural slabs, vanishing points, or pseudo-3D depth as a shortcut for freshness.
   Keep visual subject selection open and message-led; use the subject that makes the argument most observable through scale, interaction, place, evidence, or operating context.
@@ -762,7 +794,12 @@ post_generation_audit:
   - density_tier and density_design are fulfilled without shrinking body text below 18pt equivalent
   - impact_clarity_density_gate is fulfilled: the slide has a sharp takeaway, clear structure, useful evidence, simplicity, and hierarchy
   - message_sharpness_lock is fulfilled: the H1/action title is not a vague label or slogan
+  - pyramid_logic_lock is fulfilled: a single governing thought is stated, each action title answers the question its predecessor raises, the title read-through is one connected argument, and a named exhibit element proves each title
+  - mece_support_gate is fulfilled: within-slide supporting points are mutually exclusive and collectively exhaustive, and body_logic is declared inductive or deductive
   - evidence_compression_ladder is fulfilled: proof is compressed into a readable structure rather than prose or decoration
+  - chart_emphasis_lock is fulfilled: non-focal data is grayed out, the decision-carrying number is a direct on-mark label, and series are labeled directly unless 5+ series force a legend
+  - encoding_consistency_lock is fulfilled: scenario/variance/category encodings and repeated-unit scales are constant across the deck, and no distinction relies on hue alone
+  - number_format_normalization_lock is fulfilled: decimal precision, magnitude abbreviation, axis ticks, and period notation are normalized for each metric
   - density_lift_lock is fulfilled in both the slide structure and final image prompt
   - sentence_density_lift_lock is fulfilled: body labels, rows, annotations, or optional Insight contain compact meaningful clauses/sentences that explain relationship, reason, consequence, or decision relevance
   - semantic_copy_gate is fulfilled: major body labels are not noun-only unless they are headers, axes, legends, or categories
@@ -804,6 +841,7 @@ post_generation_audit:
   - Source footer follows source_separator_lock: Source is text-only, with no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline above, below, behind, or adjacent to Source
   - footer/source/table-note text uses #6E756E consistently when present
   - speaker_notes_depth_lock is honored: speaker_notes_text exists for deck slides, is substantial enough for PPT presentation delivery, and does not appear on the slide image
+  - speaker_notes_persuasion_lock is honored: notes stage current-state vs intended-future tension, balance logos with selective ethos and pathos, end with a landing sentence and signpost transition, stay consistent with notes_persuasion_arc, and add hook/objection-preempt/delivery markers only where justified
   - post_generation_full_deck_review_loop is complete: after generating slide PNGs, every actual image has been opened, compared against the deck, and reviewed before claiming completion
   - all_generated_images_reviewed is true for the current output file set
   - weak_slide_regeneration_queue is empty after reviewing tone consistency, content quality, design quality, text legibility, source/footer/header integrity, illustration consistency, structure fit, and deck unity
@@ -851,6 +889,10 @@ repair_iteration_plan:
 def deck_plan_tail() -> str:
     return """deck_plan_output:
   - deck_thesis:
+  - governing_thought:
+  - governing_thought_gate:
+  - notes_persuasion_arc:
+  - vertical_logic_chain:
   - primary_guideline:
   - guideline_priority:
   - brand_style_notes:
@@ -858,6 +900,8 @@ def deck_plan_tail() -> str:
       opening_slide_role: opening_thesis_slide
       first_slide_not_title_only: true
       opening_density_gate: core thesis + 2-4 proof/tension points + visible market-shift/matrix/causal-map/wedge structure + bridge
+      ask_present: [decision/recommendation deck: explicit ask or next step on the opener or slide 2]
+      top_risk_named: [decision/recommendation deck: single most likely objection or dependency named on the opener or slide 2]
       low_density_opener_repair: add evidence, tension, comparison, or mechanism before image generation
   - slide_list:
       - slide_number:
@@ -900,11 +944,25 @@ def deck_plan_tail() -> str:
         density_risk:
         impact_clarity_density_gate:
         message_sharpness_lock:
+        pyramid_logic_lock: state one governing thought, ladder each action title to the question its predecessor raises, and prove each title with a named exhibit element
+        predecessor_question:
+        title_exhibit_proof_match:
+        mece_support_gate: a slide's supporting points are mutually exclusive and collectively exhaustive, and each slide declares body_logic as inductive or deductive
+        body_logic: inductive / deductive
         evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation
+        chart_emphasis_lock: gray out non-focal data, place the decision-carrying number as a direct on-mark label, and label series directly instead of using a legend
+        encoding_consistency_lock: same meaning keeps the same fill/color/shape and scale across the deck, and no distinction relies on hue alone
+        number_format_normalization_lock: normalize decimal precision, magnitude abbreviation, axis ticks, and period notation before freezing exact_text
         speaker_notes_depth_lock: substantial PPT talk script, 4-7 Japanese sentences or roughly 180-320 Japanese chars unless user requests brief notes
+        speaker_notes_persuasion_lock: notes stage current-state vs intended-future tension, balance logos with selective ethos and pathos, end with a landing sentence and signpost transition, and may add a justified hook, objection pre-empt, or delivery markers
         speaker_notes_text:
         speaker_notes_source_cues:
         speaker_notes_transition:
+        speaker_notes_landing:
+        speaker_notes_signpost:
+        notes_hook:
+        notes_objection_preempt:
+        notes_delivery_markers:
         density_design:
           reader_mode:
           decision_question:
@@ -1034,6 +1092,10 @@ def deck_plan_tail() -> str:
 def text_structure_tail() -> str:
     return """text_to_slide_structure_output:
   deck_thesis:
+  governing_thought:
+  governing_thought_gate:
+  notes_persuasion_arc:
+  vertical_logic_chain:
   audience_decision:
   primary_guideline:
   guideline_priority:
@@ -1048,6 +1110,8 @@ def text_structure_tail() -> str:
     opening_slide_role: opening_thesis_slide
     first_slide_not_title_only: true
     opening_density_gate: core thesis + 2-4 proof/tension points + visible market-shift/matrix/causal-map/wedge structure + bridge
+    ask_present: [decision/recommendation deck: explicit ask or next step on the opener or slide 2]
+    top_risk_named: [decision/recommendation deck: single most likely objection or dependency named on the opener or slide 2]
     low_density_opener_repair:
   section_map:
     - section:
@@ -1057,6 +1121,12 @@ def text_structure_tail() -> str:
     - slide_id:
       chapter:
       action_title:
+      pyramid_logic_lock: state one governing thought, ladder each action title to the question its predecessor raises, and prove each title with a named exhibit element
+      predecessor_question:
+      title_exhibit_proof_match:
+      mece_support_gate: a slide's supporting points are mutually exclusive and collectively exhaustive, and each slide declares body_logic as inductive or deductive
+      mece_check:
+      body_logic: inductive / deductive
       opening_slide_role: opening_thesis_slide / standard_story_slide
       first_slide_not_title_only: true / N/A
       opening_density_gate:
@@ -1079,9 +1149,15 @@ def text_structure_tail() -> str:
       source_urls:
       assumptions:
       speaker_notes_depth_lock:
+      speaker_notes_persuasion_lock: notes stage current-state vs intended-future tension, balance logos with selective ethos and pathos, end with a landing sentence and signpost transition, and may add a justified hook, objection pre-empt, or delivery markers
       speaker_notes_text:
       speaker_notes_source_cues:
       speaker_notes_transition:
+      speaker_notes_landing:
+      speaker_notes_signpost:
+      notes_hook:
+      notes_objection_preempt:
+      notes_delivery_markers:
       pre_package_image_review:
       post_generation_full_deck_review_loop: after generating slide PNGs, review every actual image before claiming completion
       all_generated_images_reviewed:
@@ -1141,6 +1217,10 @@ def text_structure_tail() -> str:
       impact_clarity_density_gate:
       message_sharpness_lock:
       evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation
+      chart_emphasis_lock: gray out non-focal data, place the decision-carrying number as a direct on-mark label, and label series directly instead of using a legend
+      encoding_consistency_lock: same meaning keeps the same fill/color/shape and scale across the deck, and no distinction relies on hue alone
+      number_format_normalization_lock: normalize decimal precision, magnitude abbreviation, axis ticks, and period notation before freezing exact_text
+      benchmark_reference_line:
       density_layers:
       density_design:
         reader_mode: scan / read / reference
