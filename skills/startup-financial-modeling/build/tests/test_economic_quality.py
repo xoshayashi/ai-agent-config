@@ -198,6 +198,14 @@ def test_unit_price_is_extracted_from_natural_phrasing() -> None:
     assert kernel.extract_price(
         "Each robot is sold at $48,000.", hw, "USD"
     ) == 48000, "'sold at $X' unit price was not extracted"
+    assert kernel.extract_price(
+        "Each robot sells at $48,000.", hw, "USD"
+    ) == 48000, "'sells at $X' unit price was not extracted"
+    # `sells/sold for|at` needs a currency mark — a duration or volume after
+    # the verb ("sold for 30000 hours") must not be read as a price.
+    assert kernel.extract_price(
+        "The unit sold for 30000 hours of field testing.", hw, "USD"
+    ) != 30000, "a non-price figure after 'sold for' was read as a price"
     # No cue keyword at all — the number-first "$X per <unit>" form.
     assert kernel.extract_price(
         "Ships at $48,000 per unit.", hw, "USD"

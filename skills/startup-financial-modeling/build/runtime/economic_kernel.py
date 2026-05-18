@@ -749,8 +749,16 @@ def extract_price(text: str, profile: MechanicProfile, currency: str = "JPY") ->
         (rf"月額\s*([0-9,.]+)\s*{_PRICE_UNIT}?\s*円?", False),
         (
             rf"(?:price|pricing|fee|subscription|lease|rental|unit price|"
-            rf"(?:sells?|sold)\s+(?:for|at)|単価|価格|利用料)"
+            rf"単価|価格|利用料)"
             rf"[^0-9¥$]{{0,32}}[¥$]?\s*([0-9,.]+)\s*{_PRICE_UNIT}?",
+            None,
+        ),
+        # `sells/sold for|at` requires an explicit currency mark, so a volume
+        # or duration after the verb ("sold for 3 years") is not read as a
+        # price.
+        (
+            rf"(?:sells?|sold)\s+(?:for|at)[^0-9¥$]{{0,16}}[¥$]\s*"
+            rf"([0-9,.]+)\s*{_PRICE_UNIT}?",
             None,
         ),
         (
