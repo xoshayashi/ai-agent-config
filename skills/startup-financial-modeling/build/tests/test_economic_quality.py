@@ -310,6 +310,69 @@ def test_economic_audit_catches_non_positive_revenue() -> None:
     assert any("non-positive revenue" in issue for issue in issues), issues
 
 
+def test_balance_sheet_balances_in_the_kernel_projection() -> None:
+    """The projected balance sheet must satisfy A = L + E every period."""
+    for name, story in ARCHETYPES.items():
+        facts = kernel.derive_source_facts(story)
+        for idx, period in enumerate(kernel.project_balance_sheet(facts)):
+            tolerance = 1e-4 * max(1.0, abs(period["total_assets"]))
+            assert abs(period["balance_check"]) <= tolerance, (
+                f"{name} period {idx}: balance sheet off by "
+                f"{period['balance_check']:,.0f}"
+            )
+
+
+def test_economic_audit_flags_an_unbalanced_sheet() -> None:
+    """The audit must surface a balance sheet that does not balance."""
+    facts = kernel.derive_source_facts(SAAS_STORY)
+    original = kernel.project_balance_sheet
+    kernel.project_balance_sheet = lambda f: [
+        {
+            "total_assets": 1_000_000_000.0,
+            "total_liabilities": 0.0,
+            "total_equity": 0.0,
+            "balance_check": 1_000_000_000.0,
+        }
+    ]
+    try:
+        issues = kernel.audit_economic_coherence(facts)
+    finally:
+        kernel.project_balance_sheet = original
+    assert any("does not balance" in issue for issue in issues), issues
+
+
+def test_workbook_balance_sheet_balances_when_recalculated() -> None:
+    """The recalculated workbook BS must balance — A = L + E, every period."""
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        pytest.skip("soffice/libreoffice not available")
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "saas.md"
+        out = Path(tmp) / "saas.xlsx"
+        src.write_text(SAAS_STORY, encoding="utf-8")
+        source_plan.build_source_plan_workbook(src, out)
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(Path(tmp) / "recalc"), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        wb = load_workbook(Path(tmp) / "recalc" / "saas.xlsx", data_only=True)
+        ws = wb["BS"]
+        row = next(
+            (cell.row for r in ws.iter_rows() for cell in r
+             if cell.value == "Balance check"),
+            None,
+        )
+        assert row is not None, "BS sheet missing 'Balance check' row"
+        first_col = source_plan.START_PERIOD_COL
+        facts = kernel.derive_source_facts(SAAS_STORY)
+        for idx in range(len(facts.years)):
+            check = ws.cell(row, first_col + idx).value
+            assert check is not None and abs(float(check)) <= 1.0, (
+                f"period {idx}: workbook balance sheet is off by {check}"
+            )
+
+
 def test_strict_audit_fails_on_economic_incoherence() -> None:
     """An economically incoherent plan must fail the strict-audit gate (rc 2)."""
     original = build_model.ek.audit_economic_coherence
@@ -638,6 +701,9 @@ if __name__ == "__main__":
         test_economic_audit_catches_a_broken_cost_stack,
         test_economic_audit_catches_insolvency,
         test_economic_audit_catches_non_positive_revenue,
+        test_balance_sheet_balances_in_the_kernel_projection,
+        test_economic_audit_flags_an_unbalanced_sheet,
+        test_workbook_balance_sheet_balances_when_recalculated,
         test_strict_audit_fails_on_economic_incoherence,
         test_cap_table_exit_waterfall_uses_post_round_cap_table,
         test_dcf_forecast_fcf_is_not_floored_at_zero,
