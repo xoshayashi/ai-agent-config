@@ -251,8 +251,9 @@ the data room** — each load-bearing claim needs a verification path (the
 artifact or system of record that would prove it); the structural and legal
 landmines a diligence team will find should be disclosed before it finds them;
 and the story should carry a quantified bear case the deal partner can lift into
-an IC memo. Match the depth to the stage — seed diligence is light, growth and
-IPO are not. This step is distinct from step 5: step 5 answers the objections an
+an IC memo. This still applies at seed, at the lighter depth that stage warrants
+— it is not a step to skip for early-stage stories; growth and IPO carry it at
+full weight. This step is distinct from step 5: step 5 answers the objections an
 investor *asks*; this step prepares for what a diligence team *verifies*.
 
 ### 7. Draft the equity story
@@ -452,11 +453,11 @@ not.
 19. **Verification paths** — does each load-bearing claim point to the artifact
     or system of record a diligence team would check, and is every material
     metric stated with its definition (so it is not recomputed adversarially)?
-20. **Landmines disclosed, downside quantified** — are the structural and legal
-    landmines (IP ownership, cap table, customer concentration, runway, revenue
-    structure, key-person) disclosed before diligence would find them, and does
-    the story carry a quantified bear case a deal partner could lift into a
-    defensible IC memo?
+20. **Landmines disclosed** — are the structural and legal landmines (IP
+    ownership, cap table, customer concentration, runway, revenue structure,
+    key-person) disclosed before diligence would find them?
+21. **Downside quantified** — does the story carry a quantified bear case a deal
+    partner could lift into a defensible IC memo?
 
 ### Final gate
 

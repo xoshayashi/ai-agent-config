@@ -4,8 +4,8 @@ The equity story wins the meeting. It does not win the deal. Between the second
 meeting and the wired money sits the **investment-evaluation phase** — due
 diligence, the IC (investment committee) memo, the partnership vote, and term
 negotiation — and it runs for weeks or months. A story can be entirely
-persuasive in the room and still die there. Practitioners estimate that
-diligence-stage findings account for more than half of deals that fail after a
+persuasive in the room and still die there — by some practitioner accounts,
+diligence-stage findings account for a large share of deals that fail after a
 strong first impression.
 
 Read this when the work has to clear that phase, not just earn a follow-up:
@@ -42,7 +42,7 @@ Diligence depth is not uniform — match it to the stage, the same way market
 sizing does. Do not pad, and do not let an early-stage story pretend to a data
 room it cannot have.
 
-- **Seed** — light diligence, often one to two weeks, centred on team, market
+- **Seed** — light diligence, typically the shortest, centred on team, market
   and the early signal of product-market fit. Founder reference and background
   checks, design-partner or early-customer calls, basic IP hygiene (is the IP
   cleanly assigned), a sane cap table. The data room is thin, and that is
@@ -186,10 +186,11 @@ them:
   roughly sized (the revenue plateau and the multiple it earns, the clinical
   failure and the residual platform value, the down round and the recovery
   path). Strong memos carry three scenarios — base, bull and **bear** — and do
-  not hide the bear. Size the loss that actually reaches the investor: not
-  enterprise value alone but *their* outcome after the preference waterfall —
-  liquidation preferences, SAFE or note conversion, anti-dilution — which can
-  make the downside materially worse than a headline EV mark-down suggests. A
+  not hide the bear. Size the loss that actually reaches the investor: for
+  growth-stage rounds and later, account not for enterprise value alone but for
+  *their* outcome after the preference waterfall — liquidation preferences, SAFE
+  or note conversion, anti-dilution — which can make the downside materially
+  worse than a headline EV mark-down suggests. A
   thesis that has visibly costed its own failure is more credible, not less.
   Carry one honest paragraph a partner can lift; defer the full model to
   `startup-financial-modeling` — the story carries the *narrative* of the
