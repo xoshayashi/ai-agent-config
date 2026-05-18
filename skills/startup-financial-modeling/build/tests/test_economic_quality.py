@@ -351,6 +351,7 @@ def test_workbook_balance_sheet_balances_when_recalculated() -> None:
         out = Path(tmp) / "saas.xlsx"
         src.write_text(SAAS_STORY, encoding="utf-8")
         source_plan.build_source_plan_workbook(src, out)
+        (Path(tmp) / "recalc").mkdir()
         subprocess.run(
             [soffice, "--headless", "--calc", "--convert-to", "xlsx",
              "--outdir", str(Path(tmp) / "recalc"), str(out)],
