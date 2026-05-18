@@ -37,7 +37,7 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Apply `message_sharpness_lock`: rewrite each action title until it contains a clear actor/topic, change/tension, and implication. Avoid generic topic labels, vague positive claims, and slogans that do not say what changed or why it matters.
 - Apply `evidence_compression_ladder`: compress evidence into the smallest structure that still proves the message: one sharp number, ranked comparison, before/after delta, driver tree, causal chain, 2x2, mini table, or evidence strip. Use speaker notes or appendix candidates for detail that does not change the slide decision.
 - Apply `structure_choice_bias`: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide.
-- Apply `structured_density_bias`: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits.
+- Apply `structured_density_bias`: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits; add layers only until the body silhouette is filled with deliberate content, then split the slide rather than overcrowd it, because overcrowding is not solved with more density.
 - Use structured presentation patterns as an option, not a quota: issue trees, driver trees, 2x2 matrices, value chains, funnels, waterfalls, KPI bridges, decision tables, before/after bridges, and hypothesis-evidence-implication rows are available when they make the argument easier to scan.
 - Apply `structure_first_visual_mix`: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation.
 - Apply `imageability_lock`: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation.
@@ -48,7 +48,7 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Apply `visual_subject_open_set`: keep visual subject choices open; select the clearest concrete subject from the slide message, evidence, and audience context.
 - Apply `message_led_composition_lock`: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements.
 - Apply `region_balance_policy`: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette.
-- Apply `composition_fit_plan`: set the main visual field, supporting regions, whitespace role, and Insight footprint before generation so the canvas has deliberate occupancy and breathing room.
+- Apply `composition_fit_plan`: set the main visual field, supporting regions, whitespace role, and Insight footprint before generation so the canvas has deliberate occupancy and breathing room. Occupancy is observable: no quadrant of the body content area is conspicuously empty and no major region overflows its grid track.
 - Apply `secondary_region_integrity_lock`: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field.
 - Apply `body_silhouette_lock`: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions.
 - Plan visual richness before prompt writing, with the argument-carrying structure as the reader's path. Long decks can stay varied through data visuals, matrices, flows, evidence strips, and small diagram-embedded illustrations; restrained human-designed editorial illustrations work best on chapter openers, turning points, and final vision slides, while quiet tables serve truly tabular arguments.
@@ -86,9 +86,9 @@ Use this reference when the input is a long memo, strategy narrative, research n
 - Apply `header_line_top_rule`: the left vertical line is the approved header-block anchor, not a short title tick. On the 1672x941 basis, use `vertical_line x=50 y=40 w=10 h=120 #008A80` unless a newer embedded master is supplied. Its top must never sit above the first visible H1 glyph/title top; align it with the title top or place it 0-6px below. Any upward protrusion, page-top floating, clipping outside `header_safe_area`, detachment from H1/subtitle, or body intrusion is a blocker. If it fails, repair the line x/y/h before touching H1.
 - Apply `header_integrity_blocker_lock`: malformed, missing, oversized, recolored, right-decorated, or intruded headers are blockers; repair header identity before other visual polish.
 - Apply `header_footer_text_color_lock`: H1 `#2D332E`, subtitle `#4D544E`, footer/source/table-note text `#6E756E`. Do not use Petrol, Honey, yellow, or arbitrary gray for header/footer text.
-- Define `deck_tone_master_lock` before image generation and check generated images for whole-deck tone consistency before PPTX/PDF packaging.
+- Define `deck_tone_master_lock` before image generation and check generated images for whole-deck tone consistency before PPTX/PDF packaging. Freeze one exact value (not a range) for outer_padding, footer baseline x/y, card radius, message-box height, and each text-role point size at deck-master time and reuse it verbatim on every slide, exactly as the header master is frozen.
 - Check `illustration_consistency_status` after image generation by comparing first, middle, and last thirds for stroke weight, fill opacity, face/detail level, object treatment, and illustration density.
-- After image generation, run `post_generation_design_balance_check` on actual PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
+- After image generation, run `post_generation_design_balance_check` on actual PNGs: whitespace/occupancy balance, density balance against the planned density tier, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
 - Use `visual_asset_judgment`: add illustration/icons only when they help understanding, memory, comparison, or navigation; do not add them by quota.
 - Keep long-text overflow outside the slide: use `message_backlog`, `evidence_ledger`, and `appendix_candidates` rather than cramming all extracted points into the canvas.
 - Reduce prose before generation. Keep H1, subtitle, short labels, decision-relevant numbers, and one Insight sentence when needed; remove only unsupported, redundant, unreadable, or decorative numbers.
@@ -250,6 +250,7 @@ For every slide, answer:
 - Labels are ungrouped or repeat the title.
 - Illustration becomes the density source instead of evidence, structure, or annotation.
 - A slide is combined only because fewer pages feels cleaner.
+- A quadrant of the body content area sits conspicuously empty, or a major region overflows its grid track.
 
 ## Output Fields
 

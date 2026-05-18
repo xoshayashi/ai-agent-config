@@ -276,8 +276,9 @@ def canonical_planning_block(
   deck_tone_consistency_review: [first third vs middle third vs last third tone comparison after generation]
   deck_tone_consistency_status: pending / approved / repair_required
   deck_tone_repair_plan: [slides to regenerate or edit if tone drift appears]
-  post_generation_design_balance_check: required on actual generated PNGs before PPTX/PDF packaging; checks whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity
+  post_generation_design_balance_check: required on actual generated PNGs before PPTX/PDF packaging; checks whitespace/occupancy balance, density balance against the planned density tier, typography size/weight balance, color consistency, outer padding consistency, and header integrity
   whitespace_occupancy_balance_status: pending / approved / repair_required
+  density_balance_status: pending / approved / repair_required
   typography_balance_status: pending / approved / repair_required
   color_consistency_status: pending / approved / repair_required
   outer_padding_consistency_status: pending / approved / repair_required
@@ -296,7 +297,7 @@ def canonical_planning_block(
   row_tracks: [header/body/supporting-context/insight/source alignment baselines; source baseline is not a visible rule]
   column_tracks: [outer shell, main columns, separator, supporting/context columns]
   separator_x: [required when the selected composition uses a visible or structural separator; none when there is no split]
-  outer_padding: 1672 basis left/right 44-56px, top/bottom 24-52px
+  outer_padding: 1672 basis left/right 44-56px, top/bottom 24-52px; select one exact left/right value and one exact top/bottom value at deck-master time and reuse them verbatim on every slide
   major_regions: [max three]
   coordinate_inventory_1672:
     - object: [major object name]
@@ -306,7 +307,7 @@ def canonical_planning_block(
       h: [px]
   master_components: [header, invisible footer alignment baseline, card/table/insight/icon masters]
   deck_master_refs: [reuse refs for header/footer/insight/table/card if deck-level]
-  deck_tone_master_lock: [slide base, typography scale, header/footer, Petrol use, Honey use, illustration style, icon family, density rhythm, whitespace/occupancy rhythm, card/table geometry, outer padding, invisible source alignment baseline, negative prompt]
+  deck_tone_master_lock: [slide base, typography scale, header/footer, Petrol use, Honey use, illustration style, icon family, density rhythm, whitespace/occupancy rhythm, card/table geometry, outer padding, invisible source alignment baseline, negative prompt]; freeze one exact value (not a range) for outer_padding, footer baseline x/y, card radius, message-box height, and each text-role point size at deck-master time and reuse it verbatim on every slide, exactly as the header master is frozen
   deck_tone_signature_lock: preserve one material system across the deck for base, typography, rules, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior while varying only message-led layouts
   near_white_slide_base_lock: use #FFFDFC as the default ACT slide canvas, with optional #FAFAF7 only as a barely visible warm off-white tint; keep #F7FBF9 for panels/cards, not the page background; avoid darker cream/beige page bases
   illustration_tone_lock: keep all illustrations in one deck on the same editorial vector system
@@ -336,7 +337,7 @@ def canonical_planning_block(
   visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide message, evidence, and audience context
   message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements
   region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette
-  composition_fit_plan: [main visual field, supporting regions, whitespace role, Insight footprint, and intended occupancy rhythm]
+  composition_fit_plan: [main visual field, supporting regions, whitespace role, Insight footprint, and intended occupancy; occupancy is observable - no quadrant of the body content area is conspicuously empty and no major region overflows its grid track]
   content_area_priority_lock: allocate height to the body, figure, table, or diagram first; size any optional Insight/message-box from the remaining calculated space so it supports rather than compresses the main content area
   secondary_region_integrity_lock: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field
   body_silhouette_lock: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions
@@ -400,7 +401,7 @@ def canonical_planning_block(
   icon_restraint_lock: icons are sparse wayfinding or evidence markers, not the primary content layer
   icon_density_budget: default to 0-3 purposeful icons per slide and keep icon count below semantic text units unless the visual logic demands otherwise
   structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
-  structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
+  structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits; add layers only until the body silhouette is filled with deliberate content, then split the slide instead, because overcrowding is not solved with more density
   structure_choice_status: not_applicable / applied / intentionally_skipped / repair_required
   structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation
   useful_density_plan: [2-4 proof/context/comparison points, units/denominators where relevant, source cue when traceable, and one clear reading path]
@@ -419,7 +420,7 @@ def canonical_planning_block(
     visual_alignment: exact visual alignment rule copied from deck_header_master_lock
     body_start_y: exact selected y copied from deck_header_master_lock
     upper_right_clear_zone: exact x/y/w/h copied from deck_header_master_lock and kept empty
-  footer_anchor_baseline: 1672 basis x=44-56 baseline y=895-912, invisible alignment position only, planned even if source_line is none
+  footer_anchor_baseline: 1672 basis x=44-56 baseline y=895-912, invisible alignment position only, planned even if source_line is none; select one exact x and one exact baseline y at deck-master time and reuse them verbatim
   header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E; no Petrol/Honey/arbitrary gray in header or footer text
   message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement; many slides should use no message box
   insight_absence_default_lock: start each slide from insight_decision: none; add an Insight/message-box only when it passes insight_justification_required
@@ -460,7 +461,7 @@ def canonical_planning_block(
     deck_count_check: [single slide or deck-level count]
     geometry: [x/y/w/h in 1672 basis if kept; choose the smallest legible width tied to the interpreted region, not full-canvas width by default]
     height: [calculated after body and footer rhythm; use the lowest comfortable height when it helps the main content area; bottom Insight bars target 72-96px on the 1672 basis, with 108px only for a necessary two-line sentence]
-    radius: 8px or 12px
+    radius: 8px or 12px; select one deck radius at deck-master time and reuse it on every card
     padding: [balanced px; enough for centered text but not a tall band]
     honey_bar_style: [N/A unless Honey bottom bar is selected; then use #FBF3D7 very pale Honey fill, #C49A2C thin 2-3px outline, optional left icon well with a small 20-24px icon on the 1672 basis, one #C49A2C vertical separator, #2D332E text, and no dashed border]
     left_accent: [Honey bottom bars use a thin separator after the optional icon well, not a full-height far-left stripe; Petrol uses embedded ACT design system accent line spec only outside Honey]
@@ -661,7 +662,7 @@ draft_image_prompt_scaffold:
   Apply visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide message, evidence, and audience context.
   Apply message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements.
   Apply region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette.
-  Apply composition_fit_plan: set the main visual field, supporting regions, whitespace role, and Insight footprint before generation so the canvas has deliberate occupancy and breathing room.
+  Apply composition_fit_plan: set the main visual field, supporting regions, whitespace role, and Insight footprint before generation so the canvas has deliberate occupancy and breathing room. Occupancy is observable: no quadrant of the body content area should be conspicuously empty and no major region should overflow its grid track.
   Apply content_area_priority_lock: allocate height to the body, figure, table, or diagram first, then size any optional Insight/message-box from the remaining calculated space so it supports rather than compresses the main content area.
   Apply secondary_region_integrity_lock: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field.
   Apply body_silhouette_lock: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions.
@@ -693,7 +694,7 @@ draft_image_prompt_scaffold:
   Apply icon_restraint_lock: icons are quiet wayfinding or evidence markers only. Reduce icon count when icons repeat generic ideas, compete with the main structure, or replace explanatory text; prefer a short sentence, mini table, causal chain, labeled diagram, or data row when that carries meaning better.
   Apply icon_density_budget: default to 0-3 purposeful icons per slide, avoid one icon per card/row as a habit, and keep icon count below semantic text units unless the visual logic explicitly needs more.
   Apply structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide. Good candidates include issue tree, driver tree, 2x2 matrix, value chain, funnel, waterfall, KPI bridge, decision table, before/after bridge, and hypothesis-evidence-implication rows.
-  Apply structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits; keep hierarchy readable and intentionally skip the added structure when it would dilute the focal message.
+  Apply structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits; keep hierarchy readable and intentionally skip the added structure when it would dilute the focal message. Add layers only until the body silhouette is filled with deliberate content; past that, split the slide rather than overcrowd it.
   Apply structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation.
   Apply chart_emphasis_lock: render non-focal series, bars, rows, and nodes in one quiet neutral gray so the accent color marks only the element the action title is about; place the decision-carrying number as a bold direct label on the exact mark it describes with a short verdict clause; label series directly at the line end, bar, or segment, and use a separate legend only when 5+ series force it.
   Apply encoding_consistency_lock: reuse one deck-level encoding legend so each scenario (actual/plan/forecast), variance sign, and category keeps one fixed fill, color, and shape on every slide, and any repeated unit uses one consistent non-truncated scale; pair every color-encoded distinction with a label, shape, fill pattern, or position cue so it survives grayscale and thumbnail review. The chart_emphasis_lock focal layer (accent on the focal element, neutral gray on non-focal data) is a separate emphasis layer that overrides category hue on a slide where the category is non-focal; muting a non-focal category is not an encoding_consistency_lock violation.
@@ -853,7 +854,7 @@ post_generation_audit:
   - generation_block_rule: only if Codex built-in generation or repair is actually blocked by the image tool, mark completion_ready_status: blocked and do not package or report complete; do not use local environment uncertainty as the blocker
   - credential_setup_blocker: no account credential, local token, SDK setup, or environment-variable workflow is part of the route
   - review_manifest_status: approved after validate_review_manifest covers every generated PNG path, confirms slides_final/ master paths are used, confirms weak_slide_regeneration_queue is empty, and confirms all final/content/design/deck-unity/completion statuses are approved
-  - post_generation_design_balance_check is approved on actual generated PNGs: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, header integrity, card/table height equalization, line-weight consistency, icon-family consistency, Petrol scatter, Honey strength, and human-designed operational diagram feel
+  - post_generation_design_balance_check is approved on actual generated PNGs: whitespace/occupancy balance, density balance against the planned density tier, typography size/weight balance, color consistency, outer padding consistency, header integrity, card/table height equalization, line-weight consistency, icon-family consistency, Petrol scatter, Honey strength, and human-designed operational diagram feel
   - pre_package_image_review has inspected the actual generated PNG, not only the prompt
   - image_review_status is approved only when there are no blocker or major issues
   - PPTX/PDF roll-up starts only after final_image_quality_status is approved for every generated PNG
@@ -867,7 +868,7 @@ pre_package_image_review:
   - Score deck_tone_consistency across all generated PNGs after every generation or repair batch.
   - Score illustration_consistency_status across all generated PNGs after every generation or repair batch.
   - Score content_quality_status, design_quality_status, and deck_unity_status; queue any slide that feels content-weak, design-weak, inconsistent, or below the deck bar.
-  - Score post_generation_design_balance_check: whitespace/occupancy balance, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
+  - Score post_generation_design_balance_check: whitespace/occupancy balance, density balance against the planned density tier, typography size/weight balance, color consistency, outer padding consistency, and header integrity.
   - Classify each finding as blocker, major, minor, or accepted.
   - If any blocker, major, deck-consistency, content-quality, design-quality, or deck-unity issue exists, create image_repair_prompt, add the slide to weak_slide_regeneration_queue, regenerate or edit the PNG, replace the output file, and repeat this review.
   - Apply edit_scope_lock in every repair prompt: issue_observed, change_only, preserve, re_check, and no global restyle unless explicitly required.
@@ -977,7 +978,7 @@ def deck_plan_tail() -> str:
         icon_restraint_lock: icons are sparse wayfinding/evidence markers and not the primary content layer
         icon_density_budget: default to 0-3 purposeful icons per slide and keep icon count below semantic text units unless the visual logic demands otherwise
         structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
-        structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
+        structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits; add layers only until the body silhouette is filled with deliberate content, then split the slide instead, because overcrowding is not solved with more density
         structure_choice_status:
         structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation
         max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
@@ -986,7 +987,7 @@ def deck_plan_tail() -> str:
         visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide message, evidence, and audience context
         message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements
         region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette
-        composition_fit_plan: [main visual field, supporting regions, whitespace role, Insight footprint, and intended occupancy rhythm]
+        composition_fit_plan: [main visual field, supporting regions, whitespace role, Insight footprint, and intended occupancy; occupancy is observable - no quadrant of the body content area is conspicuously empty and no major region overflows its grid track]
         secondary_region_integrity_lock: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field
         body_silhouette_lock: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions
         information_unit_budget:
@@ -1235,7 +1236,7 @@ def text_structure_tail() -> str:
       icon_restraint_lock: icons are sparse wayfinding/evidence markers and not the primary content layer
       icon_density_budget: default to 0-3 purposeful icons per slide and keep icon count below semantic text units unless the visual logic demands otherwise
       structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
-      structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits
+      structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits; add layers only until the body silhouette is filled with deliberate content, then split the slide instead, because overcrowding is not solved with more density
       structure_choice_status:
       structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation
       information_unit_budget:
@@ -1268,7 +1269,7 @@ def text_structure_tail() -> str:
       visual_subject_open_set: keep visual subject choices open; select the clearest concrete subject from the slide message, evidence, and audience context
       message_led_composition_lock: choose the structure, viewpoint, region balance, and focal relationship from the slide message before adding supporting elements
       region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette
-      composition_fit_plan: [main visual field, supporting regions, whitespace role, Insight footprint, and intended occupancy rhythm]
+      composition_fit_plan: [main visual field, supporting regions, whitespace role, Insight footprint, and intended occupancy; occupancy is observable - no quadrant of the body content area is conspicuously empty and no major region overflows its grid track]
       secondary_region_integrity_lock: in split or auxiliary-region layouts, make the secondary region a complete decision panel with matched vertical rhythm, enough useful content, and top/bottom alignment to the main field
       body_silhouette_lock: plan the body as one closed visual block by aligning outer edges, lower edges, and footer clearance across main and secondary regions
       concrete_visual_anchor:
