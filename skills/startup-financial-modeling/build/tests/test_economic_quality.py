@@ -206,9 +206,13 @@ def test_hyphenated_year_horizon_is_honored() -> None:
     assert kernel.extract_forecast_periods("6-year plan", "monthly") == min(
         6 * 12, kernel.MAX_FORECAST_PERIODS
     )
-    # A company-age adjective is not a horizon and must not be matched.
+    # A company-age adjective is not a horizon and must not be matched,
+    # in either the hyphenated or the space-separated form.
     assert kernel.extract_forecast_periods("a 6-year-old startup", "annual") != 6, (
         "company age was misread as a forecast horizon"
+    )
+    assert kernel.extract_forecast_periods("a 6-year old startup", "annual") != 6, (
+        "space-separated company age was misread as a forecast horizon"
     )
     facts = kernel.derive_source_facts(
         "# Deep-tech plan\n\nA deep-tech company. We model a 6-year "
