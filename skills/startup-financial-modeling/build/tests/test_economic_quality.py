@@ -149,6 +149,37 @@ def test_stated_gross_margin_is_extracted_from_narrative() -> None:
     ) == 0.82, "a qualified gross-margin phrase was dropped"
 
 
+def test_stated_churn_rate_is_extracted_and_annualized() -> None:
+    """A stated churn rate is honored; a monthly figure is annualized."""
+    assert kernel.extract_churn_rate(
+        "Logo churn runs near 14% annually."
+    ) == 0.14, "a stated annual churn rate was not extracted"
+    monthly = kernel.extract_churn_rate("We model 1.5% monthly churn.")
+    assert monthly is not None and 0.16 <= monthly <= 0.18, (
+        f"1.5% monthly churn was not annualized: {monthly}"
+    )
+    assert kernel.extract_churn_rate("No churn figure stated here.") is None
+    # A nearby "monthly price" sentence must not annualize an annual churn.
+    assert kernel.extract_churn_rate(
+        "Churn is 8%. Monthly price is $50."
+    ) == 0.08, "an unrelated 'monthly' token wrongly annualized churn"
+    # Employee churn is an HR metric — the customer churn figure wins.
+    assert kernel.extract_churn_rate(
+        "Employee churn is 20%. Customer churn is 8%."
+    ) == 0.08, "employee churn was taken instead of customer churn"
+    # An unrelated percentage before the churn keyword is not the churn rate.
+    assert kernel.extract_churn_rate(
+        "We offer a 5% discount; logo churn is 12%."
+    ) == 0.12, "an unrelated percentage was read as the churn rate"
+    facts = kernel.derive_source_facts(
+        "# SaaS plan\n\nA SaaS platform priced at 月額1.2万円. Customer "
+        "churn is about 9%. 5-year plan, seed round. Source: memo.\n"
+    )
+    assert abs(facts.churn_rate - 0.09) < 1e-6, (
+        f"stated 9% churn ignored; churn_rate = {facts.churn_rate}"
+    )
+
+
 def test_annual_pricing_is_converted_to_a_monthly_figure() -> None:
     """An ACV or explicitly annual price must be divided to a monthly price.
 
@@ -1432,6 +1463,7 @@ if __name__ == "__main__":
     _tests = [
         test_gross_margin_tracks_target_across_archetypes,
         test_stated_gross_margin_is_extracted_from_narrative,
+        test_stated_churn_rate_is_extracted_and_annualized,
         test_annual_pricing_is_converted_to_a_monthly_figure,
         test_unit_price_is_extracted_from_natural_phrasing,
         test_monthly_burn_phrasing_does_not_flip_model_grain,

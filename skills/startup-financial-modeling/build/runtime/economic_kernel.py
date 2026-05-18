@@ -1269,6 +1269,52 @@ def extract_target_gross_margin(text: str) -> float | None:
     return None
 
 
+# Employee / workforce churn is an HR metric, not the customer-retention
+# rate the model wants.
+_HR_CHURN_CUE = re.compile(
+    r"(?:employee|staff|workforce|team|talent|personnel)\s+"
+    r"(?:churn|attrition|turnover)",
+    flags=re.IGNORECASE,
+)
+# "monthly" only annualizes when it is syntactically tied to the churn
+# phrase — "monthly churn", "churn ... per month" — not an unrelated
+# "monthly price" sentence sitting near a churn figure.
+_MONTHLY_CHURN_CUE = re.compile(
+    r"(?:monthly|per[-\s]month|/\s*mo\b|月次|月間|毎月)\s*"
+    r"(?:logo\s+|customer\s+|net\s+)?churn"
+    r"|churn[^.\n]{0,20}?(?:per[-\s]month|monthly|/\s*mo\b)",
+    flags=re.IGNORECASE,
+)
+
+
+def extract_churn_rate(text: str) -> float | None:
+    """Stated customer / logo churn as an annual fraction.
+
+    A monthly churn figure is annualized by compounding
+    (1 - (1 - monthly)^12). An employee / workforce churn mention is
+    skipped — it is not the customer-retention metric. Returns None when
+    no customer-churn figure is stated.
+    """
+    for pattern in (
+        r"churn[^0-9%\n]{0,24}?([0-9]{1,2}(?:\.[0-9])?)\s*%",
+        r"([0-9]{1,2}(?:\.[0-9])?)\s*%[^0-9%.\n]{0,28}?churn",
+    ):
+        for match in re.finditer(pattern, text, flags=re.IGNORECASE):
+            window = text[max(0, match.start() - 24): match.end() + 24]
+            if _HR_CHURN_CUE.search(window):
+                continue  # an employee-churn mention — not the retention rate
+            try:
+                pct = float(match.group(1)) / 100.0
+            except ValueError:
+                continue
+            if not 0.0 < pct < 1.0:
+                continue
+            if _MONTHLY_CHURN_CUE.search(window):
+                pct = 1.0 - (1.0 - pct) ** 12
+            return round(pct, 4)
+    return None
+
+
 def _profile_target_gross_margin(profile: MechanicProfile, periods: int) -> list[float]:
     base = (
         0.55
@@ -1983,6 +2029,7 @@ def derive_source_facts(
     # rounds are still auto-sized to keep the plan solvent.
     stated_raise = extract_raise_size(text, currency)
     stated_post_money = extract_post_money(text, currency)
+    stated_churn = extract_churn_rate(text)
     equity_raise = size_equity_rounds(
         beginning_cash, free_cash_flow, debt_raise, round_unit=round_100m,
         stated_first_round=stated_raise or None,
@@ -2077,7 +2124,11 @@ def derive_source_facts(
         customer_roi_yen=max(price * 18, int(3_000_000 * money_scale)),
         implementation_cost_yen=max(price * 2, int(300_000 * money_scale)),
         sales_cycle_months=4 if profile.key in {"recurring_software", "marketplace"} else 6,
-        churn_rate=0.08 if profile.key != "marketplace" else 0.18,
+        churn_rate=(
+            stated_churn
+            if stated_churn is not None
+            else (0.08 if profile.key != "marketplace" else 0.18)
+        ),
         repeat_rate=0.40 if profile.key == "marketplace" else 0.75,
         payment_fee_pct=0.025 if profile.key == "marketplace" else 0.0,
         incentive_pct_gmv=0.025 if profile.key == "marketplace" else 0.0,
