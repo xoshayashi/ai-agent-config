@@ -1036,7 +1036,6 @@ def _build_pl(wb: Workbook, facts: SourceFacts) -> None:
         (17, "Total OpEx", "JPY", "=SUM({c}13:{c}16)"),
         (18, "EBITDA", "JPY", "={c}9-{c}17"),
         (19, "EBITDA margin", "%", "=IF({c}7=0,0,{c}18/{c}7)"),
-        (21, "D&A", "JPY", "='Cost Build'!{c}16/'Assumptions'!{c}39*12"),
         (22, "EBIT", "JPY", "={c}18-{c}21"),
         (23, "Interest expense", "JPY", "='Capital Stack'!{c}8*'Capital Stack'!{c}9"),
         (24, "EBT", "JPY", "={c}22-{c}23"),
@@ -1047,6 +1046,21 @@ def _build_pl(wb: Workbook, facts: SourceFacts) -> None:
     for row, label, unit, formula in rows:
         fmt = ib.FMT_PERCENT if unit == "%" else ib.FMT_MONEY
         _write_values(ws, row, label, unit, [formula.format(c=get_column_letter(c)) for c in cols], kind="formula", fmt=fmt, bold=row in (9, 17, 18, 22, 26))
+    # D&A: straight-line on the accumulated asset base, capped so accumulated
+    # depreciation never exceeds gross PP&E. Self-contained on the P&L row plus
+    # cumulative Cost Build CapEx, so it survives focused-bundle pruning.
+    first = get_column_letter(cols[0])
+    da_formulas = []
+    for idx, col in enumerate(cols):
+        c = get_column_letter(col)
+        cum_capex = f"SUM('Cost Build'!${first}$16:{c}16)"
+        annual = f"{cum_capex}*12/'Assumptions'!{c}39"
+        if idx == 0:
+            da_formulas.append(f"=MIN({annual},{cum_capex})")
+        else:
+            prev = get_column_letter(cols[idx - 1])
+            da_formulas.append(f"=MIN({annual},{cum_capex}-SUM(${first}$21:{prev}21))")
+    _write_values(ws, 21, "D&A", "JPY", da_formulas, kind="formula", fmt=ib.FMT_MONEY)
 
 
 def _build_bs(wb: Workbook, facts: SourceFacts) -> None:
