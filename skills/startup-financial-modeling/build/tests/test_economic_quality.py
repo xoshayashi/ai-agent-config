@@ -229,6 +229,10 @@ def test_start_year_takes_the_start_of_a_range() -> None:
     assert kernel.extract_start_year(
         "We model a 6-year forecast horizon (2026-2031)."
     ) == 2026, "start year took the end of the range, not the start"
+    # The same non-greedy path covers a Japanese cue word.
+    assert kernel.extract_start_year("事業計画(2026-2031)") == 2026, (
+        "Japanese-cue start year took the end of the range"
+    )
     facts = kernel.derive_source_facts(
         "# Deep-tech plan\n\nA deep-tech company. We model a forecast "
         "horizon (2026-2031).\nSource: roadmap memo.\n"
