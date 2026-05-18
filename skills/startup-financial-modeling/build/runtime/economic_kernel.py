@@ -983,6 +983,17 @@ def _mechanic_key(facts: SourceFacts) -> str:
     return winners[0]
 
 
+def mechanic_key(facts: SourceFacts) -> str:
+    """Public accessor for the detected business-mechanic key.
+
+    Returns one of ``marketplace``, ``hardware_asset_heavy``,
+    ``fintech_balance_sheet``, ``pre_revenue_milestone``,
+    ``recurring_software``, or ``generic``. Renderers use it to gate
+    profile-specific surfaces without reaching into a private helper.
+    """
+    return _mechanic_key(facts)
+
+
 def scenario_drivers_for(facts: SourceFacts) -> tuple[ScenarioDriver, ...]:
     key = _mechanic_key(facts)
     registry = {
@@ -2058,6 +2069,7 @@ __all__ = [
     "extract_start_year",
     "extract_source_facts",
     "forecast_years",
+    "mechanic_key",
     "profile_for_text",
     "score_mechanics",
 ]

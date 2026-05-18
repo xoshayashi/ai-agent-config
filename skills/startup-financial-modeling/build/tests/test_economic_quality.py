@@ -837,6 +837,115 @@ def test_runway_months_is_capped_at_99() -> None:
             )
 
 
+def test_kpi_dashboard_carries_vc_decision_metrics() -> None:
+    """The KPI dashboard computes the core VC capital-efficiency and
+    retention metrics as live cells that recalculate without error."""
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        pytest.skip("soffice/libreoffice not available")
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "saas.md"
+        out = Path(tmp) / "saas.xlsx"
+        src.write_text(SAAS_STORY, encoding="utf-8")
+        source_plan.build_source_plan_workbook(src, out)
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(Path(tmp) / "recalc"), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        wb = load_workbook(Path(tmp) / "recalc" / "saas.xlsx", data_only=True)
+        ws = wb["KPI"]
+        first_col = source_plan.START_PERIOD_COL
+        facts = kernel.derive_source_facts(SAAS_STORY)
+        assert any(
+            c.value == "VC decision metrics"
+            for row in ws.iter_rows() for c in row
+        ), "KPI sheet missing the 'VC decision metrics' section"
+        metrics = [
+            "Rule of 40", "Net revenue retention",
+            "Customer acquisition cost", "CAC payback", "Magic number",
+        ]
+        for label in metrics:
+            row = _row_for_label(ws, label)
+            for idx in range(len(facts.years)):
+                val = ws.cell(row, first_col + idx).value
+                assert val is not None, f"{label} period {idx} did not resolve"
+                if isinstance(val, str):
+                    assert val == "N/A", (
+                        f"{label} period {idx}: unexpected text {val!r}"
+                    )
+                else:
+                    float(val)  # numeric, finite
+
+
+def test_rule_of_40_is_growth_plus_ebitda_margin() -> None:
+    """Rule of 40 on the KPI sheet equals revenue growth plus EBITDA margin
+    — it is composed from the live model cells, not a free-standing input."""
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        pytest.skip("soffice/libreoffice not available")
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "saas.md"
+        out = Path(tmp) / "saas.xlsx"
+        src.write_text(SAAS_STORY, encoding="utf-8")
+        source_plan.build_source_plan_workbook(src, out)
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(Path(tmp) / "recalc"), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        wb = load_workbook(Path(tmp) / "recalc" / "saas.xlsx", data_only=True)
+        kpi, rb, pl = wb["KPI"], wb["Revenue Build"], wb["P&L"]
+        first_col = source_plan.START_PERIOD_COL
+        r40 = _row_for_label(kpi, "Rule of 40")
+        growth = _row_for_label(rb, "Revenue growth")
+        ebitda_margin = _row_for_label(pl, "EBITDA margin")
+        facts = kernel.derive_source_facts(SAAS_STORY)
+        for idx in range(len(facts.years)):
+            got = kpi.cell(r40, first_col + idx).value
+            growth_val = rb.cell(growth, first_col + idx).value
+            margin_val = pl.cell(ebitda_margin, first_col + idx).value
+            # A clean failure if the recalc did not resolve a cell, rather
+            # than a confusing TypeError from float(None).
+            assert None not in (got, growth_val, margin_val), (
+                f"period {idx}: a Rule of 40 input did not recalculate "
+                f"(rule={got}, growth={growth_val}, margin={margin_val})"
+            )
+            expected = float(growth_val) + float(margin_val)
+            assert abs(float(got) - expected) < 1e-6, (
+                f"period {idx}: Rule of 40 {got} != growth + EBITDA margin "
+                f"{expected}"
+            )
+
+
+def test_kpi_dashboard_omits_vc_block_for_an_ambiguous_mechanic() -> None:
+    """The VC metrics block is gated: an ambiguous-mechanic plan gets the
+    generic KPI set and keeps the original (unshifted) dashboard layout."""
+    story = (
+        "# Ambiguous plan\n\nA new venture with unclear revenue mechanics "
+        "and weak evidence. 5-year plan, seed round. Source: management memo."
+    )
+    facts = kernel.derive_source_facts(story)
+    assert kernel.mechanic_key(facts) == "generic"
+    ws = source_plan.build_source_plan_workbook_from_facts(facts)["KPI"]
+    labels = [
+        c.value for row in ws.iter_rows() for c in row
+        if isinstance(c.value, str)
+    ]
+    assert "VC decision metrics" not in labels, (
+        "VC metrics section leaked into an ambiguous-mechanic plan"
+    )
+    for metric in ("Rule of 40", "Customer acquisition cost", "Magic number"):
+        assert metric not in labels, (
+            f"{metric} leaked into an ambiguous-mechanic plan"
+        )
+    # The layout is unshifted: the interpretation register stays at its base.
+    assert any(
+        c.value == "KPI interpretation register" and c.row == 62
+        for row in ws.iter_rows() for c in row
+    ), "ambiguous-mechanic KPI layout should not shift"
+
+
 if __name__ == "__main__":
     _tests = [
         test_gross_margin_tracks_target_across_archetypes,
@@ -874,6 +983,9 @@ if __name__ == "__main__":
         test_workbook_recalc_reconciles_with_kernel_gross_margin,
         test_burn_multiple_does_not_explode_in_period_zero,
         test_runway_months_is_capped_at_99,
+        test_kpi_dashboard_carries_vc_decision_metrics,
+        test_rule_of_40_is_growth_plus_ebitda_margin,
+        test_kpi_dashboard_omits_vc_block_for_an_ambiguous_mechanic,
     ]
     for _test in _tests:
         try:
