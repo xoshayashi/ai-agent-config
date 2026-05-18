@@ -126,6 +126,37 @@ remove_retired_skill_links() {
   done
 }
 
+remove_notification_hooks() {
+  helper="$config_home/scripts/install-notifications.py"
+  if [ ! -f "$helper" ]; then
+    warn "missing $helper; skip notification hook removal"
+    return 0
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    warn "python3 not found; skip notification hook removal"
+    return 0
+  fi
+  # A function's positional parameters are local in POSIX sh and restored on
+  # return, so building the helper's argv with `set --` does not affect $@
+  # in the caller.
+  set -- --mode uninstall \
+    --config-home "$config_home" \
+    --claude-home "$claude_home" \
+    --codex-home "$codex_home" \
+    --gemini-home "$gemini_home"
+  if [ "$dry_run" = "1" ]; then
+    set -- "$@" --dry-run
+  fi
+  python3 "$helper" "$@"
+  # Codex's hooks.json exists only for hooks. When the merge leaves it empty,
+  # trash it so uninstall fully restores the pre-install state.
+  hooks_json="$codex_home/hooks.json"
+  if [ "$dry_run" != "1" ] && [ -f "$hooks_json" ] \
+    && [ "$(tr -d ' \t\n' < "$hooks_json" 2>/dev/null)" = "{}" ]; then
+    trash_path "$hooks_json" "empty codex hooks.json"
+  fi
+}
+
 say "AI agent config uninstall (instructions only)"
 say "config: $config_home"
 
@@ -146,5 +177,6 @@ remove_managed_link "$gemini_home/DESIGN.md" "$src_root/DESIGN.md" "instruction 
 # active skill roots so backup folders are not loaded as skills.
 remove_skill_links
 remove_retired_skill_links
+remove_notification_hooks
 
 say "uninstall complete"
