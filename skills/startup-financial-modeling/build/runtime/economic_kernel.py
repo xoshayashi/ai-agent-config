@@ -542,21 +542,29 @@ def extract_rd_headcount(text: str) -> int:
     return 0
 
 
-def _headcount_plan(profile: MechanicProfile, ending: list[int], revenue: list[int]) -> tuple[list[int], list[int], list[int], list[int]]:
-    """Create editable staffing assumptions from scale, not a company example."""
+def _headcount_plan(profile: MechanicProfile, revenue: list[int]) -> tuple[list[int], list[int], list[int], list[int]]:
+    """Create editable staffing assumptions scaled to revenue, not a company
+    example.
+
+    Every function scales with revenue. Operations once carried a raw
+    account-count term (`scale / ops_divisor`) that equated one customer to a
+    fixed slice of operations staff regardless of price — a low-ARPU
+    mass-market plan then drew hundreds of operations FTE and people cost ran
+    past revenue. Headcount is funded by revenue, so revenue is the driver;
+    the agent should override `*_headcount` in structured input when a plan's
+    staffing is known.
+    """
     asset_heavy = profile.key in {"hardware_asset_heavy", "fintech_balance_sheet"}
     marketplace = profile.key == "marketplace"
     product: list[int] = []
     gtm: list[int] = []
     operations: list[int] = []
     ga: list[int] = []
-    for idx, (units, revenue_yen) in enumerate(zip(ending, revenue)):
+    for idx, revenue_yen in enumerate(revenue):
         revenue_b = max(revenue_yen / 1_000_000_000, 0)
-        scale = max(units, 1)
         product_base = 4 + idx * 2 + revenue_b * (2.2 if asset_heavy else 1.2)
         gtm_base = 2 + revenue_b * (1.4 if marketplace else 1.8)
-        ops_divisor = 80 if asset_heavy else 350 if marketplace else 220
-        ops_base = 1 + scale / ops_divisor + revenue_b * (0.7 if asset_heavy else 0.35)
+        ops_base = 1 + revenue_b * (0.7 if asset_heavy else 0.35)
         product.append(max(2, int(round(product_base))))
         gtm.append(max(1, int(round(gtm_base))))
         operations.append(max(1, int(round(ops_base))))
@@ -2163,7 +2171,7 @@ def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
         max(gmv[-1], implied_mature_revenue),
         int(1_000_000_000 * money_scale),
     )
-    product_hc, gtm_hc, ops_hc, ga_hc = _headcount_plan(profile, ending, gmv)
+    product_hc, gtm_hc, ops_hc, ga_hc = _headcount_plan(profile, gmv)
     # Honor a stated current R&D / engineering team size: scale the product
     # headcount ramp so period 0 lands on it, preserving the ramp shape. The
     # auto-derived ramp scales with revenue / units, which badly understates
