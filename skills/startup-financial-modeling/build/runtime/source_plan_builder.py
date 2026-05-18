@@ -1389,12 +1389,13 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
     _setup_sheet(ws, f"{facts.company} — KPI Dashboard", "Decision metrics: scale, margin, runway, capital efficiency, ownership, and valuation.")
     _write_period_header(ws, facts)
     cols = _period_cols(facts)
+    profile_key = mechanic_key(facts)
     # The VC decision-metrics block (CAC, payback, magic number, Rule of 40,
     # net retention) is rendered only for profiles with a real customer-
     # acquisition and recurring/transaction motion. An ambiguous-mechanic
     # plan gets generic KPIs instead, and a pre-revenue plan has no customer
     # base to compute them against — both keep the original layout.
-    vc_metrics_apply = mechanic_key(facts) not in (
+    vc_metrics_apply = profile_key not in (
         "generic", "pre_revenue_milestone",
     )
     # VC_BLOCK_OFFSET: the block occupies rows 24-29 (one section header plus
@@ -1403,12 +1404,27 @@ def _build_kpi(wb: Workbook, facts: SourceFacts) -> None:
     # one-row gap the charts and the register below shift down by 3.
     CAC_ROW = 27
     VC_BLOCK_OFFSET = 3 if vc_metrics_apply else 0
-    rows = [
-        (7, "Monthly price / unit", "JPY", "='Assumptions'!{c}11", ib.FMT_JPY_YEN),
-        (8, "Monthly unit cost", "JPY", "=('Assumptions'!{c}25+'Assumptions'!{c}26+'Assumptions'!{c}27)", ib.FMT_JPY_YEN),
-        (9, "Monthly unit gross profit", "JPY", "={c}7-{c}8", ib.FMT_JPY_YEN),
-        (10, "Unit gross margin", "%", "=IF({c}7=0,0,{c}9/{c}7)", ib.FMT_PERCENT),
-        (11, "Unit payback", "months", "=IF({c}9<=0,\"N/A\",'Assumptions'!{c}38/{c}9)", ib.FMT_NUM),
+    # Unit-economics rows (7-11). A GMV / take-rate marketplace has no
+    # per-seat subscription price, so the per-unit subscription rows would
+    # read price 0, negative unit gross profit, and "N/A" payback — which
+    # misreads as a broken business. A marketplace gets a transaction lens.
+    if profile_key == "marketplace":
+        unit_economics_rows = [
+            (7, "Take rate", "%", "='Assumptions'!{c}12", ib.FMT_PERCENT),
+            (8, "GMV per customer", "JPY", "=IF('Revenue Build'!{c}20=0,0,{c}14/'Revenue Build'!{c}20)", ib.FMT_JPY_YEN),
+            (9, "Net revenue per customer", "JPY", "=IF('Revenue Build'!{c}20=0,0,{c}15/'Revenue Build'!{c}20)", ib.FMT_JPY_YEN),
+            (10, "Variable cost / GMV", "%", "=('Assumptions'!{c}58+'Assumptions'!{c}59+'Assumptions'!{c}60)", ib.FMT_PERCENT),
+            (11, "Contribution margin", "%", "=IF('Assumptions'!{c}12=0,0,('Assumptions'!{c}12-{c}10)/'Assumptions'!{c}12)", ib.FMT_PERCENT),
+        ]
+    else:
+        unit_economics_rows = [
+            (7, "Monthly price / unit", "JPY", "='Assumptions'!{c}11", ib.FMT_JPY_YEN),
+            (8, "Monthly unit cost", "JPY", "=('Assumptions'!{c}25+'Assumptions'!{c}26+'Assumptions'!{c}27)", ib.FMT_JPY_YEN),
+            (9, "Monthly unit gross profit", "JPY", "={c}7-{c}8", ib.FMT_JPY_YEN),
+            (10, "Unit gross margin", "%", "=IF({c}7=0,0,{c}9/{c}7)", ib.FMT_PERCENT),
+            (11, "Unit payback", "months", "=IF({c}9<=0,\"N/A\",'Assumptions'!{c}38/{c}9)", ib.FMT_NUM),
+        ]
+    rows = unit_economics_rows + [
         (13, "Ending primary units", "units", "='Assumptions'!{c}8", ib.FMT_INTEGER),
         (14, "GMV / economic volume", "JPY", "='Assumptions'!{c}10", ib.FMT_MONEY),
         (15, "Revenue", "JPY", "='Revenue Build'!{c}18", ib.FMT_MONEY),
