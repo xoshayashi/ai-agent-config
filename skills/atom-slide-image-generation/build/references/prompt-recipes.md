@@ -197,7 +197,7 @@ density_design:
   semantic_copy_gate: [major body labels use meaningful clauses/sentences; noun-only labels are allowed only for headers, axes, or category names]
   icon_restraint_plan: [necessary icons, why they clarify, and which icon candidates were removed because text/structure communicates better]
   icon_density_budget: [default 0-3 purposeful icons per slide and keep icon count below semantic text units unless the visual logic demands otherwise]
-  density_levers: [KPI strip, supporting context region, evidence strip, small multiples, annotations, benchmark/context column, source cue]
+  density_levers: [KPI strip, supporting context region, evidence strip, small multiples, annotations, benchmark/context column, benchmark/target/prior-period reference line, source cue]
   overload_controls: [one dominant structure, max three major regions, body >=18pt equivalent, grouped labels, no decorative density]
 information_unit_budget:
 density_number_policy: no default cap on decision-relevant numbers; remove only unsupported, redundant, unreadable, or decorative numbers

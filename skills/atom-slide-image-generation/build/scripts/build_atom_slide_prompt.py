@@ -248,7 +248,7 @@ def canonical_planning_block(
   notes_hook: [optional one attention-grabbing line; use only on the opener, chapter turns, and turning points]
   notes_objection_preempt: [optional one sentence naming the most likely objection and its answer; use only on contestable-claim slides]
   notes_delivery_markers: [up to two deck-language pause/emphasis/slow cues per note, e.g. 【一拍】【強調】【ゆっくり】 (Japanese) or [beat] [emphasis] [slow] (English)]
-  notes_persuasion_arc: [deck-level current-state to intended-future through-line and one big-idea sentence; keep every note consistent with it]
+  notes_persuasion_arc: [keep consistent with the deck-level notes_persuasion_arc; do not redefine it per slide]
   opening_slide_role: opening_thesis_slide / standard_story_slide
   first_slide_not_title_only: true / N/A
   opening_density_gate: slide 1 has core thesis, 2-4 proof/tension points, visible market-shift/matrix/causal-map/wedge structure, and bridge
@@ -380,13 +380,13 @@ def canonical_planning_block(
     semantic_copy_gate: [major body labels use meaningful clauses/sentences; noun-only labels are allowed only for headers, axes, or category names]
     icon_restraint_plan: [which icons are necessary, what they clarify, and which icon candidates were removed because text/structure communicates better]
     icon_density_budget: [default 0-3 purposeful icons per slide and keep icon count below semantic text units unless the visual logic demands otherwise]
-    density_levers: [KPI strip, supporting context region, evidence strip, small multiples, annotation, benchmark/context column, source cue]
+    density_levers: [KPI strip, supporting context region, evidence strip, small multiples, annotation, benchmark/context column, benchmark/target/prior-period reference line, source cue]
     overload_controls: [one dominant structure, max three major regions, body >=18pt equivalent, grouped labels, no decorative density]
   impact_clarity_density_gate: [one unmistakable takeaway, one dominant visual structure, one useful evidence layer, simple reading path, clear hierarchy]
   message_sharpness_lock: action title names actor/topic, change/tension, and implication; repair generic labels, vague benefit claims, or slogans before image prompting
   pyramid_logic_lock: state one governing thought, ladder each action title to the question its predecessor raises, and prove each title with a named exhibit element
   governing_thought: [the single sentence the whole deck exists to prove]
-  predecessor_question: [the one-line question the previous slide's action title raises that this slide answers]
+  predecessor_question: [N/A for slide 1; for slides 2+, the one-line question the previous slide's action title raises that this slide answers]
   title_exhibit_proof_match: [name the exact exhibit element (bar, delta, slope, cell, row, node) that proves the action title; the title claims nothing the exhibit cannot show]
   mece_support_gate: a slide's supporting points are mutually exclusive and collectively exhaustive, and each slide declares body_logic as inductive or deductive
   body_logic: inductive (parallel MECE reasons) / deductive (premise chain with each premise independently defensible)
