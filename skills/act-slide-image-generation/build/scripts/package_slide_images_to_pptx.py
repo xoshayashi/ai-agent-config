@@ -174,29 +174,33 @@ def load_notes(
     return notes
 
 
-APPROVED_STATUSES = {
-    "final_image_quality_status",
-    "content_quality_status",
-    "design_quality_status",
-    "deck_unity_status",
-    "completion_ready_status",
-    "review_manifest_status",
-    "deck_tone_consistency_status",
-    "illustration_consistency_status",
-    "post_generation_design_balance_status",
-    "whitespace_occupancy_balance_status",
-    "density_balance_status",
-    "typography_balance_status",
-    "color_consistency_status",
-    "outer_padding_consistency_status",
-    "header_integrity_status",
-    "multimodal_design_review_status",
-    "design_balance_gate_status",
-    "occupancy_density_fit_status",
-    "font_scale_unity_status",
-    "palette_role_unity_status",
-    "design_breakage_blocker_status",
-}
+REVIEW_MANIFEST_SCHEMA_VERSION = 1
+
+APPROVED_STATUSES = frozenset(
+    {
+        "final_image_quality_status",
+        "content_quality_status",
+        "design_quality_status",
+        "deck_unity_status",
+        "completion_ready_status",
+        "review_manifest_status",
+        "deck_tone_consistency_status",
+        "illustration_consistency_status",
+        "post_generation_design_balance_status",
+        "whitespace_occupancy_balance_status",
+        "density_balance_status",
+        "typography_balance_status",
+        "color_consistency_status",
+        "outer_padding_consistency_status",
+        "header_integrity_status",
+        "multimodal_design_review_status",
+        "design_balance_gate_status",
+        "occupancy_density_fit_status",
+        "font_scale_unity_status",
+        "palette_role_unity_status",
+        "design_breakage_blocker_status",
+    }
+)
 
 SLIDE_APPROVED_STATUSES = frozenset(
     {
@@ -220,6 +224,18 @@ SLIDE_APPROVED_STATUSES = frozenset(
     }
 )
 
+REVIEW_MANIFEST_BASE_KEYS = frozenset(
+    {
+        "schema_version",
+        "all_generated_images_reviewed",
+        "weak_slide_regeneration_queue",
+        "slides",
+    }
+)
+REVIEW_MANIFEST_KEYS = REVIEW_MANIFEST_BASE_KEYS | APPROVED_STATUSES
+REVIEW_MANIFEST_SLIDE_BASE_KEYS = frozenset({"slide_id", "png_path", "blockers", "majors"})
+REVIEW_MANIFEST_SLIDE_KEYS = REVIEW_MANIFEST_SLIDE_BASE_KEYS | SLIDE_APPROVED_STATUSES
+
 
 def normalize_manifest_path(value: object, base: Path) -> Path | None:
     if not isinstance(value, str) or not value.strip():
@@ -235,6 +251,16 @@ def require_approved_status(data: dict[str, object], key: str) -> None:
         raise SystemExit(f"review_manifest {key} must be approved.")
 
 
+def require_exact_keys(data: dict[str, object], expected: frozenset[str], label: str) -> None:
+    actual = set(data)
+    missing = sorted(expected - actual)
+    if missing:
+        raise SystemExit(f"{label} missing required key: {missing[0]}")
+    unknown = sorted(actual - expected)
+    if unknown:
+        raise SystemExit(f"{label} unknown key: {unknown[0]}")
+
+
 def validate_review_manifest(manifest_file: str | None, images: list[Path]) -> None:
     if not manifest_file:
         raise SystemExit("PPTX package gate requires an approved review manifest. Provide --review-manifest.")
@@ -243,6 +269,10 @@ def validate_review_manifest(manifest_file: str | None, images: list[Path]) -> N
     data = json.loads(manifest_path.read_text(encoding="utf-8"))
     if not isinstance(data, dict):
         raise SystemExit("review_manifest must be a JSON object.")
+
+    if data.get("schema_version") != REVIEW_MANIFEST_SCHEMA_VERSION:
+        raise SystemExit(f"review_manifest schema_version must be {REVIEW_MANIFEST_SCHEMA_VERSION}.")
+    require_exact_keys(data, REVIEW_MANIFEST_KEYS, "review_manifest")
 
     if data.get("all_generated_images_reviewed") is not True:
         raise SystemExit("review_manifest all_generated_images_reviewed must be true.")
@@ -260,12 +290,15 @@ def validate_review_manifest(manifest_file: str | None, images: list[Path]) -> N
     if len(slides) != len(images):
         raise SystemExit(f"review_manifest slide count {len(slides)} does not match image count {len(images)}.")
 
-    expected_paths = {image.resolve() for image in images}
+    expected_paths = [image.resolve() for image in images]
     manifest_paths: set[Path] = set()
     base = manifest_path.parent
     for idx, slide in enumerate(slides, 1):
         if not isinstance(slide, dict):
             raise SystemExit(f"review_manifest slide {idx} must be an object.")
+        require_exact_keys(slide, REVIEW_MANIFEST_SLIDE_KEYS, f"review_manifest slide {idx}")
+        if slide.get("slide_id") != str(idx):
+            raise SystemExit(f"review_manifest slide {idx} slide_id must be {idx} as a string.")
         for key in SLIDE_APPROVED_STATUSES:
             if slide.get(key) != "approved":
                 raise SystemExit(f"review_manifest slide {idx} {key} must be approved.")
@@ -278,17 +311,9 @@ def validate_review_manifest(manifest_file: str | None, images: list[Path]) -> N
             raise SystemExit(f"review_manifest slide {idx} is missing png_path.")
         if path in manifest_paths:
             raise SystemExit(f"Duplicate png_path in review_manifest slide {idx}: {path}")
+        if path != expected_paths[idx - 1]:
+            raise SystemExit(f"review_manifest slide {idx} png_path must match image input order: {expected_paths[idx - 1]}")
         manifest_paths.add(path)
-
-    if manifest_paths != expected_paths:
-        missing = sorted(str(path) for path in expected_paths - manifest_paths)
-        extra = sorted(str(path) for path in manifest_paths - expected_paths)
-        detail = []
-        if missing:
-            detail.append("missing: " + ", ".join(missing))
-        if extra:
-            detail.append("extra: " + ", ".join(extra))
-        raise SystemExit("review_manifest image paths must match package images; " + "; ".join(detail))
 
 
 def rels_xml(relationships: list[tuple[str, str, str]]) -> str:

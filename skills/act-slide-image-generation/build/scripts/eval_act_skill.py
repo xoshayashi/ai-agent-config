@@ -280,6 +280,7 @@ def approved_review_manifest(images: list[Path]) -> dict[str, object]:
         "design_breakage_blocker_status": "approved",
     }
     return {
+        "schema_version": 1,
         "all_generated_images_reviewed": True,
         "weak_slide_regeneration_queue": [],
         "final_image_quality_status": "approved",
