@@ -30,13 +30,16 @@ quantified proof point behind every claim.
 | Drug development; value turns on clinical milestones, not revenue | Biotech / Pharma clinical-pipeline thesis |
 | Hardware / deep tech; the path to manufacturing economics | Hardware / Deep Tech cost-curve thesis |
 | Fintech; which revenue structure sets the valuation frame | Fintech: take-rate vs. balance-sheet |
+| Consumer brand / D2C; proof is repeat purchase and cohort contribution | Consumer / D2C cohort-contribution thesis |
+| Energy / infrastructure developer building and owning contracted assets | Climate & Energy Infrastructure contracted-cash-flow thesis |
+| Clinic / care-delivery chain replicating profitable sites | Healthcare Services per-site unit-economics thesis |
 
 ## Contents
 
 - A. Moat & competitive-advantage theory: [7 Powers](#1-7-powers), [Counter-Positioning](#2-counter-positioning), [Network Effects](#3-network-effects), [Data Moats](#4-data-moats--data-network-effects), [Aggregation Theory](#5-aggregation-theory)
 - B. Market & positioning archetypes: [Category Design](#6-category-design--category-king), [Blue Ocean](#7-blue-ocean-strategy), [Crossing the Chasm](#8-crossing-the-chasm--beachhead), [Jobs-to-be-Done](#9-jobs-to-be-done)
 - C. Business-model & growth archetypes: [Platform / Flywheel](#10-platform--marketplace-flywheel), [Vertical SaaS](#11-vertical-saas), [Picks & Shovels](#12-picks-and-shovels), [Land & Expand / NRR](#13-land--expand--net-revenue-retention), [PLG](#14-product-led-growth-plg), [Usage-Based Pricing](#15-usage-based-pricing), [Bundling / Unbundling](#16-bundling--unbundling)
-- D. Industry-specific proof anchors: [Biotech / Pharma](#17-biotech--pharma--the-clinical-pipeline-thesis), [Hardware / Deep Tech](#18-hardware--deep-tech--the-path-to-manufacturing-economics), [Fintech](#19-fintech--take-rate-vs-balance-sheet)
+- D. Industry-specific proof anchors: [Biotech / Pharma](#17-biotech--pharma--the-clinical-pipeline-thesis), [Hardware / Deep Tech](#18-hardware--deep-tech--the-path-to-manufacturing-economics), [Fintech](#19-fintech--take-rate-vs-balance-sheet), [Consumer / D2C](#20-consumer--d2c--the-cohort-contribution-thesis), [Climate & Energy Infrastructure](#21-climate--energy-infrastructure--the-contracted-cash-flow-thesis), [Healthcare Services](#22-healthcare-services--care-delivery--the-per-site-unit-economics-thesis)
 
 Sections A–C are model-agnostic. Section D is for businesses whose proof is not
 SaaS-shaped — where the load-bearing evidence is a clinical milestone, a
@@ -334,6 +337,100 @@ vintages shown as steady-state; a credit model never tested through a downturn;
 applying SaaS multiples to spread revenue; treating a licence only as a moat
 while ignoring its capital and compliance cost.
 
+### 20. Consumer / D2C — the cohort-contribution thesis
+**Essence.** The thesis rests on one claim: the unit economics are positive
+*after* marketing spend, and repeat purchase happens *organically* rather than
+being bought with ads. Value is carried not by NRR and a flywheel but by
+**cohort contribution margin** — revenue minus COGS, fulfilment, returns,
+payment fees *and* marketing, for a dated cohort — and the repeat-purchase
+curve. The moat is usually thin and must be named explicitly in 7 Powers terms:
+branding (a price premium or unprompted demand that survives switching the ads
+off), scale economies (procurement, logistics density), switching costs
+(subscription / replenishment). Network effects almost never apply to a consumer
+brand — do not claim them.
+**When to use.** Consumer brands, D2C, physical-goods commerce.
+**Proof investors expect.** Cohort contribution margin *after* marketing (gross
+margin alone hides a thin contribution — a 50%+ gross margin can still leave a
+~15% contribution); the repeat-purchase curve from *measured* cohorts (a second
+purchase within ~60 days lifts 12-month LTV several-fold); CAC payback (~12
+months is normal for consumer, slower than SaaS); channel-by-channel economics
+shown separately (DTC: high margin, high CAC, a direct relationship; wholesale /
+retail: roughly half the margin, near-zero CAC); inventory turn and the
+cash-conversion cycle; brand signals (branded / unprompted search, organic and
+direct traffic share, repeat-customer revenue share).
+**Pitfalls.** Mistaking ad-bought growth for brand (a high ROAS is not a moat);
+over-extrapolating LTV from a 90-day cohort; a high gross margin masking a thin
+contribution margin; ignoring inventory and working capital (the cash-conversion
+cycle can make growth itself consume cash); applying SaaS multiples; channel
+concentration on a single retailer, Amazon, or one ad platform.
+
+### 21. Climate & Energy Infrastructure — the contracted-cash-flow thesis
+**Essence.** For a developer that builds, owns and operates energy /
+infrastructure assets (renewables, storage, EV charging) — *not* a hardware
+manufacturer — the thesis is not "is the technology better" but whether the
+company can **stack contracted, long-dated cash flows at a sound cost of capital
+and low execution risk**. The load-bearing object is a portfolio of project cash
+flows backed by signed offtake. Core terms: LCOE (levelised cost of energy, the
+unit cost); the PPA / offtake contract that fixes revenue and removes
+uncertainty (uncontracted output is *merchant exposure*); a development pipeline
+measured by *stage*, not headline MW; project finance (typically non-recourse,
+roughly 70:30 debt:equity, plus tax equity where it applies). With proven
+technology the dominant risk is **execution** — grid interconnection, permitting,
+construction, contracting — not the technology. The moat is cornered resources
+(sites, interconnection-queue positions, permits), development know-how,
+long-dated contracts, and a cost-of-capital advantage from scale and track
+record.
+**When to use.** Renewable / storage / charging developers, independent power
+producers, contracted-infrastructure businesses.
+**Proof investors expect.** The contracted-offtake share of the portfolio, with
+the merchant share named explicitly; the pipeline broken down by *stage* (site
+control → interconnection → permits → signed PPA → notice-to-proceed →
+construction → operating), with stage-probability-adjusted MW; project-level
+economics (LCOE, IRR, debt-service coverage); operating performance of live
+assets (capacity factor vs. plan); secured interconnection and permits; access
+to project finance and tax equity. Tax credits and feed-in schemes are a
+tailwind *and* a dependency — show a subsidy-free LCOE and a policy-change
+sensitivity alongside them.
+**Pitfalls.** Presenting an early-stage pipeline as if it were operating
+capacity; treating uncontracted (merchant) output as fixed revenue; assuming
+subsidies are permanent; optimistic cost-of-capital and financing assumptions;
+conflating hardware technology risk with project execution risk; treating
+interconnection-queue positions as firm capacity.
+
+### 22. Healthcare Services / Care Delivery — the per-site unit-economics thesis
+**Essence.** For a care-delivery business — clinic and practice chains, home
+care, digital-health providers, *distinct from biotech* — revenue is real, and
+the question is whether a **site (clinic) is profitable and the model replicates
+across many sites**. The load-bearing object is per-site unit economics (open
+cost, time to maturity, mature contribution margin, payback) plus the payment
+structure that underwrites it. Fee-for-service pays per encounter — volume lifts
+revenue but also cost; value-based care / capitation pays a fixed amount per
+patient, so the provider takes medical-cost risk and the **medical-loss ratio**
+(MLR — medical cost as a share of the payment received) becomes the line that
+decides profit or loss. The strong story is not "scale fee-for-service volume"
+but "under value-based contracts, prevention lowers MLR so health outcomes and
+profit rise together." The moat is local density and referral networks, payer
+contracts earned through a track record, clinical reputation, licences, and the
+operational ability to execute value-based care.
+**When to use.** Clinic / practice chains, home care, value-based-care
+providers, care-delivery digital health.
+**Proof investors expect.** Per-site contribution margin and payback, and the
+loss curve by site cohort (open-year) so an investor can see whether
+immature-site losses are being diluted by new openings; same-site growth (the
+existing-site-only figure, excluding new openings); the value-based-care share
+of revenue with its MLR and shared-savings results; payer mix (Medicare
+Advantage / Medicaid / commercial / self-pay each carry a different price, reset
+risk and credit); patient retention and panel size; clinical-quality scores
+(these drive bonus payment and contract renewal under value-based care);
+licences and the clinician hiring pipeline and retention. Public reimbursement
+is reset by policy on a cycle — show the sensitivity.
+**Pitfalls.** Mistaking fee-for-service volume for growth; hiding immature-site
+losses behind the pace of new openings (cohort disclosure exposes it); ignoring
+reimbursement-reset risk; underestimating how hard value-based care is to
+execute (MLR management and risk adjustment — where Cano Health and Bright
+Health failed); applying SaaS multiples to a labour- and capex-intensive
+service; key-clinician dependence and a tight clinician labour market.
+
 ---
 
 ## Sources
@@ -353,6 +450,9 @@ while ignoring its capital and compliance cost.
 - Hardware / deep tech (FOAK→NOAK, learning curve) — https://www.ctvc.co/from-foak-to-noak/ ; https://climatedrift.substack.com/p/the-foak-field-guide ; https://ourworldindata.org/learning-curve
 - Fintech (take-rate vs. balance-sheet, moats, regulation) — https://notes.mtb.xyz/p/fintechs-moats-dont-compile ; https://www.qedinvestors.com/blog/fintechs-next-chapter-scaled-winners-and-emerging-disruptors-2 ; https://ibinterviewquestions.com/guides/fig-investment-banking/fintech-valuation-revenue-multiples-unit-economics
 - Insurtech (loss / combined ratio, MGA vs. full-stack) — https://www.finrofca.com/news/insurtech-revenue-multiples-2025
+- Consumer / D2C (cohort contribution margin, defensibility) — https://www.modernretail.co/operations/dtc-briefing-why-brand-operators-cant-stop-talking-about-contribution-margin/ ; https://nstarfinance.com/resources/dtc-brand-financial-benchmarks ; https://2pml.com/2018/10/08/dtc-brand-defensibility/
+- Climate & energy infrastructure (PPA, project finance, interconnection) — https://www.projectfinance.law/publications/2025/august/renewables-valuations/ ; https://www.leveltenenergy.com/post/project-development-essentials ; https://www.cfr.org/article/us-interconnection-challenge-why-renewables-are-stuck-line
+- Healthcare services (value-based care, per-site economics) — https://www.mckinsey.com/industries/healthcare/our-insights/investing-in-the-new-era-of-value-based-care ; https://www.statnews.com/2024/02/05/cano-health-bankruptcy-medicare-advantage/ ; https://www.commonwealthfund.org/publications/explainer/2024/apr/basics-risk-adjustment
 
 Note: industry benchmarks (probabilities of success, exclusivity periods,
 learning rates, valuation multiples) shift by year, region and segment — verify
