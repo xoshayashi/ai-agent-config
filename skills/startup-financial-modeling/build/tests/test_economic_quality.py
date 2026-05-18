@@ -780,9 +780,25 @@ def test_burn_multiple_does_not_explode_in_period_zero() -> None:
             val = ws.cell(burn_row, first_col + idx).value
             if isinstance(val, str):  # "N/A" — no revenue growth to fund
                 continue
+            # A deliberately loose regression bound: it must reliably catch
+            # the ~415,000,000x denominator-collapse explosion. A tighter
+            # business band (burn multiple is "good" below ~2x) is not
+            # asserted here because an early-stage period can legitimately
+            # carry a high ratio; that judgement belongs to the audit, not
+            # this guard.
             assert val is not None and abs(float(val)) < 50.0, (
                 f"period {idx}: burn multiple {val} is not a sane ratio"
             )
+
+
+def _row_for_label(ws, label: str) -> int:
+    """Return the row index whose first labelled cell matches `label`."""
+    row = next(
+        (cell.row for r in ws.iter_rows() for cell in r if cell.value == label),
+        None,
+    )
+    assert row is not None, f"{ws.title} sheet missing '{label}' row"
+    return row
 
 
 def test_runway_months_is_capped_at_99() -> None:
@@ -793,15 +809,17 @@ def test_runway_months_is_capped_at_99() -> None:
         pytest.skip("soffice/libreoffice not available")
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "runway.xlsx"
-        wb = source_plan.build_source_plan_workbook_from_facts(
-            kernel.derive_source_facts(SAAS_STORY)
-        )
+        facts = kernel.derive_source_facts(SAAS_STORY)
+        wb = source_plan.build_source_plan_workbook_from_facts(facts)
         ws = wb["CF"]
         first_col = source_plan.START_PERIOD_COL
         # Force a tiny-negative free cash flow against a large cash balance:
-        # the uncapped ratio would yield tens of millions of months.
-        ws.cell(16, first_col).value = -1000          # Free cash flow
-        ws.cell(31, first_col).value = 5_000_000_000  # Ending cash
+        # the uncapped ratio would yield tens of millions of months. Rows are
+        # resolved by label so a CF layout shift cannot silently mis-target.
+        fcf_row = _row_for_label(ws, "Free cash flow")
+        cash_row = _row_for_label(ws, "Ending cash")
+        ws.cell(fcf_row, first_col).value = -1000
+        ws.cell(cash_row, first_col).value = 5_000_000_000
         wb.save(out)
         subprocess.run(
             [soffice, "--headless", "--calc", "--convert-to", "xlsx",
@@ -810,16 +828,13 @@ def test_runway_months_is_capped_at_99() -> None:
         )
         wb2 = load_workbook(Path(tmp) / "recalc" / "runway.xlsx", data_only=True)
         ws2 = wb2["CF"]
-        runway_row = next(
-            (cell.row for row in ws2.iter_rows() for cell in row
-             if cell.value == "Runway months"),
-            None,
-        )
-        assert runway_row is not None, "CF sheet missing 'Runway months' row"
-        runway = ws2.cell(runway_row, first_col).value
-        assert runway is not None and float(runway) <= 99.0, (
-            f"runway {runway} months is not capped at 99"
-        )
+        runway_row = _row_for_label(ws2, "Runway months")
+        # The MIN(99,...) cap is applied uniformly, so verify every period.
+        for idx in range(len(facts.years)):
+            runway = ws2.cell(runway_row, first_col + idx).value
+            assert runway is not None and float(runway) <= 99.0, (
+                f"period {idx}: runway {runway} months is not capped at 99"
+            )
 
 
 if __name__ == "__main__":
