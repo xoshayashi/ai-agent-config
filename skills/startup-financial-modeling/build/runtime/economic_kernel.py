@@ -832,8 +832,10 @@ def extract_price(text: str, profile: MechanicProfile, currency: str = "JPY") ->
 
 # A narrative states a current / year-one figure before the maturity target
 # ("currently 30 customers and target 1,200"; "ship 40 units ... target
-# 2,500"). A target / maturity cue precedes the figure the plan should ramp
-# to, so the extractor must prefer it over a plain first match.
+# 2,500"). A target / maturity cue marks the figure the plan should ramp to,
+# so the extractor must prefer it over a plain first match. The cue can sit
+# on either side of the figure — it leads ("target 1,200") as often as it
+# trails ("25,000 operating units at maturity") — so both sides are scanned.
 # `までに` ("by / no later than") carries the temporal-target sense; bare
 # `まで` is excluded because it is also a present-state particle (`今まで`,
 # "until now").
@@ -851,9 +853,9 @@ def _maturity_count(
     """Pick the count tied to a maturity / target cue from all matches.
 
     A plain first match grabs the current or year-one figure stated before
-    the target. This prefers a figure a target / maturity cue precedes;
-    failing that the largest match (a maturity target is almost always the
-    larger number); failing that the default.
+    the target. This prefers a figure a target / maturity cue marks — on
+    either side of the figure; failing that the largest match (a maturity
+    target is almost always the larger number); failing that the default.
 
     Each pattern carries a unit multiplier so a scale word is normalised on
     the *selected* match (e.g. `万台` -> x10,000) — never document-wide.
@@ -871,7 +873,13 @@ def _maturity_count(
                 continue
             any_best = value if any_best is None else max(any_best, value)
             lead = text[max(0, m.start() - 48): m.start()]
-            if _TARGET_CUE.search(lead):
+            # The trailing window is clipped at the first clause boundary so a
+            # cue that belongs to a *later* figure ("1万台 operate; we target
+            # 2,500") is not misattributed to this one.
+            trail = re.split(
+                r"[.;,。；、，\n]", text[m.end(): m.end() + 48], maxsplit=1
+            )[0]
+            if _TARGET_CUE.search(lead) or _TARGET_CUE.search(trail):
                 cue_best = value if cue_best is None else max(cue_best, value)
     if cue_best is not None:
         return cue_best
