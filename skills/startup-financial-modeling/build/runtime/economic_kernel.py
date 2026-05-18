@@ -1241,6 +1241,10 @@ def project_free_cash_flow(
                 "net_income": net_income,
                 "depreciation": depreciation,
                 "free_cash_flow": free_cash_flow,
+                "capex": capex_yen[idx],
+                "accounts_receivable": accounts_receivable,
+                "inventory": inventory,
+                "ap_deferred": ap_deferred,
             }
         )
     return out
@@ -1335,6 +1339,47 @@ def project_plan_free_cash_flow(facts: SourceFacts) -> list[dict]:
     return projection
 
 
+def project_balance_sheet(facts: SourceFacts) -> list[dict]:
+    """Project the per-period balance sheet and its A = L + E check.
+
+    Mirrors the workbook BS sheet: cash and working capital roll forward from
+    the same projection that drives free cash flow, PP&E and accumulated D&A
+    accumulate capex and depreciation, paid-in capital accumulates equity, and
+    retained earnings accumulate net income. `balance_check` is total assets
+    minus total liabilities minus total equity; a coherent plan keeps it at
+    zero every period.
+    """
+    projection = project_plan_free_cash_flow(facts)
+    rows: list[dict] = []
+    gross_ppe = accumulated_da = 0.0
+    debt_balance = 0.0
+    paid_in_capital = float(facts.beginning_cash_yen)
+    retained_earnings = 0.0
+    for idx, period in enumerate(projection):
+        gross_ppe += period["capex"]
+        accumulated_da += period["depreciation"]
+        debt_balance += facts.debt_raise_yen[idx]
+        paid_in_capital += facts.equity_raise_yen[idx]
+        retained_earnings += period["net_income"]
+        total_assets = (
+            period["ending_cash"]
+            + period["accounts_receivable"]
+            + period["inventory"]
+            + (gross_ppe - accumulated_da)
+        )
+        total_liabilities = period["ap_deferred"] + debt_balance
+        total_equity = paid_in_capital + retained_earnings
+        rows.append(
+            {
+                "total_assets": total_assets,
+                "total_liabilities": total_liabilities,
+                "total_equity": total_equity,
+                "balance_check": total_assets - total_liabilities - total_equity,
+            }
+        )
+    return rows
+
+
 def implied_gross_margin_series(facts: SourceFacts) -> list[float]:
     """Per-period gross margin implied by the calibrated cost drivers.
 
@@ -1415,6 +1460,15 @@ def audit_economic_coherence(
             issues.append(
                 f"{_label(idx)}: projected insolvency "
                 f"(ending cash {period['ending_cash']:,.0f})"
+            )
+
+    # Three-statement integrity: the balance sheet must balance every period.
+    for idx, period in enumerate(project_balance_sheet(facts)):
+        scale = max(1.0, abs(period["total_assets"]))
+        if abs(period["balance_check"]) > 1e-4 * scale:
+            issues.append(
+                f"{_label(idx)}: balance sheet does not balance "
+                f"(A - L - E = {period['balance_check']:,.0f})"
             )
 
     if not facts.equity_raise_yen or facts.equity_raise_yen[0] <= 0:
