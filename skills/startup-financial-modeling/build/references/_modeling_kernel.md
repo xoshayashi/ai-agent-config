@@ -160,6 +160,13 @@ workbook tab is rendered:
   cost, and comp formulas annualize per period). Only an explicit monthly or
   quarterly *model* request flips the grain; metric phrases like `monthly burn`
   or `18-month runway` stay annual.
+- Currency detection: the kernel is JPY-primary but detects USD from a strong
+  narrative signal (an explicit USD word or repeated `$` figures, with no
+  competing JPY signal). A USD plan keeps stated `$` prices and revenue as
+  written, and the kernel's JPY-denominated default magnitudes (loaded comp,
+  capital floors, capex, G&A) are FX-scaled by a nominal JPY-per-USD rate so a
+  dollar plan reads in plausible dollar magnitudes. The rate is overridable via
+  structured input; a lone dollar-priced competitor never flips the currency.
 
 Keep these reconciliations in the economic-kernel layer, not in sheet
 renderers. They are economic inference, not layout.
