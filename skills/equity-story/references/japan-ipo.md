@@ -22,6 +22,10 @@ underwriter's review (引受審査) and the exchange review. The core is the uni
 
 ## 2. 成長可能性資料 — the TSE Growth growth-potential disclosure
 
+> Note: the **TSE Growth Market** is the venue renamed from "Mothers" in the
+> April 2022 TSE market restructuring. Older sources may still call it Mothers —
+> it is the same venue.
+
 Companies listing on the **TSE Growth Market** must disclose "事業計画及び成長
 可能性に関する事項" — material on the business plan and growth potential. Its
 purpose is to give investors a reasonable basis for judgement on companies that
@@ -93,7 +97,9 @@ high-growth SaaS/IT/biotech on **PSR** — this is Japanese market practice.
 - **Do.** Select primarily *domestic* peers genuinely close in business
   substance, growth rate and profit structure; use overseas comparables only as
   support. Rough guides: PER median ~20–30×, PSR median ~4–5× (PSR is often
-  quoted on next-year revenue).
+  quoted on next-year revenue). These bands move materially with market
+  conditions — verify them against current JPX/peer data before citing them in
+  a live document.
 - **Don't.** Justify a rich price by lining up only high-multiple overseas
   names. Japanese IPO opening-price formation is conservative and you will be
   asked to account for it. Don't leave the peer-selection rationale vague —
