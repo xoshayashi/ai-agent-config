@@ -1111,6 +1111,7 @@ def deck_plan_tail() -> str:
   - regenerate_until_quality_approved:
   - generation_block_rule: only if Codex built-in generation or repair is actually blocked by the image tool, mark completion_ready_status: blocked and do not package or report complete; do not use local environment uncertainty as the blocker
   - review_manifest:
+  - schema_version: 1
   - review_manifest_status: approved
   - package_gate: PPTX/PDF package gate requires an approved review manifest
   - validate_review_manifest:
@@ -1227,6 +1228,7 @@ def text_structure_tail() -> str:
       regenerate_until_quality_approved:
       generation_block_rule: only if Codex built-in generation or repair is actually blocked by the image tool, mark completion_ready_status: blocked and do not package or report complete; do not use local environment uncertainty as the blocker
       review_manifest:
+      schema_version: 1
       review_manifest_status: approved
       validate_review_manifest:
       deck_tone_consistency_review:
