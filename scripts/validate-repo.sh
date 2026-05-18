@@ -46,6 +46,15 @@ for script in "$repo_root"/scripts/*; do
     *"/sh"|*"/bash"|*"env sh"|*"env bash") sh -n "$script" ;;
   esac
 done
+sh -n "$repo_root/notifications/notify.sh"
+
+say "validate: python syntax"
+if command -v python3 >/dev/null 2>&1; then
+  python3 -c 'import ast,sys; ast.parse(open(sys.argv[1]).read())' \
+    "$repo_root/scripts/install-notifications.py"
+else
+  say "skip: python3 not available"
+fi
 
 say "validate: required files"
 require_file "README.md"
@@ -56,6 +65,8 @@ require_file "scripts/update.sh"
 require_file "scripts/uninstall.sh"
 require_file "scripts/health-check.sh"
 require_file "scripts/validate-repo.sh"
+require_file "scripts/install-notifications.py"
+require_file "notifications/notify.sh"
 require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"
@@ -140,6 +151,12 @@ grep -Fq 'remove_retired_skill_links' "$repo_root/scripts/uninstall.sh" \
   || fail "uninstall.sh must clean retired managed skill links"
 grep -Fq 'skills_status_for' "$repo_root/scripts/health-check.sh" \
   || fail "health-check.sh must report shared skill links"
+grep -Fq 'install_notification_hooks' "$repo_root/scripts/setup.sh" \
+  || fail "setup.sh must install notification hooks"
+grep -Fq 'remove_notification_hooks' "$repo_root/scripts/uninstall.sh" \
+  || fail "uninstall.sh must remove notification hooks"
+grep -Fq 'notify_status_for' "$repo_root/scripts/health-check.sh" \
+  || fail "health-check.sh must report notification hooks"
 
 say "validate: health-check runs"
 AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/health-check.sh" --json >/dev/null

@@ -22,6 +22,20 @@ Claude Code / Codex / Gemini CLI に共通の Instructions を配布するため
 
 このリポジトリでは、CLI や `/init` 系コマンドがローカルに生成しうる root-level `AGENTS.md`、`CLAUDE.md`、`GEMINI.md` は canonical ではありません。正本は `instructions/` 配下です。
 
+## 通知 hook
+
+`setup.sh` は、各 CLI がターンを終えたとき、および入力や承認を待つときにデスクトップ通知を出す hook も設定します。
+
+| CLI | 通知のきっかけ | 設定先 |
+|---|---|---|
+| Claude Code | `Stop`（完了） / `Notification`（要対応） | `~/.claude/settings.json` の `hooks` |
+| Codex | `Stop`（完了） / `PermissionRequest`（承認待ち） | `~/.codex/hooks.json` |
+| Gemini CLI | `AfterAgent`（完了） / `Notification`（要対応） | `~/.gemini/settings.json` の `hooks` |
+
+通知は共有スクリプト `notifications/notify.sh` が出します。macOS では `osascript` でバナーと音を出し、それ以外の OS では端末ベルにフォールバックします。
+
+`~/.claude/settings.json` と `~/.gemini/settings.json` は通知以外の設定も持つため、symlink ではなく `scripts/install-notifications.py` が hook 部分だけを冪等にマージします。書き換え前にタイムスタンプ付き backup を作り、ユーザーが手で足した hook は残します。`~/.codex/hooks.json` は hook 専用ファイルとして生成します。除去は `uninstall.sh` が同じヘルパーで行います。
+
 ## 前提条件
 
 1. `git` が使えること
@@ -74,6 +88,6 @@ sh /path/to/ai-agent-config/scripts/uninstall.sh
 
 ## 保守方針
 
-- 構成は `instructions/`、`scripts/`、必要に応じた `skills/`、最小 docs、CI validation、on-demand PR review workflow に絞ります。
+- 構成は `instructions/`、`scripts/`、`notifications/`、必要に応じた `skills/`、最小 docs、CI validation、on-demand PR review workflow に絞ります。
 - 初心者向けの coding support は `instructions/AI_AGENT_INSTRUCTIONS.md` の `Coding Collaboration Defaults` に集約し、長い個別プロンプト例を常時ロードしないようにします。
 - Instruction の構造を変えたら、`README.md`、`setup.md`、`scripts/validate-repo.sh` も同じ変更で合わせます。

@@ -12,6 +12,9 @@ Instruction-only 構成での代表的な確認ポイントです。
 | health が `warn` | instruction link、CLI コマンド、または repository 状態に確認点があります。 | `AI_AGENT_HEALTH_REDACT=0 sh scripts/health-check.sh` で具体 path を見て、必要なら `sh scripts/setup.sh` を再実行します。 |
 | command path error が出る | CLI の個人設定、または起動済みセッションが、この checkout に含まれない command path を保持している可能性があります。 | 該当 CLI の個人設定から存在しない command path を外し、CLI セッションを再起動します。 |
 | skill が認識されない | `skills/<name>` が `~/.codex/skills/<name>`、`~/.claude/skills/<name>`、`~/.gemini/skills/<name>` に反映されていないか、CLI を再起動していません。 | `sh scripts/setup.sh` を再実行し、Codex / Claude / Gemini CLI を再起動します。 |
+| `python3 not found; skip notification hook setup` | `python3` が無く、通知 hook の設定を skip しました。 | macOS には標準で `python3` があります。`xcode-select --install` 等で導入後、`sh scripts/setup.sh` を再実行します。 |
+| 通知が出ない | hook は設定済みでも、CLI セッションが古いか、端末アプリに通知許可がありません。 | `sh scripts/health-check.sh` の `notifications:` 行で `ok` を確認し、各 CLI を再起動します。macOS の システム設定 → 通知 で、端末アプリ（Terminal / iTerm など）の通知を許可します。 |
+| Claude Code で通知が二重に出る | Claude Code 本体のネイティブ通知と、本リポジトリの `Notification` hook が両方鳴っています。 | どちらか一方に絞ります。hook 側を止める場合は、`~/.claude/settings.json` の `hooks.Notification` から `notify.sh` を呼ぶエントリを外します。 |
 
 ## 確認手順
 
