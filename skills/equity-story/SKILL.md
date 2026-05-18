@@ -41,7 +41,7 @@ the *depth and kind of evidence*, not the quality bar. When the business is not
 SaaS-shaped (biotech, hardware / deep tech, fintech, consumer / D2C, climate &
 energy infrastructure, healthcare services — the most common non-SaaS
 archetypes, not an exhaustive list), reach for the industry-specific proof
-anchors in `references/strategy-frameworks.md` section D; for an industry not
+anchors in `references/strategy-frameworks.md` section D. For an industry not
 named there, apply the nearest anchor and the model-agnostic frameworks.
 
 ## Inputs to gather first
