@@ -300,6 +300,7 @@ a gap to fix before iterating.
 10. **Reversal triggers named** — for the two or three load-bearing assumptions,
     does the story state what observation would falsify each? An `[open]` tag
     marks what is unknown; this marks what would prove the thesis wrong.
+    (See `references/narrative-craft.md` §6 for how to implement.)
 11. **Retellable accurately, survives a sceptic** — could a third party read it
     alone, stress-test it, and still retell the thesis to a sceptical partner in
     thirty seconds without drifting?
