@@ -164,6 +164,10 @@ grep -Fq 'remove_shell_links' "$repo_root/scripts/uninstall.sh" \
   || fail "uninstall.sh must remove the shell dotfile link"
 grep -Fq 'shell_zshrc_status' "$repo_root/scripts/health-check.sh" \
   || fail "health-check.sh must report the shell dotfile link"
+grep -Fq 'install_skill_runtime_support' "$repo_root/scripts/setup.sh" \
+  || fail "setup.sh must set up skill runtime dependencies"
+grep -Fq 'skill_dependencies' "$repo_root/scripts/health-check.sh" \
+  || fail "health-check.sh must report skill runtime dependencies"
 
 say "validate: health-check runs"
 AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/health-check.sh" --json >/dev/null

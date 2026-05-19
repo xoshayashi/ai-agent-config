@@ -53,7 +53,9 @@ sh /path/to/ai-agent-config/scripts/setup.sh
 
 `setup.sh` は instruction links、skill links、シェル設定 link を作成します。既存ファイルがある場合は既定で skip します。置き換える場合は `AI_AGENT_CONFLICT_MODE=replace` を指定します。
 置換時の skill backup は各 CLI home の `skill-backups/` に移し、`skills/`
-直下には残しません。
+直下には残しません。あわせて skill のランタイム依存（`python3`、`openpyxl`、
+LibreOffice）を確認し、不足は warning で報告します。詳細は `setup.md` の
+「Skill runtime dependencies」を参照してください。
 
 既存の `~/.zshrc` を symlink へ切り替える初回は、`~/.zshrc` だけを対象に手動で
 退避・リンクします（`AI_AGENT_CONFLICT_MODE=replace` は instruction / skill を

@@ -315,6 +315,35 @@ install_notification_hooks() {
   python3 "$helper" "$@"
 }
 
+install_skill_runtime_support() {
+  if ! command -v python3 >/dev/null 2>&1; then
+    warn "python3 not found; skill scripts (financial modeling, slide packaging) will not run"
+  elif ! python3 -c 'import openpyxl' >/dev/null 2>&1; then
+    warn "python package openpyxl missing; install with: pip3 install -r $skill_source_root/startup-financial-modeling/scripts/requirements.txt"
+  fi
+
+  # macOS Homebrew installs LibreOffice as `soffice`; skills probe the
+  # `libreoffice` name. Add a same-directory compatibility symlink so the name
+  # resolves. This does not install LibreOffice itself.
+  if command -v libreoffice >/dev/null 2>&1; then
+    say "ok: libreoffice command resolves"
+  elif command -v soffice >/dev/null 2>&1; then
+    soffice_path=$(command -v soffice)
+    soffice_dir=$(dirname "$soffice_path")
+    libreoffice_link="$soffice_dir/libreoffice"
+    if [ -e "$libreoffice_link" ] || [ -L "$libreoffice_link" ]; then
+      warn "skip libreoffice compatibility link; path already exists: $libreoffice_link"
+    elif [ ! -w "$soffice_dir" ]; then
+      warn "cannot add libreoffice compatibility link; directory not writable: $soffice_dir"
+    else
+      say "link: $libreoffice_link -> $soffice_path"
+      run ln -s "$soffice_path" "$libreoffice_link"
+    fi
+  else
+    warn "libreoffice/soffice not found; xlsx recalculation and slide PDF rendering will be skipped (optional: brew install --cask libreoffice)"
+  fi
+}
+
 say "AI agent config setup"
 say "config: $config_home"
 say "codex home: $codex_home"
@@ -328,5 +357,6 @@ install_shell_links
 remove_retired_skill_links
 install_skill_links
 install_notification_hooks
+install_skill_runtime_support
 
 say "setup complete"
