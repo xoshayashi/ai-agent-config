@@ -143,3 +143,6 @@ unset _gs_entry _gs_name _gs_var _gs_val
 # bun
 export BUN_INSTALL="$HOME/.bun"
 export PATH="$BUN_INSTALL/bin:$PATH"
+
+# Added by Antigravity
+export PATH="/Users/sh/.antigravity/antigravity/bin:$PATH"

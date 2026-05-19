@@ -73,6 +73,27 @@ sh scripts/validate-repo.sh
 旧 skill root として残っている `~/.agents/skills/*.backup-*` も同じく
 `~/.agents/skill-backups/` へ移動します。
 
+## Skill runtime dependencies
+
+一部の skill はスクリプト実行用に外部ランタイムを使います。`setup.sh` は
+これらの存在を確認し、足りないものを warning で報告します（CLI と同様に、
+自動インストールはしません）。状態は `sh scripts/health-check.sh` の
+`skill dependencies:` 行でも確認できます。
+
+| 依存 | 区分 | 用途 | 不足時の対応 |
+|---|---|---|---|
+| `python3` | 必須 | skill スクリプト（財務モデリング、スライド packaging）の実行 | macOS は `xcode-select --install` 等で導入 |
+| `openpyxl` | 必須 | `startup-financial-modeling` の xlsx 生成 | `pip3 install -r skills/startup-financial-modeling/scripts/requirements.txt` |
+| LibreOffice (`soffice`) | 任意 | xlsx の再計算検証、スライドの PDF レンダリング | `brew install --cask libreoffice` |
+| ImageMagick (`convert`)・画像生成 API | 任意 | スライド画像 skill の個別処理 | 各 skill の手順に従って個別に用意 |
+
+LibreOffice は macOS Homebrew では `soffice` という名前で入りますが、skill は
+`libreoffice` という名前で探します。`setup.sh` は `soffice` が見つかり
+`libreoffice` が無い場合、`soffice` と同じディレクトリに `libreoffice` の
+互換 symlink を作成します。このため `brew doctor` が unexpected symlink として
+警告することがありますが、これは意図的なものです。互換 symlink を手動で外す
+場合は `trash /opt/homebrew/bin/libreoffice` を使います。
+
 ## Shell 設定
 
 `setup.sh` は `shell/.zshrc` を `~/.zshrc` にリンクします。`.zshrc` の正本は
