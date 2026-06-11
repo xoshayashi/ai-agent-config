@@ -349,6 +349,7 @@ brew_cask_installed() {
     gcloud-cli) command -v gcloud >/dev/null 2>&1 && return 0 ;;
     google-drive) [ -d "/Applications/Google Drive.app" ] && return 0 ;;
     ollama-app) [ -d "/Applications/Ollama.app" ] && return 0 ;;
+    tailscale-app) [ -d "/Applications/Tailscale.app" ] && return 0 ;;
     zoom) [ -d "/Applications/zoom.us.app" ] && return 0 ;;
   esac
   brew_prefix=$("$brew_path" --prefix)
@@ -357,7 +358,7 @@ brew_cask_installed() {
 
 cask_needs_terminal() {
   case "$1" in
-    chatgpt|claude|codex|displaylink|docker-desktop|google-drive|zoom) return 0 ;;
+    chatgpt|claude|codex|displaylink|docker-desktop|google-drive|tailscale-app|zoom) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -387,6 +388,7 @@ brew_install_casks() {
     displaylink \
     gcloud-cli \
     slack \
+    tailscale-app \
     thebrowsercompany-dia \
     google-chrome \
     google-drive \
@@ -446,6 +448,13 @@ brew_install_casks() {
         google-drive)
           if [ "$dry_run" != "1" ] && [ ! -t 0 ] && ! sudo -n true >/dev/null 2>&1; then
             run_in_terminal "brew cask $cask" "osascript -e 'quit app \"Google Drive\"' >/dev/null 2>&1 || true; pkill -x 'Google Drive' >/dev/null 2>&1 || true; $quoted_brew list --cask --versions $quoted_cask >/dev/null 2>&1 || $quoted_brew install --cask $quoted_cask || $quoted_brew reinstall --cask $quoted_cask"
+            continue
+          fi
+          ensure_sudo "brew cask $cask"
+          ;;
+        tailscale-app)
+          if [ "$dry_run" != "1" ] && [ ! -t 0 ] && ! sudo -n true >/dev/null 2>&1; then
+            run_in_terminal "brew cask $cask" "osascript -e 'quit app \"Tailscale\"' >/dev/null 2>&1 || true; pkill -x Tailscale >/dev/null 2>&1 || true; $quoted_brew list --cask --versions $quoted_cask >/dev/null 2>&1 || $quoted_brew install --cask $quoted_cask || $quoted_brew reinstall --cask $quoted_cask"
             continue
           fi
           ensure_sudo "brew cask $cask"
