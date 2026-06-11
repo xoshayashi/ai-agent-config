@@ -29,10 +29,104 @@ sh scripts/update.sh
 sh scripts/uninstall.sh
 ```
 
-`setup.sh` は既定で Claude Code / Codex / Gemini CLI のコマンド存在を確認します。まだ入れていない CLI がある状態で link だけ作りたい場合は、次のように実行します。
+`setup.sh` は Claude Code / Codex / Gemini CLI が未インストールでも止まりません。
+CLI の導入状態は `sh scripts/health-check.sh` で確認します。
+
+## macOS bootstrap
+
+macOS では `setup.sh` が先に Command Line Tools と Homebrew を確認し、無ければ
+インストールを開始します。その後、`.zshrc` が参照する次の Homebrew formula を
+入れます。
+
+- `zsh-autosuggestions`
+- `fzf`
+- `zoxide`
+- `starship`
+- `zsh-syntax-highlighting`
+- `displayplacer`
+- `git`
+- `gh`
+- `hf`
+- `gemini-cli`
+- `mas`
+- `python`（`python3` / `pip3` / `pip`）
+- `pipx`
+
+`colab-cli` は Homebrew formula が無いため、`pipx` で Python CLI として入れます。
+既に入っている場合は PyPI の最新 version と比較し、更新がある場合だけ
+`pipx upgrade colab-cli` を実行します。
+
+あわせて、次のアプリを cask で入れます。Dia は Homebrew の cask token が
+`thebrowsercompany-dia` なので、この名前で管理します。
+
+- `codex`
+- `claude-code@latest`
+- `chatgpt`
+- `claude`
+- `displaylink`
+- `gcloud-cli`
+- `slack`
+- `thebrowsercompany-dia`
+- `google-chrome`
+- `google-drive`
+- `docker-desktop`
+- `visual-studio-code`
+- `libreoffice`
+- `maccy`
+- `ollama-app`
+- `zoom`
+
+Antigravity CLI は公式 installer で `agy` を入れ、既に入っている場合は
+`agy update` で更新します。Perplexity は Mac App Store app のため、`mas` で
+App Store 版（app id `1668000334`）を入れます。
+
+`chatgpt`、`claude`、`codex`、`displaylink`、`docker-desktop`、`google-drive`、`zoom` は installer や symlink
+作成で管理者権限を要求します。
+`setup.sh` が非対話セッションから実行されている場合は、該当コマンドだけを
+Terminal.app で開き、通常のターミナル上の `sudo` プロンプトでパスワードを
+入力できるようにします。完了するまで `setup.sh` は待機します。
+
+既に Homebrew 管理下にある formula / cask は、`brew outdated` で更新がある場合
+だけ `brew upgrade` を実行します。更新が無い場合は `ok` として通過します。
+
+## Manual auth steps
+
+`setup.sh` は `gh`、`gcloud`、`hf` のログイン状態を確認します。未ログインの場合、
+認証そのものは自動実行せず、次のような手動コマンドを表示します。
 
 ```sh
-AI_AGENT_REQUIRE_LLM_CLIS=0 sh scripts/setup.sh
+gh auth login
+gcloud auth login
+hf auth login
+```
+
+認証チェックの表示を止める場合:
+
+```sh
+AI_AGENT_SHOW_AUTH_STEPS=0 sh scripts/setup.sh
+```
+
+bootstrap だけ止める場合:
+
+```sh
+AI_AGENT_SETUP_MACOS_BOOTSTRAP=0 sh scripts/setup.sh
+```
+
+## macOS system settings
+
+`setup.sh` は、現在のマシンから取得した再適用可能な設定を `defaults`、`pmset`、
+`displayplacer` で反映します。対象は言語/外観、キーボード入力ソース、Fn キー、
+トラックパッド/マウス、Dock、Finder の明示設定、スクリーンショット設定、Spaces、
+電源設定、ディスプレイ配置です。
+
+ディスプレイ配置は `macos/displayplacer-current.sh` に保存しています。接続する
+ディスプレイが変わった場合は、`displayplacer list` の末尾に出る現在配置コマンドで
+このファイルを更新してください。
+
+システム設定反映だけ止める場合:
+
+```sh
+AI_AGENT_SETUP_MACOS_SETTINGS=0 sh scripts/setup.sh
 ```
 
 ## Conflict Handling
@@ -76,13 +170,14 @@ sh scripts/validate-repo.sh
 ## Skill runtime dependencies
 
 一部の skill はスクリプト実行用に外部ランタイムを使います。`setup.sh` は
-これらの存在を確認し、足りないものを warning で報告します（CLI と同様に、
-自動インストールはしません）。状態は `sh scripts/health-check.sh` の
+これらの存在を確認し、足りないものを warning で報告します。macOS bootstrap が
+有効な場合、LibreOffice は cask として自動インストール対象です。状態は
+`sh scripts/health-check.sh` の
 `skill dependencies:` 行でも確認できます。
 
 | 依存 | 区分 | 用途 | 不足時の対応 |
 |---|---|---|---|
-| `python3` | 必須 | skill スクリプト（財務モデリング、スライド packaging）の実行 | macOS は `xcode-select --install` 等で導入 |
+| `python3` / `pip` / `pip3` | 必須 | skill スクリプト（財務モデリング、スライド packaging）の実行と Python package 導入 | macOS は `brew install python` |
 | `openpyxl` | 必須 | `startup-financial-modeling` の xlsx 生成 | `pip3 install -r skills/startup-financial-modeling/scripts/requirements.txt` |
 | LibreOffice (`soffice`) | 任意 | xlsx の再計算検証、スライドの PDF レンダリング | `brew install --cask libreoffice` |
 | ImageMagick (`convert`)・画像生成 API | 任意 | スライド画像 skill の個別処理 | 各 skill の手順に従って個別に用意 |

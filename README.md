@@ -42,8 +42,9 @@ Claude Code / Codex / Gemini CLI に共通の Instructions を配布するため
 ## 前提条件
 
 1. `git` が使えること
-2. Claude Code / Codex / Gemini CLI を使う場合は、それぞれインストール済みであること
-3. `uninstall.sh` を使う場合は `trash` コマンドがあること
+2. macOS では `setup.sh` が Homebrew と Command Line Tools の導入を試みます
+3. Perplexity の App Store 版を自動導入する場合は、Mac App Store にサインイン済みであること
+4. `uninstall.sh` を使う場合は `trash` コマンドがあること
 
 ## セットアップ
 
@@ -51,22 +52,25 @@ Claude Code / Codex / Gemini CLI に共通の Instructions を配布するため
 sh /path/to/ai-agent-config/scripts/setup.sh
 ```
 
-`setup.sh` は instruction links、skill links、シェル設定 link を作成します。既存ファイルがある場合は既定で skip します。置き換える場合は `AI_AGENT_CONFLICT_MODE=replace` を指定します。
+`setup.sh` は macOS の bootstrap（Homebrew、Command Line Tools、Codex /
+Claude Code / Gemini CLI / Antigravity CLI、`python` / `pip`、zsh 補助ツール、
+指定アプリの cask / App Store app）、現在の macOS 設定の再適用、instruction links、skill links、
+シェル設定 link を実行します。既存ファイルがある場合は既定で skip します。置き換える場合は `AI_AGENT_CONFLICT_MODE=replace` を指定します。
 置換時の skill backup は各 CLI home の `skill-backups/` に移し、`skills/`
-直下には残しません。あわせて skill のランタイム依存（`python3`、`openpyxl`、
+直下には残しません。あわせて skill のランタイム依存（`python3`、`pip`、`openpyxl`、
 LibreOffice）を確認し、不足は warning で報告します。詳細は `setup.md` の
 「Skill runtime dependencies」を参照してください。
+
+macOS の bootstrap やシステム設定反映を一時的に止める場合:
+
+```sh
+AI_AGENT_SETUP_MACOS_BOOTSTRAP=0 AI_AGENT_SETUP_MACOS_SETTINGS=0 sh scripts/setup.sh
+```
 
 既存の `~/.zshrc` を symlink へ切り替える初回は、`~/.zshrc` だけを対象に手動で
 退避・リンクします（`AI_AGENT_CONFLICT_MODE=replace` は instruction / skill を
 含む全 link に効く global フラグのため、この初回切り替えには使いません）。
 具体的な手順は `setup.md` の「Shell 設定」を参照してください。
-
-CLI の存在チェックを省く場合:
-
-```sh
-AI_AGENT_REQUIRE_LLM_CLIS=0 sh scripts/setup.sh
-```
 
 ## 更新
 
