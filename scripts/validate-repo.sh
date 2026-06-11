@@ -47,6 +47,12 @@ for script in "$repo_root"/scripts/*; do
   esac
 done
 sh -n "$repo_root/notifications/notify.sh"
+if [ -d "$repo_root/macos" ]; then
+  for script in "$repo_root"/macos/*.sh; do
+    [ -f "$script" ] || continue
+    sh -n "$script"
+  done
+fi
 
 say "validate: python syntax"
 if command -v python3 >/dev/null 2>&1; then
@@ -67,6 +73,7 @@ require_file "scripts/health-check.sh"
 require_file "scripts/validate-repo.sh"
 require_file "scripts/install-notifications.py"
 require_file "notifications/notify.sh"
+require_file "macos/displayplacer-current.sh"
 require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"
@@ -168,11 +175,15 @@ grep -Fq 'install_skill_runtime_support' "$repo_root/scripts/setup.sh" \
   || fail "setup.sh must set up skill runtime dependencies"
 grep -Fq 'skill_dependencies' "$repo_root/scripts/health-check.sh" \
   || fail "health-check.sh must report skill runtime dependencies"
+grep -Fq 'install_macos_bootstrap' "$repo_root/scripts/setup.sh" \
+  || fail "setup.sh must install macOS bootstrap dependencies"
+grep -Fq 'apply_macos_settings' "$repo_root/scripts/setup.sh" \
+  || fail "setup.sh must apply captured macOS settings"
 
 say "validate: health-check runs"
 AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/health-check.sh" --json >/dev/null
 
 say "validate: setup dry-run runs"
-AI_AGENT_DRY_RUN=1 AI_AGENT_CONFIG_HOME="$repo_root" AI_AGENT_REQUIRE_LLM_CLIS=0 sh "$repo_root/scripts/setup.sh" >/dev/null
+AI_AGENT_DRY_RUN=1 AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/setup.sh" >/dev/null
 
 say "validation complete"
