@@ -633,26 +633,6 @@ trash_managed_path() {
   trash "$path"
 }
 
-is_legacy_home_entrypoint() {
-  path=$1
-  [ -f "$path" ] || return 1
-  [ ! -L "$path" ] || return 1
-  grep -Fq 'Core instruction file:** `./AI_AGENT_INSTRUCTIONS.md`' "$path" 2>/dev/null \
-    && grep -Fq '@./AI_AGENT_INSTRUCTIONS.md' "$path" 2>/dev/null \
-    && grep -Fq '@./DESIGN.md' "$path" 2>/dev/null
-}
-
-remove_legacy_home_entrypoints() {
-  for name in AGENTS.md Agents.md agents.md; do
-    path="$home_dir/$name"
-    if is_legacy_home_entrypoint "$path"; then
-      trash_managed_path "$path" "legacy home instruction entrypoint"
-    elif [ -e "$path" ] || [ -L "$path" ]; then
-      warn "skip unmanaged home instruction entrypoint: $path"
-    fi
-  done
-}
-
 install_link() {
   src=$1
   dst=$2
@@ -1036,7 +1016,6 @@ check_manual_auth_steps() {
 }
 
 move_existing_skill_backups
-remove_legacy_home_entrypoints
 install_instruction_links
 install_shell_links
 remove_retired_skill_links

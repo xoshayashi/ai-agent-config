@@ -173,11 +173,6 @@ sh scripts/validate-repo.sh
 旧 skill root として残っている `~/.agents/skills/*.backup-*` も同じく
 `~/.agents/skill-backups/` へ移動します。
 
-旧 setup が作った Home 直下の `AGENTS.md` / `Agents.md` / `agents.md` は、
-このリポジトリの旧形式と判定できる内容の通常ファイルだけ `trash` へ移します。
-現在の正本は `~/.codex/AGENTS.md` です。ユーザーが手で書いた同名ファイルや
-symlink は触りません。
-
 ## Skill runtime dependencies
 
 一部の skill はスクリプト実行用に外部ランタイムを使います。`setup.sh` は
