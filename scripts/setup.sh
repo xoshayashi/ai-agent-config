@@ -337,6 +337,30 @@ install_antigravity_cli() {
   run sh -c 'curl -fsSL https://antigravity.google/cli/install.sh | bash'
 }
 
+install_claude_code_native() {
+  export PATH="$HOME/.local/bin:$PATH"
+
+  if brew_path=$(brew_command); then
+    for cask in claude-code@latest claude-code; do
+      if "$brew_path" list --cask --versions "$cask" >/dev/null 2>&1; then
+        say "uninstall: brew cask $cask"
+        run "$brew_path" uninstall --cask "$cask"
+      fi
+    done
+  fi
+
+  if [ -x "$HOME/.local/bin/claude" ]; then
+    say "ok: Claude Code native install"
+    return 0
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    warn "curl unavailable; skip Claude Code native install"
+    return 0
+  fi
+  say "install: Claude Code native"
+  run sh -c 'curl -fsSL https://claude.ai/install.sh | bash'
+}
+
 brew_cask_installed() {
   brew_path=$1
   cask=$2
@@ -365,11 +389,7 @@ cask_needs_terminal() {
 
 prepare_latest_cask_conflicts() {
   brew_path=$1
-  if "$brew_path" list --cask --versions claude-code >/dev/null 2>&1 \
-    && ! "$brew_path" list --cask --versions claude-code@latest >/dev/null 2>&1; then
-    say "replace: brew cask claude-code -> claude-code@latest"
-    run "$brew_path" uninstall --cask claude-code
-  fi
+  :
 }
 
 brew_install_casks() {
@@ -382,7 +402,6 @@ brew_install_casks() {
 
   for cask in \
     codex \
-    claude-code@latest \
     chatgpt \
     claude \
     displaylink \
@@ -522,6 +541,7 @@ install_macos_bootstrap() {
   brew_install_formulae
   install_pipx_packages
   install_antigravity_cli
+  install_claude_code_native
   brew_install_casks
   install_mas_apps
 }
