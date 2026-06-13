@@ -361,6 +361,28 @@ install_claude_code_native() {
   run sh -c 'curl -fsSL https://claude.ai/install.sh | bash'
 }
 
+install_codex_cli_native() {
+  export PATH="$HOME/.local/bin:$PATH"
+
+  if brew_path=$(brew_command); then
+    if "$brew_path" list --cask --versions codex >/dev/null 2>&1; then
+      say "uninstall: brew cask codex"
+      run "$brew_path" uninstall --cask codex
+    fi
+  fi
+
+  if [ -x "$HOME/.local/bin/codex" ]; then
+    say "ok: Codex CLI standalone install"
+    return 0
+  fi
+  if ! command -v curl >/dev/null 2>&1; then
+    warn "curl unavailable; skip Codex CLI standalone install"
+    return 0
+  fi
+  say "install: Codex CLI standalone"
+  run sh -c 'curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh'
+}
+
 brew_cask_installed() {
   brew_path=$1
   cask=$2
@@ -382,7 +404,7 @@ brew_cask_installed() {
 
 cask_needs_terminal() {
   case "$1" in
-    chatgpt|claude|codex|displaylink|docker-desktop|google-drive|tailscale-app|zoom) return 0 ;;
+    chatgpt|claude|displaylink|docker-desktop|google-drive|tailscale-app|zoom) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -401,7 +423,6 @@ brew_install_casks() {
   prepare_latest_cask_conflicts "$brew_path"
 
   for cask in \
-    codex \
     chatgpt \
     claude \
     displaylink \
@@ -441,12 +462,6 @@ brew_install_casks() {
         claude)
           if [ "$dry_run" != "1" ] && [ ! -t 0 ] && ! sudo -n true >/dev/null 2>&1; then
             run_in_terminal "brew cask $cask" "osascript -e 'quit app \"Claude\"' >/dev/null 2>&1 || true; pkill -x Claude >/dev/null 2>&1 || true; $quoted_brew list --cask --versions $quoted_cask >/dev/null 2>&1 || $quoted_brew install --cask $quoted_cask || $quoted_brew reinstall --cask $quoted_cask || $quoted_brew install --cask --adopt $quoted_cask"
-            continue
-          fi
-          ;;
-        codex)
-          if [ "$dry_run" != "1" ] && [ ! -t 0 ] && ! sudo -n true >/dev/null 2>&1; then
-            run_in_terminal "brew cask $cask" "$quoted_brew list --cask --versions $quoted_cask >/dev/null 2>&1 || $quoted_brew install --cask $quoted_cask || $quoted_brew reinstall --cask $quoted_cask || $quoted_brew install --cask --adopt $quoted_cask"
             continue
           fi
           ;;
@@ -541,6 +556,7 @@ install_macos_bootstrap() {
   brew_install_formulae
   install_pipx_packages
   install_antigravity_cli
+  install_codex_cli_native
   install_claude_code_native
   brew_install_casks
   install_mas_apps
