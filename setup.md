@@ -173,18 +173,24 @@ sh scripts/validate-repo.sh
 旧 skill root として残っている `~/.agents/skills/*.backup-*` も同じく
 `~/.agents/skill-backups/` へ移動します。
 
+旧 setup が作った Home 直下の `AGENTS.md` / `Agents.md` / `agents.md` は、
+このリポジトリの旧形式と判定できる内容の通常ファイルだけ `trash` へ移します。
+現在の正本は `~/.codex/AGENTS.md` です。ユーザーが手で書いた同名ファイルや
+symlink は触りません。
+
 ## Skill runtime dependencies
 
 一部の skill はスクリプト実行用に外部ランタイムを使います。`setup.sh` は
-これらの存在を確認し、足りないものを warning で報告します。macOS bootstrap が
-有効な場合、LibreOffice は cask として自動インストール対象です。状態は
+これらの存在を確認します。macOS bootstrap が有効な場合、`openpyxl` は
+`python3 -m pip install --user --break-system-packages` でユーザー site-packages へ
+自動インストールし、LibreOffice は cask として自動インストール対象です。状態は
 `sh scripts/health-check.sh` の
 `skill dependencies:` 行でも確認できます。
 
 | 依存 | 区分 | 用途 | 不足時の対応 |
 |---|---|---|---|
 | `python3` / `pip` / `pip3` | 必須 | skill スクリプト（財務モデリング、スライド packaging）の実行と Python package 導入 | macOS は `brew install python` |
-| `openpyxl` | 必須 | `startup-financial-modeling` の xlsx 生成 | `pip3 install -r skills/startup-financial-modeling/scripts/requirements.txt` |
+| `openpyxl` | 必須 | `startup-financial-modeling` の xlsx 生成 | `setup.sh` がユーザー site-packages へ導入 |
 | LibreOffice (`soffice`) | 任意 | xlsx の再計算検証、スライドの PDF レンダリング | `brew install --cask libreoffice` |
 | ImageMagick (`convert`)・画像生成 API | 任意 | スライド画像 skill の個別処理 | 各 skill の手順に従って個別に用意 |
 
