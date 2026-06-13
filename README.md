@@ -58,7 +58,7 @@ Claude Code / Gemini CLI / Antigravity CLI、`python` / `pip`、zsh 補助ツー
 シェル設定 link を実行します。既存ファイルがある場合は既定で skip します。置き換える場合は `AI_AGENT_CONFLICT_MODE=replace` を指定します。
 置換時の skill backup は各 CLI home の `skill-backups/` に移し、`skills/`
 直下には残しません。あわせて skill のランタイム依存（`python3`、`pip`、`openpyxl`、
-LibreOffice）を確認し、不足は warning で報告します。詳細は `setup.md` の
+LibreOffice）を確認し、`openpyxl` は不足時にユーザー site-packages へ導入します。詳細は `setup.md` の
 「Skill runtime dependencies」を参照してください。
 
 macOS の bootstrap やシステム設定反映を一時的に止める場合:

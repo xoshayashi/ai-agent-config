@@ -167,6 +167,8 @@ grep -Fq 'notify_status_for' "$repo_root/scripts/health-check.sh" \
   || fail "health-check.sh must report notification hooks"
 grep -Fq 'install_shell_links' "$repo_root/scripts/setup.sh" \
   || fail "setup.sh must install the shell dotfile link"
+grep -Fq 'remove_legacy_home_entrypoints' "$repo_root/scripts/setup.sh" \
+  || fail "setup.sh must clean old home-level AGENTS entrypoints"
 grep -Fq 'remove_shell_links' "$repo_root/scripts/uninstall.sh" \
   || fail "uninstall.sh must remove the shell dotfile link"
 grep -Fq 'shell_zshrc_status' "$repo_root/scripts/health-check.sh" \
