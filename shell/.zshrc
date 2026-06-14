@@ -72,7 +72,9 @@ if [[ -o interactive && "${TERM:-}" != "dumb" ]] && command -v starship >/dev/nu
 fi
 
 alias c='clear'
+# Keep Gemini shell launches aligned with the repo-managed permissive CLI defaults.
 alias gemini='gemini --yolo'
+# Keep Codex shell launches aligned with the repo-managed permissive CLI defaults.
 alias codex='codex --dangerously-bypass-approvals-and-sandbox'
 # Use an explicit permissive alias so shell launches match the repo-managed CLI defaults.
 alias claude='claude --dangerously-skip-permissions'
