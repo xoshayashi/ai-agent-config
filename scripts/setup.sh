@@ -391,6 +391,7 @@ install_codex_cli_native() {
     return 0
   fi
   say "install: Codex CLI standalone"
+  # Official Codex CLI documentation publishes this standalone installer URL.
   run sh -c 'curl -fsSL https://chatgpt.com/codex/install.sh | CODEX_NON_INTERACTIVE=1 sh'
 }
 
