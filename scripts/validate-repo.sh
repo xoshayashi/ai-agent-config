@@ -10,6 +10,10 @@ fail() {
   exit 1
 }
 
+warn() {
+  printf 'warning: %s\n' "$*" >&2
+}
+
 script_path=$0
 case "$script_path" in
   */*) script_dir=$(CDPATH= cd "$(dirname "$script_path")" && pwd -P) ;;
@@ -24,6 +28,17 @@ require_file() {
 
 require_absent() {
   [ ! -e "$repo_root/$1" ] || fail "unexpected repository path exists: $1"
+}
+
+lint_plist() {
+  plist=$1
+  if command -v plutil >/dev/null 2>&1; then
+    plutil -lint "$plist" >/dev/null
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import plistlib,sys; plistlib.load(open(sys.argv[1], "rb"))' "$plist"
+  else
+    warn "skip plist lint; plutil and python3 unavailable: $plist"
+  fi
 }
 
 ensure_root_entrypoint_gone() {
@@ -47,6 +62,15 @@ for script in "$repo_root"/scripts/*; do
   esac
 done
 sh -n "$repo_root/notifications/notify.sh"
+if [ -d "$repo_root/macos" ]; then
+  find "$repo_root/macos" -type f -name '*.sh' | while IFS= read -r script; do
+    [ -f "$script" ] || continue
+    sh -n "$script"
+  done
+  find "$repo_root/macos" -type f \( -name '*.plist' -o -name '*.dict' \) | while IFS= read -r plist; do
+    lint_plist "$plist"
+  done
+fi
 
 say "validate: python syntax"
 if command -v python3 >/dev/null 2>&1; then
@@ -67,6 +91,11 @@ require_file "scripts/health-check.sh"
 require_file "scripts/validate-repo.sh"
 require_file "scripts/install-notifications.py"
 require_file "notifications/notify.sh"
+require_file "macos/README.md"
+require_file "macos/defaults/NSGlobalDomain.plist"
+require_file "macos/defaults/com.apple.symbolichotkeys.plist"
+[ -f "$repo_root/macos/displays/current.sh" ] \
+  || warn "missing optional display snapshot: macos/displays/current.sh"
 require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"
@@ -168,11 +197,15 @@ grep -Fq 'install_skill_runtime_support' "$repo_root/scripts/setup.sh" \
   || fail "setup.sh must set up skill runtime dependencies"
 grep -Fq 'skill_dependencies' "$repo_root/scripts/health-check.sh" \
   || fail "health-check.sh must report skill runtime dependencies"
+grep -Fq 'install_macos_bootstrap' "$repo_root/scripts/setup.sh" \
+  || fail "setup.sh must install macOS bootstrap dependencies"
+grep -Fq 'apply_macos_settings' "$repo_root/scripts/setup.sh" \
+  || fail "setup.sh must apply captured macOS settings"
 
 say "validate: health-check runs"
 AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/health-check.sh" --json >/dev/null
 
 say "validate: setup dry-run runs"
-AI_AGENT_DRY_RUN=1 AI_AGENT_CONFIG_HOME="$repo_root" AI_AGENT_REQUIRE_LLM_CLIS=0 sh "$repo_root/scripts/setup.sh" >/dev/null
+AI_AGENT_DRY_RUN=1 AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/setup.sh" >/dev/null
 
 say "validation complete"

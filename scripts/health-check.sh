@@ -164,6 +164,7 @@ git_status=$(command_status git)
 claude_status=$(command_status claude)
 codex_status=$(command_status codex)
 gemini_status=$(command_status gemini)
+agy_status=$(command_status agy)
 
 repo_status=fail
 repo_branch=unknown
@@ -186,9 +187,9 @@ else
   mark_status fail
 fi
 
-for status in "$git_status" "$claude_status" "$codex_status" "$gemini_status"; do
-  [ "$status" = "ok" ] || mark_status warn
-done
+if [ "$git_status" != "ok" ]; then
+  mark_status warn
+fi
 
 codex_agents_status=$(link_status_for "$codex_home/AGENTS.md" "$config_home/instructions/AGENTS.md")
 codex_shared_status=$(link_status_for "$codex_home/AI_AGENT_INSTRUCTIONS.md" "$config_home/instructions/AI_AGENT_INSTRUCTIONS.md")
@@ -210,6 +211,8 @@ claude_notify_status=$(notify_status_for "$claude_home/settings.json")
 gemini_notify_status=$(notify_status_for "$gemini_home/settings.json")
 
 python3_status=$(command_status python3)
+pip_status=$(command_status pip)
+pip3_status=$(command_status pip3)
 openpyxl_status=missing
 if command -v python3 >/dev/null 2>&1 && python3 -c 'import openpyxl' >/dev/null 2>&1; then
   openpyxl_status=ok
@@ -235,7 +238,7 @@ if [ "$format" = "json" ]; then
   printf '  "claude_home": "%s",\n' "$(json_escape "$(display_path "$claude_home")")"
   printf '  "gemini_home": "%s",\n' "$(json_escape "$(display_path "$gemini_home")")"
   printf '  "repository": {"status": "%s", "branch": "%s", "dirty": %s},\n' "$repo_status" "$(json_escape "$repo_branch")" "$(json_nullable_bool "$repo_dirty")"
-  printf '  "commands": {"git": "%s", "claude": "%s", "codex": "%s", "gemini": "%s"},\n' "$git_status" "$claude_status" "$codex_status" "$gemini_status"
+  printf '  "commands": {"git": "%s", "claude": "%s", "codex": "%s", "gemini": "%s", "agy": "%s"},\n' "$git_status" "$claude_status" "$codex_status" "$gemini_status" "$agy_status"
   printf '  "links": {\n'
   printf '    "codex_AGENTS.md": "%s", "codex_AI_AGENT_INSTRUCTIONS.md": "%s", "codex_DESIGN.md": "%s", "codex_skills": "%s",\n' "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status"
   printf '    "claude_CLAUDE.md": "%s", "claude_AI_AGENT_INSTRUCTIONS.md": "%s", "claude_DESIGN.md": "%s", "claude_skills": "%s",\n' "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status"
@@ -243,14 +246,14 @@ if [ "$format" = "json" ]; then
   printf '    "shell_.zshrc": "%s"\n' "$shell_zshrc_status"
   printf '  },\n'
   printf '  "notifications": {"codex": "%s", "claude": "%s", "gemini": "%s"},\n' "$codex_notify_status" "$claude_notify_status" "$gemini_notify_status"
-  printf '  "skill_dependencies": {"python3": "%s", "openpyxl": "%s", "libreoffice": "%s"}\n' "$python3_status" "$openpyxl_status" "$libreoffice_status"
+  printf '  "skill_dependencies": {"python3": "%s", "pip": "%s", "pip3": "%s", "openpyxl": "%s", "libreoffice": "%s"}\n' "$python3_status" "$pip_status" "$pip3_status" "$openpyxl_status" "$libreoffice_status"
   printf '}\n'
 else
   printf 'AI Agent Config health: %s\n' "$(overall_status)"
   printf 'redacted: %s\n' "$([ "$redact_output" = "1" ] && printf yes || printf no)"
   printf 'config: %s\n' "$(display_path "$config_home")"
   printf 'repository: %s branch=%s dirty=%s\n' "$repo_status" "$repo_branch" "$repo_dirty"
-  printf 'commands: git=%s claude=%s codex=%s gemini=%s\n' "$git_status" "$claude_status" "$codex_status" "$gemini_status"
+  printf 'commands: git=%s claude=%s codex=%s gemini=%s agy=%s\n' "$git_status" "$claude_status" "$codex_status" "$gemini_status" "$agy_status"
   printf 'links: codex(AGENTS=%s shared=%s design=%s skills=%s) claude(CLAUDE=%s shared=%s design=%s skills=%s) gemini(GEMINI=%s shared=%s design=%s skills=%s)\n' \
     "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status" \
     "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status" \
@@ -258,8 +261,8 @@ else
   printf 'shell: zshrc=%s\n' "$shell_zshrc_status"
   printf 'notifications: codex=%s claude=%s gemini=%s\n' \
     "$codex_notify_status" "$claude_notify_status" "$gemini_notify_status"
-  printf 'skill dependencies: python3=%s openpyxl=%s libreoffice=%s\n' \
-    "$python3_status" "$openpyxl_status" "$libreoffice_status"
+  printf 'skill dependencies: python3=%s pip=%s pip3=%s openpyxl=%s libreoffice=%s\n' \
+    "$python3_status" "$pip_status" "$pip3_status" "$openpyxl_status" "$libreoffice_status"
 fi
 
 if [ "$strict" = "1" ] && [ "$(overall_status)" != "ok" ]; then

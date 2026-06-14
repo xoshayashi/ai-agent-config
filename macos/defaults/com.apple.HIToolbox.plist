@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>AppleCurrentKeyboardLayoutInputSourceID</key>
+	<string>com.apple.keylayout.ABC</string>
+	<key>AppleDictationAutoEnable</key>
+	<integer>1</integer>
+	<key>AppleEnabledInputSources</key>
+	<array>
+		<dict>
+			<key>Bundle ID</key>
+			<string>com.apple.inputmethod.Kotoeri.RomajiTyping</string>
+			<key>Input Mode</key>
+			<string>com.apple.inputmethod.Japanese</string>
+			<key>InputSourceKind</key>
+			<string>Input Mode</string>
+		</dict>
+		<dict>
+			<key>Bundle ID</key>
+			<string>com.apple.inputmethod.Kotoeri.RomajiTyping</string>
+			<key>InputSourceKind</key>
+			<string>Keyboard Input Method</string>
+		</dict>
+		<dict>
+			<key>Bundle ID</key>
+			<string>com.apple.CharacterPaletteIM</string>
+			<key>InputSourceKind</key>
+			<string>Non Keyboard Input Method</string>
+		</dict>
+		<dict>
+			<key>Bundle ID</key>
+			<string>com.apple.50onPaletteIM</string>
+			<key>InputSourceKind</key>
+			<string>Non Keyboard Input Method</string>
+		</dict>
+		<dict>
+			<key>InputSourceKind</key>
+			<string>Keyboard Layout</string>
+			<key>KeyboardLayout ID</key>
+			<integer>252</integer>
+			<key>KeyboardLayout Name</key>
+			<string>ABC</string>
+		</dict>
+	</array>
+	<key>AppleFnUsageType</key>
+	<integer>2</integer>
+	<key>AppleSelectedInputSources</key>
+	<array>
+		<dict>
+			<key>Bundle ID</key>
+			<string>com.apple.inputmethod.Kotoeri.RomajiTyping</string>
+			<key>Input Mode</key>
+			<string>com.apple.inputmethod.Japanese</string>
+			<key>InputSourceKind</key>
+			<string>Input Mode</string>
+		</dict>
+	</array>
+</dict>
+</plist>
