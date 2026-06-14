@@ -4,9 +4,12 @@
 
 # --- 基本設定 ---
 export LANG=ja_JP.UTF-8
-export PATH="/opt/homebrew/bin:$PATH"
-export PATH="/opt/homebrew/opt/python/libexec/bin:$PATH"
-export PATH="/opt/homebrew/share/google-cloud-sdk/bin:$PATH"
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+if command -v brew >/dev/null 2>&1; then
+  _brew_prefix="$(brew --prefix)"
+  export PATH="$_brew_prefix/opt/python/libexec/bin:$_brew_prefix/share/google-cloud-sdk/bin:$PATH"
+  unset _brew_prefix
+fi
 
 # --- 履歴設定 ---
 HISTFILE=~/.zsh_history
@@ -73,7 +76,9 @@ alias gemini='gemini --yolo'
 alias codex='codex --dangerously-bypass-approvals-and-sandbox'
 # Use an explicit permissive alias so shell launches match the repo-managed CLI defaults.
 alias claude='claude --dangerously-skip-permissions'
+# agy uses the same permission-bypass semantics as Claude Code in this setup.
 alias agy='agy --dangerously-skip-permissions'
+# Hermes is installed outside this setup path; keep shell launches permissive when present.
 alias hermes='hermes --yolo'
 export COPILOT_ALLOW_ALL=true
 alias copilot='copilot --allow-all'
@@ -156,8 +161,4 @@ done
 unset _gs_entry _gs_name _gs_var _gs_val
 
 # Added by Antigravity
-export PATH="/Users/sh/.antigravity/antigravity/bin:$PATH"
-
-
-# Added by Antigravity CLI installer
-export PATH="/Users/sh/.local/bin:$PATH"
+export PATH="$HOME/.antigravity/antigravity/bin:$PATH"
