@@ -226,7 +226,7 @@ install_homebrew() {
   fi
   if brew_path=$(brew_command); then
     brew_prefix=$("$brew_path" --prefix)
-    export PATH="$brew_prefix/bin:$brew_prefix/opt/python/libexec/bin:$brew_prefix/share/google-cloud-sdk/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+    export PATH="$brew_prefix/bin:$brew_prefix/opt/python/libexec/bin:$brew_prefix/share/google-cloud-sdk/bin:/usr/local/bin:$PATH"
   else
     export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
   fi
