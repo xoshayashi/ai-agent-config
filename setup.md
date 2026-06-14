@@ -121,11 +121,17 @@ AI_AGENT_SETUP_MACOS_BOOTSTRAP=0 sh scripts/setup.sh
 ## macOS system settings
 
 `setup.sh` は、現在のマシンから取得した再適用可能な設定を `defaults`、`pmset`、
-`displayplacer` で反映します。対象は言語/外観、キーボード入力ソース、Fn キー、
-トラックパッド/マウス、Dock、Finder の明示設定、スクリーンショット設定、Spaces、
+`displayplacer` で反映します。対象は `macos/defaults/*.plist` に保存した
+GlobalDomain、キーボードショートカット、入力ソース、トラックパッド/マウス、Dock、
+Finder、スクリーンショット、Window Manager、Control Center、Terminal などの基本設定、
 電源設定、ディスプレイ配置です。
 
-ディスプレイ配置は `macos/displayplacer-current.sh` に保存しています。接続する
+defaults snapshot を更新する場合は、対象 domain を `defaults export <domain>
+macos/defaults/<domain>.plist` で保存し、`plutil -convert xml1` と `plutil -lint` で
+検証してください。最近使った項目、履歴、analytics timestamp などの揮発情報は
+保存対象から外します。
+
+ディスプレイ配置は `macos/displays/current.sh` に保存しています。接続する
 ディスプレイが変わった場合は、`displayplacer list` の末尾に出る現在配置コマンドで
 このファイルを更新してください。
 

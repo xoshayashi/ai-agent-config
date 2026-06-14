@@ -10,6 +10,10 @@ fail() {
   exit 1
 }
 
+warn() {
+  printf 'warning: %s\n' "$*" >&2
+}
+
 script_path=$0
 case "$script_path" in
   */*) script_dir=$(CDPATH= cd "$(dirname "$script_path")" && pwd -P) ;;
@@ -24,6 +28,17 @@ require_file() {
 
 require_absent() {
   [ ! -e "$repo_root/$1" ] || fail "unexpected repository path exists: $1"
+}
+
+lint_plist() {
+  plist=$1
+  if command -v plutil >/dev/null 2>&1; then
+    plutil -lint "$plist" >/dev/null
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c 'import plistlib,sys; plistlib.load(open(sys.argv[1], "rb"))' "$plist"
+  else
+    warn "skip plist lint; plutil and python3 unavailable: $plist"
+  fi
 }
 
 ensure_root_entrypoint_gone() {
@@ -48,9 +63,12 @@ for script in "$repo_root"/scripts/*; do
 done
 sh -n "$repo_root/notifications/notify.sh"
 if [ -d "$repo_root/macos" ]; then
-  for script in "$repo_root"/macos/*.sh; do
+  find "$repo_root/macos" -type f -name '*.sh' | while IFS= read -r script; do
     [ -f "$script" ] || continue
     sh -n "$script"
+  done
+  find "$repo_root/macos" -type f \( -name '*.plist' -o -name '*.dict' \) | while IFS= read -r plist; do
+    lint_plist "$plist"
   done
 fi
 
@@ -73,7 +91,11 @@ require_file "scripts/health-check.sh"
 require_file "scripts/validate-repo.sh"
 require_file "scripts/install-notifications.py"
 require_file "notifications/notify.sh"
-require_file "macos/displayplacer-current.sh"
+require_file "macos/README.md"
+require_file "macos/defaults/NSGlobalDomain.plist"
+require_file "macos/defaults/com.apple.symbolichotkeys.plist"
+[ -f "$repo_root/macos/displays/current.sh" ] \
+  || warn "missing optional display snapshot: macos/displays/current.sh"
 require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
 require_file "instructions/GEMINI.md"

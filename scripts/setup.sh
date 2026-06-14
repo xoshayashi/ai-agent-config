@@ -175,6 +175,8 @@ EOF
   done
 
   status=$(cat "$status_file")
+  unlink "$status_file" 2>/dev/null || true
+  unlink "$command_file" 2>/dev/null || true
   [ "$status" = "0" ] || fail "$label failed in Terminal with exit status $status"
 }
 
@@ -205,6 +207,8 @@ install_command_line_tools() {
   fi
   say "install: Command Line Tools"
   run xcode-select --install
+  say "Complete the Command Line Tools installer dialog, then rerun setup.sh."
+  exit 0
 }
 
 install_homebrew() {
@@ -220,7 +224,12 @@ install_homebrew() {
     say "install: Homebrew"
     NONINTERACTIVE=1 /bin/bash -c "$(/usr/bin/curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
   fi
-  export PATH="/opt/homebrew/bin:/opt/homebrew/opt/python/libexec/bin:/opt/homebrew/share/google-cloud-sdk/bin:/usr/local/bin:$PATH"
+  if brew_path=$(brew_command); then
+    brew_prefix=$("$brew_path" --prefix)
+    export PATH="$brew_prefix/bin:$brew_prefix/opt/python/libexec/bin:$brew_prefix/share/google-cloud-sdk/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+  else
+    export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+  fi
 }
 
 brew_install_formulae() {
@@ -287,8 +296,9 @@ PY
 
 pypi_latest_version() {
   package=$1
-  python3 -m pip index versions "$package" 2>/dev/null \
-    | sed -n '1s/.*(\([^)]*\)).*/\1/p'
+  command -v curl >/dev/null 2>&1 || return 1
+  curl -fsSL "https://pypi.org/pypi/$package/json" 2>/dev/null \
+    | python3 -c 'import json,sys; print(json.load(sys.stdin)["info"]["version"])'
 }
 
 install_pipx_packages() {
@@ -334,6 +344,7 @@ install_antigravity_cli() {
     return 0
   fi
   say "install: Antigravity CLI"
+  # Official Antigravity CLI documentation publishes this installer URL.
   run sh -c 'curl -fsSL https://antigravity.google/cli/install.sh | bash'
 }
 
@@ -828,47 +839,16 @@ install_skill_runtime_support() {
   fi
 }
 
-write_default() {
-  domain=$1
-  key=$2
-  type=$3
-  value=$4
-  say "defaults: $domain $key"
-  run defaults write "$domain" "$key" "$type" "$value"
-}
-
-delete_default() {
-  domain=$1
-  key=$2
-  if defaults read "$domain" "$key" >/dev/null 2>&1; then
-    say "defaults delete: $domain $key"
-    run defaults delete "$domain" "$key"
-  fi
-}
-
-apply_keyboard_input_sources() {
-  say "defaults: com.apple.HIToolbox AppleEnabledInputSources"
-  run defaults write com.apple.HIToolbox AppleEnabledInputSources -array \
-    '{ InputSourceKind = "Keyboard Layout"; "KeyboardLayout ID" = 252; "KeyboardLayout Name" = ABC; }' \
-    '{ "Bundle ID" = "com.apple.inputmethod.Kotoeri.RomajiTyping"; "Input Mode" = "com.apple.inputmethod.Japanese"; InputSourceKind = "Input Mode"; }' \
-    '{ "Bundle ID" = "com.apple.inputmethod.Kotoeri.RomajiTyping"; InputSourceKind = "Keyboard Input Method"; }' \
-    '{ "Bundle ID" = "com.apple.CharacterPaletteIM"; InputSourceKind = "Non Keyboard Input Method"; }' \
-    '{ "Bundle ID" = "com.apple.50onPaletteIM"; InputSourceKind = "Non Keyboard Input Method"; }'
-
-  say "defaults: com.apple.HIToolbox AppleSelectedInputSources"
-  run defaults write com.apple.HIToolbox AppleSelectedInputSources -array \
-    '{ "Bundle ID" = "com.apple.inputmethod.Kotoeri.RomajiTyping"; "Input Mode" = "com.apple.inputmethod.Japanese"; InputSourceKind = "Input Mode"; }'
-}
-
 apply_power_settings() {
   if ! command -v pmset >/dev/null 2>&1; then
     fail "pmset unavailable; cannot apply power settings"
   fi
-  if pmset -g custom 2>/dev/null | grep -Eq 'lowpowermode[[:space:]]+1' \
-    && pmset -g custom 2>/dev/null | grep -Eq 'Battery Power:' \
-    && pmset -g custom 2>/dev/null | grep -Eq 'displaysleep[[:space:]]+2' \
-    && pmset -g custom 2>/dev/null | grep -Eq 'AC Power:' \
-    && pmset -g custom 2>/dev/null | grep -Eq 'displaysleep[[:space:]]+10'; then
+  pmset_custom=$(pmset -g custom 2>/dev/null || true)
+  if printf '%s\n' "$pmset_custom" | grep -Eq 'lowpowermode[[:space:]]+1' \
+    && printf '%s\n' "$pmset_custom" | grep -Eq 'Battery Power:' \
+    && printf '%s\n' "$pmset_custom" | grep -Eq 'displaysleep[[:space:]]+2' \
+    && printf '%s\n' "$pmset_custom" | grep -Eq 'AC Power:' \
+    && printf '%s\n' "$pmset_custom" | grep -Eq 'displaysleep[[:space:]]+10'; then
     say "ok: power settings"
     return 0
   fi
@@ -884,7 +864,7 @@ apply_power_settings() {
 }
 
 apply_display_settings() {
-  display_script="$config_home/macos/displayplacer-current.sh"
+  display_script="$config_home/macos/displays/current.sh"
   if [ ! -f "$display_script" ]; then
     warn "missing $display_script; skip display arrangement"
     return 0
@@ -899,6 +879,39 @@ apply_display_settings() {
   fi
 }
 
+apply_defaults_snapshots() {
+  defaults_dir="$config_home/macos/defaults"
+  if [ ! -d "$defaults_dir" ]; then
+    warn "missing $defaults_dir; skip defaults snapshots"
+    return 0
+  fi
+
+  find "$defaults_dir" -type f -name '*.plist' | sort | while IFS= read -r snapshot; do
+    domain=$(basename "$snapshot" .plist)
+    say "defaults import: $domain"
+    run defaults import "$domain" "$snapshot"
+  done
+}
+
+apply_stable_macos_overrides() {
+  say "defaults: com.apple.dock mru-spaces"
+  run defaults write com.apple.dock mru-spaces -bool false
+}
+
+install_key_binding_files() {
+  keybindings_dir="$config_home/macos/keybindings"
+  keybinding_file="$keybindings_dir/DefaultKeyBinding.dict"
+  if [ ! -f "$keybinding_file" ]; then
+    return 0
+  fi
+
+  target_dir="$home_dir/Library/KeyBindings"
+  target_file="$target_dir/DefaultKeyBinding.dict"
+  say "key bindings: $target_file"
+  run mkdir -p "$target_dir"
+  run cp "$keybinding_file" "$target_file"
+}
+
 apply_macos_settings() {
   [ "$setup_macos_settings" = "1" ] || {
     say "skip: macOS settings disabled"
@@ -909,42 +922,9 @@ apply_macos_settings() {
     return 0
   fi
 
-  write_default NSGlobalDomain AppleInterfaceStyle -string Dark
-  write_default NSGlobalDomain AppleInterfaceStyleSwitchesAutomatically -bool true
-  write_default NSGlobalDomain AppleLocale -string ja_JP
-  say "defaults: NSGlobalDomain AppleLanguages"
-  run defaults write NSGlobalDomain AppleLanguages -array ja-JP
-  write_default NSGlobalDomain com.apple.keyboard.fnState -bool true
-  write_default NSGlobalDomain com.apple.trackpad.forceClick -bool true
-  write_default NSGlobalDomain com.apple.trackpad.scaling -float 3
-
-  write_default com.apple.AppleMultitouchTrackpad Clicking -bool true
-  write_default com.apple.AppleMultitouchTrackpad Dragging -bool false
-  write_default com.apple.AppleMultitouchTrackpad TrackpadThreeFingerDrag -bool false
-  write_default com.apple.AppleMultitouchTrackpad TrackpadRightClick -bool true
-  write_default com.apple.AppleMultitouchTrackpad TrackpadScroll -bool true
-  write_default com.apple.AppleMultitouchTrackpad TrackpadHorizScroll -bool true
-  write_default com.apple.driver.AppleBluetoothMultitouch.trackpad Clicking -bool true
-  write_default com.apple.driver.AppleBluetoothMultitouch.trackpad TrackpadThreeFingerDrag -bool false
-  write_default com.apple.driver.AppleBluetoothMultitouch.mouse MouseButtonMode -string OneButton
-  write_default com.apple.driver.AppleBluetoothMultitouch.mouse MouseHorizontalScroll -bool true
-  write_default com.apple.driver.AppleBluetoothMultitouch.mouse MouseMomentumScroll -bool true
-
-  apply_keyboard_input_sources
-
-  write_default com.apple.dock autohide -bool true
-  write_default com.apple.dock tilesize -int 37
-  delete_default com.apple.dock orientation
-  delete_default com.apple.dock magnification
-  delete_default com.apple.dock mru-spaces
-  delete_default com.apple.finder AppleShowAllFiles
-  delete_default com.apple.finder ShowPathbar
-  delete_default com.apple.finder ShowStatusBar
-  delete_default com.apple.finder FXPreferredViewStyle
-  delete_default com.apple.screencapture location
-  delete_default com.apple.screencapture type
-  delete_default com.apple.spaces spans-displays
-
+  apply_defaults_snapshots
+  apply_stable_macos_overrides
+  install_key_binding_files
   apply_power_settings
   apply_display_settings
 
