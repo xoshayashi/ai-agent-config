@@ -88,6 +88,7 @@ column_spans:
 row_tracks:
 column_tracks:
 separator_x:
+outer_padding_lock:
 outer_padding:
 major_regions:
 coordinate_inventory_1672:
@@ -209,9 +210,11 @@ density_design:
   semantic_sentence_layer: [1-3 compact meaningful clauses/sentences in body labels, rows, annotations, or optional Insight that explain relationship, reason, consequence, or decision relevance]
   semantic_copy_gate: [major body labels use meaningful clauses/sentences; noun-only labels are allowed only for headers, axes, or category names]
   icon_restraint_plan: [necessary icons, why they clarify, and which icon candidates were removed because text/structure communicates better]
-  icon_density_budget: [default 0-3 purposeful icons per slide and keep icon count below semantic text units unless the visual logic demands otherwise]
+  icon_density_budget: [default 0-2 purposeful icons per slide; allow 3 only with explicit decision-critical justification]
+  icon_justification_gate: [each icon's reading/evidence/decision/navigation job; decorative, redundant, generic, one-icon-per-card, and noun-label replacement icons are blockers]
+  icon_box_compaction_lock: [icons must not enlarge boxes, rows, padding, or top/bottom gaps]
   density_levers: [KPI strip, supporting context region, evidence strip, small multiples, annotations, benchmark/context column, benchmark/target/prior-period reference line, source cue]
-  overload_controls: [one dominant structure, max three major regions, body >=18pt equivalent, grouped labels, no decorative density]
+  overload_controls: [one dominant structure, max three major regions, body/card/table/data text >=20pt equivalent, grouped labels, no decorative density, no icon-driven box bloat]
 information_unit_budget:
 density_number_policy: no default cap on decision-relevant numbers; remove only unsupported, redundant, unreadable, or decorative numbers
 density_guardrails:
@@ -302,6 +305,8 @@ ACT slide contract:
 - source_placeholder_blocklist: no brand assumptions, brand analysis, internal analysis, our analysis, AI-generated analysis, or working assumptions as Source
 - source_line_lock: render Source: ... when traceable sources exist; use source_line: none only when no traceable source exists
 - source_separator_lock: Source is text-only; no gray rule, separator line, divider, underline, baseline stroke, footer rail, or hairline may appear above, below, behind, or adjacent to Source
+- outer_padding_lock: use fixed 2048x1152 padding of 64px left/right and fixed 1672x941 planning padding of 52px left/right on every slide, regardless of content amount
+- content_area_padding_policy: use fixed content-zone top/bottom padding of 48px on 2048x1152 and 39px on the 1672x941 planning basis; keep cards, tables, diagrams, evidence strips, illustrations, and optional Insight aligned to that fixed shell
 - output_artifact_mastering_lock: slides_final/ is the only loose-PNG master; package and render-check folders hold only derivative artifacts
 - no_duplicate_png_output_lock: no duplicate loose PNG copies across slides_final/, slides_package/, and render_check/pdf_pages/
 - contact_sheet_mastering_lock: one retained contact_sheet_review.png by default; comparison sheet only when delivery QA requires it
@@ -313,8 +318,11 @@ ACT slide contract:
 - density_lift_lock: raise useful information density during both slide-structure planning and slide-image prompting
 - sentence_density_lift_lock: raise density one step with compact meaningful clauses or short sentences in body labels, rows, annotations, and optional Insight; avoid icon-and-keyword-only slides
 - semantic_copy_gate: major body labels use meaningful clauses/sentences; noun-only labels are allowed only for headers, axes, or category names
-- icon_restraint_lock: icons are sparse wayfinding or evidence markers, not the primary content layer; remove generic icon rows, icon wallpaper, and icons that replace clearer text or structure
-- icon_density_budget: default to 0-3 purposeful icons per slide and keep icon count below semantic text units unless the visual logic demands otherwise
+- icon_restraint_lock: icons are sparse wayfinding or evidence markers, not the primary content layer; remove generic icon rows, icon wallpaper, one-icon-per-card habits, and icons that replace clearer text or structure
+- icon_density_budget: default to 0-2 purposeful icons per slide; allow 3 only with explicit decision-critical justification
+- icon_justification_gate: every icon must name its reading/evidence/decision/navigation job; decorative, redundant, generic, and noun-label replacement icons are blockers
+- icon_location_lock: every icon must have a declared location; auto-added card, row, label, and diagram icons are blockers
+- icon_box_compaction_lock: icons must not enlarge cards, message boxes, rows, padding, or top/bottom gaps; remove/shrink icons before increasing box height
 - structure_choice_bias: gently prefer structured presentation logic when it clarifies the message, without forcing it on every slide
 - structured_density_bias: add one or two useful evidence layers, labels, drivers, or comparison cues when the slide has room and the reader benefits; add layers only until the body silhouette is filled with deliberate content, then split rather than overcrowd
 - use issue trees, driver trees, 2x2 matrices, value chains, funnels, waterfalls, KPI bridges, decision tables, before/after bridges, or hypothesis-evidence-implication rows when they improve the reader's decision path; skip them when they would clutter the focal message
@@ -328,7 +336,7 @@ ACT slide contract:
 - editorial_polish_repair_loop: raise slide quality with a stronger visual anchor, more specific evidence objects, tighter component geometry, clearer focal hierarchy, and a composed editorial rhythm
 - visual_subject_open_set, message_led_composition_lock, and composition_fit_plan: choose the visual subject, focal relationship, and canvas occupancy from the argument before image prompting; occupancy is observable - no quadrant of the body content area is conspicuously empty and no major region overflows its grid track
 - design_balance_gate: freeze planned body occupancy, useful whitespace role, content-area weight, text-role sizes, background role, and accent role before generation; approve only when the actual PNG matches those choices
-- occupancy_density_fit_lock: body occupancy must fit the selected density_tier without dead zones, margin crush, overcrowding, or density created by shrinking body text below 18pt equivalent
+- occupancy_density_fit_lock: body occupancy must fit the selected density_tier without dead zones, margin crush, overcrowding, or density created by shrinking body/card/table/data text below 20pt equivalent
 - font_scale_unity_lock: reuse one deck-level type scale for H1, subtitle, body, data labels, table labels, Source, and optional Insight; repair size/weight/color drift before packaging
 - palette_role_unity_lock: keep ACT colors in stable roles across canvas, panels/cards, text, footnotes, Petrol accent, and rare Honey signal; repair arbitrary background, text, accent, or saturation drift
 - region_balance_policy: choose the relative weight of main, supporting, and optional context regions from the slide message, evidence shape, reading path, and body silhouette
@@ -339,9 +347,11 @@ ACT slide contract:
 - use human-designed editorial/vector illustrations for chapter openers, turning points, complex systems, and final vision slides
 - keep illustration subordinate: a clear focal motif, only useful supporting details, clean controlled flat 2D linework, crisp silhouettes, restrained fills, rounded UI panels, small icon badges, a projection/viewpoint chosen from the message, no rough sketch, no arbitrary pseudo-depth, and no glossy AI concept-art finish
 - max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
-- use ACT typography: H1 30-34pt, subtitle 21-23pt, body 18pt equivalent
+- ergonomic_min_text_size_lock: body labels, card rows, table cells, data labels, annotations, and Insight text must be at least 20pt equivalent; source/footer/table-note text may be 13-15pt equivalent
+- use ACT typography: H1 30-34pt, subtitle 21-23pt, body/card/table/data text 20pt equivalent minimum
 - use ACT header rules: H1 Forest Charcoal #2D332E, subtitle #4D544E, exact compact left vertical line, no blue H1, no right-side header decoration
-- use the default exact compact ACT header unless the user explicitly provides a newer embedded master: 1672x941 basis; header_safe_area x=44 y=24 w=1584 h=136; vertical_line x=50 y=40 w=10 h=120 #008A80; H1 x=88 y=34 w=1332 max_lines=1 size=32pt weight=700 line_height=1.14 #2D332E; subtitle x=88 y=82 w=1332 max_lines=1 size=22pt weight=400 line_height=1.18 #4D544E; visual_alignment accent top aligns with the first visible H1 glyph/title top or sits 0-6px below it, never above it, and accent bottom sits 4-10px below subtitle lower visual edge; body_start_y=180; upper_right_clear_zone x=1420 y=24 w=208 h=88 empty
+- use the default exact compact ACT header unless the user explicitly provides a newer embedded master: 1672x941 basis; header_safe_area x=44 y=12 w=1584 h=72 within the fixed 105px planning header zone; vertical_line x=50 y=37 w=10 h=41 #008A80, scaled to x=61 y=45 w=12 h=50 on 2048 output with bottom around y=95; H1 x=88 y=18 w=1332 max_lines=1 size=28pt weight=700 line_height=1.10 #2D332E; subtitle x=88 y=52 w=1332 max_lines=1 size=18pt weight=400 line_height=1.14 #4D544E; visual_alignment accent top aligns exactly with the first visible H1 glyph/title top, not the H1 text-box y, with no above-title protrusion and no below-title offset, and accent bottom sits 5-11px below subtitle lower visual edge; body_start_y=105; upper_right_clear_zone x=1420 y=12 w=208 h=56 empty; no header-area bottom line; avoid two-line H1 in this master and shorten/split instead of expanding the header
+- use fixed slide shell padding: 64px left/right and 48px content-zone top/bottom on 2048 output; 52px left/right and 39px content-zone top/bottom on the 1672 planning basis
 - make the slide feel human-crafted through priority, breathing room, and editorial rhythm
 - keep the slide in a strategy operating-deck look: useful occupancy, small explanatory visuals, crisp rules, low-contrast surfaces, and no ornamental depth
 - let structure, spacing, rules, numbers, and typography carry hierarchy
@@ -394,7 +404,7 @@ Process:
 9. Run a density design gate for each slide: set reader_mode, decision_question, information_units, semantic_sentence_layer, semantic_copy_gate, icon_restraint_plan, icon_density_budget, density_levers, overload_controls, information_unit_budget, and density_guardrails.
 10. Apply sentence_density_lift_lock, semantic_copy_gate, icon_restraint_lock, and icon_density_budget before image prompting: if the slide reads as icons plus noun labels, add compact explanatory clauses/sentences and reduce icons until the argument is understandable without narration.
 11. Apply evidence_compression_ladder: choose the smallest proof structure that makes the message credible: key number, ranked list, before/after delta, driver tree, causal chain, 2x2, mini table, evidence strip, or source-backed annotation.
-12. Split any slide that has more than one message, more than one dominant structure, more than three major regions, or would force body text below 18pt equivalent.
+12. Split any slide that has more than one message, more than one dominant structure, more than three major regions, or would force main content text below 20pt equivalent.
 13. Combine adjacent slides only when messages repeat, the same comparison must be seen together, or the user explicitly requests a shorter deck.
 14. Define deck_header_master_lock, invisible footer alignment baseline, Insight surface master, and repeated table/card/icon masters before image generation.
 15. Read only the action titles in order and repair logical gaps before image generation.
@@ -541,7 +551,7 @@ Process:
 11. Assign Insight components selectively across the deck only when they add non-redundant interpretation, decision weight, or reading speed. Start each slide from `insight_decision: none`, and keep a component only when `insight_justification_required` is satisfied. Apply `honey_selective_signal_lock`: Honey remains rare, purposeful, and bottom-bar-only.
 12. Vary dominant structures so the deck feels edited around the argument. On chart/table slides apply chart_emphasis_lock, encoding_consistency_lock, and number_format_normalization_lock, and run title_exhibit_proof_match.
 13. Mark restrained illustration candidates where the idea becomes more memorable or fresh without becoming a rough sketch or glossy hero illustration.
-14. Flag slides that should split because density would force body below 18pt equivalent or create competing major regions.
+14. Flag slides that should split because density would force main content text below 20pt equivalent or create competing major regions.
 15. Define source policy per slide: none / real source list.
 16. Define deck-level master refs: header, invisible footer alignment baseline, Insight surface skeleton, table/card masters, icon circle sizes.
 17. Draft speaker_notes_text for every slide before generation. Each note should support presentation delivery, not duplicate all visible text: use speaker_notes_depth_lock with a substantial Japanese talk script, key evidence or assumptions to mention, source caveat if needed, implication, and transition to the next slide. Apply speaker_notes_persuasion_lock: stage current-state vs intended-future tension, balance logos with selective ethos and pathos, end with a landing sentence and signpost transition, and add a justified notes_hook, notes_objection_preempt, or delivery markers only where they help.
@@ -570,7 +580,7 @@ Repair:
 1. Keep the original message if valid.
 2. Rebuild the canonical planning block.
 3. Fix grid drift before color or decorative changes.
-4. Trim, split, or regrid crowded text; do not shrink body below 18pt equivalent.
+4. Trim, split, or regrid crowded text; do not shrink main content below 20pt equivalent.
 5. Add useful density only through hierarchy, grouping, comparison, annotation, evidence strip, supporting context region, small multiples, or source cue.
 6. Add, remove, or quiet Insight only after deciding the interpretation need.
 7. Use generation_mode image_edit with model gpt-image-2 when a screenshot/reference image is available.
@@ -619,7 +629,7 @@ Output:
 Repair this slide image prompt for text balance, grid fidelity, and visual hierarchy.
 
 Priority:
-1. Do not solve crowding by shrinking body text below 18pt equivalent.
+1. Do not solve crowding by shrinking body/card/table/data text below 20pt equivalent.
 2. Keep ACT header fixed: compact left accent + H1 + subtitle, H1 30-34pt #2D332E, subtitle 21-23pt #4D544E, exact header-block left accent, header_left_accent_reference_lock, header_left_accent_no_protrusion_rule, header_left_accent_top_protrusion_blocker, header_identity_lock, header_integrity_blocker_lock, and no header ranges in the final prompt.
 3. Rebuild grid_mode, column_spans, row_tracks, column_tracks, separator_x, outer_padding, and shared_edges.
 4. Add coordinate_inventory_1672 and master_components if missing.
@@ -665,14 +675,16 @@ Layout:
 - header/footer anchors are fixed with exact values, not ranges
 - header_identity_lock passes: the header remains the compact left accent + H1 + subtitle system, not a slide-specific decoration surface
 - header_left_accent_master_lock passes: the accent is a fixed header-block anchor spanning H1 + subtitle, not a page-edge rail, tall sidebar, body marker, chapter stripe, or ornament
-- header_left_accent_reference_lock passes: the accent matches the approved reference geometry x=50 y=40 w=10 h=120 on the 1672x941 basis unless a newer embedded master is supplied
+- header_left_accent_reference_lock passes: the accent matches the approved reference geometry x=50 y=37 w=10 h=41 on the 1672x941 basis unless a newer embedded master is supplied
 - header_left_accent_shape_lock passes: the accent is one solid 10px vertical rectangle with square or 0-2px radius ends and no pill cap, glow, shadow, gradient, split segment, or duplicate mark
-- header_left_accent_no_protrusion_rule passes: the top aligns with the first visible H1 glyph/title top or sits 0-6px below it
+- header_left_accent_title_top_alignment_lock passes: the top aligns exactly with the first visible H1 glyph/title top, with no below-title offset
+- header_left_accent_shape_lock passes: the accent keeps the locked x=50 y=37 w=10 h=41 shape on the 1672 basis and uses the same 10px/12px thickness across the deck
+- header_left_accent_no_protrusion_rule passes: the top does not protrude above the first visible H1 glyph/title top
 - header_left_accent_top_protrusion_blocker passes: no visible accent pixel sits above the first visible H1 glyph/title top, outside header_safe_area, detached from H1/subtitle, or inside body_start_y
 - header_integrity_blocker_lock passes: no malformed, missing, oversized, recolored, right-decorated, or intruded header remains
 - Whitespace and occupancy balance is intentional: no accidental empty dead zone, no overcrowded canvas, no content crushing the margins
 - design_balance_gate passes: intended body occupancy, whitespace role, content-area weight, type-role sizes, background role, and accent role were frozen before generation and match the actual PNG
-- occupancy_density_fit_lock passes: body occupancy matches the selected density_tier without dead zones, margin crush, overcrowding, or smaller-than-18pt body text
+- occupancy_density_fit_lock passes: body occupancy matches the selected density_tier without dead zones, margin crush, overcrowding, or smaller-than-20pt main content text
 - font_scale_unity_lock passes: one deck-level type scale holds across H1, subtitle, body, data labels, table labels, Source, and optional Insight
 - palette_role_unity_lock passes: ACT colors keep stable roles across canvas, panels/cards, text, footnotes, Petrol accent, and rare Honey signal
 - multimodal_design_review_lock passes: actual PNGs were inspected multimodally for layout collapse, occupancy/density imbalance, font-size/color drift, background/accent mismatch, and deck-unity drift
@@ -693,11 +705,12 @@ Layout:
 
 Typography:
 - max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
+- ergonomic_min_text_size_lock: body/card/table/data/annotation/Insight text stays >=20pt equivalent; source/footer/table-note may be 13-15pt equivalent
 - H1 30-34pt, default 32pt
 - long Japanese H1 uses 30-32pt; short mixed titles may use 34pt
 - subtitle 21-23pt #4D544E
 - Insight/message-box text 20-24pt by default, 24-26pt only by exception, and at least 6pt smaller than selected H1 and visually below subtitle
-- body readable at 18pt equivalent
+- main content readable at >=20pt equivalent
 - weights stay within 400/600/700
 - Typography balance is stable: size and weight hierarchy does not drift slide to slide, and no label/table/Insight text competes with H1
 
@@ -714,8 +727,10 @@ Content:
 - structure_choice_bias and structured_density_bias are applied selectively: structure and density increase the decision value without turning every slide into a rigid template
 - sentence_density_lift_lock is applied: the slide uses compact meaningful clauses/sentences where the reader needs relationships, reasons, consequences, or decision relevance, and is not an icon-and-keyword-only composition
 - semantic_copy_gate is applied: major body labels are not noun-only unless they are headers, axes, legends, or categories
-- icon_restraint_lock is applied: icons are purposeful, sparse support and do not dominate or substitute for the semantic sentence layer
-- icon_density_budget is applied: icons normally stay within 0-3 purposeful uses and below semantic text units
+- icon_restraint_lock is applied: icons are purposeful, sparse support and do not dominate, substitute for the semantic sentence layer, or force larger boxes
+- icon_density_budget is applied: icons normally stay within 0-2 purposeful uses; a third icon requires explicit decision-critical justification
+- icon_justification_gate is applied: every icon has a concrete job and decorative/redundant icons are removed
+- icon_box_compaction_lock is applied: icons do not enlarge boxes, rows, padding, or top/bottom gaps
 - information units are grouped and each added layer improves the message
 - Insight adds interpretation, not repetition
 - Insight/message-box placement creates a calm reading bridge between the relevant content and the footer when used at the bottom
