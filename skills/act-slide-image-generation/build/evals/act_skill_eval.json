@@ -175,6 +175,70 @@
       "reason": "Use generic one-primary-message language instead of a fixed investor-style claim frame."
     },
     {
+      "pattern": "header 96px / content 924px / footer 60px",
+      "reason": "Fixed zones must use the 1920x1080 guide: header 120px / content 900px / footer 60px."
+    },
+    {
+      "pattern": "2048x1152 zones header 104px / content 984px / footer 64px",
+      "reason": "Fixed zones must use 2048x1152 header 128px / content 960px / footer 64px."
+    },
+    {
+      "pattern": "1672x941 planning zones header 84px / content 805px / footer 52px",
+      "reason": "Fixed zones must use 1672x941 planning zones header 105px / content 784px / footer 52px."
+    },
+    {
+      "pattern": "96/924/60px",
+      "reason": "Fixed zones must use the 120/900/60px split."
+    },
+    {
+      "pattern": "104/984/64px",
+      "reason": "Fixed zones must use 128/960/64px on 2048x1152 output."
+    },
+    {
+      "pattern": "84/805/52px",
+      "reason": "Fixed zones must use 105/784/52px on the 1672x941 planning basis."
+    },
+    {
+      "pattern": "vertical_line x=50 y=36 w=10 h=40",
+      "reason": "Header accent must use the locked y=37 h=41 master."
+    },
+    {
+      "pattern": "x=50 y=36 w=10 h=40",
+      "reason": "Header accent must use the locked y=37 h=41 master."
+    },
+    {
+      "pattern": "vertical_line x=50 y=36 w=10 h=41",
+      "reason": "Header accent top should be trimmed 1px to y=37."
+    },
+    {
+      "pattern": "x=61 y=44 w=12 h=50",
+      "reason": "2048 output header accent top should be trimmed 1px to y=45."
+    },
+    {
+      "pattern": "vertical_line x=50 y=36 w=10 h=42",
+      "reason": "Header accent top should be trimmed 1px to y=37 while preserving bottom around y=95."
+    },
+    {
+      "pattern": "x=61 y=44 w=12 h=51",
+      "reason": "2048 output header accent top should be trimmed 1px to y=45 while preserving bottom around y=95."
+    },
+    {
+      "pattern": "smaller-than-18pt",
+      "reason": "Main content text should use the ergonomic 20pt equivalent minimum, not the older 18pt floor."
+    },
+    {
+      "pattern": "18pt equivalent",
+      "reason": "Main content text should use the ergonomic 20pt equivalent minimum."
+    },
+    {
+      "pattern": "0-3 purposeful icons",
+      "reason": "Icon budget should default to 0-2 purposeful icons; 3 requires explicit decision-critical justification."
+    },
+    {
+      "pattern": "default to 0-3",
+      "reason": "Icon budget should default to 0-2 purposeful icons; 3 requires explicit decision-critical justification."
+    },
+    {
       "pattern": "direct_native",
       "reason": "Do not guide agents toward presentation construction as the generation source."
     },
@@ -334,11 +398,17 @@
     "header_identity_lock: header is always the same compact left vertical line + H1 + subtitle system, never a slide-specific decoration surface",
     "header_footer_text_color_lock",
     "header_line_top_rule",
+    "header_accent_geometry_lock",
     "header_left_accent_reference_lock",
     "header_left_accent_shape_lock",
+    "header_left_accent_title_top_alignment_lock",
     "header_left_accent_no_protrusion_rule",
     "header_left_accent_top_protrusion_blocker",
-    "vertical_line x=50 y=40 w=10 h=120",
+    "vertical_line x=50 y=37 w=10 h=41",
+    "scaled to x=61 y=45 w=12 h=50",
+    "bottom around y=95",
+    "width is fixed at 10px on the 1672 basis and 12px on the 2048 output",
+    "no header-area bottom line",
     "any upward protrusion above H1 is a blocker",
     "header_integrity_blocker_lock: malformed, missing, oversized, recolored, right-decorated, or intruded header is a blocker and must be repaired before other polish",
     "message_box_scale_lock",
@@ -347,6 +417,19 @@
     "message_box_compactness_blocker_lock: Insight/message-box surfaces that dominate the slide, behave like a banner, or compensate for layout imbalance are blockers",
     "message_box_text_alignment_lock: center Insight/message-box text optically both horizontally and vertically within its surface",
     "insight_surface_placement_lock: when an Insight/message-box is kept, place it as a deliberate interpretation bridge tied to the body silhouette and footer baseline",
+    "ergonomic_min_text_size_lock",
+    "ergonomic_text_minimum_status",
+    "body labels, card rows, table cells, data labels, annotations, and Insight text must be at least 20pt equivalent",
+    "source/footer/table-note text may use 13-15pt equivalent",
+    "icon_justification_gate",
+    "icon_location_lock",
+    "icon_box_compaction_lock",
+    "icon_overuse_blocker_lock",
+    "icon_justification_status",
+    "icon_box_compaction_status",
+    "default to 0-2 purposeful icons per slide",
+    "auto-added card, row, label, and diagram icons are blockers",
+    "icons must not enlarge boxes",
     "deck_tone_master_lock",
     "deck_tone_signature_lock: preserve one material system across the deck for base, typography, rules, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior while varying only message-led layouts",
     "deck_tone_consistency_status",
@@ -363,6 +446,19 @@
     "typography_balance_status",
     "color_consistency_status",
     "outer_padding_consistency_status",
+    "layout_ratio_system_lock",
+    "fixed_zone_grid_16_9_lock",
+    "outer_padding_lock",
+    "content_area_padding_policy",
+    "64px left/right outer padding and 48px content-zone top/bottom padding",
+    "52px left/right outer padding and 39px content-zone top/bottom padding",
+    "fixed_zone_grid_status",
+    "header_zone_boundary_invisible_lock",
+    "header_zone_boundary_status",
+    "content_area_padding_consistency_status",
+    "2048x1152 zones header 128px / content 960px / footer 64px",
+    "1672x941 planning zones header 105px / content 784px / footer 52px",
+    "left/right content padding match each other, top/bottom content padding match each other",
     "header_integrity_status",
     "petrol_usage_lock",
     "visual_asset_judgment",
@@ -430,7 +526,7 @@
     "sentence_density_lift_lock: raise density one step with compact meaningful clauses or short sentences in body labels, rows, annotations, and optional Insight; avoid icon-and-keyword-only slides",
     "semantic_copy_gate: major body labels use meaningful clauses/sentences; noun-only labels are allowed only for headers, axes, or category names",
     "icon_restraint_lock: icons are sparse wayfinding or evidence markers, not the primary content layer",
-    "icon_density_budget: default to 0-3 purposeful icons per slide and keep icon count below semantic text units unless the visual logic demands otherwise",
+    "icon_density_budget: default to 0-2 purposeful icons per slide",
     "impact_clarity_density_gate",
     "message_sharpness_lock",
     "evidence_compression_ladder",
@@ -701,15 +797,26 @@
         "header_footer_text_color_lock",
         "header_line_top_rule",
         "header_left_accent_reference_lock",
+        "header_left_accent_title_top_alignment_lock",
         "header_left_accent_no_protrusion_rule",
         "header_left_accent_top_protrusion_blocker",
-        "vertical_line x=50 y=40 w=10 h=120",
+        "vertical_line x=50 y=37 w=10 h=41",
+        "header_zone_boundary_invisible_lock",
+        "header_zone_boundary_status",
+        "no header-area bottom line",
         "header_integrity_blocker_lock",
         "message_box_scale_lock",
         "content_area_priority_lock",
         "message_box_text_size_lock",
         "message_box_compactness_blocker_lock",
         "message_box_text_alignment_lock",
+        "ergonomic_min_text_size_lock",
+        "ergonomic_text_minimum_status",
+        "icon_justification_gate",
+        "icon_box_compaction_lock",
+        "icon_overuse_blocker_lock",
+        "icon_justification_status",
+        "icon_box_compaction_status",
         "insight_surface_placement_lock",
         "deck_tone_master_lock",
         "deck_tone_signature_lock",
@@ -774,7 +881,7 @@
         "sentence_density_lift_lock: raise density one step with compact meaningful clauses or short sentences in body labels, rows, annotations, and optional Insight; avoid icon-and-keyword-only slides",
         "semantic_copy_gate: major body labels use meaningful clauses/sentences; noun-only labels are allowed only for headers, axes, or category names",
         "icon_restraint_lock: icons are sparse wayfinding or evidence markers, not the primary content layer",
-        "icon_density_budget: default to 0-3 purposeful icons per slide and keep icon count below semantic text units unless the visual logic demands otherwise",
+        "icon_density_budget: default to 0-2 purposeful icons per slide",
         "structure_first_visual_mix: lead with charts, tables, matrices, flows, maps, comparison axes, and evidence strips when they carry the argument; use illustration as support, memory, or navigation",
         "max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt",
         "imageability_lock: every slide prompt must name a concrete visual anchor, observable scene or object, viewpoint/crop, and 2-4 specific visual details before generation",
