@@ -348,7 +348,7 @@ ACT slide contract:
 - keep illustration subordinate: a clear focal motif, only useful supporting details, clean controlled flat 2D linework, crisp silhouettes, restrained fills, rounded UI panels, small icon badges, a projection/viewpoint chosen from the message, no rough sketch, no arbitrary pseudo-depth, and no glossy AI concept-art finish
 - max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
 - ergonomic_min_text_size_lock: body labels, card rows, table cells, data labels, annotations, and Insight text must be at least 20pt equivalent; source/footer/table-note text may be 13-15pt equivalent
-- use ACT typography: H1 30-34pt, subtitle 21-23pt, body/card/table/data text 20pt equivalent minimum
+- use ACT typography: H1 28-32pt, subtitle 18-21pt, body/card/table/data text 20pt equivalent minimum
 - use ACT header rules: H1 Forest Charcoal #2D332E, subtitle #4D544E, exact compact left vertical line, no blue H1, no right-side header decoration
 - use the default exact compact ACT header unless the user explicitly provides a newer embedded master: 1672x941 basis; header_safe_area x=44 y=12 w=1584 h=72 within the fixed 105px planning header zone; vertical_line x=50 y=37 w=10 h=41 #008A80, scaled to x=61 y=45 w=12 h=50 on 2048 output with bottom around y=95; H1 x=88 y=18 w=1332 max_lines=1 size=28pt weight=700 line_height=1.10 #2D332E; subtitle x=88 y=52 w=1332 max_lines=1 size=18pt weight=400 line_height=1.14 #4D544E; visual_alignment accent top aligns exactly with the first visible H1 glyph/title top, not the H1 text-box y, with no above-title protrusion and no below-title offset, and accent bottom sits 5-11px below subtitle lower visual edge; body_start_y=105; upper_right_clear_zone x=1420 y=12 w=208 h=56 empty; no header-area bottom line; avoid two-line H1 in this master and shorten/split instead of expanding the header
 - use fixed slide shell padding: 64px left/right and 48px content-zone top/bottom on 2048 output; 52px left/right and 39px content-zone top/bottom on the 1672 planning basis
@@ -630,7 +630,7 @@ Repair this slide image prompt for text balance, grid fidelity, and visual hiera
 
 Priority:
 1. Do not solve crowding by shrinking body/card/table/data text below 20pt equivalent.
-2. Keep ACT header fixed: compact left accent + H1 + subtitle, H1 30-34pt #2D332E, subtitle 21-23pt #4D544E, exact header-block left accent, header_left_accent_reference_lock, header_left_accent_no_protrusion_rule, header_left_accent_top_protrusion_blocker, header_identity_lock, header_integrity_blocker_lock, and no header ranges in the final prompt.
+2. Keep ACT header fixed: compact left accent + H1 + subtitle, H1 28-32pt #2D332E, subtitle 18-21pt #4D544E, exact header-block left accent, header_left_accent_reference_lock, header_left_accent_no_protrusion_rule, header_left_accent_top_protrusion_blocker, header_identity_lock, header_integrity_blocker_lock, and no header ranges in the final prompt.
 3. Rebuild grid_mode, column_spans, row_tracks, column_tracks, separator_x, outer_padding, and shared_edges.
 4. Add coordinate_inventory_1672 and master_components if missing.
 5. Apply design_balance_gate: set body occupancy, useful whitespace, content-area weight, text-role sizes, background role, and accent role explicitly.
@@ -706,9 +706,9 @@ Layout:
 Typography:
 - max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
 - ergonomic_min_text_size_lock: body/card/table/data/annotation/Insight text stays >=20pt equivalent; source/footer/table-note may be 13-15pt equivalent
-- H1 30-34pt, default 32pt
-- long Japanese H1 uses 30-32pt; short mixed titles may use 34pt
-- subtitle 21-23pt #4D544E
+- H1 28-32pt, default 28pt
+- long Japanese H1 uses 28-30pt; short mixed titles may use 32pt
+- subtitle 18-21pt #4D544E
 - Insight/message-box text 20-24pt by default, 24-26pt only by exception, and at least 6pt smaller than selected H1 and visually below subtitle
 - main content readable at >=20pt equivalent
 - weights stay within 400/600/700
