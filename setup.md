@@ -192,7 +192,9 @@ sh scripts/validate-repo.sh
 |---|---|---|---|
 | `python3` / `pip` / `pip3` | 必須 | skill スクリプト（財務モデリング、スライド packaging）の実行と Python package 導入 | macOS は `brew install python` |
 | `openpyxl` | 必須 | `startup-financial-modeling` の xlsx 生成 | `setup.sh` がユーザー site-packages へ導入 |
+| `python-pptx` / `Pillow` / `lxml` / `fonttools` | 必須 | `act-structured-slide-generation` の pptx 生成と検証 | `setup.sh` がユーザー site-packages へ導入 |
 | LibreOffice (`soffice`) | 任意 | xlsx の再計算検証、スライドの PDF レンダリング | `brew install --cask libreoffice` |
+| poppler (`pdftoppm`) | 任意 | `act-structured-slide-generation` のレンダリング検証（PDF→PNG） | `brew install poppler` |
 | ImageMagick (`convert`)・画像生成 API | 任意 | スライド画像 skill の個別処理 | 各 skill の手順に従って個別に用意 |
 
 LibreOffice は macOS Homebrew では `soffice` という名前で入りますが、skill は

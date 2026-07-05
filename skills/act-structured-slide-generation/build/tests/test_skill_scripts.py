@@ -334,3 +334,112 @@ def test_waterfall_auto_label_uses_triangle(tmp_path):
                 texts.append(sh.text_frame.text)
     joined = " ".join(texts)
     assert "△2.8" in joined and "-2.8" not in joined
+
+
+def test_validate_rejects_financial_summary_without_table_or_chart(tmp_path):
+    deck = {"meta": {}, "slides": [{
+        "pattern": "financial_summary",
+        "title": "売上高は3年で2.4倍の32.4億円に拡大し、利益率も同時に改善している",
+        "source": "テスト",
+    }]}
+    bad = tmp_path / "deck.json"
+    bad.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", bad)
+    assert r.returncode == 1 and "financial_summary" in r.stdout
+
+
+def test_validate_rejects_player_missing_or_out_of_range_xy(tmp_path):
+    deck = {"meta": {}, "slides": [{
+        "pattern": "competitive_landscape",
+        "title": "統合スイート×中堅企業の右上象限は当社のみが占める空白地帯である",
+        "x_axis": {"low": "単機能", "high": "統合"},
+        "y_axis": {"low": "小規模", "high": "大企業"},
+        "players": [{"name": "当社", "y": 0.5}, {"name": "A社", "x": 1.5, "y": 0.2}],
+        "source": "テスト",
+    }]}
+    bad = tmp_path / "deck.json"
+    bad.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", bad)
+    assert r.returncode == 1
+    assert "がない/数値でない" in r.stdout and "範囲外" in r.stdout
+
+
+def test_validate_allows_primary_insight_with_accent_series(tmp_path):
+    # insight_style "primary" は Accent を消費しない — series の ECC85A 1 回は適法
+    deck = _minimal_deck(insight="一言インサイト", insight_style="primary")
+    deck["slides"][0]["chart"]["series"][0]["color"] = "ECC85A"
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_validate_rejects_too_many_takeaways(tmp_path):
+    deck = _minimal_deck(
+        takeaways=[{"heading": f"論点{i}", "body": "根拠"} for i in range(1, 6)])
+    bad = tmp_path / "deck.json"
+    bad.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", bad)
+    assert r.returncode == 1 and "takeaways" in r.stdout
+
+
+def test_build_handles_null_focal_category_with_annotation(tmp_path):
+    # LLM は「focal なし」を null で表現しがち — dict.get のデフォルトでは拾えない
+    deck = _minimal_deck()
+    deck["slides"][0]["chart"]["focal_category"] = None
+    deck["slides"][0]["chart"]["annotation"] = {"yoy": "+12%"}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    r = run("build_deck.py", spec, "-o", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_negative_waterfall_stays_inside_slide(tmp_path):
+    from pptx.util import Inches
+
+    deck = {"meta": {}, "slides": [{
+        "pattern": "waterfall",
+        "title": "一過性費用12億円の計上で通期は7億円の赤字に転落する見込みである",
+        "unit": "億円",
+        "items": [{"label": "期首", "value": 5, "kind": "start"},
+                  {"label": "一過性費用", "value": -12},
+                  {"label": "期末", "value": -7, "kind": "end"}],
+        "source": "テスト",
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    r = run("build_deck.py", spec, "-o", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+    for slide in pptx.Presentation(out).slides:
+        for sh in slide.shapes:
+            if sh.top is not None and sh.height is not None:
+                assert sh.top + sh.height <= Inches(7.51), \
+                    f"shape extends past slide bottom: {sh.shape_type}"
+
+
+def test_section_divider_without_number_has_no_void(tmp_path):
+    from pptx.util import Inches
+
+    deck = {"meta": {}, "slides": [{"pattern": "section_divider", "title": "市場環境"}]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    r = run("build_deck.py", spec, "-o", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+    tops = [sh.top for slide in pptx.Presentation(out).slides for sh in slide.shapes
+            if sh.has_text_frame and "市場環境" in sh.text_frame.text]
+    # number を省いたら 96pt 数字分の空洞は入らない(タイトルが光学中心近くに来る)
+    assert tops and min(tops) < Inches(3.5)
+
+
+def test_lint_render_flags_slide_count_mismatch(tmp_path):
+    from PIL import Image
+
+    for i in (1, 2):
+        Image.new("RGB", (733, 412), (0xFF, 0xFD, 0xFC)).save(tmp_path / f"deck-{i}.png")
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(_minimal_deck(), ensure_ascii=False))
+    r = run("lint_render.py", tmp_path, "--spec", spec)
+    assert r.returncode == 1 and "枚数不一致" in r.stdout

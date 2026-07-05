@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import re
 import sys
+from functools import lru_cache
 from pathlib import Path
 
 from pptx import Presentation
@@ -42,9 +43,15 @@ except ImportError:
     _measure_ok = False
 
 
+@lru_cache(maxsize=None)
+def _load_font(weight: int, size_px: int):
+    # 段落ごとの再ロードを避ける: (weight, size) の組は高々十数種
+    return ImageFont.truetype(_FONTS[weight], size=size_px)
+
+
 def text_width_in(text: str, size_pt: float, weight: int) -> float:
     """Measured width in inches using real Noto Sans JP metrics (widest of our pair)."""
-    font = ImageFont.truetype(_FONTS[weight if weight in (400, 600, 700) else 400], size=int(size_pt * 4))
+    font = _load_font(weight if weight in (400, 600, 700) else 400, int(size_pt * 4))
     return font.getlength(text) / 4 / 72.0
 
 
@@ -57,25 +64,27 @@ def _para_weight(para) -> int:
     return 400
 
 
-def check_overflow(shape, issues, where):
-    tf = shape.text_frame
-    w_in = Emu(shape.width).inches - 0.02
-    h_in = Emu(shape.height).inches
-    if w_in <= 0.05:
-        return
-    used_h = 0.0
+def _para_metrics(tf, w_in):
+    """Yield (line_stack_h_in, space_after_in, line_w_in) per non-empty paragraph.
+    overflow 判定と ink-box 判定が同じ行高モデルを共有するための単一実装。"""
     for para in tf.paragraphs:
         text = "".join(r.text for r in para.runs)
         if not text.strip():
             continue
         size = max((r.font.size.pt if r.font.size else 11) for r in para.runs)
-        weight = _para_weight(para)
-        width = text_width_in(text, size, weight)
-        lines = max(1, -(-int(width * 100) // int(w_in * 100)))
+        width = text_width_in(text, size, _para_weight(para))
+        lines = max(1, -(-int(width * 100) // max(1, int(w_in * 100))))
         spacing = para.line_spacing if isinstance(para.line_spacing, float) else 1.15
-        used_h += lines * (size / 72.0) * spacing
-        if para.space_after is not None:
-            used_h += para.space_after.pt / 72.0
+        space_after = para.space_after.pt / 72.0 if para.space_after is not None else 0.0
+        yield lines * (size / 72.0) * spacing, space_after, width
+
+
+def check_overflow(shape, issues, where):
+    w_in = Emu(shape.width).inches - 0.02
+    h_in = Emu(shape.height).inches
+    if w_in <= 0.05:
+        return
+    used_h = sum(h + sa for h, sa, _ in _para_metrics(shape.text_frame, w_in))
     # textboxes are allowed to visually overrun their nominal box a bit (top-anchored,
     # autosize off) as long as they don't collide; flag only meaningful overruns
     if used_h > h_in * 1.35 + 0.22:
@@ -107,16 +116,9 @@ def _ink_bbox(shape):
         return box
     w_in = box[2] - box[0]
     max_w, used_h = 0.0, 0.0
-    for para in shape.text_frame.paragraphs:
-        text = "".join(r.text for r in para.runs)
-        if not text.strip():
-            continue
-        size = max((r.font.size.pt if r.font.size else 11) for r in para.runs)
-        weight = _para_weight(para)
-        width = text_width_in(text, size, weight)
-        lines = max(1, -(-int(width * 100) // max(1, int(w_in * 100))))
-        spacing = para.line_spacing if isinstance(para.line_spacing, float) else 1.15
-        used_h += lines * (size / 72.0) * spacing
+    # space_after はボックス内の余白であってインクではないため ink 高には含めない
+    for line_h, _space_after, width in _para_metrics(shape.text_frame, w_in):
+        used_h += line_h
         max_w = max(max_w, min(width, w_in))
     if max_w <= 0:
         return box

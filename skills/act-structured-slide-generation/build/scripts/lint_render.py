@@ -27,15 +27,7 @@ from pathlib import Path
 
 from PIL import Image
 
-
-def _token_rgb(key: str, fallback: tuple) -> tuple:
-    try:
-        tokens = json.loads((Path(__file__).resolve().parent.parent
-                             / "references" / "tokens.json").read_text())
-        return tuple(int(tokens["colors"][key][i:i + 2], 16) for i in (0, 2, 4))
-    except Exception:
-        return fallback
-
+from deck_text import HW as _HW, token_rgb as _token_rgb
 
 CANVAS = _token_rgb("canvas", (0xFF, 0xFD, 0xFC))
 TOL = 26  # per-channel tolerance: antialiasing over near-white
@@ -46,8 +38,7 @@ def is_content(px) -> bool:
     return any(abs(px[i] - CANVAS[i]) > TOL for i in range(3))
 
 
-def edge_scan(png: Path) -> list[str]:
-    im = Image.open(png).convert("RGB")
+def edge_scan(im: Image.Image) -> list[str]:
     w, h = im.size
     p = im.load()
     hits = []
@@ -67,11 +58,10 @@ def edge_scan(png: Path) -> list[str]:
     return hits
 
 
-def balance_scan(png: Path) -> list[str]:
+def balance_scan(im: Image.Image) -> list[str]:
     """Vertical whitespace balance inside the body band (below header, above footer).
     許容差は edge_scan(26)より厳しい 8 — surface_tint のカード面(canvas との色差 16)は
     空白ではなく構造なので、バランス判定ではコンテンツとして数える。"""
-    im = Image.open(png).convert("RGB")
     w, h = im.size
     p = im.load()
     # 0.23: kicker+2行タイトル+subtitle のヘッダー下端(1.63in/7.5in)より下から走査する
@@ -121,12 +111,9 @@ def diff_frac(a: Path, b: Path) -> float:
     return changed / max(1, total)
 
 
-_HW = {c: c - 0xFEE0 for c in [*range(0xFF10, 0xFF1A), *range(0xFF21, 0xFF3B),
-                               *range(0xFF41, 0xFF5B), 0xFF05, 0xFF0D]}
-
-
 def normalize(s: str) -> str:
     # fold full-width alnum first: the builder normalizes them at render time
+    # (_HW は deck_text.py の単一実装 — builder の hw() と同一であることが照合の前提)
     return re.sub(r"[\s  、。・,\.\-—〜~()()「」%%+±△▲]", "", s.translate(_HW))
 
 
@@ -160,14 +147,18 @@ def main() -> int:
                 fullbleed.add(i)
             if s.get("pattern") in ("cover", "section_divider", "statement", "agenda"):
                 no_balance.add(i)
+    if spec and len(spec.get("slides", [])) != len(pngs):
+        findings.append(f"render {len(pngs)} 枚 vs spec {len(spec.get('slides', []))} 枚 — "
+                        "枚数不一致。古い PNG の残留か再レンダー漏れを疑う")
     for i, png in enumerate(pngs, start=1):
         if i in fullbleed:
             continue
-        for hit in edge_scan(png):
+        im = Image.open(png).convert("RGB")  # decode once, share across both scans
+        for hit in edge_scan(im):
             findings.append(f"slide {i}: {hit}")
         # balance needs pattern knowledge (statements/covers are legitimately sparse)
         if spec and i not in no_balance:
-            for hit in balance_scan(png):
+            for hit in balance_scan(im):
                 findings.append(f"slide {i}: {hit}")
 
     if spec:

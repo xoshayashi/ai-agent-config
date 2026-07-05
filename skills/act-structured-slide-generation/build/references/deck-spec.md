@@ -92,7 +92,7 @@ deck.json はこのスキルの単一の真実点。LLM はコンテンツと構
 ```json
 { "pattern": "comparison_table", "title": "...",
   "table": { "headers": ["評価軸", "当社", "A社"], "col_widths": [0.3, 0.35, 0.35],
-             "align": ["l", "c", "c"], "emphasis_col": 1,  // 自社列の強調(0始まり、ヘッダー除くデータ列指定)
+             "align": ["l", "c", "c"], "emphasis_col": 1,  // 自社列の強調(全列 0 始まり=ラベル列が 0。ヘッダー行には適用されない)
              "rows": [["...", "...", "..."]] } }
 ```
 

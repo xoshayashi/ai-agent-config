@@ -13,6 +13,8 @@ import json
 import sys
 from pathlib import Path
 
+from deck_text import ja_len
+
 TOKENS = json.loads((Path(__file__).resolve().parent.parent / "references" / "tokens.json").read_text())
 BUDGET = TOKENS["text_budget"]
 ALLOWED_COLORS = set(TOKENS["colors"].values())
@@ -64,10 +66,6 @@ def iter_texts(obj):
     elif isinstance(obj, list):
         for v in obj:
             yield from iter_texts(v)
-
-
-def ja_len(s: str) -> float:
-    return sum(1.0 if ord(ch) > 0x2E7F else 0.55 for ch in s or "")
 
 
 def iter_colors(obj):
@@ -165,7 +163,9 @@ def main() -> int:
                 errors.append(f"{loc}: forbidden color #{cval}")
             elif cval not in ALLOWED_COLORS:
                 errors.append(f"{loc}: color #{cval} is outside the Act palette (see references/tokens.json)")
-        accent_uses = colors.count(ACCENT) + (1 if s.get("insight") else 0)
+        # insight_style "primary" は淡緑バンドで描画され Accent を使わない(build_deck の描画と対応)
+        insight_uses_accent = bool(s.get("insight")) and s.get("insight_style", "accent") == "accent"
+        accent_uses = colors.count(ACCENT) + (1 if insight_uses_accent else 0)
         if accent_uses > TOKENS["color_policy"]["accent_max_uses_per_slide"]:
             errors.append(f"{loc}: Accent #{ACCENT} used {accent_uses}x — max 1 per slide (insight bar counts as the one use)")
 
@@ -225,6 +225,19 @@ def main() -> int:
             errors.append(f"{loc}: {len(s['steps'])} steps — max 5")
         if pat == "roadmap" and len(s.get("phases", [])) > 4:
             errors.append(f"{loc}: {len(s['phases'])} phases — max 4")
+        if len(s.get("takeaways", [])) > 3:
+            errors.append(f"{loc}: {len(s['takeaways'])} takeaways — max 3")
+        if pat == "financial_summary" and not (s.get("table") or s.get("chart")):
+            errors.append(f"{loc}: financial_summary には table か chart の少なくとも一方が必要")
+        if pat == "competitive_landscape":
+            for pl in s.get("players", []):
+                pname = pl.get("name", "?")
+                for ax in ("x", "y"):
+                    v = pl.get(ax)
+                    if isinstance(v, bool) or not isinstance(v, (int, float)):
+                        errors.append(f"{loc}: player '{pname}' の {ax} がない/数値でない(0-1 で指定)")
+                    elif not 0.0 <= float(v) <= 1.0:
+                        errors.append(f"{loc}: player '{pname}' の {ax}={v} が 0-1 の範囲外")
 
         texts = list(iter_texts({k: v for k, v in s.items() if k != "pattern"}))
         joined = " ".join(texts)

@@ -18,6 +18,7 @@ import re
 import subprocess
 import sys
 import tempfile
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -126,19 +127,22 @@ def main() -> int:
         print(f"no slide PNGs in {render_dir}")
         return 1
     prompt = judge_prompt()
+    selected = [(name, fn) for name, fn in (("gemini", run_gemini), ("codex", run_codex))
+                if judge in ("both", name)]
     verdicts: dict[str, dict] = {}
-    for name, fn in (("gemini", run_gemini), ("codex", run_codex)):
-        if judge not in ("both", name):
-            continue
-        try:
-            v = clamp_scores(fn(pngs, prompt))
-            readback = str(v.get("slide1_readback", ""))
-            if anchor and anchor not in readback:
-                print(f"WARN: judge {name} discarded — slide1 readback '{readback[:60]}' does not contain anchor '{anchor}' (likely judged wrong images)")
-            else:
-                verdicts[name] = v
-        except Exception as e:
-            print(f"WARN: judge {name} failed: {e}")
+    # 2 ジャッジは独立の外部 CLI 呼び出し — 直列だと待ち時間が合計になるため並行実行する
+    with ThreadPoolExecutor(max_workers=max(1, len(selected))) as pool:
+        futures = [(name, pool.submit(fn, pngs, prompt)) for name, fn in selected]
+        for name, fut in futures:
+            try:
+                v = clamp_scores(fut.result())
+                readback = str(v.get("slide1_readback", ""))
+                if anchor and anchor not in readback:
+                    print(f"WARN: judge {name} discarded — slide1 readback '{readback[:60]}' does not contain anchor '{anchor}' (likely judged wrong images)")
+                else:
+                    verdicts[name] = v
+            except Exception as e:
+                print(f"WARN: judge {name} failed: {e}")
     if not verdicts:
         print("FAIL: no judge produced a verdict")
         return 1

@@ -18,21 +18,12 @@ Exit 0 = sheet written, 1 = no slide PNGs found.
 from __future__ import annotations
 
 import argparse
-import json
 import sys
 from pathlib import Path
 
 from PIL import Image, ImageDraw
 
-
-def _token_rgb(key: str, fallback: tuple) -> tuple:
-    try:
-        tokens = json.loads((Path(__file__).resolve().parent.parent
-                             / "references" / "tokens.json").read_text())
-        return tuple(int(tokens["colors"][key][i:i + 2], 16) for i in (0, 2, 4))
-    except Exception:
-        return fallback
-
+from deck_text import token_rgb as _token_rgb
 
 THUMB_W = 480
 GAP = 16
@@ -45,13 +36,14 @@ INK = _token_rgb("ink", (0x2D, 0x33, 0x2E))
 HEADER_FRAC = 0.22  # kicker + accent bar + 2-line title + subtitle の下端(1.63in/7.5in)を含む帯
 
 
-def header_strip(pngs: list, out: Path) -> None:
+def header_strip(ims: list, out: Path) -> None:
     strips = []
-    for p in pngs:
-        im = Image.open(p).convert("RGB")
+    for im in ims:
         w = 1100
-        h = round(im.height * w / im.width)
-        strips.append(im.resize((w, h), Image.LANCZOS).crop((0, 0, w, round(h * HEADER_FRAC))))
+        # crop 先行: 帯だけを LANCZOS 対象にする(全面リサイズ→crop は約8割を捨てる)
+        src_h = round(im.height * HEADER_FRAC)
+        strips.append(im.crop((0, 0, im.width, src_h))
+                        .resize((w, round(src_h * w / im.width)), Image.LANCZOS))
     strip_h = strips[0].height
     sheet = Image.new("RGB", (MARGIN * 2 + 1100 + 44,
                               MARGIN * 2 + len(strips) * (strip_h + GAP) - GAP), BG)
@@ -78,12 +70,12 @@ def main() -> int:
     if not pngs:
         print(f"no slide PNGs in {args.render_dir}", file=sys.stderr)
         return 1
+    ims = [Image.open(p).convert("RGB") for p in pngs]  # decode once for strip + thumbs
     if args.headers:
-        header_strip(pngs, args.render_dir / "header-strip.png")
+        header_strip(ims, args.render_dir / "header-strip.png")
 
     thumbs = []
-    for p in pngs:
-        im = Image.open(p).convert("RGB")
+    for im in ims:
         h = round(im.height * THUMB_W / im.width)
         thumbs.append(im.resize((THUMB_W, h), Image.LANCZOS))
 

@@ -9,10 +9,8 @@ and color so every deck lands on the same visual system deterministically.
 from __future__ import annotations
 
 import argparse
-import copy
 import json
 import math
-import sys
 from pathlib import Path
 
 from lxml import etree
@@ -41,19 +39,9 @@ A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 
 # ---------------------------------------------------------------- utilities
 
-def _ja_len(s: str) -> float:
-    """Approximate display length: full-width chars count 1, half-width 0.55."""
-    return sum(1.0 if ord(ch) > 0x2E7F else 0.55 for ch in s or "")
-
-
-# Full-width alnum/% → half-width. Applied to every rendered string so spec
-# sloppiness cannot leak mixed-width digits into the deliverable (執筆規律).
-_HW = {c: c - 0xFEE0 for c in [*range(0xFF10, 0xFF1A), *range(0xFF21, 0xFF3B),
-                               *range(0xFF41, 0xFF5B), 0xFF05, 0xFF0D]}
-
-
-def hw(s):
-    return s.translate(_HW) if isinstance(s, str) else s
+# 表示長(_ja_len)と全角→半角(hw)は deck_text.py の単一実装を使う — validate_spec の
+# 字数バジェット・lint_render の readback 照合と同一実装であることが契約
+from deck_text import hw, ja_len as _ja_len
 
 
 def _text_lines(text: str, width_in: float, size_pt: float) -> int:
@@ -350,7 +338,7 @@ def add_act_chart(slide, x, y, w, h, cspec: dict):
 
     palette = [RGBColor.from_string(c) for c in CH["comparison_series_colors"]]
     focal_cat = cspec.get("focal_category")
-    for si, (s, ser) in enumerate(zip(cspec["series"], chart.plots[0].series if ctype != "donut" else chart.plots[0].series)):
+    for si, (s, ser) in enumerate(zip(cspec["series"], chart.plots[0].series)):
         color = RGBColor.from_string(s["color"]) if s.get("color") else (
             C["chart_gray"] if s.get("focal") is False else palette[si % len(palette)])
         if ctype == "line":
@@ -496,22 +484,25 @@ def p_section_divider(slide, spec, deck):
     if len(chapters) >= 2:
         add_rect(slide, panel_x, 0, W - panel_x, H, C["surface_tint"])
     num_pt = 96
-    num_h = num_pt / 72.0 * 1.12
+    has_num = bool(spec.get("number"))
+    # number 省略時は数字の段をレイアウトから除く(96pt 分の空洞をバーがブラケットしない)
+    num_h = num_pt / 72.0 * 1.12 if has_num else 0.0
+    num_gap = 0.08 if has_num else 0.0
     title_h = 0.55
     desc_h = 0.55 if spec.get("desc") else 0.0
-    block_h = num_h + 0.08 + title_h + desc_h
+    block_h = num_h + num_gap + title_h + desc_h
     by = H / 2 - block_h / 2 - 0.25
     block_cy = by + block_h / 2
-    # 縦バーは数字のキャップトップから最終行の下端までをブラケットする(固定長にしない)
-    bar_top = by + num_h * 0.16
-    bar_bottom = by + num_h + 0.08 + title_h + desc_h - 0.10
+    # 縦バーは先頭行のキャップトップから最終行の下端までをブラケットする(固定長にしない)
+    bar_top = by + num_h * 0.16 if has_num else by + 0.06
+    bar_bottom = by + num_h + num_gap + title_h + desc_h - 0.10
     add_rect(slide, MX - 0.1, bar_top, 0.075, bar_bottom - bar_top, C["primary"])
-    if spec.get("number"):
+    if has_num:
         add_text(slide, MX + 0.2, by, 3.4, num_h, [[(str(spec["number"]).zfill(2), num_pt, 600, C["primary"])]])
-    add_text(slide, MX + 0.2, by + num_h + 0.08, panel_x - MX - 0.7, title_h,
+    add_text(slide, MX + 0.2, by + num_h + num_gap, panel_x - MX - 0.7, title_h,
              [[(spec.get("title", ""), TS["divider_title"], 700, C["ink"])]])
     if spec.get("desc"):
-        add_text(slide, MX + 0.2, by + num_h + 0.08 + title_h, panel_x - MX - 0.7, desc_h,
+        add_text(slide, MX + 0.2, by + num_h + num_gap + title_h, panel_x - MX - 0.7, desc_h,
                  [[(spec["desc"], 14, 400, C["ink_subtle"])]], line_spacing=1.3)
     if len(chapters) >= 2:
         row_h = 0.5
@@ -608,7 +599,9 @@ def p_kpi_dashboard(slide, spec, deck):
 def _focal_bar_anchor(cx, cw, cspec):
     """Rough x-center of the focal category's bar inside a rendered chart frame."""
     n = max(1, len(cspec.get("categories", [])))
-    i = cspec.get("focal_category", n - 1)
+    i = cspec.get("focal_category")
+    if i is None:  # 明示的な null もここに落ちる(get のデフォルトでは拾えない)
+        i = n - 1
     plot_x, plot_w = cx + 0.15, cw - 0.35
     return plot_x + plot_w * (i + 0.5) / n
 
@@ -888,17 +881,22 @@ def p_waterfall(slide, spec, deck):
         else:
             levels.append((running, running + v))
             running += v
-    top = max(max(a, b) for a, b in levels) * 1.15 or 1.0
+    # 負の累計(赤字転落ブリッジ)も帯内に収める: 0 の基準線を span 内に置いてスケールする
+    hi_max = max(max(a, b) for a, b in levels)
+    lo_min = min(min(a, b) for a, b in levels)
+    top = max(hi_max, 0.0) * 1.15 or 1.0
+    bot = min(lo_min, 0.0) * 1.15
+    span = (top - bot) or 1.0
+    zero_y = base_y + chart_h * top / span
     n = len(items)
     slot = w / n
     bar_w = slot * 0.62
-    add_line(slide, x, base_y + chart_h, x + w, base_y + chart_h, C["chart_gray"], 0.75)
-    prev_top_y = None
+    add_line(slide, x, zero_y, x + w, zero_y, C["chart_gray"], 0.75)
     for i, (it, (lo, hi)) in enumerate(zip(items, levels)):
         v = float(it["value"])
         kind = it.get("kind", "delta")
-        y_top = base_y + chart_h * (1 - max(lo, hi) / top)
-        bh = max(0.03, chart_h * abs(hi - lo) / top)
+        y_top = base_y + chart_h * (top - max(lo, hi)) / span
+        bh = max(0.03, chart_h * abs(hi - lo) / span)
         bx = x + i * slot + (slot - bar_w) / 2
         if kind in ("start", "end"):
             fill = C["primary_deep"]
@@ -910,10 +908,9 @@ def p_waterfall(slide, spec, deck):
                      line=C["primary_deep"], line_w_pt=1.5)
         else:
             add_rect(slide, bx, y_top, bar_w, bh, fill)
-        if prev_top_y is not None:
-            edge = base_y + chart_h * (1 - lo / top) if kind == "delta" else y_top
+        if i > 0:
+            edge = base_y + chart_h * (top - lo) / span if kind == "delta" else y_top
             add_line(slide, bx - (slot - bar_w), edge, bx, edge, C["chart_gray"], 0.5, dash="dash")
-        prev_top_y = base_y + chart_h * (1 - hi / top) if kind != "end" else y_top
         if it.get("display") is not None:
             label_v = it["display"]
         elif kind == "delta":
@@ -977,8 +974,6 @@ def p_roadmap(slide, spec, deck):
                     add_text(slide, cx_ + 0.14, yy, pw - 0.34, row_h - 0.12,
                              [[(str(cell), TS["body_small"], 400, C["ink_subtle"])]],
                              line_spacing=1.2, anchor=MSO_ANCHOR.MIDDLE)
-            if r_i < len(rows) - 1:
-                pass
     else:
         row_h = h - ph_h - 0.35
         for i, ph in enumerate(phases):
@@ -1321,7 +1316,7 @@ def p_guidance_progress(slide, spec, deck):
         bh = chart_h * v / top
         bx = x + i * slot + (slot - bar_w) / 2
         add_rect(slide, bx, base_y + chart_h - bh, bar_w, bh, C["chart_gray"])
-        add_text(slide, bx - slot * 0.2, base_y + chart_h - bh - 0.26, slot + slot * 0.4 - bar_w + bar_w, 0.22,
+        add_text(slide, bx - slot * 0.2, base_y + chart_h - bh - 0.26, bar_w + slot * 0.4, 0.22,
                  [[(b.get("display", f"{v:,.0f}"), TS["chart_label"], 400, C["ink_subtle"])]], align=PP_ALIGN.CENTER, wrap=False)
         add_text(slide, x + i * slot, base_y + chart_h + 0.08, slot, 0.3,
                  [[(b.get("label", ""), TS["chart_axis"], 400, C["ink_subtle"])]], align=PP_ALIGN.CENTER)
