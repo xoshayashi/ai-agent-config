@@ -818,6 +818,37 @@ install_skill_runtime_support() {
     say "ok: python package openpyxl"
   fi
 
+  # act-structured-slide-generation runtime: python-pptx / Pillow / lxml / fonttools
+  if command -v python3 >/dev/null 2>&1; then
+    if ! python3 -c 'import pptx, PIL, lxml, fontTools' >/dev/null 2>&1; then
+      requirements_file="$skill_source_root/act-structured-slide-generation/scripts/requirements.txt"
+      if [ ! -f "$requirements_file" ]; then
+        warn "python packages for act-structured-slide-generation missing; requirements file not found: $requirements_file"
+      elif ! python3 -m pip --version >/dev/null 2>&1; then
+        warn "python packages for act-structured-slide-generation missing; python3 pip is unavailable"
+      elif [ "$dry_run" = "1" ]; then
+        run python3 -m pip install --user --break-system-packages -r "$requirements_file"
+      else
+        say "install: python packages for act-structured-slide-generation (python-pptx/Pillow/lxml/fonttools)"
+        if python3 -m pip install --user --break-system-packages -r "$requirements_file" \
+          && python3 -c 'import pptx, PIL, lxml, fontTools' >/dev/null 2>&1; then
+          say "ok: python packages for act-structured-slide-generation"
+        else
+          warn "python packages for act-structured-slide-generation still missing; install with: python3 -m pip install --user --break-system-packages -r $requirements_file"
+        fi
+      fi
+    else
+      say "ok: python packages for act-structured-slide-generation"
+    fi
+  fi
+
+  # pdftoppm (poppler) renders the PDF to per-slide PNGs for the deck QA loop.
+  if command -v pdftoppm >/dev/null 2>&1; then
+    say "ok: pdftoppm resolves"
+  else
+    warn "pdftoppm (poppler) not found; act-structured-slide-generation render QA will be skipped (optional: brew install poppler)"
+  fi
+
   # macOS Homebrew installs LibreOffice as `soffice`; skills probe the
   # `libreoffice` name. Add a same-directory compatibility symlink so the name
   # resolves. This does not install LibreOffice itself.

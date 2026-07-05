@@ -1,0 +1,62 @@
+{
+  "skill_name": "act-structured-slide-generation",
+  "notes": "クリーンベース評価: 各イテレーションで deck.json をゼロから書き、validate → build → verify → render → lint_render を全通しした上で eval_deck.py(rubric.json、閾値95)で採点する。前イテレーションの deck.json 編集流用は不可(スキル自体の改善効果を測るため)。",
+  "evals": [
+    {
+      "id": 1,
+      "name": "earnings-deck-ja",
+      "prompt": "build/evals/scenario-earnings.md のプロンプトを入力として、10〜12枚の決算説明資料を生成する",
+      "expected_output": "全lint green + ルーブリック95点以上のpptx。アクションタイトルのみで通読可能、数値はシナリオ記載のみ使用",
+      "files": ["build/evals/scenario-earnings.md"],
+      "assertions": [
+        "validate_spec.py / verify_deck.py / lint_render.py が全て exit 0",
+        "スライド枚数が 10〜12 枚",
+        "outline.md と deck.json が出力ディレクトリに残っている",
+        "デッキ内の全数値が scenario-earnings.md に実在する",
+        "eval_deck.py(rubric.json)が 95 点以上"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "strategy-proposal-ja",
+      "prompt": "examples/sample-deck.json と同じ市場参入テーマを、deck.json を新規に書き起こして14〜16枚の提案書として生成する",
+      "expected_output": "全lint green のpptx。市場規模→競争→参入→財務のストーリーライン、waterfall と 2x2 を含む",
+      "files": ["examples/sample-deck.json"],
+      "assertions": [
+        "validate_spec.py / verify_deck.py / lint_render.py が全て exit 0",
+        "スライド枚数が 14〜16 枚",
+        "waterfall と competitive_landscape(2x2)パターンを含む",
+        "render/contact-sheet.png が生成されている",
+        "eval_deck.py(rubric.json)が 95 点以上"
+      ]
+    }
+  ],
+  "assertions_note": "決定的検証は validate_spec.py / verify_deck.py / lint_render.py が担う(exit code)。視覚品質は rubric.json のチェックリスト減点法で採点する — 審査者は Advisor(既定、SKILL.md §5)または eval_deck.py の codex/gemini(代替、--anchor 必須)。",
+  "trigger_evals_note": "発火精度は実行品質と別軸で評価する。SKILL.md の description を変更したら、should_fire の各プロンプトでこのスキルが選択され、should_not_fire では選択されない(または括弧内の隣接スキルに委譲される)ことを確認する。ニアミス(語彙が重なるが責務が違うもの)を意図的に多く含めている。",
+  "trigger_evals": {
+    "should_fire": [
+      "来週火曜の取締役会で使う決算説明資料を作って。FY26Q3 の実績メモは ~/Documents/fy26q3.md にある。10枚くらいで",
+      "シリーズB調達用のピッチデッキが欲しい。投資家はUS系グロースファンド。エクイティストーリーの骨子は既に equity-story.md にまとまってるのでそれをスライド化して",
+      "この事業計画書(v3)を役員会向けに15枚前後の資料にまとめてほしい",
+      "ACME商事向けの提案書つくって。先方の比較対象はfreeeとマネーフォワード。パワポで納品したい",
+      "前回のIR資料の deck.json があるから、ガイダンス進捗のページを足してアップデートして",
+      "パワポつくって 中計の骨子これ→(箇条書き貼り付け) 役員向けでたのむ",
+      "戦略資料を作って。図表多め、あとで自分たちで直したいからネイティブで編集できる pptx で",
+      "TAM/SAM/SOM の整理と競合ポジショニングを入れた市場参入の社内検討資料が欲しい",
+      "need a board deck for our Japan entity covering quarterly results, editable pptx please",
+      "けっさんせつめい資料つくってほしい すうじはこのメモの通り(fy26q3.md) 枚数おまかせ",
+      "とりあえず提案しょの叩き台ほしい。あいて先はACME、パワポで。こまかい体裁はあとでいい"
+    ],
+    "should_not_fire": [
+      "戦略スライドを1枚、キービジュアル的なイメージ画像として生成して(→ act-slide-image-generation)",
+      "ATOM のブランドで 16:9 の戦略スライド画像を作って(→ atom-slide-image-generation)",
+      "この決算説明資料.pptx を読んで要点を3行で教えて",
+      "エクイティストーリーの論点をまず文章で整理したい。スライドはまだいらない(→ equity-story)",
+      "5カ年の財務モデルを xlsx で組んでほしい。資料化はその後で(→ startup-financial-modeling)",
+      "明日のプレゼンの話す原稿(トークスクリプト)を書いて。スライドはもう完成してる",
+      "Marp で markdown からスライドを作りたいんだけどセットアップを教えて",
+      "Google Slides で共同編集できる形の資料にしてほしい",
+      "この提案書の誤字脱字チェックだけお願い"
+    ]
+  }
+}

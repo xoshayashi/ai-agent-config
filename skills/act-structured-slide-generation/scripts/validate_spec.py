@@ -1,0 +1,1 @@
+../build/scripts/validate_spec.py

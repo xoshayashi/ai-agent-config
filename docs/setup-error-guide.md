@@ -16,6 +16,8 @@ Instruction-only 構成での代表的な確認ポイントです。
 | 通知が出ない | hook は設定済みでも、CLI セッションが古いか、端末アプリに通知許可がありません。 | `sh scripts/health-check.sh` の `notifications:` 行で `ok` を確認し、各 CLI を再起動します。macOS の システム設定 → 通知 で、端末アプリ（Terminal / iTerm など）の通知を許可します。 |
 | Claude Code で通知が二重に出る | Claude Code 本体のネイティブ通知と、本リポジトリの `Notification` hook が両方鳴っています。 | どちらか一方に絞ります。hook 側を止める場合は、`~/.claude/settings.json` の `hooks.Notification` から `notify.sh` を呼ぶエントリを外します。 |
 | `python package openpyxl missing` | `startup-financial-modeling` の xlsx 生成に必要な `openpyxl` が入っていません。 | `sh scripts/setup.sh` を再実行します。setup はユーザー site-packages へ `openpyxl` を導入します。 |
+| `python packages for act-structured-slide-generation missing` | pptx デッキ生成に必要な `python-pptx` / `Pillow` / `lxml` / `fonttools` が入っていません（skill 実行時は `ModuleNotFoundError: pptx` 等になります）。 | `sh scripts/setup.sh` を再実行します。setup は skill の `scripts/requirements.txt` からユーザー site-packages へ導入します。 |
+| `pdftoppm (poppler) not found` | デッキのレンダリング検証（PDF→PNG）に使う poppler が入っていません（任意の依存です）。 | 必要なら `brew install poppler` を実行後、`sh scripts/setup.sh` を再実行します。 |
 | `libreoffice/soffice not found` | LibreOffice が無く、xlsx の再計算検証とスライド PDF レンダリングは skip されます（任意の依存です）。 | 必要なら `brew install --cask libreoffice` を実行後、`sh scripts/setup.sh` を再実行します。 |
 | skill 実行時に `libreoffice not found` で exit 1 | LibreOffice は `soffice` という名前で入っており、`libreoffice` の名前で見つかりません。 | `sh scripts/setup.sh` を実行すると、`soffice` と同じディレクトリに `libreoffice` 互換 symlink を作成します。 |
 | `brew doctor` が `libreoffice` symlink を警告する | `setup.sh` が作る `libreoffice` 互換 symlink です。 | 意図的なものです。外す場合は `trash /opt/homebrew/bin/libreoffice` を使います。 |

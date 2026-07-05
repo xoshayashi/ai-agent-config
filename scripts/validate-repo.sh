@@ -133,6 +133,8 @@ tracked_ignored=$(git -C "$repo_root" ls-files -ci --exclude-standard)
 if [ -d "$repo_root/skills" ]; then
   find "$repo_root/skills" -name __pycache__ -type d | grep -q . \
     && fail "skills/ must not contain __pycache__ directories"
+  find "$repo_root/skills" -name .pytest_cache -type d | grep -q . \
+    && fail "skills/ must not contain .pytest_cache directories"
   for skill_dir in "$repo_root"/skills/*; do
     [ -d "$skill_dir" ] || fail "skills/ must contain skill directories only"
     skill_name=$(basename "$skill_dir")
