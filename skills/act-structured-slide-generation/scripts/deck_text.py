@@ -1,0 +1,1 @@
+../build/scripts/deck_text.py

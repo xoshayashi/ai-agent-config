@@ -1,0 +1,1 @@
+../build/scripts/verify_deck.py

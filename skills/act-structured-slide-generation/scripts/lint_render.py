@@ -1,0 +1,1 @@
+../build/scripts/lint_render.py

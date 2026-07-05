@@ -217,7 +217,12 @@ openpyxl_status=missing
 if command -v python3 >/dev/null 2>&1 && python3 -c 'import openpyxl' >/dev/null 2>&1; then
   openpyxl_status=ok
 fi
+pptx_deps_status=missing
+if command -v python3 >/dev/null 2>&1 && python3 -c 'import pptx, PIL, lxml, fontTools' >/dev/null 2>&1; then
+  pptx_deps_status=ok
+fi
 libreoffice_status=$(command_status libreoffice)
+pdftoppm_status=$(command_status pdftoppm)
 
 for status in \
   "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status" \
@@ -225,7 +230,7 @@ for status in \
   "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status" \
   "$shell_zshrc_status" \
   "$codex_notify_status" "$claude_notify_status" "$gemini_notify_status" \
-  "$python3_status" "$openpyxl_status"; do
+  "$python3_status" "$openpyxl_status" "$pptx_deps_status"; do
   [ "$status" = "ok" ] || mark_status warn
 done
 
@@ -246,7 +251,7 @@ if [ "$format" = "json" ]; then
   printf '    "shell_.zshrc": "%s"\n' "$shell_zshrc_status"
   printf '  },\n'
   printf '  "notifications": {"codex": "%s", "claude": "%s", "gemini": "%s"},\n' "$codex_notify_status" "$claude_notify_status" "$gemini_notify_status"
-  printf '  "skill_dependencies": {"python3": "%s", "pip": "%s", "pip3": "%s", "openpyxl": "%s", "libreoffice": "%s"}\n' "$python3_status" "$pip_status" "$pip3_status" "$openpyxl_status" "$libreoffice_status"
+  printf '  "skill_dependencies": {"python3": "%s", "pip": "%s", "pip3": "%s", "openpyxl": "%s", "pptx_deps": "%s", "libreoffice": "%s", "pdftoppm": "%s"}\n' "$python3_status" "$pip_status" "$pip3_status" "$openpyxl_status" "$pptx_deps_status" "$libreoffice_status" "$pdftoppm_status"
   printf '}\n'
 else
   printf 'AI Agent Config health: %s\n' "$(overall_status)"
@@ -261,8 +266,8 @@ else
   printf 'shell: zshrc=%s\n' "$shell_zshrc_status"
   printf 'notifications: codex=%s claude=%s gemini=%s\n' \
     "$codex_notify_status" "$claude_notify_status" "$gemini_notify_status"
-  printf 'skill dependencies: python3=%s pip=%s pip3=%s openpyxl=%s libreoffice=%s\n' \
-    "$python3_status" "$pip_status" "$pip3_status" "$openpyxl_status" "$libreoffice_status"
+  printf 'skill dependencies: python3=%s pip=%s pip3=%s openpyxl=%s pptx_deps=%s libreoffice=%s pdftoppm=%s\n' \
+    "$python3_status" "$pip_status" "$pip3_status" "$openpyxl_status" "$pptx_deps_status" "$libreoffice_status" "$pdftoppm_status"
 fi
 
 if [ "$strict" = "1" ] && [ "$(overall_status)" != "ok" ]; then

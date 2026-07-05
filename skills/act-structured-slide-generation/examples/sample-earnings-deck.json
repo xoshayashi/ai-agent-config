@@ -1,0 +1,110 @@
+{
+  "$comment": "決算説明資料の最小実例。決算系 4 パターン(financial_highlights / metrics_rows / guidance_progress / driver_decomposition)の使い方を示す。市場参入テーマの実例は sample-deck.json。",
+  "meta": {
+    "title": "FY2026 第2四半期 決算説明資料",
+    "subtitle": "2026年8月期 上期実績とガイダンス進捗",
+    "date": "2026年4月",
+    "author": "Act IR Team",
+    "confidential": "Confidential",
+    "lang": "ja"
+  },
+  "slides": [
+    {
+      "pattern": "cover",
+      "title": "FY2026 第2四半期 決算説明資料",
+      "subtitle": "2026年8月期 上期実績とガイダンス進捗",
+      "date": "2026年4月",
+      "author": "Act IR Team"
+    },
+    {
+      "pattern": "financial_highlights",
+      "title": "上期は売上64.8億円(+28%)と計画を上回り、通期達成の確度が高まった",
+      "subtitle": "FY2026 上期ハイライト",
+      "groups": [
+        {
+          "label": "業績",
+          "claim": "増収と黒字幅拡大が両立",
+          "metrics": [
+            { "label": "売上高", "value": "64.8", "unit": "億円", "delta": "+28% YoY", "delta_dir": "up" },
+            { "label": "調整後営業利益", "value": "2.1", "unit": "億円", "delta": "+1.8億円 YoY", "delta_dir": "up" },
+            { "label": "売上総利益率", "value": "72.4", "unit": "%", "delta": "+2.1pt YoY", "delta_dir": "up" }
+          ]
+        },
+        {
+          "label": "顧客基盤",
+          "claim": "大型顧客の獲得が継続",
+          "metrics": [
+            { "label": "有料顧客数", "value": "1,284", "unit": "社", "delta": "+212社 YoY", "delta_dir": "up" },
+            { "label": "NRR", "value": "114", "unit": "%", "delta": "+2pt YoY", "delta_dir": "up" }
+          ],
+          "note": "NRR は過去12カ月の既存顧客収益の増減率"
+        }
+      ],
+      "source": "決算短信(2026年4月開示)"
+    },
+    {
+      "pattern": "metrics_rows",
+      "title": "Q2単体でも全指標がプラス成長を維持し、成長の質が改善している",
+      "subtitle": "FY2026 Q2 会計期間サマリ",
+      "columns": [
+        {
+          "heading": "FY2026 Q2(2025年12月-2026年2月)",
+          "rows": [
+            { "label": "売上高", "value": "33.6", "unit": "億円", "delta": "+31.2% YoY", "delta_dir": "up" },
+            { "label": "売上総利益", "value": "24.5", "unit": "億円", "delta": "+34.8% YoY", "delta_dir": "up" },
+            { "label": "調整後営業利益", "value": "1.3", "unit": "億円", "delta": "+1.1億円 YoY", "delta_dir": "up" },
+            { "label": "調整後EBITDA", "value": "2.4", "unit": "億円", "delta": "+1.5億円 YoY", "delta_dir": "up" }
+          ]
+        }
+      ],
+      "source": "決算短信(2026年4月開示)",
+      "assumption": "調整後指標は株式報酬費用・M&A関連一時費用を除く"
+    },
+    {
+      "pattern": "driver_decomposition",
+      "title": "成長は顧客数と単価の両輪で、ARR 136億円ペースへ乗った",
+      "subtitle": "ARR ドライバー分解(2026年2月末時点)",
+      "factors": [
+        { "label": "有料顧客数", "value": "1,284", "unit": "社", "delta": "+19.8% YoY",
+          "note": "エンタープライズ比率 31%" },
+        { "label": "顧客単価(ARPA)", "value": "10,590", "unit": "千円", "delta": "+7.2% YoY",
+          "note": "上位プランへの移行が寄与" },
+        { "label": "ARR", "value": "136", "unit": "億円", "delta": "+28.4% YoY", "focal": true }
+      ],
+      "operators": ["×", "="],
+      "source": "社内管理数値"
+    },
+    {
+      "pattern": "guidance_progress",
+      "title": "上期進捗率48%は過去2年の同時期を上回り、通期レンジ達成は射程圏内",
+      "subtitle": "通期ガイダンス進捗(売上高)",
+      "unit": "億円",
+      "bars": [
+        { "label": "FY2024", "value": 78.2, "display": "78.2" },
+        { "label": "FY2025", "value": 104.5, "display": "104.5" }
+      ],
+      "current": {
+        "label": "FY2026",
+        "actual": 64.8,
+        "actual_display": "上期実績 64.8",
+        "guidance_low": 132,
+        "guidance_high": 136,
+        "range_display": "132 - 136(予想)"
+      },
+      "side_heading": "上期進捗",
+      "side": [
+        { "label": "進捗率", "value": "48%" },
+        { "label": "YoY", "value": "+28%" },
+        { "label": "過去2年平均の同時期進捗", "value": "45%" }
+      ],
+      "source": "決算短信(2026年4月開示)",
+      "assumption": "進捗率はガイダンスレンジ中央値に対する上期実績"
+    },
+    {
+      "pattern": "statement",
+      "title": "結論",
+      "statement": "上期の進捗率48%とNRR 114%は、通期ガイダンスの達成確度が高いことを示している。下期はエンタープライズ獲得への投資を継続する。",
+      "attribution": "Act IR Team, 2026年4月"
+    }
+  ]
+}
