@@ -1,0 +1,1 @@
+../build/scripts/render_deck.sh

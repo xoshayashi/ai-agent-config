@@ -1,0 +1,1 @@
+../build/scripts/setup_fonts.py

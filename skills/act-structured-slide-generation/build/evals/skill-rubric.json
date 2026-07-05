@@ -1,0 +1,76 @@
+{
+  "$comment": "Rubric for the SKILL ITSELF (not the decks it produces — that's rubric.json). Grounded in Anthropic skill-creator (anthropics/skills) plus this repo's skill conventions. Defect-deduction scoring: each category starts at full points; judges deduct per concrete observed defect (minor=-1, major=-3, critical=-5 within the category, floor 0). Total = sum of categories (max 100). Judge = an independent LLM reviewer given the full skill tree; every deduction must cite file:line evidence.",
+  "target": "SKILL.md + build/ + scripts/ + examples/ of this skill directory",
+  "categories": [
+    {
+      "id": "triggering",
+      "name": "発火設計(description・trigger evals)",
+      "max_points": 20,
+      "criteria": [
+        "description が「何をするか」と「いつ使うか」の両方を含み、ユーザーが 'slide' と言わないケースも拾う押し出し(pushy)がある",
+        "隣接スキルとの境界が description に明記され、誤発火先への委譲(Not for ...)がある",
+        "trigger evals が現実的な文面(ファイルパス・背景・口語・typo を含む)で、should_fire / should_not_fire 各 8 問以上ある",
+        "should_not_fire がニアミス中心(語彙は重なるが責務が違う)で、明白な無関係プロンプトで水増しされていない"
+      ]
+    },
+    {
+      "id": "disclosure",
+      "name": "段階的開示・構造",
+      "max_points": 20,
+      "criteria": [
+        "SKILL.md 本文が 500 行未満で、metadata → 本文 → 参照ファイルの 3 層が機能している",
+        "各参照ファイルに「いつ読むか」の明確な指示があり、常時読ませる想定の肥大ファイルがない",
+        "300 行に近い参照ファイルには目次がある",
+        "scripts / references / evals / examples の責務分離が明確(実行可能コードとドキュメントが混在しない)"
+      ]
+    },
+    {
+      "id": "writing",
+      "name": "記述品質(why・命令形・汎用性)",
+      "max_points": 20,
+      "criteria": [
+        "指示は命令形で、重要な制約には理由(why)が添えられている — 裸の MUST/禁止の列挙になっていない",
+        "特定の例に過剰適合した指示(overfit)がなく、100 万回の多様な利用に耐える一般性がある",
+        "出力フォーマット・実例(examples)が具体的に示されている",
+        "冗長・重複・死んだ記述(参照されないファイル、実行されない手順)がない"
+      ]
+    },
+    {
+      "id": "determinism",
+      "name": "決定論・検証可能性",
+      "max_points": 20,
+      "criteria": [
+        "バイナリ生成・レンダリング・検証は scripts に寄せ、LLM は判断とコンテンツに限定されている",
+        "機械検証(exit code)と視覚/主観検証が分離され、両方がパイプラインに組み込まれている",
+        "スクリプトに pytest 等の自動テストがあり、通っている",
+        "eval が客観的 assertion を持ち、品質ルーブリックに合格閾値が定義されている"
+      ]
+    },
+    {
+      "id": "workflow",
+      "name": "ワークフロー完全性",
+      "max_points": 10,
+      "criteria": [
+        "要件整理 → 承認ゲート → 生成 → 検証 → 修正ループ → 完了報告のフェーズが明示されている",
+        "中間成果物がファイルとして残り、中断・別セッションから再開できる",
+        "修正の範囲(修理メニュー)と、上流に戻るべき条件が定義されている"
+      ]
+    },
+    {
+      "id": "operability",
+      "name": "運用性・安全性",
+      "max_points": 10,
+      "criteria": [
+        "依存(Python パッケージ・外部 CLI・フォント)が明記され、欠落時のフォールバック手順がある",
+        "スキルの内容がユーザーの意図から見て驚きがない(Principle of Lack of Surprise)",
+        "リポジトリの検証(validate-repo.sh 等)に適合する構造になっている"
+      ]
+    }
+  ],
+  "deduction_scale": {
+    "minor": 1,
+    "major": 3,
+    "critical": 5
+  },
+  "pass_threshold": 95
+}
