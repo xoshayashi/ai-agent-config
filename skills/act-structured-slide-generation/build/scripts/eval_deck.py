@@ -121,8 +121,8 @@ def main() -> int:
         print(__doc__)
         return 1
     render_dir = Path(args[0])
-    pngs = sorted(render_dir.glob("*.png"))
-    pngs = [p for p in pngs if re.search(r"-\d+\.png$", p.name)]
+    pngs = sorted((p for p in render_dir.glob("*.png") if re.search(r"-\d+\.png$", p.name)),
+                  key=lambda p: int(re.search(r"-(\d+)\.png$", p.name).group(1)))
     if not pngs:
         print(f"no slide PNGs in {render_dir}")
         return 1

@@ -443,3 +443,22 @@ def test_lint_render_flags_slide_count_mismatch(tmp_path):
     spec.write_text(json.dumps(_minimal_deck(), ensure_ascii=False))
     r = run("lint_render.py", tmp_path, "--spec", spec)
     assert r.returncode == 1 and "枚数不一致" in r.stdout
+
+
+def test_validate_rejects_unsupported_chart_type(tmp_path):
+    deck = _minimal_deck()
+    deck["slides"][0]["chart"]["type"] = "area"
+    bad = tmp_path / "deck.json"
+    bad.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", bad)
+    assert r.returncode == 1 and "未対応" in r.stdout and "Traceback" not in r.stderr
+
+
+def test_chart_type_lists_stay_in_sync():
+    sys.path.insert(0, str(SCRIPTS))
+    try:
+        import build_deck
+        import validate_spec
+        assert set(validate_spec.SUPPORTED_CHART_TYPES) == set(build_deck.CHART_TYPES)
+    finally:
+        sys.path.remove(str(SCRIPTS))

@@ -65,8 +65,10 @@ def main() -> int:
                     help="also write header-strip.png (stacked top bands)")
     args = ap.parse_args()
 
-    pngs = sorted(p for p in args.render_dir.glob("*.png")
-                  if p.stem.rsplit("-", 1)[-1].isdigit())
+    # ゼロ埋め幅が揃わない場合も正順になるよう、スライド番号の数値でソートする
+    pngs = sorted((p for p in args.render_dir.glob("*.png")
+                   if p.stem.rsplit("-", 1)[-1].isdigit()),
+                  key=lambda p: int(p.stem.rsplit("-", 1)[-1]))
     if not pngs:
         print(f"no slide PNGs in {args.render_dir}", file=sys.stderr)
         return 1

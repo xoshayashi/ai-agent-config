@@ -20,6 +20,8 @@ BUDGET = TOKENS["text_budget"]
 ALLOWED_COLORS = set(TOKENS["colors"].values())
 FORBIDDEN = set(TOKENS["color_policy"]["forbidden_colors"])
 ACCENT = TOKENS["colors"]["accent"]
+# build_deck.py の CHART_TYPES と同期(テスト test_chart_type_lists_stay_in_sync が担保)
+SUPPORTED_CHART_TYPES = ("column", "stacked_column", "bar", "line", "donut")
 
 PATTERNS = {
     "cover": [],
@@ -171,6 +173,9 @@ def main() -> int:
 
         chart = s.get("chart")
         if chart:
+            ctype = chart.get("type", "column")
+            if ctype not in SUPPORTED_CHART_TYPES:
+                errors.append(f"{loc}: chart type '{ctype}' は未対応 — {' / '.join(SUPPORTED_CHART_TYPES)} から選ぶ")
             cats, series = chart.get("categories", []), chart.get("series", [])
             if not cats or not series:
                 errors.append(f"{loc}: chart needs categories and series")
