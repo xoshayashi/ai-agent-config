@@ -59,7 +59,9 @@ required check." Do not preserve a raw transcript as the lesson.
 
 1. Classify the signal: one-off artifact issue, reusable skill gap, eval gap,
    runtime helper bug, reference/protocol gap, dependency/tooling gap, or
-   documentation ambiguity.
+   documentation ambiguity. Load `_self_improvement_pruning.md` when deciding
+   whether to reflect: n=1 evidence normally becomes a sanitized deferred candidate,
+   not a permanent rule.
 2. Fix the artifact first when the user-facing output is still wrong. Do not
    spend the user's time improving the skill while the requested workbook or
    memo remains broken.
@@ -77,17 +79,31 @@ required check." Do not preserve a raw transcript as the lesson.
    reflection record with `build/runtime/self_improvement.py` or an equivalent
    privacy / invariant-shape scanner before writing it to the skill or progress
    log.
-6. Keep eval roles separate. Capability evals prove broad skill behavior,
+6. Run the semantic reviewer panel in `_self_improvement_reviewer_panel.md`.
+   The order is strict because the gates do different work:
+   `validate_reflection_record` rejects unsafe or overfit records, then the
+   independent panel scores whether the proposed change is a real quality
+   improvement. Accept the reflection only when both gates pass. This avoids
+   schema-complete changes that make the skill worse.
+7. Keep eval roles separate. Capability evals prove broad skill behavior,
    regression evals protect known failures and should stay near-perfect, and
    holdout/adversarial examples should not be tuned against during the same
    iteration.
-7. Rerun the check that failed and one broader gate that proves the skill still
+8. Rerun the check that failed and one broader gate that proves the skill still
    behaves in its normal path.
-8. Before writing any Reflection Record, run `validate_reflection_record` from
-   `build/runtime/self_improvement.py` or an equivalent scanner on the proposed
-   record. Record only concise, sanitized learning in the project progress log
-   when one already exists. Do not create auxiliary changelogs just for the
-   skill.
+9. Before writing any Reflection Record, run
+   `validate_reflection_record_for_acceptance` from
+   `build/runtime/self_improvement.py` or an equivalent validator-plus-panel
+   scanner on the proposed record. Record only concise, sanitized learning in
+   the project progress log when one already exists. Do not create auxiliary
+   changelogs just for the skill.
+10. Before closeout on skill-quality edits, run deterministic consistency
+   checks where possible. `build/runtime/closeout_consistency.py` catches
+   dangling local links and declared count drift; an independent reviewer should
+   also inspect cross-references, frozen terminology, duplicate rules, body
+   bloat, and eval/gate cleanliness. Stop when the target score/gate is met, no
+   new reusable gap appears, or the iteration bound is reached with a deferred
+   candidate. Adding process after saturation is not improvement.
 
 ## Research Intake
 
@@ -130,9 +146,19 @@ Do not generalize a lesson into the skill when:
 If any stop condition applies, fix or document the artifact-level issue and
 leave the skill unchanged.
 
+## Failure Modes
+
+Load `_self_improvement_failure_modes.md` before accepting any change that
+affects self-improvement doctrine. It is the source of truth for model collapse,
+reward hacking / Goodhart, sycophancy, eval overfit, and non-convergence
+mitigations. These risks are not theoretical for SFM: a rule can pass the
+reflection schema and still reduce workbook truthfulness, auditability, or
+future maintainability.
+
 ## Closeout Addendum
 
 Before final response on a skill-quality run, state whether session-log or
 post-output learning produced a reusable change, which layer was patched, and
-which regression proof now protects it. If no reusable change was justified,
-say so and name the stop condition.
+which regression proof now protects it. Also state whether the validator,
+reviewer panel, and closeout consistency checks passed. If no reusable change
+was justified, say so and name the stop condition or deferred-candidate reason.

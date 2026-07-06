@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Quality gates — machine-scored rubric points for generated workbooks.
 
-Scores the machine half (65 pts) of the workbook-quality rubric:
+Scores the machine half (70 pts) of the workbook-quality rubric:
 
   G-A strict-audit clean on all target builds .......... 10
   G-B pytest suite green ............................... 10
@@ -13,6 +13,7 @@ Scores the machine half (65 pts) of the workbook-quality rubric:
   G-H bundle closure (no refs to missing sheets) ....... 4
   G-I tab-count cap + driver-family coverage ........... 4
   G-J self-improvement reflection validator ............ 5
+  G-K self-improvement panel + closeout consistency .... 5
 
 Usage:
   python3 quality_gates.py                    # offline deterministic gates
@@ -39,6 +40,7 @@ BUILD_CLI = SKILL_ROOT / "scripts" / "build_model.py"
 sys.path.insert(0, str(SKILL_ROOT / "build" / "runtime"))
 
 import self_improvement
+import closeout_consistency
 
 NUMERIC_WHITELIST = {"0", "1", "-1", "2", "3", "12", "24", "100", "365", "1000"}
 PERIOD_WIDTH = 11.5
@@ -392,6 +394,12 @@ def gate_self_improvement() -> GateResult:
         "privacy_classification": "sanitized",
         "regression_proof": "pytest: row-formula consistency and quality gate G-D",
         "is_reusable": True,
+        "record_author": "codex-runner",
+        "panel_reviewer": "independent-reviewer-r1",
+        "panel_evidence_citations": ["redacted_evidence", "verification_evidence", "regression_proof"],
+        "evidence_count": 2,
+        "broader_gate_to_rerun": "quality_gates.py",
+        "expected_quality_effect": "prevents repeated formula drift while preserving strict audit discipline",
         "public_signal_type": "x",
         "x_public_signal": "weak practitioner signal summarized without handles or quotes",
         "milestone_review": True,
@@ -424,6 +432,69 @@ def gate_self_improvement() -> GateResult:
     if missing:
         evidence.append(f"invalid record not rejected for: {missing}")
     return GateResult("G-J self-improvement reflection validator", 5.0 if not evidence else 0.0, 5.0, evidence)
+
+
+def gate_self_improvement_panel_closeout() -> GateResult:
+    good = {
+        "task_type": "post_output_repair",
+        "artifact_type": "xlsx",
+        "redacted_evidence": "quality gate G-D failed twice, then passed after a formula-shape assertion",
+        "observed_failure": "period formulas diverged after two manual repair loops",
+        "verification_evidence": "targeted pytest passed and quality_gates.py reran clean",
+        "root_cause_category": "quality_gate_gap",
+        "generalized_lesson": (
+            "When repeated workbook repairs expose the same formula-shape gap, "
+            "promote the invariant into a deterministic gate before accepting closeout."
+        ),
+        "proposed_change_layer": "quality_gate",
+        "privacy_classification": "sanitized",
+        "regression_proof": "pytest: panel regression and quality gate G-K",
+        "is_reusable": True,
+        "record_author": "codex-runner",
+        "panel_reviewer": "independent-reviewer-r2",
+        "panel_evidence_citations": ["redacted_evidence", "verification_evidence", "regression_proof"],
+        "evidence_count": 2,
+        "broader_gate_to_rerun": "quality_gates.py",
+        "expected_quality_effect": "turns a recurring manual repair into an auditable workbook gate",
+    }
+    bad = dict(good)
+    bad.update({
+        "redacted_evidence": "user said the output should feel more premium",
+        "verification_evidence": "manual review only",
+        "root_cause_category": "documentation_ambiguity",
+        "generalized_lesson": "Always improve.",
+        "proposed_change_layer": "skill_trigger",
+        "regression_proof": "self-review",
+        "panel_evidence_citations": [],
+        "evidence_count": 1,
+        "broader_gate_to_rerun": "",
+        "expected_quality_effect": "",
+    })
+
+    evidence: list[str] = []
+    if self_improvement.validate_reflection_record(bad):
+        evidence.append("panel degradation fixture should pass structural validator")
+    good_panel = self_improvement.score_reflection_panel(good)
+    bad_panel = self_improvement.score_reflection_panel(bad)
+    if not good_panel["accepted"]:
+        evidence.append(f"good panel record rejected: {good_panel}")
+    if bad_panel["accepted"]:
+        evidence.append(f"degradation record accepted by panel: {bad_panel}")
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        (root / "protocol.md").write_text(
+            "[missing](missing.md)\n"
+            "<!-- sfm-closeout-count name=\"refs\" expected=\"2\" glob=\"*.md\" -->\n",
+            encoding="utf-8",
+        )
+        closeout_errors = set(closeout_consistency.check_closeout_consistency([root / "protocol.md"]))
+    if not any(err.startswith("dangling_ref:") for err in closeout_errors):
+        evidence.append(f"missing dangling ref detection: {sorted(closeout_errors)}")
+    if not any(err.startswith("count_drift:") for err in closeout_errors):
+        evidence.append(f"missing count drift detection: {sorted(closeout_errors)}")
+
+    return GateResult("G-K self-improvement panel+closeout", 5.0 if not evidence else 0.0, 5.0, evidence)
 
 
 def main() -> int:
@@ -471,6 +542,7 @@ def main() -> int:
     else:
         results.append(GateResult("G-I tabs+coverage", 0.0, 4.0, ["G1 build missing"]))
     results.append(gate_self_improvement())
+    results.append(gate_self_improvement_panel_closeout())
 
     total = sum(r.points for r in results)
     max_total = sum(r.max_points for r in results)
