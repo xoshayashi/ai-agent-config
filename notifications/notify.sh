@@ -21,23 +21,41 @@ category=${2:-done}
 case "$category" in
   attention)
     message="承認または入力を待っています"
-    sound="Funk"
+    sound_file="/System/Library/Sounds/Funk.aiff"
     ;;
   *)
     message="作業が完了しました"
-    sound="Glass"
+    sound_file="/System/Library/Sounds/Glass.aiff"
     ;;
 esac
 
-if [ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ] && command -v osascript >/dev/null 2>&1; then
-  # label/category are fixed strings supplied by this repo's hook config,
-  # so there is no untrusted input to escape here.
-  osascript -e "display notification \"$message\" with title \"$label\" sound name \"$sound\"" >/dev/null 2>&1 \
-    || printf '\a' >&2
-else
-  # Non-macOS fallback: terminal bell. Most terminals flash or chime on BEL.
-  printf '\a' >&2
+# Two independent channels, no third-party app in the loop:
+#   1. afplay chimes through the system audio - not gated by notification
+#      permission (macOS only).
+#   2. The terminal emulator surfaces the visual signal itself: a real banner
+#      where it has a documented escape (iTerm2, WezTerm), otherwise a BEL
+#      that each terminal turns into its own indicator (VS Code/Cursor ->
+#      terminal activity badge, Apple Terminal -> bell notification per its
+#      profile settings, Linux -> terminal default).
+# When the hook runs without a controlling TTY (Claude Code Desktop, headless
+# automation), the visual step silently no-ops and only the chime fires.
+if [ "$(uname -s 2>/dev/null || printf unknown)" = "Darwin" ]; then
+  if [ -f "$sound_file" ] && command -v afplay >/dev/null 2>&1; then
+    afplay "$sound_file" >/dev/null 2>&1 &
+  fi
 fi
+
+case "${TERM_PROGRAM:-}" in
+  iTerm.app|WezTerm)
+    # OSC 9: single-string notification, no title/message split. Write to the
+    # controlling TTY because hook stdout is reserved for the JSON payload.
+    # Subshell so /dev/tty open failures (TTY-less hooks) are silenced.
+    ( printf '\033]9;%s: %s\007' "$label" "$message" >/dev/tty ) 2>/dev/null || true
+    ;;
+  *)
+    ( printf '\a' >/dev/tty ) 2>/dev/null || true
+    ;;
+esac
 
 # Valid no-op JSON result for the calling CLI's hook parser.
 printf '{}\n'
