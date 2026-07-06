@@ -16,6 +16,7 @@ License: internal (startup-financial-modeling skill)
 
 from __future__ import annotations
 
+import math
 from copy import copy
 from dataclasses import dataclass
 from typing import Iterable, Literal
@@ -391,6 +392,180 @@ def _fill_rgb(cell: Cell) -> str | None:
     return value[-6:].upper() if isinstance(value, str) else None
 
 
+def _row_has_semantic_header_fill(ws: Worksheet, row: int) -> bool:
+    for cell in ws[row]:
+        if _fill_rgb(cell) == BG_TABLE_HEADER:
+            return True
+    return False
+
+
+def _find_table_header_row(ws: Worksheet, row: int) -> int | None:
+    """Return the nearest row at or above ``row`` whose cells carry BG_TABLE_HEADER.
+
+    Nearest-above (not topmost) so a nested inner table picks its own
+    header instead of the outer top-of-sheet table — surfaced by the
+    Phase 1 mid-checkpoint review of this helper.
+    """
+    for r in range(row, 0, -1):
+        if _row_has_semantic_header_fill(ws, r):
+            return r
+    return None
+
+
+def _semantic_header_bounds(
+    ws: Worksheet,
+    row: int,
+    *,
+    target_row: int | None = None,
+) -> tuple[int, int] | None:
+    cols = [c.column for c in ws[row] if _fill_rgb(c) == BG_TABLE_HEADER]
+    if not cols:
+        return None
+    if target_row is not None:
+        target_bounds = _row_content_bounds(ws, target_row)
+        if target_bounds is not None and target_bounds[0] != target_bounds[1]:
+            target_start, target_end = target_bounds
+            in_target = [col for col in cols if target_start <= col <= target_end]
+            if in_target:
+                return min(in_target), max(in_target)
+    return min(cols), max(cols)
+
+
+def _row_content_bounds(ws: Worksheet, row: int) -> tuple[int, int] | None:
+    cols = [c.column for c in ws[row] if c.value not in (None, "")]
+    if not cols:
+        return None
+    return min(cols), max(cols)
+
+
+def apply_semantic_border_span(
+    ws: Worksheet,
+    row: int,
+    *,
+    top: Side | None = None,
+    bottom: Side | None = None,
+    header_row: int | None = None,
+    border_start_col: int | None = None,
+) -> None:
+    """Apply a top / bottom border across the table block ``row`` belongs to.
+
+    Symmetric to :func:`apply_semantic_fill_span`. The span is resolved from
+    :func:`detect_table_block` — the helper deliberately exposes no
+    ``start_col`` / ``end_col`` parameters so callers cannot reintroduce the
+    hard-coded column ranges that the
+    ``accent_cols = [label_col, *period_cols]`` path in
+    ``source_plan_builder._write_values`` produced. Block-internal empty /
+    middle cells (source / unit columns between the label column and the
+    first period) receive the same border so the underline reads as a
+    continuous rule — the structural fix for the
+    ``if cell.value is None: continue`` gap.
+
+    To keep dedicated hierarchy / indent columns borderless when they fall
+    inside the detected block (the canonical practice — the indent column is
+    a visual gutter, not a table member with a rule), pass
+    ``border_start_col`` to the real label / data start. Callers typically
+    derive this from the row's role (text position / fill), not from a
+    column number.
+
+    A call with neither ``top`` nor ``bottom`` is a no-op.
+
+    Args:
+        ws: openpyxl worksheet.
+        row: 1-indexed row to draw the border on.
+        top: top-edge ``Side`` (e.g. :data:`THIN_LINE` for subtotals).
+        bottom: bottom-edge ``Side`` (e.g. :data:`MEDIUM_LINE` for grand totals).
+        header_row: optional override forwarded to ``detect_table_block``.
+        border_start_col: leftmost column inside the block that should
+            receive the border. Columns from the detected block start up
+            to this column are left untouched.
+    """
+    if top is None and bottom is None:
+        return
+    start_col, end_col = detect_table_block(ws, row, header_row=header_row)
+    border_first = border_start_col if border_start_col is not None else start_col
+    if border_first < start_col:
+        border_first = start_col
+    for col in range(border_first, end_col + 1):
+        cell = ws.cell(row=row, column=col)
+        cell.border = Border(
+            left=cell.border.left,
+            right=cell.border.right,
+            top=top if top is not None else cell.border.top,
+            bottom=bottom if bottom is not None else cell.border.bottom,
+            diagonal=cell.border.diagonal,
+            diagonal_direction=cell.border.diagonal_direction,
+            diagonalUp=cell.border.diagonalUp,
+            diagonalDown=cell.border.diagonalDown,
+            outline=cell.border.outline,
+            vertical=cell.border.vertical,
+            horizontal=cell.border.horizontal,
+        )
+
+
+def detect_table_block(
+    ws: Worksheet,
+    row: int,
+    *,
+    header_row: int | None = None,
+) -> tuple[int, int]:
+    """Return ``(start_col, end_col)`` of the table block ``row`` belongs to.
+
+    The block boundary is derived from the worksheet's actual cell content
+    and styling — never from a hard-coded column number — so the helper is
+    safe on sheets that diverge from the canonical LAYOUT. Detection
+    signals, applied in order:
+
+    1. **Semantic header fill.** The nearest row at or above ``row`` whose
+       cells carry the ``BG_TABLE_HEADER`` fill defines the block. The
+       block's column range is the min/max column of the filled cells that
+       overlap the target row's own populated span. That overlap rule keeps
+       unrelated side-by-side tables on the same header row out of the block.
+       Empty middle cells (e.g. source / unit columns that sit between the
+       label column and the first period column) are inside the range —
+       they are block members, which lets ``apply_semantic_border_span``
+       paint a continuous underline across the whole block.
+    2. **Row content fallback.** If no semantic header is found anywhere
+       at or above ``row``, fall back to ``row`` itself: leftmost to
+       rightmost non-empty column.
+
+    An annotation column to the right of the period block (e.g. a wide
+    "Notes" column with plain text but no header fill) is correctly
+    excluded — the BG_TABLE_HEADER footprint ends before it.
+
+    Args:
+        ws: openpyxl worksheet.
+        row: 1-indexed target row.
+        header_row: optional override; force detection from this row
+            instead of auto-scanning. Useful when nested sub-tables make
+            the auto-scan pick the wrong header.
+
+    Returns:
+        ``(start_col, end_col)``, both 1-indexed inclusive.
+
+    Raises:
+        ValueError: when no block can be detected (no header fill found
+            above and the target row itself is empty).
+    """
+    detected_header = (
+        header_row if header_row is not None else _find_table_header_row(ws, row)
+    )
+    if detected_header is not None:
+        bounds = _semantic_header_bounds(
+            ws,
+            detected_header,
+            target_row=None if header_row is not None else row,
+        )
+        if bounds is not None:
+            return bounds
+    fallback = _row_content_bounds(ws, row)
+    if fallback is not None:
+        return fallback
+    raise ValueError(
+        f"row {row} on '{ws.title}': no BG_TABLE_HEADER cell found at or above, "
+        "and the target row itself has no content; cannot detect table block."
+    )
+
+
 def _is_intentional_blank_component_cell(cell: Cell, row_has_value: bool) -> bool:
     """Keep blank cells that visually complete a semantic row component.
 
@@ -398,10 +573,25 @@ def _is_intentional_blank_component_cell(cell: Cell, row_has_value: bool) -> boo
     clean. A blank cell with a semantic row fill is different: it can be the
     quiet continuation of a header/check/highlight band, aligned to the same
     visual width as neighboring rows.
+
+    A blank cell that carries a deliberate border (any side, any style) is
+    also a semantic row component: it is the empty middle of a table-block
+    span painted by ``apply_semantic_border_span`` so the underline reads
+    as continuous across the source / unit gap. Wiping its border to the
+    default style would re-introduce the ragged-rule defect that span is
+    meant to fix.
     """
     if not row_has_value:
         return False
-    return _fill_rgb(cell) in SEMANTIC_BLANK_FILL_COLORS
+    if _fill_rgb(cell) in SEMANTIC_BLANK_FILL_COLORS:
+        return True
+    border = cell.border
+    if border is None:
+        return False
+    return any(
+        side is not None and getattr(side, "style", None) is not None
+        for side in (border.top, border.bottom, border.left, border.right)
+    )
 
 
 def clear_blank_cell_styles(wb: Workbook) -> None:
@@ -549,13 +739,60 @@ FMT_DEFAULT              = FMT_NUM_MILLION
 # ramp consistent with B(parent/indent)≈20px in Google Sheets / C(label)=54 / D(source)=54 /
 # E(unit)=12 / F-(period)=15 baseline.
 
+# CJK ranges used for display-width measurement (autosize_role_columns).
+# These ranges cover Hiragana, Katakana, CJK Unified Ideographs (incl. Ext A),
+# and CJK / fullwidth punctuation. Characters in any of these count as 2
+# display units so a column carrying Japanese labels resolves to a width
+# that actually fits the text in Google Sheets render.
+_CJK_RANGES: tuple[tuple[int, int], ...] = (
+    (0x3000, 0x303F),   # CJK Symbols and Punctuation
+    (0x3040, 0x309F),   # Hiragana
+    (0x30A0, 0x30FF),   # Katakana
+    (0x3400, 0x4DBF),   # CJK Unified Ideographs Extension A
+    (0x4E00, 0x9FFF),   # CJK Unified Ideographs
+    (0xFF00, 0xFFEF),   # Halfwidth and Fullwidth Forms
+)
+
+
+def _is_cjk_char(ch: str) -> bool:
+    code = ord(ch)
+    for lo, hi in _CJK_RANGES:
+        if lo <= code <= hi:
+            return True
+    return False
+
+
+def _display_width(value: object) -> int:
+    """Return the visual display width of ``value`` with CJK chars at 2.
+
+    Used by :func:`autosize_role_columns` so a Japanese label that needs 56
+    display units does not get squeezed into a 28-cell-wide column.
+    """
+    if value is None:
+        return 0
+    text = str(value)
+    width = 0
+    for ch in text:
+        width += 2 if _is_cjk_char(ch) else 1
+    return width
+
+
 # Column widths
 COL_MARGIN_WIDTH = 3.0          # A: visual gutter only
-COL_HIERARCHY_WIDTH = 2.14      # B and additional hierarchy columns; renders at ~20px in Google Sheets
+# Hierarchy / indent column width — single source of truth.
+# Every column that plays the role of indent / hierarchy spacer (starting at B
+# and any deeper hierarchy column added to the right) MUST use this exact
+# xlsx width. It renders as 20px in Google Sheets — the canonical indent
+# rhythm called out in build/references/_layout_canonical.md. No sheet may
+# widen B for label/text purposes: text overflows from B into intentionally
+# blank cells to the right instead, or shifts to a wider C+ column.
+COL_HIERARCHY_WIDTH = 2.14      # B and additional hierarchy columns; exactly 2.14 xlsx ≈ 20px Google Sheets
+INDENT_COL_WIDTH = COL_HIERARCHY_WIDTH  # semantic alias used by indent-role helpers
 COL_LABEL_WIDTH = 54.0          # Lowest-level line-item label
 COL_SOURCE_WIDTH = 54.0         # Source / driver
 COL_UNIT_WIDTH = 14.0           # Unit (¥M / %)
 COL_PERIOD_WIDTH = 16.0         # Each period (Y1 / Q1 / Jan-26)
+COL_WIDTH_TOL = 0.001           # comparison tolerance for indent / role widths
 
 # Column width T-shirt scale (auxiliary; for non-canonical layouts)
 COL_WIDTH_TINY = 6.0
@@ -564,6 +801,19 @@ COL_WIDTH_BASE = 16.0
 COL_WIDTH_LARGE = 20.0          # auxiliary large text/table width; not hierarchy width
 COL_WIDTH_XLARGE = 32.0
 COL_NOTE_WIDTH = 72.0
+
+# Role-based [min, max] bounds for content-driven column widths
+# (autosize_role_columns). The min is the role's starting width — also the
+# minimum that survives a workbook with only short content. The max keeps
+# pathological inputs (a 500-char source note) from bloating the sheet.
+ROLE_WIDTH_BOUNDS: dict[str, tuple[float, float]] = {
+    "label":  (COL_LABEL_WIDTH,  90.0),
+    "source": (COL_SOURCE_WIDTH, 90.0),
+    "unit":   (COL_UNIT_WIDTH,   24.0),
+    "period": (COL_PERIOD_WIDTH, 24.0),
+    "note":   (COL_NOTE_WIDTH,  120.0),
+}
+ROLE_WIDTH_PADDING = 2.0  # whitespace breathing room added to measured width
 
 # Row heights used by builder modules.
 ROW_BODY_HEIGHT = 15.0
@@ -617,34 +867,11 @@ PRINT_ORIENTATION_PORTRAIT = "portrait"
 # ============================================================================
 # 9. Sheet Naming
 # ============================================================================
-
-CANONICAL_SHEET_ORDER: tuple[str, ...] = (
-    "Guide",
-    "Kernel",
-    "Assumptions",
-    "Driver Tree",
-    "Revenue Build",
-    "Cost Build",
-    "People Plan",
-    "P&L",
-    "BS",
-    "CF",
-    "Capital Stack",
-    "Ownership",
-    "Pricing",
-    "Financing",
-    "Exit Waterfall",
-    "Segments",
-    "KPI",
-    "Scenarios",
-    "Sensitivity",
-    "Valuation",
-    "Market Support",
-    "Benchmarks",
-    "IC Memo",
-)
-
-OPTIONAL_SHEETS: tuple[str, ...] = ("99_Glossary",)
+# The legacy 23-sheet canonical order / role tables (CANONICAL_SHEET_ORDER,
+# OPTIONAL_SHEETS, SHEET_ROLE_MAPPING, validate_sheet_naming) were retired
+# with the S3 12-sheet architecture. Sheet sets now live in
+# source_plan_builder (SOURCE_PLAN_SHEETS_V2 / CONDITIONAL_SHEETS_V2 /
+# TAB_COLORS_V2) and build_model (MODE_BUNDLE_SEEDS).
 
 # ============================================================================
 # 10. Cell-level helper functions
@@ -780,6 +1007,119 @@ def set_uniform_column_width(
     """
     for col_letter in columns:
         ws.column_dimensions[col_letter].width = width
+
+
+def autosize_role_columns(
+    ws: Worksheet,
+    role_columns: dict[int, str],
+    *,
+    padding: float | None = None,
+) -> None:
+    """Set role columns' widths from their content, clamped to role bounds.
+
+    For each ``(column_index, role)`` pair in ``role_columns``, the column's
+    width is set to ``max(role_min, min(role_max, content_max + padding))``,
+    where ``content_max`` is the maximum display width of any cell value in
+    the column (CJK chars counted as 2 via :func:`_display_width`). The
+    role bounds come from :data:`ROLE_WIDTH_BOUNDS`.
+
+    The clamp keeps short-content columns from being padded wider than the
+    role floor and keeps pathologically long content from bloating the
+    sheet beyond the role max. Used after data has been written into the
+    worksheet so the measurement reflects the final visible content.
+
+    Args:
+        ws: worksheet to size columns on.
+        role_columns: ``{column_index: role_name}`` mapping where role
+            name must be a key in :data:`ROLE_WIDTH_BOUNDS`. Unknown
+            roles are silently skipped.
+        padding: visual breathing room added to the measured display
+            width before clamping. Defaults to :data:`ROLE_WIDTH_PADDING`.
+    """
+    pad = ROLE_WIDTH_PADDING if padding is None else padding
+    for col, role in role_columns.items():
+        width = role_column_width_for_content(ws, col, role, padding=pad)
+        if width is None:
+            continue
+        ws.column_dimensions[get_column_letter(col)].width = width
+
+
+def role_column_width_for_content(
+    ws: Worksheet,
+    col: int,
+    role: str,
+    *,
+    padding: float | None = None,
+) -> float | None:
+    """Return the clamped content-driven width for one role column.
+
+    The helper is intentionally independent from setting the worksheet
+    dimension so builders can resolve one workbook-wide width per role before
+    applying it to every sheet. That keeps same-role columns visually stable
+    across the workbook while preserving content-driven growth.
+    """
+    bounds = ROLE_WIDTH_BOUNDS.get(role)
+    if bounds is None:
+        return None
+    pad = ROLE_WIDTH_PADDING if padding is None else padding
+    role_min, role_max = bounds
+    content_max = 0
+    for r in range(1, max(ws.max_row, 1) + 1):
+        value = ws.cell(row=r, column=col).value
+        content_max = max(content_max, _display_width(value))
+    target = content_max + pad if content_max > 0 else role_min
+    return max(role_min, min(role_max, target))
+
+
+def apply_indent_column_widths(
+    ws: Worksheet, columns: Iterable[str | int]
+) -> None:
+    """Indent / hierarchy 役割を持つ列を canonical 幅 (=INDENT_COL_WIDTH) に固定.
+
+    Use this helper instead of writing `column_dimensions[X].width = 2.14`
+    by hand so the indent rhythm stays consistent across sheets and is
+    grep-able when the rule needs to be audited.
+
+    Args:
+        ws: Worksheet
+        columns: 列文字 (例: ['B']) または列番号 iterable (例: range(2, 4))
+    """
+    for col in columns:
+        letter = col if isinstance(col, str) else get_column_letter(col)
+        ws.column_dimensions[letter].width = INDENT_COL_WIDTH
+
+
+def audit_indent_column_widths(
+    wb,
+    *,
+    indent_columns: Iterable[str | int] = ("B",),
+) -> list[str]:
+    """Workbook 全体で indent 列が canonical 幅か検査して違反を返す.
+
+    Returns:
+        違反メッセージのリスト (空 = 全シート合格).
+    """
+    targets = [
+        col if isinstance(col, str) else get_column_letter(col)
+        for col in indent_columns
+    ]
+    violations: list[str] = []
+    for ws in wb.worksheets:
+        for letter in targets:
+            dim = ws.column_dimensions.get(letter)
+            width = dim.width if dim else None
+            if width is None:
+                violations.append(
+                    f"{ws.title}!{letter}: indent column has no explicit width "
+                    f"(expected {INDENT_COL_WIDTH})"
+                )
+                continue
+            if abs(float(width) - float(INDENT_COL_WIDTH)) >= COL_WIDTH_TOL:
+                violations.append(
+                    f"{ws.title}!{letter}: indent column width={float(width):.4f} "
+                    f"(expected {INDENT_COL_WIDTH})"
+                )
+    return violations
 
 
 def apply_section_header(cell, label: str) -> None:
@@ -1238,7 +1578,7 @@ def write_toc(
 
     Args:
         ws: Cover sheet
-        sheet_names: 飛び先 sheet 名の iterable (e.g. CANONICAL_SHEET_ORDER[1:])
+        sheet_names: 飛び先 sheet 名の iterable (e.g. the workbook bundle minus Guide)
         start_row: 目次の開始 row
         label_col: 目次 label 列 (default "B")
         title: 目次の見出し
@@ -1370,7 +1710,7 @@ def setup_sheet_layout(
         F..F+n-1: periods
     """
     ws.column_dimensions["A"].width = COL_MARGIN_WIDTH
-    ws.column_dimensions["B"].width = COL_HIERARCHY_WIDTH
+    apply_indent_column_widths(ws, ["B"])
     ws.column_dimensions["C"].width = COL_LABEL_WIDTH
     ws.column_dimensions["D"].width = COL_SOURCE_WIDTH
     if has_unit_col:
@@ -1518,45 +1858,14 @@ TAB_COLOR_BY_ROLE: dict[str, str] = {
     "memo":   BRAND_ACCENT,         # ECC85A — IC thesis prose
 }
 
-# Source-plan canonical role assignment.
-SHEET_ROLE_MAPPING: dict[str, str] = {
-    "Guide":            "cover",
-    "Kernel":           "input",
-    "Assumptions":      "input",
-    "Driver Tree":      "driver",
-    "Revenue Build":    "driver",
-    "Cost Build":       "driver",
-    "People Plan":      "driver",
-    "P&L":              "output",
-    "BS":               "output",
-    "CF":               "output",
-    "Capital Stack":    "output",
-    "Ownership":        "output",
-    "Pricing":          "driver",
-    "Financing":        "output",
-    "Exit Waterfall":   "output",
-    "Segments":         "driver",
-    "KPI":              "driver",
-    "Scenarios":        "check",
-    "Sensitivity":      "check",
-    "Valuation":        "output",
-    "Market Support":   "output",
-    "Benchmarks":       "check",
-    "IC Memo":          "memo",
-}
+# The legacy SHEET_ROLE_MAPPING (23-sheet role assignment) was retired with
+# the S3 12-sheet architecture; v2 tab colors are declared per sheet in
+# source_plan_builder.TAB_COLORS_V2. set_tab_color keeps the explicit-role
+# contract for standalone sheets (e.g. the cap-table state machine).
 
 
-def get_sheet_role(sheet_name: str) -> str | None:
-    """Return canonical role for a sheet name, or None if not in the sheet set.
-
-    Optional sheets return ``None``; callers may extend ``SHEET_ROLE_MAPPING``
-    in-place to assign a role to optional sheets.
-    """
-    return SHEET_ROLE_MAPPING.get(sheet_name)
-
-
-def set_tab_color(ws: Worksheet, role: str | None = None) -> None:
-    """Sheet のタブ色を canonical mapping に基づき設定.
+def set_tab_color(ws: Worksheet, role: str) -> None:
+    """Sheet のタブ色を canonical role color に設定.
 
     canonical role colors:
       - cover  → BRAND_NAVY
@@ -1569,36 +1878,11 @@ def set_tab_color(ws: Worksheet, role: str | None = None) -> None:
     Args:
         ws: Worksheet
         role: 明示 role (cover/input/driver/output/check/memo)。
-            ``None`` のとき ``ws.title`` から ``SHEET_ROLE_MAPPING`` で推論。
-
-    sheet name から推論できないときは no-op。
+            未知の role は no-op。
     """
-    resolved = role
-    if resolved is None:
-        resolved = SHEET_ROLE_MAPPING.get(ws.title)
-    if resolved is None:
-        return
-    color = TAB_COLOR_BY_ROLE.get(resolved)
+    color = TAB_COLOR_BY_ROLE.get(role)
     if color:
         ws.sheet_properties.tabColor = color
-
-
-def apply_canonical_tab_colors(wb) -> int:
-    """ブック内全 sheet を走査し、SHEET_ROLE_MAPPING にある sheet にのみ
-    canonical tab color を一括適用. 適用件数を返す.
-
-    用途: builder の保存直前に呼び出すと、output / driver 系を含めた
-    canonical sheet 全体に tab color が確実に行き渡る。
-    """
-    applied = 0
-    for ws in wb.worksheets:
-        role = SHEET_ROLE_MAPPING.get(ws.title)
-        if role is None:
-            continue
-        color = TAB_COLOR_BY_ROLE[role]
-        ws.sheet_properties.tabColor = color
-        applied += 1
-    return applied
 
 
 # ============================================================================
@@ -1615,30 +1899,6 @@ class CellRoleViolation:
     detail: str
 
 
-def validate_sheet_naming(workbook_sheetnames: Iterable[str]) -> list[str]:
-    """Verify that sheet names are a canonical ordered subset.
-
-    Focused-mode workbooks intentionally omit some canonical sheets. Treat that
-    as valid when the remaining sheets preserve canonical relative order.
-    """
-    expected = list(CANONICAL_SHEET_ORDER)
-    actual = list(workbook_sheetnames)
-    violations: list[str] = []
-
-    actual_filtered = [s for s in actual if s not in OPTIONAL_SHEETS]
-    expected_positions = {name: i for i, name in enumerate(expected)}
-    positions: list[int] = []
-    for name in actual_filtered:
-        if name not in expected_positions:
-            violations.append(f"Extra sheet '{name}' (only canonical sheets + 99_Glossary allowed)")
-            continue
-        positions.append(expected_positions[name])
-    if positions != sorted(positions):
-        violations.append(f"Sheet order is not canonical: {actual_filtered}")
-
-    return violations
-
-
 # ============================================================================
 # 13. Convenience constants for builders
 # ============================================================================
@@ -1653,6 +1913,396 @@ MONEY_UNIT_BY_CCY: dict[str, str] = {
 }
 
 
+# ============================================================================
+# 13b. S2 format layer v2 (additive — 構造改革 slice S2)
+# ============================================================================
+# ARCHITECTURE.md §4 技術フォーマット体系 / §0 ヘッダ・ルーラー行の新契約。
+# このセクションは**追加のみ**: 既存 token / helper は S3 が builder を移行する
+# まで現行契約のまま並存する。新旧の識別は JP▲系 = FMT_JP_* / 幅 = *_V2。
+#
+# 数値書式 v2 の方針 (JP デフォルト):
+#   - セル値は常に円の生値。表示スケールは number_format のみで切替。
+#   - 負数は赤 + "▲" 接頭 (JP 決算書慣行)。括弧囲み (旧 FMT_JPY_*) は使わない。
+#   - セル毎の ¥ 記号は廃止 → シート左上の「(単位: 百万円)」キャプション+単位列。
+#   - ゼロは "-" 表示。
+#
+# 億円 (10^8) を v2 スケールラダーから除外する理由:
+#   Excel の comma scaling は 1 個につき ÷1,000 (10^3 単位) しか刻めない。
+#   ",,"=10^6 (百万) / ",,,"=10^9 (十億) であり、10^8=億 は comma scaling では
+#   表現不可能。セル値のスケーリング (円以外で保存) は本設計で禁止のため、
+#   億円書式は出荷しない。v2 スケールラダーは 円 → 千円 → 百万円 → 十億円。
+#   (旧 FMT_JPY_HUNDRED_MILLION は「百万のまま億接尾」の近似であり v2 では不使用。)
+# ----------------------------------------------------------------------------
+
+# --- JP ▲ 系 number format tokens --------------------------------------------
+FMT_JP_YEN      = '#,##0;[Red]"▲"#,##0;"-"'        # 円 (生値表示)
+FMT_JP_THOUSAND = '#,##0,;[Red]"▲"#,##0,;"-"'      # 千円 (÷10^3)
+FMT_JP_MILLION  = '#,##0,,;[Red]"▲"#,##0,,;"-"'    # 百万円 (÷10^6)
+FMT_JP_BILLION  = '#,##0,,,;[Red]"▲"#,##0,,,;"-"'  # 十億円 (÷10^9)
+FMT_JP_PERCENT  = '0.0%;[Red]"▲"0.0%'              # % (負は赤▲)
+FMT_FACTOR      = '0.0000'                          # 係数 (FAST 3.01-08)
+FMT_MONTHS_1DP  = '0.0'                             # 月数 (ランウェイ等)
+# USD は既存の FMT_USD_DOLLAR / FMT_USD_THOUSAND / FMT_USD_MILLION
+# (括弧囲み Accounting 形式) を v2 でもそのまま再利用する。
+
+# --- スケールラダー / 単位ラベル ---------------------------------------------
+# scale 識別子はラダー順。JP は billion まで、USD は million まで ($B は IB
+# モデルの表示慣行上 $M 継続が普通のため ladder に含めない)。
+JP_SCALE_LADDER: tuple[str, ...] = ("actual", "thousand", "million", "billion")
+USD_SCALE_LADDER: tuple[str, ...] = ("actual", "thousand", "million")
+
+JP_UNIT_BY_SCALE: dict[str, str] = {
+    "actual": "円",
+    "thousand": "千円",
+    "million": "百万円",
+    "billion": "十億円",
+}
+USD_UNIT_BY_SCALE: dict[str, str] = {
+    "actual": "$",
+    "thousand": "$K",
+    "million": "$M",
+}
+
+FMT_JP_BY_SCALE: dict[str, str] = {
+    "actual": FMT_JP_YEN,
+    "thousand": FMT_JP_THOUSAND,
+    "million": FMT_JP_MILLION,
+    "billion": FMT_JP_BILLION,
+}
+FMT_USD_BY_SCALE: dict[str, str] = {
+    "actual": FMT_USD_DOLLAR,
+    "thousand": FMT_USD_THOUSAND,
+    "million": FMT_USD_MILLION,
+}
+
+
+def fmt_jp_for_scale(scale: str) -> str:
+    """v2 JP▲系 number_format を scale 識別子から返す。
+
+    Args:
+        scale: "actual" / "thousand" / "million" / "billion"
+
+    Returns:
+        FMT_JP_* トークン (セル値は円の生値のまま表示だけ切替)。
+
+    Raises:
+        ValueError: ラダー外の scale (億円含む — §13b 冒頭の除外理由参照)。
+    """
+    try:
+        return FMT_JP_BY_SCALE[scale]
+    except KeyError:
+        raise ValueError(
+            f"unknown JP scale {scale!r}: expected one of {JP_SCALE_LADDER} "
+            "(億円は comma-scaling 制約により v2 ラダーから除外)"
+        ) from None
+
+
+# --- 決定論スケールピッカー (2層ルール — ARCHITECTURE.md §2 実装機構) ---------
+# ルール: 「最大絶対値がそのスケールで 3.0 表示単位以上になる最大のスケール」
+# を選ぶ。3x のヒステリシス係数により境界近傍 (例: 1.2M) が 「1」表示に潰れる
+# ことを防ぐ (1,200千円 と表示される)。閾値:
+#   JP : thousand ≥ 3_000 / million ≥ 3_000_000 / billion ≥ 3_000_000_000
+#   USD: thousand ≥ 3_000 / million ≥ 3_000_000 ($M 上限)
+# 純関数・決定論。入力値は常に基本通貨 (円 / dollar) の生値。
+
+SCALE_HYSTERESIS_FACTOR = 3.0
+
+# scale → 表示除数 (comma scaling の除数と一致)
+_SCALE_DIVISOR: dict[str, float] = {
+    "actual": 1.0,
+    "thousand": 1_000.0,
+    "million": 1_000_000.0,
+    "billion": 1_000_000_000.0,
+}
+
+
+def _scale_ladder_for_currency(currency: str) -> tuple[str, ...]:
+    return USD_SCALE_LADDER if currency == "USD" else JP_SCALE_LADDER
+
+
+def pick_scale_for_magnitude(max_abs: float, currency: str = "JPY") -> str:
+    """代表桁 (最大絶対値) から表示スケールを決定論的に選ぶ。
+
+    「max_abs がそのスケールの除数で 3.0 表示単位以上になる」最大のスケールを
+    ラダーから選ぶ (ヒステリシス係数 3x)。境界例:
+        2_999_999 → "thousand" / 3_000_000 → "million"
+
+    Args:
+        max_abs: 系列の最大絶対値 (基本通貨の生値)。負値は絶対値として扱う。
+        currency: "JPY" / "USD" (USD ラダーは million 止まり)。
+
+    Returns:
+        scale 識別子 ("actual" / "thousand" / "million" / "billion")。
+        非有限値・0 近傍は "actual"。
+    """
+    magnitude = abs(float(max_abs))
+    if not math.isfinite(magnitude):
+        return "actual"
+    chosen = "actual"
+    for scale in _scale_ladder_for_currency(currency):
+        divisor = _SCALE_DIVISOR[scale]
+        if magnitude >= SCALE_HYSTERESIS_FACTOR * divisor:
+            chosen = scale
+    return chosen
+
+
+def _max_finite_abs(values: Iterable[float]) -> float:
+    best = 0.0
+    for v in values:
+        if v is None:
+            continue
+        f = float(v)
+        if not math.isfinite(f):
+            continue
+        a = abs(f)
+        if a > best:
+            best = a
+    return best
+
+
+def pick_sheet_scale(values: Iterable[float], currency: str = "JPY") -> str:
+    """シート単一スケール (2層ルール (a) — ステートメント/エンジン系) を選ぶ。
+
+    シートの支配的桁 = 渡された集約行 (合計行等) の最大絶対値。呼び出し側は
+    per-unit / 率などの例外行を除いた集約行の生値を渡す。
+
+    Args:
+        values: 集約行の生値 (円 / dollar)。None / 非有限値は無視。
+        currency: "JPY" / "USD"。
+
+    Returns:
+        scale 識別子。空 iterable は "actual"。
+    """
+    return pick_scale_for_magnitude(_max_finite_abs(values), currency=currency)
+
+
+def pick_row_scale(values: Iterable[float], currency: str = "JPY") -> str:
+    """行スケール (2層ルール (b) — レジスタ系の行単位選択) を選ぶ。
+
+    行の代表桁 = 系列の最大絶対値。選択規則はシートスケールと同一
+    (決定論・同一入力 → 同一出力) だが、レジスタ系では行ごとに呼び、
+    単位列ラベル (JP_UNIT_BY_SCALE) と number_format を必ず対で更新する。
+
+    Args:
+        values: 行の全期間値 (生値)。None / 非有限値は無視。
+        currency: "JPY" / "USD"。
+
+    Returns:
+        scale 識別子。空 iterable は "actual"。
+    """
+    return pick_scale_for_magnitude(_max_finite_abs(values), currency=currency)
+
+
+# --- v2 ヘッダ行契約 (期間軸シート — ARCHITECTURE.md §0) ----------------------
+# row 2: タイトル (C2) + マスターチェックエコー (最初の期間列)
+# row 3: パーパス (C3, gray italic)
+# row 4: 単位キャプション (C4) + FY ラベルルーラー (期間列, centered 9pt gray)
+# row 5: months_in_period ルーラー (期間列, right 9pt gray, integer)
+# row 6: 期間ヘッダ (bold centered + 既存ヘッダバンド BG_TABLE_HEADER)
+# row 7: スペーサ / data は row 8 から。フリーズは (first_period_col, row 7)。
+HEADER_TITLE_ROW_V2 = 2
+HEADER_PURPOSE_ROW_V2 = 3
+HEADER_FY_RULER_ROW = 4
+HEADER_MONTHS_RULER_ROW = 5
+HEADER_PERIOD_ROW = 6
+HEADER_ROWS_V2 = 6
+DATA_START_ROW_V2 = 8
+HEADER_CAPTION_COL = 3  # C 列 (単位キャプション / タイトル / パーパス)
+
+_FONT_RULER = Font(name=FONT_FAMILY, size=FONT_SIZE_SMALL, color=IB_COMMENT)
+_FONT_RULER_CAPTION = Font(
+    name=FONT_FAMILY, size=FONT_SIZE_SMALL, italic=True, color=IB_COMMENT
+)
+
+
+def write_period_rulers(
+    ws,
+    first_period_col: int,
+    fy_labels: list[str],
+    months_in_period: list[int],
+    period_labels: list[str],
+    unit_caption: str | None,
+) -> None:
+    """v2 ヘッダのルーラー3行 (row 4/5/6) + 単位キャプション (C4) を書く。
+
+    全期間式は months 行 (row 5) を参照する契約 (例 ``=F9*F11*F$5``) のため、
+    months_in_period は int で格納する。3 リストは同じ長さ (期間数) であること。
+
+    Args:
+        ws: Worksheet (期間軸シート)
+        first_period_col: 最初の期間列 index (1-based, canonical は 6 = F)
+        fy_labels: 会計年度ラベル (例 ["FY2026", "FY2026", ...]) — row 4
+        months_in_period: 各期間の月数 (月次=1 / 年次=12) — row 5
+        period_labels: 期間ヘッダ (例 "2026-07" / "FY2028") — row 6
+        unit_caption: 「(単位: 百万円)」等。None で省略 (register 系は
+            「(単位: 単位列参照)」を渡す) — C4
+
+    Raises:
+        ValueError: 3 リストの長さが不一致のとき。
+    """
+    n = len(period_labels)
+    if len(fy_labels) != n or len(months_in_period) != n:
+        raise ValueError(
+            "write_period_rulers: fy_labels / months_in_period / period_labels "
+            f"must share one length (got {len(fy_labels)} / "
+            f"{len(months_in_period)} / {n})"
+        )
+
+    if unit_caption:
+        cap = ws.cell(row=HEADER_FY_RULER_ROW, column=HEADER_CAPTION_COL)
+        cap.value = unit_caption
+        cap.font = _FONT_RULER_CAPTION
+        cap.alignment = Alignment(
+            horizontal=ALIGN_LABEL, vertical=ALIGN_VERTICAL_BODY, wrap_text=False
+        )
+
+    for i in range(n):
+        col = first_period_col + i
+
+        fy = ws.cell(row=HEADER_FY_RULER_ROW, column=col)
+        fy.value = fy_labels[i]
+        fy.font = _FONT_RULER
+        fy.alignment = Alignment(
+            horizontal=ALIGN_PERIOD_HEADER, vertical=ALIGN_VERTICAL_BODY,
+            wrap_text=False,
+        )
+
+        months = ws.cell(row=HEADER_MONTHS_RULER_ROW, column=col)
+        months.value = int(months_in_period[i])
+        months.font = _FONT_RULER
+        months.number_format = "0"
+        months.alignment = Alignment(
+            horizontal=ALIGN_VALUE, vertical=ALIGN_VERTICAL_BODY, wrap_text=False
+        )
+
+        period = ws.cell(row=HEADER_PERIOD_ROW, column=col)
+        period.value = period_labels[i]
+        period.font = FONT_YEAR_HEADER
+        period.fill = PatternFill("solid", fgColor=BG_TABLE_HEADER)
+        period.alignment = Alignment(
+            horizontal=ALIGN_PERIOD_HEADER, vertical=ALIGN_VERTICAL_BODY,
+            wrap_text=False,
+        )
+
+
+def apply_freeze_pane(ws, first_period_col: int, header_rows: int = HEADER_ROWS_V2) -> None:
+    """v2 フリーズペイン契約 (期間軸シート) を適用する。
+
+    アンカー = (first_period_col, header_rows + 1)。canonical の
+    first_period_col=6 / header_rows=6 では "F7" になり、A-E 列 (ガター/階層/
+    ラベル/ソースタグ/単位) とヘッダ 6 行が常時視認される。
+
+    Note:
+        既存 audit_workbook (build_model.py) は現行契約でフリーズを fail に
+        するため、S3/S5 が監査を反転するまで builder からは未使用。
+
+    Args:
+        ws: Worksheet
+        first_period_col: 最初の期間列 index (1-based)
+        header_rows: フリーズするヘッダ行数 (default 6 → data row 8 の直前
+            スペーサ row 7 がスクロール域先頭)
+    """
+    ws.freeze_panes = ws.cell(row=header_rows + 1, column=first_period_col).coordinate
+
+
+def write_master_check_echo(ws, cell_ref: str, master_check_formula: str) -> None:
+    """フリーズ域ヘッダにマスターチェックエコーセルを書く。
+
+    全期間軸シートの row 2 × 最初の期間列に置き、Summary の統合チェック
+    (マスターチェック 1 セル) を echo する契約 (ICAEW #18-20)。式は caller が
+    渡す (例 ``'=IF(Summary!$F$40=0,"checks OK","CHECK FAILED")'``)。
+
+    Args:
+        ws: Worksheet
+        cell_ref: 書き込み先 (例 "F2")
+        master_check_formula: Excel 式文字列 (= 始まり)
+    """
+    cell = ws[cell_ref]
+    cell.value = master_check_formula
+    cell.font = _FONT_RULER
+    cell.alignment = Alignment(
+        horizontal=ALIGN_VALUE, vertical=ALIGN_VERTICAL_BODY, wrap_text=False
+    )
+
+
+def period_axis_columns(ws) -> list[int]:
+    """Canonical v2 period-column detector — the single source of truth shared
+    by the shipping strict audit (build_model) and every audit here.
+
+    A period column carries the integer months-in-period ruler
+    (HEADER_MONTHS_RULER_ROW = 5) under a period header (HEADER_PERIOD_ROW = 6).
+    The trailing notes column has a row-6 header but no ruler, and the
+    label/driver/unit columns have neither, so both are correctly excluded.
+    Legacy / non-period sheets (string row-5 values, or no ruler) yield []."""
+    cols: list[int] = []
+    for col in range(2, ws.max_column + 1):
+        months = ws.cell(row=HEADER_MONTHS_RULER_ROW, column=col).value
+        header = ws.cell(row=HEADER_PERIOD_ROW, column=col).value
+        if (
+            isinstance(months, (int, float))
+            and not isinstance(months, bool)
+            and header not in (None, "")
+        ):
+            cols.append(col)
+    return cols
+
+
+def period_axis_anchor_col(ws) -> int | None:
+    """First period column (freeze-pane anchor) per :func:`period_axis_columns`,
+    or None when the sheet is not a v2 period-axis sheet."""
+    cols = period_axis_columns(ws)
+    return cols[0] if cols else None
+
+
+def audit_period_column_widths(wb, expected_width: float) -> list[str]:
+    """全期間軸シートの期間列が単一幅 expected_width かを監査する (R3)。
+
+    期間軸シート・期間列の判定は :func:`period_axis_columns` に一元化
+    (row-5 月次ルーラー + row-6 期間ヘッダ)。非期間系シート (Guide / Cap Table
+    / IC Memo 等) と期間列が無いシートはスキップ。
+
+    Args:
+        wb: openpyxl Workbook
+        expected_width: 全シート共通の期間列幅 (canonical は COL_PERIOD_WIDTH_V2)
+
+    Returns:
+        違反メッセージの list (空 = clean)。幅未設定 (None) も違反として報告。
+    """
+    violations: list[str] = []
+    for ws in wb.worksheets:
+        period_cols = period_axis_columns(ws)
+        if not period_cols:
+            continue
+        for c in period_cols:
+            letter = get_column_letter(c)
+            # 注意: ws.column_dimensions[letter] は未設定列に default 幅の
+            # ColumnDimension を自動生成するため、.get() で未設定を判定する。
+            dim = ws.column_dimensions.get(letter)
+            width = dim.width if dim is not None else None
+            if width is None:
+                violations.append(
+                    f"sheet '{ws.title}' period column {letter}: width not set "
+                    f"(expected {expected_width})"
+                )
+            elif abs(float(width) - float(expected_width)) >= COL_WIDTH_TOL:
+                violations.append(
+                    f"sheet '{ws.title}' period column {letter}: width {width} "
+                    f"!= expected {expected_width}"
+                )
+    return violations
+
+
+# --- v2 列幅トークン (ARCHITECTURE.md §4 列体系 — 旧トークンは S3 まで並存) ---
+COL_GUTTER_WIDTH_V2 = 1.5       # A: ガター/ナビ
+COL_LABEL_WIDTH_V2 = 38.0       # C: ラベル (ワイド)
+COL_SOURCE_WIDTH_INPUT = 30.0   # D: ソース列 (Assumptions/Evidence 入力系のみワイド)
+COL_DRIVER_TAG_WIDTH = 10.0     # D: エンジン/ステートメント系ドライバタグ列
+COL_UNIT_WIDTH_V2 = 9.0         # E: 単位
+COL_PERIOD_WIDTH_V2 = 11.5      # F〜: 期間列 (全シート同一幅 — R3 監査対象)
+COL_NOTE_WIDTH_V2 = 64.0        # 末尾+1: ノート/解釈列
+# B (階層インデント) は既存 COL_HIERARCHY_WIDTH = 2.14 (20px 契約) を継続使用。
+
+
 __all__ = [
     # Colors
     "IB_HARD_INPUT", "IB_FORMULA", "IB_LINK_INTRA", "IB_LINK_EXTERNAL", "IB_COMMENT",
@@ -1662,10 +2312,10 @@ __all__ = [
     "BRAND_EVERCORE_NAVY",
     "BRAND_WARNING", "BRAND_DANGER", "BRAND_SUCCESS", "BRAND_SLATE",
     # Sheet tab color canonical mapping
-    "TAB_COLOR_BY_ROLE", "SHEET_ROLE_MAPPING", "get_sheet_role",
-    "apply_canonical_tab_colors",
+    "TAB_COLOR_BY_ROLE",
     "BG_WHITE", "BG_CANVAS", "BG_TABLE_HEADER", "BG_TOTAL_BAND", "BG_HEADER_BAND", "BG_WORKING",
     "SEMANTIC_BLANK_FILL_COLORS", "apply_semantic_fill_span",
+    "apply_semantic_border_span", "detect_table_block",
     "LINK_COLOR",
     # Heatmap palettes
     "HEATMAP_LOW_COOL", "HEATMAP_MID_NEUTRAL", "HEATMAP_HIGH_WARM",
@@ -1703,9 +2353,12 @@ __all__ = [
     "FMT_MULTIPLE", "FMT_SHARES", "FMT_DATE_SHORT", "FMT_DATE_LONG",
     "FMT_DEFAULT",
     # Layout
-    "COL_MARGIN_WIDTH", "COL_HIERARCHY_WIDTH", "COL_LABEL_WIDTH", "COL_SOURCE_WIDTH",
+    "COL_MARGIN_WIDTH", "COL_HIERARCHY_WIDTH", "INDENT_COL_WIDTH", "COL_WIDTH_TOL",
+    "COL_LABEL_WIDTH", "COL_SOURCE_WIDTH",
     "COL_UNIT_WIDTH", "COL_PERIOD_WIDTH",
     "COL_WIDTH_TINY", "COL_WIDTH_SMALL", "COL_WIDTH_BASE", "COL_WIDTH_LARGE", "COL_WIDTH_XLARGE",
+    "ROLE_WIDTH_BOUNDS", "ROLE_WIDTH_PADDING", "autosize_role_columns",
+    "role_column_width_for_content",
     "ROW_BODY_HEIGHT", "ROW_SPACER_HEIGHT", "ROW_SECTION_HEIGHT",
     "ROW_HEIGHT_TIGHT", "ROW_HEIGHT_BASE", "ROW_HEIGHT_STANDARD", "ROW_HEIGHT_MEDIUM",
     "ROW_HEIGHT_RELAXED", "ROW_HEIGHT_HERO", "ROW_HEIGHT_COVER_TITLE", "ROW_HEIGHT_PER_WRAPPED_LINE",
@@ -1714,12 +2367,11 @@ __all__ = [
     "BORDER_SECTION_END_MEDIUM", "BORDER_TOP_THIN", "BORDER_BOTTOM_THIN",
     "BORDER_BOX_THIN", "BORDER_BOX_MEDIUM",
     "THIN_LINE", "MEDIUM_LINE", "DOTTED_LINE",
-    # Sheet naming
-    "CANONICAL_SHEET_ORDER", "OPTIONAL_SHEETS",
     # Cell-level helpers
     "apply_hard_input", "apply_formula", "apply_link_intra", "apply_link_external",
     "apply_label", "write_hierarchical_line_item",
-    "set_uniform_column_width", "apply_chart_palette",
+    "set_uniform_column_width", "apply_indent_column_widths", "audit_indent_column_widths",
+    "apply_chart_palette",
     "apply_section_header", "apply_year_header",
     "apply_subtotal", "apply_grand_total", "apply_comment", "apply_working_highlight",
     # Unit / currency helpers
@@ -1736,12 +2388,34 @@ __all__ = [
     "apply_row_heights", "wrapped_text_row_height", "visible_text_line_count", "set_wrapped_exception_row_height",
     # Sheet-level helpers
     "setup_sheet_layout", "setup_print_layout", "write_cover", "set_tab_color",
-    "validate_sheet_naming",
     "last_value_bounds", "rendered_bounds", "clear_blank_cell_styles", "trim_blank_canvas",
     # Currency
     "MONEY_UNIT_BY_CCY",
     # Models
     "CellRoleViolation",
+    # --- S2 format layer v2 (additive) ---
+    # JP ▲ 系 number formats
+    "FMT_JP_YEN", "FMT_JP_THOUSAND", "FMT_JP_MILLION", "FMT_JP_BILLION",
+    "FMT_JP_PERCENT", "FMT_FACTOR", "FMT_MONTHS_1DP",
+    # Scale ladder / unit labels
+    "JP_SCALE_LADDER", "USD_SCALE_LADDER",
+    "JP_UNIT_BY_SCALE", "USD_UNIT_BY_SCALE",
+    "FMT_JP_BY_SCALE", "FMT_USD_BY_SCALE", "fmt_jp_for_scale",
+    # Deterministic scale pickers
+    "SCALE_HYSTERESIS_FACTOR",
+    "pick_scale_for_magnitude", "pick_sheet_scale", "pick_row_scale",
+    # v2 header contract (rulers / freeze / check echo)
+    "HEADER_TITLE_ROW_V2", "HEADER_PURPOSE_ROW_V2", "HEADER_FY_RULER_ROW",
+    "HEADER_MONTHS_RULER_ROW", "HEADER_PERIOD_ROW", "HEADER_ROWS_V2",
+    "DATA_START_ROW_V2", "HEADER_CAPTION_COL",
+    "write_period_rulers", "apply_freeze_pane", "write_master_check_echo",
+    "audit_period_column_widths",
+    "period_axis_columns",
+    "period_axis_anchor_col",
+    # v2 column width tokens
+    "COL_GUTTER_WIDTH_V2", "COL_LABEL_WIDTH_V2", "COL_SOURCE_WIDTH_INPUT",
+    "COL_DRIVER_TAG_WIDTH", "COL_UNIT_WIDTH_V2", "COL_PERIOD_WIDTH_V2",
+    "COL_NOTE_WIDTH_V2",
 ]
 
 
@@ -1762,10 +2436,9 @@ if __name__ == "__main__":
     apply_link_external(ws["B8"])
     apply_subtotal(ws["B9"], FMT_MONEY)
     apply_grand_total(ws["B10"], FMT_MONEY)
-    set_tab_color(ws)
+    set_tab_color(ws, "cover")
     assert ws["B5"].number_format == FMT_USD_MILLION
     assert ws["B6"].number_format == FMT_PERCENT
     assert ws.sheet_properties.tabColor.rgb.endswith(BRAND_NAVY)
-    assert validate_sheet_naming(CANONICAL_SHEET_ORDER) == []
 
     print("ib_format.py smoke test: PASS")

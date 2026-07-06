@@ -7,14 +7,21 @@ and closeout gates that should not live in the always-loaded `SKILL.md`.
 
 References live in `build/references/`; load the smallest set that covers the
 decision. Start with `_output_modes.md`, `_generic_composition_protocol.md`,
-and `_self_review_protocol.md`. For any xlsx generation or repair, also load
+and `_self_review_protocol.md`. When a run reaches post-output closeout, a user
+asks to improve a prior skill output, or logs show failed checks, repeated
+workarounds, cleanup noise, or tool/routing inefficiency, load
+`_self_improvement_protocol.md`. Xlsx generation or repair also needs
 `_layout_canonical.md`, `_ib_workbook_design_system.md`, and
-`_sheet_quality_rubric.md`. Add `_modeling_kernel.md`,
-`_coverage_universe.md`, `_assumption_decomposition_patterns.md`,
-`_kpi_analytics.md`, `_scenario_sensitivity_playbook.md`,
-`_valuation_and_return_logic.md`, `_ic_memo_depth.md`,
-`_benchmark_protocol.md`, `_terminology.md` for full plans, fundraising, DD,
-or investor outputs.
+`_sheet_quality_rubric.md`. Full plans, fundraising, DD, or investor outputs
+draw from `_modeling_kernel.md`, `_coverage_universe.md`,
+`_assumption_decomposition_patterns.md`, `_kpi_analytics.md`,
+`_scenario_sensitivity_playbook.md`, `_valuation_and_return_logic.md`,
+`_ic_memo_depth.md`, `_benchmark_protocol.md`, and `_terminology.md` as the
+decision requires. External material enters the model only through its evidence
+role: comps, market reports, and benchmarks use `_benchmark_protocol.md`;
+public prompt or agent-workflow material uses `_ai_prompt_research_patterns.md`
+to become source-bound assumptions, formulas, checks, and closeout inspection;
+it shapes workflow, never the evidence for a financial claim.
 
 ## Routing Quick Map
 
@@ -23,16 +30,33 @@ or investor outputs.
 | pricing / ROI / willingness-to-pay                      | compact pricing model, assumption register, or validation plan | `_output_modes.md`, `_generic_composition_protocol.md`, `_assumption_decomposition_patterns.md` | BS/CF/cap table unless explicitly needed         |
 | cap table / SAFE / J-KISS / option pool / exit proceeds | cap-table state-machine workbook or ownership audit            | `_output_modes.md`, `_valuation_and_return_logic.md`, `_self_review_protocol.md`                | full P&L/BS/CF unless financing plan requires it |
 | runway / burn / lender plan                             | cash/runway model with downside and financing timing           | `_output_modes.md`, `_scenario_sensitivity_playbook.md`, `_kpi_analytics.md`                    | valuation and IC memo unless requested           |
-| market sizing / comps / benchmark                       | source-backed register or market-support workbook              | `_benchmark_protocol.md`, `_output_modes.md`                                                    | static benchmark truth without refresh date      |
+| market sizing / comps / benchmark                       | source-backed Evidence register or market-sizing workbook      | `_benchmark_protocol.md`, `_output_modes.md`                                                    | static benchmark truth without refresh date      |
 | fundraising / board / investor-ready model              | integrated decision workbook                                   | full finance reference stack                                                                    | low-value tabs that fail sheet quality           |
 | ambiguous memo or weak evidence                         | model spec, assumption register, DD questions                  | `_generic_composition_protocol.md`, `_assumption_decomposition_patterns.md`                     | xlsx generation until mechanics are clear        |
 
 ## Core Pattern
 
 Compose from decision and dependencies; examples, maturity cues, sectors, and
-modes are prompts for reasoning, not templates. Build the driver tree, select
-material variables, keep primitive drivers as assumptions, and calculate
-dependent outputs as formulas or checks.
+modes are prompts for reasoning, not templates. Treat outside workflow ideas the
+same way: translate only the reusable reasoning pattern into drivers, formulas,
+checks, or closeout gates. Build the driver tree, select material variables,
+keep primitive drivers as assumptions, and calculate dependent outputs as
+formulas or checks.
+
+## Self-Improvement Trigger
+
+At every closeout and every improvement prompt, decide whether the current run
+contains a reusable learning. If command logs, tool failures, user feedback,
+artifact repair, or repeated manual work reveal a generalizable weakness, follow
+`_self_improvement_protocol.md`: inspect sanitized evidence, classify one-off
+artifact fixes separately from reusable skill gaps, patch the lowest durable
+layer, add regression proof, and rerun the failed check plus a broader gate.
+Before writing any Reflection Record, progress-log learning, or proposed skill
+change based on the run, validate the record with
+`build/runtime/self_improvement.py` (`validate_reflection_record`) or an
+equivalent privacy / invariant-shape scanner. Do not store raw logs or
+confidential source text in the skill, and do not turn one company-specific
+fact into a global rule.
 
 ## Workbook Helper
 
@@ -64,6 +88,10 @@ placeholders.
 
 Structured YAML may define company/currency/display scale/grain/periods,
 segments, operating drivers, financing instruments, and valuation scalars.
+`grain: hybrid` (monthly for the first two fiscal years plus annual to five,
+with a months-in-period ruler) is the YAML default for `full` and
+`three_statement`; `burn_runway` is monthly and the other modes are annual.
+The `--source-md` narrative fallback stays annual five-year.
 Money inputs are raw base-currency values; `_yen` names are money-driver names.
 Carry every figure the source states — especially the demand driver as a
 per-period list (`customers` for subscription/account models, `new_units` for
@@ -86,8 +114,16 @@ Workbook gates: blue inputs, black formulas, green internal links, red external
 links, raw money values with display formats, compact unit labels, direct
 formulas, editable grid structure, unnumbered sections, traceable sources, no
 merged cells, Google-Sheets-20px hierarchy / indent columns (`2.14` xlsx
-width), no native indent or leading-space indentation, no frozen panes, and
-generated cells with `wrap_text` off. Treat text wrapping as prohibited for
+width), no native indent or leading-space indentation, and generated cells
+with `wrap_text` off. Period-axis sheets carry the header contract: FY-label
+ruler in row 4, months-in-period ruler in row 5 (period formulas reference it
+so one formula shape spans monthly and annual columns), period headers in row
+6, freeze pane at F7, and a master-check echo cell in the frozen header.
+Number formats use red `▲` negatives and dash zeros with no per-cell `¥`
+symbol — scale is declared by the sheet-corner unit caption plus the unit
+column. Display scale is two-tier: statement/engine sheets use one sheet-level
+scale (per-unit and ratio rows excepted); register sheets (Assumptions,
+Evidence, Financing, Cap Table) may scale per row against the unit column. Treat text wrapping as prohibited for
 generated workbook cells. Classify the cell role before changing wrap settings:
 horizontal-read titles, explanations, instructions, notes, bullets, source
 caveats, and memo lines keep wrap off and read through blank unmerged unstyled
@@ -201,10 +237,11 @@ errors; formula-string checks alone are not sufficient. If rendering or
 recalculation is blocked, document the blocker and still run workbook
 inspection commands.
 Use the generator's strict audit option when producing an xlsx for handoff:
-`python build_model.py --source-md input.md --output model.xlsx --strict-audit`.
+`python build_model.py --input model.yaml --output model.xlsx --strict-audit`.
 It should fail if omitted-sheet references, `#REF!` markers, missing
-sheet-quality markers, merged cells, frozen panes, generated wrapping/manual
-line breaks, non-standard fonts, or semantic alignment regressions remain.
+sheet-quality markers, merged cells, missing or mis-anchored freeze panes,
+generated wrapping/manual line breaks, non-standard fonts, or semantic
+alignment regressions remain.
 Strict audit also runs a profile-independent economic-coherence check: the plan
 fails the gate if implied gross margin diverges from its target, if projected
 ending cash goes negative, if any period has non-positive revenue, if the
@@ -214,7 +251,7 @@ necessary but not sufficient — a workbook can pass every layout check while th
 economics are incoherent.
 The generator attempts public-market comparable refresh by default and records
 current multiples, provided comparable evidence, or retrieval failures in the
-Benchmarks sheet. Override the auto-selected public ticker set only when the
+Evidence sheet. Override the auto-selected public ticker set only when the
 decision needs specific listed peers: `--live-comps CRM NOW DDOG`. For
 non-public companies, funding rounds, M&A transactions, market reports, customer
 benchmarks, or internal/user-provided sources, use YAML `private_comps`,
@@ -250,6 +287,8 @@ transaction_comps:
 ```
 
 Follow `_self_review_protocol.md`. If tests, workbook inspection, render
-checks, or artifact self-review find failures, fix the concrete failed items
-and rerun the same checks. Keep iterating until the model logic and the visible
-sheet design are both sufficient, or a real blocker is explicitly documented.
+checks, artifact self-review, or the self-improvement trigger finds failures,
+fix the concrete failed items and rerun the same checks. Keep iterating until
+the model logic and the visible sheet design are both sufficient; when the
+self-improvement trigger applies, reusable skill-learning proof must also be
+sufficient, or a real blocker is explicitly documented.

@@ -34,8 +34,8 @@ not appropriate, override it with explicit ticker symbols. Private-company,
 funding-round, M&A, market-report, customer, and internal benchmarks should be
 accepted through structured evidence fields and kept in the same register with
 source date and applicability limits. If live retrieval fails, keep the failure
-in the Benchmarks sheet and mark the support as needing refresh rather than
-silently falling back to stale multiples.
+as a visible row in the Evidence sheet and mark the support as needing refresh
+rather than silently falling back to stale multiples.
 
 ## Applicability Check
 
@@ -48,7 +48,7 @@ Every benchmark should state why it is comparable:
 - segment mix and accounting policy differences.
 
 If the benchmark is directionally useful but not directly comparable, say so in
-the Source / driver or Benchmarks sheet.
+the source/driver column or the Evidence sheet.
 
 ## Source Hygiene
 
@@ -59,7 +59,8 @@ sources carry their date, owner, file, or URL.
 
 ## Register Fields
 
-When benchmarks or source facts are material, keep a compact register with:
+The benchmark / comparable register lives on the Evidence sheet. When
+benchmarks or source facts are material, keep a compact register with:
 
 | Field | Purpose |
 |---|---|
@@ -72,8 +73,14 @@ When benchmarks or source facts are material, keep a compact register with:
 | linked assumption | Driver or KPI that uses the evidence |
 | refresh-needed flag | Whether the item must be refreshed before external circulation |
 
-Do not create fake entries to make the register look complete. Empty evidence
-should remain visibly unresolved.
+Do not create fake entries to make the register look complete. Placeholder
+source rows (SRC-01..05 style) are banned: a register row is either real
+evidence with provenance or an explicit "No external evidence provided — DD
+gap" row. Empty evidence should remain visibly unresolved.
+
+Market sanity (TAM/SAM/SOM with sources and freshness) is an isolated block on
+the Evidence sheet: it feeds cross-checks such as the final-year share 検算 on
+Summary, and never feeds a formula in the revenue chain.
 
 ## Comparable Evidence Coverage
 
@@ -129,11 +136,11 @@ Common evidence lenses:
 | Pricing / customer ROI comps | price, value capture, willingness-to-pay, implementation cost, or ROI proof drives revenue quality | customer segment, value metric, price/fee, ROI bridge, source date, contract/proof status |
 | Market / competitive benchmarks | TAM/SAM/SOM, adoption pace, utilization, cost curve, or competitive position supports the plan | source, metric, geography, period, methodology, linked model driver |
 
-The sheet set can remain generic: these lenses may live in Benchmarks, Market
-Support, People Plan, Financing, Pricing, or a user-requested support sheet.
-The gate is not the sheet name; the gate is whether the material assumption has
-traceable evidence, a freshness status, an applicability limit, and a linked
-decision implication.
+The sheet set can remain generic: these lenses may live in Evidence, People
+Plan, Financing, Pricing, or a user-requested support sheet. The gate is not
+the sheet name; the gate is whether the material assumption has traceable
+evidence, a freshness status, an applicability limit, and a linked decision
+implication.
 
 ## Quantitative Reference Bands
 
@@ -189,10 +196,11 @@ Metrics ~2010; David Sacks "SaaS Metrics That Matter" 2022; Carta State of
 Private Markets 2024; Finro fintech framework 2024-2025.
 
 The bands above are review anchors for the modeler, not the generator's
-evaluation axis. The generated KPI sheet carries a `KPI vs live public peers`
-block whose comparison axis is fetched at generation time: peer gross-margin
-and EBITDA-margin median / low / high come from the live public comparable
-retrieval, and the plan-vs-peer verdict is a formula against that fetched
-range. Do not hard-code benchmark constants into the generator or the
-workbook; when live peer margins cannot be retrieved, mark the block for
-refresh rather than back-filling a stale number.
+evaluation axis. The Summary KPI block carries benchmark-context notes whose
+comparison axis is fetched at generation time: peer gross-margin and
+EBITDA-margin median / low / high come from the live public comparable
+retrieval recorded in the Evidence sheet, and any plan-vs-peer verdict is a
+formula against that fetched range. Do not hard-code benchmark constants into
+the generator or the workbook; when live peer data cannot be retrieved, omit
+the comparison rows and carry the gap as a one-line DD item instead of
+back-filling a stale number.

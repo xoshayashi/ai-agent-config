@@ -37,35 +37,30 @@ For every generated sheet, verify:
 - **Interpretation:** output sheets should state what the result means, not only
   calculate it.
 - **Design:** use the canonical no-wrap, no-merge, sparse-fill, sparse-border,
-  black-border, and role-based palette rules. Design is part of model quality.
+  black-border, workbook-consistent role-width, table-local span, and
+  role-based palette rules. Design is part of model quality.
 
 ## Sheet-Level Gates
 
 | Sheet | Must prove | Failure smell |
 |---|---|---|
-| Guide | Decision, source story, model grain, sheet map, color/font conventions, and known source gaps are clear enough for a new reviewer to orient in under a minute. | Generic instructions, missing source boundary, or navigation that does not match actual sheets. |
-| Kernel | Business mechanics, economic unit, period grain, currency/scale, entity scope, and driver families are summarized before formulas branch outward. | Sector label replaces real mechanics; kernel repeats sheet outputs without explaining why drivers matter. |
-| Assumptions | Primitive drivers have units, source/driver status, evidence status, selected value, explanatory drivers, implied value, and support ratio where material. | Dependent outputs are hardcoded as assumptions; important rows lack source status or unit clarity. |
-| Driver Tree | Shows value creation from demand, monetization, delivery, capacity, capital, ownership, valuation, and evidence into workbook owner and decision relevance. | A list of metrics without dependency hierarchy, owner, source status, or decision relevance. |
-| Revenue Build | Calculates revenue from the real economic unit: customers, units, GMV, utilization, price, take rate, attach rate, retention, or segment mix as relevant. | ARR/SaaS defaults forced onto non-SaaS models; revenue is entered directly without driver proof. |
-| Cost Build | Separates variable cost, COGS, delivery, cloud, support, service, BOM, warranty, and fixed operating cost drivers tied to activity. | Margin assumed directly while cost-to-serve, workload, or capacity drivers are hidden. |
-| People Plan | Links headcount to work units, productivity, squads, support load, GTM capacity, hiring timing, and fully loaded cost. | FTE grows as a flat percentage without capacity or role logic. |
-| P&L | Presents revenue, gross profit, opex, EBITDA/operating profit, and key margins from upstream schedules with no buried hardcodes. | P&L contains independent assumptions that should live in assumptions or operating schedules. |
-| BS | Balances from cash, working capital, capex/assets, debt/leases, equity, retained earnings, and retained losses with an explicit balance check. | Balance sheet plugs unexplained assets/liabilities or does not reconcile to CF and P&L. |
-| CF | Reconciles opening cash, operating cash flow, working capital, capex, financing, and ending cash/runway. | Cash flow is an afterthought or duplicates P&L without explaining cash timing. |
-| Capital Stack | Traces equity, converts, debt, leases, grants, advances, interest, covenants, capacity, maturity, and runway/funding gap. | Financing is a single raise amount with no instrument terms, debt capacity, or covenant logic. |
-| Ownership | Reconciles founders, option pool, employees, investors, converts, warrants, secondary, and new rounds to 100.00%. | Dilution is directional only; holder classes do not sum cleanly or ignore converts/options. |
-| Pricing | Connects customer ROI/value capture, cost-plus floor, willingness-to-pay evidence, margin, sales friction, and validation tests. | Price is copied from management target without value, cost, or evidence triangulation. |
-| Financing | Shows raise need, timing, runway, downside gap, source of funds, use of funds, dilution, debt/lease/grant capacity, and milestone coverage. | Funding need is not tied to runway, milestone plan, or scenario pressure. |
-| Exit Waterfall | Converts exit EV/equity value into proceeds by instrument, preference, debt, secondary, option pool, founder, and investor return. | Exit value is shown without proceeds waterfall or return math. |
-| Segments | Defines segment economics, source status, intercompany/NCI/tax handling where relevant, and consolidation bridge. | Segment labels exist but each segment uses the same blended assumptions. |
-| KPI | Selects KPIs from the economic mechanism and decision, defines formula, applicability, source context, downside trigger, and IC implication. | Generic SaaS KPIs appear when they do not affect the decision or mechanics. |
-| Scenarios | Coherent cases move linked drivers together and show outputs, breakpoints, decision implication, and DD action. | Downside/base/upside are unrelated scalar shocks without narrative cause. |
-| Sensitivity | Axes come from high-impact weak evidence, are anchored to a scenario, and show the output and threshold that changes the decision. | Decorative 2D grid using arbitrary volume x price defaults. |
-| Valuation | States method credibility, exclusions, scenario range, DCF/multiple/SOTP bridge where relevant, and investor/founder return support. | Averages methods blindly or applies a revenue multiple without quality, margin, or risk context. |
-| Market Support | TAM/SAM/SOM, reachability, source freshness, plan-to-market bridge, and gaps tie market evidence to assumptions. | Market size is a headline number with no source freshness or connection to revenue drivers. |
-| Benchmarks | Each benchmark has source id, type, period, applicability limits, freshness, linked assumption/KPI, and refresh need. Material assumptions use the right evidence lens, such as labor / HR comps, venture equity or funding comps, venture debt / non-dilutive capacity, pricing / customer ROI comps, or market / competitive benchmarks. | Fake or stale source labels appear without applicability limits or linked driver. |
-| IC Memo | Gives recommendation, KPI readout, what must be true, downside triggers, valuation support, financing/ownership implication, DD questions, and source boundary. | Memo summarizes tabs instead of making an investment judgment. |
+| Guide | Decision, business mechanics, source boundary, sheet map, formatting key (colors, ▲, sign convention, hybrid-axis boundary), and model qualifications orient a new reviewer in under a minute. | Generic instructions, missing formatting key, or navigation that does not match actual sheets. |
+| Summary | Answers the first five minutes of investor questions without opening engine tabs: annual condensed P&L, cash & runway, mechanism-fit KPIs (≤10) with benchmark context, all-scenario comparison with a staleness check, consolidated checks + master check, cross-checks (final-year market share, revenue per FTE, growth vs market), and a recommendation with conditions. | A metrics dump without judgment; scenario numbers that cannot be traced or verified; missing master check. |
+| Assumptions | Every driver row has value, unit, source/driver explanation, and evidence status; scenario toggle + case table actually drives the engine; the driver map shows what matters and who owns it; no irrelevant-mechanic or all-zero placeholder rows. | Dependent outputs hardcoded as assumptions; rows without source status; scenario table disconnected from the model body. |
+| Revenue Build | Calculates revenue bottom-up from the real economic unit (customers, units, GMV × take rate, utilization × rate) with retention/churn logic, plus demand-support (funnel coverage) and price-support (ROI / cost floor) verification blocks and a revenue bridge check. | Revenue entered directly, derived from TAM × share, or SaaS defaults forced onto non-SaaS mechanics. |
+| Cost Build | Separates variable COGS, delivery/cloud/support cost-to-serve, department opex programs, and capex tied to activity drivers, with a gross-margin-vs-target check. | Margin assumed directly while cost drivers stay hidden; opex as one blanket % of revenue. |
+| People Plan | Department FTE × loaded compensation (statutory welfare rate handled), capacity checks (customers per CS FTE, required support FTE), and a headcount-vs-revenue-growth sanity flag. | FTE grows as a flat percentage without capacity logic; payroll ignores social-insurance load. |
+| P&L | Presents revenue, gross profit, opex, EBITDA, D&A, interest, tax, and net income purely from upstream schedules (tax-exclusive), with margins and a consistency check. | P&L contains independent assumptions or buried hardcodes. |
+| BS | Balances cash, working capital (site-based AR), assets, tax-timing balances, debt, and equity with an explicit tolerance-based balance check. | Plugs, or a balance sheet that does not reconcile to CF and P&L. |
+| CF | Tax-inclusive cash plan: operating cash with consumption-tax / withholding / social-insurance balance deltas (simplifications noted), capex, financing by instrument, ending cash, runway months, and a cash-shortfall check. | Cash flow duplicates P&L without cash timing; runway absent; tax timing silently ignored. |
+| Financing | Sources & uses, instrument terms, post-raise runway ≥18 months check, and a live downside funding gap. | Funding need not tied to runway or milestone coverage. |
+| Cap Table | Rounds register with pre/post money, price per share, share counts by class, issued and fully diluted ownership, voting-threshold flags (66.67/50.01/33.34%), option-pool range check, and a 100% reconciliation check. | Percent-only dilution with no share math; converts/options ignored; no reconciliation. |
+| Evidence | Real comparable/benchmark evidence only (source, date, applicability, freshness); retrieval failures and evidence gaps are visible rows; market sanity (TAM/SAM/SOM) is isolated from the revenue chain and feeds only cross-checks. | Fake or placeholder source rows; market size feeding revenue formulas. |
+| Pricing | Connects customer ROI/value capture, cost-plus floor, willingness-to-pay evidence, margin, sales friction, and validation tests. | Price copied from management target without triangulation. |
+| Unit Economics | Per-unit P&L (price, cost-to-serve, margin), CAC/LTV, payback, retention basis, and benchmark context tied to the economic unit. | Generic SaaS metrics detached from the actual unit. |
+| Valuation & Exit | Method matrix (rows = methods, columns = low/mid/high + credibility), selected range, exit waterfall (net debt, transaction costs, preference, proceeds by holder), and investor return with guarded division. | Period columns abused as method ranges; averages methods blindly; MOIC divides by a floor constant. |
+| Segments | Real per-segment economics (requires ≥2 stated segments), source status, and a consolidation bridge check. | Segment labels sharing one blended assumption set. |
+| IC Memo | Recommendation, KPI readout, what must be true, downside triggers, valuation support, financing/ownership implication, ranked DD questions, and source boundary. | Memo summarizes tabs instead of making an investment judgment. |
 
 ## Sheet Inclusion And Omission
 
@@ -86,12 +81,14 @@ When a sheet is omitted:
 
 The workbook should read like a decision argument:
 
-1. Guide and Kernel define the decision, evidence, mechanics, and scope.
-2. Assumptions and Driver Tree select the material variables.
+1. Guide defines the decision, evidence, mechanics, and scope.
+2. Assumptions (register + driver map + scenario table) selects the material
+   variables.
 3. Operating schedules calculate revenue, cost, people, assets, cash, capital,
    and ownership from those variables.
-4. KPI, scenario, sensitivity, valuation, market support, and benchmarks test
-   the weak links.
-5. IC Memo converts the model into recommendation, risks, and diligence action.
+4. Summary's KPI block, scenario comparison, cross-checks, and the Evidence
+   register test the weak links.
+5. The Summary recommendation block (or a conditional IC Memo) converts the
+   model into recommendation, risks, and diligence action.
 
 If this flow is broken, repair the model structure before polishing formatting.

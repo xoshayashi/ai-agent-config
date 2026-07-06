@@ -14,6 +14,12 @@ explain it, the implied value from those drivers, and a support check.
 | Support ratio / variance | Comparison of implied value to selected value. |
 | Evidence status | `actual`, `contracted`, `pipeline-backed`, `benchmark`, `management target`, `estimate`, `placeholder`, or `unknown`. |
 
+In the workbook this pattern renders as: selected drivers with evidence status
+in the Assumptions register, and support blocks next to the engine that
+consumes them — demand and price support on Revenue Build, cost-to-serve
+support on Cost Build, capacity checks on People Plan, funding coverage on
+Financing, external evidence on Evidence. It is not a separate sheet.
+
 ## Evidence Strength Ladder
 
 Evidence status should change modeling depth:
