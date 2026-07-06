@@ -1705,6 +1705,9 @@ def test_self_improvement_panel_accepts_evidence_backed_independent_record() -> 
         "milestone_review": True,
     }
     assert self_improvement.validate_reflection_record_for_acceptance(accepted) == []
+    missing_reviewer = dict(accepted)
+    missing_reviewer.pop("panel_reviewer")
+    assert "panel:reviewer_required" in self_improvement.validate_reflection_record_for_acceptance(missing_reviewer)
 
 
 def test_self_improvement_closeout_consistency_catches_links_and_count_drift(tmp_path: Path) -> None:

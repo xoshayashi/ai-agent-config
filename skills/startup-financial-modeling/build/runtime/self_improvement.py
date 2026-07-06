@@ -232,6 +232,7 @@ def score_reflection_panel(record: Mapping[str, Any]) -> dict[str, Any]:
     reviewer = str(record.get("panel_reviewer", "")).strip().lower()
     if not reviewer:
         scores["R1"] -= 5
+        blockers.append("panel:reviewer_required")
         findings.append("R1: missing independent panel_reviewer")
     elif author and author == reviewer:
         scores["R1"] -= 10
