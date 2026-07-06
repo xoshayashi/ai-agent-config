@@ -72,18 +72,13 @@ if [[ -o interactive && "${TERM:-}" != "dumb" ]] && command -v starship >/dev/nu
 fi
 
 alias c='clear'
-# Keep Gemini shell launches aligned with the repo-managed permissive CLI defaults.
-alias gemini='gemini --yolo'
-# Keep Codex shell launches aligned with the repo-managed permissive CLI defaults.
-alias codex='codex --dangerously-bypass-approvals-and-sandbox'
-# Use an explicit permissive alias so shell launches match the repo-managed CLI defaults.
-alias claude='claude --dangerously-skip-permissions'
-# agy uses the same permission-bypass semantics as Claude Code in this setup.
-alias agy='agy --dangerously-skip-permissions'
-# Hermes is installed outside this setup path; keep shell launches permissive when present.
-alias hermes='hermes --yolo'
-export COPILOT_ALLOW_ALL=true
-alias copilot='copilot --allow-all'
+# Keep permissive CLI launches explicit so base commands retain their defaults.
+alias gemini-yolo='gemini --yolo'
+alias codex-yolo='codex --dangerously-bypass-approvals-and-sandbox'
+alias claude-yolo='claude --dangerously-skip-permissions'
+alias agy-yolo='agy --dangerously-skip-permissions'
+alias hermes-yolo='hermes --yolo'
+alias copilot-yolo='copilot --allow-all'
 
 # --- Ollama BYOK for Copilot CLI ---
 export OLLAMA_CONTEXT_LENGTH=16384
@@ -164,3 +159,10 @@ unset _gs_entry _gs_name _gs_var _gs_val
 
 # Added by Antigravity
 export PATH="$HOME/.antigravity/antigravity/bin:$PATH"
+
+# Added by Antigravity IDE
+export PATH="/Users/sh/.antigravity-ide/antigravity-ide/bin:$PATH"
+
+# Google Cloud SDK installed outside Homebrew on this machine.
+if [ -f '/Users/sh/Downloads/google-cloud-sdk/path.zsh.inc' ]; then . '/Users/sh/Downloads/google-cloud-sdk/path.zsh.inc'; fi
+if [ -f '/Users/sh/Downloads/google-cloud-sdk/completion.zsh.inc' ]; then . '/Users/sh/Downloads/google-cloud-sdk/completion.zsh.inc'; fi

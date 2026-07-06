@@ -46,6 +46,15 @@ Claude Code / Codex / Gemini CLI に共通の Instructions を配布するため
 3. Perplexity の App Store 版を自動導入する場合は、Mac App Store にサインイン済みであること
 4. `uninstall.sh` を使う場合は `trash` コマンドがあること
 
+Microsoft Office が必要な場合は、セットアップとは別に Homebrew Cask で導入します。
+
+```sh
+brew install --cask microsoft-office
+```
+
+インストール後の Microsoft 365 サインインやライセンス認証は手動で行います。
+詳細は `setup.md` の「Optional macOS apps」を参照してください。
+
 ## セットアップ
 
 ```sh
