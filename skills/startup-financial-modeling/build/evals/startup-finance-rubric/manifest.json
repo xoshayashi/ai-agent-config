@@ -1,0 +1,6 @@
+{
+  "name": "startup-finance-rubric",
+  "version": "1.0.0",
+  "supportedTargetKinds": ["skill"],
+  "command": ["node", "./emit-startup-finance-rubric.js"]
+}
