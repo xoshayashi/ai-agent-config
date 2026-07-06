@@ -3,11 +3,18 @@
 The IC Memo is not a summary of workbook tabs. It is the investment judgment
 that connects model outputs, evidence quality, downside risk, and next actions.
 
+The IC Memo sheet is conditional: it ships by default in `ma_exit` and
+`comps_only`, and elsewhere only via `--additional-sheets`. The always-on
+judgment surface is the Summary recommendation block (recommended raise,
+conditions, weakest evidence, next DD); the memo deepens that judgment when
+the decision warrants a full memo.
+
 ## Required Thinking
 
-Before writing the memo, read across assumptions, KPI, scenarios, sensitivity,
-valuation, capital stack, ownership, and source support. The memo should make a
-decision easier, not merely describe formulas.
+Before writing the memo, read across the Assumptions register, the Summary KPI
+/ scenario / sensitivity blocks, Valuation & Exit, Financing, Cap Table, and
+the Evidence register. The memo should make a decision easier, not merely
+describe formulas.
 
 ## Memo Sections
 

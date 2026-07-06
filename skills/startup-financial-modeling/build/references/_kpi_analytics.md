@@ -4,11 +4,18 @@ KPI work is not a fixed dashboard. It is the analytical layer that tells the
 reader whether the model's economic engine is investable, fundable, and
 operationally credible.
 
+The KPI surface is a block of at most 10 rows on the Summary sheet, not a
+dedicated tab. Each row carries the metric, its unit, and a compact
+benchmark-context note (gray) sourced from the Evidence register.
+
 ## Selection Protocol
 
-Choose KPIs from the decision, mechanics, and model stage. A KPI is useful only
-if it changes a financing, pricing, hiring, valuation, risk, or diligence
-decision.
+Choose KPIs from the economic mechanism, the decision, and the model stage. A
+KPI is useful only if it changes a financing, pricing, hiring, valuation, risk,
+or diligence decision. For a recurring-software mechanism the natural set is
+ARR, growth, gross margin %, NRR, churn, CAC payback, LTV/CAC, burn multiple,
+Rule of 40, and revenue per FTE — but treat that as an example of
+mechanism-fit selection, not a template.
 
 For each candidate KPI, ask:
 
@@ -38,9 +45,9 @@ Use families, not templates:
 | Ownership and return | Shows investor/founder economics | dilution, option pool, investor ownership, MOIC, IRR, founder proceeds |
 | Evidence / diligence | Shows what is proven vs assumed | evidence status, support coverage, benchmark variance, open DD item count |
 
-## Interpretation Row
+## Interpretation Notes
 
-Every KPI block should have enough context to be read, not just calculated:
+Every KPI row should have enough context to be read, not just calculated:
 
 - selected KPI value or trend;
 - source / driver and evidence status;
@@ -48,8 +55,11 @@ Every KPI block should have enough context to be read, not just calculated:
 - scenario or sensitivity that pressures it;
 - investment implication or diligence question.
 
-If the workbook format cannot fit this in the KPI sheet, capture it in the
-Benchmarks or IC Memo sheet. Do not leave interpretation only in the final chat.
+The KPI interpretation register survives as compact notes on the Summary KPI
+block, not as a separate sheet. When a note needs more room, put the evidence
+detail in the Evidence register and the judgment in the Summary recommendation
+block or the IC Memo (when present). Do not leave interpretation only in the
+final chat.
 
 ## Maturity and Mechanic Signals
 
@@ -88,4 +98,6 @@ For each material KPI, keep a compact definition record:
 
 Common KPI names are not definitions. Burn multiple, NRR, payback, Rule of 40,
 loan loss, capital efficiency, and similar metrics must be formula-defined in
-the artifact or omitted.
+the artifact or omitted. Keep the record as compact notes attached to the
+Summary KPI rows (driver/source column plus note column); it does not justify
+a separate sheet.

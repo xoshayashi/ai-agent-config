@@ -3,6 +3,22 @@
 Scenario and sensitivity work should make uncertainty actionable. It should not
 be a cosmetic downside/base/upside table with unrelated scalar changes.
 
+## Workbook Mechanism
+
+Scenario and sensitivity work owns no dedicated tab. The mechanism is:
+
+- One scenario toggle cell (blue input, 1/2/3) plus a Base/Down/Up case table
+  at the end of the Assumptions sheet. Effective-scale rows read the active
+  case via `INDEX`, and the model body multiplies through those rows — the
+  whole workbook recalculates on one toggle, one calculation at a time.
+- The all-scenario comparison and the single decision-relevant sensitivity
+  matrix live on Summary as generator-computed snapshots, each with a
+  staleness check row that compares the Base-column snapshot against the live
+  output at toggle = Base and shows CHECK FAILED on divergence.
+- The downside case is not decorative: it must still reach a fundable
+  milestone within the raise. Pair it with the Financing sheet's post-raise
+  runway check (≥18 months) and the downside funding gap row.
+
 ## Scenario Construction
 
 A scenario is a coherent story about how drivers move together. Build each case
@@ -98,6 +114,7 @@ Breakpoints are often more decision-useful than a large grid of numbers.
 
 ## Output Linkage
 
-Scenario and sensitivity sheets should feed the IC memo. The memo should name
-the downside trigger, the metric that shows it, and the action or diligence
-needed before relying on the plan.
+The Summary scenario and sensitivity blocks should feed the Summary
+recommendation block and, when present, the IC Memo. That judgment surface
+should name the downside trigger, the metric that shows it, and the action or
+diligence needed before relying on the plan.

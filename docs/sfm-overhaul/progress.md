@@ -493,6 +493,69 @@ eval 12 の XLSX assertion 欠落）を修正して 174 / 174 緑を回復。`va
   (×12 前提の解消)、grants の P&L 経由計上オプション、convertible の
   転換時デット→エクイティ振替の三表連動。
 
+### 2026-07-06 — docs/sfm-overhaul 再読後の clean-base 抽象化
+
+`design-research.md` / `spec.md` / `plan.md` / 本進捗ログを再読し、履歴や旧タスク
+名を貼り戻さず、汎用的に再利用できる2点を SFM skill 側へ抽象化して取り込んだ。
+
+- **Workbook-wide role width**: label / source-driver / note 幅は sheet ごとの
+  局所値ではなく、workbook 全体の role 最大内容幅から解決して全 default-layout
+  sheet に一貫適用。`uses_default_layout` は現行 v2 の row-6 header 契約に修正。
+- **Table-local semantic spans**: `detect_table_block` は target row の populated
+  span と header fill を突合し、同じ header row 上の side-by-side table を min/max
+  で融合しない。明示 `header_row` override は従来通り指定 header の全 span を使う。
+- 参照資料・eval/rubric・machine gate に同契約を追加:
+  `_layout_canonical.md`, `_ib_workbook_design_system.md`,
+  `_sheet_quality_rubric.md`, `evals.json`, `startup-finance-rubric`,
+  `quality_gates.py`, `test_build_model.py`。
+- 検証: targeted pytest 16 passed, full `quality_gates.py` 60/60
+  (internal pytest 258 passed), domain rubric 100/100, quick_validate pass,
+  plugin-eval 100/100, `git diff --check` pass, `__pycache__` cleanup済み。
+- milestone-review: Codex host から context-digest route を試行。Gemini CLI は
+  missing、Claude / Antigravity は 240s timeout。外部レビューは degraded として記録し、
+  pass 扱いにはしていない。完了判断は上記の一次検証に基づく。
+
+### 2026-07-06 — session-log 自己改善ゲートの追加
+
+ユーザーの「生成後ログ / 改善プロンプトから汎用的に自己改善する」要求を、
+SFM skill の横断 closeout 契約として抽象化して実装した。
+
+- 新規 `_self_improvement_protocol.md`: trigger signals、sanitized evidence、
+  reflection record、artifact fix と reusable skill gap の分離、lowest durable
+  layer への patch、regression proof、capability/regression/holdout eval 分離、
+  cost/latency 記録、privacy/secrets hygiene、milestone/human review stop
+  condition を定義。
+- 新規 `build/runtime/self_improvement.py`: `validate_reflection_record` /
+  `detect_sensitive_text` で required fields、layer/privacy whitelist、
+  secret/email/raw-log detection、company-specific / numeric-instance overfit、
+  X handle/status/raw-post rejection、audit/privacy 変更時の review-required
+  を機械検査。
+- `_skill_invocation_protocol.md` / `_self_review_protocol.md` /
+  `_ai_prompt_research_patterns.md` / `SKILL.md` に発動条件を接続し、
+  Reflection Record 書き込み前に validator を通す live-path gate を明記。
+- `evals.json`, `quality_gates.py`, `startup-finance-rubric`,
+  `test_build_model.py` に `SELF_IMPROVEMENT_PROTOCOL`,
+  `self_improvement_from_failed_session_log`, G-J reflection validator、
+  validator の positive/negative behavior tests を追加。
+- 外部調査: Reflexion, Self-Refine, Anthropic evaluator-optimizer/agent evals,
+  OpenAI evals/cookbook, LangSmith trace-to-dataset loop, DSPy assertions,
+  X public posts は weak signal として反映。財務主張の evidence には使わない。
+- 検証: targeted pytest 5 passed, full `quality_gates.py` 65/65
+  (internal pytest 261 passed), domain rubric 100/100, quick_validate pass,
+  plugin-eval 100/100, `git diff --check` pass, JSON validation pass,
+  generated cache なし。
+- milestone-review:
+  - milestone: session-log self-improvement gate | host: codex | end state:
+    reviewed
+    routes: claude=ok (digest route) | digest route: yes
+    conclusion: 初回レビューは「文言だけ、専用 eval 不在、privacy scanner 不在」を
+    structural gap と指摘。validator / G-J / 専用 eval / behavior tests 追加後の
+    follow-up は「prior concerns closed」、残確認は live path で validator が必須か。
+    `_skill_invocation_protocol.md` と `_self_improvement_protocol.md` に
+    `validate_reflection_record` を Reflection Record 書き込み前 gate として明記。
+    verified: 指摘は一次ファイルと test/gate 結果に照合済み。
+    next: 完了報告。
+
 ## ブロッカー / 要人間判断
 
 （なし）

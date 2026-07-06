@@ -1249,7 +1249,12 @@ def build_cap_table_sheet(
     else:
         ws = wb.create_sheet(CAP_TABLE_SHEET_NAME)
 
-    # Layout setup (no period columns; just A=margin / B=label / C-G=values)
+    # Intermediate layout during cell population (no period columns; just
+    # A=margin / B=label / C-G=values). insert_cols(2) further down shifts
+    # everything one column right and the *final* canonical layout
+    # (B = 2.14 indent, C = label, ...) is reapplied immediately after. The
+    # canonical indent-width rule is audited against the final state — do not
+    # rely on these intermediate widths being canonical.
     ws.column_dimensions["A"].width = 2
     ws.column_dimensions["B"].width = 32
     for col in "CDEFGH":
@@ -1500,7 +1505,7 @@ def build_cap_table_sheet(
 
     ws.insert_cols(2)
     ws.column_dimensions["A"].width = ib.COL_MARGIN_WIDTH
-    ws.column_dimensions["B"].width = ib.COL_HIERARCHY_WIDTH
+    ib.apply_indent_column_widths(ws, ["B"])
     ws.column_dimensions["C"].width = ib.COL_LABEL_WIDTH
     ws.column_dimensions["D"].width = ib.COL_WIDTH_LARGE
     ws.column_dimensions["E"].width = ib.COL_WIDTH_BASE

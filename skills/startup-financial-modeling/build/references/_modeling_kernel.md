@@ -6,16 +6,21 @@ companies without assuming a fixed sector or maturity template.
 ## Kernel Inputs
 
 - Decision: what choice the model must support.
-- Model grain: annual, quarterly, or monthly periods, fiscal year, currency,
-  display scale, consolidation scope, and forecast horizon.
+- Model grain: annual, quarterly, monthly, or hybrid periods, fiscal year,
+  currency, display scale, consolidation scope, and forecast horizon. The
+  structured-YAML default for full and three-statement builds is hybrid:
+  monthly for the first two fiscal years plus annual to five, with a
+  months-in-period ruler row so one formula shape spans both grains.
 - Evidence map: source facts, management targets, estimates, assumptions, and
   unknowns.
 - Entity map: parent, subsidiaries, segments, products, geographies, customers,
   assets, instruments, and shareholders where relevant.
 
-## Driver Tree
+## Driver tree
 
-Build a driver tree before adding workbook tabs. Start with primitive flows:
+Build a driver tree before adding workbook tabs; it is a reasoning artifact,
+and its compact rendering is the driver map block on the Assumptions sheet.
+Start with primitive flows:
 
 - Demand: leads, customers, sites, units, transactions, utilization, retention,
   cohort behavior, renewals, churn, expansion, and pipeline conversion.
@@ -108,15 +113,23 @@ Use only the engines needed by the decision:
   and hardware cost curves.
 - Working-capital engine: models receivables, payables, deferred revenue,
   inventory, advances, and tax timing.
-- Capital stack: traces cash sources, debt, interest, covenants, equity rounds,
-  converts, warrants, option pool, and ownership.
+- Capital engine: traces cash sources, debt, interest, covenants, equity
+  rounds, converts, warrants, option pool, and ownership. It surfaces on the
+  Financing sheet (period axis) and the Cap Table sheet (rounds axis).
 - Scenario engine: centralizes base/downside/upside, sensitivity, break-even,
-  runway, covenant, dilution, valuation, and exit cases.
+  runway, covenant, dilution, valuation, and exit cases. It surfaces as the
+  toggle + case table on Assumptions and snapshot blocks on Summary, not as a
+  separate sheet.
 
 ## Output Logic
 
 Start from the smallest complete graph of dependent logic. Add a sheet only
-when it owns a distinct calculation surface or makes a decision auditable.
+when it owns a distinct calculation surface or makes a decision auditable. The
+full workbook follows a three-layer architecture — Assumptions (inputs) →
+engine sheets (Revenue Build, Cost Build, People Plan, statements, Financing,
+Cap Table) → Summary (presentation, no new logic) — with a hard cap of 12
+sheets; conditional sheets (Valuation & Exit, IC Memo, Segments) exceed the
+cap only on an explicit flag.
 
 Use direct formulas. Keep source facts separate from assumptions. Where the
 source is thin, show the placeholder assumption and the decision sensitivity it
@@ -156,10 +169,12 @@ workbook tab is rendered:
   buffer; a fundraise plan whose own cash goes negative is not investor-grade.
   Rounds can legitimately be zero once the plan is self-funding, so downstream
   surfaces must guard divisions by round size or post-money.
-- Conservative grain detection: the forecast architecture is annual (revenue,
-  cost, and comp formulas annualize per period). Only an explicit monthly or
-  quarterly *model* request flips the grain; metric phrases like `monthly burn`
-  or `18-month runway` stay annual.
+- Conservative grain detection: the `--source-md` narrative route stays annual
+  five-year (per-period formulas scale by the months-in-period ruler, so the
+  shape is grain-independent). Only an explicit monthly or quarterly *model*
+  request flips the narrative route's grain; metric phrases like `monthly
+  burn` or `18-month runway` stay annual. The structured-YAML route defaults
+  to the hybrid axis for full and three-statement builds.
 - Currency detection: the kernel is JPY-primary but detects USD from a strong
   narrative signal (an explicit USD word or repeated `$` figures, with no
   competing JPY signal). A USD plan keeps stated `$` prices and revenue as

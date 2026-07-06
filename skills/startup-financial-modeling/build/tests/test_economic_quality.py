@@ -16,6 +16,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+from dataclasses import replace
 from pathlib import Path
 
 import pytest
@@ -83,9 +84,18 @@ def _implied(facts) -> list[dict]:
 
     Mirrors Revenue Build, Cost Build, and People Plan so the test is an
     independent check on the driver values rather than trusting kernel
-    internals.
+    internals. The installed base follows the kernel's K1 input-fidelity
+    rule (Phase 2 Task 2.2): when ``facts.customers_pinned`` is True the
+    customers series drives the average installed base, otherwise the
+    legacy new-unit rollforward
+    (``ending_units(facts.new_units, churn_rate=facts.churn_rate)``) holds.
     """
-    ending = kernel.ending_units(facts.new_units)
+    if getattr(facts, "customers_pinned", False) and any(v > 0 for v in facts.customers):
+        ending = list(facts.customers)
+    else:
+        # narrative-derived plans keep the legacy ramp-style churn schedule
+        # (matched by calibrate at derivation time).
+        ending = kernel.ending_units(facts.new_units)
     average = kernel.average_units(ending)
     rows: list[dict] = []
     for i in range(len(facts.years)):
@@ -811,17 +821,16 @@ def test_dcf_forecast_fcf_is_not_floored_at_zero() -> None:
         out = Path(tmp) / "dcf.xlsx"
         build_model.build_model(None, out, mode="dcf_only")
         wb = load_workbook(out, data_only=False)
-        ws = wb["Valuation"]
-        row = next(
-            (cell.row for r in ws.iter_rows() for cell in r
-             if cell.value == "PV of forecast FCF"),
-            None,
-        )
-        assert row is not None, "Valuation sheet missing 'PV of forecast FCF' row"
-        first_col = source_plan.START_PERIOD_COL
+        ws = wb["Valuation & Exit"]
+        rows = [
+            cell.row for r in ws.iter_rows() for cell in r
+            if cell.value in ("PV of forecast FCF", "PV of FCF (per FY)")
+        ]
+        assert rows, "Valuation & Exit sheet missing the forecast-FCF PV rows"
         formulas = [
             ws.cell(row, c).value
-            for c in range(first_col, ws.max_column + 1)
+            for row in rows
+            for c in range(4, ws.max_column + 1)
             if isinstance(ws.cell(row, c).value, str) and ws.cell(row, c).value.startswith("=")
         ]
         assert formulas, "no forecast-FCF formulas found"
@@ -844,14 +853,7 @@ def test_dcf_enterprise_value_is_positive_and_method_consistent() -> None:
             check=True, capture_output=True, timeout=120,
         )
         wb = load_workbook(Path(tmp) / "recalc" / "dcf.xlsx", data_only=True)
-        ws = wb["Valuation"]
-
-        # Derive the last period column from the period header row (row 5).
-        final_col = max(
-            cell.column
-            for cell in ws[5]
-            if cell.column >= source_plan.START_PERIOD_COL and cell.value
-        )
+        ws = wb["Valuation & Exit"]
 
         def final_value(label: str) -> float:
             row = next(
@@ -859,8 +861,9 @@ def test_dcf_enterprise_value_is_positive_and_method_consistent() -> None:
                  if cell.value == label),
                 None,
             )
-            assert row is not None, f"Valuation sheet missing '{label}' row"
-            return float(ws.cell(row, final_col).value)
+            assert row is not None, f"Valuation & Exit sheet missing '{label}' row"
+            # single-value rows carry their figure in column D
+            return float(ws.cell(row, 4).value)
 
         dcf_ev = final_value("DCF EV")
         primary_ev = final_value("Primary-method EV")
@@ -934,10 +937,11 @@ def test_stated_raise_size_and_post_money_are_honored() -> None:
              "--outdir", str(Path(tmp) / "recalc"), str(out)],
             check=True, capture_output=True, timeout=120,
         )
-        ws = load_workbook(Path(tmp) / "recalc" / "raise.xlsx", data_only=True)["Capital Stack"]
-        first_col = source_plan.START_PERIOD_COL
+        ws = load_workbook(Path(tmp) / "recalc" / "raise.xlsx", data_only=True)["Cap Table"]
         own_row = _row_for_label(ws, "New investor ownership")
-        ownership = ws.cell(own_row, first_col).value
+        # Cap Table rounds register: column F = founding, column G = round 1
+        # (C label / D driver / E unit keep the v2 register contract).
+        ownership = ws.cell(own_row, 7).value
         # $3.5M into a $14M post-money is a 25% round.
         assert ownership is not None and abs(float(ownership) - 0.25) < 0.01, (
             f"new-investor ownership {ownership} does not reflect the stated "
@@ -1020,9 +1024,9 @@ def _saas_facts_with_peer_comps():
 
 
 def test_kpi_sheet_compares_plan_kpis_to_live_peers() -> None:
-    """The KPI sheet juxtaposes plan KPIs with live-fetched peer margins."""
+    """The Evidence sheet juxtaposes plan KPIs with live-fetched peer margins."""
     wb = source_plan.build_source_plan_workbook_from_facts(_saas_facts_with_peer_comps())
-    ws = wb["KPI"]
+    ws = wb["Evidence"]
     texts = [c.value for row in ws.iter_rows() for c in row if isinstance(c.value, str)]
     assert any("live public peers" in t for t in texts), "peer comparison section missing"
     # The peer median for the injected SaaS comps (0.77, 0.81) must appear live,
@@ -1056,13 +1060,13 @@ def test_peer_comparison_status_recalculates_without_error() -> None:
             check=True, capture_output=True, timeout=120,
         )
         wb = load_workbook(Path(tmp) / "recalc" / "peers.xlsx", data_only=True)
-        ws = wb["KPI"]
+        ws = wb["Evidence"]
         statuses = {"below", "above", "within"}
         found = [
             c.value for row in ws.iter_rows() for c in row
             if isinstance(c.value, str) and c.value in statuses
         ]
-        assert found, "no resolved plan-vs-peer status found on the KPI sheet"
+        assert found, "no resolved plan-vs-peer status found on the Evidence sheet"
 
 
 def test_archetype_workbooks_pass_strict_audit() -> None:
@@ -1130,14 +1134,14 @@ def test_burn_multiple_does_not_explode_in_period_zero() -> None:
             check=True, capture_output=True, timeout=120,
         )
         wb = load_workbook(Path(tmp) / "recalc" / "saas.xlsx", data_only=True)
-        ws = wb["KPI"]
+        ws = wb["Summary"]
         first_col = source_plan.START_PERIOD_COL
         burn_row = next(
             (cell.row for row in ws.iter_rows() for cell in row
              if cell.value == "Burn multiple"),
             None,
         )
-        assert burn_row is not None, "KPI sheet missing 'Burn multiple' row"
+        assert burn_row is not None, "Summary sheet missing 'Burn multiple' row"
         facts = kernel.derive_source_facts(SAAS_STORY)
         for idx in range(len(facts.years)):
             val = ws.cell(burn_row, first_col + idx).value
@@ -1217,13 +1221,13 @@ def test_kpi_dashboard_carries_vc_decision_metrics() -> None:
             check=True, capture_output=True, timeout=120,
         )
         wb = load_workbook(Path(tmp) / "recalc" / "saas.xlsx", data_only=True)
-        ws = wb["KPI"]
+        ws = wb["Summary"]
         first_col = source_plan.START_PERIOD_COL
         facts = kernel.derive_source_facts(SAAS_STORY)
         assert any(
             c.value == "VC decision metrics"
             for row in ws.iter_rows() for c in row
-        ), "KPI sheet missing the 'VC decision metrics' section"
+        ), "Summary sheet missing the 'VC decision metrics' section"
         metrics = [
             "Rule of 40", "Net revenue retention",
             "Customer acquisition cost", "CAC payback", "Magic number",
@@ -1234,7 +1238,7 @@ def test_kpi_dashboard_carries_vc_decision_metrics() -> None:
                 val = ws.cell(row, first_col + idx).value
                 assert val is not None, f"{label} period {idx} did not resolve"
                 if isinstance(val, str):
-                    assert val == "N/A", (
+                    assert val in ("N/A", "-"), (
                         f"{label} period {idx}: unexpected text {val!r}"
                     )
                 else:
@@ -1258,27 +1262,37 @@ def test_rule_of_40_is_growth_plus_ebitda_margin() -> None:
             check=True, capture_output=True, timeout=120,
         )
         wb = load_workbook(Path(tmp) / "recalc" / "saas.xlsx", data_only=True)
-        kpi, rb, pl = wb["KPI"], wb["Revenue Build"], wb["P&L"]
+        summary = wb["Summary"]
         first_col = source_plan.START_PERIOD_COL
-        r40 = _row_for_label(kpi, "Rule of 40")
-        growth = _row_for_label(rb, "Revenue growth")
-        ebitda_margin = _row_for_label(pl, "EBITDA margin")
+        r40 = _row_for_label(summary, "Rule of 40")
+        growth = _row_for_label(summary, "Revenue growth (YoY)")
+        ebitda_margin = _row_for_label(summary, "EBITDA margin")
         facts = kernel.derive_source_facts(SAAS_STORY)
+        checked = 0
         for idx in range(len(facts.years)):
-            got = kpi.cell(r40, first_col + idx).value
-            growth_val = rb.cell(growth, first_col + idx).value
-            margin_val = pl.cell(ebitda_margin, first_col + idx).value
+            got = summary.cell(r40, first_col + idx).value
+            growth_val = summary.cell(growth, first_col + idx).value
+            margin_val = summary.cell(ebitda_margin, first_col + idx).value
             # A clean failure if the recalc did not resolve a cell, rather
             # than a confusing TypeError from float(None).
             assert None not in (got, growth_val, margin_val), (
                 f"period {idx}: a Rule of 40 input did not recalculate "
                 f"(rule={got}, growth={growth_val}, margin={margin_val})"
             )
+            if growth_val == "-":
+                # The first fiscal year has no prior-year base; the composed
+                # metric must mirror that sentinel rather than fake a number.
+                assert got == "-", f"period {idx}: Rule of 40 {got!r} on '-' growth"
+                continue
             expected = float(growth_val) + float(margin_val)
             assert abs(float(got) - expected) < 1e-6, (
                 f"period {idx}: Rule of 40 {got} != growth + EBITDA margin "
                 f"{expected}"
             )
+            checked += 1
+        assert checked >= len(facts.years) - 1, (
+            "Rule of 40 resolved on too few periods to prove the composition"
+        )
 
 
 def test_kpi_dashboard_omits_vc_block_for_an_ambiguous_mechanic() -> None:
@@ -1290,7 +1304,7 @@ def test_kpi_dashboard_omits_vc_block_for_an_ambiguous_mechanic() -> None:
     )
     facts = kernel.derive_source_facts(story)
     assert kernel.mechanic_key(facts) == "generic"
-    ws = source_plan.build_source_plan_workbook_from_facts(facts)["KPI"]
+    ws = source_plan.build_source_plan_workbook_from_facts(facts)["Summary"]
     labels = [
         c.value for row in ws.iter_rows() for c in row
         if isinstance(c.value, str)
@@ -1302,11 +1316,9 @@ def test_kpi_dashboard_omits_vc_block_for_an_ambiguous_mechanic() -> None:
         assert metric not in labels, (
             f"{metric} leaked into an ambiguous-mechanic plan"
         )
-    # The layout is unshifted: the interpretation register stays at its base.
-    assert any(
-        c.value == "KPI interpretation register" and c.row == 62
-        for row in ws.iter_rows() for c in row
-    ), "ambiguous-mechanic KPI layout should not shift"
+    # The generic KPI block and the consolidated master check still render.
+    assert "KPI" in labels, "generic KPI section missing from Summary"
+    assert "Master check" in labels, "master check missing from Summary"
 
 
 PRE_REVENUE_STORY = """# Helios — pre-revenue deep-tech plan
@@ -1582,12 +1594,14 @@ def test_marketplace_kpi_uses_a_transaction_lens() -> None:
     )
     facts = kernel.derive_source_facts(story)
     assert kernel.mechanic_key(facts) == "marketplace"
-    ws = source_plan.build_source_plan_workbook_from_facts(facts)["KPI"]
-    # Restrict to the metric area; the interpretation register far below
-    # also names "Take rate" and would mask a missing metric row.
+    ws = source_plan.build_source_plan_workbook_from_facts(facts)["Summary"]
+    # Restrict to the KPI block (between the "KPI" section band and the
+    # scenario block) so labels elsewhere cannot mask a missing metric row.
+    kpi_start = _row_for_label(ws, "KPI")
+    kpi_end = _row_for_label(ws, "Scenario comparison")
     metric_labels = [
         c.value for row in ws.iter_rows() for c in row
-        if isinstance(c.value, str) and c.row <= 12
+        if isinstance(c.value, str) and kpi_start < c.row < kpi_end
     ]
     for per_seat in (
         "Monthly price / unit", "Monthly unit gross profit", "Unit payback",
@@ -1595,7 +1609,7 @@ def test_marketplace_kpi_uses_a_transaction_lens() -> None:
         assert per_seat not in metric_labels, (
             f"{per_seat} leaked into a marketplace KPI dashboard"
         )
-    for metric in ("Take rate", "GMV per customer", "Contribution margin"):
+    for metric in ("Take rate (FY end)", "GMV per customer", "Contribution margin"):
         assert metric in metric_labels, (
             f"{metric} missing from the marketplace KPI dashboard"
         )
@@ -1612,7 +1626,7 @@ def test_marketplace_kpi_uses_a_transaction_lens() -> None:
              "--outdir", str(Path(tmp) / "recalc"), str(out)],
             check=True, capture_output=True, timeout=120,
         )
-        recalced = load_workbook(Path(tmp) / "recalc" / "mkt.xlsx", data_only=True)["KPI"]
+        recalced = load_workbook(Path(tmp) / "recalc" / "mkt.xlsx", data_only=True)["Summary"]
         first_col = source_plan.START_PERIOD_COL
         cm_row = _row_for_label(recalced, "Contribution margin")
         for idx in range(len(facts.years)):
@@ -1706,6 +1720,1301 @@ def test_structured_yaml_revenue_tracks_the_stated_customer_count() -> None:
         )
 
 
+# =========================================================================
+# Phase 2 — K1 / K2 / K4 / K5 / K7 economic-coherence regression tests
+# (spec.md §3). These are red on main today; they go green as Tasks 2.2-2.6
+# of docs/sfm-overhaul/plan.md replace the implementations.
+# =========================================================================
+
+
+def test_K1_explicit_customers_dominate_recurring_revenue_over_new_units() -> None:
+    """K1 — input fidelity: when the structured input pins both `customers`
+    and `new_units` to genuinely different series, the recurring revenue
+    must derive from `customers` (the user-stated installed base), not from
+    `ending_units(new_units)` (the implicit ramp).
+
+    Currently `plan_revenue_series` averages `ending_units(new_units)` and
+    multiplies by price × 12 — so with new_units = [5] × 5, the recurring
+    base collapses to ~25, even though the user said 5,000 customers are
+    paying at maturity. The fix (Task 2.2) routes facts.customers into
+    plan_revenue_series as the installed base when the structured input
+    provides it."""
+    yaml_text = (
+        "periods: 5\n"
+        "customers: [1000, 2000, 3000, 4000, 5000]\n"
+        "new_units: [5, 5, 5, 5, 5]\n"
+        "monthly_price_yen: [10000, 10000, 10000, 10000, 10000]\n"
+        "target_gross_margin: [0.7, 0.7, 0.7, 0.7, 0.7]\n"
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        ypath = Path(tmp) / "k1.yaml"
+        ypath.write_text(yaml_text, encoding="utf-8")
+        raw = build_model.load_yaml(ypath)
+        facts = kernel.derive_source_facts_from_mapping(raw)
+
+        assert list(facts.customers) == [1000, 2000, 3000, 4000, 5000], (
+            "facts.customers must preserve the YAML-stated series"
+        )
+
+        revenue = kernel.plan_revenue_series(
+            facts.new_units,
+            facts.gmv_yen,
+            facts.monthly_price_yen,
+            facts.take_rate,
+            facts.other_revenue_share,
+            facts.revenue_mode,
+            installed_base=facts.customers,
+        )
+        # Recurring component at maturity if customers drove the base:
+        expected_floor = 5000 * 10000 * 12 * 0.5  # 50% tolerance for averaging
+        assert revenue[-1] >= expected_floor, (
+            f"K1 violated: with explicit customers=[…,5000] and "
+            f"monthly_price=¥10k, recurring revenue at maturity should be "
+            f">= {expected_floor:,.0f} JPY; got {revenue[-1]:,.0f}. The "
+            f"kernel is using ending_units(new_units) (≈25) instead of "
+            f"facts.customers (5,000) as the installed base."
+        )
+
+
+def test_K2_changing_churn_rate_moves_ending_units_and_terminal_arr() -> None:
+    """K2 — churn honor: facts.churn_rate must propagate into the fleet
+    rollforward so a higher churn rate produces a smaller terminal fleet
+    and lower terminal revenue. Today `ending_units` hard-codes the churn
+    factor as ``0.02 + idx * 0.005`` and ignores its caller — so changing
+    facts.churn_rate has zero effect. The fix (Task 2.2) accepts churn_rate
+    as a kwarg to ending_units."""
+    new_units = [200, 200, 200, 200, 200]
+    low_churn = kernel.ending_units(new_units, churn_rate=0.02)
+    high_churn = kernel.ending_units(new_units, churn_rate=0.30)
+    assert high_churn[-1] < low_churn[-1] * 0.7, (
+        f"K2 violated: ending_units must shrink when churn rises. "
+        f"low (0.02): {low_churn[-1]}; high (0.30): {high_churn[-1]}. "
+        f"Currently ending_units ignores its churn_rate argument and uses "
+        f"a hard-coded `0.02 + idx * 0.005` schedule."
+    )
+
+
+def test_K2_structured_yaml_churn_rate_moves_terminal_customers_and_revenue() -> None:
+    """K2 integrated path: when the structured YAML pins only new_units and
+    declares a churn_rate, the implied customer rollforward must honor that
+    rate. Surfaced by the Phase 2 mid-checkpoint Codex review — the
+    `kernel.ending_units(.., churn_rate=…)` unit test passed but
+    derive_source_facts_from_mapping built prims.customers via
+    `ending_units(prims.new_units)` (no churn_rate), so the full
+    structured path silently used the legacy schedule."""
+    base_yaml = (
+        "periods: 5\n"
+        "new_units: [200, 200, 200, 200, 200]\n"
+        "monthly_price_yen: [12000, 12000, 12000, 12000, 12000]\n"
+        "target_gross_margin: [0.7, 0.7, 0.7, 0.7, 0.7]\n"
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        low_path = Path(tmp) / "low.yaml"
+        high_path = Path(tmp) / "high.yaml"
+        low_path.write_text(base_yaml + "churn_rate: 0.02\n", encoding="utf-8")
+        high_path.write_text(base_yaml + "churn_rate: 0.30\n", encoding="utf-8")
+        low_facts = kernel.derive_source_facts_from_mapping(
+            build_model.load_yaml(low_path)
+        )
+        high_facts = kernel.derive_source_facts_from_mapping(
+            build_model.load_yaml(high_path)
+        )
+
+    assert low_facts.churn_rate == 0.02
+    assert high_facts.churn_rate == 0.30
+    assert high_facts.customers[-1] < low_facts.customers[-1] * 0.7, (
+        f"K2 violated in structured path: same new_units with churn 0.02 vs 0.30 "
+        f"produced terminal customers low={low_facts.customers[-1]} vs "
+        f"high={high_facts.customers[-1]}. derive_source_facts_from_mapping must "
+        f"thread stated_churn into the implied-customers rollforward."
+    )
+
+    low_revenue = kernel.plan_revenue_series(
+        low_facts.new_units, low_facts.gmv_yen, low_facts.monthly_price_yen,
+        low_facts.take_rate, low_facts.other_revenue_share, low_facts.revenue_mode,
+        installed_base=low_facts.customers, churn_rate=low_facts.churn_rate,
+    )
+    high_revenue = kernel.plan_revenue_series(
+        high_facts.new_units, high_facts.gmv_yen, high_facts.monthly_price_yen,
+        high_facts.take_rate, high_facts.other_revenue_share, high_facts.revenue_mode,
+        installed_base=high_facts.customers, churn_rate=high_facts.churn_rate,
+    )
+    assert high_revenue[-1] < low_revenue[-1] * 0.8, (
+        f"K2 violated: terminal revenue did not respond to churn_rate. "
+        f"low: {low_revenue[-1]:,.0f}; high: {high_revenue[-1]:,.0f}."
+    )
+
+
+def test_K4_nol_absorbs_prior_losses_so_cash_tax_does_not_double_dip() -> None:
+    """K4 — NOL carryforward: cumulative cash tax must satisfy
+    ``cum_cash_tax <= tax_rate × max(0, cum_pre_tax_income)``. A plan that
+    loses ¥1B early and earns ¥500M + ¥500M later must report 0 cumulative
+    cash tax (NOL balance fully absorbs the gains). Today
+    `project_free_cash_flow` taxes each period independently with
+    ``tax = max(0, ebt * tax_rate)`` — losses never become tax credits
+    for later periods. The fix (Task 2.3) tracks an NOL balance and
+    deducts it from taxable income."""
+    periods = 5
+    # Construct revenue + cost so EBT is roughly: -1000M, +500M, +500M, 0, 0 (¥)
+    revenue = [200_000_000, 1_500_000_000, 1_500_000_000, 1_000_000_000, 1_000_000_000]
+    # Big upfront OpEx absorbed via headcount avg_comp to make period 0 negative.
+    target_gross_margin = [0.50] * periods
+    total_headcount = [100, 30, 30, 25, 25]
+    avg_comp_yen = [12_000_000] * periods  # 12M/year — big in period 0
+    product_headcount = [40, 10, 10, 8, 8]
+    sm_pct_revenue = [0.05] * periods
+    rd_program_per_product_fte_yen = [2_000_000] * periods
+    rd_program_floor_yen = [0] * periods
+    ga_pct_revenue = [0.02] * periods
+    fixed_ga_yen = [0] * periods
+    capex_yen = [0] * periods
+    depreciation_life_months = [60] * periods
+    debt_raise_yen = [0] * periods
+    debt_interest_rate = [0.0] * periods
+    ar_days = [0] * periods
+    ap_days = [0] * periods
+    deferred_revenue_share = [0.0] * periods
+    inventory_wip_pct_capex = [0.0] * periods
+    tax_rate = [0.30] * periods
+
+    projection = kernel.project_free_cash_flow(
+        revenue, target_gross_margin, total_headcount, avg_comp_yen,
+        product_headcount, sm_pct_revenue, rd_program_per_product_fte_yen,
+        rd_program_floor_yen, ga_pct_revenue, fixed_ga_yen, capex_yen,
+        depreciation_life_months, debt_raise_yen, debt_interest_rate,
+        ar_days, ap_days, deferred_revenue_share, inventory_wip_pct_capex,
+        tax_rate,
+    )
+    cum_pretax = sum(p["ebt"] for p in projection)
+    cum_loss = sum(-p["ebt"] for p in projection if p["ebt"] < 0)
+    cum_cash_tax = sum(p["tax"] for p in projection)
+    # NOL contract: cumulative cash tax cannot exceed tax_rate × max(0, cumulative EBT).
+    max_allowed_tax = 0.30 * max(0.0, cum_pretax)
+    assert cum_cash_tax <= max_allowed_tax + 1.0, (
+        f"K4 violated: cumulative cash tax {cum_cash_tax:,.0f} JPY exceeds "
+        f"the NOL-aware ceiling {max_allowed_tax:,.0f} JPY "
+        f"(cum_pretax={cum_pretax:,.0f}, cum_loss={cum_loss:,.0f}). "
+        f"project_free_cash_flow taxes each period independently — losses "
+        f"never accumulate into an NOL balance that absorbs later gains."
+    )
+
+
+def test_K5_hardware_profile_suppresses_transaction_revenue_and_gmv() -> None:
+    """K5 — off-mechanics suppression: a hardware / RaaS plan must carry
+    transaction revenue = 0, take rate = 0, and GMV = 0. The current
+    `_extract_source_primitives` does set take = 0 for non-marketplace
+    profiles, but `gmv_ramp` still produces a non-zero GMV series for the
+    hardware profile from `profile.default_gmv_yen`. The Revenue Build
+    sheet still renders an off-mechanics 'Transaction revenue' row at
+    zero. The fix (Task 2.4) gates the off-mechanics rows on a
+    marketplace signal so they are not generated for hardware / RaaS."""
+    narrative = (
+        "# Hardware co\n"
+        "Sells industrial robots at ¥9M per unit. Target 200 units shipped "
+        "per year at maturity. Source: pilot installs memo.\n"
+    )
+    facts = kernel.derive_source_facts(narrative)
+    assert facts.mechanics.lower().find("hardware") >= 0 or "asset" in facts.mechanics.lower(), (
+        f"prerequisite: hardware narrative must select hardware-asset profile, got {facts.mechanics!r}"
+    )
+    assert all(v == 0 for v in facts.gmv_yen), (
+        f"K5 violated: hardware profile must emit gmv_yen = [0]; got {facts.gmv_yen}"
+    )
+    assert all(v == 0.0 for v in facts.take_rate), (
+        f"K5 violated: hardware profile must emit take_rate = [0]; got {facts.take_rate}"
+    )
+
+
+def test_K7_audit_economic_coherence_detects_K1_customers_drift() -> None:
+    """K7 — audit meta: audit_economic_coherence must flag a K1 violation
+    (revenue drifting from the stated customers series). Construct a
+    facts where customers = [1000,…,5000] but new_units = [5]×5; verify
+    the audit emits an issue naming the drift. Today the audit only
+    checks gross margin, ending cash, and balance-sheet identities — it
+    has no K1/K2/K4/K5 hooks. The fix (Task 2.6) wires those checks."""
+    yaml_text = (
+        "periods: 5\n"
+        "customers: [1000, 2000, 3000, 4000, 5000]\n"
+        "new_units: [5, 5, 5, 5, 5]\n"
+        "monthly_price_yen: [10000, 10000, 10000, 10000, 10000]\n"
+        "target_gross_margin: [0.7, 0.7, 0.7, 0.7, 0.7]\n"
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        ypath = Path(tmp) / "k7.yaml"
+        ypath.write_text(yaml_text, encoding="utf-8")
+        raw = build_model.load_yaml(ypath)
+        facts = kernel.derive_source_facts_from_mapping(raw)
+        issues = kernel.audit_economic_coherence(facts)
+        flagged = [i for i in issues if "customer" in i.lower() or "k1" in i.lower()]
+        assert flagged, (
+            f"K7 violated: audit_economic_coherence did not flag the K1 "
+            f"customers / new_units drift. Returned issues:\n  "
+            + "\n  ".join(issues or ["<none>"])
+        )
+
+
+# =========================================================================
+# Phase 3 — K3 financing-integration regression tests (spec.md §2 C3 Tier 2 B).
+# These pin lease / converts / grants / customer advances / secondary into the
+# FCF projection, balance sheet, audit layer, and equity-round sizing.
+# =========================================================================
+
+
+def _k3_base_yaml() -> str:
+    """A structured plan with zero debt interest so instrument cash deltas
+    are exact (no interest or tax interplay in the comparisons below)."""
+    return (
+        "periods: 5\n"
+        "customers: [200, 400, 700, 1100, 1600]\n"
+        "monthly_price_yen: [50000, 50000, 50000, 50000, 50000]\n"
+        "target_gross_margin: [0.7, 0.7, 0.7, 0.7, 0.7]\n"
+        "debt_interest_rate: [0, 0, 0, 0, 0]\n"
+    )
+
+
+def _k3_facts(extra_yaml: str = ""):
+    with tempfile.TemporaryDirectory() as tmp:
+        ypath = Path(tmp) / "k3.yaml"
+        ypath.write_text(_k3_base_yaml() + extra_yaml, encoding="utf-8")
+        return kernel.derive_source_facts_from_mapping(build_model.load_yaml(ypath))
+
+
+def test_K3_stated_grants_reduce_auto_sized_equity() -> None:
+    """K3 — financing integration: a stated non-dilutive grant schedule must
+    reach the equity-round sizing. Today grants_yen is applied as a Step-5
+    display override after size_equity_rounds has run, so a plan with ¥2B of
+    annual grants raises exactly as much equity as one with none."""
+    baseline = _k3_facts()
+    granted = _k3_facts(
+        "grants_yen: [2000000000, 2000000000, 2000000000, 2000000000, 2000000000]\n"
+    )
+    assert list(granted.grants_yen) == [2_000_000_000] * 5, (
+        "facts.grants_yen must preserve the YAML-stated schedule"
+    )
+    assert sum(granted.equity_raise_yen) < sum(baseline.equity_raise_yen), (
+        f"K3 violated: ¥10B of stated grants did not reduce the auto-sized "
+        f"equity plan. baseline equity={baseline.equity_raise_yen}, "
+        f"granted equity={granted.equity_raise_yen}. Financing instruments "
+        f"must be moved from the post-derivation override into the sizing walk."
+    )
+
+
+def test_K3_projection_ending_cash_reflects_each_instrument() -> None:
+    """K3 — the kernel cash walk must mirror the workbook CF sheet: grants,
+    convertibles, and lease financing add cash; secondary liquidity uses
+    cash; customer advances shift cash timing through working capital
+    (deferred-revenue level) without double-counting as a financing inflow."""
+    base = _k3_facts()
+    base_proj = kernel.project_plan_free_cash_flow(base)
+    base_end = base_proj[-1]["ending_cash"]
+
+    for field, series, expected_delta in (
+        ("grants_yen", [500_000_000] * 5, 2_500_000_000),
+        ("convertibles_yen", [400_000_000, 0, 0, 0, 0], 400_000_000),
+        ("lease_financing_yen", [0, 300_000_000, 0, 0, 0], 300_000_000),
+        ("secondary_yen", [0, 200_000_000, 0, 0, 0], -200_000_000),
+    ):
+        mutated = replace(base, **{field: series})
+        proj = kernel.project_plan_free_cash_flow(mutated)
+        delta = proj[-1]["ending_cash"] - base_end
+        assert delta == pytest.approx(expected_delta, rel=1e-6), (
+            f"K3 violated: {field}={series} should move terminal ending cash "
+            f"by {expected_delta:,} JPY (zero-interest plan); got {delta:,.0f}."
+        )
+
+    # Customer advances: +A cash in the receipt period via the deferred /
+    # advances liability level, released afterwards — terminal cash returns
+    # to baseline, so the instrument shifts timing rather than adding funding.
+    advanced = replace(base, customer_advances_yen=[600_000_000, 0, 0, 0, 0])
+    proj = kernel.project_plan_free_cash_flow(advanced)
+    first_delta = proj[0]["ending_cash"] - base_proj[0]["ending_cash"]
+    final_delta = proj[-1]["ending_cash"] - base_end
+    assert first_delta == pytest.approx(600_000_000, rel=1e-6), (
+        f"K3 violated: a ¥600M customer advance must raise period-0 ending "
+        f"cash by the advance; got {first_delta:,.0f}."
+    )
+    assert final_delta == pytest.approx(0, abs=1_000), (
+        f"K3 violated: a released customer advance must not change terminal "
+        f"cash (it is working-capital timing, not funding); got {final_delta:,.0f}."
+    )
+
+
+def test_K3_interest_accrues_on_convertibles_and_lease() -> None:
+    """K3 — interest: convertible notes and lease financing join the
+    interest-bearing balance exactly as the workbook does (P&L interest =
+    Capital Stack debt balance × rate, where the balance rolls debt +
+    converts + lease forward)."""
+    periods = 3
+    zeros = [0] * periods
+    args = dict(
+        revenue=[1_000_000_000] * periods,
+        target_gross_margin=[0.7] * periods,
+        total_headcount=[10] * periods,
+        avg_comp_yen=[10_000_000] * periods,
+        product_headcount=[3] * periods,
+        sm_pct_revenue=[0.10] * periods,
+        rd_program_per_product_fte_yen=[4_500_000] * periods,
+        rd_program_floor_yen=zeros,
+        ga_pct_revenue=[0.05] * periods,
+        fixed_ga_yen=zeros,
+        capex_yen=zeros,
+        depreciation_life_months=[60] * periods,
+        debt_raise_yen=zeros,
+        debt_interest_rate=[0.10] * periods,
+        ar_days=zeros,
+        ap_days=zeros,
+        deferred_revenue_share=[0.0] * periods,
+        inventory_wip_pct_capex=[0.0] * periods,
+        tax_rate=[0.0] * periods,
+    )
+    baseline = kernel.project_free_cash_flow(**args)
+    financed = kernel.project_free_cash_flow(
+        **args,
+        convertibles_yen=[500_000_000, 0, 0],
+        lease_financing_yen=[300_000_000, 0, 0],
+    )
+    expected_interest = (500_000_000 + 300_000_000) * 0.10
+    assert financed[0].get("interest", 0.0) == pytest.approx(expected_interest), (
+        f"K3 violated: period-0 interest must accrue on the convertible + "
+        f"lease balance (expected {expected_interest:,.0f}); got "
+        f"{financed[0].get('interest')!r}."
+    )
+    ni_drop = baseline[0]["net_income"] - financed[0]["net_income"]
+    assert ni_drop == pytest.approx(expected_interest), (
+        f"K3 violated: net income must carry the convertible/lease interest "
+        f"expense; expected a drop of {expected_interest:,.0f}, got {ni_drop:,.0f}."
+    )
+
+
+def test_K3_balance_sheet_balances_with_all_instruments() -> None:
+    """K3 — three-statement integrity with every instrument non-zero: cash,
+    debt-like balances (converts + lease), the advances liability, and the
+    grants / secondary equity effects must keep A = L + E every period."""
+    facts = replace(
+        _k3_facts(),
+        grants_yen=[300_000_000, 0, 0, 0, 0],
+        convertibles_yen=[400_000_000, 0, 0, 0, 0],
+        lease_financing_yen=[0, 250_000_000, 0, 0, 0],
+        customer_advances_yen=[150_000_000, 0, 0, 0, 0],
+        secondary_yen=[0, 100_000_000, 0, 0, 0],
+    )
+    for idx, period in enumerate(kernel.project_balance_sheet(facts)):
+        scale = max(1.0, abs(period["total_assets"]))
+        assert abs(period["balance_check"]) <= 1e-4 * scale, (
+            f"K3 violated: balance sheet with financing instruments does not "
+            f"balance in period {idx}: A - L - E = {period['balance_check']:,.0f}"
+        )
+
+
+def test_K7_audit_detects_K3_secondary_without_a_round() -> None:
+    """K7 meta for K3 — audit_economic_coherence must flag founder/investor
+    secondary liquidity scheduled in a period with no equity round: the
+    company cannot fund shareholder liquidity out of operating cash, so a
+    secondary without a concurrent round is a financing-coherence defect."""
+    facts = _k3_facts()
+    equity = list(facts.equity_raise_yen)
+    if len(equity) > 1:
+        equity[1] = 0
+    broken = replace(
+        facts,
+        equity_raise_yen=equity,
+        secondary_yen=[0, 500_000_000, 0, 0, 0],
+    )
+    issues = kernel.audit_economic_coherence(broken)
+    flagged = [i for i in issues if "secondary" in i.lower() or "k3" in i.lower()]
+    assert flagged, (
+        "K7 violated: audit_economic_coherence did not flag secondary "
+        "liquidity scheduled without a concurrent equity round. Returned "
+        "issues:\n  " + "\n  ".join(issues or ["<none>"])
+    )
+
+
+def test_K3_debt_amortization_gives_declining_balance_interest() -> None:
+    """Task 3.2 (D) — contractual amortization: the interest-bearing balance
+    is cumulative draws minus cumulative repayments, and interest accrues on
+    the declining balance. Draw ¥1B at 10%, repay ¥400M then ¥300M: interest
+    must fall ¥100M → ¥60M → ¥30M."""
+    periods = 3
+    zeros = [0] * periods
+    args = dict(
+        revenue=[1_000_000_000] * periods,
+        target_gross_margin=[0.7] * periods,
+        total_headcount=[10] * periods,
+        avg_comp_yen=[10_000_000] * periods,
+        product_headcount=[3] * periods,
+        sm_pct_revenue=[0.10] * periods,
+        rd_program_per_product_fte_yen=[4_500_000] * periods,
+        rd_program_floor_yen=zeros,
+        ga_pct_revenue=[0.05] * periods,
+        fixed_ga_yen=zeros,
+        capex_yen=zeros,
+        depreciation_life_months=[60] * periods,
+        debt_raise_yen=[1_000_000_000, 0, 0],
+        debt_interest_rate=[0.10] * periods,
+        ar_days=zeros,
+        ap_days=zeros,
+        deferred_revenue_share=[0.0] * periods,
+        inventory_wip_pct_capex=[0.0] * periods,
+        tax_rate=[0.0] * periods,
+    )
+    projection = kernel.project_free_cash_flow(
+        **args, debt_amortization_yen=[0, 400_000_000, 300_000_000],
+    )
+    expected = [100_000_000, 60_000_000, 30_000_000]
+    got = [period.get("interest") for period in projection]
+    for idx, (want, have) in enumerate(zip(expected, got)):
+        assert have == pytest.approx(want), (
+            f"K3 violated (Task 3.2): period {idx} interest must accrue on the "
+            f"declining balance (cum draws − cum repaid); expected {want:,}, "
+            f"got {have!r}. Full interest series: {got}."
+        )
+
+
+def test_K3_debt_amortization_flows_through_cash_and_balance_sheet() -> None:
+    """Task 3.2 (D) — principal repayment is a financing outflow: ending cash
+    drops by the cumulative repayment (zero-rate plan keeps the delta exact)
+    and the balance sheet still balances with a declining debt balance."""
+    base = _k3_facts()
+    amortized = replace(
+        base,
+        debt_raise_yen=[500_000_000, 0, 0, 0, 0],
+        debt_amortization_yen=[0, 200_000_000, 100_000_000, 0, 0],
+    )
+    baseline = replace(
+        base,
+        debt_raise_yen=[500_000_000, 0, 0, 0, 0],
+    )
+    proj_amortized = kernel.project_plan_free_cash_flow(amortized)
+    proj_baseline = kernel.project_plan_free_cash_flow(baseline)
+    delta = proj_amortized[-1]["ending_cash"] - proj_baseline[-1]["ending_cash"]
+    assert delta == pytest.approx(-300_000_000, rel=1e-6), (
+        f"K3 violated (Task 3.2): cumulative ¥300M of principal repayment must "
+        f"reduce terminal ending cash by the same amount; got {delta:,.0f}. "
+        f"Amortization is a financing outflow, not a P&L item."
+    )
+    for idx, period in enumerate(kernel.project_balance_sheet(amortized)):
+        scale = max(1.0, abs(period["total_assets"]))
+        assert abs(period["balance_check"]) <= 1e-4 * scale, (
+            f"K3 violated (Task 3.2): balance sheet with debt amortization "
+            f"does not balance in period {idx}: A - L - E = "
+            f"{period['balance_check']:,.0f}"
+        )
+
+
+def test_K3_workbook_capital_stack_carries_amortization_schedule() -> None:
+    """Task 3.2 (D) — the workbook mirrors the kernel: Assumptions carries the
+    'Debt amortization' schedule as an input row, the P&L debt balance nets it
+    out, and the CF financing block subtracts the repayment."""
+    from openpyxl.utils import get_column_letter
+
+    with tempfile.TemporaryDirectory() as tmp:
+        input_path = Path(tmp) / "model.yaml"
+        out = Path(tmp) / "amortized.xlsx"
+        input_path.write_text(
+            _k3_base_yaml()
+            + "debt_raise_yen: [500000000, 0, 0, 0, 0]\n"
+            + "debt_amortization_yen: [0, 200000000, 100000000, 0, 0]\n",
+            encoding="utf-8",
+        )
+        build_model.build_model(input_path, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+        first_col = source_plan.START_PERIOD_COL
+        second = get_column_letter(first_col + 1)
+        assumptions = wb["Assumptions"]
+        amort_row = _row_for_label(assumptions, "Debt amortization")
+        assert assumptions.cell(amort_row, first_col + 1).value == 200000000, (
+            "K3 violated (Task 3.2): the stated amortization schedule must land "
+            "on the Assumptions input row"
+        )
+        balance_row = _row_for_label(wb["P&L"], "Debt balance (ending)")
+        balance_formula = str(
+            wb["P&L"].cell(balance_row, first_col + 1).value).replace(" ", "")
+        assert f"-'Assumptions'!{second}{amort_row}" in balance_formula, (
+            f"K3 violated (Task 3.2): debt balance must net out the "
+            f"amortization row; got {balance_formula!r}"
+        )
+        repay_row = _row_for_label(wb["CF"], "Debt principal repayment")
+        cf_repay = str(wb["CF"].cell(repay_row, first_col + 1).value).replace(" ", "")
+        assert f"-'Assumptions'!{second}{amort_row}" in cf_repay, (
+            f"K3 violated (Task 3.2): CF financing must subtract the "
+            f"repayment; got {cf_repay!r}"
+        )
+
+
+def test_G_half_year_convention_halves_acquisition_period_depreciation() -> None:
+    """Task 3.3 (G) — half-year convention: assets acquired in a period take
+    half a period's straight-line charge in that period, a full charge
+    afterwards. ¥1.2B of period-0 CapEx on a 60-month life must depreciate
+    ¥120M in period 0 (half of 240M) and ¥240M in period 1."""
+    periods = 3
+    zeros = [0] * periods
+    args = dict(
+        revenue=[1_000_000_000] * periods,
+        target_gross_margin=[0.7] * periods,
+        total_headcount=[10] * periods,
+        avg_comp_yen=[10_000_000] * periods,
+        product_headcount=[3] * periods,
+        sm_pct_revenue=[0.10] * periods,
+        rd_program_per_product_fte_yen=[4_500_000] * periods,
+        rd_program_floor_yen=zeros,
+        ga_pct_revenue=[0.05] * periods,
+        fixed_ga_yen=zeros,
+        capex_yen=[1_200_000_000, 0, 0],
+        depreciation_life_months=[60] * periods,
+        debt_raise_yen=zeros,
+        debt_interest_rate=[0.0] * periods,
+        ar_days=zeros,
+        ap_days=zeros,
+        deferred_revenue_share=[0.0] * periods,
+        inventory_wip_pct_capex=[0.0] * periods,
+        tax_rate=[0.0] * periods,
+    )
+    projection = kernel.project_free_cash_flow(**args)
+    assert projection[0]["depreciation"] == pytest.approx(120_000_000), (
+        f"G violated: acquisition-period D&A must take the half-year "
+        f"convention (¥120M on ¥1.2B / 60mo); got "
+        f"{projection[0]['depreciation']:,.0f}."
+    )
+    assert projection[1]["depreciation"] == pytest.approx(240_000_000), (
+        f"G violated: the first full period must charge the full straight-line "
+        f"amount (¥240M); got {projection[1]['depreciation']:,.0f}."
+    )
+    legacy = kernel.project_free_cash_flow(
+        **args, depreciation_convention="full_period",
+    )
+    assert legacy[0]["depreciation"] == pytest.approx(240_000_000), (
+        f"G violated: depreciation_convention='full_period' must reproduce the "
+        f"legacy full-period charge; got {legacy[0]['depreciation']:,.0f}."
+    )
+
+
+def test_G_workbook_pl_da_mirrors_half_year_convention() -> None:
+    """Task 3.3 (G) — the workbook P&L D&A formula must mirror the kernel's
+    half-year convention: the acquisition period charges only half of the
+    current period's CapEx contribution."""
+    with tempfile.TemporaryDirectory() as tmp:
+        input_path = Path(tmp) / "model.yaml"
+        out = Path(tmp) / "halfyear.xlsx"
+        input_path.write_text(_k3_base_yaml(), encoding="utf-8")
+        build_model.build_model(input_path, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+        first_col = source_plan.START_PERIOD_COL
+        da_row = _row_for_label(wb["P&L"], "D&A")
+        formula = str(wb["P&L"].cell(da_row, first_col).value).replace(" ", "")
+        # Half-year convention, gated to annual columns via the months ruler:
+        # acquisition-period CapEx contributes only half its base.
+        assert "IF(F$5=12" in formula and "/2" in formula, (
+            f"G violated: P&L D&A must apply the half-year convention to the "
+            f"current period's CapEx on annual columns; got {formula!r}"
+        )
+        assert "'CostBuild'!" in formula, (
+            f"G violated: the D&A base must come from the CapEx engine row; "
+            f"got {formula!r}"
+        )
+
+
+def test_K7_audit_detects_amortization_exceeding_draws() -> None:
+    """K7 meta for Task 3.2 — repaying more principal than was ever drawn
+    (debt + convertibles + lease) is a financing-coherence defect the audit
+    must flag."""
+    broken = replace(
+        _k3_facts(),
+        debt_raise_yen=[100_000_000, 0, 0, 0, 0],
+        debt_amortization_yen=[0, 500_000_000, 0, 0, 0],
+    )
+    issues = kernel.audit_economic_coherence(broken)
+    flagged = [i for i in issues if "amortization" in i.lower() or "repay" in i.lower()]
+    assert flagged, (
+        "K7 violated: audit_economic_coherence did not flag amortization "
+        "exceeding cumulative draws. Returned issues:\n  "
+        + "\n  ".join(issues or ["<none>"])
+    )
+
+
+def test_K8_out_of_range_gross_margin_target_is_warned_not_silently_clamped() -> None:
+    """Task 3.4 (H) — K8: a stated target_gross_margin outside the modelable
+    range is still clamped for computation, but the clamp must be surfaced
+    through the warnings channel instead of silently rewriting the user's
+    input."""
+    facts = _k3_facts()
+    with tempfile.TemporaryDirectory() as tmp:
+        ypath = Path(tmp) / "k8.yaml"
+        ypath.write_text(
+            "periods: 5\n"
+            "customers: [200, 400, 700, 1100, 1600]\n"
+            "monthly_price_yen: [50000, 50000, 50000, 50000, 50000]\n"
+            "target_gross_margin: [0.99, 0.99, 0.99, 0.99, 0.99]\n",
+            encoding="utf-8",
+        )
+        stated = kernel.derive_source_facts_from_mapping(build_model.load_yaml(ypath))
+    assert max(stated.target_gross_margin) <= 0.95, (
+        "computation must still clamp the target into the modelable range"
+    )
+    warnings = kernel.audit_economic_warnings(stated)
+    flagged = [w for w in warnings if "clamp" in w.lower() or "gross margin" in w.lower()]
+    assert flagged, (
+        f"K8 violated: an out-of-range target_gross_margin (0.99) must produce "
+        f"a clamp warning. Warnings returned: {warnings!r}"
+    )
+    clean = kernel.audit_economic_warnings(facts)
+    assert not any("clamp" in w.lower() for w in clean), (
+        f"K8 violated: an in-range target must not produce a clamp warning; "
+        f"got {clean!r}"
+    )
+
+
+def test_K6_material_revenue_on_default_drivers_is_warned() -> None:
+    """Task 3.4 (H) — K6: when a plan's revenue is material but its demand
+    drivers were never pinned by a structured input (profile-default or
+    narrative-scale estimates), the warnings channel must name the provenance
+    so the reader knows the revenue rests on defaults, not evidence."""
+    with tempfile.TemporaryDirectory() as tmp:
+        ypath = Path(tmp) / "k6.yaml"
+        # No customers / new_units / price: demand and pricing fall back to
+        # profile defaults, yet the derived plan carries material revenue.
+        ypath.write_text(
+            "company: DefaultsCo\nmechanics: recurring software\nperiods: 5\n",
+            encoding="utf-8",
+        )
+        defaults = kernel.derive_source_facts_from_mapping(build_model.load_yaml(ypath))
+    warnings = kernel.audit_economic_warnings(defaults)
+    flagged = [
+        w for w in warnings
+        if "provenance" in w.lower() or "default" in w.lower() or "k6" in w.lower()
+    ]
+    assert flagged, (
+        f"K6 violated: material revenue driven by unpinned profile defaults "
+        f"must produce a provenance warning. Warnings: {warnings!r}"
+    )
+    pinned = _k3_facts()
+    pinned_warnings = kernel.audit_economic_warnings(pinned)
+    assert not any("provenance" in w.lower() or "k6" in w.lower() for w in pinned_warnings), (
+        f"K6 violated: a structured plan with pinned demand must not warn on "
+        f"revenue provenance; got {pinned_warnings!r}"
+    )
+
+
+def test_H_cost_build_carries_governor_note() -> None:
+    """Task 3.4 (H) — governor transparency: the Cost Build sheet must state
+    that COGS components are governor-rescaled to the target gross margin, so
+    a reader knows the cost mix is calibrated, not sourced line-by-line."""
+    with tempfile.TemporaryDirectory() as tmp:
+        input_path = Path(tmp) / "model.yaml"
+        out = Path(tmp) / "governed.xlsx"
+        input_path.write_text(_k3_base_yaml(), encoding="utf-8")
+        build_model.build_model(input_path, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+        texts = [
+            str(cell.value)
+            for row in wb["Cost Build"].iter_rows()
+            for cell in row
+            if isinstance(cell.value, str)
+        ]
+        assert any(
+            "governor" in text.lower() and "gross margin" in text.lower()
+            for text in texts
+        ), (
+            "H violated: Cost Build must carry a governor-rescale note "
+            "explaining that COGS components are calibrated to the target "
+            "gross margin."
+        )
+
+
+def test_F_stated_onboarding_months_drive_one_time_revenue() -> None:
+    """Task 2.5 (F) — the one-time / onboarding fee is a YAML driver, not a
+    hard-coded price×3: stating onboarding_months must move revenue by
+    new_units × price × months, and stating a direct per-unit one-time fee
+    must override the months path."""
+    zero = _k3_facts("onboarding_months: 0\n")
+    six = _k3_facts("onboarding_months: 6\n")
+    rev_zero = [p["revenue"] for p in kernel.project_plan_free_cash_flow(zero)]
+    rev_six = [p["revenue"] for p in kernel.project_plan_free_cash_flow(six)]
+    for idx in range(len(rev_zero)):
+        expected = six.new_units[idx] * 50_000 * 6 * (
+            1.0 + six.other_revenue_share[idx]
+        )
+        got = rev_six[idx] - rev_zero[idx]
+        assert got == pytest.approx(expected, rel=1e-6), (
+            f"F violated: onboarding_months must drive the one-time stream; "
+            f"period {idx} revenue delta {got:,.0f} != new_units×price×6"
+            f"×(1+other share) = {expected:,.0f}."
+        )
+    flat = _k3_facts("one_time_revenue_per_unit_yen: [90000, 90000, 90000, 90000, 90000]\n")
+    rev_flat = [p["revenue"] for p in kernel.project_plan_free_cash_flow(flat)]
+    for idx in range(len(rev_zero)):
+        expected = flat.new_units[idx] * 90_000 * (
+            1.0 + flat.other_revenue_share[idx]
+        )
+        got = rev_flat[idx] - rev_zero[idx]
+        assert got == pytest.approx(expected, rel=1e-6), (
+            f"F violated: a stated per-unit one-time fee must override the "
+            f"months path; period {idx} delta {got:,.0f} != "
+            f"new_units×¥90k×(1+other share) = {expected:,.0f}."
+        )
+
+
+def test_F_default_onboarding_is_labeled_placeholder_in_workbook() -> None:
+    """Task 2.5 (F) — when no onboarding driver is stated, the profile
+    default (price × 3) may apply, but the Assumptions row must label it as
+    a placeholder instead of presenting it as a sourced fact; a stated
+    driver drops the placeholder label and lands in the formula."""
+    with tempfile.TemporaryDirectory() as tmp:
+        default_path = Path(tmp) / "default.yaml"
+        stated_path = Path(tmp) / "stated.yaml"
+        default_out = Path(tmp) / "default.xlsx"
+        stated_out = Path(tmp) / "stated.xlsx"
+        default_path.write_text(_k3_base_yaml(), encoding="utf-8")
+        stated_path.write_text(
+            _k3_base_yaml() + "onboarding_months: 6\n", encoding="utf-8"
+        )
+        build_model.build_model(default_path, default_out, mode="full")
+        build_model.build_model(stated_path, stated_out, mode="full")
+        first_col = source_plan.START_PERIOD_COL
+
+        wb_default = load_workbook(default_out, data_only=False)
+        ws = wb_default["Assumptions"]
+        row = next(
+            r for r in range(5, 25)
+            if ws.cell(r, source_plan.LAYOUT.label_col).value == "One-time revenue / new unit"
+        )
+        source_text = str(ws.cell(row, source_plan.LAYOUT.source_col).value or "")
+        assert "placeholder" in source_text.lower(), (
+            f"F violated: the defaulted onboarding row must carry a "
+            f"placeholder evidence label; source cell reads {source_text!r}."
+        )
+
+        wb_stated = load_workbook(stated_out, data_only=False)
+        ws2 = wb_stated["Assumptions"]
+        row2 = next(
+            r for r in range(5, 25)
+            if ws2.cell(r, source_plan.LAYOUT.label_col).value == "One-time revenue / new unit"
+        )
+        formula = str(ws2.cell(row2, first_col).value).replace(" ", "")
+        assert "*6" in formula, (
+            f"F violated: a stated onboarding_months must land in the "
+            f"one-time formula; got {formula!r}."
+        )
+        source_text2 = str(ws2.cell(row2, source_plan.LAYOUT.source_col).value or "")
+        assert "placeholder" not in source_text2.lower(), (
+            f"F violated: a stated onboarding driver must not be labeled "
+            f"placeholder; source cell reads {source_text2!r}."
+        )
+
+
+def test_K3_stated_debt_interest_rate_reaches_equity_sizing() -> None:
+    """Phase 3 review follow-up (Codex) — a stated debt_interest_rate was
+    still a post-derivation display override, so the equity auto-sizing
+    projected interest at the profile default. A plan drawing ¥2B at 25%
+    must size more equity than the same plan at 0%."""
+    base = (
+        "periods: 5\n"
+        "customers: [200, 400, 700, 1100, 1600]\n"
+        "monthly_price_yen: [50000, 50000, 50000, 50000, 50000]\n"
+        "target_gross_margin: [0.7, 0.7, 0.7, 0.7, 0.7]\n"
+        "debt_raise_yen: [2000000000, 0, 0, 0, 0]\n"
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        cheap_path = Path(tmp) / "cheap.yaml"
+        dear_path = Path(tmp) / "dear.yaml"
+        cheap_path.write_text(base + "debt_interest_rate: 0\n", encoding="utf-8")
+        dear_path.write_text(base + "debt_interest_rate: 0.25\n", encoding="utf-8")
+        cheap = kernel.derive_source_facts_from_mapping(build_model.load_yaml(cheap_path))
+        dear = kernel.derive_source_facts_from_mapping(build_model.load_yaml(dear_path))
+    assert dear.debt_interest_rate[0] == pytest.approx(0.25)
+    assert sum(dear.equity_raise_yen) > sum(cheap.equity_raise_yen), (
+        f"K3 violated: a stated 25% debt interest rate must reach the "
+        f"equity sizing (¥500M/yr more burn); 0%: {cheap.equity_raise_yen}, "
+        f"25%: {dear.equity_raise_yen}."
+    )
+
+
+def test_F_stated_zero_one_time_fee_is_honored_per_period() -> None:
+    """Phase 3 review follow-up (Codex) — statedness, not positivity, decides
+    the one-time fee path: a stated [90000, 0, 0, 0, 0] schedule books the fee
+    only in period 0 and books zero afterwards (no silent price×3 fallback),
+    and the workbook input row mirrors the same schedule."""
+    zero = _k3_facts("onboarding_months: 0\n")
+    mixed = _k3_facts("one_time_revenue_per_unit_yen: [90000, 0, 0, 0, 0]\n")
+    rev_zero = [p["revenue"] for p in kernel.project_plan_free_cash_flow(zero)]
+    rev_mixed = [p["revenue"] for p in kernel.project_plan_free_cash_flow(mixed)]
+    first_expected = mixed.new_units[0] * 90_000 * (1.0 + mixed.other_revenue_share[0])
+    assert rev_mixed[0] - rev_zero[0] == pytest.approx(first_expected, rel=1e-6), (
+        f"F violated: period-0 stated fee not booked; delta "
+        f"{rev_mixed[0] - rev_zero[0]:,.0f} != {first_expected:,.0f}."
+    )
+    for idx in range(1, len(rev_zero)):
+        assert rev_mixed[idx] - rev_zero[idx] == pytest.approx(0, abs=1_000), (
+            f"F violated: a stated 0 fee in period {idx} must book zero "
+            f"one-time revenue, not fall back to price×3; delta "
+            f"{rev_mixed[idx] - rev_zero[idx]:,.0f}."
+        )
+    with tempfile.TemporaryDirectory() as tmp:
+        input_path = Path(tmp) / "mixed.yaml"
+        out = Path(tmp) / "mixed.xlsx"
+        input_path.write_text(
+            _k3_base_yaml()
+            + "one_time_revenue_per_unit_yen: [90000, 0, 0, 0, 0]\n",
+            encoding="utf-8",
+        )
+        build_model.build_model(input_path, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+        ws = wb["Assumptions"]
+        row = next(
+            r for r in range(5, 25)
+            if ws.cell(r, source_plan.LAYOUT.label_col).value == "One-time revenue / new unit"
+        )
+        first_col = source_plan.START_PERIOD_COL
+        values = [ws.cell(row, first_col + i).value for i in range(5)]
+        assert values == [90000, 0, 0, 0, 0], (
+            f"F violated: workbook one-time row must mirror the stated "
+            f"schedule including zeros; got {values!r}."
+        )
+
+
+def test_K3_financing_inflow_subtotal_excludes_advances() -> None:
+    """Phase 3 review follow-up (Codex) — the financing-inflow subtotal must
+    not count customer advances (they flow through working capital) and must
+    net out contractual amortization, mirroring the CF financing block."""
+    import re
+
+    with tempfile.TemporaryDirectory() as tmp:
+        input_path = Path(tmp) / "model.yaml"
+        out = Path(tmp) / "fin.xlsx"
+        input_path.write_text(
+            _k3_base_yaml()
+            + "customer_advances_yen: [100000000, 0, 0, 0, 0]\n"
+            + "debt_raise_yen: [500000000, 0, 0, 0, 0]\n"
+            + "debt_amortization_yen: [0, 100000000, 0, 0, 0]\n",
+            encoding="utf-8",
+        )
+        build_model.build_model(input_path, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+        first_col = source_plan.START_PERIOD_COL
+
+        def sum_bounds(ws, row) -> tuple[int, int]:
+            formula = str(ws.cell(row, first_col).value).replace(" ", "")
+            match = re.search(r"=SUM\([A-Z]+(\d+):[A-Z]+(\d+)\)", formula)
+            assert match, f"{ws.title} subtotal is not a SUM range: {formula!r}"
+            return int(match.group(1)), int(match.group(2))
+
+        # CF financing block: repayment inside the total, advances outside it
+        # (advances live in the operating working-capital deltas).
+        cf = wb["CF"]
+        cf_total = _row_for_label(cf, "Total financing CF")
+        lo, hi = sum_bounds(cf, cf_total)
+        repay_row = _row_for_label(cf, "Debt principal repayment")
+        assert lo <= repay_row <= hi, (
+            "K3 violated: CF financing total must net out the principal repayment"
+        )
+        adv_delta = _row_for_label(cf, "Δ Customer advances (前受金)")
+        assert not (lo <= adv_delta <= hi), (
+            "K3 violated: customer advances leaked into the CF financing total"
+        )
+        # Financing sheet sources: repayment netted, no advances source row.
+        fin = wb["Financing"]
+        fin_total = _row_for_label(fin, "Total sources (net of repayment)")
+        lo, hi = sum_bounds(fin, fin_total)
+        fin_repay = _row_for_label(fin, "Debt principal repayment")
+        assert lo <= fin_repay <= hi, (
+            "K3 violated: financing sources must net out the principal repayment"
+        )
+        source_labels = [
+            fin.cell(row, 3).value for row in range(lo, hi + 1)
+        ]
+        assert not any(
+            isinstance(label, str) and "advance" in label.lower()
+            for label in source_labels
+        ), (
+            f"K3 violated: customer advances leaked into the funding sources: "
+            f"{source_labels!r}"
+        )
+
+
+# --- S1: period axis, annual-series expansion, grain-correct kernel math ----
+
+
+def _s1_mapping(**extra) -> dict:
+    """Structured base mapping for the S1 axis / grain tests."""
+    base = {
+        "company": "AxisCo",
+        "mechanics": "recurring software subscription",
+        "grain": "hybrid",
+        "periods": 5,
+        "start_year": 2027,
+        "fiscal_year_end_month": 3,
+        "customers": [100, 300, 700, 1200, 1800],
+        "monthly_price_yen": [50000, 50000, 50000, 50000, 50000],
+    }
+    base.update(extra)
+    return base
+
+
+def test_S1_build_period_axis_hybrid_fye3() -> None:
+    """Hybrid axis: 24 monthly columns over FY2027-FY2028, then annual.
+
+    Facts stay ANNUAL-CANONICAL (5 fiscal years, FY labels); the monthly ×
+    annual expansion happens only in build_period_axis. FY convention:
+    FY2027 with fiscal_year_end_month=3 spans 2026/04-2027/03.
+    """
+    from datetime import date as _date
+
+    facts = kernel.derive_source_facts_from_mapping(_s1_mapping())
+    assert facts.grain == "hybrid"
+    assert facts.years == [2027, 2028, 2029, 2030, 2031]
+    assert facts.period_labels == [f"FY{y}" for y in facts.years], (
+        "hybrid facts must keep annual-canonical FY labels"
+    )
+    assert facts.fiscal_year_end_month == 3
+
+    axis = kernel.build_period_axis(facts)
+    assert axis.grain == "hybrid"
+    assert axis.monthly_count == 24
+    assert axis.months_in_period == [1] * 24 + [12] * 3
+    assert sum(axis.months_in_period) == 5 * 12, (
+        "hybrid axis must cover exactly periods × 12 months"
+    )
+    assert axis.labels[0] == "2026/04"
+    assert axis.labels[11] == "2027/03"
+    assert axis.labels[12] == "2027/04"
+    assert axis.labels[23] == "2028/03"
+    assert axis.labels[24:] == ["FY2029", "FY2030", "FY2031"]
+    assert axis.fy_labels[0] == "FY2027" and axis.fy_labels[11] == "FY2027"
+    assert axis.fy_labels[12] == "FY2028" and axis.fy_labels[23] == "FY2028"
+    assert axis.fy_labels[24:] == ["FY2029", "FY2030", "FY2031"]
+    assert axis.period_end[0] == _date(2026, 4, 30)
+    assert axis.period_end[10] == _date(2027, 2, 28)
+    assert axis.period_end[23] == _date(2028, 3, 31)
+    assert axis.period_end[24] == _date(2029, 3, 31)
+    assert axis.period_end[-1] == _date(2031, 3, 31)
+
+    # A stated monthly window is rounded UP to whole fiscal years (30 → 36).
+    wide = kernel.derive_source_facts_from_mapping(
+        _s1_mapping(monthly_window_months=30)
+    )
+    wide_axis = kernel.build_period_axis(wide)
+    assert wide.monthly_window_months == 30
+    assert wide_axis.monthly_count == 36
+    assert wide_axis.months_in_period == [1] * 36 + [12] * 2
+    narrow_axis = kernel.build_period_axis(
+        kernel.derive_source_facts_from_mapping(_s1_mapping(monthly_window_months=12))
+    )
+    assert narrow_axis.monthly_count == 12
+    assert narrow_axis.months_in_period == [1] * 12 + [12] * 4
+
+    # A "5年" horizon string keeps periods = 5 fiscal years under hybrid.
+    jp = kernel.derive_source_facts_from_mapping(_s1_mapping(periods="5年"))
+    assert len(jp.years) == 5 and jp.grain == "hybrid"
+
+    # FYE=12 (calendar fiscal year): FY2027 starts 2027/01.
+    cal_axis = kernel.build_period_axis(
+        kernel.derive_source_facts_from_mapping(_s1_mapping(fiscal_year_end_month=12))
+    )
+    assert cal_axis.labels[0] == "2027/01"
+    assert cal_axis.period_end[23] == _date(2028, 12, 31)
+
+
+def test_S1_build_period_axis_annual_is_backward_compatible() -> None:
+    """Annual axis labels must remain exactly the current FY labels."""
+    facts = kernel.derive_source_facts(SAAS_STORY)
+    axis = kernel.build_period_axis(facts)
+    assert axis.grain == "annual"
+    assert axis.labels == facts.period_labels
+    assert axis.labels == [f"FY{year}" for year in facts.years]
+    assert axis.fy_labels == axis.labels
+    assert axis.months_in_period == [12] * len(facts.years)
+    assert axis.monthly_count == 0
+    # Default JP fiscal year end (March): FY{Y} ends Y/03/31.
+    assert facts.fiscal_year_end_month == 3
+    assert all(d.month == 3 and d.day == 31 for d in axis.period_end)
+    assert [d.year for d in axis.period_end] == facts.years
+
+
+def test_S1_expand_annual_series_flow_stock_rate_contracts() -> None:
+    """flow sums exactly per FY; stock hits FY-ends exactly; rate holds."""
+    facts = kernel.derive_source_facts_from_mapping(_s1_mapping())
+    axis = kernel.build_period_axis(facts)
+
+    flow = [1200, 2401, 300, 400, 500]  # 2401 is not divisible by 78
+    out = kernel.expand_annual_series(flow, axis, "flow")
+    assert len(out) == len(axis.labels)
+    assert all(isinstance(v, int) for v in out[:24]), (
+        "integer flow input must expand to integers"
+    )
+    assert sum(out[:12]) == 1200, "monthly flow must sum exactly to FY1"
+    assert sum(out[12:24]) == 2401, (
+        "integer rounding must be distributed so the FY sum is exact"
+    )
+    assert out[24:] == [300, 400, 500], "annual columns pass through"
+    assert out[0] < out[11], "flow expansion is a rising ramp within the FY"
+
+    stock = [120, 240, 480, 800, 1200]
+    s = kernel.expand_annual_series(stock, axis, "stock")
+    assert s[11] == 120 and s[23] == 240, "month 12 of each FY == FY value"
+    assert s[24:] == [480, 800, 1200], "annual columns pass through"
+    assert s[5] == 60, "linear interpolation from prior FY-end (0) to FY-end"
+    assert s[17] == 180, "FY2 interpolates from 120 to 240"
+    assert all(s[i] <= s[i + 1] for i in range(23)), "stock interp is monotone here"
+
+    rate = [0.60, 0.65, 0.70, 0.70, 0.70]
+    r = kernel.expand_annual_series(rate, axis, "rate")
+    assert r[:12] == [0.60] * 12 and r[12:24] == [0.65] * 12, "rate holds per FY"
+    assert r[24:] == [0.70, 0.70, 0.70]
+
+    with pytest.raises(ValueError):
+        kernel.expand_annual_series([1, 2], axis, "flow")
+    with pytest.raises(ValueError):
+        kernel.expand_annual_series(flow, axis, "balance")
+
+
+def test_S1_months_factor_and_monthly_axis_labels() -> None:
+    assert kernel.months_factor("annual") == 12
+    assert kernel.months_factor("hybrid") == 12, (
+        "hybrid facts are annual-canonical — kernel projections keep factor 12"
+    )
+    assert kernel.months_factor("quarterly") == 3
+    assert kernel.months_factor("monthly") == 1
+
+    # forecast_axis: real year-month labels are derived from the fiscal
+    # start when fiscal_year_end_month is given; the legacy bare "M1" form
+    # is kept when it is not (existing workbook headers pin that format).
+    _, labels = kernel.forecast_axis(2027, 6, "monthly", fiscal_year_end_month=3)
+    assert labels == ["2026/04", "2026/05", "2026/06", "2026/07", "2026/08", "2026/09"]
+    _, legacy = kernel.forecast_axis(2027, 6, "monthly")
+    assert legacy == ["M1", "M2", "M3", "M4", "M5", "M6"]
+
+    # build_period_axis always derives real year-month labels for monthly.
+    facts = kernel.derive_source_facts_from_mapping(
+        _s1_mapping(grain="monthly", periods=24,
+                    customers=[100] * 24, monthly_price_yen=[50000] * 24)
+    )
+    axis = kernel.build_period_axis(facts)
+    assert axis.grain == "monthly"
+    assert axis.monthly_count == 24
+    assert axis.months_in_period == [1] * 24
+    assert axis.labels[0] == "2026/04" and axis.labels[23] == "2028/03"
+    assert axis.fy_labels[0] == "FY2027" and axis.fy_labels[12] == "FY2028"
+
+
+def test_S1_monthly_grain_kernel_math_is_not_12x() -> None:
+    """Monthly-grain projections book one month per period, not twelve.
+
+    The kernel used to annualize every period (recurring = base × price ×
+    12, payroll = headcount × annual comp, runway buffer = burn × months/12)
+    regardless of grain, so a monthly model overstated revenue and burn 12x.
+    """
+    customers = [1000] * 24
+    price = 10_000
+    facts = kernel.derive_source_facts_from_mapping(
+        {
+            "company": "MonthlyCo",
+            "mechanics": "recurring software subscription",
+            "grain": "monthly",
+            "periods": 24,
+            "start_year": 2026,
+            "customers": customers,
+            "monthly_price_yen": [price] * 24,
+        }
+    )
+    assert facts.grain == "monthly" and facts.customers_pinned
+
+    projection = kernel.project_plan_free_cash_flow(facts)
+    average = kernel.average_units(facts.customers)
+    for idx in (1, 12, 23):
+        expected = (
+            average[idx] * price * 1  # one month of recurring billing
+            + facts.new_units[idx] * price * facts.onboarding_months[idx]
+        ) * (1.0 + facts.other_revenue_share[idx])
+        assert abs(projection[idx]["revenue"] - expected) <= max(1.0, 0.001 * expected), (
+            f"period {idx}: monthly revenue {projection[idx]['revenue']:,.0f} "
+            f"!= customers × price × 1 (+ onboarding) = {expected:,.0f}"
+        )
+        assert projection[idx]["revenue"] < customers[idx] * price * 6, (
+            f"period {idx}: revenue looks annualized (12x) again"
+        )
+
+    # Cost calibration and the audit-side recomputation share the factor:
+    # the implied gross margin still lands on target at monthly grain.
+    margins = kernel.implied_gross_margin_series(facts)
+    for idx, margin in enumerate(margins):
+        assert abs(margin - facts.target_gross_margin[idx]) <= 0.03, (
+            f"period {idx}: monthly implied margin {margin:.1%} off target"
+        )
+
+    # Payroll: one month books headcount × avg ANNUAL comp / 12.
+    payroll_kwargs = dict(
+        product_headcount=[0], sm_pct_revenue=[0.0],
+        rd_program_per_product_fte_yen=[0], rd_program_floor_yen=[0],
+        ga_pct_revenue=[0.0], fixed_ga_yen=[0], capex_yen=[0],
+        depreciation_life_months=[60], debt_raise_yen=[0],
+        debt_interest_rate=[0.0], ar_days=[0], ap_days=[0],
+        deferred_revenue_share=[0.0], inventory_wip_pct_capex=[0.0],
+        tax_rate=[0.0],
+    )
+    monthly_row = kernel.project_free_cash_flow(
+        [0.0], [0.6], [12], [12_000_000], months_per_period=1, **payroll_kwargs
+    )[0]
+    annual_row = kernel.project_free_cash_flow(
+        [0.0], [0.6], [12], [12_000_000], **payroll_kwargs
+    )[0]
+    assert monthly_row["ebitda"] == -12_000_000, (
+        f"monthly payroll must be hc × comp / 12: {monthly_row['ebitda']:,.0f}"
+    )
+    assert annual_row["ebitda"] == -144_000_000, "annual payroll changed"
+
+    # Interest and depreciation follow the factor too.
+    fin_kwargs = dict(payroll_kwargs)
+    fin_kwargs.update(
+        capex_yen=[120_000_000], debt_raise_yen=[120_000_000],
+        debt_interest_rate=[0.06], depreciation_life_months=[60],
+    )
+    fin_row = kernel.project_free_cash_flow(
+        [0.0], [0.6], [0], [0], months_per_period=1, **fin_kwargs
+    )[0]
+    assert fin_row["interest"] == pytest.approx(120_000_000 * 0.06 / 12)
+    assert fin_row["depreciation"] == pytest.approx(60_000_000 * 1 / 60)
+
+    # Runway: the buffer is target months × MONTHLY burn on a monthly axis.
+    burn = [-1_000_000.0, -1_000_000.0, -1_000_000.0]
+    monthly_equity = kernel.size_equity_rounds(
+        0, burn, [0, 0, 0], target_runway_months=12, round_unit=1,
+        months_per_period=1,
+    )
+    annual_equity = kernel.size_equity_rounds(
+        0, burn, [0, 0, 0], target_runway_months=12, round_unit=1,
+    )
+    assert monthly_equity[0] == 13_000_000, (
+        f"monthly runway buffer must be 12 months of monthly burn: "
+        f"{monthly_equity[0]:,}"
+    )
+    assert annual_equity[0] == 2_000_000, "annual runway sizing changed"
+
+
+def test_S1_statutory_welfare_rate_scales_base_comp() -> None:
+    """A stated 法定福利費率 loads base comp: avg_comp = base × (1 + rate)."""
+    base = _s1_mapping(grain="annual", avg_comp_yen=[8_000_000] * 5)
+    base.pop("fiscal_year_end_month")
+
+    loaded = kernel.derive_source_facts_from_mapping(
+        {**base, "statutory_welfare_rate": 0.15}
+    )
+    assert loaded.statutory_welfare_rate == 0.15
+    assert loaded.avg_comp_yen == [9_200_000] * 5, (
+        f"base 8M × 1.15 expected: {loaded.avg_comp_yen}"
+    )
+    assert any("statutory welfare" in note for note in loaded.derivation_warnings), (
+        "the welfare loading must be surfaced as a derivation note"
+    )
+    # The percent form is accepted too.
+    pct = kernel.derive_source_facts_from_mapping(
+        {**base, "statutory_welfare_rate": "15%"}
+    )
+    assert pct.avg_comp_yen == [9_200_000] * 5
+
+    # Default path (rate unstated) stays byte-identical: comp untouched,
+    # no welfare note.
+    plain = kernel.derive_source_facts_from_mapping(dict(base))
+    assert plain.statutory_welfare_rate == 0.0
+    assert plain.avg_comp_yen == [8_000_000] * 5
+    assert not any("statutory welfare" in note for note in plain.derivation_warnings)
+
+
+def test_S1_new_source_facts_fields_default_and_plumb() -> None:
+    """New S1 fields default safely and flow through the YAML plumbing."""
+    facts = kernel.derive_source_facts(SAAS_STORY)
+    assert facts.fiscal_year_end_month == 3
+    assert facts.monthly_window_months == 0
+    assert facts.statutory_welfare_rate == 0.0
+    assert facts.consumption_tax_rate == 0.10
+    assert facts.ar_site_months == 0.0 and facts.ap_site_months == 0.0
+
+    mapped = kernel.derive_source_facts_from_mapping(
+        _s1_mapping(
+            fiscal_year_end_month=12,
+            monthly_window_months=24,
+            statutory_welfare_rate=0.14,
+            consumption_tax_rate=0.08,
+            ar_site_months=1.5,
+            ap_site_months=2.0,
+        )
+    )
+    assert mapped.fiscal_year_end_month == 12
+    assert mapped.monthly_window_months == 24
+    assert mapped.statutory_welfare_rate == 0.14
+    assert mapped.consumption_tax_rate == 0.08
+    assert mapped.ar_site_months == 1.5 and mapped.ap_site_months == 2.0
+
+
+def test_S1_hybrid_facts_are_annual_canonical() -> None:
+    """grain=hybrid derives the same annual-canonical facts as grain=annual;
+    only the grain tag (and hence the derived period axis) differs."""
+    annual = kernel.derive_source_facts_from_mapping(_s1_mapping(grain="annual"))
+    hybrid = kernel.derive_source_facts_from_mapping(_s1_mapping(grain="hybrid"))
+    assert annual.grain == "annual" and hybrid.grain == "hybrid"
+    for field_name in (
+        "years", "period_labels", "new_units", "customers", "monthly_price_yen",
+        "avg_comp_yen", "equity_raise_yen", "delivery_cost_yen",
+        "variable_cogs_pct", "target_gross_margin", "fixed_ga_yen",
+    ):
+        assert getattr(annual, field_name) == getattr(hybrid, field_name), (
+            f"hybrid facts diverged from annual-canonical on {field_name}"
+        )
+    # And the explicit-factor call path is the identity for annual facts.
+    for story in ARCHETYPES.values():
+        story_facts = kernel.derive_source_facts(story)
+        args = (
+            story_facts.new_units, story_facts.gmv_yen,
+            story_facts.monthly_price_yen, story_facts.take_rate,
+            story_facts.other_revenue_share, story_facts.revenue_mode,
+        )
+        assert kernel.plan_revenue_series(*args) == kernel.plan_revenue_series(
+            *args, months_per_period=12
+        )
+
+
+def test_S5_unstated_monthly_window_start_anchors_to_fy_in_progress() -> None:
+    """Unstated start on a monthly-window grain anchors to the fiscal year in
+    progress (S5 fix): the calendar-year default must never render a monthly
+    window whose first fiscal year already ended before the run date."""
+    from datetime import date as _date
+
+    run = _date(2026, 7, 5)
+    # Deterministic helper contract (injected run date).
+    assert kernel.anchor_start_year(2026, "hybrid", 3, today=run) == 2027
+    assert kernel.anchor_start_year(2026, "monthly", 3, today=run) == 2027
+    # A stated start year is always respected, even when fully past.
+    assert kernel.anchor_start_year(2026, "hybrid", 3, stated=True, today=run) == 2026
+    # Annual / quarterly grains keep the calendar-year default unchanged.
+    assert kernel.anchor_start_year(2026, "annual", 3, today=run) == 2026
+    assert kernel.anchor_start_year(2026, "quarterly", 3, today=run) == 2026
+    # FYE=12: FY2026 is still in progress on 2026-07-05 — no shift.
+    assert kernel.anchor_start_year(2026, "hybrid", 12, today=run) == 2026
+    # Already-current or future years are never shifted.
+    assert kernel.anchor_start_year(2027, "hybrid", 3, today=run) == 2027
+
+    # End-to-end (live run date): a default hybrid mapping must produce a
+    # first fiscal year that does not end before the run date.
+    facts = kernel.derive_source_facts_from_mapping({"company": "AnchorCo", "grain": "hybrid"})
+    assert facts.start_year_stated is False
+    axis = kernel.build_period_axis(facts)
+    first_fy_end = axis.period_end[11]  # 12th monthly column = first FY end
+    assert first_fy_end >= _date.today().replace(day=1), (
+        "unstated hybrid start rendered a fully-past first fiscal year"
+    )
+    # A stated start_year still wins end-to-end.
+    stated = kernel.derive_source_facts_from_mapping(
+        {"company": "AnchorCo", "grain": "hybrid", "start_year": 2026}
+    )
+    assert stated.start_year_stated is True and stated.years[0] == 2026
+    # Facts-level re-anchor helper (burn_runway hybrid promotion path).
+    promoted = replace(
+        kernel.derive_source_facts_from_mapping({"company": "AnchorCo"}), grain="hybrid"
+    )
+    anchored = kernel.anchor_facts_first_fiscal_year(promoted)
+    a_axis = kernel.build_period_axis(anchored)
+    assert a_axis.period_end[11] >= _date.today().replace(day=1)
+    assert anchored.period_labels == [f"FY{y}" for y in anchored.years]
+
+
 if __name__ == "__main__":
     _tests = [
         test_gross_margin_tracks_target_across_archetypes,
@@ -1768,6 +3077,40 @@ if __name__ == "__main__":
         test_hardware_unit_sale_survives_an_attach_subscription,
         test_marketplace_kpi_uses_a_transaction_lens,
         test_structured_yaml_revenue_tracks_the_stated_customer_count,
+        test_K1_explicit_customers_dominate_recurring_revenue_over_new_units,
+        test_K2_changing_churn_rate_moves_ending_units_and_terminal_arr,
+        test_K2_structured_yaml_churn_rate_moves_terminal_customers_and_revenue,
+        test_K4_nol_absorbs_prior_losses_so_cash_tax_does_not_double_dip,
+        test_K5_hardware_profile_suppresses_transaction_revenue_and_gmv,
+        test_K7_audit_economic_coherence_detects_K1_customers_drift,
+        test_K3_stated_grants_reduce_auto_sized_equity,
+        test_K3_projection_ending_cash_reflects_each_instrument,
+        test_K3_interest_accrues_on_convertibles_and_lease,
+        test_K3_balance_sheet_balances_with_all_instruments,
+        test_K7_audit_detects_K3_secondary_without_a_round,
+        test_K3_debt_amortization_gives_declining_balance_interest,
+        test_K3_debt_amortization_flows_through_cash_and_balance_sheet,
+        test_K3_workbook_capital_stack_carries_amortization_schedule,
+        test_K7_audit_detects_amortization_exceeding_draws,
+        test_G_half_year_convention_halves_acquisition_period_depreciation,
+        test_G_workbook_pl_da_mirrors_half_year_convention,
+        test_K8_out_of_range_gross_margin_target_is_warned_not_silently_clamped,
+        test_K6_material_revenue_on_default_drivers_is_warned,
+        test_H_cost_build_carries_governor_note,
+        test_F_stated_onboarding_months_drive_one_time_revenue,
+        test_F_default_onboarding_is_labeled_placeholder_in_workbook,
+        test_K3_stated_debt_interest_rate_reaches_equity_sizing,
+        test_F_stated_zero_one_time_fee_is_honored_per_period,
+        test_K3_financing_inflow_subtotal_excludes_advances,
+        test_S1_build_period_axis_hybrid_fye3,
+        test_S1_build_period_axis_annual_is_backward_compatible,
+        test_S1_expand_annual_series_flow_stock_rate_contracts,
+        test_S1_months_factor_and_monthly_axis_labels,
+        test_S1_monthly_grain_kernel_math_is_not_12x,
+        test_S1_statutory_welfare_rate_scales_base_comp,
+        test_S1_new_source_facts_fields_default_and_plumb,
+        test_S1_hybrid_facts_are_annual_canonical,
+        test_S5_unstated_monthly_window_start_anchors_to_fy_in_progress,
     ]
     for _test in _tests:
         try:

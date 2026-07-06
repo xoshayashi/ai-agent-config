@@ -1,0 +1,4 @@
+interface:
+  display_name: "Startup Financial Modeling"
+  short_description: "Build and audit startup xlsx models"
+  default_prompt: "Use $startup-financial-modeling to build a validated startup financial model from this equity-story brief."
