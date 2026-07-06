@@ -78,7 +78,6 @@ alias codex-yolo='codex --dangerously-bypass-approvals-and-sandbox'
 alias claude-yolo='claude --dangerously-skip-permissions'
 alias agy-yolo='agy --dangerously-skip-permissions'
 alias hermes-yolo='hermes --yolo'
-export COPILOT_ALLOW_ALL=true
 alias copilot-yolo='copilot --allow-all'
 
 # --- Ollama BYOK for Copilot CLI ---
