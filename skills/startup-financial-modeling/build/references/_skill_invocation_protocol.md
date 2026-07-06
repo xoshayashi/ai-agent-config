@@ -10,7 +10,9 @@ decision. Start with `_output_modes.md`, `_generic_composition_protocol.md`,
 and `_self_review_protocol.md`. When a run reaches post-output closeout, a user
 asks to improve a prior skill output, or logs show failed checks, repeated
 workarounds, cleanup noise, or tool/routing inefficiency, load
-`_self_improvement_protocol.md`. Xlsx generation or repair also needs
+`_self_improvement_protocol.md`; it routes to the reviewer-panel,
+failure-mode, pruning, and closeout-consistency references only when that
+learning path is active. Xlsx generation or repair also needs
 `_layout_canonical.md`, `_ib_workbook_design_system.md`, and
 `_sheet_quality_rubric.md`. Full plans, fundraising, DD, or investor outputs
 draw from `_modeling_kernel.md`, `_coverage_universe.md`,
@@ -53,10 +55,13 @@ artifact fixes separately from reusable skill gaps, patch the lowest durable
 layer, add regression proof, and rerun the failed check plus a broader gate.
 Before writing any Reflection Record, progress-log learning, or proposed skill
 change based on the run, validate the record with
-`build/runtime/self_improvement.py` (`validate_reflection_record`) or an
-equivalent privacy / invariant-shape scanner. Do not store raw logs or
+`build/runtime/self_improvement.py`
+(`validate_reflection_record_for_acceptance`) or an equivalent
+validator-plus-panel scanner. The first gate preserves privacy, source
+discipline, regression proof, and anti-overfit rules; the second gate asks
+whether the change truly improves reusable quality. Do not store raw logs or
 confidential source text in the skill, and do not turn one company-specific
-fact into a global rule.
+fact or n=1 preference into a global rule.
 
 ## Workbook Helper
 

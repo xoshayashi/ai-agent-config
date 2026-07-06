@@ -789,6 +789,143 @@
      "type": "implementation"
     }
    ]
+  },
+  {
+   "id": 13,
+   "name": "self_improvement_panel_rejects_schema_valid_degradation",
+   "prompt": "A prior SFM run has a structurally valid Reflection Record: it has all required fields, no secrets, no PII, no company-specific facts, and a nominal regression_proof. However the proposed lesson is vague ('always improve quality'), evidence is n=1, verification is manual review only, and the proposed change adds trigger prose instead of a deterministic gate. Produce the skill-level acceptance decision.",
+   "expected_output": "The record passes the structural privacy/overfit validator but is rejected before reflection by the independent reviewer panel. The response cites R2 verification weakness, R3 n=1/pruning weakness, R4 process-bloat risk, keeps validate_reflection_record/regression/privacy/human-review/git discipline intact, and records the item only as a sanitized deferred candidate unless stronger evidence and a regression proof appear.",
+   "files": [
+    "schema_valid_degraded_reflection_record"
+   ],
+   "applicable_references": [
+    "_self_improvement_protocol",
+    "_self_improvement_reviewer_panel",
+    "_self_improvement_failure_modes",
+    "_self_improvement_pruning",
+    "_skill_invocation_protocol"
+   ],
+   "assertions": [
+    {
+     "id": "PANEL1",
+     "text": "The answer preserves the existing structural validator as the first gate and explicitly says the validator is not replaced by the reviewer panel.",
+     "type": "quality"
+    },
+    {
+     "id": "PANEL2",
+     "text": "The answer rejects a validator-clean but semantically weak Reflection Record via independent panel scoring, with cited reasons under R1/R2/R3/R4 rather than uncited impressions.",
+     "type": "quality"
+    },
+    {
+     "id": "PANEL3",
+     "text": "The answer applies pruning discipline: n=1 evidence becomes a sanitized deferred candidate, not permanent doctrine, and the lowest durable layer rule is preserved.",
+     "type": "quality"
+    },
+    {
+     "id": "PANEL4",
+     "text": "The answer names a concrete regression_proof and broader gate required before acceptance, and does not weaken privacy, audit, human-review, or git-managed change requirements.",
+     "type": "implementation"
+    }
+   ]
+  },
+  {
+   "id": 14,
+   "name": "self_improvement_closeout_consistency_drift",
+   "prompt": "A skill-quality change added self-improvement references and updated eval counts. Before closeout, a sanitized review finds one local markdown link points to a missing reference and a declared count says four self-improvement references exist while only three files are present. Produce the closeout decision.",
+   "expected_output": "Closeout is blocked until the dangling local reference and count drift are fixed. The answer runs or cites a deterministic closeout consistency check, then asks an independent reviewer to inspect cross-references, frozen terms, duplicate rules, body bloat, and eval/gate cleanliness before declaring completion.",
+   "files": [
+    "closeout_protocol_markdown_fixture"
+   ],
+   "applicable_references": [
+    "_self_improvement_protocol",
+    "_self_improvement_reviewer_panel",
+    "_self_improvement_failure_modes",
+    "_self_improvement_pruning",
+    "_skill_invocation_protocol"
+   ],
+   "assertions": [
+    {
+     "id": "CLOSEOUT1",
+     "text": "The response treats dangling local references and declared-count drift as closeout blockers, not polish.",
+     "type": "quality"
+    },
+    {
+     "id": "CLOSEOUT2",
+     "text": "The response cites a deterministic closeout consistency check and an independent closeout read for cross-references, frozen terminology, duplicate guidance, body bloat, and eval/gate cleanliness.",
+     "type": "implementation"
+    },
+    {
+     "id": "CLOSEOUT3",
+     "text": "The response uses explicit convergence conditions: target score/gate met, no new reusable gap, or iteration bound with a deferred candidate.",
+     "type": "quality"
+    }
+   ]
+  },
+  {
+   "id": 15,
+   "name": "self_improvement_failure_modes_mitigated",
+   "prompt": "A proposed self-improvement change passes a small eval by copying synthetic examples into doctrine, narrows the process around one score, and claims the skill is now generic after three tuned examples. Produce the acceptance decision.",
+   "expected_output": "The change is rejected or held because it shows model-collapse, Goodhart/reward-hacking, and eval-overfit risks. The answer keeps human/artifact-derived evidence as the anchor, does not rely on one proxy score, requires privacy/audit gate sampling, and pairs any targeted regression with a broader gate or holdout/adversarial example.",
+   "files": [
+    "synthetic_only_improvement_proposal"
+   ],
+   "applicable_references": [
+    "_self_improvement_protocol",
+    "_self_improvement_reviewer_panel",
+    "_self_improvement_failure_modes",
+    "_self_improvement_pruning",
+    "_skill_invocation_protocol"
+   ],
+   "assertions": [
+    {
+     "id": "FAILMODE1",
+     "text": "The response identifies model collapse, reward hacking / Goodhart, sycophancy, eval overfit, or non-convergence where applicable.",
+     "type": "quality"
+    },
+    {
+     "id": "FAILMODE2",
+     "text": "The response ties mitigations to existing gates: validator privacy/overfit rejection, reviewer-panel evidence citations, broader gate rerun, and holdout/adversarial separation.",
+     "type": "implementation"
+    },
+    {
+     "id": "FAILMODE3",
+     "text": "The response does not let a small tuned eval set override privacy, audit, source discipline, regression proof, or artifact-quality checks.",
+     "type": "quality"
+    }
+   ]
+  },
+  {
+   "id": 16,
+   "name": "self_improvement_pruning_deferred_candidate",
+   "prompt": "A single user disliked a one-off model note and asks to make that preference a permanent SFM rule. The artifact can be fixed locally, but there is no repeated evidence, no invariant, and no regression proof yet. Produce the skill-level response.",
+   "expected_output": "The artifact issue is fixed locally, but the skill change is not reflected. The answer records at most a one-line sanitized deferred candidate, explains that reflecting nothing is a quality decision, and states what n>=2 evidence or failed-check/regression proof would be required to promote it.",
+   "files": [
+    "single_instance_user_preference"
+   ],
+   "applicable_references": [
+    "_self_improvement_protocol",
+    "_self_improvement_reviewer_panel",
+    "_self_improvement_failure_modes",
+    "_self_improvement_pruning",
+    "_skill_invocation_protocol"
+   ],
+   "assertions": [
+    {
+     "id": "PRUNE1",
+     "text": "The response separates artifact repair from durable skill change and treats not reflecting as an acceptable quality decision.",
+     "type": "quality"
+    },
+    {
+     "id": "PRUNE2",
+     "text": "The response keeps n=1 evidence as a sanitized deferred candidate and does not store raw logs, private source text, or company-specific details.",
+     "type": "privacy"
+    },
+    {
+     "id": "PRUNE3",
+     "text": "The response requires the lowest durable layer and a real regression proof before any future promotion.",
+     "type": "implementation"
+    }
+   ]
   }
  ]
 }

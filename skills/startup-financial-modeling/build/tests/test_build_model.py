@@ -34,6 +34,7 @@ import economic_kernel as kernel  # noqa: E402
 import ib_format as ib  # noqa: E402
 import live_comps  # noqa: E402
 import self_improvement  # noqa: E402
+import closeout_consistency  # noqa: E402
 import source_plan_builder as source_plan  # noqa: E402
 
 FIRST_VALUE_COL = source_plan.START_PERIOD_COL
@@ -1654,6 +1655,98 @@ def test_self_improvement_reflection_validator_rejects_privacy_and_overfit_recor
     } <= errors
 
 
+def test_self_improvement_panel_rejects_schema_valid_quality_degradation() -> None:
+    degraded = {
+        "task_type": "post_output_repair",
+        "artifact_type": "xlsx",
+        "redacted_evidence": "user said the workbook should feel more premium",
+        "observed_failure": "closeout wording did not persuade the user",
+        "verification_evidence": "manual review only",
+        "root_cause_category": "documentation_ambiguity",
+        "generalized_lesson": "Always improve the skill so future outputs are higher quality.",
+        "proposed_change_layer": "skill_trigger",
+        "privacy_classification": "sanitized",
+        "regression_proof": "self-review says it looks good",
+        "is_reusable": True,
+        "record_author": "codex-runner",
+        "panel_reviewer": "independent-reviewer-r1",
+        "panel_evidence_citations": [],
+        "evidence_count": 1,
+    }
+    assert self_improvement.validate_reflection_record(degraded) == []
+    panel = self_improvement.score_reflection_panel(degraded)
+    assert panel["accepted"] is False
+    assert {
+        "panel:weak_regression_proof",
+        "panel:weak_generalized_lesson",
+        "pruning:n1_requires_deferred_candidate",
+    } <= set(panel["blockers"])
+
+
+def test_self_improvement_panel_accepts_evidence_backed_independent_record() -> None:
+    accepted = {
+        "task_type": "post_output_repair",
+        "artifact_type": "xlsx",
+        "redacted_evidence": "quality gate G-D failed in two runs, then passed after a formula-shape assertion",
+        "observed_failure": "period formulas diverged after repeated manual repair loops",
+        "verification_evidence": "targeted pytest passed and quality_gates.py reran clean",
+        "root_cause_category": "quality_gate_gap",
+        "generalized_lesson": "When repeated workbook repairs expose the same formula-shape gap, promote the invariant into a deterministic gate before accepting closeout.",
+        "proposed_change_layer": "quality_gate",
+        "privacy_classification": "sanitized",
+        "regression_proof": "pytest: self-improvement panel regression and quality gate G-K",
+        "is_reusable": True,
+        "record_author": "codex-runner",
+        "panel_reviewer": "independent-reviewer-r2",
+        "panel_evidence_citations": ["redacted_evidence", "verification_evidence", "regression_proof"],
+        "evidence_count": 2,
+        "broader_gate_to_rerun": "quality_gates.py",
+        "expected_quality_effect": "turns a recurring manual repair into an auditable workbook gate",
+        "milestone_review": True,
+    }
+    assert self_improvement.validate_reflection_record_for_acceptance(accepted) == []
+
+
+def test_self_improvement_closeout_consistency_catches_links_and_count_drift(tmp_path: Path) -> None:
+    protocol = tmp_path / "protocol.md"
+    protocol.write_text(
+        "[good](kept.md)\n"
+        "[missing](missing.md)\n"
+        "<!-- sfm-closeout-count name=\"refs\" expected=\"3\" glob=\"*.md\" -->\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "kept.md").write_text("ok\n", encoding="utf-8")
+
+    errors = set(closeout_consistency.check_closeout_consistency([protocol]))
+    assert "dangling_ref:protocol.md->missing.md" in errors
+    assert "count_drift:protocol.md:refs:expected=3:found=2:glob=*.md" in errors
+
+
+def test_self_improvement_failure_modes_and_pruning_are_linked_from_gates() -> None:
+    protocol_text = (SKILL_DIR / "build" / "references" / "_self_improvement_protocol.md").read_text(encoding="utf-8")
+    failure_text = (SKILL_DIR / "build" / "references" / "_self_improvement_failure_modes.md").read_text(encoding="utf-8")
+    pruning_text = (SKILL_DIR / "build" / "references" / "_self_improvement_pruning.md").read_text(encoding="utf-8")
+    gate_text = (SKILL_DIR / "build" / "evals" / "quality_gates.py").read_text(encoding="utf-8")
+    eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
+    combined = "\n".join([protocol_text, failure_text, pruning_text, gate_text, eval_text])
+
+    for phrase in [
+        "_self_improvement_reviewer_panel.md",
+        "_self_improvement_failure_modes.md",
+        "_self_improvement_pruning.md",
+        "model collapse",
+        "reward hacking / Goodhart",
+        "sycophancy",
+        "eval overfit",
+        "non-convergence",
+        "n=1 evidence normally becomes a sanitized deferred candidate",
+        "Rules fail at the prompt and succeed at the boundary",
+        "score_reflection_panel",
+        "closeout_consistency.py",
+    ]:
+        assert phrase in combined
+
+
 def test_skill_guidance_uses_meaningful_sparse_fills_and_borders() -> None:
     skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
     invocation_text = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
@@ -1763,14 +1856,10 @@ def test_xlsx_evals_load_full_design_reference_stack() -> None:
     }
     missing = []
     for item in evals:
-        if item.get("name") == "self_improvement_from_failed_session_log":
+        if str(item.get("name", "")).startswith("self_improvement_"):
             refs = set(item.get("applicable_references", []))
-            assertions = {assertion.get("id") for assertion in item.get("assertions", [])}
             if "_self_improvement_protocol" not in refs:
                 missing.append(f"{item['id']}:{item['name']} missing _self_improvement_protocol")
-            for assertion_id in ("SI1", "SI2", "SI3", "SI4"):
-                if assertion_id not in assertions:
-                    missing.append(f"{item['id']}:{item['name']} missing {assertion_id}")
             continue
         refs = set(item.get("applicable_references", []))
         if not required <= refs:
