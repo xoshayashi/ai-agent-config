@@ -77,10 +77,10 @@ VERIFICATION_TERMS = (
     "closeout_consistency",
 )
 WEAK_PROOF_RE = re.compile(
-    r"(?i)\b(self[- ]?review|manual review only|looks good|seems fine|n/a|none)\b"
+    r"(?i)^\s*(self[- ]?review|manual review only|looks good|seems fine|n/a|none)\s*[.!]*\s*$"
 )
 GENERIC_LESSON_RE = re.compile(
-    r"(?i)\b(always improve|make it better|be more careful|use better judgment|high quality)\b"
+    r"(?i)^\s*(always improve|make it better|be more careful|use better judgment|high quality)(?:\s+outputs?)?\s*[.!]*\s*$"
 )
 WEAKENING_RE = re.compile(
     r"(?i)\b(skip|relax|weaken|remove|bypass|disable)\b.*\b(strict audit|privacy|source discipline|regression|human review)\b"

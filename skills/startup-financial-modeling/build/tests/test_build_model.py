@@ -1663,10 +1663,10 @@ def test_self_improvement_panel_rejects_schema_valid_quality_degradation() -> No
         "observed_failure": "closeout wording did not persuade the user",
         "verification_evidence": "manual review only",
         "root_cause_category": "documentation_ambiguity",
-        "generalized_lesson": "Always improve the skill so future outputs are higher quality.",
+        "generalized_lesson": "Always improve.",
         "proposed_change_layer": "skill_trigger",
         "privacy_classification": "sanitized",
-        "regression_proof": "self-review says it looks good",
+        "regression_proof": "self-review",
         "is_reusable": True,
         "record_author": "codex-runner",
         "panel_reviewer": "independent-reviewer-r1",
@@ -1708,6 +1708,15 @@ def test_self_improvement_panel_accepts_evidence_backed_independent_record() -> 
     missing_reviewer = dict(accepted)
     missing_reviewer.pop("panel_reviewer")
     assert "panel:reviewer_required" in self_improvement.validate_reflection_record_for_acceptance(missing_reviewer)
+    specific_language = dict(accepted)
+    specific_language["generalized_lesson"] = (
+        "When repeated workbook repairs expose the same formula-shape gap, "
+        "promote the invariant into a deterministic gate to preserve high quality financial-model output."
+    )
+    specific_language["regression_proof"] = (
+        "none of the previously passing tests regressed; pytest and quality_gates.py both passed clean"
+    )
+    assert self_improvement.validate_reflection_record_for_acceptance(specific_language) == []
 
 
 def test_self_improvement_closeout_consistency_catches_links_and_count_drift(tmp_path: Path) -> None:
@@ -1861,8 +1870,13 @@ def test_xlsx_evals_load_full_design_reference_stack() -> None:
     for item in evals:
         if str(item.get("name", "")).startswith("self_improvement_"):
             refs = set(item.get("applicable_references", []))
+            assertions = {assertion.get("id") for assertion in item.get("assertions", [])}
             if "_self_improvement_protocol" not in refs:
                 missing.append(f"{item['id']}:{item['name']} missing _self_improvement_protocol")
+            if item.get("name") == "self_improvement_from_failed_session_log":
+                for assertion_id in ("SI1", "SI2", "SI3", "SI4"):
+                    if assertion_id not in assertions:
+                        missing.append(f"{item['id']}:{item['name']} missing {assertion_id}")
             continue
         refs = set(item.get("applicable_references", []))
         if not required <= refs:
