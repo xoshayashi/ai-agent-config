@@ -1,63 +1,49 @@
-# 人間が作った資料に見せる規律
+# Discipline For Human-Made Output
 
-AI 生成資料の最大の兆候は語彙ではなく**構造の均一性**(全スライドが同じ密度・同じ文長・
-同じ 3 項目)にある。deck.json を書くとき・自己レビューするときに本文書のルールを適用する。
-機械チェック可能な項目は validate_spec.py が警告する。
+Use this file during copy and composition cleanup. The goal is not casual language; it is the
+absence of generic, machine-like filler.
 
-## 視覚面(エンジンが既に守るもの+spec 側の責任)
+## Visual
 
-- タイトル下の全幅アクセント罫線は AI 生成の代表的痕跡。使わない(エンジンは左縦バーのみ)。
-- 本文の中央揃えは表紙・扉・ステートメント以外で使わない。
-- 装飾アイコンの行(色付き円+キーワード)や、内容と無関係な抽象ビジュアル
-  (グラデーション、光、球体)は置かない。アイコンは ○× やステップ番号など機能がある時だけ。
-- **情報密度はスライドごとに変える**: エビデンススライドは濃く、ステートメントは薄く。
-  全ページが同じ文字量・同じブロック数なら再配分する。
-- 強調は 1 スライド 1-2 箇所、必ずタイトルの主張と結びつける。全キーワード太字は禁止。
-- カードグリッドの全カードが同じ文字数・同じ構文なら、少なくとも 1 枚は数値入りの
-  検証可能な文に書き換える。
-- レイアウトの一貫性(ヘッダー・フッター)はプロの証、ボディ構成の単調反復はロボットの証。
-  隣接スライドで同じパターンを繰り返さない。
+- Avoid repeated layout shells across unrelated slides.
+- Use real evidence objects, not generic icons.
+- Keep navigation/source discipline consistent.
+- Add variation through focal object, density, and composition, not decoration.
+- Delete any slide that could belong unchanged in another company's deck.
 
-## コピー面: 禁止・要注意表現
+## Copy
 
-日本語(使ったら書き直し):
-「〜と言えるでしょう」「〜と考えられます」「〜が期待されます」「一概には言えませんが」
-「〜することが重要です」「まとめると」「いかがでしたか」「近年」「急速に」(単独の)「注目」
-汎用動詞の空回し: 実現/提供/推進/強化/最適化 — 誰が・何を・どう変えるかの具体動詞に置換。
+Replace broad claims with concrete facts:
 
-英語: delve / leverage / robust / seamless / comprehensive / pivotal / landscape /
-ecosystem / foster / empower / streamline / game-changer / "it's important to note" /
-"in today's ..."
+- industry-leading
+- robust
+- seamless
+- innovative
+- comprehensive
+- scalable
+- future-proof
+- game-changing
+- unlock
+- empower
+- transform
 
-- 数値の裏付けのない評価語(重要/最適/非常に/significant/innovative)は 1 スライド 1 語まで、
-  タイトルでは 0。
-- 常套メタファー(羅針盤/土台/架け橋/エンジン、tapestry/beacon)は使わない。
-- 同義語の言い換えサイクル(顧客→ユーザー→クライアント)をしない。正しい語の反復は良い文章。
-- 幽霊出典(「調査によると」「専門家は」)は禁止。組織名・レポート名・年まで書く。
+These words may appear only when the slide proves exactly what they mean.
 
-## コピー面: 文の構造
+## Sentence Structure
 
-- ヘッジは 1 文 1 個まで。「〜の可能性があると考えられます」のような二重ヘッジは書き直し。
-- 「〜など」「等」は 1 スライド 1 回まで。名前を列挙する。
-- 文長を混ぜる。全文が同じ長さ(±30%以内)なら書き直し。「です/ます」の同一文末 3 連続を避ける。
-- 修辞疑問はタイトル上のキッカー行のみ(デッキ内 2-3 回まで)。
-- 「A だけでなく B も」構文はデッキ内 1 回まで。
-- メタ宣言(「以下の3点を説明します」「本資料では」)は全削除。内容で構造を示す。
+- Short labels beat long explanatory prose.
+- Avoid stacked hedges that make the claim feel evasive.
+- Avoid colon-title formulas that reveal a template.
+- Keep each bullet tied to a metric, mechanism, action, or evidence item.
 
-## 構成面
+## Composition
 
-- **3 項目の罠**: 過半数のスライドが「ちょうど 3 項目」なら再配分する。弱い 3 点目を
-  水増しするくらいなら 2 項目にする。
-- どの会社のデッキにも入りうる汎用スライドは削除か統合。全スライドに固有名詞・数値・日付・
-  事例など、このデッキ固有の事実を最低 1 つ入れる。
-- 丸めた数字より実測値(約50% でなく 47%)。期間と出典を添える。
-- 記号の癖を掃除: 「: +半角スペース」、em ダッシュ(—)、全角スラッシュの対句、
-  マークダウン残骸(**)、絵文字ビュレット、全角英数字、和文見出し内の Title Case 英語。
-- 「◯◯: △△」型のタイトル(コロンでラベルと補足を繋ぐ形)を連発しない。アクション
-  タイトルは文で書く。同型タイトルの連続はテンプレート出力の証。
+- Every page needs at least one deck-specific fact, number, date, name, source, or artifact.
+- If the page contains only generic categories, it is not done.
+- If the design looks polished but the proof is interchangeable, rewrite the content first.
 
-## 適用方法
+## Application
 
-deck.json 初稿 → 本文書でセルフレビュー → 書き直しは 1 回のまとめ修正で行う。
-全ルールを最大強度で機械的に当てると逆に均一化する(過剰研磨)。判断の軸は
-「意味に従った不規則性」— レイアウトも文も、内容が要求する形に合わせて崩す。
+Draft `deck.json`, run self-review against this file, then rewrite in one consolidated pass.
+Do not patch individual words while leaving the underlying generic slide intact.
+

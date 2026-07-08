@@ -64,6 +64,14 @@ def _para_weight(para) -> int:
     return 400
 
 
+def _run_weight(run) -> int:
+    if run.font.bold:
+        return 700
+    if "SemiBold" in (run.font.name or ""):
+        return 600
+    return 400
+
+
 def _para_metrics(tf, w_in):
     """Yield (line_stack_h_in, space_after_in, line_w_in) per non-empty paragraph.
     overflow 判定と ink-box 判定が同じ行高モデルを共有するための単一実装。"""
@@ -72,7 +80,11 @@ def _para_metrics(tf, w_in):
         if not text.strip():
             continue
         size = max((r.font.size.pt if r.font.size else 11) for r in para.runs)
-        width = text_width_in(text, size, _para_weight(para))
+        width = sum(
+            text_width_in(r.text, r.font.size.pt if r.font.size else size, _run_weight(r))
+            for r in para.runs
+            if r.text
+        )
         lines = max(1, -(-int(width * 100) // max(1, int(w_in * 100))))
         spacing = para.line_spacing if isinstance(para.line_spacing, float) else 1.15
         space_after = para.space_after.pt / 72.0 if para.space_after is not None else 0.0

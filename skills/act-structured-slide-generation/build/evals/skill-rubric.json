@@ -1,69 +1,69 @@
 {
-  "$comment": "Rubric for the SKILL ITSELF (not the decks it produces — that's rubric.json). Grounded in Anthropic skill-creator (anthropics/skills) plus this repo's skill conventions. Defect-deduction scoring: each category starts at full points; judges deduct per concrete observed defect (minor=-1, major=-3, critical=-5 within the category, floor 0). Total = sum of categories (max 100). Judge = an independent LLM reviewer given the full skill tree; every deduction must cite file:line evidence.",
+  "$comment": "Rubric for the SKILL ITSELF, not for generated decks. Grounded in the skill-creator guidance and this repository's conventions. Defect-deduction scoring: each category starts at full points; deduct for concrete observed defects (minor=-1, major=-3, critical=-5 within the category, floor 0). Total = max 100. Judge = an independent reviewer given the full skill tree; every deduction must cite file:line evidence.",
   "target": "SKILL.md + build/ + scripts/ + examples/ of this skill directory",
   "categories": [
     {
       "id": "triggering",
-      "name": "発火設計(description・trigger evals)",
+      "name": "Trigger Design",
       "max_points": 20,
       "criteria": [
-        "description が「何をするか」と「いつ使うか」の両方を含み、ユーザーが 'slide' と言わないケースも拾う押し出し(pushy)がある",
-        "隣接スキルとの境界が description に明記され、誤発火先への委譲(Not for ...)がある",
-        "trigger evals が現実的な文面(ファイルパス・背景・口語・typo を含む)で、should_fire / should_not_fire 各 8 問以上ある",
-        "should_not_fire がニアミス中心(語彙は重なるが責務が違う)で、明白な無関係プロンプトで水増しされていない"
+        "The description explains both what the skill does and when to use it, including cases where the user does not say slide or pptx.",
+        "Boundaries with adjacent skills are explicit, with Not for cases that route to image slides, ATOM slides, narrative-only writing, Google Slides-only work, and financial models.",
+        "Trigger evals contain realistic prompts with paths, context, casual wording, and typos; should_fire and should_not_fire each have at least eight cases.",
+        "should_not_fire cases are near misses, not unrelated filler."
       ]
     },
     {
       "id": "disclosure",
-      "name": "段階的開示・構造",
+      "name": "Progressive Disclosure And Structure",
       "max_points": 20,
       "criteria": [
-        "SKILL.md 本文が 500 行未満で、metadata → 本文 → 参照ファイルの 3 層が機能している",
-        "各参照ファイルに「いつ読むか」の明確な指示があり、常時読ませる想定の肥大ファイルがない",
-        "300 行に近い参照ファイルには目次がある",
-        "scripts / references / evals / examples の責務分離が明確(実行可能コードとドキュメントが混在しない)"
+        "SKILL.md stays under 500 lines and separates metadata, operating workflow, and reference map.",
+        "Each reference file has a clear role and is read only when relevant.",
+        "Long reference files are organized with headings.",
+        "scripts, references, evals, examples, and assets have distinct responsibilities."
       ]
     },
     {
       "id": "writing",
-      "name": "記述品質(why・命令形・汎用性)",
+      "name": "Instruction Quality",
       "max_points": 20,
       "criteria": [
-        "指示は命令形で、重要な制約には理由(why)が添えられている — 裸の MUST/禁止の列挙になっていない",
-        "特定の例に過剰適合した指示(overfit)がなく、100 万回の多様な利用に耐える一般性がある",
-        "出力フォーマット・実例(examples)が具体的に示されている",
-        "冗長・重複・死んだ記述(参照されないファイル、実行されない手順)がない"
+        "Instructions are imperative and explain the why behind major constraints.",
+        "Guidance is generalized for diverse future deck work and is not overfit to one sample deck.",
+        "Output formats and examples are concrete enough to execute.",
+        "Redundant, dead, contradictory, or unreferenced guidance is absent."
       ]
     },
     {
       "id": "determinism",
-      "name": "決定論・検証可能性",
+      "name": "Determinism And Verification",
       "max_points": 20,
       "criteria": [
-        "バイナリ生成・レンダリング・検証は scripts に寄せ、LLM は判断とコンテンツに限定されている",
-        "機械検証(exit code)と視覚/主観検証が分離され、両方がパイプラインに組み込まれている",
-        "スクリプトに pytest 等の自動テストがあり、通っている",
-        "eval が客観的 assertion を持ち、品質ルーブリックに合格閾値が定義されている"
+        "Binary generation, rendering, validation, and linting live in scripts; the LLM handles judgment and content.",
+        "Machine checks and visual/subjective checks are separated and both are required.",
+        "Automated tests cover scripts and key behavioral contracts.",
+        "Evals have objective assertions and a quality rubric with a pass threshold."
       ]
     },
     {
       "id": "workflow",
-      "name": "ワークフロー完全性",
+      "name": "Workflow Completeness",
       "max_points": 10,
       "criteria": [
-        "要件整理 → 承認ゲート → 生成 → 検証 → 修正ループ → 完了報告のフェーズが明示されている",
-        "中間成果物がファイルとして残り、中断・別セッションから再開できる",
-        "修正の範囲(修理メニュー)と、上流に戻るべき条件が定義されている"
+        "The phases are explicit: requirements, outline gate, generation, validation, repair loop, and final report.",
+        "Intermediate artifacts are files so work can resume across sessions.",
+        "The repair menu defines local fixes and when to return upstream."
       ]
     },
     {
       "id": "operability",
-      "name": "運用性・安全性",
+      "name": "Operability And Safety",
       "max_points": 10,
       "criteria": [
-        "依存(Python パッケージ・外部 CLI・フォント)が明記され、欠落時のフォールバック手順がある",
-        "スキルの内容がユーザーの意図から見て驚きがない(Principle of Lack of Surprise)",
-        "リポジトリの検証(validate-repo.sh 等)に適合する構造になっている"
+        "Dependencies, external CLIs, and rendering prerequisites are documented.",
+        "The skill follows the user's intent without surprising destructive or hidden behavior.",
+        "The tree is compatible with repo validation and avoids cache artifacts."
       ]
     }
   ],

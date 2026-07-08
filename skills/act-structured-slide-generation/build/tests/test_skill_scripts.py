@@ -23,6 +23,160 @@ def run(script, *args):
                           capture_output=True, text=True)
 
 
+def test_skill_metadata_and_resource_map_are_discoverable():
+    skill_md = (SKILL / "SKILL.md").read_text()
+    desc = skill_md.split("description:", 1)[1].split("---", 1)[0].strip().strip('"')
+    assert len(desc) <= 1024
+    assert "grid-and-flex-strategy.md" in skill_md
+    assert "slide-decision-engine.md" in skill_md
+    assert "corpus-derived-composition-atoms.md" in skill_md
+    assert "visual-qa-and-repair-rubric.md" in skill_md
+    assert "assets/deck-workspace-template/" in skill_md
+    assert (SKILL / "agents" / "openai.yaml").exists()
+    assert (SKILL / "build" / "references" / "grid-and-flex-strategy.md").exists()
+    assert (SKILL / "build" / "references" / "slide-decision-engine.md").exists()
+    assert (SKILL / "build" / "references" / "ir-slide-design-principles.md").exists()
+    assert (SKILL / "build" / "references" / "corpus-derived-composition-atoms.md").exists()
+    assert (SKILL / "build" / "references" / "visual-qa-and-repair-rubric.md").exists()
+    assert (SKILL / "assets" / "deck-workspace-template" / "outline.md").exists()
+
+
+def test_reference_markdown_is_english_without_japanese_residue():
+    import re
+
+    japanese = re.compile(r"[ぁ-んァ-ン一-龯]")
+    for path in sorted((SKILL / "build" / "references").glob("*.md")):
+        text = path.read_text()
+        assert not japanese.search(text), f"Japanese residue in {path.relative_to(SKILL)}"
+
+
+def test_slide_judgment_requires_grid_and_flex_strategy_fields():
+    ref = (SKILL / "build" / "references" / "slide-judgment-system.md").read_text()
+    assert "these 22 fields" in ref
+    assert "grid_role_map" in ref
+    assert "main_axis" in ref
+    for token in (
+        "reader_question",
+        "single_takeaway",
+        "focal_object",
+        "evidence_strategy",
+        "composition_move",
+        "density_control",
+        "whitespace_role",
+        "hierarchy_spine",
+        "annotation_policy",
+        "rhythm_role",
+        "failure_mode",
+        "repair_instruction",
+    ):
+        assert token in ref
+    for token in (
+        "grid_role_map",
+        "column_span_plan",
+        "alignment_spine",
+        "body_band_plan",
+        "edge_lock",
+        "cross_slide_consistency",
+        "main_axis",
+        "cross_axis_align",
+        "gap_scale",
+        "grow_rule",
+        "shrink_guard",
+        "wrap_rule",
+        "fill_repair",
+    ):
+        assert token in ref
+
+
+def test_grid_flex_reference_requires_granular_non_template_contract():
+    ref = (SKILL / "build" / "references" / "grid-and-flex-strategy.md").read_text()
+    compact_ref = " ".join(ref.split())
+    assert "Grid Contract" in ref
+    assert "relationships, not coordinates" in ref
+    assert "fixed template" in compact_ref
+    for token in (
+        "grid_role_map",
+        "column_span_plan",
+        "alignment_spine",
+        "body_band_plan",
+        "edge_lock",
+        "cross_slide_consistency",
+        "main_axis",
+        "cross_axis_align",
+        "gap_scale",
+        "grow_rule",
+        "shrink_guard",
+        "wrap_rule",
+        "fill_repair",
+        "Fine-grained adjustment loop",
+    ):
+        assert token in ref
+
+
+def test_ir_corpus_decision_engine_is_wired_as_judgment_not_templates():
+    skill_md = (SKILL / "SKILL.md").read_text()
+    decision = (SKILL / "build" / "references" / "slide-decision-engine.md").read_text()
+    atoms = (SKILL / "build" / "references" / "corpus-derived-composition-atoms.md").read_text()
+    principles = (SKILL / "build" / "references" / "ir-slide-design-principles.md").read_text()
+    qa = (SKILL / "build" / "references" / "visual-qa-and-repair-rubric.md").read_text()
+    anti = (SKILL / "build" / "references" / "anti-patterns.md").read_text()
+    skill_compact = " ".join(skill_md.split())
+    atoms_compact = " ".join(atoms.split())
+
+    assert "source understanding -> reader_question -> single_takeaway -> focal_object" in skill_compact
+    assert "slide-type template catalog" in decision
+    assert "reader_question" in decision and "repair_instruction" in decision
+    assert "existing_rule_refinement" in decision and "new_composition_atom" in decision
+    assert "These are not slide types" in atoms_compact
+    assert "Atom Mixing Rules" in atoms
+    assert "Use when / Why it works / Parameters / Failure / Repair" in principles
+    assert "Investor Lens" in qa and "Legal / Disclaimer Lens" in qa
+    assert "F19" in anti and "F24" in anti
+
+
+def test_design_contract_keeps_banker_base_and_modern_freshness():
+    skill_md = (SKILL / "SKILL.md").read_text()
+    principles = (SKILL / "build" / "references" / "design-principles.md").read_text()
+    grid_ref = (SKILL / "build" / "references" / "grid-and-flex-strategy.md").read_text()
+    rubric = json.loads((SKILL / "build" / "evals" / "rubric.json").read_text())
+    assert "banker-grade / strategy-consulting base" in skill_md
+    assert "Freshness comes second" in principles
+    assert "grid/flex contract" in principles
+    assert "investment-bank / strategy-consulting discipline" in grid_ref
+    assert "Modern freshness" in json.dumps(rubric)
+
+
+def test_anti_template_audit_and_no_page_numbers_are_contractual(tmp_path):
+    skill_md = (SKILL / "SKILL.md").read_text()
+    judgment = (SKILL / "build" / "references" / "slide-judgment-system.md").read_text()
+    assert "Anti-Template Audit" in judgment
+    assert "Do not create page numbers" in skill_md
+    assert "Does the close look fixed" in judgment
+
+    deck = {"meta": {}, "slides": [{
+        "pattern": "cover",
+        "title": "ページ番号を表示しない表紙",
+        "subtitle": "脚注は不要",
+    }, {
+        "pattern": "statement",
+        "title": "結論",
+        "variant": "evidence_strip",
+        "statement": "本文領域の構図で締める",
+        "recap": [{"label": "確認指標", "value": "3", "unit": "点"}],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    r = run("build_deck.py", spec, "-o", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+    texts = []
+    for slide in pptx.Presentation(out).slides:
+        for sh in slide.shapes:
+            if sh.has_text_frame:
+                texts.append(sh.text_frame.text.strip())
+    assert "1" not in texts and "2" not in texts
+
+
 def _minimal_deck(**slide_overrides):
     slide = {
         "pattern": "chart_insight",
@@ -172,6 +326,33 @@ def test_validate_warns_fat_process_step(tmp_path):
     assert r.returncode == 0 and "3個超" in r.stdout
 
 
+def test_process_flow_outcome_is_centered_destination_label(tmp_path):
+    from pptx.enum.text import PP_ALIGN
+
+    deck = {"meta": {}, "slides": [{
+        "pattern": "process_flow",
+        "title": "3段階の打ち手で90日以内に改善余地を具体化",
+        "steps": [
+            {"label": "Step 1", "items": ["対象整理"], "outcome": "改善余地の特定"},
+            {"label": "Step 2", "items": ["優先順位付け"], "outcome": "実行順序の確定"},
+        ],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    r = run("build_deck.py", spec, "-o", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+    para = None
+    for slide in pptx.Presentation(out).slides:
+        for sh in slide.shapes:
+            if sh.has_text_frame and "改善余地の特定" in sh.text_frame.text:
+                para = sh.text_frame.paragraphs[0]
+    assert para is not None
+    assert para.alignment == PP_ALIGN.CENTER
+    sizes = [run.font.size.pt for run in para.runs if run.text and run.font.size]
+    assert max(sizes) >= 18
+
+
 def test_contact_sheet_header_strip(tmp_path):
     from PIL import Image
 
@@ -250,6 +431,19 @@ def test_lint_render_detects_bottom_whitespace(tmp_path):
     spec.write_text(json.dumps(_minimal_deck(), ensure_ascii=False))
     r = run("lint_render.py", tmp_path, "--spec", spec)
     assert r.returncode == 1 and "下部に大きな空白" in r.stdout
+
+
+def test_lint_render_detects_tiny_center_island(tmp_path):
+    from PIL import Image, ImageDraw
+
+    im = Image.new("RGB", (1466, 825), (0xFF, 0xFD, 0xFC))
+    # 本文帯の中央に小さいブロックだけが浮く = 上下とも広い余白
+    ImageDraw.Draw(im).rectangle([420, 410, 1040, 470], fill=(0x2D, 0x33, 0x2E))
+    im.save(tmp_path / "deck-01.png")
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(_minimal_deck(), ensure_ascii=False))
+    r = run("lint_render.py", tmp_path, "--spec", spec)
+    assert r.returncode == 1 and "オブジェクトが小さい" in r.stdout
 
 
 def test_lint_render_baseline_diff_reports_changed_slides(tmp_path):
@@ -336,6 +530,63 @@ def test_waterfall_auto_label_uses_triangle(tmp_path):
     assert "△2.8" in joined and "-2.8" not in joined
 
 
+def test_kpi_signed_delta_is_not_prefixed_with_arrow(tmp_path):
+    deck = {"meta": {}, "slides": [{
+        "pattern": "kpi_dashboard",
+        "title": "サブスク売上29.8億円が継続収益の中核を形成",
+        "kpis": [{
+            "label": "サブスク売上",
+            "value": "29.8",
+            "unit": "億円",
+            "delta": "+31% YoY",
+            "delta_dir": "up",
+            "note": "継続収益の中核",
+            "focal": True,
+        }],
+        "source": "テスト",
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    r = run("build_deck.py", spec, "-o", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+    texts = []
+    for slide in pptx.Presentation(out).slides:
+        for sh in slide.shapes:
+            if sh.has_text_frame:
+                texts.append(sh.text_frame.text)
+    joined = " ".join(texts)
+    assert "+31% YoY" in joined and "▲ +31% YoY" not in joined
+
+
+def test_kpi_comparison_delta_is_not_prefixed_with_arrow(tmp_path):
+    deck = {"meta": {}, "slides": [{
+        "pattern": "kpi_dashboard",
+        "title": "NRR114%が継続収益品質を下支え",
+        "kpis": [{
+            "label": "NRR",
+            "value": "114",
+            "unit": "%",
+            "delta": "前年同期111%",
+            "delta_dir": "up",
+            "focal": True,
+        }],
+        "source": "テスト",
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    r = run("build_deck.py", spec, "-o", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+    texts = []
+    for slide in pptx.Presentation(out).slides:
+        for sh in slide.shapes:
+            if sh.has_text_frame:
+                texts.append(sh.text_frame.text)
+    joined = " ".join(texts)
+    assert "前年同期111%" in joined and "▲ 前年同期111%" not in joined
+
+
 def test_validate_rejects_financial_summary_without_table_or_chart(tmp_path):
     deck = {"meta": {}, "slides": [{
         "pattern": "financial_summary",
@@ -346,6 +597,180 @@ def test_validate_rejects_financial_summary_without_table_or_chart(tmp_path):
     bad.write_text(json.dumps(deck, ensure_ascii=False))
     r = run("validate_spec.py", bad)
     assert r.returncode == 1 and "financial_summary" in r.stdout
+
+
+def test_validate_allows_current_only_guidance_progress(tmp_path):
+    deck = {"meta": {}, "slides": [{
+        "pattern": "guidance_progress",
+        "title": "Q2進捗率48%で通期132〜136億円を追走",
+        "unit": "%",
+        "bars": [],
+        "current": {
+            "label": "FY2026",
+            "actual": 48,
+            "actual_display": "Q2時点48%",
+            "guidance_low": 100,
+            "guidance_high": 100,
+            "range_display": "通期100%"
+        },
+        "source": "テスト統計2026",
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_build_current_only_guidance_progress_stays_in_bounds(tmp_path):
+    deck = {"meta": {}, "slides": [{
+        "pattern": "guidance_progress",
+        "title": "Q2進捗率48%で通期132〜136億円を追走",
+        "unit": "%",
+        "bars": [],
+        "current": {
+            "label": "FY2026",
+            "actual": 48,
+            "actual_display": "Q2時点48%",
+            "guidance_low": 100,
+            "guidance_high": 100,
+            "range_display": "通期100%"
+        },
+        "side_heading": "確認指標",
+        "side": [
+            {"label": "売上高", "value": "132〜136億"},
+            {"label": "YoY", "value": "+26〜30%"},
+            {"label": "中期ARR目標", "value": "250億円"},
+            {"label": "中期利益率目標", "value": "15%"},
+        ],
+        "source": "テスト統計2026",
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    r = run("build_deck.py", spec, "-o", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+    r = run("verify_deck.py", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+    texts = []
+    for slide in pptx.Presentation(out).slides:
+        for sh in slide.shapes:
+            if sh.has_text_frame:
+                texts.append(sh.text_frame.text)
+    joined = " ".join(texts)
+    assert "FY2026 現在地" in joined
+    assert "48%" in joined
+    first_side_top = last_side_top = None
+    for slide in pptx.Presentation(out).slides:
+        for sh in slide.shapes:
+            if sh.has_text_frame:
+                text = sh.text_frame.text
+                if "売上高" == text.strip():
+                    first_side_top = sh.top
+                if "中期利益率目標" == text.strip():
+                    last_side_top = sh.top
+    assert first_side_top is not None and last_side_top is not None
+    assert (last_side_top - first_side_top) / 914400 >= 1.8
+
+
+def test_value_delta_spacing_has_visible_air(tmp_path):
+    deck = {"meta": {}, "slides": [{
+        "pattern": "driver_decomposition",
+        "title": "有料課金社数とARPAがARRを形成",
+        "factors": [
+            {"label": "有料課金社数", "value": "8,420", "unit": "社", "delta": "+18% YoY"},
+            {"label": "ARPA", "value": "152", "unit": "万円", "delta": "+10% YoY"},
+            {"label": "ARR", "value": "128", "unit": "億円", "delta": "+30% YoY", "focal": True},
+        ],
+        "operators": ["×", "="],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    r = run("build_deck.py", spec, "-o", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+    value_top = delta_top = None
+    for slide in pptx.Presentation(out).slides:
+        for sh in slide.shapes:
+            if sh.has_text_frame:
+                text = sh.text_frame.text
+                if "8,420" in text:
+                    value_top = sh.top
+                if "+18% YoY" in text:
+                    delta_top = sh.top
+    assert value_top is not None and delta_top is not None
+    assert (delta_top - value_top) / 914400 >= 0.72
+
+
+def test_financial_highlights_hero_yoy_uses_metric_subline_gap(tmp_path):
+    deck = {"meta": {}, "slides": [{
+        "pattern": "financial_highlights",
+        "title": "Q2売上32.4億円とARR128億円で成長継続",
+        "groups": [{
+            "label": "売上",
+            "claim": "サブスク売上が成長を牽引",
+            "metrics": [{"label": "Q2売上高", "value": "32.4", "unit": "億円", "delta": "+28% YoY", "hero": True}],
+        }],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    r = run("build_deck.py", spec, "-o", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+    value_top = delta_top = None
+    for slide in pptx.Presentation(out).slides:
+        for sh in slide.shapes:
+            if sh.has_text_frame:
+                text = sh.text_frame.text
+                if "32.4" in text:
+                    value_top = sh.top
+                if "Q2売上高" in text and "+28% YoY" in text:
+                    delta_top = sh.top
+    assert value_top is not None and delta_top is not None
+    assert (delta_top - value_top) / 914400 >= 0.90
+
+
+def test_statement_split_evidence_variant_builds_and_verifies(tmp_path):
+    deck = {"meta": {}, "slides": [{
+        "pattern": "statement",
+        "title": "結論",
+        "variant": "split_evidence",
+        "statement": "ARR128億円、NRR114%、Q2進捗率48%が示す通期ガイダンスへの実行土台",
+        "attribution": "テスト株式会社, 2026年7月",
+        "recap": [
+            {"label": "ARR", "value": "128", "unit": "億円", "focal": True},
+            {"label": "NRR", "value": "114", "unit": "%"},
+            {"label": "進捗率", "value": "48", "unit": "%"}
+        ],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    r = run("build_deck.py", spec, "-o", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+    r = run("verify_deck.py", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_statement_evidence_strip_variant_builds_and_verifies(tmp_path):
+    deck = {"meta": {}, "slides": [{
+        "pattern": "statement",
+        "title": "投資家への結論",
+        "variant": "evidence_strip",
+        "statement": "ARR128億円、NRR114%、Q2進捗率48%を確認し、通期達成確度を継続評価",
+        "recap_heading": "確認すべき3指標",
+        "recap": [
+            {"label": "ARR", "value": "128", "unit": "億円", "focal": True},
+            {"label": "NRR", "value": "114", "unit": "%"},
+            {"label": "進捗率", "value": "48", "unit": "%"}
+        ],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    r = run("build_deck.py", spec, "-o", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+    r = run("verify_deck.py", out)
+    assert r.returncode == 0, r.stdout + r.stderr
 
 
 def test_validate_rejects_player_missing_or_out_of_range_xy(tmp_path):
@@ -381,6 +806,36 @@ def test_validate_rejects_too_many_takeaways(tmp_path):
     bad.write_text(json.dumps(deck, ensure_ascii=False))
     r = run("validate_spec.py", bad)
     assert r.returncode == 1 and "takeaways" in r.stdout
+
+
+def test_validate_warns_long_content_run(tmp_path):
+    content = _minimal_deck()["slides"][0]
+    deck = {"meta": {"title": "t"},
+            "slides": [dict(content, title=f"テスト市場は年率1{i}%で拡大し、2030年に1兆円に到達する見込み")
+                       for i in range(7)]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    assert r.returncode == 0 and "休符" in r.stdout
+    # a divider inside the run resets the counter
+    deck["slides"].insert(3, {"pattern": "section_divider", "number": 1, "title": "章"})
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    assert "休符" not in r.stdout
+
+
+def test_validate_warns_wide_comparison_table(tmp_path):
+    deck = {"meta": {"title": "t"}, "slides": [{
+        "pattern": "comparison_table",
+        "title": "4社比較でも当社の機能カバレッジ優位は変わらないことを示す",
+        "table": {"headers": ["評価軸", "当社", "A社", "B社", "C社"],
+                  "rows": [["対応領域", "◎", "○", "○", "△"]]},
+        "source": "テスト統計2026",
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    assert r.returncode == 0 and "4列以内" in r.stdout
 
 
 def test_build_handles_null_focal_category_with_annotation(tmp_path):
@@ -462,3 +917,51 @@ def test_chart_type_lists_stay_in_sync():
         assert set(validate_spec.SUPPORTED_CHART_TYPES) == set(build_deck.CHART_TYPES)
     finally:
         sys.path.remove(str(SCRIPTS))
+
+
+def test_validate_warns_missing_speaker_notes(tmp_path):
+    deck = _minimal_deck()  # content slide without speaker_notes
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck))
+    r = run("validate_spec.py", spec)
+    assert r.returncode == 0 and "speaker_notes" in r.stdout
+
+
+def test_validate_talk_minutes_mismatch_warns(tmp_path):
+    deck = _minimal_deck(speaker_notes="短い一言だけの語り。")
+    deck["meta"]["talk_minutes"] = 10
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck))
+    r = run("validate_spec.py", spec)
+    assert r.returncode == 0 and "talk_minutes=10" in r.stdout and "乖離" in r.stdout
+
+
+def test_validate_talk_minutes_match_passes(tmp_path):
+    deck = _minimal_deck(speaker_notes="あ" * 300)  # 300字 ≈ 1分
+    deck["meta"]["talk_minutes"] = 1
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck))
+    r = run("validate_spec.py", spec)
+    assert r.returncode == 0 and "乖離" not in r.stdout
+    assert "talk script" in r.stdout and "target 1分" in r.stdout
+
+
+def test_validate_rejects_nonnumeric_talk_minutes(tmp_path):
+    deck = _minimal_deck(speaker_notes="語り。")
+    deck["meta"]["talk_minutes"] = "abc"
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck))
+    r = run("validate_spec.py", spec)
+    assert r.returncode == 1 and "talk_minutes" in r.stdout
+
+
+def test_build_writes_speaker_notes_into_pptx(tmp_path):
+    deck = _minimal_deck(speaker_notes="この市場は2年で倍になります。次のスライドで内訳を示します。")
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck))
+    out = tmp_path / "deck.pptx"
+    r = run("build_deck.py", spec, "-o", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+    prs = pptx.Presentation(str(out))
+    notes = prs.slides[0].notes_slide.notes_text_frame.text
+    assert "次のスライドで内訳を示します" in notes

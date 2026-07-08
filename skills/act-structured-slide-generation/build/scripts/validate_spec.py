@@ -42,13 +42,16 @@ PATTERNS = {
     "financial_highlights": ["title", "groups"],
     "metrics_rows": ["title", "columns"],
     "driver_decomposition": ["title", "factors"],
-    "guidance_progress": ["title", "bars", "current"],
+    "guidance_progress": ["title", "current"],
 }
 EVIDENCE_PATTERNS = {
     "chart_insight", "market_sizing", "comparison_table", "competitive_landscape",
     "financial_summary", "waterfall", "kpi_dashboard",
     "financial_highlights", "metrics_rows", "driver_decomposition", "guidance_progress",
 }
+
+# 日本語プレゼンの標準話速(NHKアナウンス基準の目安)。トークスクリプト総量の照合に使う
+TALK_CHARS_PER_MIN = 300
 
 
 BANNED_PHRASES = [
@@ -135,6 +138,16 @@ def main() -> int:
             errors.append(f"{loc}: subtitle too long — shorten")
         if s.get("insight") and ja_len(s["insight"]) > BUDGET["insight_max_chars_ja"]:
             errors.append(f"{loc}: insight too long ({ja_len(s['insight']):.0f} > {BUDGET['insight_max_chars_ja']}) — one short judgment sentence only")
+        if pat == "statement" and s.get("statement"):
+            # 孤立行対策の節分割は中央ヒーロー文(既定)のみ。recap 駆動の strip/split 変種は
+            # 左寄せの別レイアウトのため、この警告は中央ヒーロー描画に限定する。
+            _variant = s.get("variant", s.get("layout", "center_hero"))
+            _center_hero = not (s.get("recap") and _variant in (
+                "evidence_strip", "thesis_strip", "closing_grid", "split_evidence", "editorial_split"))
+            _clauses = [c for c in s["statement"].split("、") if c]
+            _longest = max((ja_len(c) for c in _clauses), default=ja_len(s["statement"]))
+            if _center_hero and _longest > 22:
+                warns.append(f"{loc}: 締めのステートメントの節が長い(最長 {_longest:.0f}字) — 中央ヒーロー文は節ごとに折返すため、各節を22字以内・全体を60字前後に短縮すると尾行の孤立が消える")
 
         if pat not in STRUCTURAL and title:
             # action title should be a sentence (predicate), not a topic label
@@ -234,6 +247,11 @@ def main() -> int:
             errors.append(f"{loc}: {len(s['takeaways'])} takeaways — max 3")
         if pat == "financial_summary" and not (s.get("table") or s.get("chart")):
             errors.append(f"{loc}: financial_summary には table か chart の少なくとも一方が必要")
+        # 比較表の列上限(rubric.json layout と同じ 4 列)。年度列が並ぶ financial_summary は対象外
+        if pat == "comparison_table":
+            ncols = len((s.get("table") or {}).get("headers", []))
+            if ncols > 4:
+                warns.append(f"{loc}: 比較表が{ncols}列 — ラベル列を含め4列以内にする(超える対象は列統合か絞り込み、残りは note か別スライドへ)")
         if pat == "competitive_landscape":
             for pl in s.get("players", []):
                 pname = pl.get("name", "?")
@@ -253,16 +271,34 @@ def main() -> int:
             if b in joined:
                 warns.append(f"{loc}: メタ宣言「{b}」— 内容で構造を示し、宣言は削除する")
         nado = sum(t.count("など") + t.count("等") for t in texts)
-        if nado > 2:
+        if nado > 1:
             warns.append(f"{loc}: 「など/等」が{nado}回 — 名前を列挙するか削る(1スライド1回まで)")
 
     # emphasis-device rationing: insight / kicker lose force when they appear everywhere
     n_insight = sum(1 for s in slides if s.get("insight"))
     if n_insight > 4:
         warns.append(f"insight バーが{n_insight}枚 — 非自明な判断がある 2-4 枚に絞る(全部に置くと強調が消える)")
-    n_kicker = sum(1 for s in slides if s.get("kicker"))
-    if n_kicker > 3:
-        warns.append(f"kicker が{n_kicker}枚 — 修辞疑問はデッキ内 2-3 枚まで")
+    # header kicker (label above the title) is retired — it breaks header uniformity
+    for i, s in enumerate(slides, start=1):
+        if s.get("kicker"):
+            warns.append(f"slide {i}: ヘッダー上の kicker「{s['kicker']}」— ヘッダーの統一性を崩すため使わない。問いはサブタイトルか speaker_notes へ(build_deck は描画しない)")
+
+    # executive_summary の points は section_divider の章立てと整合させる(冒頭サマリー=章マップ)。
+    # 許容形は (a) 1:1 で kicker=章タイトル、または (b) 各章が同数の点をまとめる均等グルーピング
+    # (例: 4点を2章で 2点ずつ)。点数が章数で割り切れない中途半端な対応をドリフトとして検出する。
+    dividers = [s.get("title", "") for s in slides if s.get("pattern") == "section_divider"]
+    for i, s in enumerate(slides, start=1):
+        if s.get("pattern") != "executive_summary":
+            continue
+        pts = s.get("points", [])
+        klabels = [p.get("kicker", "") for p in pts]
+        if dividers and pts:
+            nd, npt = len(dividers), len(pts)
+            if npt == nd:
+                if klabels != dividers:
+                    warns.append(f"slide {i}: executive_summary の kicker が章タイトルと不一致 — 各点の kicker を章扉と同じ語順・同じ語に揃える: points={klabels} / 章={dividers}")
+            elif npt < nd or npt % nd != 0:
+                warns.append(f"slide {i}: executive_summary {npt}点 ↔ 章扉{nd}章がズレている — 1:1(kicker=章タイトル)か、各章が同数の点をまとめる均等グルーピング(例 {nd}章なら {nd} か {nd*2} 点)に揃える")
 
     # adjacent-slide monotony: same content pattern back to back reads as a template loop
     prev_pat = None
@@ -271,6 +307,17 @@ def main() -> int:
         if pat and pat == prev_pat and pat not in STRUCTURAL:
             warns.append(f"slide {i}: 直前のスライドと同じパターン '{pat}' が連続 — 内容が同型でないなら構成を散らす")
         prev_pat = pat
+
+    # visual rhythm: a long unbroken run of dense content slides reads as a wall —
+    # every 3-5 slides the deck needs a rest (divider / statement) [design-principles 11b]
+    run = 0
+    for i, s in enumerate(slides, start=1):
+        if s.get("pattern") in STRUCTURAL:
+            run = 0
+            continue
+        run += 1
+        if run == 6:
+            warns.append(f"slide {i}: コンテンツスライドが6枚以上連続 — 3-5枚ごとに扉や statement の休符を挟む(視覚リズム)")
 
     # structural uniformity (the strongest AI tell): too many exactly-3-item slides
     counts = []
@@ -334,11 +381,56 @@ def main() -> int:
                 warns.append(f"slide {i}: ステップの項目が3個超({', '.join(fat)}) — カードあたり3項目以内。超える分は詳細スライドか speaker_notes へ")
 
     # subtitle uniformity: content slides follow all-or-none (有無が混ざると
-    # アクセントバー高と本文開始位置がスライド毎に変わる)
+    # ヘッダー高と本文開始位置がスライド毎に変わる)
     content = [(i, s) for i, s in enumerate(slides, start=1) if s.get("pattern") not in STRUCTURAL]
     no_sub = [i for i, s in content if not s.get("subtitle")]
     if no_sub and len(no_sub) < len(content):
         warns.append(f"サブタイトルの有無が混在(無し: slide {', '.join(map(str, no_sub))}) — ヘッダー高が揺れる。全コンテンツスライドに付けるか全て外す")
+
+    # 文体規約: スライド表示テキストは体言止め・句点なし。speaker_notes を除く可視文字列に
+    # 句点(。／．)が残っていれば体言止めへの直し漏れとして警告する(build は末尾のみ自動除去)
+    def _visible_strings(obj):
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if k != "speaker_notes":
+                    yield from _visible_strings(v)
+        elif isinstance(obj, list):
+            for v in obj:
+                yield from _visible_strings(v)
+        elif isinstance(obj, str):
+            yield obj
+    period_slides = [i for i, s in enumerate(slides, start=1)
+                     if any(("。" in t or "．" in t) for t in _visible_strings(s))]
+    if period_slides:
+        warns.append("表示テキストに句点(。)が残る: slide "
+                     f"{', '.join(map(str, period_slides))} — スライドは体言止め・句点なし。"
+                     "文を名詞句へ言い換えるか2項目に分ける(speaker_notes は対象外)")
+
+    # talk script: 全コンテンツスライドに語り原稿(speaker_notes)を書く。
+    # meta.talk_minutes(発表分数)があれば 300字/分 目安で総量を照合する
+    notes_total = sum(ja_len(s.get("speaker_notes", "")) for s in slides)
+    missing_notes = [i for i, s in content if not s.get("speaker_notes")]
+    if missing_notes:
+        warns.append(f"speaker_notes が無いコンテンツスライド: slide {', '.join(map(str, missing_notes))}"
+                     " — トークスクリプトを全コンテンツスライドに書く(表紙・扉はつなぎの一言でよい)")
+    talk_min = (deck.get("meta") or {}).get("talk_minutes")
+    if talk_min is not None:
+        try:
+            talk_min = float(talk_min)
+            if talk_min <= 0:
+                raise ValueError
+        except (TypeError, ValueError):
+            errors.append("meta.talk_minutes は正の数値(分)で指定する")
+            talk_min = None
+    if talk_min:
+        est_min = notes_total / TALK_CHARS_PER_MIN
+        if abs(est_min - talk_min) > talk_min * 0.25:
+            warns.append(f"トークスクリプト総量 約{notes_total:,.0f}字 ≈ {est_min:.1f}分 が"
+                         f" meta.talk_minutes={talk_min:g}分 と±25%超乖離 —"
+                         f" {TALK_CHARS_PER_MIN}字/分 目安で各スライドの語りを増減する")
+    if notes_total:
+        target = f"(target {talk_min:g}分)" if talk_min else "(meta.talk_minutes 未指定)"
+        print(f"talk script: 約{notes_total:,.0f}字 ≈ {notes_total / TALK_CHARS_PER_MIN:.1f}分 {target}")
 
     for w in warns:
         print(f"WARN: {w}")

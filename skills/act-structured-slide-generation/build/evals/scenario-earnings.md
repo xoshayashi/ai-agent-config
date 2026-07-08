@@ -1,27 +1,35 @@
-# Eval シナリオ: 決算説明資料(クリーンベース生成用)
+# Eval Scenario: Earnings Deck, Clean-Base Generation
 
-毎イテレーション、このプロンプトだけを入力として deck.json を**ゼロから**書き、
-パイプライン(validate → build → verify → render)を通して eval_deck.py で採点する。
-前イテレーションの deck.json を編集して流用しない(スキル自体の改善効果を測るため)。
+For each iteration, use only this prompt to write `deck.json` from scratch. Then run the full
+pipeline: validate -> build -> verify -> render -> lint_render -> eval_deck.py.
 
-## 入力プロンプト
+Do not edit a previous iteration's `deck.json`; the purpose is to measure the skill's current
+generation quality.
 
-架空のクラウド人事労務SaaS企業「WorkFlow株式会社」(東証グロース上場)の
-FY2026 第2四半期決算説明資料を10〜12枚で作成してください。聴衆は機関投資家・アナリスト。
+## Input Prompt
 
-事実(この数値のみ使用可):
-- Q2売上高 32.4億円(YoY +28%)、うちサブスクリプション 29.8億円(YoY +31%)
-- ARR 128億円(YoY +30%、前四半期比 +8.5億円)
-- 有料課金社数 8,420社(YoY +18%)、ARPA 152万円(YoY +10%)
-- NRR 114%(前年同期 111%)、グロスチャーンレート 年率 3.2%
-- 調整後営業利益 2.1億円(前年同期 -1.8億円、黒字転換)、調整後営業利益率 6.5%
-- 売上総利益率 78%(前年同期 76%)
-- S&M費率 42%(前年同期 48%)、R&D費率 18%
-- FY2026 通期ガイダンス: 売上高 132〜136億円(YoY +26〜30%)、進捗率 Q2時点 48%
-- 中期方針: FY2028 に ARR 250億円、調整後営業利益率 15% を目標
-- 成長戦略: ①エンタープライズ移行(1,000名以上の新規獲得が Q2 は 42社、累計 380社)
-  ②勤怠・給与に続く第3モジュール「タレントマネジメント」を Q3 にローンチ
-  ③社労士パートナー経由の販売が新規の 35% に拡大
-- ARR の四半期推移(億円): Q2/25: 98.5 → Q3/25: 105.2 → Q4/25: 112.8 → Q1/26: 119.5 → Q2/26: 128.0
-  (直近5四半期。最後が当四半期。YoY +30% = 128.0/98.5、QoQ +8.5億円 = 128.0-119.5)
-- 調整後営業利益の定義: 営業利益 + 株式報酬費用 + M&A関連一時費用
+Create a 10-12 slide Japanese earnings presentation for the fictional listed cloud HR SaaS
+company WorkFlow Inc. The audience is institutional investors and analysts.
+
+Use only the following facts and numbers:
+
+- Q2 revenue: JPY 3.24bn, YoY +28%; subscription revenue: JPY 2.98bn, YoY +31%.
+- ARR: JPY 12.8bn, YoY +30%, QoQ +JPY 0.85bn.
+- Paid customers: 8,420, YoY +18%; ARPA: JPY 1.52mn, YoY +10%.
+- NRR: 114%, prior-year period 111%; gross churn rate: annualized 3.2%.
+- Adjusted operating profit: JPY 0.21bn, prior-year period JPY -0.18bn, turned profitable;
+  adjusted operating margin: 6.5%.
+- Gross margin: 78%, prior-year period 76%.
+- S&M expense ratio: 42%, prior-year period 48%; R&D expense ratio: 18%.
+- FY2026 full-year guidance: revenue JPY 13.2-13.6bn, YoY +26-30%; Q2 progress rate: 48%.
+- Medium-term policy: target ARR JPY 25.0bn and adjusted operating margin 15% in FY2028.
+- Growth strategy:
+  1. enterprise migration: 42 new accounts with 1,000+ employees in Q2; cumulative 380.
+  2. launch a third module, Talent Management, in Q3 after attendance and payroll modules.
+  3. sales through labor-and-social-security attorney partners expanded to 35% of new sales.
+- ARR quarterly trend in JPY bn: Q2/25 9.85 -> Q3/25 10.52 -> Q4/25 11.28 -> Q1/26 11.95
+  -> Q2/26 12.80. These are the latest five quarters. YoY +30% = 12.80 / 9.85. QoQ
+  +JPY 0.85bn = 12.80 - 11.95.
+- Definition of adjusted operating profit: operating profit + share-based compensation
+  expense + temporary M&A-related expenses.
+

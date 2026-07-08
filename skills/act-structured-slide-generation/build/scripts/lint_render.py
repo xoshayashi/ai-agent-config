@@ -77,7 +77,10 @@ def balance_scan(im: Image.Image) -> list[str]:
     band_h = band_bot - band_top
     top_gap = (ink_rows[0] - band_top) / band_h
     bot_gap = (band_bot - ink_rows[-1]) / band_h
+    body_extent = (ink_rows[-1] - ink_rows[0]) / band_h
     hits = []
+    if body_extent < 0.36 and top_gap > 0.20 and bot_gap > 0.20:
+        hits.append(f"本文領域に対してオブジェクトが小さい(占有{body_extent:.0%})— カード/行/主数値を大きくし、余白を設計された密度に戻す")
     if bot_gap > 0.33 and bot_gap > 2.5 * max(top_gap, 0.02):
         hits.append(f"下部に大きな空白(本文帯の{bot_gap:.0%})— 中身が上に張り付いている。分割/統合かパターン変更を検討")
     if top_gap > 0.33 and top_gap > 2.5 * max(bot_gap, 0.02):

@@ -3,8 +3,9 @@
 
 Usage: build_deck.py <deck.json> [-o out.pptx]
 
-The LLM owns content (deck.json); this script owns geometry, typography,
-and color so every deck lands on the same visual system deterministically.
+The LLM owns content (deck.json); this script owns geometry, typography, and color. The
+engine keeps the Act system consistent, but pattern renderers must branch by evidence shape
+and available data rather than forcing one fixed layout.
 """
 from __future__ import annotations
 
@@ -29,6 +30,7 @@ TS = TOKENS["type_scale_pt"]
 LAY = TOKENS["layout"]
 CH = TOKENS["chart_style"]
 FONTS = TOKENS["fonts"]
+VALUE_DELTA_GAP_IN = 0.18
 SLIDE_W = Inches(TOKENS["slide"]["width_in"])
 SLIDE_H = Inches(TOKENS["slide"]["height_in"])
 MX = LAY["margin_x_in"]
@@ -50,6 +52,32 @@ def _text_lines(text: str, width_in: float, size_pt: float) -> int:
         return 0
     chars_per_line = max(4.0, width_in / (size_pt / 72.0))
     return max(1, math.ceil(_ja_len(text) / chars_per_line))
+
+
+def _statement_lines(stmt: str, width_in: float, size_pt: float) -> list[str]:
+    """Break a centered closing statement into display lines on 、 clause boundaries so
+    the tail never renders as an orphaned one/two-character line. Clauses are greedily
+    packed to the box width; short statements (no 、) keep their natural single-run wrap."""
+    if "\n" in stmt:
+        return stmt.split("\n")
+    if "、" not in stmt:
+        return [stmt]
+    raw = stmt.split("、")
+    clauses = [c + "、" for c in raw[:-1]] + ([raw[-1]] if raw[-1] else [])
+    if len(clauses) < 2:
+        return [stmt]
+    cap = max(8.0, width_in / (size_pt / 72.0))
+    lines: list[str] = []
+    cur = ""
+    for c in clauses:
+        if cur and _ja_len(cur) + _ja_len(c) > cap:
+            lines.append(cur)
+            cur = c
+        else:
+            cur += c
+    if cur:
+        lines.append(cur)
+    return lines
 
 
 def grid(col_start: int, col_span: int) -> tuple[float, float]:
@@ -115,6 +143,35 @@ def add_text(slide, x, y, w, h, runs, *, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.
     return tb
 
 
+def add_bullets(slide, x, y, w, h, items, size, color, *, line_spacing=1.3,
+                space_after_pt=8, anchor=MSO_ANCHOR.TOP, weight=400):
+    """Real DrawingML bullets (●, ぶら下げインデント付き)。「・」文字連結と違い、
+    折返し行が箇条書き記号の右に揃う。段落後スペースで項目の切れ目を作る。"""
+    tb = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
+    tf = tb.text_frame
+    tf.word_wrap = True
+    tf.vertical_anchor = anchor
+    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+    indent = Inches(0.24)
+    for i, txt in enumerate(items):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.alignment = PP_ALIGN.LEFT
+        p.line_spacing = line_spacing
+        p.space_after = Pt(space_after_pt)
+        r = p.add_run()
+        r.text = hw(txt)
+        _set_run_fonts(r, size, weight, color)
+        pPr = p._p.get_or_add_pPr()
+        pPr.set("marL", str(int(indent)))
+        pPr.set("indent", str(-int(indent)))
+        buClr = etree.SubElement(pPr, f"{A_NS}buClr")
+        etree.SubElement(buClr, f"{A_NS}srgbClr").set("val", str(color))
+        etree.SubElement(pPr, f"{A_NS}buSzPct").set("val", "60000")
+        etree.SubElement(pPr, f"{A_NS}buFont").set("typeface", FONTS["latin"])
+        etree.SubElement(pPr, f"{A_NS}buChar").set("char", "●")
+    return tb
+
+
 P_NS = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
 
 
@@ -167,7 +224,7 @@ def add_line(slide, x1, y1, x2, y2, color: RGBColor, w_pt: float = 0.75, dash: s
     return ln
 
 
-def add_chevron(slide, x, y, w, h, fill: RGBColor):
+def add_chevron(slide, x, y, w, h, fill: RGBColor, tip_in: float = 0.30):
     # 矢羽は常に左辺フラットの PENTAGON(ホームベース形)。左に窪みのある CHEVRON は
     # 「前工程から食い込まれる」形で、Act ではどの位置のステップにも使わない(全パターン共通)
     sh = slide.shapes.add_shape(MSO_SHAPE.PENTAGON, Inches(x), Inches(y), Inches(w), Inches(h))
@@ -176,6 +233,15 @@ def add_chevron(slide, x, y, w, h, fill: RGBColor):
     sh.line.fill.background()
     sh.shadow.inherit = False
     _strip_style(sh)
+    # 矢先の水平深さを高さに依らず一定(~tip_in)に保つ。PENTAGON の既定調整値は
+    # 矢先深さ=min(w,h)×adj のため、背の高い矢羽(roadmap の 2 行ラベル)だと矢先が
+    # 深く尖りすぎる。process_flow の浅い矢先感に揃えるため adj を実寸から算出する。
+    try:
+        ss = min(w, h)
+        if ss > 0:
+            sh.adjustments[0] = max(0.12, min(0.5, tip_in / ss))
+    except Exception:
+        pass
     return sh
 
 
@@ -187,10 +253,24 @@ def _delta_color(direction: str | None, positive_is_good: bool = True) -> RGBCol
     return C["ink_subtle"]
 
 
+def _kpi_delta_text(k: dict) -> str:
+    """The KPI delta string exactly as rendered. Signed (+/-/△/▲/▼) and comparison
+    ('前年同期', '業界' …) deltas keep their own marker; only a bare magnitude gets a
+    direction arrow. Shared by the height budget and the placement so a long delta
+    reserves the right number of lines and never collides with the note below it."""
+    delta_text = str(k.get("delta", "")).lstrip()
+    is_comparison_text = delta_text.startswith(("前年同期", "前期", "業界", "目標", "計画", "中央値"))
+    arrow = "" if delta_text.startswith(("+", "-", "△", "▲", "▼")) or is_comparison_text else \
+        {"up": "▲ ", "down": "▼ "}.get(k.get("delta_dir"), "")
+    return arrow + delta_text
+
+
 # ---------------------------------------------------------------- chrome
 
 def title_lines(title: str) -> int:
-    return 1 if _ja_len(title) <= TOKENS["text_budget"]["action_title_max_chars_ja"] else 2
+    budget_lines = 1 if _ja_len(title) <= TOKENS["text_budget"]["action_title_max_chars_ja"] else 2
+    measured_lines = _text_lines(title, LAY["header"]["title_w_in"], TS["action_title"])
+    return min(3, max(budget_lines, measured_lines))
 
 
 def header_offset(spec: dict) -> float:
@@ -198,53 +278,61 @@ def header_offset(spec: dict) -> float:
 
 
 def header_metrics(spec: dict) -> dict:
-    """Deterministic header geometry: the accent bar spans exactly from the title
-    cap-top to the bottom of the last header line (title or subtitle)."""
+    """Deterministic header geometry: title cap-top to the bottom of the last
+    header line (title or subtitle) fixes where the body region starts."""
     hdr = LAY["header"]
     off = header_offset(spec)
     title = spec.get("title", "")
     lines = title_lines(title)
     # タイトルサイズは行数によらず一定。縮小して収める操作は AutoFit と同種の一貫性破壊
-    # (スライド間でタイトルの見た目が揺れる)。2行予算 66 字(tokens.json の
-    # action_title_two_line_max_chars_ja)は 25pt × 11.6in の2行に収まる
+    # (スライド間でタイトルの見た目が揺れる)。28pt 化後は実幅推定を併用し、
+    # 長い action title はボックス自体を高くして、本文との衝突を避ける。
     t_size = TS["action_title"]
     title_y = hdr["title_y_in"] + off
-    title_h = lines * (t_size / 72.0) * 1.16
+    title_h = lines * (t_size / 72.0) * 1.27
     sub_y = title_y + title_h + hdr["title_subtitle_gap_in"]
-    sub_h = (TS["subtitle"] / 72.0) * 1.25
+    sub_lines = _text_lines(spec.get("subtitle", ""), hdr["title_w_in"], TS["subtitle"]) if spec.get("subtitle") else 0
+    sub_h = max(1, sub_lines) * (TS["subtitle"] / 72.0) * 1.35
     block_bottom = sub_y + sub_h if spec.get("subtitle") else title_y + title_h
     return {
         "off": off, "lines": lines, "t_size": t_size,
         "title_y": title_y, "title_h": title_h,
         "sub_y": sub_y, "sub_h": sub_h,
-        "bar_y": title_y + 0.045,
-        "bar_h": block_bottom - (title_y + 0.045),
         "body_y": block_bottom + hdr["body_gap_in"],
     }
 
 
 def add_chrome(slide, spec: dict, page_no: int, total: int, deck: dict) -> None:
-    """Background, header (optional kicker + accent bar + action title + subtitle), footer."""
+    """Background, header (optional kicker + action title + subtitle), footer.
+    ヘッダーに縦アクセントバーは置かない — タイトル・サブタイトルの級差だけで階層を作る。"""
     add_rect(slide, 0, 0, TOKENS["slide"]["width_in"], TOKENS["slide"]["height_in"], C["canvas"])
     hdr = LAY["header"]
     m = header_metrics(spec)
     if spec.get("kicker"):
         add_text(slide, hdr["title_x_in"], 0.18, hdr["title_w_in"], 0.26,
-                 [[(spec["kicker"], 12, 600, C["ink_faint"])]])
-    add_rect(slide, hdr["accent_bar_x_in"], m["bar_y"], hdr["accent_bar_w_in"], m["bar_h"], C["primary"])
+                 [[(spec["kicker"], 13, 600, C["ink_faint"])]])
     add_text(slide, hdr["title_x_in"], m["title_y"], hdr["title_w_in"], m["title_h"],
-             [[(spec.get("title", ""), m["t_size"], 700, C["ink"])]], line_spacing=1.12)
+             [[(spec.get("title", ""), m["t_size"], 700, C["ink"])]], line_spacing=1.16)
     if spec.get("subtitle"):
         add_text(slide, hdr["title_x_in"], m["sub_y"], hdr["title_w_in"], m["sub_h"],
-                 [[(spec["subtitle"], TS["subtitle"], 400, C["ink_subtle"])]])
+                 [[(spec["subtitle"], TS["subtitle"], 400, C["ink_subtle"])]], line_spacing=1.18)
     add_footer(slide, spec, page_no, total, deck)
+
+
+def _clean_source(src: str) -> str:
+    """出典欄には実際に参照した外部出所だけを残す。自社の内部分析を指す
+    「Act分析」単独の断片は出典として表示しない(「各社IR資料を基にAct作成」等の
+    実在の作成主体表記は残す)。全断片が内部分析なら空文字を返し Source 行ごと省く。"""
+    keep = [f.strip() for f in src.split("、") if f.strip() and f.strip() != "Act分析"]
+    return "、".join(keep)
 
 
 def add_footer(slide, spec: dict, page_no: int, total: int, deck: dict) -> None:
     foot = LAY["footer"]
     frags = []
-    if spec.get("source"):
-        frags.append(("Source: " + spec["source"], TS["footnote"], 400, C["ink_faint"]))
+    source = _clean_source(spec.get("source", ""))
+    if source:
+        frags.append(("Source: " + source, TS["footnote"], 400, C["ink_faint"]))
     if spec.get("assumption"):
         pre = "   " if frags else ""
         frags.append((pre + "Assumption: " + spec["assumption"], TS["footnote"], 400, C["ink_faint"]))
@@ -252,11 +340,7 @@ def add_footer(slide, spec: dict, page_no: int, total: int, deck: dict) -> None:
         pre = "   " if frags else ""
         frags.append((pre + "Note: " + spec["note"], TS["footnote"], 400, C["ink_faint"]))
     if frags:
-        add_text(slide, foot["source_x_in"], foot["y_in"], CONTENT_W - 1.2, foot["h_in"], [frags])
-    pn_w = 0.9
-    add_text(slide, TOKENS["slide"]["width_in"] - foot["page_num_right_in"] - pn_w, foot["y_in"],
-             pn_w, foot["h_in"], [[(str(page_no), TS["page_number"], 400, C["ink_faint"])]],
-             align=PP_ALIGN.RIGHT)
+        add_text(slide, foot["source_x_in"], foot["y_in"], CONTENT_W, foot["h_in"], [frags])
 
 
 
@@ -284,7 +368,8 @@ def add_insight_bar(slide, spec: dict) -> None:
     else:
         add_rect(slide, MX, y, CONTENT_W, h, C["accent_pale"], line=C["accent_line"], line_w_pt=1.0, radius_pt=4)
         add_text(slide, MX + 0.18, y, CONTENT_W - 0.36, h,
-                 [[(spec["insight"], TS["insight"], 600, C["ink"])]], anchor=MSO_ANCHOR.MIDDLE)
+                 [[(spec["insight"], TS["insight"], 600, C["ink"])]], anchor=MSO_ANCHOR.MIDDLE,
+                 align=PP_ALIGN.CENTER)
 
 
 # ---------------------------------------------------------------- charts
@@ -403,15 +488,17 @@ def add_act_chart(slide, x, y, w, h, cspec: dict):
         if axisless or cspec.get("hide_value_axis"):
             val_ax.visible = False
             val_ax.has_major_gridlines = False
-        cat_ax.format.line.color.rgb = RGBColor.from_string(CH["axis_line_color"])
-        cat_ax.format.line.width = Pt(0.75)
+        # 基線は遠目でも構造が読めるよう少し太く・濃く(Qwen: 軸が細い)
+        cat_ax.format.line.color.rgb = C["ink_faint"]
+        cat_ax.format.line.width = Pt(1.25)
         cat_ax.major_tick_mark = XL_TICK_MARK.NONE
         cat_ax.tick_labels.font.size = Pt(TS["chart_axis"])
-        cat_ax.tick_labels.font.color.rgb = C["ink_subtle"]
+        cat_ax.tick_labels.font.color.rgb = C["ink"]
         if show_labels:
             plot.has_data_labels = True
             dl = plot.data_labels
             dl.font.size = Pt(TS["chart_label"])
+            dl.font.bold = True  # 主要値を太字にして視認性を上げる(Qwen)
             dl.font.color.rgb = C["ink"]
             dl.number_format = cspec.get("number_format", "#,##0.0")
             dl.number_format_is_linked = False
@@ -442,15 +529,11 @@ def p_cover(slide, spec, deck):
                  [[(spec["subtitle"], TS["cover_subtitle"], 400, C["ink_subtle"])]])
     meta_bits = [b for b in [spec.get("date", m.get("date")), spec.get("author", m.get("author"))] if b]
     if meta_bits:
-        add_text(slide, MX, 6.55, CONTENT_W, 0.3,
-                 [[("  |  ".join(meta_bits), 12, 400, C["ink_faint"])]])
+        add_text(slide, MX, 6.48, CONTENT_W, 0.4,
+                 [[("  |  ".join(meta_bits), TS["cover_meta"], 600, C["ink_subtle"])]])
     if m.get("confidential"):
         add_text(slide, TOKENS["slide"]["width_in"] - MX - 3.0, 0.42, 3.0, 0.3,
-                 [[(m["confidential"], 10, 600, C["ink_faint"])]], align=PP_ALIGN.RIGHT)
-    foot = LAY["footer"]
-    add_text(slide, TOKENS["slide"]["width_in"] - foot["page_num_right_in"] - 0.9, foot["y_in"],
-             0.9, foot["h_in"], [[("1", TS["page_number"], 400, C["ink_faint"])]], align=PP_ALIGN.RIGHT)
-
+                 [[(m["confidential"], 11, 600, C["ink_faint"])]], align=PP_ALIGN.RIGHT)
 
 def p_agenda(slide, spec, deck):
     items = spec.get("items", [])
@@ -462,13 +545,13 @@ def p_agenda(slide, spec, deck):
         label = it if isinstance(it, str) else it.get("label", "")
         desc = None if isinstance(it, str) else it.get("desc")
         y = y0 + 0.2 + i * row_h
-        add_text(slide, x, y, 0.6, 0.4,
-                 [[(f"{i + 1:02d}", 18, 600, C["primary"])]])
+        add_text(slide, x, y, 0.7, 0.4,
+                 [[(f"{i + 1:02d}", 20, 600, C["primary"])]])
         add_text(slide, x + 0.85, y - 0.02, w - 3.0, 0.4,
-                 [[(label, 16, 600, C["ink"])]])
+                 [[(label, 17, 600, C["ink"])]])
         if desc:
-            add_text(slide, x + 0.85, y + 0.30, w - 1.0, 0.3,
-                     [[(desc, 12.5, 400, C["ink_subtle"])]])
+            add_text(slide, x + 0.85, y + 0.34, w - 1.0, 0.3,
+                     [[(desc, TS["body"], 400, C["ink_subtle"])]])
         if i < len(items) - 1:
             add_line(slide, x, y + row_h - 0.12, x + w, y + row_h - 0.12, C["rule"], 0.5)
 
@@ -503,7 +586,7 @@ def p_section_divider(slide, spec, deck):
              [[(spec.get("title", ""), TS["divider_title"], 700, C["ink"])]])
     if spec.get("desc"):
         add_text(slide, MX + 0.2, by + num_h + num_gap + title_h, panel_x - MX - 0.7, desc_h,
-                 [[(spec["desc"], 14, 400, C["ink_subtle"])]], line_spacing=1.3)
+                 [[(spec["desc"], 15, 400, C["ink_subtle"])]], line_spacing=1.3)
     if len(chapters) >= 2:
         row_h = 0.5
         nav_h = len(chapters) * row_h
@@ -512,16 +595,16 @@ def p_section_divider(slide, spec, deck):
         for num, title in chapters:
             cur = title == spec.get("title", "")
             add_text(slide, nx, ny, 0.6, 0.32,
-                     [[(str(num).zfill(2), 14, 600, C["primary"] if cur else C["ink_faint"])]])
+                     [[(str(num).zfill(2), 15, 600, C["primary"] if cur else C["ink_faint"])]])
             add_text(slide, nx + 0.6, ny + 0.01, W - nx - 1.1, 0.32,
-                     [[(title, 14, 700 if cur else 400, C["ink"] if cur else C["ink_faint"])]])
+                     [[(title, 15, 700 if cur else 400, C["ink"] if cur else C["ink_faint"])]])
             ny += row_h
 
 
 def p_executive_summary(slide, spec, deck):
     points = spec.get("points", [])
     y0, h = body_region(spec)
-    row_h = min(1.55, h / max(1, len(points)))
+    row_h = min(1.95, h / max(1, len(points)))
     x, w = grid(0, 12)
     y0 += max(0.0, (h - row_h * len(points)) * 0.4)
     for i, pt_ in enumerate(points):
@@ -529,15 +612,15 @@ def p_executive_summary(slide, spec, deck):
         card_h = row_h - 0.14
         add_rect(slide, x, y, w, card_h, C["surface_tint"], radius_pt=LAY["card"]["radius_pt"])
         add_rect(slide, x, y, 0.055, card_h, C["primary"])
-        kx = x + 0.25
+        kx = x + 0.34
         if pt_.get("kicker"):
-            add_text(slide, kx, y, 2.1, card_h,
-                     [[(pt_["kicker"], 12, 600, C["primary_deep"])]], anchor=MSO_ANCHOR.MIDDLE)
-            kx = x + 2.45
-        add_text(slide, kx, y + 0.08, x + w - kx - 0.25, card_h - 0.16,
-                 [[(pt_.get("heading", ""), 14, 600, C["ink"])],
+            add_text(slide, kx, y, 2.2, card_h,
+                     [[(pt_["kicker"], TS["body"], 700, C["primary_deep"])]], anchor=MSO_ANCHOR.MIDDLE)
+            kx = x + 2.7
+        add_text(slide, kx, y + 0.08, x + w - kx - 0.34, card_h - 0.16,
+                 [[(pt_.get("heading", ""), TS["section_heading"], 600, C["ink"])],
                   [(pt_.get("body", ""), TS["body"], 400, C["ink_subtle"])]],
-                 line_spacing=1.18, space_after_pt=4, anchor=MSO_ANCHOR.MIDDLE)
+                 line_spacing=1.28, space_after_pt=6, anchor=MSO_ANCHOR.MIDDLE)
 
 
 def p_kpi_dashboard(slide, spec, deck):
@@ -553,19 +636,28 @@ def p_kpi_dashboard(slide, spec, deck):
     # 1行×4枚以下はヒーロースケール — まばらなスライドは装飾でなくサイズで埋める
     vsize = TS["kpi_value_hero"] if rows == 1 and n <= 4 else (TS["kpi_value"] if rows == 1 else 27)
     pad = 0.18
+    label_h = 0.34
+    value_h = vsize / 52.0
+    delta_line_h = 0.30
+    note_line_h = (TS["kpi_sub"] / 72.0) * 1.28 * 1.13
     inner_hs = []
     for k in kpis:
-        ch_ = 0.52 + vsize / 60
+        ch_ = label_h + 0.06 + value_h
         if k.get("delta"):
-            ch_ += 0.24
+            dlines = _text_lines(_kpi_delta_text(k), cw - 2 * pad, TS["kpi_sub"])
+            ch_ += VALUE_DELTA_GAP_IN + dlines * delta_line_h
         if k.get("note"):
-            ch_ += _text_lines(k["note"], cw - 2 * pad, TS["kpi_sub"]) * 0.19 + 0.04
+            ch_ += 0.06 + _text_lines(k["note"], cw - 2 * pad, TS["kpi_sub"]) * note_line_h
         inner_hs.append(ch_)
-    content_h = max(inner_hs) + 0.16
+    content_h = max(inner_hs) + 0.22
     rh = min((h - gut * (rows - 1)) / rows, max(1.30, content_h))
-    # フィルルール: ブロックが本文領域の58%未満なら「浮いた帯」— カードを伸ばして埋め、
-    # 中身はカード内で垂直中央(ブロック間だけでなくブロック内の余白も設計する)
-    rh = max(rh, min((h - gut * (rows - 1)) / rows, (0.58 * h - gut * (rows - 1)) / rows))
+    # 器と中身のサイズを釣り合わせる: 多段ダッシュボードは本文領域を充填して浮いた帯を防ぐ。
+    # 1段(4枚以下)は内容高のカードのまま、行そのものを本文内で中央寄せし、余白はカード内では
+    # なく行の外側に置く(背の高い空カードを作らない)
+    if rows > 1:
+        rh = max(rh, min((h - gut * (rows - 1)) / rows, (0.58 * h - gut * (rows - 1)) / rows))
+    else:
+        rh = max(rh, min(h - 0.20, 0.50 * h))
     block_h = rows * rh + (rows - 1) * gut
     y_base = y0 + 0.05 + max(0.0, (h - block_h) * 0.44)
     for i, k in enumerate(kpis):
@@ -577,23 +669,31 @@ def p_kpi_dashboard(slide, spec, deck):
                  C["primary_pale"] if k.get("focal") else C["surface_tint"],
                  radius_pt=LAY["card"]["radius_pt"])
         yin = y + max(0.14, (rh - inner_hs[i]) / 2)
-        add_text(slide, x + pad, yin, cw - 2 * pad, 0.28,
+        add_text(slide, x + pad, yin, cw - 2 * pad, label_h,
                  [[(k.get("label", ""), TS["kpi_label"], 600, C["ink_subtle"])]])
-        vparts = [(k.get("value", ""), vsize, 700, C["primary_deep"])]
+        # 主役は focal だけ teal(primary_deep)。非 focal の数値は ink(本文色)で支え、
+        # 1枚あたりの主強調を1つに保つ(Qwen: 強調数値が多く主役が分散する)。
+        # focal 指定が無いダッシュボードは全数値 teal(従来通り)
+        any_focal_kpi = any(kk.get("focal") for kk in kpis)
+        vcolor = C["primary_deep"] if (k.get("focal") or not any_focal_kpi) else C["ink"]
+        vparts = [(k.get("value", ""), vsize, 700, vcolor)]
         if k.get("unit"):
             vparts.append(_unit_part(k["unit"], vsize * 0.45))
-        add_text(slide, x + pad, yin + 0.30, cw - 2 * pad, vsize / 60,
+        value_y = yin + label_h + 0.06
+        add_text(slide, x + pad, value_y, cw - 2 * pad, value_h,
                  [vparts])
-        by = yin + 0.38 + vsize / 60
+        by = value_y + value_h + VALUE_DELTA_GAP_IN
         if k.get("delta"):
-            arrow = {"up": "▲ ", "down": "▼ "}.get(k.get("delta_dir"), "")
-            add_text(slide, x + pad, by, cw - 2 * pad, 0.24,
-                     [[(arrow + k["delta"], TS["kpi_sub"], 600,
-                        _delta_color(k.get("delta_dir"), k.get("positive_is_good", True)))]])
-            by += 0.24
+            delta_text = _kpi_delta_text(k)
+            dbox_h = max(1, _text_lines(delta_text, cw - 2 * pad, TS["kpi_sub"])) * delta_line_h
+            add_text(slide, x + pad, by, cw - 2 * pad, dbox_h,
+                     [[(delta_text, TS["kpi_sub"], 600,
+                        _delta_color(k.get("delta_dir"), k.get("positive_is_good", True)))]],
+                     line_spacing=1.1)
+            by += dbox_h + 0.06
         if k.get("note"):
             add_text(slide, x + pad, by, cw - 2 * pad, max(0.2, rh - (by - y) - 0.08),
-                     [[(k["note"], TS["kpi_sub"], 400, C["ink_faint"])]], line_spacing=1.12)
+                     [[(k["note"], TS["kpi_sub"], 400, C["ink_faint"])]], line_spacing=1.18)
 
 
 def _focal_bar_anchor(cx, cw, cspec):
@@ -613,7 +713,7 @@ def add_chart_annotations(slide, cx, cy, cw, ch, cspec):
         return
     bx = _focal_bar_anchor(cx, cw, cspec)
     if ann.get("yoy") or ann.get("badge"):
-        bw, bh = (1.5, 0.52) if ann.get("badge") else (1.15, 0.52)
+        bw, bh = (1.5, 0.52) if ann.get("badge") else (1.32, 0.56)
         ox = min(bx - bw / 2, cx + cw - bw - 0.05)
         sh = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(ox), Inches(cy - 0.06), Inches(bw), Inches(bh))
         sh.fill.solid()
@@ -622,8 +722,8 @@ def add_chart_annotations(slide, cx, cy, cw, ch, cspec):
         sh.line.width = Pt(1.5)
         sh.shadow.inherit = False
         _strip_style(sh)
-        parts = [(ann["badge"], 12.5, 700, C["primary_deep"])] if ann.get("badge") else [
-            ("YoY ", 10, 400, C["ink_subtle"]), (ann["yoy"], 13.5, 700, C["primary_deep"])]
+        parts = [(ann["badge"], TS["chart_label"], 700, C["primary_deep"])] if ann.get("badge") else [
+            ("YoY ", TS["chart_axis"], 400, C["ink_subtle"]), (ann["yoy"], TS["chart_label"], 700, C["primary_deep"])]
         add_text(slide, ox, cy - 0.06, bw, bh, [parts],
                  align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE, wrap=False)
     if ann.get("trend_arrow"):
@@ -652,29 +752,33 @@ def p_chart_insight(slide, spec, deck):
     cx, cw = grid(0, 7)
     tx, tw = grid(7, 5)
     add_unit_note(slide, cx, y0 + 0.02, spec.get("chart", {}).get("unit"))
-    add_act_chart(slide, cx, y0 + 0.25, cw, h - 0.3, spec["chart"])
-    add_chart_annotations(slide, cx, y0 + 0.25, cw, h - 0.3, spec["chart"])
-    ty = y0 + 0.15
-    add_text(slide, tx, ty, tw, 0.3, [[(spec.get("takeaways_heading", "要点"), 14, 600, C["primary_deep"])]])
-    add_line(slide, tx, ty + 0.34, tx + tw, ty + 0.34, C["rule"], 0.75)
-    ty += 0.5
-    chars_per_line = max(8.0, (tw - 0.04) / 0.176)
+    chart_y, chart_h = y0 + 0.25, h - 0.3
+    add_act_chart(slide, cx, chart_y, cw, chart_h, spec["chart"])
+    add_chart_annotations(slide, cx, chart_y, cw, chart_h, spec["chart"])
+    line_h = (TS["body"] / 72.0) * 1.28 * 1.13  # 1.13 = 和文フォントの行ボックス補正
+    chars_per_line = max(8.0, (tw - 0.04) / (TS["body"] / 72.0))
     blocks = []
     for t in takeaways:
         head = t.get("heading") if isinstance(t, dict) else None
         body = t.get("body") if isinstance(t, dict) else str(t)
         body_lines = math.ceil(_ja_len(body) / chars_per_line) if body else 0
-        bh = (0.28 if head else 0.0) + body_lines * 0.235 + 0.05
+        bh = (0.32 if head else 0.0) + body_lines * line_h + 0.05
         blocks.append((head, body, bh))
     total_h = sum(b[2] for b in blocks)
-    gap = min(0.42, max(0.16, (h - 0.7 - total_h) / max(1, len(blocks) - 1))) if len(blocks) > 1 else 0
+    gap = min(0.40, max(0.20, (chart_h - 0.55 - total_h) / max(1, len(blocks) - 1))) if len(blocks) > 1 else 0
+    # 要点列はチャートの垂直中心に合わせて置く(上に張り付けない)
+    group_h = 0.5 + total_h + gap * max(0, len(blocks) - 1)
+    ty = max(y0 + 0.05, chart_y + (chart_h - group_h) / 2)
+    add_text(slide, tx, ty, tw, 0.3, [[(spec.get("takeaways_heading", "要点"), 16, 600, C["primary_deep"])]])
+    add_line(slide, tx, ty + 0.34, tx + tw, ty + 0.34, C["rule"], 0.75)
+    ty += 0.5
     for head, body, bh in blocks:
         paras = []
         if head:
-            paras.append([(head, 13, 600, C["ink"])])
+            paras.append([(head, 15, 600, C["ink"])])
         if body:
             paras.append([(body, TS["body"], 400, C["ink_subtle"])])
-        add_text(slide, tx + 0.02, ty, tw - 0.04, bh, paras, line_spacing=1.2, space_after_pt=2)
+        add_text(slide, tx + 0.02, ty, tw - 0.04, bh, paras, line_spacing=1.28, space_after_pt=2)
         ty += bh + gap
 
 
@@ -689,26 +793,38 @@ def p_market_sizing(slide, spec, deck):
     bar_max_w = w * 0.52
     vals = [float(s.get("numeric", 0) or 0) for s in stages]
     vmax = max(vals) if any(vals) else 1.0
+    # 桁違いのファネル(TAM 35兆 vs SOM 663億)では実比率だと下段が潰れて段差が読めない。
+    # 実比率(√スケール)と均等ステップ(1.0→0.4)の大きい方を採り、隣接段には必ず差を残す
+    fracs = []
+    for i in range(n):
+        raw = ((vals[i] / vmax) ** 0.5) if vmax else 1.0
+        even = 1.0 - (0.6 * i / max(1, n - 1))
+        f = max(raw, even)
+        if i > 0:
+            f = min(f, fracs[i - 1] - 0.12)
+        fracs.append(max(f, 0.2))
     for i, s in enumerate(stages):
         y = y0 + 0.1 + i * row_h
-        frac = (vals[i] / vmax) if vmax else 1.0
-        frac = max(frac, 0.16)
-        bw = bar_max_w * (frac ** 0.5)
+        bar_h = row_h - 0.28
+        bw = bar_max_w * fracs[i]
         fill = [C["chart_gray"], C["primary"], C["primary_deep"]][i % 3]
         txt = C["ink"] if i % 3 == 0 else C["canvas"]  # 白文字はグレー地でコントラスト不足
-        add_rect(slide, x, y, bw, row_h - 0.28, fill, radius_pt=4)
-        add_text(slide, x + 0.18, y + 0.10, bw - 0.3, 0.26, [[(s.get("label", ""), 12.5, 600, txt)]])
-        add_text(slide, x + 0.18, y + 0.34, bw - 0.3, row_h - 0.6,
-                 [[(s.get("value", ""), 22, 700, txt)]])
+        add_rect(slide, x, y, bw, bar_h, fill, radius_pt=4)
+        # オブジェクトに載る/併記するテキストは、オブジェクト高に対して垂直中央に置く
+        add_text(slide, x + 0.18, y, bw - 0.3, bar_h,
+                 [[(s.get("label", ""), TS["chart_axis"], 600, txt)],
+                  [(s.get("value", ""), 24, 700, txt)]],
+                 anchor=MSO_ANCHOR.MIDDLE, line_spacing=1.1, space_after_pt=2)
         dx = x + bar_max_w + 0.35
-        add_text(slide, dx, y + 0.08, x + w - dx, row_h - 0.3,
-                 [[(s.get("name", s.get("label", "")), 14, 600, C["ink"])],
+        add_text(slide, dx, y, x + w - dx, bar_h,
+                 [[(s.get("name", s.get("label", "")), 16, 600, C["ink"])],
                   [(s.get("desc", ""), TS["body"], 400, C["ink_subtle"])]],
-                 line_spacing=1.15, space_after_pt=2)
+                 anchor=MSO_ANCHOR.MIDDLE, line_spacing=1.26, space_after_pt=3)
 
 
-def _cell_borders(cell, bottom_hex: str | None = "D8D4C9"):
-    """Kill vertical/top borders; keep a thin bottom rule (banker table look)."""
+def _cell_borders(cell, bottom_hex: str | None = "D8D4C9", width_pt: float = 0.5):
+    """Kill vertical/top borders; keep a thin bottom rule (banker table look).
+    width_pt controls the bottom rule weight (header uses a heavier accent line)."""
     tcPr = cell._tc.get_or_add_tcPr()
     for tag in ("lnL", "lnR", "lnT", "lnB"):
         el = tcPr.find(f"{A_NS}{tag}")
@@ -721,7 +837,7 @@ def _cell_borders(cell, bottom_hex: str | None = "D8D4C9"):
         els.append(ln)
     lnB = etree.SubElement(tcPr, f"{A_NS}lnB")
     if bottom_hex:
-        lnB.set("w", "6350")
+        lnB.set("w", str(int(width_pt * 12700)))
         fill = etree.SubElement(lnB, f"{A_NS}solidFill")
         etree.SubElement(fill, f"{A_NS}srgbClr").set("val", bottom_hex)
     else:
@@ -750,42 +866,82 @@ def add_act_table(slide, x, y, w, h, tspec: dict):
     headers = tspec.get("headers", [])
     rows = tspec.get("rows", [])
     nrows, ncols = len(rows) + 1, len(headers)
-    g = slide.shapes.add_table(nrows, ncols, Inches(x), Inches(y), Inches(w), Inches(h))
+    # --- 列幅(inch)。レイアウトと折返し行数推定の両方に使う ---
+    if tspec.get("col_widths"):
+        fr = tspec["col_widths"]
+        total_fr = sum(fr) or 1.0
+        col_w_in = [w * f / total_fr for f in fr]
+    else:
+        col_w_in = [w / ncols] * ncols
+    # --- 内容量ドリブンの行高(面をストレッチで埋めず、折返し行数から実測して算出) ---
+    # ヘッダーも本文行と同じ級差ユニットで組み、本文行が複数行で高いときはヘッダーも
+    # 比例して高くする(級差のバランス)。表全体は body 内で垂直中央に置く。
+    cell_pt, hdr_pt = TS["table_cell"], TS["table_header"]
+    line_h = cell_pt / 72.0 * 1.34          # 1 行あたりの高さ(和文行送り込み)
+    v_pad = 0.26                            # 1 行の内容最小余白(上下)
+    def _row_lines(cells):
+        ln = 1
+        for ci in range(ncols):
+            txt = str(cells[ci]) if ci < len(cells) else ""
+            ln = max(ln, _text_lines(txt, max(0.4, col_w_in[ci] - 0.18), cell_pt))
+        return ln
+    row_min = [_row_lines(r) * line_h + v_pad for r in rows] or [line_h + v_pad]
+    hdr_min = hdr_pt / 72.0 * 1.34 + v_pad * 0.7
+    n = len(row_min)
+    sum_min = sum(row_min)
+    # 余白を詰めて本文領域を埋める(全体の高さを出す)。追加高は主にデータ行へ配分し、
+    # ヘッダーはデータ行より低めに保つ。1 行が過度に伸びないよう上限も設ける。
+    FILL, HDR_RATIO, ROW_CAP = 0.90, 0.60, 1.9
+    target = h * FILL
+    if sum_min + hdr_min >= target:         # 既に埋まる/溢れる → 実測高そのまま
+        hdr_h_in, body_heights = hdr_min, list(row_min)
+    else:                                   # 余白ぶんをデータ行主体に配ってフィル
+        hdr_h_in = max(hdr_min, HDR_RATIO * target / (n + HDR_RATIO))
+        remain = target - hdr_h_in
+        body_heights = [min(remain * (rm / sum_min), rm * ROW_CAP) for rm in row_min]
+        hdr_h_in = min(hdr_h_in, min(body_heights) * 0.9)   # ヘッダーはデータ行より低く
+        hdr_h_in = max(hdr_h_in, hdr_min)
+    total = hdr_h_in + sum(body_heights)
+    if total <= h:                          # 残余はわずかな上下マージンとして中央へ
+        y = y + (h - total) / 2.0
+    else:                                   # 超えるなら比率維持で全行を縮小して収める
+        k = h / total
+        hdr_h_in *= k
+        body_heights = [bh * k for bh in body_heights]
+    g = slide.shapes.add_table(nrows, ncols, Inches(x), Inches(y), Inches(w), Inches(total))
     table = g.table
     table.first_row = False
     table.horz_banding = False
     tbl = g._element.graphic.graphicData.tbl
     tbl[0][-1].text = "{5940675A-B579-460E-94D1-54222C63F5DA}"  # "no style" table style
-    if tspec.get("col_widths"):
-        fr = tspec["col_widths"]
-        total_fr = sum(fr) or 1.0
-        for ci, fracw in enumerate(fr):
-            table.columns[ci].width = Emu(int(Inches(w) * fracw / total_fr))
+    for ci, cwin in enumerate(col_w_in):
+        table.columns[ci].width = Emu(int(Inches(cwin)))
     aligns = tspec.get("align", ["l"] * ncols)
     amap = {"l": PP_ALIGN.LEFT, "r": PP_ALIGN.RIGHT, "c": PP_ALIGN.CENTER}
     emph_col = tspec.get("emphasis_col")
     emph_row = tspec.get("emphasis_row")
-    hdr_h = Inches(0.32)
-    table.rows[0].height = hdr_h
-    body_h = max(Inches(0.3), int((Inches(h) - hdr_h) / max(1, len(rows))))
+    table.rows[0].height = Inches(hdr_h_in)
     for ri in range(1, nrows):
-        table.rows[ri].height = body_h
+        table.rows[ri].height = Inches(body_heights[ri - 1])
+    # ヘッダーは濃緑の塗り帯はやめつつ、遠目でも構造が読めるよう淡い面(surface_tint)で
+    # 行を定義し、primary_deep の太字テキスト+1.75pt の primary_deep 下線で締める
+    # (面で押さず、淡面+濃い罫+級差で階層を作る)。本文行はゼブラを外しヘアライン区切り、
+    # 文字色は #2D332E(ink)に固定して役割を明確にする(Qwen: ヘッダー弱い/本文色を固定)。
     for ci, htxt in enumerate(headers):
         cell = table.cell(0, ci)
         cell.fill.solid()
-        cell.fill.fore_color.rgb = C["primary_deep"]
-        _table_font(cell, str(htxt), TS["table_header"], 600, C["canvas"], amap.get(aligns[ci], PP_ALIGN.LEFT))
+        cell.fill.fore_color.rgb = C["surface_tint"]
+        _table_font(cell, str(htxt), TS["table_header"], 700, C["primary_deep"], amap.get(aligns[ci], PP_ALIGN.LEFT))
         cell.vertical_anchor = MSO_ANCHOR.MIDDLE
-        _cell_borders(cell, "004F49")
+        _cell_borders(cell, "004F49", 1.75)  # primary_deep のヘッダー下線(濃いアクセント罫)
     for ri, row in enumerate(rows, start=1):
         for ci, val in enumerate(row):
             cell = table.cell(ri, ci)
             focal = (emph_col is not None and ci == emph_col) or (emph_row is not None and ri - 1 == emph_row)
             cell.fill.solid()
-            cell.fill.fore_color.rgb = C["primary_pale"] if focal else (
-                C["surface_tint"] if ri % 2 == 0 else C["canvas"])
-            weight = 600 if (focal or ci == 0) else 400
-            color = C["ink"] if (focal or ci == 0) else C["ink_subtle"]
+            cell.fill.fore_color.rgb = C["primary_pale"] if focal else C["canvas"]
+            weight = 700 if ci == 0 else (600 if focal else 400)
+            color = C["ink"]  # 本文は #2D332E に固定(ラベル/値の別は級差で表す)
             _table_font(cell, str(val), TS["table_cell"], weight, color, amap.get(aligns[ci], PP_ALIGN.LEFT))
             cell.vertical_anchor = MSO_ANCHOR.MIDDLE
             _cell_borders(cell)
@@ -811,12 +967,12 @@ def p_competitive_landscape(slide, spec, deck):
     add_line(slide, cx, cy + size / 2, cx + cw_, cy + size / 2, C["chart_gray"], 0.75)
     add_line(slide, cx + cw_ / 2, cy, cx + cw_ / 2, cy + size, C["chart_gray"], 0.75)
     ax, ay = spec.get("x_axis", {}), spec.get("y_axis", {})
-    add_text(slide, cx - 1.02, cy + size / 2 - 0.10, 0.94, 0.3, [[(ax.get("low", ""), 10.5, 400, C["ink_faint"])]], align=PP_ALIGN.RIGHT)
-    add_text(slide, cx + cw_ + 0.08, cy + size / 2 - 0.10, 0.92, 0.3, [[(ax.get("high", ""), 10.5, 400, C["ink_faint"])]])
-    add_text(slide, cx + cw_ / 2 - 1.0, cy - 0.28, 2.0, 0.24, [[(ay.get("high", ""), 10.5, 400, C["ink_faint"])]], align=PP_ALIGN.CENTER)
-    add_text(slide, cx + cw_ / 2 - 1.0, cy + size + 0.05, 2.0, 0.24, [[(ay.get("low", ""), 10.5, 400, C["ink_faint"])]], align=PP_ALIGN.CENTER)
+    add_text(slide, cx - 1.02, cy + size / 2 - 0.10, 0.94, 0.34, [[(ax.get("low", ""), TS["chart_axis"], 400, C["ink_faint"])]], align=PP_ALIGN.RIGHT)
+    add_text(slide, cx + cw_ + 0.08, cy + size / 2 - 0.10, 0.92, 0.34, [[(ax.get("high", ""), TS["chart_axis"], 400, C["ink_faint"])]])
+    add_text(slide, cx + cw_ / 2 - 1.0, cy - 0.30, 2.0, 0.30, [[(ay.get("high", ""), TS["chart_axis"], 400, C["ink_faint"])]], align=PP_ALIGN.CENTER)
+    add_text(slide, cx + cw_ / 2 - 1.0, cy + size + 0.05, 2.0, 0.30, [[(ay.get("low", ""), TS["chart_axis"], 400, C["ink_faint"])]], align=PP_ALIGN.CENTER)
     for pl in spec.get("players", []):
-        dot = 0.42 if pl.get("focal") else 0.3
+        dot = 0.5 if pl.get("focal") else 0.3
         dx = cx + pl["x"] * cw_ - dot / 2
         dy = cy + (1 - pl["y"]) * size - dot / 2
         sh = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(dx), Inches(dy), Inches(dot), Inches(dot))
@@ -826,24 +982,31 @@ def p_competitive_landscape(slide, spec, deck):
         sh.shadow.inherit = False
         _strip_style(sh)
         add_text(slide, dx - 0.55, dy + dot + 0.02, dot + 1.1, 0.22,
-                 [[(pl["name"], 11, 600 if pl.get("focal") else 400,
+                 [[(pl["name"], TS["body_small"], 600 if pl.get("focal") else 400,
                     C["ink"] if pl.get("focal") else C["ink_subtle"])]], align=PP_ALIGN.CENTER)
     notes = spec.get("notes", [])
     if notes:
         nx, nw = grid(8, 4)
-        ny = y0 + 0.15
-        add_text(slide, nx, ny, nw, 0.3, [[(spec.get("notes_heading", "Positioning"), 14, 600, C["primary_deep"])]])
-        add_line(slide, nx, ny + 0.3, nx + nw, ny + 0.3, C["rule"], 0.75)
-        ny += 0.45
-        chars_per_line = max(8.0, nw / 0.176)
+        line_h = (TS["body"] / 72.0) * 1.28 * 1.13
+        chars_per_line = max(8.0, nw / (TS["body"] / 72.0))
+        note_gap = 0.24
+        blocks = []
         for t in notes:
             head = t.get("heading") if isinstance(t, dict) else None
             body = t.get("body") if isinstance(t, dict) else str(t)
-            paras = ([[(head, 13, 600, C["ink"])]] if head else []) + ([[(body, TS["body"], 400, C["ink_subtle"])]] if body else [])
             body_lines = math.ceil(_ja_len(body) / chars_per_line) if body else 0
-            block_h = (0.28 if head else 0.0) + body_lines * 0.235 + 0.05
-            add_text(slide, nx, ny, nw, block_h, paras, line_spacing=1.2, space_after_pt=2)
-            ny += block_h + 0.18
+            block_h = (0.32 if head else 0.0) + body_lines * line_h + 0.05
+            blocks.append((head, body, block_h))
+        # 右の要点列は左の2x2マップ(cy..cy+size)の垂直中心に揃える(上に張り付けない)
+        group_h = 0.5 + sum(b[2] for b in blocks) + note_gap * max(0, len(blocks) - 1)
+        ny = max(cy, cy + (size - group_h) / 2)
+        add_text(slide, nx, ny, nw, 0.3, [[(spec.get("notes_heading", "Positioning"), 16, 600, C["primary_deep"])]])
+        add_line(slide, nx, ny + 0.34, nx + nw, ny + 0.34, C["rule"], 0.75)
+        ny += 0.5
+        for head, body, block_h in blocks:
+            paras = ([[(head, 15, 600, C["ink"])]] if head else []) + ([[(body, TS["body"], 400, C["ink_subtle"])]] if body else [])
+            add_text(slide, nx, ny, nw, block_h, paras, line_spacing=1.28, space_after_pt=2)
+            ny += block_h + note_gap
 
 
 def p_financial_summary(slide, spec, deck):
@@ -921,7 +1084,7 @@ def p_waterfall(slide, spec, deck):
         add_text(slide, bx - slot * 0.19, y_top - 0.26, slot, 0.22,
                  [[(label_v, TS["chart_label"], 600, C["ink"])]], align=PP_ALIGN.CENTER)
         add_text(slide, x + i * slot + 0.02, base_y + chart_h + 0.08, slot - 0.04, 0.55,
-                 [[(it.get("label", ""), TS["chart_axis"], 400, C["ink_subtle"])]], align=PP_ALIGN.CENTER, line_spacing=1.05)
+                 [[(it.get("label", ""), TS["chart_axis"], 600, C["ink_subtle"])]], align=PP_ALIGN.CENTER, line_spacing=1.05)
     add_unit_note(slide, x, y0 + 0.0, spec.get("unit"))
 
 
@@ -944,20 +1107,32 @@ def p_roadmap(slide, spec, deck):
     notch_ratio = 0.6
     ph_h = 0.52
     inner_w = pw - 0.06 - ph_h * notch_ratio * 2
-    two_line = any(_ja_len(_phase_text(ph)) * 12.5 / 72.0 > inner_w for ph in phases)
+    phase_pt = TS["body_small"]
+    period_pt = TS["kpi_sub"]
+    two_line = any(_ja_len(_phase_text(ph)) * phase_pt / 72.0 > inner_w for ph in phases)
     if two_line:
-        ph_h = 0.78
+        # 矢羽高はラベル+期間の実測行数から導出する(固定 0.78 では 3 行以上が溢れる)
+        head_rows = max(_text_lines(ph.get("label", ""), inner_w, phase_pt)
+                        + (_text_lines(ph["period"], inner_w, period_pt) if ph.get("period") else 0)
+                        for ph in phases)
+        ph_h = max(0.86, 0.18 + head_rows * 0.30)
+    gap = LAY["gutter_in"]
     for i, ph in enumerate(phases):
         px = x + label_w + i * pw
-        add_chevron(slide, px, y0 + 0.05, pw - 0.06, ph_h, C["primary_deep"] if i == spec.get("focal_phase") else C["primary"])
-        paras = [[(ph.get("label", ""), 12.5, 600, C["canvas"])]]
+        # 矢羽の間に小さな隙間を空け、矢先を次段へオーバーハングさせて「流れ」を明確にする
+        # (Qwen: フローの視認性)。矢羽色はデフォルトで primary_deep、非注目段はやや淡い teal
+        chev_w = pw - gap + (gap if i < n - 1 else 0)
+        focal_ph = spec.get("focal_phase")
+        chev_fill = C["primary_deep"] if (focal_ph is None or i == focal_ph) else C["primary"]
+        add_chevron(slide, px, y0 + 0.05, chev_w, ph_h, chev_fill)
+        paras = [[(ph.get("label", ""), phase_pt, 600, C["canvas"])]]
         if ph.get("period"):
             if two_line:
-                paras.append([(ph["period"], 10.5, 400, C["canvas"])])
+                paras.append([(ph["period"], period_pt, 400, C["canvas"])])
             else:
-                paras[0].append(("  " + ph["period"], 10.5, 400, C["canvas"]))
+                paras[0].append(("  " + ph["period"], period_pt, 400, C["canvas"]))
         tip = ph_h * notch_ratio if not two_line else 0.52 * notch_ratio
-        add_text(slide, px + 0.12, y0 + 0.05, pw - 0.06 - tip - 0.12, ph_h, paras,
+        add_text(slide, px + 0.12, y0 + 0.05, chev_w - tip - 0.12, ph_h, paras,
                  anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.CENTER, wrap=False, line_spacing=1.1)
     ry = y0 + ph_h + 0.25
     if rows:
@@ -965,7 +1140,7 @@ def p_roadmap(slide, spec, deck):
         for r_i, row in enumerate(rows):
             yy = ry + r_i * row_h
             add_text(slide, x, yy, label_w - 0.15, row_h - 0.12,
-                     [[(row.get("label", ""), 12, 600, C["ink"])]], anchor=MSO_ANCHOR.MIDDLE)
+                     [[(row.get("label", ""), TS["body_small"], 600, C["ink"])]], anchor=MSO_ANCHOR.MIDDLE)
             for c_i in range(n):
                 cell = (row.get("cells") or [""] * n)[c_i] if c_i < len(row.get("cells", [])) else ""
                 cx_ = x + label_w + c_i * pw
@@ -979,28 +1154,28 @@ def p_roadmap(slide, spec, deck):
         for i, ph in enumerate(phases):
             px = x + i * pw
             add_rect(slide, px, ry, pw - 0.06, row_h, C["surface_tint"], radius_pt=LAY["card"]["radius_pt"])
-            bullets = ph.get("items", [])
-            paras = [[("・" + b, TS["body_small"], 400, C["ink_subtle"])] for b in bullets]
-            add_text(slide, px + 0.16, ry, pw - 0.38, row_h - 0.2, paras,
-                     line_spacing=1.25, space_after_pt=5, anchor=MSO_ANCHOR.MIDDLE)
+            add_bullets(slide, px + 0.2, ry, pw - 0.44, row_h - 0.2,
+                        ph.get("items", []), TS["body_small"], C["ink_subtle"],
+                        line_spacing=1.25, space_after_pt=7, anchor=MSO_ANCHOR.MIDDLE)
 
 
 def p_two_column(slide, spec, deck):
     y0, h = body_region(spec)
     # card height follows the measured content of the fuller side (container ≒ content),
     # then the block is centered — a full-height card over short content reads as neglect
+    HEAD_H, CONTENT_TOP, ITEM_GAP = 0.54, 0.80, 0.22  # ヘッダー帯と本文に上下の余裕を与える
     def _side_h(blk, w):
-        chars_w = w - 0.44
+        chars_w = w - 0.68
         used = 0.0
         for it in blk.get("items", []):
             head = it.get("heading") if isinstance(it, dict) else None
             body = it.get("body") if isinstance(it, dict) else str(it)
             lines = _text_lines(body, chars_w, TS["body"])
-            used += (0.26 if head else 0.0) + lines * (TS["body"] / 72.0) * 1.3 + 0.04 + 0.16
+            used += (0.30 if head else 0.0) + lines * (TS["body"] / 72.0) * 1.34 + 0.06 + ITEM_GAP
         return used
     _, w_probe = grid(0, 6)
     content_h = max(_side_h(spec.get(s, {}), w_probe) for s in ("left", "right"))
-    card_h = min(h - 0.1, max(1.8, 0.61 + content_h + 0.08))
+    card_h = min(h - 0.1, max(1.9, CONTENT_TOP + content_h + 0.14))
     y_top = y0 + 0.05 + max(0.0, (h - 0.1 - card_h) * 0.44)
     for side, (c0, span) in (("left", (0, 6)), ("right", (6, 6))):
         blk = spec.get(side, {})
@@ -1013,191 +1188,362 @@ def p_two_column(slide, spec, deck):
             hd_fill = C["primary_deep"]
         else:
             hd_fill = C["navy"]
-        add_rect(slide, x, y_top, w, 0.42, hd_fill, radius_pt=LAY["card"]["radius_pt"])
-        add_rect(slide, x, y_top + 0.23, w, 0.19, hd_fill)
+        add_rect(slide, x, y_top, w, HEAD_H, hd_fill, radius_pt=LAY["card"]["radius_pt"])
+        add_rect(slide, x, y_top + HEAD_H - 0.19, w, 0.19, hd_fill)
         head_txt = blk.get("heading", side)
         if mark == "cross":
             head_txt = "× " + head_txt
         elif mark == "check":
             head_txt = "○ " + head_txt
-        add_text(slide, x + 0.16, y_top, w - 0.32, 0.42,
-                 [[(head_txt, 13, 600, C["canvas"])]], anchor=MSO_ANCHOR.MIDDLE)
-        yy = y_top + 0.61
+        add_text(slide, x + 0.16, y_top, w - 0.32, HEAD_H,
+                 [[(head_txt, TS["body_small"], 600, C["canvas"])]], anchor=MSO_ANCHOR.MIDDLE)
+        yy = y_top + CONTENT_TOP
         for it in blk.get("items", []):
             head = it.get("heading") if isinstance(it, dict) else None
             body = it.get("body") if isinstance(it, dict) else str(it)
-            paras = []
+            body_lines = _text_lines(body, w - 0.68, TS["body"])
+            block_h = (0.30 if head else 0.0) + body_lines * (TS["body"] / 72.0) * 1.34 + 0.06
             if head:
-                paras.append([(head, 12.5, 600, C["ink"])])
-            if body:
-                paras.append([(("" if head else "・") + body, TS["body"], 400, C["ink_subtle"])])
-            body_lines = _text_lines(body, w - 0.44, TS["body"])
-            block_h = (0.26 if head else 0.0) + body_lines * (TS["body"] / 72.0) * 1.3 + 0.04
-            add_text(slide, x + 0.2, yy, w - 0.4, block_h, paras, line_spacing=1.22, space_after_pt=3)
-            yy += block_h + 0.16
+                add_text(slide, x + 0.2, yy, w - 0.4, block_h,
+                         [[(head, TS["body_small"], 600, C["ink"])], [(body, TS["body"], 400, C["ink_subtle"])]],
+                         line_spacing=1.28, space_after_pt=3)
+            else:
+                add_bullets(slide, x + 0.24, yy, w - 0.48, block_h,
+                            [body], TS["body"], C["ink_subtle"], line_spacing=1.28, space_after_pt=0)
+            yy += block_h + ITEM_GAP
 
 
 def p_process_flow(slide, spec, deck):
     """Horizontal step flow with descriptions under each step. Card height follows
-    the fullest step's measured content; the whole block centers in the body region."""
+    the fullest step's measured content; the whole block centers in the body region.
+    箇条書きは ●+ぶら下げインデント+段落後スペース、矢羽の矢先はカード右端から
+    少しはみ出させて前進感を作る(参照モック準拠)。"""
     steps = spec.get("steps", [])
     y0, h = body_region(spec)
     x, w = grid(0, 12)
     n = max(1, len(steps))
     sw = w / n
-    head_h = 0.5
-    line_h = (TS["body_small"] / 72.0) * 1.25 + 5 / 72.0
+    head_h = 0.52
+    gut = LAY["gutter_in"]
+    overhang = gut  # 矢先をカード右端より前へ出す(次の矢羽の左辺には触れるだけ)
+    line_h = (TS["body"] / 72.0) * 1.30 * 1.13  # 1.13 = 和文フォントの行ボックス補正
+    sp_h = 8 / 72.0
+    card_pad = 0.56  # カード内左右の余白合計に相当する差し引き(gutter 別)
+    # 箇条書きは ● のぶら下げインデント(add_bullets の 0.24in)分だけ折返し幅が狭い。
+    # 行数見積もりは描画箱幅からインデントと安全余白を引いた実効幅で行う(引き忘れると
+    # card_h が足りず、折り返した項目が outcome の罫線に食い込む)
+    bullet_text_w = sw - LAY["gutter_in"] - card_pad - 0.24 - 0.20
+    outcome_text_w = sw - LAY["gutter_in"] - card_pad
+    outcome_pt = TS["section_heading"]
     content_h = 0.0
     has_outcome = any(st.get("outcome") for st in steps)
     for st in steps:
-        used = 0.30 if st.get("desc") else 0.0
+        used = 0.34 if st.get("desc") else 0.0
         for b in st.get("items", []):
-            used += _text_lines("・" + b, sw - 0.40, TS["body_small"]) * line_h
+            used += _text_lines(b, bullet_text_w, TS["body"]) * line_h + sp_h
         content_h = max(content_h, used)
     outcome_h = 0.0
     if has_outcome:
-        outcome_h = max(_text_lines(st.get("outcome", ""), sw - 0.40, TS["body_small"])
-                        for st in steps) * 0.24 + 0.42
-    card_h = min(h - head_h - 0.35, max(1.3, 0.14 + content_h + outcome_h + 0.16))
-    # フィルルール: 帯(シェブロン+カード)が本文領域の60%未満だと「浮いた帯」になる。
-    # カードを伸ばして埋め、中身はカード内で垂直中央に置く
-    card_h = max(card_h, min(h - head_h - 0.35, 0.60 * h - head_h - 0.15))
-    y_top = y0 + 0.05 + max(0.0, (h - head_h - 0.25 - card_h - 0.1) * 0.44)
-    gut = LAY["gutter_in"]
+        outcome_h = max(_text_lines(st.get("outcome", ""), outcome_text_w, outcome_pt)
+                        for st in steps) * (outcome_pt / 72.0) * 1.22 + 0.52
+    card_h = min(h - head_h - 0.35, max(1.5, 0.20 + content_h + outcome_h + 0.16))
+    # フィルルール: 帯(シェブロン+カード)で本文領域を ~82% まで埋め、上下余白を詰める
+    # (中身はカード内で垂直中央に置く)
+    card_h = max(card_h, min(h - head_h - 0.35, 0.82 * h - head_h - 0.20))
+    y_top = y0 + 0.05 + max(0.05, (h - head_h - 0.25 - card_h - 0.1) * 0.42)
     n_last = len(steps) - 1
     for i, st in enumerate(steps):
         sx = x + i * sw
         # 彩度は到達点に配給する: 途中ステップは淡テール、終端だけソリッド
         head_fill = C["primary"] if i == n_last else C["primary_pale"]
         label_color = C["canvas"] if i == n_last else C["primary_deep"]
-        add_chevron(slide, sx, y_top, sw - gut, head_h, head_fill)
+        add_chevron(slide, sx, y_top, sw - gut + overhang, head_h, head_fill)
         tip = head_h * 0.6  # PENTAGON: 左辺フラット、右にだけ矢先
-        add_text(slide, sx + 0.12, y_top, sw - gut - tip - 0.12, head_h,
-                 [[(st.get("label", ""), 13, 600, label_color)]],
+        add_text(slide, sx + 0.12, y_top, sw - gut + overhang - tip - 0.12, head_h,
+                 [[(st.get("label", ""), 15, 600, label_color)]],
                  anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.CENTER, wrap=False)
         cy = y_top + head_h + 0.15
         add_rect(slide, sx, cy, sw - gut, card_h, C["surface_tint"], radius_pt=LAY["card"]["radius_pt"])
-        paras = [[("・" + b, TS["body_small"], 400, C["ink_subtle"])] for b in st.get("items", [])]
+        # このカード自身の内容高を実測し、items+outcome を1つの意味グループとして
+        # 垂直中央に置く。outcome をカード下端へ固定すると、短い箇条書きとの間に
+        # 大きな空白帯が生まれる。
+        own_h = (0.34 if st.get("desc") else 0.0)
+        for b in st.get("items", []):
+            own_h += _text_lines(b, bullet_text_w, TS["body"]) * line_h + sp_h
+        has_this_outcome = bool(st.get("outcome"))
+        outcome_gap = 0.20 if has_this_outcome else 0.0
+        group_h = own_h + outcome_gap + (outcome_h if has_this_outcome else 0.0)
+        group_top = cy + max(0.26, (card_h - group_h) * 0.5)
+        iy = group_top
         if st.get("desc"):
-            paras.insert(0, [(st["desc"], 12.5, 600, C["ink"])])
-        add_text(slide, sx + 0.16, cy + 0.14, sw - gut - 0.32, card_h - outcome_h - 0.28,
-                 paras, line_spacing=1.25, space_after_pt=5, anchor=MSO_ANCHOR.MIDDLE)
+            add_text(slide, sx + 0.28, iy, sw - gut - 0.56, 0.28,
+                     [[(st["desc"], 14.5, 600, C["ink"])]])
+            iy += 0.34
+        bullet_h = max(0.24, own_h - (iy - group_top))
+        add_bullets(slide, sx + 0.30, iy, sw - gut - card_pad, bullet_h,
+                    st.get("items", []), TS["body"], C["ink_subtle"],
+                    line_spacing=1.30, space_after_pt=8)
         if st.get("outcome"):
-            oy = cy + card_h - outcome_h + 0.06
-            add_line(slide, sx + 0.16, oy, sx + sw - gut - 0.16, oy, C["rule"], 0.5)
-            add_text(slide, sx + 0.16, oy + 0.04, sw - gut - 0.32, 0.18,
+            oy = iy + bullet_h + outcome_gap
+            add_line(slide, sx + 0.28, oy, sx + sw - gut - 0.28, oy, C["rule"], 0.5)
+            add_text(slide, sx + 0.28, oy + 0.04, sw - gut - 0.56, 0.18,
                      [[("▼", 9, 400, C["primary"])]], align=PP_ALIGN.CENTER)
-            add_text(slide, sx + 0.16, oy + 0.24, sw - gut - 0.32, outcome_h - 0.30,
-                     [[(st["outcome"], TS["body_small"], 600, C["ink"])]], line_spacing=1.2)
+            add_text(slide, sx + 0.28, oy + 0.24, sw - gut - 0.56, outcome_h - 0.30,
+                     [[(st["outcome"], outcome_pt, 700, C["ink"])]],
+                     align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE, line_spacing=1.20)
 
 
 def p_quote_or_statement(slide, spec, deck):
-    """Hero statement: 28pt(長文24pt)/1.5行送り。ルール+本文+出典+recap を実測高で
-    1グループに組み、光学中心(残余の45%)へ置く — 固定枠に流し込むと「小さな塊が
-    余白に浮く」最頻出欠陥になる。ルールはテキスト実高だけをブラケットする。"""
+    """Flexible closing statement. center_hero is ceremonial; split_evidence is an
+    editorial close with proof metrics attached."""
     y0, h = body_region(spec)
-    x, w = grid(1, 10)
     recap = spec.get("recap", [])
     stmt = spec.get("statement", "")
-    s_pt = TS["statement"] if _ja_len(stmt) <= 60 else 24
-    lines = _text_lines(stmt, w, s_pt)
-    text_h = lines * (s_pt / 72.0) * 1.5 + 0.06
-    attr_h = 0.58 if spec.get("attribution") else 0.0
-    recap_h = 1.05 if recap else 0.0
-    group_h = text_h + attr_h + recap_h
-    gy = y0 + max(0.0, (h - group_h) * 0.45)
-    bar_w = 0.125
-    add_rect(slide, x - 0.16 - bar_w, gy - 0.10, bar_w, text_h + 0.20, C["primary"])
-    add_text(slide, x, gy, w, text_h, [[(stmt, s_pt, 400, C["ink"])]], line_spacing=1.5)
-    ay = gy + text_h + 0.30
-    if spec.get("attribution"):
-        add_text(slide, x, ay, w, 0.28, [[("— " + spec["attribution"], 12.5, 400, C["ink_subtle"])]])
-        ay += 0.58
-    if recap:
-        ry = ay + 0.05
-        n = len(recap)
-        rw = w / n
-        add_line(slide, x, ry - 0.12, x + w, ry - 0.12, C["rule"], 0.75)
-        for i, m in enumerate(recap):
-            rx = x + i * rw
-            add_text(slide, rx, ry + 0.05, rw - 0.2, 0.22, [[(m.get("label", ""), 11, 600, C["ink_subtle"])]])
-            vparts = [(str(m.get("value", "")), 24, 700, C["primary_deep"])]
+    variant = spec.get("variant", spec.get("layout", "center_hero"))
+    if variant in ("evidence_strip", "thesis_strip", "closing_grid") and recap:
+        x, w = grid(0, 12)
+        s_pt = 31 if _ja_len(stmt) <= 70 else 28
+        lines = _text_lines(stmt, w * 0.86, s_pt)
+        text_w = min(w, max(w * 0.72, lines and _ja_len(stmt) * (s_pt / 72.0) * 0.72))
+        text_h = lines * (s_pt / 72.0) * 1.38 * 1.15 + 0.12
+        n = min(4, len(recap))
+        gap = LAY["gutter_in"]
+        heading_h = 0.34
+        card_h = 1.42 if n <= 3 else 1.30
+        group_h = 0.06 + 0.36 + text_h + 0.40 + heading_h + 0.16 + card_h
+        gy = y0 + max(0.0, (h - group_h) * 0.44)
+        add_rect(slide, x, gy, 0.72, 0.055, C["primary"])
+        add_text(slide, x, gy + 0.34, text_w, text_h,
+                 [[(stmt, s_pt, 700, C["ink"])]], line_spacing=1.34)
+        hy = gy + 0.34 + text_h + 0.40
+        add_text(slide, x, hy, w, heading_h,
+                 [[(spec.get("recap_heading", "確認指標"), TS["section_heading"], 700, C["primary_deep"])]])
+        add_line(slide, x, hy + heading_h + 0.05, x + w, hy + heading_h + 0.05, C["rule"], 0.75)
+        card_y = hy + heading_h + 0.20
+        cw = (w - gap * (n - 1)) / n
+        any_focal = any(m.get("focal") for m in recap[:n])
+        for i, m in enumerate(recap[:n]):
+            cx = x + i * (cw + gap)
+            focal = m.get("focal") or not any_focal
+            add_rect(slide, cx, card_y, cw, card_h,
+                     C["primary_pale"] if focal else C["surface_tint"],
+                     radius_pt=LAY["card"]["radius_pt"])
+            add_text(slide, cx + 0.22, card_y + 0.18, cw - 0.44, 0.28,
+                     [[(m.get("label", ""), TS["body"], 600, C["ink_subtle"])]])
+            vcolor = C["primary_deep"] if focal else C["ink"]
+            vparts = [(str(m.get("value", "")), 34, 700, vcolor)]
             if m.get("unit"):
-                vparts.append(_unit_part(m["unit"], 12))
-            add_text(slide, rx, ry + 0.28, rw - 0.2, 0.4, [vparts])
+                vparts.append(_unit_part(m["unit"], 16))
+            add_text(slide, cx + 0.22, card_y + 0.52, cw - 0.44, 0.58, [vparts],
+                     anchor=MSO_ANCHOR.MIDDLE)
+            if m.get("note"):
+                add_text(slide, cx + 0.22, card_y + 1.08, cw - 0.44, 0.24,
+                         [[(m["note"], TS["kpi_sub"], 400, C["ink_faint"])]])
+        return
+    if variant in ("split_evidence", "editorial_split") and recap:
+        lx, lw = grid(0, 7)
+        rx, rw = grid(8, 4)
+        s_pt = TS["statement"] if _ja_len(stmt) <= 60 else max(30, TS["statement"] - 6)
+        lines = _text_lines(stmt, lw, s_pt)
+        # Split-evidence closers use a large editorial statement; mixed JP/ASCII numerals
+        # often wrap one line earlier in the rendered font than the simple JA estimate.
+        text_h = (lines + 0.35) * (s_pt / 72.0) * 1.52 * 1.15 + 0.16
+        attr_h = 0.40 if spec.get("attribution") else 0.0
+        group_h = 0.36 + text_h + attr_h
+        rail_h = min(h - 0.30, max(2.75, 0.55 + len(recap) * 0.72 + 0.28))
+        gy = y0 + max(0.0, (h - max(group_h, rail_h)) * 0.45)
+        add_rect(slide, lx, gy, 0.82, 0.055, C["primary"])
+        add_text(slide, lx, gy + 0.32, lw, text_h, [[(stmt, s_pt, 700, C["ink"])]],
+                 line_spacing=1.34, align=PP_ALIGN.LEFT)
+        if spec.get("attribution"):
+            add_text(slide, lx, gy + 0.32 + text_h + 0.10, lw, 0.32,
+                     [[(spec["attribution"], TS["body_small"], 400, C["ink_faint"])]])
+        ry = gy
+        add_rect(slide, rx, ry, rw, rail_h, C["surface_tint"], radius_pt=LAY["card"]["radius_pt"])
+        add_text(slide, rx + 0.25, ry + 0.24, rw - 0.5, 0.30,
+                 [[(spec.get("recap_heading", "結論を支える指標"), TS["section_heading"], 700, C["primary_deep"])]],
+                 wrap=False)
+        cy = ry + 0.72
+        any_focal = any(m.get("focal") for m in recap)
+        for i, m in enumerate(recap):
+            if i > 0:
+                add_line(slide, rx + 0.25, cy - 0.10, rx + rw - 0.25, cy - 0.10, C["rule"], 0.75)
+            label_w = rw * 0.34
+            add_text(slide, rx + 0.25, cy, label_w, 0.36,
+                     [[(m.get("label", ""), TS["body"], 600, C["ink_subtle"])]],
+                     anchor=MSO_ANCHOR.MIDDLE)
+            vcolor = C["primary_deep"] if (m.get("focal") or not any_focal) else C["ink"]
+            vparts = [(str(m.get("value", "")), 34, 700, vcolor)]
+            if m.get("unit"):
+                vparts.append(_unit_part(m["unit"], 16))
+            value_x = rx + 0.25 + label_w + 0.10
+            add_text(slide, value_x, cy - 0.08, rx + rw - 0.25 - value_x, 0.64, [vparts],
+                     align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE, wrap=False)
+            cy += 0.72
+        return
+
+    x, w = grid(1, 10)
+    eff_w = w * 0.94  # 中央揃えの実効幅
+    s_pt = TS["statement"] if _ja_len(stmt) <= 60 else max(30, TS["statement"] - 6)
+    stmt_lines = _statement_lines(stmt, eff_w, s_pt)  # 、で節分割し末尾の孤立行を防ぐ
+    # 節が実効幅を超えて折返す間はフォントを1ptずつ縮小(28pt下限)。節自体が長すぎて
+    # 28ptでも1行に収まらない場合は validate_spec が短縮を警告する(縮小より短文化が原則)。
+    while s_pt > 28 and any(_text_lines(ln, eff_w, s_pt) > 1 for ln in stmt_lines):
+        s_pt -= 1
+        stmt_lines = _statement_lines(stmt, eff_w, s_pt)
+    lines = sum(max(1, _text_lines(ln, eff_w, s_pt)) for ln in stmt_lines)  # 実効幅で行数見積
+    text_h = lines * (s_pt / 72.0) * 1.5 * 1.15 + 0.06  # 1.15 = 和文行ボックス補正
+    rule_h = 0.30
+    attr_h = 0.44 if spec.get("attribution") else 0.0
+    recap_h = 1.37 if recap else 0.0
+    group_h = rule_h + text_h + attr_h + recap_h
+    gy = y0 + max(0.0, (h - group_h) * 0.45)
+    add_rect(slide, x + w / 2 - 0.35, gy, 0.7, 0.05, C["primary"])
+    ty = gy + rule_h
+    add_text(slide, x, ty, w, text_h, [[("\n".join(stmt_lines), s_pt, 600, C["ink"])]],
+             line_spacing=1.5, align=PP_ALIGN.CENTER)
+    ay = ty + text_h + 0.14
+    if spec.get("attribution"):
+        add_text(slide, x, ay, w, 0.3, [[(spec["attribution"], 13, 400, C["ink_faint"])]],
+                 align=PP_ALIGN.CENTER)
+        ay += attr_h
+    if recap:
+        ry = ay + 0.30
+        n = len(recap)
+        rw_total = min(w, 3.1 * n)
+        rx0 = x + (w - rw_total) / 2
+        rw = rw_total / n
+        for i, m in enumerate(recap):
+            rx = rx0 + i * rw
+            if i > 0:
+                add_line(slide, rx, ry + 0.04, rx, ry + 0.92, C["rule"], 0.75)
+            add_text(slide, rx, ry, rw, 0.28, [[(m.get("label", ""), 14, 600, C["ink_faint"])]],
+                     align=PP_ALIGN.CENTER)
+            # 主役は1つに絞る: focal だけ primary_deep、残りは ink(本文色)で支える(Qwen)
+            any_focal = any(mm.get("focal") for mm in recap)
+            vcolor = C["primary_deep"] if (m.get("focal") or not any_focal) else C["ink"]
+            vparts = [(str(m.get("value", "")), 34, 700, vcolor)]
+            if m.get("unit"):
+                vparts.append(_unit_part(m["unit"], 17))
+            add_text(slide, rx, ry + 0.36, rw, 0.55, [vparts], align=PP_ALIGN.CENTER)
 
 
 
 
 def _unit_part(unit: str, size: float, weight: int = 600):
     pad = "" if unit in ("%", "pt", "x", "倍") else " "
-    return (pad + unit, size, weight, C["ink_subtle"])
+    return (pad + unit, max(size, TS["kpi_sub"]), weight, C["ink_subtle"])
 
 
 def _metric_pair(slide, x, y, w, m, value_size=24):
     """label (small) / big value + small unit / colored delta — exemplar big-number grammar."""
-    add_text(slide, x, y, w, 0.22, [[(m.get("label", ""), 11.5, 600, C["ink_subtle"])]])
+    add_text(slide, x, y, w, 0.26, [[(m.get("label", ""), TS["kpi_label"], 600, C["ink_subtle"])]])
     vparts = [(str(m.get("value", "")), value_size, 700, C["primary_deep"])]
     if m.get("unit"):
         vparts.append(_unit_part(m["unit"], value_size * 0.45))
-    add_text(slide, x, y + 0.24, w, value_size / 60, [vparts])
-    dy = y + 0.24 + value_size / 60
+    add_text(slide, x, y + 0.26, w, value_size / 60, [vparts])
+    dy = y + 0.26 + value_size / 60 + VALUE_DELTA_GAP_IN
     if m.get("delta"):
-        add_text(slide, x, dy, w, 0.2,
-                 [[(m["delta"], 11, 600, _delta_color(m.get("delta_dir"), m.get("positive_is_good", True)))]])
-        dy += 0.2
+        add_text(slide, x, dy, w, 0.26,
+                 [[(m["delta"], TS["kpi_sub"], 600, _delta_color(m.get("delta_dir"), m.get("positive_is_good", True)))]])
+        dy += 0.26
     return dy
 
 
 def p_financial_highlights(slide, spec, deck):
-    """Exemplar archetype: dot-labelled groups, bold claim, big-number metric pairs."""
+    """Earnings highlight board: hero KPIs up top, supporting metrics in an evidence strip."""
     groups = spec.get("groups", [])
     y0, h = body_region(spec)
-    n = max(1, len(groups))
-    gut = 0.5
-    gw = (CONTENT_W - gut * (n - 1)) / n
-    est_h = 0.30
+    x, w = grid(0, 12)
+    hero_items = []
+    support_items = []
+    notes = []
     for g in groups:
-        gh = 0.30
-        if g.get("claim"):
-            gh += 0.34 * (1 if _ja_len(g["claim"]) <= gw / 0.24 else 2) + 0.12
         metrics = g.get("metrics", [])
-        mcols = 2 if len(metrics) >= 2 else 1
-        for row in range(math.ceil(len(metrics) / mcols)):
-            vsize = 30 if row == 0 else 24
-            gh += 0.24 + vsize / 60 + 0.2 + 0.28
+        if not metrics:
+            continue
+        hero = next((m for m in metrics if m.get("hero") or m.get("focal")), metrics[0])
+        hero_items.append((g, hero))
+        for m in metrics:
+            if m is not hero:
+                support_items.append((g, m))
         if g.get("note"):
-            gh += 0.08 + _text_lines(g["note"], gw - 0.2, TS["body_small"]) * 0.24
-        est_h = max(est_h, gh)
-    y_shift = max(0.0, (h - 0.1 - est_h) * 0.44)
-    for gi, g in enumerate(groups):
-        gx = MX + gi * (gw + gut)
-        gy = y0 + 0.1 + y_shift
-        add_rect(slide, gx, gy + 0.03, 0.09, 0.09, C["primary"])
-        add_text(slide, gx + 0.18, gy - 0.03, gw - 0.2, 0.24, [[(g.get("label", ""), 12.5, 600, C["ink"])]])
-        gy += 0.30
+            notes.append(g["note"])
+    if not hero_items and not support_items:
+        return
+
+    gap = LAY["gutter_in"]
+    hero_h = min(2.48, max(2.28, h * 0.44))
+    support_h = min(1.66, max(1.50, h * 0.30)) if support_items else 0.0
+    support_heading_h = 0.34 if support_items else 0.0
+    note_h = 0.26 if notes else 0.0
+    group_h = hero_h + (0.40 + support_heading_h + 0.16 + support_h if support_items else 0) + note_h
+    y = y0 + max(0.03, (h - group_h) * 0.42)
+
+    hero_n = min(3, len(hero_items))
+    hero_w = (w - gap * (hero_n - 1)) / hero_n
+    any_focal = any(m.get("focal") for _, m in hero_items[:hero_n])
+    for i, (g, m) in enumerate(hero_items[:hero_n]):
+        hx = x + i * (hero_w + gap)
+        focal = m.get("focal") or (i == 0 and not any_focal)
+        fill = C["primary_pale"] if focal else C["surface_tint"]
+        add_rect(slide, hx, y, hero_w, hero_h, fill, radius_pt=LAY["card"]["radius_pt"])
+        add_rect(slide, hx + 0.24, y + 0.22, 0.10, 0.10, C["primary"])
+        add_text(slide, hx + 0.40, y + 0.15, hero_w - 0.64, 0.30,
+                 [[(g.get("label", ""), TS["kpi_label"], 700, C["ink"])]])
         if g.get("claim"):
-            add_text(slide, gx, gy, gw, 0.62,
-                     [[(g["claim"], 17, 700, C["ink"])]], line_spacing=1.2)
-            claim_lines = 1 if _ja_len(g["claim"]) <= gw / 0.24 else 2
-            gy += 0.34 * claim_lines + 0.12
-        metrics = g.get("metrics", [])
-        mcols = 2 if len(metrics) >= 2 else 1
-        mw = (gw - 0.3 * (mcols - 1)) / mcols
-        row_y = [gy] * mcols
-        for mi, m in enumerate(metrics):
-            col = mi % mcols
-            hero = m.get("hero", mi == 0)
-            row_y[col] = _metric_pair(slide, gx + col * (mw + 0.3), row_y[col], mw, m,
-                                      value_size=30 if hero else 24) + 0.28
-        gy = max(row_y)
-        if g.get("note"):
-            add_line(slide, gx, gy, gx + gw - 0.2, gy, C["rule"], 0.5)
-            add_text(slide, gx, gy + 0.08, gw - 0.2, 0.5,
-                     [[(g["note"], TS["body_small"], 400, C["ink_subtle"])]], line_spacing=1.2)
-        if gi < n - 1:
-            add_line(slide, gx + gw + gut / 2, y0 + 0.10 + y_shift, gx + gw + gut / 2,
-                     y0 + 0.10 + y_shift + est_h, C["rule"], 0.75)
+            add_text(slide, hx + 0.24, y + 0.54, hero_w - 0.48, 0.48,
+                     [[(g["claim"], TS["section_heading"], 700, C["ink"])]], line_spacing=1.13)
+        vcolor = C["primary_deep"] if focal else C["ink"]
+        vparts = [(str(m.get("value", "")), TS["kpi_value_hero"], 700, vcolor)]
+        if m.get("unit"):
+            vparts.append(_unit_part(m["unit"], 17))
+        value_y = y + 1.02
+        value_h = 0.74
+        add_text(slide, hx + 0.24, value_y, hero_w - 0.48, value_h, [vparts],
+                 anchor=MSO_ANCHOR.MIDDLE, wrap=False)
+        metric_line = m.get("label", "")
+        if m.get("delta"):
+            metric_line = f"{metric_line}  {m['delta']}"
+        metric_y = value_y + value_h + VALUE_DELTA_GAP_IN
+        add_text(slide, hx + 0.24, metric_y, hero_w - 0.48, 0.28,
+                 [[(metric_line, TS["body"], 700, _delta_color(m.get("delta_dir"), m.get("positive_is_good", True)))]],
+                 wrap=False)
+
+    if support_items:
+        sy = y + hero_h + 0.40
+        add_text(slide, x, sy, w, support_heading_h,
+                 [[(spec.get("support_heading", "補助指標"), TS["section_heading"], 700, C["primary_deep"])]])
+        add_line(slide, x, sy + support_heading_h + 0.04, x + w, sy + support_heading_h + 0.04, C["rule"], 0.75)
+        card_y = sy + support_heading_h + 0.16
+        n = min(4, len(support_items))
+        cw = (w - gap * (n - 1)) / n
+        for i, (g, m) in enumerate(support_items[:n]):
+            cx = x + i * (cw + gap)
+            add_rect(slide, cx, card_y, cw, support_h, C["canvas"], line=C["rule"],
+                     radius_pt=LAY["card"]["radius_pt"])
+            add_text(slide, cx + 0.18, card_y + 0.16, cw - 0.36, 0.25,
+                     [[(m.get("label", ""), TS["kpi_label"], 600, C["ink_subtle"])]], wrap=False)
+            vparts = [(str(m.get("value", "")), 34, 700, C["primary_deep"])]
+            if m.get("unit"):
+                vparts.append(_unit_part(m["unit"], 15))
+            value_y = card_y + 0.47
+            value_h = 0.50
+            add_text(slide, cx + 0.18, value_y, cw - 0.36, value_h, [vparts],
+                     anchor=MSO_ANCHOR.MIDDLE, wrap=False)
+            if m.get("delta"):
+                delta_y = value_y + value_h + VALUE_DELTA_GAP_IN
+                add_text(slide, cx + 0.18, delta_y, cw - 0.36, 0.28,
+                         [[(m["delta"], TS["kpi_sub"], 700, _delta_color(m.get("delta_dir"), m.get("positive_is_good", True)))]],
+                         wrap=False)
+        if len(support_items) > n:
+            more = " / ".join(f"{m.get('label','')}: {m.get('value','')}{m.get('unit','')}" for _, m in support_items[n:])
+            add_text(slide, x, card_y + support_h + 0.08, w, 0.22,
+                     [[(more, TS["body_small"], 400, C["ink_faint"])]], wrap=False)
+
+    if notes:
+        add_text(slide, x, y + group_h - note_h + 0.04, w, note_h,
+                 [[(" / ".join(notes), TS["body_small"], 400, C["ink_subtle"])]], wrap=False)
 
 
 def p_metrics_rows(slide, spec, deck):
@@ -1209,15 +1555,15 @@ def p_metrics_rows(slide, spec, deck):
     gw = (CONTENT_W - gut * (n - 1)) / n
     max_rows = max((len(g.get("rows", [])) for g in columns), default=1)
     has_heading = any(g.get("heading") for g in columns)
-    row_h_all = min(0.7, (h - 0.13 - (0.36 if has_heading else 0.0)) / max(1, max_rows))
+    row_h_all = min(0.95, (h - 0.13 - (0.36 if has_heading else 0.0)) / max(1, max_rows))
     block_h = (0.36 if has_heading else 0.0) + max_rows * row_h_all
     y_shift = max(0.0, (h - 0.08 - block_h) * 0.44)
     for gi, g in enumerate(columns):
         gx = MX + gi * (gw + gut)
         gy = y0 + 0.08 + y_shift
         if g.get("heading"):
-            add_text(slide, gx, gy, gw, 0.26, [[(g["heading"], 13.5, 600, C["ink"])]], align=PP_ALIGN.CENTER)
-            gy += 0.36
+            add_text(slide, gx, gy, gw, 0.30, [[(g["heading"], TS["body"], 600, C["ink"])]], align=PP_ALIGN.CENTER)
+            gy += 0.38
         rows = g.get("rows", [])
         row_h = row_h_all
         for r in rows:
@@ -1225,15 +1571,15 @@ def p_metrics_rows(slide, spec, deck):
             if emph:
                 add_rect(slide, gx - 0.08, gy + 0.02, gw + 0.16, row_h - 0.06, C["primary_pale"], radius_pt=4)
             add_text(slide, gx, gy, gw * 0.34, row_h,
-                     [[(r.get("label", ""), 11.5, 600, C["ink"] if emph else C["ink_subtle"])]], anchor=MSO_ANCHOR.MIDDLE, line_spacing=1.05)
-            vparts = [(str(r.get("value", "")), 19, 700, C["primary_deep"] if emph else C["ink"])]
+                     [[(r.get("label", ""), TS["kpi_label"], 600, C["ink"] if emph else C["ink_subtle"])]], anchor=MSO_ANCHOR.MIDDLE, line_spacing=1.05)
+            vparts = [(str(r.get("value", "")), 25, 700, C["primary_deep"] if emph else C["ink"])]
             if r.get("unit"):
-                vparts.append(_unit_part(r["unit"], 11, 400))
+                vparts.append(_unit_part(r["unit"], TS["kpi_sub"], 400))
             add_text(slide, gx + gw * 0.34, gy, gw * 0.38, row_h, [vparts],
                      align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE, wrap=False)
             if r.get("delta"):
                 add_text(slide, gx + gw * 0.76, gy, gw * 0.24, row_h,
-                         [[(r["delta"], 11.5, 600, _delta_color(r.get("delta_dir", "up"), r.get("positive_is_good", True)))]],
+                         [[(r["delta"], TS["kpi_sub"], 600, _delta_color(r.get("delta_dir", "up"), r.get("positive_is_good", True)))]],
                          align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE, wrap=False)
             add_line(slide, gx, gy + row_h - 0.02, gx + gw, gy + row_h - 0.02, C["rule"], 0.5)
             gy += row_h
@@ -1248,9 +1594,11 @@ def p_driver_decomposition(slide, spec, deck):
     gut = 0.18
     cw = (CONTENT_W - op_w * (n - 1) - gut * 2 * (n - 1)) / n
     has_delta = any(f.get("delta") for f in factors)
-    note_lines = max((_text_lines(f.get("note", ""), cw - 0.3, 10.5) for f in factors), default=0)
-    card_h = min(h - 0.75, max(1.7, 0.26 + 0.30 + 0.62 + (0.30 if has_delta else 0.0)
-                               + (0.10 + note_lines * 0.20 if note_lines else 0.0) + 0.24))
+    factor_note_pt = TS["kpi_sub"]
+    note_line_h = (factor_note_pt / 72.0) * 1.22 * 1.13
+    note_lines = max((_text_lines(f.get("note", ""), cw - 0.3, factor_note_pt) for f in factors), default=0)
+    card_h = min(h - 0.75, max(1.7, 0.30 + 0.34 + 0.66 + (0.46 if has_delta else 0.0)
+                               + (0.12 + note_lines * note_line_h if note_lines else 0.0) + 0.26))
     cy = y0 + 0.15 + max(0.0, (h - 0.55 - card_h) * 0.44)
     ops = spec.get("operators") or (["×"] * (n - 2) + ["="] if n >= 2 else [])
     for i, f in enumerate(factors):
@@ -1258,20 +1606,20 @@ def p_driver_decomposition(slide, spec, deck):
         emphasized = f.get("focal", i == n - 1)
         add_rect(slide, x, cy, cw, card_h, C["primary_pale"] if emphasized else None,
                  line=None if emphasized else C["rule"], line_w_pt=1.0, radius_pt=8)
-        add_text(slide, x + 0.15, cy + 0.24, cw - 0.3, 0.26,
-                 [[(f.get("label", ""), 12, 600, C["ink_subtle"])]], align=PP_ALIGN.CENTER)
+        add_text(slide, x + 0.15, cy + 0.22, cw - 0.3, 0.32,
+                 [[(f.get("label", ""), TS["kpi_label"], 600, C["ink_subtle"])]], align=PP_ALIGN.CENTER)
         vparts = [(str(f.get("value", "")), 34, 700, C["primary_deep"])]
         if f.get("unit"):
-            vparts.append(_unit_part(f["unit"], 14))
+            vparts.append(_unit_part(f["unit"], 15))
         vy = cy + 0.58
         add_text(slide, x + 0.15, vy, cw - 0.3, 0.55, [vparts], align=PP_ALIGN.CENTER)
         if f.get("delta"):
-            add_text(slide, x + 0.15, vy + 0.60, cw - 0.3, 0.24,
-                     [[(f["delta"], 12, 600, _delta_color(f.get("delta_dir", "up"), f.get("positive_is_good", True)))]],
+            add_text(slide, x + 0.15, vy + 0.55 + VALUE_DELTA_GAP_IN, cw - 0.3, 0.30,
+                     [[(f["delta"], TS["kpi_sub"], 600, _delta_color(f.get("delta_dir", "up"), f.get("positive_is_good", True)))]],
                      align=PP_ALIGN.CENTER)
         if f.get("note"):
-            add_text(slide, x + 0.15, cy + card_h - 0.14 - note_lines * 0.20, cw - 0.3, note_lines * 0.20 + 0.06,
-                     [[(f["note"], 10.5, 400, C["ink_faint"])]], align=PP_ALIGN.CENTER, line_spacing=1.15)
+            add_text(slide, x + 0.15, cy + card_h - 0.16 - note_lines * note_line_h, cw - 0.3, note_lines * note_line_h + 0.08,
+                     [[(f["note"], factor_note_pt, 400, C["ink_faint"])]], align=PP_ALIGN.CENTER, line_spacing=1.18)
         if i < n - 1:
             add_text(slide, x + cw + gut, cy, op_w, card_h,
                      [[(ops[i] if i < len(ops) else "×", 26, 600, C["ink_subtle"])]],
@@ -1287,24 +1635,98 @@ def p_driver_decomposition(slide, spec, deck):
         caption = " ".join(parts)
     if caption:
         add_text(slide, MX, cy + card_h + 0.22, CONTENT_W, 0.26,
-                 [[(caption, 12, 400, C["ink_faint"])]], align=PP_ALIGN.CENTER)
+                 [[(caption, TS["body_small"], 400, C["ink_faint"])]], align=PP_ALIGN.CENTER)
 
 
 
 
 def p_guidance_progress(slide, spec, deck):
-    """Yearly bars where the current year shows actual fill + dashed empty box up to
-    the guidance range, with a side stack of progress facts. bars:
-    [{label, value, display}] ... past years; current: {label, actual, actual_display,
-    guidance_low, guidance_high, range_display}; side: [{label, value}]"""
+    """Guidance progress. With comparable bars, draw a comparison chart; without them,
+    draw a current-position gauge so the engine never forces a single vertical bar."""
     bars = spec.get("bars", [])
     cur = spec.get("current", {})
     y0, h = body_region(spec)
     x, w = grid(0, 8)
     sx, sw = grid(8, 4)
+    # guidance_progress is a proof-field + facts-rail composition. A normal grid gutter is
+    # too tight for two different roles, so add a section gap while preserving the 8+4 role map.
+    section_gap_extra = 0.16
+    w -= section_gap_extra
+    sx += section_gap_extra
+    sw -= section_gap_extra
     chart_h = h - 0.75
     base_y = y0 + 0.30
     g_high = float(cur.get("guidance_high", cur.get("guidance_low", 0)) or 0)
+    actual = float(cur.get("actual", 0))
+
+    def add_guidance_side(y: float, side_h: float) -> None:
+        side = spec.get("side", [])
+        if not side:
+            return
+        sy = y + 0.04
+        add_text(slide, sx, sy, sw, 0.32, [[(spec.get("side_heading", "進捗"), TS["section_heading"], 600, C["primary_deep"])]])
+        add_line(slide, sx, sy + 0.34, sx + sw, sy + 0.34, C["rule"], 0.75)
+        sy += 0.52
+        step = min(0.68, max(0.54, (side_h - 0.62) / max(1, len(side))))
+        for it in side:
+            add_text(slide, sx, sy, sw * 0.55, 0.44, [[(it.get("label", ""), TS["kpi_label"], 600, C["ink_subtle"])]],
+                     anchor=MSO_ANCHOR.MIDDLE)
+            add_text(slide, sx + sw * 0.55, sy, sw * 0.45, 0.44,
+                     [[(str(it.get("value", "")), 20, 700, C["ink"])]], align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE, wrap=False)
+            sy += step
+
+    if not bars:
+        panel_h = min(h - 0.35, max(3.35, h * 0.72))
+        py = y0 + max(0.05, (h - panel_h) * 0.42)
+        add_rect(slide, x, py, w, panel_h, C["surface_tint"], radius_pt=LAY["card"]["radius_pt"])
+        heading = spec.get("progress_heading") or (cur.get("label", "進捗") + " 現在地")
+        add_text(slide, x + 0.34, py + 0.28, w - 0.68, 0.34,
+                 [[(heading, TS["section_heading"], 700, C["primary_deep"])]],
+                 wrap=False)
+        progress = actual / g_high if g_high else 0.0
+        progress = max(0.0, progress)
+        progress_clamped = min(1.0, progress)
+        pct_label = cur.get("progress_display") or f"{progress * 100:.0f}%"
+        pct_pt = 58 if _ja_len(pct_label) <= 4 else 48
+        add_text(slide, x + 0.34, py + 0.86, w * 0.42, 0.88,
+                 [[(pct_label, pct_pt, 700, C["primary_deep"])]],
+                 anchor=MSO_ANCHOR.MIDDLE, wrap=False)
+        supporting = cur.get("actual_display", "")
+        if supporting:
+            add_text(slide, x + 0.38, py + 1.70, w * 0.46, 0.30,
+                     [[(supporting, TS["body"], 700, C["ink"])]], wrap=False)
+        range_text = cur.get("range_display", "")
+        if range_text:
+            add_text(slide, x + w * 0.58, py + 1.02, w * 0.34, 0.34,
+                     [[(range_text, TS["section_heading"], 700, C["ink"])]],
+                     align=PP_ALIGN.RIGHT, wrap=False)
+            add_text(slide, x + w * 0.58, py + 1.42, w * 0.34, 0.26,
+                     [[("目標レンジ", TS["body_small"], 400, C["ink_subtle"])]],
+                     align=PP_ALIGN.RIGHT, wrap=False)
+        rail_x = x + 0.38
+        rail_y = py + 2.42
+        rail_w = w - 0.76
+        rail_h = 0.34
+        add_rect(slide, rail_x, rail_y, rail_w, rail_h, C["canvas"],
+                 line=C["rule"], radius_pt=6)
+        if progress_clamped > 0:
+            add_rect(slide, rail_x, rail_y, rail_w * progress_clamped, rail_h,
+                     C["primary"], radius_pt=6)
+        if progress_clamped < 0.98:
+            rem_x = rail_x + rail_w * progress_clamped
+            add_rect(slide, rem_x, rail_y, rail_w * (1 - progress_clamped), rail_h, None,
+                     line=C["primary_deep"], line_w_pt=1.0, dash="dash", radius_pt=6)
+        add_text(slide, rail_x, rail_y + 0.42, rail_w * 0.25, 0.24,
+                 [[("0%", TS["chart_axis"], 400, C["ink_subtle"])]], wrap=False)
+        add_text(slide, rail_x + rail_w * 0.75, rail_y + 0.42, rail_w * 0.25, 0.24,
+                 [[("100%", TS["chart_axis"], 600, C["ink"])]], align=PP_ALIGN.RIGHT, wrap=False)
+        if progress_clamped > 0.06:
+            marker_x = rail_x + rail_w * progress_clamped
+            add_line(slide, marker_x, rail_y - 0.06, marker_x, rail_y + rail_h + 0.06,
+                     C["primary_deep"], 1.0)
+        add_guidance_side(py, panel_h)
+        return
+
     vals = [float(b.get("value", 0)) for b in bars] + [g_high]
     top = max(vals) * 1.18 if vals and max(vals) > 0 else 1.0
     n = len(bars) + 1
@@ -1320,7 +1742,6 @@ def p_guidance_progress(slide, spec, deck):
                  [[(b.get("display", f"{v:,.0f}"), TS["chart_label"], 400, C["ink_subtle"])]], align=PP_ALIGN.CENTER, wrap=False)
         add_text(slide, x + i * slot, base_y + chart_h + 0.08, slot, 0.3,
                  [[(b.get("label", ""), TS["chart_axis"], 400, C["ink_subtle"])]], align=PP_ALIGN.CENTER)
-    actual = float(cur.get("actual", 0))
     bx = x + len(bars) * slot + (slot - bar_w) / 2
     a_h = chart_h * actual / top
     g_h = chart_h * g_high / top
@@ -1331,31 +1752,22 @@ def p_guidance_progress(slide, spec, deck):
         add_rect(slide, bx, base_y + chart_h - g_h, bar_w, g_h - a_h, None,
                  line=C["primary_deep"], line_w_pt=1.25, dash="dash")
     if cur.get("range_display"):
-        add_text(slide, bx - slot * 0.35, base_y + chart_h - g_h - 0.30, bar_w + slot * 0.7, 0.24,
+        range_x = max(x, bx - slot * 0.35)
+        range_w = min(bar_w + slot * 0.7, x + w - range_x)
+        add_text(slide, range_x, base_y + chart_h - g_h - 0.30, range_w, 0.24,
                  [[(cur["range_display"], TS["chart_label"], 700, C["ink"])]], align=PP_ALIGN.CENTER, wrap=False)
     g_low = float(cur.get("guidance_low", 0) or 0)
     if g_low and g_low != g_high:
         low_h = chart_h * g_low / top
         add_line(slide, bx, base_y + chart_h - low_h, bx + bar_w, base_y + chart_h - low_h, C["primary_deep"], 0.75)
-        add_text(slide, bx + bar_w + 0.08, base_y + chart_h - g_h - 0.05, 1.2, 0.2,
-                 [[("上限 " + f"{g_high:,.0f}".rstrip("0").rstrip("."), 10.5, 600, C["ink_subtle"])]], wrap=False)
-        add_text(slide, bx + bar_w + 0.08, base_y + chart_h - low_h + 0.04, 1.2, 0.2,
-                 [[("下限 " + f"{g_low:,.0f}".rstrip("0").rstrip("."), 10.5, 600, C["ink_subtle"])]], wrap=False)
+        add_text(slide, bx + bar_w + 0.08, base_y + chart_h - g_h - 0.07, 1.3, 0.26,
+                 [[("上限 " + f"{g_high:,.0f}".rstrip("0").rstrip("."), TS["kpi_sub"], 600, C["ink_subtle"])]], wrap=False)
+        add_text(slide, bx + bar_w + 0.08, base_y + chart_h - low_h + 0.04, 1.3, 0.26,
+                 [[("下限 " + f"{g_low:,.0f}".rstrip("0").rstrip("."), TS["kpi_sub"], 600, C["ink_subtle"])]], wrap=False)
     add_text(slide, x + len(bars) * slot, base_y + chart_h + 0.08, slot, 0.3,
              [[(cur.get("label", ""), TS["chart_axis"], 600, C["ink"])]], align=PP_ALIGN.CENTER)
     add_unit_note(slide, x, y0 - 0.02, spec.get("unit"))
-    side = spec.get("side", [])
-    if side:
-        sy = base_y + 0.2
-        add_text(slide, sx, sy, sw, 0.28, [[(spec.get("side_heading", "進捗"), 14, 600, C["primary_deep"])]])
-        add_line(slide, sx, sy + 0.32, sx + sw, sy + 0.32, C["rule"], 0.75)
-        sy += 0.5
-        for it in side:
-            add_text(slide, sx, sy, sw * 0.55, 0.4, [[(it.get("label", ""), 12, 600, C["ink_subtle"])]],
-                     anchor=MSO_ANCHOR.MIDDLE)
-            add_text(slide, sx + sw * 0.55, sy, sw * 0.45, 0.4,
-                     [[(str(it.get("value", "")), 16, 700, C["ink"])]], align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE, wrap=False)
-            sy += 0.48
+    add_guidance_side(base_y + 0.2, chart_h)
 
 
 PATTERNS = {
@@ -1383,8 +1795,24 @@ PATTERNS = {
 NO_CHROME = {"cover", "section_divider"}
 
 
+def _strip_visible_periods(obj):
+    """スライド表示テキストは体言止め・句点なしで組む。文末の 。/． を安全網として
+    取り除く(speaker_notes は口頭原稿なので対象外)。"""
+    if isinstance(obj, dict):
+        return {k: (v if k == "speaker_notes" else _strip_visible_periods(v))
+                for k, v in obj.items()}
+    if isinstance(obj, list):
+        return [_strip_visible_periods(v) for v in obj]
+    if isinstance(obj, str):
+        s = obj.rstrip()
+        while s[-1:] in ("。", "．"):
+            s = s[:-1].rstrip()
+        return s
+    return obj
+
+
 def build(spec_path: Path, out_path: Path) -> Path:
-    deck = json.loads(spec_path.read_text())
+    deck = _strip_visible_periods(json.loads(spec_path.read_text()))
     prs = Presentation()
     prs.slide_width, prs.slide_height = SLIDE_W, SLIDE_H
     blank = prs.slide_layouts[6]

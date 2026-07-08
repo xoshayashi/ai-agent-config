@@ -1,72 +1,78 @@
 {
-  "$comment": "Rubric for banker-grade slide quality. Defect-deduction scoring: each category starts at full points; judges deduct per concrete observed defect (minor=-1, major=-3, critical=-5 within the category, floor 0). Total = sum of categories (max 100). Judge of record: Claude Code Advisor consulted with the rendered PNGs in context (SKILL.md §5); codex/gemini CLI via eval_deck.py as fallback. Every reported defect must be re-verified against the actual render before fixing (judges hallucinate).",
+  "$comment": "Rubric for banker-grade slide quality with controlled modern freshness. Base grammar is investment-bank / strategy-consulting: action title, one claim, aligned evidence, source discipline, consistent title/source placement, and a clear grid/flex contract. Freshness is rewarded only when it improves composition, hierarchy, density, and impact without weakening auditability. Defect-deduction scoring: each category starts at full points; deduct for concrete observed defects (minor=-1, major=-3, critical=-5 within the category, floor 0). Total = max 100. Judge of record is an independent reviewer in the other CLI's non-interactive mode, run on rendered PNGs via eval_deck.py (Claude Code host -> --judge codex; Codex host -> --judge claude), iterating to >=95. Every reported defect must be re-verified against the actual render before fixing.",
   "categories": [
     {
       "id": "story",
-      "name": "ストーリー構造・メッセージ",
+      "name": "Story Structure And Message",
       "max_points": 20,
       "criteria": [
-        "コンテンツスライドのタイトルが主張文(アクションタイトル)であり、タイトルだけ通読して一本の論理になっている。表紙・目次・章扉・締めの引用スライドは構造スライドであり本チェックの対象外",
-        "タイトルの主張を同じスライドの図表・数値が直接証明している(図表が示せない期間・数値をタイトルが語っていない)",
-        "1スライド1メッセージ。競合するメッセージや二重の主役がない",
-        "数値がタイトル・本文・図表・他スライド間で矛盾しない",
-        "聴衆の意思決定に必要な論点を過不足なくカバーしている(聴衆に関係の薄い網羅・自己紹介的スライドで注意を浪費しない)"
+        "Content-slide titles are action titles that state conclusions, and the title read-through forms one coherent argument. Cover, agenda, section dividers, and quote-only close slides are structural exceptions.",
+        "The same slide's chart, table, value, diagram, or evidence directly proves the title.",
+        "Each slide has one message and one protagonist; no competing focal object or second claim.",
+        "Numbers are consistent across title, body, chart, table, source, and other slides.",
+        "The deck covers the decision-critical issues for the audience without generic completeness or self-introduction pages."
       ]
     },
     {
       "id": "layout",
-      "name": "レイアウト・密度",
+      "name": "Layout And Density",
       "max_points": 20,
       "criteria": [
-        "テキストのはみ出し・見切れ・要素の重なりがない",
-        "余白バランス: 不自然な大きい空白や過密がない。カードの器と中身のサイズが釣り合う",
-        "ブロック間に十分な水平・垂直セパレーション(0.3in相当以上)がある",
-        "1スライドの主要ブロックは原則3つ以内(仕様上の上限: プロセスのステップ5つ・KPIカード4枚/行(最大8)・比較表の列4つ・ロードマップのフェーズ4つは許容)。整列(左端・上端・等幅・等高)が守られている"
+        "No overflow, clipping, overlap, or broken render artifacts.",
+        "Whitespace is balanced: no accidental large empty zones and no cramped clusters.",
+        "The investment-bank / strategy-consulting base is visible: stable header, clear evidence field, comparable rows/columns, and disciplined source area.",
+        "Modern freshness comes from scale contrast, asymmetry, proof rails, dense but readable fields, and composition rather than decorative effects.",
+        "The grid/flex contract is visible in the render: role map, column spans, alignment spine, body bands, edge locks, and consistent gaps.",
+        "Major body blocks are generally three or fewer unless the primitive explicitly supports structured multiples."
       ]
     },
     {
       "id": "typography",
-      "name": "タイポグラフィ",
+      "name": "Typography",
       "max_points": 15,
       "criteria": [
-        "階層が明確: タイトル > 見出し > 本文 > 脚注。同格に見える競合がない",
-        "スライド間でサイズ・ウェイトの体系が一貫している",
-        "本文が読める大きさで、詰め込みのための縮小がない",
-        "日本語組版が正しい: 行頭に句読点・閉じ括弧が来ない、英数字は半角、不自然な折返しがない"
+        "Hierarchy is clear: title > heading > body/proof > metric subline > source.",
+        "Type size and weight are consistent across comparable slides.",
+        "Important body evidence is readable from the back row; only footer/source text may be small.",
+        "Japanese typesetting is clean: no awkward wrapping, full-width alphanumeric drift, or line-initial punctuation.",
+        "YoY, delta, vs plan, and prior-year text sit on a separate metric subline with visible air from the value line."
       ]
     },
     {
       "id": "color",
-      "name": "カラー・デザイン規律",
+      "name": "Color And Design Discipline",
       "max_points": 15,
       "criteria": [
-        "ブランド色(深緑系)+濃淡+グレーの配給制が守られ、色数が氾濫していない",
-        "黄色アクセントは1スライド1箇所以下で、面積が小さい",
-        "時系列チャートで最新・結論の期のみ濃色、過去はグレー/淡色の強調規律",
-        "装飾(影・グラデ・ネオン・純黒)がない"
+        "Act palette usage is disciplined: deep green/teal base, controlled tints, gray support, and no uncontrolled color spread.",
+        "Yellow accent appears no more than once per slide and only for a true protagonist mark.",
+        "Time-series emphasis is consistent: latest/conclusion period is strongest, prior periods recede.",
+        "Color meaning remains stable across the deck.",
+        "No gradients, shadows, neon, pure black, or decorative effects are used to manufacture impact."
       ]
     },
     {
       "id": "chart",
-      "name": "チャート・エビデンス craft",
+      "name": "Chart And Evidence Craft",
       "max_points": 20,
       "criteria": [
-        "チャートは軸レス+全プロット直接データラベル(または軸が必要な合理性がある)",
-        "単位表記(億円等)がチャート左上にあり、桁・小数・符号(+/△)の書式がデッキ内で統一",
-        "結論を支える1点(行・バー・象限)が3秒で分かる強調になっている",
-        "実績と予想・計画が塗りで描き分けられている(予想がソリッド塗りで実績を装っていない)",
-        "表は罫線が軽く、強調列/行が結論と対応している"
+        "Charts are minimal, direct-labeled when practical, and use axes only when needed.",
+        "Bar/column charts provide comparison across periods, scenarios, segments, plans, peers, or prior year; no lone current-value bar.",
+        "Units, signs, decimals, denominators, and labels are consistent.",
+        "The one point supporting the conclusion is visible within three seconds.",
+        "Actuals, forecasts, plans, targets, and assumptions are visually distinguishable.",
+        "Tables use light rules, readable row heights, and a highlighted row/column that corresponds to the title."
       ]
     },
     {
       "id": "evidence",
-      "name": "出典・脚注規律",
+      "name": "Source And Footnote Discipline",
       "max_points": 10,
       "criteria": [
-        "エビデンススライドに Source があり、実在しうる出典として書かれている(プレースホルダーがない)",
-        "内部仮定は Assumption として Source と分離されている",
-        "スライド上の数値に出所の見当がつかないものがない(見た目の完成度と根拠の充足は別採点 — きれいだが数字が浮いているスライドを見逃さない)",
-        "ページ番号が裸数字で右下にある"
+        "Evidence slides include real-looking sources; no placeholders or impossible citations.",
+        "Internal assumptions are separated from external sources.",
+        "No material number appears without provenance, period, unit, or denominator.",
+        "Source, assumption, and note remain small and restrained without interfering with the main proof.",
+        "Future-looking claims include assumption or caveat language rather than promise-like certainty."
       ]
     }
   ],

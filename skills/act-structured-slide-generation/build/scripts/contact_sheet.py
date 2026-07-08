@@ -33,7 +33,7 @@ BG = _token_rgb("surface", (0xEC, 0xE9, 0xE1))
 INK = _token_rgb("ink", (0x2D, 0x33, 0x2E))
 
 
-HEADER_FRAC = 0.22  # kicker + accent bar + 2-line title + subtitle の下端(1.63in/7.5in)を含む帯
+HEADER_FRAC = 0.22  # kicker + 2-line title + subtitle の下端を含む帯
 
 
 def header_strip(ims: list, out: Path) -> None:

@@ -1,169 +1,134 @@
-# デザイン原則
+# Design Principles
 
-国内外の上場テック企業の決算説明・投資家向け資料十数社分と、営業資料設計のベスト
-プラクティスをマルチモーダル分析と目視でクロスチェックし、個別企業の意匠を汎用の
-構成原理に一般化した実装原則。deck.json を書くときの判断はこの文書に従う。
-[実装済] はエンジン(build_deck.py / tokens.json)に焼き込み済みで、spec 側の配慮が不要なもの。
+The Act structured deck style is a banker-grade base with modern editorial impact. The base
+is investment-bank / strategy-consulting: action title, one claim, tight proof hierarchy,
+auditable sources, and disciplined comparison. Freshness comes second and must be earned
+through composition, object scale, asymmetry, and density control.
 
-## タイポグラフィとホワイトスペースのバランス
+## Typography And Whitespace
 
-- **タイプスケールは tokens.json が単一情報源**(タイトル 25pt / サブタイトル 15pt / 本文
-  12.5pt / 脚注 8pt / KPI 34pt / ステートメント 28pt)。spec や個別スライドでサイズを
-  上書きしない。読者の最遠距離(会議室のスクリーン)で本文が読めることが下限を決める。
-- **ヘッダーは計算で固定**: 左縦アクセントバーはタイトルのキャップトップから最終行
-  (subtitle があれば subtitle)の下端までを正確にスパンする。バーとテキスト塊の高さが
-  ずれるのはエンジンの欠陥として直す(スライド側で調整しない)。
-- **図形内のテキストは中央揃え**: シェブロン・バッジ・カードヘッダー等、器に入る短いラベルは
-  水平・垂直とも中央に置き、矢羽は右の矢先分を除いた内側で中央を取る。
-- **カードの中身は上に張り付けない**: 中身が器より小さいときは垂直中央寄せ(または計測した
-  実高さで器を縮める)。「上 1/3 に文字、下 2/3 が空白」は最頻出の失敗パターン。
-- **空白は意図的に**: 余ったから空くのではなく、ブロック間ギャップ(0.16-0.5in)と
-  マージンで設計する。文字量が少ないスライドは文字を大きく(ステートメント・KPI)、
-  多いスライドは分割する。縮小で埋め合わせない。
+- Use the type scale from `tokens.json`; do not shrink body evidence to fit a weak layout.
+- Important body text, table values, chart labels, process outcomes, and metric deltas must
+  be readable from the back row.
+- Footer/source text may be small because it is provenance, not the page's argument.
+- Increase impact by enlarging the focal object and tightening structure, not by adding
+  decoration.
+- Keep enough line spacing for multi-line Japanese text. A value and its YoY / delta line are
+  two hierarchy levels; the delta must have a deliberate metric-subline gap.
+- Avoid over-large closing-slide text when it creates a left-heavy imbalance. Closing slides
+  need scale contrast, but the body must remain composed.
 
-## キャンバスとタイトル
+## Canvas And Header
 
-1. **キャンバス**: 白背景、左右マージン=0.5in(幅の約 3.75%)、ヘッダー 18% / コンテンツ 72% /
-   フッター 10%。[実装済]
-2. **タイトル 2 階層**: 主張文アクションタイトル(25-33 字で 1 行に収める — tokens.json の
-   action_title_max_chars_ja が単一情報源、結論の数値を必ず 1 つ含む)+
-   名詞型の subtitle(図表の中立説明: 対象・指標・単位・期間の 3 要素を含める —
-   「国内SaaS市場規模の推移(2024-2030年)」)。**タイトルに数字が 1 つも無いスライドは疑う**。
-2b. **3 層サメーション**: タイトル = 見出し(takeaways/points の heading)の総和、
-   見出し = その本文・データの総和。どの層にも属さない要素はスライドから消す。
-   タイトルの数値は図表の中で目視で見つけられること。
-2c. **タイトルに「と」「および」で 2 つの主張を繋がない** — 繋ぎたくなったらスライドを分割する。
-3. **キッカー行**: タイトルの上に小さな問い(「なぜ今参入すべきか?」)を置き、アクション
-   タイトルをその答えにできる。読者の頭に質問を先に立てる技法。乱用せずデッキ内 2-3 枚まで。
-3b. **ヘッダー統一契約**(IBCS UNIFY / MBB 流の核心 — 「意味が同じものは同じ位置・同じ
-   見た目」): ヘッダーの位置・サイズ・スタイルはデッキ内で不変とする。
-   - タイトルは常に左上・常に同サイズ(25pt)。**収まらないときにサイズを縮めない** —
-     縮小(AutoFit)は「同じ要素が枚ごとに違って見える」統一感破壊の最大要因。短文化か分割で解く。
-   - 行数は全コンテンツスライドで揃える(1 行推奨)。混在は本文開始位置とバー高を揺らす。
-   - タイトルの様式(主張文)・文体・時制はデッキ内で統一する。主張文と体言止めラベルを
-     混ぜない(様式は片方に固定)。
-   - subtitle はスコープ行(対象・指標・期間)であり第 2 の主張を書かない。コンテンツ
-     スライドで有無を揃える。IR・データスライドでは title+subtitle で対象/指標/期間が
-     特定できること(IBCS UN 2.2)。
-   - アクセントバー・キッカーは純粋なトークン(位置・太さ・色は固定)。deck.json 側から
-     動かせないのは仕様であり制約ではない。
-   - 検証: validate_spec が行数・subtitle 混在を警告し、レンダー後は `render/header-strip.png`
-     (全ヘッダー帯の縦積み)で揺れを一望確認する。
+- The header is a navigation contract, not a decorative template.
+- The title states the conclusion. The subtitle scopes period, segment, audience, or metric.
+- Do not add a kicker line above the title.
+- Keep title line count and subtitle use consistent enough that the deck feels controlled.
+- The body starts after the header with a consistent content top. If a two-line title changes
+  body position, review the header strip.
+- Do not render page numbers.
 
-## チャートとエビデンス
+## Color
 
-4. **チャートは軸レス**: Y 軸・グリッド線を消し X 軸ベースライン 1 本。全プロットに直接
-   データラベル。単位はチャート左上に小さく「(億円)」。[実装済: value_labels 時の既定]
-5. **最新期ハイライト**: 時系列は過去期をグレー/淡色、最新・結論の期だけブランド濃色。
-   [実装済: focal_category]。予想値は categories 名に「E」「計画」を付けて区別。
-5b. **実績・予想のシナリオ描き分け**(IBCS の中核規律): 実績=ソリッド塗り、予想・計画=
-   淡色塗り+枠線(chart.forecast_from)、ガイダンス=破線の空箱(guidance_progress)。
-   「意味が同じものは同じ見た目、違うものは違う見た目」— 予想をソリッドで塗ると実績を
-   装ったことになる。[実装済: forecast_from / guidance_progress]
-5c. **軸の規律**: 棒・柱の値軸をゼロ以外から始めない(差の誇張)。同一スライドで同じ単位の
-   図表は同じスケールに揃える。時間は横軸(column/line)、構造比較は縦軸(bar)。
-6. **トレンド注釈は 1 チャート 1 デバイス**: 結論を担う時系列スライドでは、成長矢印と
-   YoY バッジで「方向」を一目で伝える(chart.annotation)。YoY と QoQ の同時注釈はしない。
-   デッキ内 1-2 枚の主役チャートに限る。
-7. **ガイダンス・目標値は常にレンジ表記**(132〜136億円)で、実績と予想の描き分け
-   (予想=破線・淡色・「E」表記)を徹底する。CAGR を掲げるときは対象期間を必ず添える
-   (「2年でCAGR +40%」)。
-8. **増減表記**: 必ず符号付き(+23.2% / △1,898)、率の変化は「pt」。マイナスは赤の面積を
-   増やさず △ 表記で処理する(waterfall の負バーのみ Danger 色可)。
-8b. **赤・緑は増減の意味にのみ配給**: 良い変化=緑、悪い変化=赤を「符号でなく意味」で判定
-   する(コスト増は数値がプラスでも赤)。増減以外の用途に赤緑を使わない。
-   [実装済: delta_dir + positive_is_good]
-9. **ビッグナンバー文法**: 数値:単位:比較 = サイズ比 3:1:1、ベースライン揃え、内訳は
-   1 段小さく下へ。[実装済: kpi_dashboard / financial_highlights / metrics_rows]
-10. **KPI はドライバーで語る**: 結果指標は可能な限り「数 × 単価 = 結果」の因数分解で見せ、
-   成長の質(数量成長か値上げか)を示す(driver_decomposition)。
+- Use the Act palette from `tokens.json`. Avoid pure black, neon colors, gradients, shadows,
+  and excessive fills.
+- Use deep green / teal as the serious base. Use yellow accent sparingly and only for a true
+  protagonist mark.
+- In time-series charts, the latest or conclusion period may be darkest; historical periods
+  recede.
+- Color meaning must remain stable across the deck. Do not use the same accent for unrelated
+  meanings.
+- Modern freshness must come from layout and hierarchy, not color noise.
 
-## 構造スライドの視覚重量(statement / section_divider / process_flow)
+## Charts And Evidence
 
-S1. **statement はヒーロースケール**: 28pt(60 字超は 24pt)・行送り 1.5。ルール(0.125in)は
-    テキスト実高だけをブラケットし、本文+出典を 1 グループとして光学中心(残余の 45%)に
-    置く。[実装済] 固定枠に 20pt で流し込むと「小さな塊が余白に浮く」— スケール不足は
-    装飾でなくサイズで直す(BrightCarbon: ヒーロー本文は 28pt が下限、48pt を目標)。
-S2. **章扉は数字が主役**: 96pt 数字(タイトル比 3:1 以上)+右 surface_tint 面パネル+
-    章ナビ。ナビは現在章をスポットライト(700・ink、番号 primary)、他章は ink_faint。
-    左ブロックは光学中心(50%−0.25in)。[実装済] スケールコントラストがないと扉は
-    「白場に浮く 2 行見出し」になる(IR デザイン会社の扉 4 パターンの共通項)。
-S3. **process は彩度を到達点に配給**: 途中ステップ= primary_pale + primary_deep 文字、
-    終端ステップのみソリッド primary。矢羽は全ステップ・全パターン共通で左辺フラットの
-    ホームベース形(左に窪んだ CHEVRON は使わない — 窪みは「前工程から食い込まれる」形で
-    ノイズになる)。帯が本文領域の 60% 未満ならカードを伸ばして埋め、中身はカード内で
-    垂直中央。[実装済] カード項目は 3 個以内(validate_spec が警告)。
-S4. **光学中心**: 単独ブロックの垂直中央は幾何中心でなく 45%(複数ソースの標準値)。
-    まばらなスライドは「上に張り付く」か「沈む」かのどちらかに必ずズレる — 残余×0.45 の
-    配分で置く。[実装済: statement / process_flow / section_divider]
-S5. **フィルルールと中抜けの禁止**: 本文ブロックは本文領域の約6割以上を占める。足りない
-    ときは装飾でなくスケールで埋める(カードを伸ばす・1行KPIはヒーロー数値 44pt)。
-    ブロック間だけでなく**ブロック内の余白も設計**し、中身はカード内で垂直中央に置く。
-    本文と直下の結論バンドの間に大きな空白を残さない — 余白は「情報の関係を伝える設計」
-    であり、関係のある要素を分断する空白はノイズ(lint_render が中抜け32%超を検出)。
-    [実装済: kpi_dashboard / process_flow]
+- Charts must support the title directly. If the chart cannot prove the title, rewrite one of
+  them.
+- Prefer direct data labels and minimal axes. Keep units visible.
+- Bars and columns require comparison: time, segment, scenario, plan, prior year, or peer.
+  A single current bar is not a chart; use a hero number, gauge, range card, or table row.
+- Actual, forecast, plan, and target values must be distinguishable without relying on a
+  long legend.
+- Do not place YoY and QoQ callouts together unless the story truly needs both; usually one
+  comparison is the protagonist.
+- Tables are accountability tools. Highlight the row or column that proves the title and keep
+  gridlines light.
+- Guidance and target ranges need a denominator and progress context, not a lone bar.
 
-## 密度と構成
+## Structural Slides
 
-11. **密度予算**: 1 スライド 1 メッセージ。チャート/カード/ブロックは 3 つが上限、
-    本文 300 字以内(脚注除く)。超えたら分割。カードは 3 枚まで(KPI カードのみ 1 行
-    4 枚・最大 2 行 8 枚可、プロセスのステップは 5 つまで — deck-spec の上限と同義)。
-12. **結論バンド**: スライドの so-what を本文の下に一文で言い切る場合は、淡ブランド色・
-    中央揃えのバンドを使う(insight_style: "primary")。非自明な判断・条件の付記は淡黄の
-    insight(既定)。どちらも「図表の繰り返し」になるなら置かない。
-13. **Before/After 対比**: 悪い例=灰+×、良い例=ブランド色+○ の左右対比で意思決定を
-    誘導する(two_column の mark)。
-14. **ステップの帰結**: プロセスの各カード下部に「このステップで何が得られるか」を
-    ▼ 付きの一行で書くと、手順が目的とつながる(process_flow の outcome)。
+### Section Dividers
 
-## 規律
+Use a strong but quiet reset. A divider should signal the next chapter, not fill space. Scale
+contrast matters: chapter number or section label may be large, but the page must still hint
+at the next proof arc.
 
-15. **脚注規律**: 独自 KPI(ARR、調整後営業利益等)は初出スライドの note/source で定義式
-    レベルまで書く。ページ番号は裸数字を右下。[実装済: フッター]
-16. **色の配給制**: ブランド色(Primary 系)+濃淡+グレーが基本。Accent 黄は 1 枚 1 箇所・
-    面積 1% 未満の感覚で。面積比の目安: 白 80% / ブランド 15% / グレー 4% / アクセント <1%。
+### Process Flow
 
-## 決算・報告デッキの定石構成
+Steps must share a disciplined silhouette. Outcome labels after arrows should be large enough
+to read as design objects and centered in their target area when that improves balance.
 
-ハイライト(financial_highlights)→ 数値サマリ(metrics_rows)→ 主役 KPI の時系列
-(chart_insight + annotation)→ ドライバー分解(driver_decomposition)→ 損益・財務
-(financial_summary)→ 戦略(executive_summary / two_column / roadmap)→ ガイダンス進捗
-(guidance_progress)→ 締めの statement。
+### Statement / Closing
 
-- ハイライトページは「主要 KPI / 財務 / トピック」の 2-3 ブロックに数字 1-3 個ずつ。文章を書かない。
-- ガイダンス進捗は進捗率%だけでなく**過年度同期の進捗率を並記**する(季節性の文脈が
-  ないと 48% の良し悪しが判定できない)。guidance_progress の side 列に入れる。
-- 利益・売上の前年差はウォーターフォールで要因分解するのが定石(差異分析型)。
+Statement slides are flexible. Decide the closing role:
 
-## 提案・戦略デッキの定石構成
+- closing thesis
+- decision request
+- next actions
+- proof recap
+- legal/disclaimer close
+- quote from a named person
 
-cover → agenda → executive_summary → 市場(chart_insight / market_sizing)→ 競争
-(competitive_landscape / comparison_table)→ 打ち手(two_column / process_flow / roadmap)
-→ 財務(financial_summary / waterfall)→ statement。
+Do not default to oversized left text plus company/date metadata. Omit company/date unless it
+is legally or operationally required. A close should feel like the deck's final move, not a
+fixed end-card.
 
-- executive_summary は SCR 配分で書く: 状況(共有済みの文脈)1 点 / 変化(なぜ今か)1 点 /
-  提案と根拠に残り全部。points の heading だけ拾い読みして結論が伝わること。
+## Density And Composition
 
-## 自動生成スライドが陥りがちな欠陥(自己レビューで必ず探す)
+- Avoid both underfilled pages and overstuffed pages. Dense does not mean cramped; it means
+  the evidence field is full, aligned, and legible.
+- If a page has too much whitespace, first enlarge the focal object, row heights, proof field,
+  or interpretation rail. Do not add decorative objects.
+- If a page is cramped, reduce claims, move supporting detail to notes/appendix, or split the
+  slide. Do not shrink the typography below the token scale.
+- Use whitespace by role: section separation, focal authority, quiet reset, or legal buffer.
+  Unexplained whitespace is a defect.
+- Repetition is useful only when the reader needs comparison. Repeating a fixed layout for
+  unrelated claims makes the deck look generated.
 
-- タイトルの主張を図表が証明できていない(例: FY33 の話をするのに表が FY31 まで)—
-  **タイトルは exhibit が示せる範囲でしか言わない**。
-- Y 軸目盛とデータラベルの二重表示(冗長)。
-- ブロック間の水平余白不足、カードの器に対して中身が少なすぎる縦余白。
-- パネル見出し(Key takeaways 等)がアイテム見出しと同格に見える階層の潰れ。
-- 投資判断デッキで回収軌道(J カーブ)の可視化がない — 財務ストーリーでは waterfall や
-  line チャートで回収軌道を 1 枚立てることを検討する。
-- 複数スライド間での数値・単位・期間表記の不一致。
+## Evidence And Source Discipline
 
-## 発展(未実装、必要になったら builder に追加)
+- Every evidence slide needs a source or a clear reason why the data is internal.
+- Separate source, assumption, and note. Do not bury assumptions inside source text.
+- Future-looking claims require assumption language and, when possible, sensitivity or range.
+- Bad news must use the same grammar as good news: show cause, action, and recovery path.
+- Do not use placeholder sources or generic internal labels unless the work itself produced
+  the analysis.
 
-- **図解(ダイアグラム)パターンの拡充** — ファネル・サイクル・ベン図・ツリー等の定型図解
-  カタログ。矢印が密な自由図解は AI スライドの最弱クラスで、2026 年時点の上位スキルは
-  20-30 種の図解テンプレを持つ。エンジンのシェイプ合成で定型から順に足す(画像生成への
-  逃げは編集可能性を失うため最終手段)。
-- **ブランド抽出モード** — クライアントの既存 PPTX/PDF からパレット・フォント・ロゴ配置を
-  抽出して tokens.json の別テーマとして書き出す(Act 以外のブランドで納品するとき)。
-- 目標←ドライバー←施策←実績の多段ロジックツリー(統合報告で有効)
-- バランスシートのブロック比較図、ガイダンスレンジ棒と実績の並置
-- 直角ステップ矢印 YoY(前年同期バー頂点→当期バー頂点を破線エルボーで結ぶ)、
-  チャート上の時系列イベント注釈
+## Common Proof Arcs
+
+### Earnings / IR
+
+Typical arc: opening summary -> quarter highlights -> KPI trend -> revenue / profit bridge
+-> driver decomposition -> guidance progress -> strategy update -> risks or assumptions ->
+closing thesis. Challenge this sequence when the audience question requires a different arc.
+
+### Proposal / Strategy
+
+Typical arc: decision context -> market or problem -> customer/economic proof -> competitive
+position -> strategy options -> operating model -> financial impact -> risks -> decision
+request. Replace generic self-introduction slides with proof that changes the reader's mind.
+
+## Defects To Hunt
+
+- title and evidence mismatch
+- a main object too small for the claim
+- cards used as a default rather than an evidence structure
+- YoY / delta text cramped against the value
+- single-bar chart with no comparison
+- fixed or left-heavy closing page
+- grid/flex contract visible in notes but violated in render
+- large empty zones around small objects
+- excessive source/footer prominence
+- decoration used to create impact
+
