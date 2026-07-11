@@ -67,6 +67,8 @@ def _statement_lines(stmt: str, width_in: float, size_pt: float) -> list[str]:
     clauses = [c + "、" for c in raw[:-1]] + ([raw[-1]] if raw[-1] else [])
     if len(clauses) < 2:
         return [stmt]
+    # 床値 8.0 は意図的に _text_lines の 4.0 と異なる: ステートメント箱は常に広く、
+    # 節パッキングの下限を狭くすると1節1行の退化分割になるため(極端入力のみ差が出る)
     cap = max(8.0, width_in / (size_pt / 72.0))
     lines: list[str] = []
     cur = ""
@@ -1083,6 +1085,7 @@ def add_act_table(slide, x, y, w, h, tspec: dict):
         k = h / total
         hdr_h_in *= k
         body_heights = [bh * k for bh in body_heights]
+        total = h  # スケール後の実寸。旧 total のままだとフレームだけ縦に溢れフッターへ食い込む
     g = slide.shapes.add_table(nrows, ncols, Inches(x), Inches(y), Inches(w), Inches(total))
     table = g.table
     table.first_row = False
@@ -1751,6 +1754,10 @@ def p_financial_highlights(slide, spec, deck):
     y = y0 + max(0.03, (h - group_h) * 0.42)
 
     hero_n = min(3, len(hero_items))
+    # ヒーローカードは3枚まで。4グループ目以降の主指標は黙って落とさず、補助指標
+    # ストリップの先頭へ回す(グループ丸ごとの欠落を防ぐ)。validate_spec も groups > 3 を警告
+    if len(hero_items) > hero_n:
+        support_items = list(hero_items[hero_n:]) + support_items
     hero_w = (w - gap * (hero_n - 1)) / hero_n
     any_focal = any(m.get("focal") for _, m in hero_items[:hero_n])
     for i, (g, m) in enumerate(hero_items[:hero_n]):

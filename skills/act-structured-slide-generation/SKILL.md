@@ -99,27 +99,11 @@ emphasis knobs (`emphasis_col`, `focal_category`, `segment_labels`, `annotation.
 load-bearing object the renderer cannot draw.
 
 For each content slide, record the judgment fields in WORKING NOTES (outline.md or a
-blueprints file) — never inside `speaker_notes`:
-
-- reader question
-- single takeaway
-- focal object
-- evidence strategy
-- composition move
-- render route
-- density control
-- grid role map
-- column span plan
-- alignment spine
-- body band plan
-- edge lock
-- flex main axis
-- cross-axis alignment
-- gap scale
-- grow/shrink/wrap behavior
-- fill repair
-- failure mode
-- repair instruction
+blueprints file) — never inside `speaker_notes`. The CANONICAL field list lives in
+`references/slide-judgment-system.md` (22 numbered fields plus annotation_policy,
+rhythm_role, fill_repair, failure_mode, repair_instruction); `slide-decision-engine.md`
+§3 defines the per-slide minimum vocabulary that maps into it. Do not maintain a third
+list here — when in doubt, follow slide-judgment-system.md.
 
 Write Japanese slide text in noun-ending / headline style with no sentence-final full stop.
 The title must state the conclusion, not the topic. Source, assumption, and note fields stay

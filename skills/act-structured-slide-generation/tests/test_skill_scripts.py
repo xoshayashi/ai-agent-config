@@ -1133,3 +1133,89 @@ def test_image_annotations_layer_renders(tmp_path):
     aid1 = A.asset_id(deck["slides"][0]["chart"], (8.6, 4.7))
     aid2 = A.asset_id(deck["slides"][0]["chart"], (8.6, 4.7))
     assert aid1 == aid2 and len(aid1) == 16
+
+
+# ---- review follow-ups (PR #127): direct coverage for the robustness mechanisms ----
+
+def _import_build_deck():
+    sys.path.insert(0, str(SCRIPTS))
+    import importlib
+    import build_deck
+    return importlib.reload(build_deck)
+
+
+def test_statement_lines_packs_clauses_without_orphan_tail():
+    bd = _import_build_deck()
+    stmt = "中堅企業向けSaaSは今後3年が参入の最終ウィンドウ、経理領域からの段階参入とM&A活用で、5年でARR68億円の事業構築を提言"
+    lines = bd._statement_lines(stmt, 8.0, 31)
+    # 内容が保存され(節の欠落なし)、複数行に分割される
+    assert "".join(lines) == stmt
+    assert len(lines) >= 2
+    # 各行は節境界(、)で終わるか最終行 — 語中改行の孤立行を作らない
+    for ln in lines[:-1]:
+        assert ln.endswith("、")
+    # 尾行が1-2文字の孤立にならない
+    assert bd._ja_len(lines[-1]) > 2
+
+
+def test_statement_lines_single_clause_passthrough():
+    bd = _import_build_deck()
+    single = "読点を含まない一文のステートメントはそのまま"
+    assert bd._statement_lines(single, 8.0, 31) == [single]
+    multiline = "一行目\n二行目"
+    assert bd._statement_lines(multiline, 8.0, 31) == ["一行目", "二行目"]
+
+
+def test_validate_warns_on_long_statement_clause(tmp_path):
+    # 節が22字超の中央ヒーロー文 → 警告(読点あり/なしで文言が変わる)
+    with_comma = {"slides": [{"pattern": "statement", "title": "結論",
+                              "statement": "この読点つき文はとても長い節をひとつだけ含んでおり折返し警告の対象になる、短い節"}]}
+    no_comma = {"slides": [{"pattern": "statement", "title": "結論",
+                            "statement": "読点を全く含まない非常に長い一文のステートメントは節折返しが効かない旨を警告される"}]}
+    for deck, needle in ((with_comma, "節が長い"), (no_comma, "読点のない一文")):
+        f = tmp_path / "d.json"
+        f.write_text(json.dumps(deck, ensure_ascii=False))
+        r = run("validate_spec.py", f)
+        assert needle in r.stdout, r.stdout
+
+
+def test_financial_highlights_overflow_hero_reaches_support(tmp_path):
+    # 4グループ目の主指標は落とさず補助ストリップへ回る
+    groups = [{"label": f"G{i}", "metrics": [{"label": f"主指標{i}", "value": f"{i}00", "unit": "億円", "hero": True}]}
+              for i in range(1, 5)]
+    deck = {"slides": [{"pattern": "financial_highlights", "title": "4グループの主要指標は補助帯まで含め全件表示",
+                        "groups": groups}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "out.pptx"
+    r = run("build_deck.py", f, "-o", out)
+    assert r.returncode == 0, r.stderr
+    from pptx import Presentation
+    texts = []
+    for shape in Presentation(str(out)).slides[0].shapes:
+        if shape.has_text_frame:
+            texts.append(shape.text_frame.text)
+    joined = "\n".join(texts)
+    assert "主指標4" in joined, joined
+    # validate は groups > 3 を警告する
+    rv = run("validate_spec.py", f)
+    assert "groups" in rv.stdout and "3" in rv.stdout
+
+
+def test_oversized_table_frame_stays_inside_slide(tmp_path):
+    # 行数過多で縮小スケールが走っても、テーブルのフレーム自体がスライド外へ溢れない
+    rows = [[f"項目{i}", "あ" * 38, "い" * 30] for i in range(16)]
+    deck = {"slides": [{"pattern": "comparison_table", "title": "16行の過大テーブルでも枠はスライド内に収まることを確認",
+                        "table": {"headers": ["項目", "内容", "備考"], "rows": rows}}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "out.pptx"
+    r = run("build_deck.py", f, "-o", out)
+    assert r.returncode == 0, r.stderr
+    from pptx import Presentation
+    from pptx.util import Emu
+    prs = Presentation(str(out))
+    frames = [s for s in prs.slides[0].shapes if s.has_table]
+    assert frames
+    for fr in frames:
+        assert fr.top + fr.height <= Emu(int(7.5 * 914400)) + Emu(1)

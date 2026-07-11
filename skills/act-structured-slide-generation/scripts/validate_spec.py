@@ -152,10 +152,15 @@ def main() -> int:
             _variant = s.get("variant", s.get("layout", "center_hero"))
             _center_hero = not (s.get("recap") and _variant in (
                 "evidence_strip", "thesis_strip", "closing_grid", "split_evidence", "editorial_split"))
+            # 節長は「、」を除いた実測。build_deck のパッカーは「、」を再結合してから測る
+            # ため約1字ずれるが、22字閾値のマージン内なので意図的に同一視しない
             _clauses = [c for c in s["statement"].split("、") if c]
             _longest = max((ja_len(c) for c in _clauses), default=ja_len(s["statement"]))
             if _center_hero and _longest > 22:
-                warns.append(f"{loc}: 締めのステートメントの節が長い(最長 {_longest:.0f}字) — 中央ヒーロー文は節ごとに折返すため、各節を22字以内・全体を60字前後に短縮すると尾行の孤立が消える")
+                if "、" in s["statement"]:
+                    warns.append(f"{loc}: 締めのステートメントの節が長い(最長 {_longest:.0f}字) — 中央ヒーロー文は節ごとに折返すため、各節を22字以内・全体を60字前後に短縮すると尾行の孤立が消える")
+                else:
+                    warns.append(f"{loc}: 締めのステートメントが読点のない一文({_longest:.0f}字) — 節折返しが効かず語中で改行される。「、」で節に区切るか60字前後に短縮する")
 
         if pat not in STRUCTURAL and title:
             # action title should be a sentence (predicate), not a topic label
@@ -166,6 +171,10 @@ def main() -> int:
             # competitive_landscape / diagram は関係・構造の定性主張が正当なため数字必須から除外
             if pat in EVIDENCE_PATTERNS and pat not in ("competitive_landscape", "diagram") and not any(ch.isdigit() for ch in title):
                 warns.append(f"{loc}: エビデンススライドのタイトルに数字がない — 図表が証明する結論の数値を1つ入れる")
+
+        if pat == "financial_highlights" and len(s.get("groups", [])) > 3:
+            warns.append(f"{loc}: financial_highlights の groups が {len(s['groups'])} 件 — ヒーローカードは3枚まで。"
+                         "4件目以降の主指標は補助ストリップへ回るため、グループを3つに絞るかスライドを分割する")
 
         # speaker_notes はトークスクリプト専用。設計メタデータの混入と、読み上げに
         # 耐えない薄さを検出する(cover と構造スライドは薄くてよい)
