@@ -949,11 +949,18 @@ def p_chart_grid(slide, spec, deck):
             add_text(slide, cx, cy, cw, 0.5, [[(sub, 15, 600, C["ink"])]],
                      align=PP_ALIGN.CENTER, wrap=True)
             cy += 0.52
-        add_unit_note(slide, cx, cy, ch.get("unit"))
-        ch_y = cy + 0.22
-        ch_h = y0 + h - ch_y - 0.05
-        add_act_chart(slide, cx, ch_y, cw, ch_h, ch)
-        add_chart_annotations(slide, cx, ch_y, cw, ch_h, ch)
+        akind = _asset_kind(ch)
+        if akind:
+            # セル単位の image-kind エスカレーション(deck-spec に明記)をネイティブ経路へ
+            # 流さない — `kind` は `type` ではないため、add_act_chart に渡すと既定の
+            # column として誤描画されるかデータ形状が失われる
+            place_asset(slide, ch, cx, cy + 0.10, cw, y0 + h - (cy + 0.10) - 0.05)
+        else:
+            add_unit_note(slide, cx, cy, ch.get("unit"))
+            ch_y = cy + 0.22
+            ch_h = y0 + h - ch_y - 0.05
+            add_act_chart(slide, cx, ch_y, cw, ch_h, ch)
+            add_chart_annotations(slide, cx, ch_y, cw, ch_h, ch)
 
 
 def p_market_sizing(slide, spec, deck):
@@ -1521,6 +1528,7 @@ def p_process_flow(slide, spec, deck):
     # 主張を担うステップが途中にある場合は focal_step で指定する — タイトルの核心と
     # 強調色の位置がずれると、主張と視覚焦点の不一致になる
     focal_i = spec.get("focal_step", len(steps) - 1)
+    focal_i = min(max(int(focal_i), 0), max(0, len(steps) - 1))  # 範囲外は黙って無強調にしない
     for i, st in enumerate(steps):
         sx = x + i * sw
         head_fill = C["primary"] if i == focal_i else C["primary_pale"]
@@ -1745,6 +1753,15 @@ def p_financial_highlights(slide, spec, deck):
     if not hero_items and not support_items:
         return
 
+    # ヒーローカードは3枚まで。4グループ目以降の主指標は黙って落とさず補助指標
+    # ストリップの先頭へ回す。support_h / heading / group_h の算出より前に回すこと —
+    # 後から足すと「溢れ分で初めて support が生まれる」ケースで高さ0のストリップに
+    # 描画されレイアウトが潰れる。validate_spec も groups > 3 を警告する
+    hero_n = min(3, len(hero_items))
+    if len(hero_items) > hero_n:
+        support_items = list(hero_items[hero_n:]) + support_items
+        hero_items = hero_items[:hero_n]
+
     gap = LAY["gutter_in"]
     hero_h = min(2.48, max(2.28, h * 0.44))
     support_h = min(1.66, max(1.50, h * 0.30)) if support_items else 0.0
@@ -1753,11 +1770,6 @@ def p_financial_highlights(slide, spec, deck):
     group_h = hero_h + (0.40 + support_heading_h + 0.16 + support_h if support_items else 0) + note_h
     y = y0 + max(0.03, (h - group_h) * 0.42)
 
-    hero_n = min(3, len(hero_items))
-    # ヒーローカードは3枚まで。4グループ目以降の主指標は黙って落とさず、補助指標
-    # ストリップの先頭へ回す(グループ丸ごとの欠落を防ぐ)。validate_spec も groups > 3 を警告
-    if len(hero_items) > hero_n:
-        support_items = list(hero_items[hero_n:]) + support_items
     hero_w = (w - gap * (hero_n - 1)) / hero_n
     any_focal = any(m.get("focal") for _, m in hero_items[:hero_n])
     for i, (g, m) in enumerate(hero_items[:hero_n]):

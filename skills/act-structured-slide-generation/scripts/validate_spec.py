@@ -234,6 +234,10 @@ def main() -> int:
                 warns.append(f"{loc}: image chart '{k}' ignores native `annotation` — use `annotations:[{{target,text}}]`")
             if chart.get("annotations") and k in ("org_tree", "node_graph"):
                 warns.append(f"{loc}: `annotations` are not rendered on Graphviz '{k}' — use edge labels")
+            elif chart.get("annotations") and k not in ("combo", "waterfall") and any(
+                    isinstance(a, dict) and isinstance(a.get("target"), int) for a in chart["annotations"]):
+                warns.append(f"{loc}: image chart '{k}' は int target のアンカーを持たず黙って落ちる — "
+                             "combo/waterfall 以外は target を {'x','y'} のデータ座標で指定する")
             chart = None  # skip native-chart checks below
         if chart:
             # track trap: image `annotations` on a native chart is silently ignored
@@ -453,6 +457,11 @@ def main() -> int:
     # それ以上は「概要+ステップ別詳細スライド」に分割する)
     for i, s in enumerate(slides, start=1):
         if s.get("pattern") == "process_flow":
+            fs = s.get("focal_step")
+            n_steps = len(s.get("steps", []))
+            if fs is not None and not (isinstance(fs, int) and 0 <= fs < n_steps):
+                warns.append(f"slide {i}: focal_step={fs} が steps の範囲外(0..{n_steps - 1}) — "
+                             "レンダラーは範囲内へクランプするが、意図したステップか確認する")
             fat = [st.get("label", f"step{j+1}") for j, st in enumerate(s.get("steps", []))
                    if len(st.get("items", [])) > 3]
             if fat:

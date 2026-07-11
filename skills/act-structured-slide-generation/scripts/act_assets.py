@@ -316,7 +316,11 @@ def _diag_venn(ax, spec, palette, C):
         v = venn2(subsets=spec.get("subsets", (10, 10, 4)), set_labels=labels, ax=ax)
     else:
         v = venn3(subsets=spec.get("subsets", (10, 10, 3, 10, 3, 3, 2)), set_labels=labels, ax=ax)
-    for i, patch_id in enumerate(("10", "01", "11", "100", "010", "001")):
+    # venn2 のリージョン id と venn3 の全 id(単集合+重なり)を両方カバーする。
+    # 重なり id("110","101","011","111")を落とすとそこだけ matplotlib_venn の
+    # 既定色が残り、act_theme 一元化の契約が破れる
+    for i, patch_id in enumerate(("10", "01", "11",
+                                  "100", "010", "001", "110", "101", "011", "111")):
         try:
             p = v.get_patch_by_id(patch_id)
             if p:

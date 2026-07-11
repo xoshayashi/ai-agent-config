@@ -1197,6 +1197,8 @@ def test_financial_highlights_overflow_hero_reaches_support(tmp_path):
             texts.append(shape.text_frame.text)
     joined = "\n".join(texts)
     assert "主指標4" in joined, joined
+    # 溢れ分で support ストリップが新設されるケース: 見出しと帯が実寸で描画される
+    assert "補助指標" in joined, joined
     # validate は groups > 3 を警告する
     rv = run("validate_spec.py", f)
     assert "groups" in rv.stdout and "3" in rv.stdout
@@ -1219,3 +1221,41 @@ def test_oversized_table_frame_stays_inside_slide(tmp_path):
     assert frames
     for fr in frames:
         assert fr.top + fr.height <= Emu(int(7.5 * 914400)) + Emu(1)
+
+
+def test_chart_grid_image_cell_routes_to_asset(tmp_path):
+    # chart_grid のセル単位 image-kind エスカレーションが picture として埋め込まれる
+    pytest.importorskip("matplotlib")
+    deck = {"slides": [{"pattern": "chart_grid",
+                        "title": "2系列の小型チャート群で売上と利益率の両立を確認",
+                        "charts": [
+                            {"title": "売上", "chart": {"type": "column", "unit": "億円",
+                                                        "categories": ["FY24", "FY25"],
+                                                        "series": [{"name": "売上", "values": [10, 12]}]}},
+                            {"title": "利益率", "chart": {"kind": "combo", "categories": ["FY24", "FY25"],
+                                                          "bar": {"name": "売上", "values": [10, 12], "unit": "億円"},
+                                                          "line": {"name": "利益率", "values": [10.0, 12.5], "unit": "%"}}},
+                        ]}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "out.pptx"
+    r = run("build_deck.py", f, "-o", out)
+    assert r.returncode == 0, r.stderr
+    from pptx import Presentation
+    from pptx.enum.shapes import MSO_SHAPE_TYPE
+    shapes = list(Presentation(str(out)).slides[0].shapes)
+    assert any(s.shape_type == MSO_SHAPE_TYPE.PICTURE for s in shapes), [s.shape_type for s in shapes]
+    assert any(s.has_chart for s in shapes if hasattr(s, "has_chart"))
+
+
+def test_validate_warns_on_out_of_range_focal_step(tmp_path):
+    deck = {"slides": [{"pattern": "process_flow", "title": "3ステップの導線で登録転換までの流れを確認する",
+                        "focal_step": 9,
+                        "steps": [{"label": f"Step {i}", "items": ["項目"]} for i in range(1, 4)]}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    assert "focal_step" in r.stdout, r.stdout
+    out = tmp_path / "out.pptx"
+    rb = run("build_deck.py", f, "-o", out)
+    assert rb.returncode == 0, rb.stderr
