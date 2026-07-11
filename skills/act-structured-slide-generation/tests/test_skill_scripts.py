@@ -1259,3 +1259,22 @@ def test_validate_warns_on_out_of_range_focal_step(tmp_path):
     out = tmp_path / "out.pptx"
     rb = run("build_deck.py", f, "-o", out)
     assert rb.returncode == 0, rb.stderr
+
+
+def test_validate_covers_chart_grid_cells(tmp_path):
+    # chart_grid のセルにも本体 chart と同じ検査(黙殺アノテーション警告・型チェック)が届く
+    deck = {"slides": [{"pattern": "chart_grid",
+                        "title": "2セルの小型チャート群で検査カバレッジを確認する",
+                        "charts": [
+                            {"chart": {"kind": "radar", "categories": ["a", "b", "c"],
+                                       "series": [{"name": "s", "values": [1, 2, 3]}],
+                                       "annotations": [{"target": 0, "text": "落ちる注記"}]}},
+                            {"chart": {"type": "no_such_type", "unit": "億円", "categories": ["a"],
+                                       "series": [{"name": "s", "values": [1]}]}},
+                        ]}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    out = r.stdout
+    assert "cell 1" in out and "int target" in out, out
+    assert "cell 2" in out and "no_such_type" in out, out

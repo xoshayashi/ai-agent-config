@@ -221,66 +221,76 @@ def main() -> int:
         if accent_uses > TOKENS["color_policy"]["accent_max_uses_per_slide"]:
             errors.append(f"{loc}: Accent #{ACCENT} used {accent_uses}x — max 1 per slide (insight bar counts as the one use)")
 
-        chart = s.get("chart")
-        if chart and (chart.get("kind") in IMAGE_ASSET_KINDS or chart.get("render") == "image"):
-            # image-asset chart (combo/area/…): rendered by act_assets, not the native engine.
-            k = chart.get("kind")
-            if k == "combo" and not (chart.get("bar") and chart.get("line") and chart.get("categories")):
-                errors.append(f"{loc}: combo chart needs categories, bar, and line")
-            elif k in ("area", "line_multi") and not (chart.get("categories") and chart.get("series")):
-                errors.append(f"{loc}: {k} chart needs categories and series")
-            # track trap: native badge on an image chart is ignored — image uses `annotations`
-            if chart.get("annotation"):
-                warns.append(f"{loc}: image chart '{k}' ignores native `annotation` — use `annotations:[{{target,text}}]`")
-            if chart.get("annotations") and k in ("org_tree", "node_graph"):
-                warns.append(f"{loc}: `annotations` are not rendered on Graphviz '{k}' — use edge labels")
-            elif chart.get("annotations") and k not in ("combo", "waterfall") and any(
-                    isinstance(a, dict) and isinstance(a.get("target"), int) for a in chart["annotations"]):
-                warns.append(f"{loc}: image chart '{k}' は int target のアンカーを持たず黙って落ちる — "
-                             "combo/waterfall 以外は target を {'x','y'} のデータ座標で指定する")
-            chart = None  # skip native-chart checks below
-        if chart:
-            # track trap: image `annotations` on a native chart is silently ignored
-            if chart.get("annotations"):
-                warns.append(f"{loc}: native chart ignores `annotations` — use `annotation.badge/trend_arrow`, or set an image `kind`")
-            ctype = chart.get("type", "column")
-            if ctype not in SUPPORTED_CHART_TYPES:
-                errors.append(f"{loc}: chart type '{ctype}' は未対応 — {' / '.join(SUPPORTED_CHART_TYPES)} から選ぶ")
-            cats, series = chart.get("categories", []), chart.get("series", [])
-            if not cats or not series:
-                errors.append(f"{loc}: chart needs categories and series")
-            values_numeric = True
-            for ser in series:
-                if len(ser.get("values", [])) != len(cats):
-                    errors.append(f"{loc}: series '{ser.get('name')}' has {len(ser.get('values', []))} values for {len(cats)} categories")
-                bad = [v for v in ser.get("values", []) if isinstance(v, bool) or not isinstance(v, (int, float))]
-                if bad:
-                    values_numeric = False
-                    errors.append(f"{loc}: series '{ser.get('name')}' の values に数値でない要素: {bad[0]!r}")
-            if len(series) > 4:
-                errors.append(f"{loc}: {len(series)} series — max 4; aggregate or split the chart")
-            ff = chart.get("forecast_from")
-            if ff is not None:
-                try:
-                    ff = int(ff)
-                except (TypeError, ValueError):
-                    errors.append(f"{loc}: forecast_from は整数 index で指定する(現在: {ff!r})")
-                    ff = None
-            if ff is not None:
-                if len(series) > 1 or chart.get("type", "column") not in ("column", "bar"):
-                    warns.append(f"{loc}: forecast_from は単一系列の column/bar のみ有効 — line・複数系列では描き分けされない。categories の E 表記+注記で区別するか column に変える")
-                else:
-                    def _marked(c):
-                        cs = str(c)
-                        return cs.endswith("E") or any(m in cs for m in ("予", "計画", "見込", "見通し", "目標"))
-                    unmarked = [str(c) for c in cats[ff:] if not _marked(c)]
-                    if unmarked:
-                        warns.append(f"{loc}: forecast_from 以降のカテゴリに予想表記(E/計画/予想)がない: {', '.join(unmarked[:3])}")
-            if not chart.get("unit"):
-                warns.append(f"{loc}: chart has no 'unit' — add one (e.g. 億円, %) unless truly unitless")
-            if values_numeric and chart.get("type", "column") in ("column", "bar", "stacked_column") and any(
-                    float(v) < 0 for ser in series for v in ser.get("values", [])):
-                warns.append(f"{loc}: negative values in a {chart.get('type', 'column')} chart — LibreOffice render-QA draws them wrong (PowerPoint is fine); prefer 'line', the waterfall pattern, or keep negatives in a table")
+        # スライド本体の chart と chart_grid の各セルを同じ検査に通す。セルは image-kind の
+        # セル単位エスカレーションを持てるため、本体だけ検査すると同じ「黙って落ちる」罠が
+        # セル側に残る(annotation 系の警告・型/系列チェックとも共通)。
+        _charts = []
+        if s.get("chart"):
+            _charts.append((s["chart"], loc))
+        if pat == "chart_grid":
+            for _ci, _cell in enumerate(s.get("charts", []), start=1):
+                if isinstance(_cell, dict):
+                    _charts.append((_cell.get("chart", _cell), f"{loc} cell {_ci}"))
+        for chart, cloc in _charts:
+            if chart and (chart.get("kind") in IMAGE_ASSET_KINDS or chart.get("render") == "image"):
+                # image-asset chart (combo/area/…): rendered by act_assets, not the native engine.
+                k = chart.get("kind")
+                if k == "combo" and not (chart.get("bar") and chart.get("line") and chart.get("categories")):
+                    errors.append(f"{cloc}: combo chart needs categories, bar, and line")
+                elif k in ("area", "line_multi") and not (chart.get("categories") and chart.get("series")):
+                    errors.append(f"{cloc}: {k} chart needs categories and series")
+                # track trap: native badge on an image chart is ignored — image uses `annotations`
+                if chart.get("annotation"):
+                    warns.append(f"{cloc}: image chart '{k}' ignores native `annotation` — use `annotations:[{{target,text}}]`")
+                if chart.get("annotations") and k in ("org_tree", "node_graph"):
+                    warns.append(f"{cloc}: `annotations` are not rendered on Graphviz '{k}' — use edge labels")
+                elif chart.get("annotations") and k not in ("combo", "waterfall") and any(
+                        isinstance(a, dict) and isinstance(a.get("target"), int) for a in chart["annotations"]):
+                    warns.append(f"{cloc}: image chart '{k}' は int target のアンカーを持たず黙って落ちる — "
+                                 "combo/waterfall 以外は target を {'x','y'} のデータ座標で指定する")
+                chart = None  # skip native-chart checks below
+            if chart:
+                # track trap: image `annotations` on a native chart is silently ignored
+                if chart.get("annotations"):
+                    warns.append(f"{cloc}: native chart ignores `annotations` — use `annotation.badge/trend_arrow`, or set an image `kind`")
+                ctype = chart.get("type", "column")
+                if ctype not in SUPPORTED_CHART_TYPES:
+                    errors.append(f"{cloc}: chart type '{ctype}' は未対応 — {' / '.join(SUPPORTED_CHART_TYPES)} から選ぶ")
+                cats, series = chart.get("categories", []), chart.get("series", [])
+                if not cats or not series:
+                    errors.append(f"{cloc}: chart needs categories and series")
+                values_numeric = True
+                for ser in series:
+                    if len(ser.get("values", [])) != len(cats):
+                        errors.append(f"{cloc}: series '{ser.get('name')}' has {len(ser.get('values', []))} values for {len(cats)} categories")
+                    bad = [v for v in ser.get("values", []) if isinstance(v, bool) or not isinstance(v, (int, float))]
+                    if bad:
+                        values_numeric = False
+                        errors.append(f"{cloc}: series '{ser.get('name')}' の values に数値でない要素: {bad[0]!r}")
+                if len(series) > 4:
+                    errors.append(f"{cloc}: {len(series)} series — max 4; aggregate or split the chart")
+                ff = chart.get("forecast_from")
+                if ff is not None:
+                    try:
+                        ff = int(ff)
+                    except (TypeError, ValueError):
+                        errors.append(f"{cloc}: forecast_from は整数 index で指定する(現在: {ff!r})")
+                        ff = None
+                if ff is not None:
+                    if len(series) > 1 or chart.get("type", "column") not in ("column", "bar"):
+                        warns.append(f"{cloc}: forecast_from は単一系列の column/bar のみ有効 — line・複数系列では描き分けされない。categories の E 表記+注記で区別するか column に変える")
+                    else:
+                        def _marked(c):
+                            cs = str(c)
+                            return cs.endswith("E") or any(m in cs for m in ("予", "計画", "見込", "見通し", "目標"))
+                        unmarked = [str(c) for c in cats[ff:] if not _marked(c)]
+                        if unmarked:
+                            warns.append(f"{cloc}: forecast_from 以降のカテゴリに予想表記(E/計画/予想)がない: {', '.join(unmarked[:3])}")
+                if not chart.get("unit"):
+                    warns.append(f"{cloc}: chart has no 'unit' — add one (e.g. 億円, %) unless truly unitless")
+                if values_numeric and chart.get("type", "column") in ("column", "bar", "stacked_column") and any(
+                        float(v) < 0 for ser in series for v in ser.get("values", [])):
+                    warns.append(f"{cloc}: negative values in a {chart.get('type', 'column')} chart — LibreOffice render-QA draws them wrong (PowerPoint is fine); prefer 'line', the waterfall pattern, or keep negatives in a table")
 
         if pat == "waterfall":
             kinds = [it.get("kind", "delta") for it in s.get("items", [])]
