@@ -31,7 +31,7 @@ Use this file during self-review. These are defects to hunt, not style preferenc
 - **F18. Grid/flex breach**: notes describe structure but the render shows floating blocks,
   uneven gaps, or broken alignment.
 
-## Corpus-Derived IR Anti-Patterns
+## IR Anti-Patterns
 
 - **F19. Progress without denominator**: progress is shown without target/range/context.
 - **F20. Good-news-only grammar**: bad news is hidden or presented with a different visual

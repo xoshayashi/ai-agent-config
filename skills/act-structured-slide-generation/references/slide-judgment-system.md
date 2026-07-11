@@ -50,7 +50,7 @@ loose.
    the page.
 6. **evidence_strategy** — why this evidence type is sufficient for the claim.
 7. **composition_move** — the visual move selected from `composition-vocabulary.md` or
-   `corpus-derived-composition-atoms.md`.
+   `composition-atoms.md`.
 8. **density_control** — what stays on the page, what moves to notes or appendix, and why.
 9. **whitespace_role** — whether whitespace separates roles, gives a hero object authority,
    or creates a quiet reset; never leave dead space accidentally.

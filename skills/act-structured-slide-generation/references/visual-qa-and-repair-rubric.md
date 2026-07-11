@@ -1,6 +1,6 @@
 # Visual QA and repair rubric
 
-Purpose: corpus-derived review lens for generated slide blueprints, rendered PNGs, or PPTX.
+Purpose: review lens for generated slide blueprints, rendered PNGs, or PPTX.
 Use after `review-and-repair-rubric.md` when the deck is IR, investor, earnings, or any
 evidence-heavy decision material.
 

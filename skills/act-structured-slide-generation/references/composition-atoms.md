@@ -1,6 +1,6 @@
-# Corpus-derived composition atoms
+# Composition atoms
 
-Purpose: reusable composition atoms abstracted from the IR-slide corpus. These are not slide
+Purpose: reusable composition atoms for evidence-led IR and investor pages. These are not slide
 types. Choose and combine them from the reader question, focal object, evidence strategy,
 density, and rhythm role.
 
@@ -174,3 +174,25 @@ Before choosing an atom, answer:
 - If a slide needs chart + table + diagram + photo, split it or move one object to appendix.
 - Reuse the same atom across adjacent slides only when the reader should compare differences.
 - Freshness comes from choosing the right atom and scale, not from new colors or decoration.
+
+## Evidence-emphasis move → renderer knob map
+
+Each of these emphasis moves is expressed through a spec knob (see `deck-spec.md`). Reach for
+the knob instead of building a bespoke layout; that is what turns these atoms into output. This
+is a mapping of intent to knob, not a template.
+
+| Evidence-emphasis move | Reach for |
+|---|---|
+| Protagonist column (actual / forecast / latest) in a table (atoms 4, 5, 6) | table `emphasis_col` (or `emphasis_row`) |
+| Decline / loss carried by color as well as glyph (principle 10) | table `color_negatives` + `△` notation in cell |
+| Latest-period / turning-point bar stands out (atoms 2, 8) | chart `focal_category` |
+| Stacked total + per-segment values readable (atom 11) | chart `segment_labels` on `stacked_column` |
+| Pulled-out CAGR / multiple / net-change chip on the key bar | chart `annotation.badge` |
+| YoY chip / diagonal growth arrow on the key bar | chart `annotation.yoy` / `annotation.trend_arrow` |
+| Actual vs forecast kept visibly distinct (principle 6, 22) | chart `forecast_from` |
+| One hero KPI leads, peers recede (atoms 3, 6) | KPI `focal` |
+| Direct value labels instead of an axis | chart `value_labels` (+ `axis_less`) |
+
+If the move you need is not in this map, check the capability boundary in
+`data-and-diagram-rules.md`: it may be an object the renderer does not draw (re-express it a
+different way) rather than a missing knob.

@@ -2,4 +2,12 @@ python-pptx>=1.0
 Pillow>=10.0
 lxml>=5.0
 fonttools>=4.50
-pytest>=8.0  # dev: build/tests
+# Image-asset backend (act_assets.py): Act-styled deterministic, headless, browser-free graphics
+# embedded as pictures for objects native python-pptx cannot draw (combo/dual-axis charts,
+# relationship graphs, ring/funnel/pyramid/Venn schematics). Also needs the Graphviz CLI:
+#   macOS:  brew install graphviz
+matplotlib>=3.9
+matplotlib-venn>=1.1
+graphviz>=0.21      # Python wrapper that shells out to the `dot` CLI
+resvg_py>=0.3       # SVG rasteriser for recoloured Lucide icons (deterministic, no native deps)
+pytest>=8.0  # dev: tests

@@ -28,6 +28,14 @@ The code provides safe primitives, not a design template. The prompt and referen
 drive flexible composition. If the renderer's default shape produces a rigid or low-density
 page, change the spec, choose a different pattern, or extend the primitive.
 
+**Two rendering tracks, native first.** Every object routes to the most editable representation
+it can faithfully take (`render_route`). The native python-pptx track (text, tables, native
+charts, autoshapes) is the default and stays editable in PowerPoint. When an object genuinely
+exceeds native — a combo/dual-axis chart, an area/radar chart, an org tree, a ring/funnel/
+pyramid/Venn/matrix — it escalates to the image-asset track (matplotlib / Graphviz via
+`act_assets.py`, one shared token core via `act_theme.py`), embedded as an Act-styled picture
+with an audit sidecar. Escalate only the single hard object; keep the rest of the slide native.
+
 ## Required Workflow
 
 ### 0. Environment
@@ -46,6 +54,16 @@ If PowerPoint rendering is needed on macOS and LibreOffice is missing:
 brew install --cask libreoffice
 ```
 
+The image-asset track (combo/dual-axis charts, relationship and schematic diagrams) needs the
+Graphviz CLI in addition to the pip deps:
+
+```bash
+brew install graphviz
+```
+
+Native-only decks never import the image backend, so this is only required when a deck uses an
+image chart `kind` or the `diagram` pattern.
+
 ### 1. Requirements And Outline
 
 1. Confirm audience, desired action, talk time, page count, source files, mandatory topics,
@@ -58,28 +76,37 @@ brew install --cask libreoffice
 5. Run the outline read-through before building:
 
 ```bash
-python3 build/scripts/validate_spec.py deck.json --outline
+python3 scripts/validate_spec.py deck.json --outline
 ```
 
 ### 2. Author `deck.json`
 
 Read these references before writing or substantially repairing `deck.json`:
 
-- `build/references/slide-decision-engine.md`
-- `build/references/slide-judgment-system.md`
-- `build/references/deck-spec.md`
-- `build/references/design-principles.md`
-- `build/references/grid-and-flex-strategy.md`
-- `build/references/copy-and-title-rules.md`
-- `build/references/evidence-and-claim-rules.md`
+- `references/slide-decision-engine.md`
+- `references/slide-judgment-system.md`
+- `references/deck-spec.md`
+- `references/design-principles.md`
+- `references/grid-and-flex-strategy.md`
+- `references/copy-and-title-rules.md`
+- `references/evidence-and-claim-rules.md`
 
-For each content slide, fill the judgment fields in speaker notes or working notes:
+For IR / earnings / evidence-heavy decks, also read
+`references/composition-atoms.md` (the evidence-emphasis move→knob map) and
+the capability boundary in `references/data-and-diagram-rules.md`. Prove titles with the
+emphasis knobs (`emphasis_col`, `focal_category`, `segment_labels`, `annotation.badge`,
+`color_negatives`, `focal`) rather than inventing bespoke layout, and re-express any slide whose
+load-bearing object the renderer cannot draw.
+
+For each content slide, record the judgment fields in WORKING NOTES (outline.md or a
+blueprints file) — never inside `speaker_notes`:
 
 - reader question
 - single takeaway
 - focal object
 - evidence strategy
 - composition move
+- render route
 - density control
 - grid role map
 - column span plan
@@ -98,22 +125,41 @@ Write Japanese slide text in noun-ending / headline style with no sentence-final
 The title must state the conclusion, not the topic. Source, assumption, and note fields stay
 small in the footer area; page numbers are never rendered.
 
+### 2b. Talk Script (speaker_notes)
+
+`speaker_notes` is the presenter's spoken script and NOTHING else. Design metadata
+(judgment fields, "reader_question", "composition", "focal", rhythm labels) must never
+appear there — a presenter reads these notes verbatim while delivering. Write each
+content slide's script so it can be spoken as-is:
+
+1. Open with the slide's claim in spoken language (not a re-read of the title string).
+2. Walk the evidence in the slide's visual reading order — name the specific numbers,
+   rows, steps, or columns the audience should look at.
+3. State the implication (so-what), and speak caveats naturally: assumptions, hearsay,
+   open items ("この期間は会議時点の見込みです" 等).
+4. Bridge to the next slide.
+
+Depth target: ~150-300 Japanese characters per content slide (≈30-60 seconds of speech);
+calibrate the deck total against `meta.talk_minutes` (~300字/分). A one-line note is a
+defect on any slide except the cover. `validate_spec.py` warns on metadata leakage into
+speaker_notes and on thin scripts.
+
 ### 3. Validate, Build, Verify, Render
 
 All commands must pass before final delivery:
 
 ```bash
-python3 build/scripts/validate_spec.py deck.json
-python3 build/scripts/build_deck.py deck.json -o deck.pptx
-python3 build/scripts/verify_deck.py deck.pptx
-sh build/scripts/render_deck.sh deck.pptx render/
-python3 build/scripts/lint_render.py render/ --spec deck.json
+python3 scripts/validate_spec.py deck.json
+python3 scripts/build_deck.py deck.json -o deck.pptx
+python3 scripts/verify_deck.py deck.pptx
+sh scripts/render_deck.sh deck.pptx render/
+python3 scripts/lint_render.py render/ --spec deck.json
 ```
 
 Use `--baseline` after the first render so regression checks focus on intended changes:
 
 ```bash
-python3 build/scripts/lint_render.py render-v2/ --spec deck.json --baseline render/
+python3 scripts/lint_render.py render-v2/ --spec deck.json --baseline render/
 ```
 
 ### 4. Visual Review
@@ -142,12 +188,16 @@ missing evidence, conflicting chapters, or a title sequence that no longer reads
 ### 5. Independent Rubric Loop
 
 After self-repair, use an independent reviewer from the other CLI to score the rendered PNGs
-with `build/evals/rubric.json`. Iterate until the deck scores at least 95.
+with `evals/rubric.json`. Iterate until the deck scores at least 95.
 
 ```bash
-python3 build/scripts/eval_deck.py render/ --rubric build/evals/rubric.json --judge codex --anchor deck.json
-python3 build/scripts/eval_deck.py render/ --rubric build/evals/rubric.json --judge claude --anchor deck.json
+python3 scripts/eval_deck.py render/ --judge codex --anchor "<slide-1 title phrase>"
+python3 scripts/eval_deck.py render/ --judge claude --anchor "<slide-1 title phrase>"
 ```
+
+The rubric loads automatically from `evals/rubric.json`; there is no `--rubric` flag.
+`--anchor` takes a phrase from slide 1's title so the judge's readback proves it scored
+the right images.
 
 Use `--judge codex` when the host is Claude Code. Use `--judge claude` when the host is Codex.
 Every reported defect must be rechecked against the actual render before editing; judges can
@@ -191,26 +241,28 @@ Read only what the task needs, but do not skip the required workflow references.
 
 | File | Use |
 |---|---|
-| `build/references/slide-decision-engine.md` | End-to-end decision flow from sources to repair |
-| `build/references/slide-judgment-system.md` | Per-slide judgment fields and anti-template audit |
-| `build/references/deck-spec.md` | `deck.json` schema, pattern fields, chart spec, copy rules |
-| `build/references/design-principles.md` | Act visual grammar and slide-level design decisions |
-| `build/references/grid-and-flex-strategy.md` | Granular grid/flex contract for layout consistency |
-| `build/references/composition-vocabulary.md` | Composition moves, not templates |
-| `build/references/corpus-derived-composition-atoms.md` | IR-corpus atoms for evidence-led pages |
-| `build/references/ir-slide-design-principles.md` | Corpus-derived IR and investor-deck principles |
-| `build/references/evidence-and-claim-rules.md` | Claim/evidence/status/source discipline |
-| `build/references/data-and-diagram-rules.md` | Chart and diagram selection rules |
-| `build/references/visual-hierarchy-rules.md` | Reading path, emphasis, alignment, accessibility |
-| `build/references/copy-and-title-rules.md` | Action titles and Japanese slide copy discipline |
-| `build/references/design-richness-rules.md` | Freshness and impact without decoration |
-| `build/references/humanize.md` | Remove AI-like generic output |
-| `build/references/anti-patterns.md` | Failure modes to hunt before delivery |
-| `build/references/all-perspective-review.md` | Twenty-lens review checklist |
-| `build/references/review-and-repair-rubric.md` | Operational repair menu and scoring gate |
-| `build/references/visual-qa-and-repair-rubric.md` | Render-based multi-lens visual QA |
-| `build/references/pptx-pitfalls.md` | python-pptx implementation pitfalls |
-| `build/references/tokens.json` | Single source for Act color, type, and grid tokens |
+| `references/slide-decision-engine.md` | End-to-end decision flow from sources to repair |
+| `references/slide-judgment-system.md` | Per-slide judgment fields and anti-template audit |
+| `references/deck-spec.md` | `deck.json` schema, pattern fields, chart spec, copy rules |
+| `references/design-principles.md` | Act visual grammar and slide-level design decisions |
+| `references/grid-and-flex-strategy.md` | Granular grid/flex contract for layout consistency |
+| `references/composition-vocabulary.md` | Composition moves, not templates |
+| `references/composition-atoms.md` | IR-slide composition atoms + evidence-emphasis move→knob map |
+| `references/ir-slide-design-principles.md` | IR and investor-deck design principles |
+| `references/evidence-and-claim-rules.md` | Claim/evidence/status/source discipline |
+| `references/data-and-diagram-rules.md` | Chart and diagram selection rules |
+| `references/visual-hierarchy-rules.md` | Reading path, emphasis, alignment, accessibility |
+| `references/copy-and-title-rules.md` | Action titles and Japanese slide copy discipline |
+| `references/design-richness-rules.md` | Freshness and impact without decoration |
+| `references/humanize.md` | Remove AI-like generic output |
+| `references/anti-patterns.md` | Failure modes to hunt before delivery |
+| `references/all-perspective-review.md` | Twenty-lens review checklist |
+| `references/review-and-repair-rubric.md` | Operational repair menu and scoring gate |
+| `references/visual-qa-and-repair-rubric.md` | Render-based multi-lens visual QA |
+| `references/pptx-pitfalls.md` | python-pptx implementation pitfalls |
+| `references/tokens.json` | Single source for Act color, type, and grid tokens |
+| `scripts/act_theme.py` | Token-core adapter: feeds tokens.json to every backend (native, matplotlib, Graphviz) |
+| `scripts/act_assets.py` | Image-asset backend: Act-styled deterministic charts/diagrams for objects native cannot draw |
 | `assets/deck-workspace-template/` | Optional starter for `outline.md` and `review-log.md` |
 
 ## Skill Maintenance
@@ -218,12 +270,12 @@ Read only what the task needs, but do not skip the required workflow references.
 Use:
 
 ```bash
-PYTHONDONTWRITEBYTECODE=1 python3 -m pytest build/tests -p no:cacheprovider
-python3 /Users/sh/.codex/skills/.system/skill-creator/scripts/quick_validate.py .
+PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests -p no:cacheprovider
+python3 /Users/sh/.claude/plugins/marketplaces/claude-plugins-official/plugins/skill-creator/skills/skill-creator/scripts/quick_validate.py .
 ```
 
 Remove caches after local testing if they appear:
 
 ```bash
-trash .pytest_cache build/tests/__pycache__
+trash .pytest_cache tests/__pycache__ scripts/__pycache__
 ```

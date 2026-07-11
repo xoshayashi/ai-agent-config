@@ -63,6 +63,23 @@ Use a strong but quiet reset. A divider should signal the next chapter, not fill
 contrast matters: chapter number or section label may be large, but the page must still hint
 at the next proof arc.
 
+**When to use dividers — length and reading mode decide, not habit.** Section dividers are a
+navigation aid for *long, read-oriented* decks (board / IR / leave-behind documents, roughly
+18+ slides, or any deck the audience reads without a presenter). There, a reset every 3-5
+proof slides helps the reader keep the map.
+
+**When to omit them.** In a short talk deck (a ~10-minute pitch, roughly a dozen-odd slides),
+a hard section page before a 1-2 slide "chapter" injects a hard narrative break — it stops the
+story just as it builds momentum — while adding nothing to readability. Prefer a continuous
+flow carried by action titles, with the executive summary acting as the chapter map. Remove a
+divider when: the deck is short and reads just as clearly without it; the "chapter" it opens
+holds only one or two slides; or the reset breaks the presentation's momentum. If a talk deck
+needs a breath, a quiet `statement` beat disrupts flow less than a full section page.
+
+Rule of thumb: a divider must open a chapter of at least ~3 proof slides and the deck must be
+long enough to need navigation. Otherwise fold the chapter label into the next slide's subtitle
+and drop the divider.
+
 ### Process Flow
 
 Steps must share a disciplined silhouette. Outcome labels after arrows should be large enough
@@ -98,7 +115,9 @@ fixed end-card.
 
 ## Evidence And Source Discipline
 
-- Every evidence slide needs a source or a clear reason why the data is internal.
+- Every evidence slide needs a source or a clear reason why the data is internal. A true
+  citation names the organization, report, and date; a whole-deck internal origin (one
+  meeting, one internal doc) is declared once in `meta.basis`, not stamped per slide.
 - Separate source, assumption, and note. Do not bury assumptions inside source text.
 - Future-looking claims require assumption language and, when possible, sensitivity or range.
 - Bad news must use the same grammar as good news: show cause, action, and recovery path.
@@ -127,7 +146,11 @@ request. Replace generic self-introduction slides with proof that changes the re
 - YoY / delta text cramped against the value
 - single-bar chart with no comparison
 - fixed or left-heavy closing page
+- section dividers in a short talk deck, or a divider opening a 1-2 slide chapter — a reset
+  that breaks momentum without aiding readability; reserve dividers for long read decks
 - grid/flex contract visible in notes but violated in render
+- content block not vertically centered in the content area — asymmetric top/bottom margin
+  makes a table, rail, or card block drift downward (or upward) instead of sitting centered
 - large empty zones around small objects
 - excessive source/footer prominence
 - decoration used to create impact

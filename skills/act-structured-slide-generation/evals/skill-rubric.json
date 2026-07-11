@@ -1,6 +1,6 @@
 {
   "$comment": "Rubric for the SKILL ITSELF, not for generated decks. Grounded in the skill-creator guidance and this repository's conventions. Defect-deduction scoring: each category starts at full points; deduct for concrete observed defects (minor=-1, major=-3, critical=-5 within the category, floor 0). Total = max 100. Judge = an independent reviewer given the full skill tree; every deduction must cite file:line evidence.",
-  "target": "SKILL.md + build/ + scripts/ + examples/ of this skill directory",
+  "target": "SKILL.md + references/ + scripts/ + evals/ + examples/ of this skill directory",
   "categories": [
     {
       "id": "triggering",

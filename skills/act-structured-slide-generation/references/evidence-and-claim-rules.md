@@ -30,6 +30,11 @@ Actuals, forecasts, plans, targets, and assumptions must not look identical.
 - Every number needs period, unit, denominator, and definition.
 - External data needs organization, report or dataset, date, and denominator.
 - Internal estimates and management plans belong in `assumption`, not `source`.
+- `source` carries TRUE citations only. A deck built from one internal artifact (meeting
+  minutes, an internal workshop or doc) must not repeat that artifact as a per-slide Source
+  footer — declare it once in `meta.basis` and keep slide footers for real external
+  provenance, assumptions, and definitions. Repeating an internal origin on every page is
+  noise and weakens the credibility of genuine citations.
 - Proprietary KPIs and non-GAAP metrics need formula and scope.
 - Series breaks, accounting changes, reclassifications, and one-off effects need notes.
 - Missing and not-applicable values should be distinguished.

@@ -1,6 +1,6 @@
 """Tests for build_deck / validate_spec / verify_deck.
 
-Run: python3 -m pytest skills/act-structured-slide-generation/build/tests
+Run: python3 -m pytest skills/act-structured-slide-generation/tests
 Requires python-pptx + Pillow (scripts/requirements.txt); tests skip if absent.
 """
 import json
@@ -12,8 +12,8 @@ import pytest
 
 pptx = pytest.importorskip("pptx")
 
-SKILL = Path(__file__).resolve().parent.parent.parent
-SCRIPTS = SKILL / "build" / "scripts"
+SKILL = Path(__file__).resolve().parent.parent
+SCRIPTS = SKILL / "scripts"
 SAMPLE = SKILL / "examples" / "sample-deck.json"
 SAMPLE_EARNINGS = SKILL / "examples" / "sample-earnings-deck.json"
 
@@ -29,15 +29,15 @@ def test_skill_metadata_and_resource_map_are_discoverable():
     assert len(desc) <= 1024
     assert "grid-and-flex-strategy.md" in skill_md
     assert "slide-decision-engine.md" in skill_md
-    assert "corpus-derived-composition-atoms.md" in skill_md
+    assert "composition-atoms.md" in skill_md
     assert "visual-qa-and-repair-rubric.md" in skill_md
     assert "assets/deck-workspace-template/" in skill_md
     assert (SKILL / "agents" / "openai.yaml").exists()
-    assert (SKILL / "build" / "references" / "grid-and-flex-strategy.md").exists()
-    assert (SKILL / "build" / "references" / "slide-decision-engine.md").exists()
-    assert (SKILL / "build" / "references" / "ir-slide-design-principles.md").exists()
-    assert (SKILL / "build" / "references" / "corpus-derived-composition-atoms.md").exists()
-    assert (SKILL / "build" / "references" / "visual-qa-and-repair-rubric.md").exists()
+    assert (SKILL / "references" / "grid-and-flex-strategy.md").exists()
+    assert (SKILL / "references" / "slide-decision-engine.md").exists()
+    assert (SKILL / "references" / "ir-slide-design-principles.md").exists()
+    assert (SKILL / "references" / "composition-atoms.md").exists()
+    assert (SKILL / "references" / "visual-qa-and-repair-rubric.md").exists()
     assert (SKILL / "assets" / "deck-workspace-template" / "outline.md").exists()
 
 
@@ -45,13 +45,13 @@ def test_reference_markdown_is_english_without_japanese_residue():
     import re
 
     japanese = re.compile(r"[ぁ-んァ-ン一-龯]")
-    for path in sorted((SKILL / "build" / "references").glob("*.md")):
+    for path in sorted((SKILL / "references").glob("*.md")):
         text = path.read_text()
         assert not japanese.search(text), f"Japanese residue in {path.relative_to(SKILL)}"
 
 
 def test_slide_judgment_requires_grid_and_flex_strategy_fields():
-    ref = (SKILL / "build" / "references" / "slide-judgment-system.md").read_text()
+    ref = (SKILL / "references" / "slide-judgment-system.md").read_text()
     assert "these 22 fields" in ref
     assert "grid_role_map" in ref
     assert "main_axis" in ref
@@ -89,7 +89,7 @@ def test_slide_judgment_requires_grid_and_flex_strategy_fields():
 
 
 def test_grid_flex_reference_requires_granular_non_template_contract():
-    ref = (SKILL / "build" / "references" / "grid-and-flex-strategy.md").read_text()
+    ref = (SKILL / "references" / "grid-and-flex-strategy.md").read_text()
     compact_ref = " ".join(ref.split())
     assert "Grid Contract" in ref
     assert "relationships, not coordinates" in ref
@@ -113,13 +113,13 @@ def test_grid_flex_reference_requires_granular_non_template_contract():
         assert token in ref
 
 
-def test_ir_corpus_decision_engine_is_wired_as_judgment_not_templates():
+def test_ir_decision_engine_is_wired_as_judgment_not_templates():
     skill_md = (SKILL / "SKILL.md").read_text()
-    decision = (SKILL / "build" / "references" / "slide-decision-engine.md").read_text()
-    atoms = (SKILL / "build" / "references" / "corpus-derived-composition-atoms.md").read_text()
-    principles = (SKILL / "build" / "references" / "ir-slide-design-principles.md").read_text()
-    qa = (SKILL / "build" / "references" / "visual-qa-and-repair-rubric.md").read_text()
-    anti = (SKILL / "build" / "references" / "anti-patterns.md").read_text()
+    decision = (SKILL / "references" / "slide-decision-engine.md").read_text()
+    atoms = (SKILL / "references" / "composition-atoms.md").read_text()
+    principles = (SKILL / "references" / "ir-slide-design-principles.md").read_text()
+    qa = (SKILL / "references" / "visual-qa-and-repair-rubric.md").read_text()
+    anti = (SKILL / "references" / "anti-patterns.md").read_text()
     skill_compact = " ".join(skill_md.split())
     atoms_compact = " ".join(atoms.split())
 
@@ -136,9 +136,9 @@ def test_ir_corpus_decision_engine_is_wired_as_judgment_not_templates():
 
 def test_design_contract_keeps_banker_base_and_modern_freshness():
     skill_md = (SKILL / "SKILL.md").read_text()
-    principles = (SKILL / "build" / "references" / "design-principles.md").read_text()
-    grid_ref = (SKILL / "build" / "references" / "grid-and-flex-strategy.md").read_text()
-    rubric = json.loads((SKILL / "build" / "evals" / "rubric.json").read_text())
+    principles = (SKILL / "references" / "design-principles.md").read_text()
+    grid_ref = (SKILL / "references" / "grid-and-flex-strategy.md").read_text()
+    rubric = json.loads((SKILL / "evals" / "rubric.json").read_text())
     assert "banker-grade / strategy-consulting base" in skill_md
     assert "Freshness comes second" in principles
     assert "grid/flex contract" in principles
@@ -148,7 +148,7 @@ def test_design_contract_keeps_banker_base_and_modern_freshness():
 
 def test_anti_template_audit_and_no_page_numbers_are_contractual(tmp_path):
     skill_md = (SKILL / "SKILL.md").read_text()
-    judgment = (SKILL / "build" / "references" / "slide-judgment-system.md").read_text()
+    judgment = (SKILL / "references" / "slide-judgment-system.md").read_text()
     assert "Anti-Template Audit" in judgment
     assert "Do not create page numbers" in skill_md
     assert "Does the close look fixed" in judgment
@@ -809,19 +809,80 @@ def test_validate_rejects_too_many_takeaways(tmp_path):
 
 
 def test_validate_warns_long_content_run(tmp_path):
+    # The wall-of-content rest is a READ-deck concern: only a long, read-oriented deck
+    # (>= LONG_DECK_MIN slides) is pushed toward a rest. A short talk deck is meant to flow
+    # continuously, so a 6+ content run there is NOT nagged.
     content = _minimal_deck()["slides"][0]
-    deck = {"meta": {"title": "t"},
-            "slides": [dict(content, title=f"テスト市場は年率1{i}%で拡大し、2030年に1兆円に到達する見込み")
-                       for i in range(7)]}
+
+    def mk(i):
+        return dict(content, title=f"テスト市場は年率1{i % 9}%で拡大し、2030年に{i + 1}兆円に到達する見込み")
+
+    # short talk deck: a 7-slide content run flows — no rest is pushed
+    short = {"meta": {"title": "t"}, "slides": [mk(i) for i in range(7)]}
+    spec = tmp_path / "short.json"
+    spec.write_text(json.dumps(short, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    assert r.returncode == 0 and "休符" not in r.stdout
+
+    # long read deck (>= 18 slides): an unbroken 6+ content run warns
+    long_run = {"meta": {"title": "t"}, "slides": [mk(i) for i in range(18)]}
+    spec = tmp_path / "long.json"
+    spec.write_text(json.dumps(long_run, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    assert r.returncode == 0 and "休符" in r.stdout
+
+    # dividers breaking the run below 6 clear the warning even in a long deck
+    slides = []
+    for i in range(18):
+        if i and i % 4 == 0:
+            slides.append({"pattern": "section_divider", "number": i // 4, "title": f"章{i // 4}"})
+        slides.append(mk(i))
+    broken = {"meta": {"title": "t"}, "slides": slides}
+    spec = tmp_path / "broken.json"
+    spec.write_text(json.dumps(broken, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    assert "休符" not in r.stdout
+
+
+def test_validate_flags_divider_overuse_in_short_deck(tmp_path):
+    # A short talk deck chopped by dividers into 1-2 slide chapters is flagged: the deck-level
+    # over-use warning fires, and any chapter holding <= 1 content slide is named as thin.
+    content = _minimal_deck()["slides"][0]
+
+    def mk(i):
+        return dict(content, title=f"テスト市場は年率1{i % 9}%で拡大し、2030年に{i + 1}兆円に到達する見込み")
+
+    slides = [
+        {"pattern": "section_divider", "number": 1, "title": "章1"}, mk(0),
+        {"pattern": "section_divider", "number": 2, "title": "章2"}, mk(1),
+        {"pattern": "section_divider", "number": 3, "title": "章3"}, mk(2), mk(3),
+    ]
+    deck = {"meta": {"title": "t"}, "slides": slides}
     spec = tmp_path / "deck.json"
     spec.write_text(json.dumps(deck, ensure_ascii=False))
     r = run("validate_spec.py", spec)
-    assert r.returncode == 0 and "休符" in r.stdout
-    # a divider inside the run resets the counter
-    deck["slides"].insert(3, {"pattern": "section_divider", "number": 1, "title": "章"})
+    assert r.returncode == 0
+    assert "枚数が多い" in r.stdout            # deck-level: reserve dividers for long/read decks
+    assert "章が内容1枚以下" in r.stdout        # thin chapters (章1, 章2 hold one content slide)
+
+
+def test_validate_allows_dividers_in_long_read_deck(tmp_path):
+    # A long read deck (>= 18 slides) whose chapters each carry >= 3 proof slides is not nagged.
+    content = _minimal_deck()["slides"][0]
+
+    def mk(i):
+        return dict(content, title=f"テスト市場は年率1{i % 9}%で拡大し、2030年に{i + 1}兆円に到達する見込み")
+
+    slides = []
+    for c in range(4):  # 4 chapters x 4 content slides = 20 slides total
+        slides.append({"pattern": "section_divider", "number": c + 1, "title": f"章{c + 1}"})
+        slides += [mk(c * 4 + j) for j in range(4)]
+    deck = {"meta": {"title": "t"}, "slides": slides}
+    spec = tmp_path / "deck.json"
     spec.write_text(json.dumps(deck, ensure_ascii=False))
     r = run("validate_spec.py", spec)
-    assert "休符" not in r.stdout
+    assert r.returncode == 0
+    assert "枚数が多い" not in r.stdout and "章が内容1枚以下" not in r.stdout
 
 
 def test_validate_warns_wide_comparison_table(tmp_path):
@@ -965,3 +1026,110 @@ def test_build_writes_speaker_notes_into_pptx(tmp_path):
     prs = pptx.Presentation(str(out))
     notes = prs.slides[0].notes_slide.notes_text_frame.text
     assert "次のスライドで内訳を示します" in notes
+
+
+# --- image-asset track + native table merge (skip when optional backends absent) ------------
+
+def test_native_table_col0_spans_merges_and_builds(tmp_path):
+    deck = {"slides": [{
+        "pattern": "comparison_table", "title": "セグメント別は電機が牽引し+2,559", "source": "Act分析",
+        "table": {"headers": ["区分", "科目", "前期", "当期"],
+                  "rows": [["電機", "売上", "29,265", "31,824"], ["", "利益", "1,585", "1,370"],
+                           ["機械", "売上", "9,189", "9,469"], ["", "利益", "269", "417"]],
+                  "align": ["l", "l", "r", "r"], "emphasis_col": 3, "color_negatives": True,
+                  "col0_spans": [[0, 2], [2, 2]]}}]}
+    spec = tmp_path / "d.json"; spec.write_text(json.dumps(deck))
+    assert run("validate_spec.py", spec).returncode == 0
+    out = tmp_path / "d.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    # the first-column group cells are merged (one origin spans two rows)
+    tbl = pptx.Presentation(str(out)).slides[0].shapes[0]
+    # locate the graphic-frame table
+    from pptx.util import Emu  # noqa: F401
+    tables = [sh.table for sh in pptx.Presentation(str(out)).slides[0].shapes if sh.has_table]
+    assert tables and tables[0].cell(1, 0).is_merge_origin
+
+
+def test_image_asset_track_combo_and_diagram(tmp_path):
+    import shutil
+    pytest.importorskip("matplotlib")
+    if shutil.which("dot") is None:
+        pytest.skip("Graphviz CLI (dot) not installed")
+    deck = {"slides": [
+        {"pattern": "chart_insight", "title": "売上と利益率を2軸で示す", "source": "Act分析",
+         "chart": {"kind": "combo", "categories": ["'23", "'24", "'25"],
+                   "bar": {"name": "売上", "values": [138, 162, 190], "unit": "億円"},
+                   "line": {"name": "利益率", "values": [10.1, 12.2, 13.4], "unit": "%"}}},
+        {"pattern": "diagram", "title": "資本関係を一枚で示す", "source": "Act分析",
+         "diagram": {"kind": "org_tree",
+                     "nodes": [{"id": "h", "label": "持株", "focal": True}, {"id": "a", "label": "A社"}],
+                     "edges": [{"from": "h", "to": "a", "label": "100%"}]}},
+        {"pattern": "chart_insight", "title": "自社は品質と実績で優位", "source": "Act分析",
+         "chart": {"kind": "radar", "axes": ["価格", "品質", "実績"],
+                   "series": [{"name": "自社", "values": [4, 5, 5]}, {"name": "他社", "values": [3, 3, 3]}]}},
+        {"pattern": "diagram", "title": "地域別の製品カバレッジ", "source": "Act分析",
+         "diagram": {"kind": "matrix", "rows": ["東", "西"], "cols": ["X", "Y"],
+                     "cells": {"0,0": True, "1,1": True}}}]}
+    spec = tmp_path / "d.json"; spec.write_text(json.dumps(deck))
+    assert run("validate_spec.py", spec).returncode == 0
+    out = tmp_path / "d.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    # assets cached beside the pptx with a manifest and audit sidecars
+    assets = tmp_path / "assets"
+    assert (assets / "asset-manifest.json").exists()
+    pngs = list(assets.glob("*.png"))
+    assert len(pngs) == 4 and all(p.with_suffix(".json").exists() for p in pngs)
+    # both slides embed a picture (the image asset)
+    prs = pptx.Presentation(str(out))
+    for sl in prs.slides:
+        assert any(sh.shape_type == 13 for sh in sl.shapes)  # 13 = PICTURE
+
+
+def test_act_theme_reads_one_token_core(tmp_path):
+    sys.path.insert(0, str(SCRIPTS))
+    import act_theme as t
+    assert t.COLORS["primary"].startswith("#") and t.SERIES_PALETTE
+    assert len(t.tokens_hash()) == 12
+
+
+def test_native_chart_grid_small_multiples(tmp_path):
+    deck = {"slides": [{
+        "pattern": "chart_grid", "title": "3事業とも増収しCAGR11%成長", "source": "Act分析",
+        "charts": [
+            {"title": "売上", "chart": {"type": "column", "unit": "百万円", "categories": ["24", "25", "26"],
+             "series": [{"name": "売上", "values": [118, 125, 130]}], "value_labels": True,
+             "focal_category": 2, "annotation": {"badge": "CAGR 5%"}}},
+            {"title": "利益", "chart": {"type": "column", "unit": "百万円", "categories": ["24", "25", "26"],
+             "series": [{"name": "利益", "values": [27, 29, 37]}], "value_labels": True, "focal_category": 2}}]}]}
+    spec = tmp_path / "d.json"; spec.write_text(json.dumps(deck))
+    assert run("validate_spec.py", spec).returncode == 0
+    out = tmp_path / "d.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    # two NATIVE chart graphic-frames tiled on one slide (editable, not an image)
+    charts = [sh for sh in pptx.Presentation(str(out)).slides[0].shapes if sh.has_chart]
+    assert len(charts) == 2
+
+
+def test_image_annotations_layer_renders(tmp_path):
+    import shutil
+    pytest.importorskip("matplotlib")
+    if shutil.which("dot") is None:
+        pytest.skip("dot not installed")
+    deck = {"slides": [{
+        "pattern": "chart_insight", "title": "増減を要因別に注記した2軸コンボ", "source": "Act分析",
+        "chart": {"kind": "combo", "categories": ["'24", "'25", "'26"],
+                  "bar": {"name": "売上", "values": [138, 162, 190], "unit": "億円"},
+                  "line": {"name": "利益率", "values": [10.1, 12.2, 13.4], "unit": "%"},
+                  "annotations": [{"target": 2, "text": "新製品寄与", "dy": 40},
+                                  {"target": 0, "text": "統合完了"}]}}]}
+    spec = tmp_path / "d.json"; spec.write_text(json.dumps(deck))
+    assert run("validate_spec.py", spec).returncode == 0
+    out = tmp_path / "d.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    # annotations must not break the deterministic content-addressed cache
+    import sys as _sys
+    _sys.path.insert(0, str(SCRIPTS))
+    import act_assets as A
+    aid1 = A.asset_id(deck["slides"][0]["chart"], (8.6, 4.7))
+    aid2 = A.asset_id(deck["slides"][0]["chart"], (8.6, 4.7))
+    assert aid1 == aid2 and len(aid1) == 16

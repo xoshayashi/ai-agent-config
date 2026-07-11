@@ -51,6 +51,6 @@ Before independent judging, confirm:
 
 ## Scoring Gate
 
-Use defect-deduction scoring with `build/evals/rubric.json`. The deck must score at least 95
+Use defect-deduction scoring with `evals/rubric.json`. The deck must score at least 95
 after independent judging. A beautiful deck with unsupported claims still fails.
 

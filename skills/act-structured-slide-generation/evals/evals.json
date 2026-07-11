@@ -5,9 +5,9 @@
     {
       "id": 1,
       "name": "earnings-deck-ja",
-      "prompt": "Use build/evals/scenario-earnings.md as the input prompt and generate a 10-12 slide Japanese earnings presentation.",
+      "prompt": "Use evals/scenario-earnings.md as the input prompt and generate a 10-12 slide Japanese earnings presentation.",
       "expected_output": "All lint checks green plus rubric score >=95. Action-title read-through works, and every number in the deck comes from the scenario.",
-      "files": ["build/evals/scenario-earnings.md"],
+      "files": ["evals/scenario-earnings.md"],
       "assertions": [
         "validate_spec.py / verify_deck.py / lint_render.py all exit 0",
         "slide count is 10-12",

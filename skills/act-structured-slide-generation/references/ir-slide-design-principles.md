@@ -1,6 +1,6 @@
 # IR slide design principles
 
-Purpose: distilled operating principles from the 5,394 abstracted IR-slide corpus. These are
+Purpose: distilled operating principles for IR and investor decks. These are
 not templates and do not preserve company-specific facts, colors, or layouts. Use them as
 decision rules when a slide must convince investors, IR teams, executives, or analysts with
 evidence-rich but readable pages.
@@ -9,7 +9,7 @@ Each principle has: **Use when / Why it works / Parameters / Failure / Repair**.
 
 ## 1. Start From The Reader Question
 - **Use when**: composing any slide, especially dense IR pages.
-- **Why it works**: the corpus pages are strongest when each page answers a specific doubt:
+- **Why it works**: IR pages are strongest when each page answers a specific doubt:
   what changed, why believe it, how far along, what risk remains.
 - **Parameters**: reader type, skepticism, decision moment, required evidence strength.
 - **Failure**: a topic page lists information but cannot say which reader question it answers.
@@ -35,7 +35,7 @@ Each principle has: **Use when / Why it works / Parameters / Failure / Repair**.
 
 ## 4. Pair Numbers With Their Interpretation
 - **Use when**: displaying KPIs, financial results, segment performance, or market figures.
-- **Why it works**: the best corpus pages avoid leaving numbers as raw facts; they attach a
+- **Why it works**: the best IR pages avoid leaving numbers as raw facts; they attach a
   short cause, implication, or caveat near the value.
 - **Parameters**: interpretation rail, metric subline, callout, row note, speaker note.
 - **Failure**: cards or tables show values with no "so what".
@@ -117,7 +117,7 @@ Each principle has: **Use when / Why it works / Parameters / Failure / Repair**.
 
 ## 13. Name The Relationship In Every Diagram
 - **Use when**: drawing flows, systems, funnels, matrices, loops, hierarchies, or ecosystem maps.
-- **Why it works**: the corpus diagrams work when arrows mean cause, flow, dependency, sequence,
+- **Why it works**: diagrams work when arrows mean cause, flow, dependency, sequence,
   or ownership, not just "connectedness".
 - **Parameters**: relation type, edge label, highlighted path, muted context.
 - **Failure**: boxes and arrows look structural but do not prove causality or advantage.
@@ -216,7 +216,7 @@ Each principle has: **Use when / Why it works / Parameters / Failure / Repair**.
 
 ## 24. Repair Locally Before Redesigning Globally
 - **Use when**: rendered slides have issues but the claim and evidence are still right.
-- **Why it works**: many corpus-derived failures are local: protagonist unclear, note mixed into
+- **Why it works**: many such failures are local: protagonist unclear, note mixed into
   body, gap too tight, comparison basis missing.
 - **Parameters**: focal object, hierarchy, whitespace role, annotation policy, proof proximity.
 - **Failure**: every finding triggers a complete redesign, creating new regressions.

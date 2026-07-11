@@ -1,12 +1,12 @@
 # Slide decision engine
 
-Purpose: the corpus-derived decision flow for turning source material into slide blueprints.
+Purpose: the decision flow for turning source material into slide blueprints.
 Use this before writing `deck.json`. It keeps the skill a judgment engine instead of a
 slide-type template catalog.
 
 Core flow:
 
-`source understanding -> reader_question -> single_takeaway -> focal_object -> evidence_strategy -> composition_move -> density_control -> visual QA -> repair`
+`source understanding -> reader_question -> single_takeaway -> focal_object -> evidence_strategy -> composition_move -> render_route -> density_control -> visual QA -> repair`
 
 ## 1. Source Understanding
 
@@ -41,6 +41,8 @@ existing spec fields:
 - **focal_object**: the first visual object the eye should land on.
 - **evidence_strategy**: how the takeaway is proven and what evidence status it has.
 - **composition_move**: the body composition atom or combination chosen.
+- **render_route**: native (default, editable) or image (escalation for objects native cannot
+  draw). Keep it native unless the load-bearing object forces an image.
 - **information_architecture**: how information is split and ordered.
 - **density_control**: why the page is sparse, medium, dense, or appendix-like.
 - **whitespace_role**: emphasis, separation, interpretation space, rhythm reset, or legal.
@@ -67,11 +69,32 @@ Choose by the claim and evidence, not by a slide label.
   action.
 - **Credibility proof** -> evidence strip, image-proof panel, quote with source, third-party
   citation.
-- **Navigation/rhythm** -> current-location agenda, section reset, quiet conclusion.
+- **Navigation/rhythm** -> current-location agenda, section reset, quiet conclusion. Add a
+  section reset only in a long, read-oriented deck where a chapter carries ~3+ proof slides;
+  in a short talk deck it injects a hard narrative break without aiding readability — flow on
+  action titles and omit the divider (see design-principles: Section Dividers).
 - **Legal/admin** -> dedicated quiet text page or concise source/assumption line.
 
 If two branches seem equally right, create 2-3 visual directions and select the one that proves
 the `single_takeaway` with the least reader effort.
+
+Before committing the move, set the object's **`render_route`** (the link after
+`composition_move`): pick the most editable representation the object can faithfully take.
+- **native** (default): text, tables, native charts, autoshapes — fully editable. Prove the
+  title with the emphasis knobs in `data-and-diagram-rules.md` and `composition-atoms.md`.
+  Small-multiples (a 2-4 chart trend grid, each with a CAGR badge) is native — use `chart_grid`,
+  not an image.
+- **image**: escalate only when native genuinely cannot draw the load-bearing object — a
+  combo/dual-axis chart, area/radar/scatter/bubble/waterfall, an org tree or node graph, a
+  ring/funnel/pyramid/Venn/matrix, OR when a leader-line cause callout must anchor to a specific
+  bar/step (the `annotations` layer). It renders as an Act-styled embedded image (one hard object
+  per slide; keep title, rail, tables, body native). See the image chart kinds, `annotations`,
+  and `diagram`/`chart_grid` in `deck-spec.md`.
+- Still re-express (do not imitate): geographic maps, proportional Sankey, raster proof grids
+  (user-supplied only), and whole-slide bespoke layouts — per the boundary in
+  `data-and-diagram-rules.md`.
+Do not escalate a simple 2×2, ≤6-node tree, or ≤5-step flow to an image just because the image
+track exists — native keeps it editable.
 
 ## 5. Blueprint Output
 
@@ -129,7 +152,7 @@ Use local repairs before redesign:
 
 ## 8. Mapping To Existing References
 
-- Composition atom details: `corpus-derived-composition-atoms.md`
+- Composition atom details: `composition-atoms.md`
 - Core design principles: `ir-slide-design-principles.md`
 - Grid/flex contract: `grid-and-flex-strategy.md`
 - Claims and trust: `evidence-and-claim-rules.md`
@@ -137,10 +160,10 @@ Use local repairs before redesign:
 - Review and repair: `visual-qa-and-repair-rubric.md`, `review-and-repair-rubric.md`,
   `anti-patterns.md`
 
-## 9. Continuous Corpus Updates
+## 9. Incorporating New Observations
 
-When a new IR-slide abstraction corpus is added, do not paste all new observations into the
-skill. First classify each candidate insight:
+When new IR-slide observations are gathered, do not paste them all into the skill. First
+classify each candidate insight:
 
 - **existing_rule_support**: supports an existing rule; do not add unless it changes a
   condition or repair.
