@@ -34,7 +34,9 @@ usually Japanese.
 
 ## Words To Replace
 
-Replace generic language with proof:
+Replace generic language with proof. (This section owns REPLACE-WITH-PROOF mappings;
+the banned generic-filler word list — "industry-leading", "seamless", … — lives only in
+`humanize.md`. Add new banned words there, not here.)
 
 - strong -> name the metric or evidence
 - efficient -> state hours, cost, margin, or process step reduced
