@@ -1133,3 +1133,380 @@ def test_image_annotations_layer_renders(tmp_path):
     aid1 = A.asset_id(deck["slides"][0]["chart"], (8.6, 4.7))
     aid2 = A.asset_id(deck["slides"][0]["chart"], (8.6, 4.7))
     assert aid1 == aid2 and len(aid1) == 16
+
+
+# ---- review follow-ups (PR #127): direct coverage for the robustness mechanisms ----
+
+def _import_build_deck():
+    sys.path.insert(0, str(SCRIPTS))
+    import importlib
+    import build_deck
+    return importlib.reload(build_deck)
+
+
+def test_statement_lines_packs_clauses_without_orphan_tail():
+    bd = _import_build_deck()
+    stmt = "中堅企業向けSaaSは今後3年が参入の最終ウィンドウ、経理領域からの段階参入とM&A活用で、5年でARR68億円の事業構築を提言"
+    lines = bd._statement_lines(stmt, 8.0, 31)
+    # 内容が保存され(節の欠落なし)、複数行に分割される
+    assert "".join(lines) == stmt
+    assert len(lines) >= 2
+    # 各行は節境界(、)で終わるか最終行 — 語中改行の孤立行を作らない
+    for ln in lines[:-1]:
+        assert ln.endswith("、")
+    # 尾行が1-2文字の孤立にならない
+    assert bd._ja_len(lines[-1]) > 2
+
+
+def test_statement_lines_single_clause_passthrough():
+    bd = _import_build_deck()
+    single = "読点を含まない一文のステートメントはそのまま"
+    assert bd._statement_lines(single, 8.0, 31) == [single]
+    multiline = "一行目\n二行目"
+    assert bd._statement_lines(multiline, 8.0, 31) == ["一行目", "二行目"]
+
+
+def test_validate_warns_on_long_statement_clause(tmp_path):
+    # 節が22字超の中央ヒーロー文 → 警告(読点あり/なしで文言が変わる)
+    with_comma = {"slides": [{"pattern": "statement", "title": "結論",
+                              "statement": "この読点つき文はとても長い節をひとつだけ含んでおり折返し警告の対象になる、短い節"}]}
+    no_comma = {"slides": [{"pattern": "statement", "title": "結論",
+                            "statement": "読点を全く含まない非常に長い一文のステートメントは節折返しが効かない旨を警告される"}]}
+    for deck, needle in ((with_comma, "節が長い"), (no_comma, "読点のない一文")):
+        f = tmp_path / "d.json"
+        f.write_text(json.dumps(deck, ensure_ascii=False))
+        r = run("validate_spec.py", f)
+        assert needle in r.stdout, r.stdout
+
+
+def test_financial_highlights_overflow_hero_reaches_support(tmp_path):
+    # 4グループ目の主指標は落とさず補助ストリップへ回る
+    groups = [{"label": f"G{i}", "metrics": [{"label": f"主指標{i}", "value": f"{i}00", "unit": "億円", "hero": True}]}
+              for i in range(1, 5)]
+    deck = {"slides": [{"pattern": "financial_highlights", "title": "4グループの主要指標は補助帯まで含め全件表示",
+                        "groups": groups}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "out.pptx"
+    r = run("build_deck.py", f, "-o", out)
+    assert r.returncode == 0, r.stderr
+    from pptx import Presentation
+    texts = []
+    for shape in Presentation(str(out)).slides[0].shapes:
+        if shape.has_text_frame:
+            texts.append(shape.text_frame.text)
+    joined = "\n".join(texts)
+    assert "主指標4" in joined, joined
+    # 溢れ分で support ストリップが新設されるケース: 見出しと帯が実寸で描画される
+    assert "補助指標" in joined, joined
+    # validate は groups > 3 を警告する
+    rv = run("validate_spec.py", f)
+    assert "groups" in rv.stdout and "3" in rv.stdout
+
+
+def test_oversized_table_frame_stays_inside_slide(tmp_path):
+    # 行数過多で縮小スケールが走っても、テーブルのフレーム自体がスライド外へ溢れない
+    rows = [[f"項目{i}", "あ" * 38, "い" * 30] for i in range(16)]
+    deck = {"slides": [{"pattern": "comparison_table", "title": "16行の過大テーブルでも枠はスライド内に収まることを確認",
+                        "table": {"headers": ["項目", "内容", "備考"], "rows": rows}}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "out.pptx"
+    r = run("build_deck.py", f, "-o", out)
+    assert r.returncode == 0, r.stderr
+    from pptx import Presentation
+    from pptx.util import Emu
+    prs = Presentation(str(out))
+    frames = [s for s in prs.slides[0].shapes if s.has_table]
+    assert frames
+    for fr in frames:
+        assert fr.top + fr.height <= Emu(int(7.5 * 914400)) + Emu(1)
+
+
+def test_chart_grid_image_cell_routes_to_asset(tmp_path):
+    # chart_grid のセル単位 image-kind エスカレーションが picture として埋め込まれる
+    pytest.importorskip("matplotlib")
+    deck = {"slides": [{"pattern": "chart_grid",
+                        "title": "2系列の小型チャート群で売上と利益率の両立を確認",
+                        "charts": [
+                            {"title": "売上", "chart": {"type": "column", "unit": "億円",
+                                                        "categories": ["FY24", "FY25"],
+                                                        "series": [{"name": "売上", "values": [10, 12]}]}},
+                            {"title": "利益率", "chart": {"kind": "combo", "categories": ["FY24", "FY25"],
+                                                          "bar": {"name": "売上", "values": [10, 12], "unit": "億円"},
+                                                          "line": {"name": "利益率", "values": [10.0, 12.5], "unit": "%"}}},
+                        ]}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "out.pptx"
+    r = run("build_deck.py", f, "-o", out)
+    assert r.returncode == 0, r.stderr
+    from pptx import Presentation
+    from pptx.enum.shapes import MSO_SHAPE_TYPE
+    shapes = list(Presentation(str(out)).slides[0].shapes)
+    assert any(s.shape_type == MSO_SHAPE_TYPE.PICTURE for s in shapes), [s.shape_type for s in shapes]
+    assert any(s.has_chart for s in shapes if hasattr(s, "has_chart"))
+
+
+def test_validate_warns_on_out_of_range_focal_step(tmp_path):
+    deck = {"slides": [{"pattern": "process_flow", "title": "3ステップの導線で登録転換までの流れを確認する",
+                        "focal_step": 9,
+                        "steps": [{"label": f"Step {i}", "items": ["項目"]} for i in range(1, 4)]}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    assert "focal_step" in r.stdout, r.stdout
+    out = tmp_path / "out.pptx"
+    rb = run("build_deck.py", f, "-o", out)
+    assert rb.returncode == 0, rb.stderr
+
+
+def test_validate_covers_chart_grid_cells(tmp_path):
+    # chart_grid のセルにも本体 chart と同じ検査(黙殺アノテーション警告・型チェック)が届く
+    deck = {"slides": [{"pattern": "chart_grid",
+                        "title": "2セルの小型チャート群で検査カバレッジを確認する",
+                        "charts": [
+                            {"chart": {"kind": "radar", "categories": ["a", "b", "c"],
+                                       "series": [{"name": "s", "values": [1, 2, 3]}],
+                                       "annotations": [{"target": 0, "text": "落ちる注記"}]}},
+                            {"chart": {"type": "no_such_type", "unit": "億円", "categories": ["a"],
+                                       "series": [{"name": "s", "values": [1]}]}},
+                        ]}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    out = r.stdout
+    assert "cell 1" in out and "int target" in out, out
+    assert "cell 2" in out and "no_such_type" in out, out
+
+
+def test_validate_rejects_incomplete_or_unknown_image_kinds(tmp_path):
+    # 必須フィールド欠落の image kind と、非対応 kind の render:"image" 強制は
+    # build 前に validate がエラーにする(黙って通すと build が落ちる)
+    deck = {"slides": [
+        {"pattern": "chart_insight", "title": "レーダー1枚で能力バランスの偏りを確認する",
+         "chart": {"kind": "radar", "categories": ["a"], "series": [{"name": "s", "values": [1]}]}},
+        {"pattern": "chart_insight", "title": "強制image指定の未知kindは事前に弾かれることを確認",
+         "chart": {"render": "image", "kind": "column", "unit": "億円", "categories": ["a"],
+                   "series": [{"name": "s", "values": [1]}]}},
+    ]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    assert "必須フィールドがない: axes" in r.stdout, r.stdout
+    assert "image バックエンド非対応" in r.stdout, r.stdout
+
+
+def test_financial_summary_image_chart_routes_to_asset(tmp_path):
+    pytest.importorskip("matplotlib")
+    deck = {"slides": [{"pattern": "financial_summary",
+                        "title": "売上60億円と利益率12%の同時達成をテーブルとcomboで確認",
+                        "table": {"headers": ["項目", "FY24", "FY25"],
+                                  "rows": [["売上", "10", "12"], ["利益", "1", "2"]]},
+                        "chart": {"kind": "combo", "categories": ["FY24", "FY25"],
+                                  "bar": {"name": "売上", "values": [10, 12], "unit": "億円"},
+                                  "line": {"name": "利益率", "values": [10.0, 16.7], "unit": "%"}}}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "out.pptx"
+    r = run("build_deck.py", f, "-o", out)
+    assert r.returncode == 0, r.stderr
+    from pptx import Presentation
+    from pptx.enum.shapes import MSO_SHAPE_TYPE
+    shapes = list(Presentation(str(out)).slides[0].shapes)
+    assert any(s.shape_type == MSO_SHAPE_TYPE.PICTURE for s in shapes)
+
+
+def test_non_numeric_focal_step_does_not_crash_build(tmp_path):
+    deck = {"slides": [{"pattern": "process_flow", "title": "非数値focal_stepでもビルドが完走することを確認",
+                        "focal_step": "last",
+                        "steps": [{"label": f"Step {i}", "items": ["項目"]} for i in range(1, 4)]}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    assert "focal_step" in r.stdout
+    out = tmp_path / "out.pptx"
+    rb = run("build_deck.py", f, "-o", out)
+    assert rb.returncode == 0, rb.stderr
+
+
+def test_validate_covers_diagram_specs_and_grid_size(tmp_path):
+    # diagram の asset spec も image-kind 検査に通り、chart_grid の5枚超はエラーになる
+    deck = {"slides": [
+        {"pattern": "diagram", "title": "組織ツリーで意思決定ラインの重複を確認する",
+         "diagram": {"kind": "org_tree", "nodes": [{"id": "a", "label": "A"}]}},
+        {"pattern": "diagram", "title": "未知kindのダイアグラムは事前に弾かれることを確認",
+         "diagram": {"kind": "banana"}},
+        {"pattern": "chart_grid", "title": "5セルのグリッドは契約違反としてエラーになることを確認",
+         "charts": [{"chart": {"type": "column", "unit": "億円", "categories": ["a"],
+                               "series": [{"name": "s", "values": [1]}]}} for _ in range(5)]},
+    ]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    assert "必須フィールドがない: edges" in r.stdout, r.stdout
+    assert "diagram kind 'banana' は未対応" in r.stdout, r.stdout
+    assert "パターン契約は2-4" in r.stdout, r.stdout
+
+
+def test_validate_talk_script_fidelity_and_register(tmp_path):
+    # (1) スライドに無い単位つき数値 (2) 敬体でないメモ書き (3) タイトル逐語読みの冒頭 を検出する
+    title = "導入社数120社とNRR112%で初年度の検証を完了する"
+    base_kpis = [{"label": "導入社数", "value": "120", "unit": "社"},
+                 {"label": "NRR", "value": "112", "unit": "%"}]
+    slides = [
+        {"pattern": "kpi_dashboard", "title": title, "kpis": base_kpis,
+         "speaker_notes": "初年度はこの2指標に絞ります。導入社数は120社、NRRは112%です。ここが立てば拡張投資に進めます。ARRは999億円に達する見込みです。次のスライドで前提を確認します。"},
+        {"pattern": "kpi_dashboard", "title": title, "kpis": base_kpis,
+         "speaker_notes": "導入社数120社・NRR112%の2指標。初年度はユニットエコノミクス検証。達成なら拡張投資へ。前提条件は次スライドの通り。以上の構成で全体像を先に共有する形とした。"},
+        {"pattern": "kpi_dashboard", "title": title, "kpis": base_kpis,
+         "speaker_notes": title + "、という結論です。導入社数は120社、NRRは112%を目標にします。この2つが立てば来期は拡張投資に進めますので、次のスライドで前提条件を確認します。"},
+    ]
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps({"slides": slides}, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    out = r.stdout
+    assert "スライド上に無い数値: 999億" in out, out
+    assert "話し言葉でない" in out, out
+    assert "タイトルの逐語読み" in out, out
+
+
+def test_validate_fidelity_gate_matches_unit_pairs(tmp_path):
+    # 数字だけの一致では通らない: スライドが 120社/112% のとき「112社」は単位違いとして検出。
+    # 逆に、数値型のチャート値(12)+chart.unit(億円)を話す「12億円」は構造ペアで通る
+    slides = [
+        {"pattern": "kpi_dashboard", "title": "導入社数120社とNRR112%で初年度の検証を完了する",
+         "kpis": [{"label": "導入社数", "value": "120", "unit": "社"},
+                  {"label": "NRR", "value": "112", "unit": "%"}],
+         "speaker_notes": "初年度の指標です。導入社数は112社を目標にします。この水準で検証が成立しますので、次のスライドで前提を確認します。八十字を超えるようにもう一文だけ補足します。"},
+        {"pattern": "chart_insight", "title": "売上は2年で12億円へ拡大し成長率を維持する",
+         "chart": {"type": "column", "unit": "億円", "categories": ["FY24", "FY25"],
+                   "series": [{"name": "売上", "values": [10, 12]}]},
+         "speaker_notes": "売上の推移をご覧ください。FY25には12億円へ届き、前年の10億円からの伸びを維持できるかが焦点になります。単価と件数のどちらが効いているかは次のスライドのドライバー分解で確認しますので、まずは水準感だけ押さえてください。"},
+    ]
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps({"slides": slides}, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    out = r.stdout
+    assert "112社" in out and "スライド上に無い数値" in out, out
+    # slide 2: 数値型チャート値(10, 12)+chart.unit(億円)の組は構造ペアで通り、警告が出ない
+    assert not any("slide 2" in ln and "スライド上に無い数値" in ln for ln in out.splitlines()), out
+
+
+def test_validate_image_chart_data_shape(tmp_path):
+    # combo の values 長さ不一致は build 前にエラーになる
+    deck = {"slides": [{"pattern": "chart_insight", "title": "売上と利益率の両立を1枚で確認する",
+                        "chart": {"kind": "combo", "categories": ["FY24", "FY25", "FY26"],
+                                  "bar": {"name": "売上", "values": [10, 12], "unit": "億円"},
+                                  "line": {"name": "利益率", "values": [10.0, 11.0, 12.0], "unit": "%"}}}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    assert "bar.values が 2 件で categories 3 件と不一致" in r.stdout, r.stdout
+
+
+def test_validate_fidelity_ignores_control_fields_and_scopes_table_units(tmp_path):
+    slides = [
+        # focal_category:1 は描画制御であり「1億円」の根拠にならない
+        {"pattern": "chart_insight", "title": "売上は2年で12億円へ拡大し成長軌道を維持する",
+         "chart": {"type": "column", "unit": "億円", "categories": ["FY24", "FY25"],
+                   "series": [{"name": "売上", "values": [10, 12]}], "focal_category": 1},
+         "speaker_notes": "売上の推移をご覧ください。まず1億円の水準から立ち上がり、FY25には12億円へ届く計画です。ここからの伸びの持続性を次のスライドで確認していきます。"},
+        # 複数単位ヘッダーの表では単位は自列に限定される: 10 は億円列の値で、10% は存在しない
+        {"pattern": "comparison_table", "title": "売上10億円と成長率5%の組み合わせを1表で確認する",
+         "table": {"headers": ["項目", "売上(億円)", "YoY(%)"],
+                   "rows": [["A事業", "10", "+5"]]},
+         "speaker_notes": "この表のポイントはA事業です。売上は10億円、成長率はプラス5%で、規模と成長の両立ができています。仮に10%と読み間違えると評価を誤りますので、列の対応にご注意ください。"},
+    ]
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps({"slides": slides}, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    out = r.stdout
+    assert any("slide 1" in ln and "1億円" in ln for ln in out.splitlines()), out
+    assert any("slide 2" in ln and "10%" in ln for ln in out.splitlines()), out
+    # 正当な組(12億円 / 10億円 / 5%)は警告されない
+    assert "12億円" not in out and "10億円" not in out and " 5%" not in out, out
+
+
+def test_validate_rejects_zero_only_funnel(tmp_path):
+    deck = {"slides": [{"pattern": "chart_insight", "title": "獲得ファネルの歩留まりを3段で確認する",
+                        "chart": {"kind": "funnel",
+                                  "stages": [{"label": "訪問", "value": 0},
+                                             {"label": "登録", "value": 0}]}}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    assert "全て0以下" in r.stdout, r.stdout
+
+
+def test_fidelity_corpus_has_delimiters_and_filters_control_keys(tmp_path):
+    # キー順で focal_category の「1」と unit の「億円」が隣接しても偽陰性にならない
+    deck = {"slides": [{"pattern": "chart_insight", "title": "売上は2年で12億円へ拡大し成長軌道を維持する",
+                        "chart": {"focal_category": 1, "unit": "億円", "type": "column",
+                                  "categories": ["FY24", "FY25"],
+                                  "series": [{"name": "売上", "values": [10, 12]}]},
+                        "speaker_notes": "売上の推移をご覧ください。1億円の水準からの立ち上がりを経て、FY25には12億円へ届く計画です。伸びの持続性は次のスライドで確認していきます。"}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    assert any("1億円" in ln and "スライド上に無い数値" in ln for ln in r.stdout.splitlines()), r.stdout
+
+
+def test_pyramid_accepts_scalar_tiers(tmp_path):
+    pytest.importorskip("matplotlib")
+    deck = {"slides": [{"pattern": "diagram", "title": "3層の実行体制で意思決定から現場までを接続する",
+                        "diagram": {"kind": "pyramid", "tiers": ["経営", "推進", "現場"]}}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "out.pptx"
+    r = run("build_deck.py", f, "-o", out)
+    assert r.returncode == 0, r.stderr
+
+
+def test_fidelity_flags_sign_flip_against_negative_slide_values(tmp_path):
+    # スライドでは △5.0(損失)のみの数を、正方向の文脈で「5億円」と語ると警告。
+    # 「赤字5億円」のように向きの語があれば通る
+    table = {"headers": ["(億円)", "FY26"], "rows": [["営業利益", "△5.0"]]}
+    base = {"pattern": "comparison_table", "title": "営業損失5.0億円までの縮小を1表で確認する", "table": table}
+    slides = [
+        dict(base, speaker_notes="今期の損益です。営業利益は5億円に到達し、収益化の目処が立ちました。この水準を維持できるかを次のスライドで確認します。八十字対策の補足文です。"),
+        dict(base, speaker_notes="今期の損益です。営業赤字5億円まで縮小し、黒字化が視野に入りました。改善ドライバーの中身は次のスライドで確認します。八十字対策の補足文です。"),
+    ]
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps({"slides": slides}, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    out = r.stdout
+    assert any("slide 1" in ln and "負値" in ln for ln in out.splitlines()), out
+    assert not any("slide 2" in ln and "負値" in ln for ln in out.splitlines()), out
+
+
+def test_sign_flip_not_warned_when_positive_form_also_on_slide(tmp_path):
+    # 同じ数がスライド上に正・負の両形で存在するなら、符号なしのナレーションは正当
+    table = {"headers": ["(億円)", "FY25", "FY26"], "rows": [["売上", "5.0", "6.0"], ["営業利益", "△5.0", "1.0"]]}
+    deck = {"slides": [{"pattern": "comparison_table",
+                        "title": "売上5.0億円と損失解消の同時進行を1表で確認する", "table": table,
+                        "speaker_notes": "この表の見方です。売上は5億円で前期並みを確保しつつ、営業利益は赤字5億円から黒字1億円へ転換しました。両者が同じ5という数字なので読み違えにご注意ください。"}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    assert not any("負値" in ln for ln in r.stdout.splitlines()), r.stdout
+
+
+def test_venn_subsets_derive_from_sizes_and_overlaps():
+    pytest.importorskip("matplotlib")
+    sys.path.insert(0, str(SCRIPTS))
+    import importlib
+    import act_assets
+    act_assets = importlib.reload(act_assets)
+    # 2集合: サイズと重なりから排他リージョンを導出
+    sub2 = act_assets._venn_subsets([{"label": "A", "size": 20}, {"label": "B", "size": 10}], {"AB": 4})
+    assert sub2 == (16.0, 6.0, 4.0)
+    # 3集合: 包除原理で導出され、負にならない
+    sub3 = act_assets._venn_subsets(
+        [{"label": "A", "size": 20}, {"label": "B", "size": 15}, {"label": "C", "size": 10}],
+        {"AB": 5, "AC": 4, "BC": 3, "ABC": 2})
+    assert sub3 == (13.0, 9.0, 3.0, 5.0, 2.0, 1.0, 2.0)
+    assert all(v >= 0 for v in sub3)
+    # サイズ違いは異なるリージョン値になる(固定既定値で潰れない)
+    other = act_assets._venn_subsets([{"label": "A", "size": 40}, {"label": "B", "size": 10}], {"AB": 4})
+    assert other != sub2

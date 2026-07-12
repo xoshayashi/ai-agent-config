@@ -75,6 +75,10 @@ loose.
 22. **wrap_rule** — which text may wrap, the maximum line count, and what to simplify if it
     wraps beyond that.
 
+Fields 11-22 (grid/flex) take their DEFINITIONS from `grid-and-flex-strategy.md` — the
+single source for the layout-contract semantics. The list above only fixes which fields
+must be recorded per slide; do not fork the meanings here.
+
 Then add:
 
 - **annotation_policy** — what is labeled directly and what remains implicit.

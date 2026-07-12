@@ -34,7 +34,9 @@ Set these before slide bodies:
 ## 3. Per-Slide Minimum Vocabulary
 
 Every slide blueprint must include these fields, even if the final `deck.json` maps them to
-existing spec fields:
+existing spec fields. This is the per-slide MINIMUM; the canonical superset (22 numbered
+fields plus the repair fields) is `slide-judgment-system.md` — that file wins on any
+divergence:
 
 - **reader_question**: the question this page answers.
 - **single_takeaway**: the one conclusion the reader should remember.

@@ -184,8 +184,9 @@ def _chart_combo(ax, spec, palette, C):
     ax2 = ax.twinx()
     ax2.plot(x, line["values"], color=C["navy"], marker="o", markersize=5, lw=2.2, zorder=3)
     chip = dict(boxstyle="round,pad=0.15", fc=C["canvas"], ec="none", alpha=0.9)
+    lunit = line.get("unit", "")  # 線は%とは限らない(ARPU等の金額系) — spec の unit で表記する
     for xi, v in zip(x, line["values"]):
-        ax2.annotate(f"{v:,.1f}%", (xi, v), textcoords="offset points", xytext=(0, 9),
+        ax2.annotate(f"{v:,.1f}{lunit}", (xi, v), textcoords="offset points", xytext=(0, 9),
                      ha="center", fontsize=11, fontweight="bold", color=C["navy"],
                      bbox=chip, zorder=4)
     # headroom so the line + its %-labels sit clear BELOW the bar-top zone even when the last bar
@@ -294,7 +295,8 @@ def _diag_funnel(ax, spec, palette, C):
 
 def _diag_pyramid(ax, spec, palette, C):
     from matplotlib.patches import Polygon
-    tiers = spec["tiers"]  # top→bottom [{"label"}]
+    # top→bottom。[{"label": ...}] と ["経営", "現場"] のようなスカラー列の両方を受ける
+    tiers = [t if isinstance(t, dict) else {"label": str(t)} for t in spec["tiers"]]
     n = len(tiers); h = 1.0 / n
     for i, t in enumerate(tiers):
         yt = 1 - i * h; yb = 1 - (i + 1) * h
@@ -308,15 +310,40 @@ def _diag_pyramid(ax, spec, palette, C):
     ax.set_xlim(0, 1); ax.set_ylim(0, 1); ax.axis("off")
 
 
+def _venn_subsets(sets, overlaps):
+    """sets の size と overlaps({"AB": n, "AC": n, "BC": n, "ABC": n})から matplotlib_venn の
+    排他リージョン値を導出する。固定既定値でサイズを無視すると、重なりの違う図が全て同じ
+    見た目になり証拠を誤らせる。overlaps 未指定時は min サイズ比の穏当な既定を使い、
+    導出結果は負にならないようクランプする。"""
+    sizes = [float(s.get("size", 10)) for s in sets]
+    ov = {str(k).upper(): float(v) for k, v in (overlaps or {}).items()}
+    if len(sizes) == 2:
+        ab = ov.get("AB", 0.3 * min(sizes))
+        ab = max(0.0, min(ab, min(sizes)))
+        return (max(sizes[0] - ab, 0.0), max(sizes[1] - ab, 0.0), ab)
+    a, b, c = sizes
+    abc = max(0.0, ov.get("ABC", 0.15 * min(sizes)))
+    ab = max(ov.get("AB", 0.3 * min(a, b)), abc)
+    ac = max(ov.get("AC", 0.3 * min(a, c)), abc)
+    bc = max(ov.get("BC", 0.3 * min(b, c)), abc)
+    return (max(a - ab - ac + abc, 0.0), max(b - ab - bc + abc, 0.0), max(ab - abc, 0.0),
+            max(c - ac - bc + abc, 0.0), max(ac - abc, 0.0), max(bc - abc, 0.0), abc)
+
+
 def _diag_venn(ax, spec, palette, C):
     from matplotlib_venn import venn2, venn3
     sets = spec["sets"]  # [{"label","size"}] len 2 or 3, plus optional "overlaps"
     labels = [s["label"] for s in sets]
+    subsets = tuple(spec["subsets"]) if spec.get("subsets") else _venn_subsets(sets, spec.get("overlaps"))
     if len(sets) == 2:
-        v = venn2(subsets=spec.get("subsets", (10, 10, 4)), set_labels=labels, ax=ax)
+        v = venn2(subsets=subsets, set_labels=labels, ax=ax)
     else:
-        v = venn3(subsets=spec.get("subsets", (10, 10, 3, 10, 3, 3, 2)), set_labels=labels, ax=ax)
-    for i, patch_id in enumerate(("10", "01", "11", "100", "010", "001")):
+        v = venn3(subsets=subsets, set_labels=labels, ax=ax)
+    # venn2 のリージョン id と venn3 の全 id(単集合+重なり)を両方カバーする。
+    # 重なり id("110","101","011","111")を落とすとそこだけ matplotlib_venn の
+    # 既定色が残り、act_theme 一元化の契約が破れる
+    for i, patch_id in enumerate(("10", "01", "11",
+                                  "100", "010", "001", "110", "101", "011", "111")):
         try:
             p = v.get_patch_by_id(patch_id)
             if p:
