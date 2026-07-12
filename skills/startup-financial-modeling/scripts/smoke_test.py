@@ -71,7 +71,7 @@ CASES = {
         "financing": {
             "beginning_cash": 500000000,
             "rounds": [{"year_index": 1, "label": "シリーズA",
-                        "amount": 1500000000}],
+                        "amount": 4000000000}],
         },
     },
 }
@@ -115,7 +115,7 @@ def run_case(name, cfg, with_captable=False):
             return False
         r = subprocess.run(
             [sys.executable, str(HERE / "inspect_workbook.py"),
-             str(out / "smoke.xlsx")],
+             str(out / "smoke.xlsx"), "--recalc"],
             capture_output=True, text=True)
         if r.returncode != 0:
             print(f"FAIL {name}: inspect\n{r.stdout[-1500:]}")
@@ -129,6 +129,19 @@ def main():
     for name, cfg in CASES.items():
         ok &= run_case(name, cfg, with_captable=False)
         ok &= run_case(name, cfg, with_captable=True)
+    # 短期間（4期）でのcap_table/valuation: 感応度3点フォールバックの回帰確認
+    short = dict(CASES["minimal_b2b_only_6y"])
+    short["periods"] = 4
+    short["segments"] = [dict(s, ending_customers=s["ending_customers"][:4],
+                              cost_per_min=s["cost_per_min"][:4])
+                         for s in short["segments"]]
+    short["implementation_cost_pct"] = short["implementation_cost_pct"][:4]
+    short["headcount"] = [dict(h, fte=h["fte"][:4]) for h in short["headcount"]]
+    short["opex"] = dict(short["opex"],
+                         sm_pct_of_revenue=short["opex"]["sm_pct_of_revenue"][:4],
+                         rd_program_yen=short["opex"]["rd_program_yen"][:4])
+    short["capex_yen"] = short["capex_yen"][:4]
+    ok &= run_case("short_4y", short, with_captable=True)
     return 0 if ok else 1
 
 

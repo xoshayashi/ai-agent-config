@@ -31,6 +31,44 @@ def load_config() -> dict:
     return json.loads(CONFIG.read_text(encoding="utf-8"))
 
 
+def check_geometry_arithmetic() -> list[Result]:
+    geometry = json.loads((ROOT / "build" / "references" / "canonical-geometry.json").read_text(encoding="utf-8"))
+    shell, header, body = geometry["outer_shell"], geometry["header"], geometry["body"]
+    padding = shell["padding_px"]
+    equal_shell = (
+        shell["x"] == shell["y"] == padding
+        and geometry["basis"]["width"] - shell["right"] == padding
+        and geometry["basis"]["height"] - shell["bottom"] == padding
+    )
+    subtitle_bottom = header["subtitle"]["y"] + 36
+    glyph_gap_range = (
+        header["subtitle"]["y"] - (header["h1"]["y"] + 50),
+        header["subtitle"]["y"] - (header["h1"]["y"] + 42),
+    )
+    header_fits = (
+        subtitle_bottom <= header["max_visible_bottom"]
+        and body["start_y"] - subtitle_bottom >= 64
+        and glyph_gap_range == (14, 22)
+    )
+    utilization_results = []
+    for mode, bottom, envelope in (
+        ("without_footer", body["bottom_without_footer"], body["target_envelope_without_footer"]),
+        ("with_footer", body["bottom_with_footer"], body["target_envelope_with_footer"]),
+    ):
+        ratio = (envelope["bottom"] - envelope["top"]) / (bottom - body["start_y"])
+        lo, hi = body["height_utilization_range"]
+        utilization_results.append(Result(f"geometry_utilization:{mode}", lo <= ratio <= hi, f"ratio={ratio:.3f}"))
+    envelope = body["target_envelope_without_footer"]
+    centroid = ((envelope["top"] + envelope["bottom"]) / 2) / geometry["basis"]["height"]
+    centroid_ok = body["centroid_y_range_without_footer"][0] <= centroid <= body["centroid_y_range_without_footer"][1]
+    return [
+        Result("geometry_equal_four_side_inset", equal_shell, str(shell)),
+        Result("geometry_header_stack", header_fits, f"subtitle_bottom={subtitle_bottom}, gap={glyph_gap_range}"),
+        Result("geometry_envelope_centroid", centroid_ok, f"centroid={centroid:.3f}"),
+        *utilization_results,
+    ]
+
+
 def runtime_files(globs: list[str]) -> list[Path]:
     files: set[Path] = set()
     all_files = [p for p in ROOT.rglob("*") if p.is_file()]
@@ -653,6 +691,7 @@ def main() -> int:
     results.extend(check_no_old_files())
     results.extend(check_forbidden_patterns(config, content_files))
     results.extend(check_required_phrases(config, files))
+    results.extend(check_geometry_arithmetic())
     results.append(check_script_syntax())
     results.extend(check_entrypoint_symlinks())
     results.extend(check_current_master_contract())

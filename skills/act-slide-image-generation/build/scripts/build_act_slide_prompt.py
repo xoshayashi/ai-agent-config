@@ -14,9 +14,11 @@ IMAGE_MODEL = "gpt-image-2"
 ROOT = Path(__file__).resolve().parents[1]
 GEOMETRY_PATH = ROOT / "references" / "canonical-geometry.json"
 CANONICAL_GEOMETRY = json.loads(GEOMETRY_PATH.read_text(encoding="utf-8"))
-ALLOWED_16_9_SIZES = {"1672x941", "2048x1152"}
+# --size として要求可能なのは gpt-image-2 の制約（両辺16の倍数）を満たすもののみ。
+# 1672x941 はツールが返しうるフォールバック出力のラベルであり、要求サイズには使えない。
+ALLOWED_16_9_SIZES = {"2048x1152"}
 SIZE_LABELS = {
-    "1672x941": "directly generated 16:9 fallback output size",
+    "1672x941": "directly generated 16:9 fallback output size (tool-returned only; not a valid --size)",
     "2048x1152": "default 16:9 2K-width image-generation output size",
 }
 LAYOUT_RATIO_GUIDE = "canonical_geometry_lock: use references/canonical-geometry.json as the single coordinate source and scale proportionally"
@@ -377,7 +379,7 @@ def canonical_planning_block(
   fixed_zone_grid_16_9_lock: derive shell, header, body, and footer zones from references/canonical-geometry.json
   header_zone_boundary_invisible_lock: fixed zones guide placement only; do not render a header-bottom line, footer-top line, rail, band, or shadow at the zone boundaries; no header-area bottom line
   outer_padding_lock: use one 72px inset on all four sides on the 1672 basis, scaled proportionally and reused across the deck
-  content_area_padding_policy: fixed content-zone top/bottom padding is 48px on 2048x1152 output and 39px on the 1672x941 planning basis; reuse it for cards, tables, diagrams, evidence strips, illustrations, and optional Insight placement without density-based padding changes
+  content_area_padding_policy: the 72px four-side containment shell is fixed; body-internal spacing follows the shared 8px grid and selected zonal_mass_plan
   layout_decision_priority: exact-text and semantic integrity -> single header and deck master -> safe shell and minimum readable type -> connected reading path and body silhouette -> region-weight and occupancy balance -> visible outer-margin balance -> decorative refinement
   composition_occupancy_review: measure occupancy, body union, region weights, and blank bands as diagnostic signals; compare them within the selected layout family and approved pilot instead of enforcing universal fill quotas
   grouping_proximity_gate: group-internal gaps stay smaller than group-separation gaps and heading-to-owned-content spacing stays smaller than the separation above the heading
@@ -439,16 +441,16 @@ def canonical_planning_block(
   deck_header_master_lock:
     coordinate_basis: 1672x941
     status: exact_required_before_generation
-    header_safe_area: [x=72 y=72 w=1528 h=94 on the 1672 basis]
+    header_safe_area: [x=72 y=72 w=1528 h=100 on the 1672 basis]
     header_clean_title_block_lock: [quiet text-only H1 and subtitle aligned directly to the outer shell]
     header_title_grid_anchor_lock: [derive H1, subtitle, and body anchors from references/canonical-geometry.json]
-    header_body_clearance_lock: [actual subtitle glyph bottom to first body mark 64-96px]
-    edge_margin_balance_lock: [T2-T4 side margins 24-72px; T1 side margins 96-160px; footer-aware bottom gap]
+    header_body_clearance_lock: [actual subtitle glyph bottom to first body mark 64-80px]
+    edge_margin_balance_lock: [T2-T4 side margins 61-72px; T1 side margins 61-96px; footer-aware bottom gap]
     intentional_space_coverage_lock: [4-column x 3-row grid; intentional blank-cell caps T1=5, T2=2, T3/T4=1]
     focal_aspect_preservation_lock: [single chart, diagram, or illustration keeps native aspect ratio within 5%]
     h1: [x=72 y=72 w=1528 max_lines=1 font_family=Noto Sans JP font_size=38pt weight=700 color #2D332E]
     subtitle: [x=72 y=136 w=1528 max_lines=1 font_family=Noto Sans JP font_size=32pt weight=400 color #626A64]
-    body_start_y: 270
+    body_start_y: 238
   component_inventory: [master components and coordinates]
   equalized_groups: [cards, rows, phase cards, icons]
   shared_edges: [header, main structure, supporting region, insight, source alignment baseline; no visible Source separator]
@@ -792,7 +794,7 @@ draft_image_prompt_scaffold:
   Apply header_identity_lock: the header is the same quiet text-only H1 + subtitle system on every slide, copied from the deck-wide header master.
   Apply header_clean_title_block_lock: use a quiet text-only H1 and subtitle aligned directly to the outer shell, with structural accents beginning in the body.
   Apply header_title_grid_anchor_lock from references/canonical-geometry.json and scale proportionally.
-  Apply header_body_clearance_lock: keep the actual subtitle glyph bottom to first body mark at 64-96px.
+  Apply header_body_clearance_lock: keep the actual subtitle glyph bottom to first body mark at 64-80px.
   Apply edge_margin_balance_lock: T2-T4 body side margins are 24-72px inside the shell and T1 margins are 96-160px; footer-absent bottom gap is 26-80px and footer-present bottom gap is 30-80px.
   Apply intentional_space_coverage_lock: review a 4-column x 3-row body grid; declare blank cells intentionally and keep caps at T1<=5, T2<=2, T3/T4<=1.
   Apply focal_aspect_preservation_lock: a single chart, diagram, or illustration retains its native aspect ratio within 5%; satisfy balance through margins, grouping, and declared blank space.
@@ -1069,7 +1071,7 @@ def deck_plan_tail() -> str:
         fixed_zone_grid_16_9_lock: keep header, content, and footer zones reserved; content objects stay inside the content zone with footer clearance
         header_zone_boundary_invisible_lock: zones are invisible alignment guides; no horizontal header/footer boundary line, rail, band, or shadow
         outer_padding_lock: one 72px inset on all four sides on the 1672 basis, scaled proportionally
-        content_area_padding_policy: fixed content-zone top/bottom padding is 48px on 2048x1152 and 39px on the 1672x941 planning basis; reuse regardless of content amount
+        content_area_padding_policy: the 72px four-side containment shell is fixed; body-internal spacing follows the shared 8px grid and selected zonal_mass_plan
         fixed_zone_grid_status:
         header_zone_boundary_status:
         content_area_padding_consistency_status:
@@ -1188,7 +1190,7 @@ def deck_plan_tail() -> str:
   - fixed_zone_grid_16_9_lock: reserve header/content/footer before placing body content; content may not invade header or footer
   - header_zone_boundary_invisible_lock: zones are invisible alignment guides; no horizontal header/footer boundary line, rail, band, or shadow
   - outer_padding_lock: one 72px inset on all four sides on the 1672 basis, scaled proportionally
-  - content_area_padding_policy: fixed content-zone top/bottom padding is 48px on 2048x1152 and 39px on the 1672x941 planning basis; reuse regardless of content amount
+  - content_area_padding_policy: the 72px four-side containment shell is fixed; body-internal spacing follows the shared 8px grid and selected zonal_mass_plan
   - fixed_zone_grid_status:
   - header_zone_boundary_status:
   - content_area_padding_consistency_status:
@@ -1392,7 +1394,7 @@ def text_structure_tail() -> str:
       fixed_zone_grid_16_9_lock: keep content in the content zone, preserve footer clearance, and solve overflow by density adjustment, split/merge decision, or a new slide
       header_zone_boundary_invisible_lock: zones are invisible alignment guides; no horizontal header/footer boundary line, rail, band, or shadow
       outer_padding_lock: one 72px inset on all four sides on the 1672 basis, scaled proportionally
-      content_area_padding_policy: fixed content-zone top/bottom padding is 48px on 2048x1152 and 39px on the 1672x941 planning basis; reuse regardless of content amount
+      content_area_padding_policy: the 72px four-side containment shell is fixed; body-internal spacing follows the shared 8px grid and selected zonal_mass_plan
       fixed_zone_grid_status:
       header_zone_boundary_status:
       content_area_padding_consistency_status:
@@ -1564,7 +1566,7 @@ composition: {archetype}; grid {grid_mode}; choose one dominant evidence object 
 spacing: use one 72px inset on all four sides; snap major edges and repeated gaps to the shared 8px grid; related gaps are smaller than group-separation gaps
 zonal_mass_plan: header visible marks y=72..172; body available y=238..869 without footer or y=238..806 with footer; target body envelope y=248..815 without footer or y=248..759 with footer; use 72-92% of available body width and 70-90% of available body height; name one intentional quiet region; without footer place the body-only centroid at 54-58% of canvas height
 body_type: on the 1672x941 basis render section headings at 28-34px visible height, primary labels 22-28px, supporting text 18-24px, and takeaway 26-32px no larger than section headings
-canvas_edges: keep every meaningful pixel inside x=72..1600 and y=72..869; measure all four outer clearances against the same 72px inset; keep opposite-side clearance differences <=8px for comparable outer bounds
+canvas_edges: keep every meaningful pixel inside x=72..1600 and y=72..869 using one 72px containment inset on all four sides; for the body union, keep left/right clearance difference <=8px; assess vertical balance through the selected body envelope and centroid target
 style: near-white ACT canvas; Petrol #008A80 for structure; one selective Honey treatment uses #FBF3D7 pale fill with #C49A2C outline or mark; flat rules; restrained corners; every visible element supports the evidence
 readability: normal text contrast >=4.5:1, large text >=3:1; Japanese paragraph lines <=40 CJK glyphs; ragged-right; multi-line explanatory text uses 1.4-1.5 line height; color pairs with label, shape, position, or pattern
 source_line: freeze either one traceable publication string or the literal state none before generation

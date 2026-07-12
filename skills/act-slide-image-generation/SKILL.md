@@ -48,7 +48,7 @@ Prompts follow a short two-layer contract: first state purpose, exact text, zone
 
 ## Canvas Edges
 
-On the 1672x941 basis, keep all meaningful pixels inside the four-side 72px safe shell. Measure top, right, bottom, and left clearances from the same visible-bounds method; comparable opposite-side clearances stay within 8px. Adjust the top through the header master, the sides through the body envelope, and the bottom through body/footer composition. Scale proportionally for other outputs.
+On the 1672x941 basis, keep all meaningful pixels inside the four-side 72px safe shell. This equal inset is a containment contract. Measure optical balance separately: the body union keeps its left/right clearance difference within 8px, while vertical balance follows the selected body envelope and centroid target. Adjust the top through the header master, the sides through the body envelope, and the bottom through body/footer composition. Scale proportionally for other outputs.
 
 Apply a `canvas_furniture_allowlist` before generation and again during pixel review. The top outer band contains only the approved H1 and subtitle beginning at the shared left anchor. The side and bottom outer bands remain quiet canvas, except for a genuine traceable source placed on the approved footer baseline. Treat every visible label, running header, brand name, deck descriptor, page marker, navigation cue, decorative rail, and corner annotation outside the frozen exact-text specification as reference contamination. Repair by restoring the quiet canvas edge while preserving the approved header and body.
 

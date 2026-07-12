@@ -447,6 +447,9 @@ def build_assumptions(wb, reg, cfg):
     sc_cfg = cfg.get("scenario_scales", {})
     vol = sc_cfg.get("volume", [0.75, 1.0, 1.25])
     prc = sc_cfg.get("price", [0.9, 1.0, 1.1])
+    if len(vol) < 3 or len(prc) < 3:
+        raise SystemExit(
+            "scenario_scales.volume / .price には低位・Base・高位の3要素が必要です")
     s.section("シナリオ感応度スケール", note="仮置き。KPIシートの最終年EBITDA感応度で使用")
     for i, lab in enumerate(("低位", "Base", "高位")):
         s.scalar(f"稼働スケール：{lab}", vol[i], FMT_PCT, name=f"a_sc_vol{i}",
@@ -496,26 +499,26 @@ def build_assumptions(wb, reg, cfg):
         for i, lab in enumerate(("低位", "中位", "高位")):
             s.scalar(f"要求収益率：{lab}", v["discount_rate"][i], FMT_PCT,
                      name=f"a_v_dr{i}", italic=True,
-                     note="シリーズA段階20-30%（Damodaran／Pepperdine PCM 2025。2026-07取得）")
+                     note=v.get("dr_note", "ベンチャー段階の要求収益率（ステージ相応の帯を出典付きで設定）"))
         s.scalar("Gordon永久成長率", v["gordon_g"], FMT_PCT, name="a_v_g",
                  italic=True, note="実務レンジ1.5-3.0%（Wall Street Prep）")
         for i, lab in enumerate(("低位", "中位", "高位")):
             s.scalar(f"EBITDA Exit倍率：{lab}", v["ebitda_exit_multiple"][i],
                      FMT_X, name=f"a_v_em{i}",
-                     note="SaaS M&A中央値22.1x（aventis-advisors.com 2015-25。2026-07取得）から保守化")
+                     note=v.get("em_note", "Exit時EBITDA倍率（M&A/上場倍率を出典付きで設定）"))
         for i, lab in enumerate(("低位", "中位", "高位")):
             s.scalar(f"売上Exit倍率（類似上場）：{lab}", v["rev_exit_multiple"][i],
                      FMT_X, name=f"a_v_rm{i}",
-                     note="低3.0x=国内中央値3.3x比の保守値／中5.0x=成長20-30%帯5.5x近傍／高8.0x=AIプレミアム刈込。2026-07取得")
+                     note=v.get("rm_note", "Exit年売上倍率（類似上場の分布から低・中・高を設定）"))
         for i, lab in enumerate(("低位", "中位", "高位")):
             s.scalar(f"売上Exit倍率（類似取引）：{lab}", v["txn_multiple"][i],
                      FMT_X, name=f"a_v_tm{i}",
-                     note="非公開SaaS M&A中央値3.8-4.7x・戦略案件は二桁（Aventis/SEG 2026-07取得）を保守化")
+                     note=v.get("tm_note", "Exit年売上倍率（類似取引の分布から保守側に設定）"))
         s.scalar("非流動性ディスカウント（DLOM）", v["dlom"], FMT_PCT,
                  name="a_v_dlom", italic=True,
-                 note="実証研究20-35%（Damodaran liquidity.pdf／stout.com。2026-07取得）")
+                 note=v.get("dlom_note", "非流動性ディスカウント（実証研究の帯から設定）"))
         s.scalar("シリーズA目標MOIC", v["moic_target"], FMT_X,
-                 name="a_v_moic", note="シリーズA 10-15x（kruzeconsulting.com。2026-07取得）")
+                 name="a_v_moic", note=v.get("moic_note", "ステージ相応の目標MOIC帯"))
         s.scalar("採用レンジ：下限（現在価値EV）", v["adopted_range"][0], FMT_M,
                  name="a_v_adopt_lo",
                  note="類似上場中位〜DCF中位の重なり帯から設定")
@@ -588,7 +591,8 @@ def build_revenue(wb, reg, cfg):
           name="r_total", bold=True, grand=True)
     s.row("売上高成長率（YoY）", FMT_PCT,
           formula=lambda col, t:
-          f"={col}{reg.rows['r_total'][1]}/{col_of(t - 1)}{reg.rows['r_total'][1]}-1",
+          f"=IF({col_of(t - 1)}{reg.rows['r_total'][1]}=0,0,"
+          f"{col}{reg.rows['r_total'][1]}/{col_of(t - 1)}{reg.rows['r_total'][1]}-1)",
           skip_first=True, italic=True, name="r_growth")
     s.row("（参考）期中平均稼働ベース売上", FMT_M,
           formula=lambda col, t: "=" + "+".join(
@@ -647,7 +651,8 @@ def build_headcount(wb, reg, cfg):
     s.section("生産性")
     s.row("一人当たり売上高", FMT_M,
           formula=lambda col, t:
-          f"={s.ref('r_total', col)}/{col}{reg.rows['h_fte_total'][1]}",
+          f"=IF({col}{reg.rows['h_fte_total'][1]}=0,0,"
+          f"{s.ref('r_total', col)}/{col}{reg.rows['h_fte_total'][1]})",
           italic=True, name="h_rev_per_fte")
     return s
 
@@ -774,7 +779,8 @@ def build_pl(wb, reg, cfg):
           name="p_gp", bold=True, total=True)
     s.row("売上総利益率", FMT_PCT,
           formula=lambda col, t:
-          f"={col}{reg.rows['p_gp'][1]}/{col}{reg.rows['p_rev'][1]}",
+          f"=IF({col}{reg.rows['p_rev'][1]}=0,0,"
+          f"{col}{reg.rows['p_gp'][1]}/{col}{reg.rows['p_rev'][1]})",
           name="p_gm", italic=True,
           note=cfg.get("gm_phase_note", "粗利率はドライバーから導出（率の直打ちなし）"))
     s.blank()
@@ -795,7 +801,8 @@ def build_pl(wb, reg, cfg):
           name="p_ebitda", bold=True, total=True)
     s.row("EBITDAマージン", FMT_PCT,
           formula=lambda col, t:
-          f"={col}{reg.rows['p_ebitda'][1]}/{col}{reg.rows['p_rev'][1]}",
+          f"=IF({col}{reg.rows['p_rev'][1]}=0,0,"
+          f"{col}{reg.rows['p_ebitda'][1]}/{col}{reg.rows['p_rev'][1]})",
           name="p_ebitda_m", italic=True)
     s.row("減価償却費", FMT_M,
           formula=lambda col, t:
@@ -814,7 +821,8 @@ def build_pl(wb, reg, cfg):
           name="p_ni", bold=True, grand=True)
     s.row("当期純利益率", FMT_PCT,
           formula=lambda col, t:
-          f"={col}{reg.rows['p_ni'][1]}/{col}{reg.rows['p_rev'][1]}",
+          f"=IF({col}{reg.rows['p_rev'][1]}=0,0,"
+          f"{col}{reg.rows['p_ni'][1]}/{col}{reg.rows['p_rev'][1]})",
           italic=True)
 
     s.section("繰越欠損金スケジュール", note="仮置き：期初残高ゼロ")
@@ -1069,11 +1077,12 @@ def build_summary(wb, reg, cfg):
                   f"=SUMPRODUCT(--(ABS({rng_ck})>{tol}))" if t == 0 else None,
                   note=f"許容誤差±{ck['tol']}")
         agg_rows.append(r)
-    r = s.row("サマリー：エクイティストーリー照合", FMT_CNT,
-              formula=lambda col, t:
-              f"={tie_diff_expr}" if t == 0 else None,
-              note="金額・数量±1%、市場シェア±5%（記載値の2桁丸めに対応）")
-    agg_rows.append(r)
+    if tie_cells:
+        r = s.row("サマリー：ソース記載値照合", FMT_CNT,
+                  formula=lambda col, t:
+                  f"={tie_diff_expr}" if t == 0 else None,
+                  note="金額・数量±1%、市場シェア±5%（記載値の2桁丸めに対応）")
+        agg_rows.append(r)
     first = col_of(0)
     total = s.row("総合判定", "General",
                   formula=lambda col, t:
@@ -1150,7 +1159,8 @@ def build_kpi(wb, reg, cfg):
     magic = s.row("Magic Number（純増ARR÷前年S&M）", FMT_X,
                   formula=lambda col, t:
                   None if t == 0
-                  else f"={col}{netnew}/{s.ref('o_sm', col_of(t - 1))}",
+                  else f"=IF({s.ref('o_sm', col_of(t - 1))}=0,\"—\","
+                       f"{col}{netnew}/{s.ref('o_sm', col_of(t - 1))})",
                   name="k_magic", bench="0.75x以上",
                   note="Scale VP。FY3-5平均で評価。年次は採用ランプを平滑化、解約近似（グロス≒ネット）の概算値")
     s.ws.cell(row=magic, column=s.last_col + 2,
@@ -1191,8 +1201,10 @@ def build_kpi(wb, reg, cfg):
     if b2b_ix:
         s.row("（参考）B2B獲得単価（円/導入単位）", FMT_YEN,
               formula=lambda col, t:
-              f"={s.ref('o_sm', col)}/("
-              + "+".join(s.ref(f"r_new{i}", col) for i in b2b_ix) + ")",
+              f'=IF(('
+              + "+".join(s.ref(f"r_new{i}", col) for i in b2b_ix)
+              + f')=0,"—",{s.ref("o_sm", col)}/('
+              + "+".join(s.ref(f"r_new{i}", col) for i in b2b_ix) + "))",
               name="k_cac", bench="参考値",
               note="S&M計÷新規B2B導入単位。コホート仮定に依存しない獲得効率。LTV逆算は行わない方針")
 
@@ -1305,6 +1317,10 @@ def build_captable(wb, reg, cfg):
     events = ["設立時", "増資前", "増資後", "予備"]
     s = Sheet(wb, reg, "資本政策", cfg, header_labels=events)
     A = col_of(2)  # ラウンド後列
+    if not cfg["financing"].get("rounds"):
+        raise SystemExit(
+            "cap_table / valuation を使うには financing.rounds に少なくとも1件の"
+            "ラウンド（year_index/label/amount）が必要です")
     round0 = cfg["financing"]["rounds"][0]
     raise_col = col_of(round0["year_index"])  # 実施年の資金繰り列
 
@@ -1518,7 +1534,7 @@ def build_valuation(wb, reg, cfg):
 
     # ---- 手法② 類似上場会社 ----
     s.section("手法② 類似上場会社（トレーディングマルチプル）",
-              note="stockanalysis.com 2026-07-11/12取得。LTMベース")
+              note=v.get("comps_source_note", "コンプ各行の備考に出典・取得日を記載する"))
     mini_header(["EV/売上(LTM)", "売上成長率"])
     comp_rows = []
     for c in v["comps"]:
@@ -1680,34 +1696,45 @@ def build_valuation(wb, reg, cfg):
           bold=True, grand=True,
           note="類似上場中位〜DCF中位の重なり帯から設定（青字入力・根拠は前提条件）")
 
-    # ---- 感応度（5×5） ----
+    # ---- 感応度（シート幅に応じて5点または3点） ----
     s.ws.row_breaks.append(Break(id=s.r))
     s.section("感応度：株式価値（EBITDA Exit倍率 × 要求収益率）",
               note="中位×中位セルはDCF中位株式価値と一致（式整合の検算行あり）。点列は低位・中位・高位入力からの内挿")
     def five(a, b, c):
         return [a, f"(({a}+{b})/2)", b, f"(({b}+{c})/2)", c]
-    r_pts = five(s.sref("a_v_dr0"), s.sref("a_v_dr1"), s.sref("a_v_dr2"))
-    m_pts = five(s.sref("a_v_em0"), s.sref("a_v_em1"), s.sref("a_v_em2"))
-    mini_header(["割引率:低位", "低中間", "中位", "中高間", "高位"])
+    n_pts = 5 if s.p >= 5 else 3
+    if n_pts == 5:
+        r_pts = five(s.sref("a_v_dr0"), s.sref("a_v_dr1"), s.sref("a_v_dr2"))
+        m_pts = five(s.sref("a_v_em0"), s.sref("a_v_em1"), s.sref("a_v_em2"))
+        rate_hdrs = ["割引率:低位", "低中間", "中位", "中高間", "高位"]
+        m_labels = ("低位", "低中間", "中位", "中高間", "高位")
+        mid_i = 2
+    else:
+        r_pts = [s.sref("a_v_dr0"), s.sref("a_v_dr1"), s.sref("a_v_dr2")]
+        m_pts = [s.sref("a_v_em0"), s.sref("a_v_em1"), s.sref("a_v_em2")]
+        rate_hdrs = ["割引率:低位", "中位", "高位"]
+        m_labels = ("低位", "中位", "高位")
+        mid_i = 1
+    mini_header(rate_hdrs)
     rate_r = s.row("割引率（点列）", FMT_PCT,
                    formula=lambda col, t:
-                   f"={r_pts[t]}" if t < 5 else None, italic=True)
+                   f"={r_pts[t]}" if t < n_pts else None, italic=True)
     pv_r = s.row("ΣPV（FCF・点列）", FMT_M,
                  formula=lambda col, t:
-                 f"={pv_fcf(f'{col}{rate_r}')}" if t < 5 else None,
+                 f"={pv_fcf(f'{col}{rate_r}')}" if t < n_pts else None,
                  italic=True, note="1行1計算のための分解行。感応度セルはここを参照")
     sens_rows = []
-    m_labels = ("低位", "低中間", "中位", "中高間", "高位")
-    for i in range(5):
+    for i in range(n_pts):
         r = s.row(f"EBITDA倍率：{m_labels[i]}", FMT_M,
                   formula=lambda col, t, i=i:
                   (f"={col}{pv_r}+{m_pts[i]}*{ebitda_ref}"
                    f"/(1+{col}{rate_r})^{s.sref('a_v_n')}"
-                   f"+{s.sref('a_cash0')}") if t < 5 else None)
+                   f"+{s.sref('a_cash0')}") if t < n_pts else None)
         sens_rows.append(r)
     s.check("感応度整合（中位×中位−DCF中位・0=OK）",
-            formula=lambda col, t:
-            f"={col_of(2)}{sens_rows[2]}-{mid}{eq_dcf}" if t == 2 else None,
+            formula=lambda col, t, mid_i=mid_i:
+            f"={col_of(mid_i)}{sens_rows[mid_i]}-{mid}{eq_dcf}"
+            if t == mid_i else None,
             fmt=FMT_M, tolerance=1000)
 
     s.blank()

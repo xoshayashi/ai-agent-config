@@ -53,7 +53,7 @@ Apply `header_alignment_lock`: content slides use left-aligned H1 and subtitle w
 
 Measure the rendered header anchor, body envelope, footer clearance, and body-only optical centroid separately. Keep the header fixed to the deck master; the lowest body element does not move the header. Use top-title and bottom-content margins as descriptive evidence rather than a symmetry target. Repair body imbalance inside the selected content band, preserving header clearance, safe-shell bounds, and footer mode.
 
-On the 1672x941 basis, keep all meaningful pixels inside `x=72..1600 y=72..869`. Measure the same visible-bound method on all four sides and keep comparable opposite-side clearance differences within 8px. Repair the top through the header master, the sides through the body envelope, and the bottom through body/footer composition.
+On the 1672x941 basis, keep all meaningful pixels inside `x=72..1600 y=72..869`; this is the equal four-side containment contract. Measure optical balance separately. The body union keeps its left/right clearance difference within 8px, and vertical balance follows the selected envelope and centroid target. Repair the top through the header master, the sides through the body envelope, and the bottom through body/footer composition.
 
 Freeze a `canvas_furniture_allowlist` with the exact-text specification. The top outer band contains the shared left-aligned H1 and subtitle only. Side and bottom outer bands remain quiet canvas; a genuine traceable source may occupy the approved footer baseline. During full-size review, inventory every visible mark in the outer bands and compare it with the allowlist. Any running header, brand label, deck descriptor, page marker, navigation cue, corner annotation, or decorative rail is classified as `outer_band_contamination` and repaired by restoring the canvas surface without moving the approved header or body.
 
@@ -61,10 +61,10 @@ Freeze a `canvas_furniture_allowlist` with the exact-text specification. The top
 
 Measure the combined body silhouette, including main and supporting regions, through safe bounds, grouping proximity, reading path, and pilot-calibrated optical balance.
 
-- `T2_balanced`, `T3_dense`, `T4_appendix_dense`: body side margins 24-72px inside the shell
-- `T1_sparse`: body side margins 48-96px inside the shell
-- Footer absent: bottom gap 26-80px
-- Footer present: bottom gap 30-80px
+- `T2_balanced`, `T3_dense`, `T4_appendix_dense`: body side margins 61-72px inside the shell
+- `T1_sparse`: body side margins 61-96px inside the shell
+- Footer absent: bottom gap 54-80px
+- Footer present: bottom gap 47-80px
 - Coverage grid: divide the body band into 4 columns x 3 rows; classify each cell as occupied or intentionally blank
 - Occupancy, blank cells, region weights, and blank bands: diagnostic measurements calibrated by layout family and approved pilot, not universal quotas
 - Proximity: related-element gaps are smaller than group-separation gaps; heading-to-owned-content gap is smaller than the separation above the heading

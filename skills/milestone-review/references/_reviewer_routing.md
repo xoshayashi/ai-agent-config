@@ -140,7 +140,7 @@ The thing being reviewed, pasted or referenced unambiguously:
 - A code diff (`git diff <commit>..HEAD -- path`) pasted into the
   prompt as a fenced block.
 - A file slice with absolute path + line numbers
-  (`skills/.../source_plan_builder.py:445-510`), and the slice content
+  (`skills/.../<builder module>.py:445-510`), and the slice content
   itself if the reviewer cannot read the filesystem.
 - A test output (last 50 lines, including the assertion that fired).
 - A spec section with the headline.
@@ -325,7 +325,7 @@ Consequences, all built into `route_review.py`:
 Host: Claude Code (so `advisor()` is available and codex /
 antigravity form the external pool). Milestone: finished implementing
 `apply_semantic_border_span` and replaced the `_write_values` bold path
-in `source_plan_builder.py`.
+in the workbook builder module.
 
 1. **Classify.** "Does the new helper correctly cover all table-block
    cells, including empty middle cells?" → diff-level correctness →

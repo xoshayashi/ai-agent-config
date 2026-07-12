@@ -38,8 +38,8 @@ canvas_furniture_allowlist:
 
 ```text
 edge_margin_balance_lock:
-  T1 side margins: 48-96px
-  T2-T4 side margins: 24-72px
+  T1 side margins: 61-96px
+  T2-T4 side margins: 61-72px
 intentional_space_coverage_lock:
   grid: 4 columns x 3 rows
   calibration: occupancy, blank cells, region weights, and blank bands are compared within the selected layout family and approved pilot
@@ -49,7 +49,7 @@ intentional_space_coverage_lock:
   vertical body utilization: pilot-calibrated; without a pilot preserve deliberate breathing rather than a fill target
   header/body proportion: compact header, body as dominant visual mass
   safe-shell containment: all meaningful body pixels remain inside x=72..1600 and the selected vertical band
-  canvas-edge balance: all meaningful pixels remain inside the four-side 72px safe shell; comparable opposite-side clearances differ by <=8px
+  canvas-edge balance: all meaningful pixels remain inside the four-side 72px containment shell; the body union's left/right clearances differ by <=8px; vertical balance follows its envelope and centroid target
 focal_aspect_preservation_lock:
   single chart, diagram, or illustration: native aspect ratio within 5%
 ```

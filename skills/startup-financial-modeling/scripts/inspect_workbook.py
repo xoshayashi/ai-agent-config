@@ -152,14 +152,20 @@ def recalc_gate(path):
                 for ws in wb.worksheets for row in ws.iter_rows()
                 for c in row if isinstance(c.value, str)
                 and c.value.startswith("#")]
-        verdicts = [c.value for ws in wb.worksheets
-                    for row in ws.iter_rows() for c in row
-                    if c.value in ("OK", "要確認")]
+        verdict = None
+        for ws in wb.worksheets:
+            for row in ws.iter_rows():
+                label = next((c.value for c in row[1:4]
+                              if isinstance(c.value, str) and c.value.strip()),
+                             None)
+                if label == "総合判定":
+                    verdict = next((c.value for c in row[4:]
+                                    if c.value is not None), None)
         if errs:
             print(f"RECALC FAIL: 数式エラー {len(errs)}件: {errs[:5]}")
             return 2
-        if "要確認" in verdicts or "OK" not in verdicts:
-            print(f"RECALC FAIL: 総合判定 = {verdicts or '検出不能'}")
+        if verdict != "OK":
+            print(f"RECALC FAIL: 総合判定 = {verdict or '検出不能'}")
             return 2
         print("recalcゲート通過（数式エラーゼロ・総合判定OK）")
         return 0

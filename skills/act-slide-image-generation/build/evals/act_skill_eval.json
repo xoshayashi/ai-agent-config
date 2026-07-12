@@ -372,7 +372,7 @@
     "subtitle x=72 y=136 w=1528",
     "#626A64",
     "canonical-geometry.json",
-    "side margins 24-72px",
+    "side margins 61-72px",
     "4-column x 3-row",
     "native aspect ratio within 5%",
     "header_integrity_blocker_lock: malformed, missing, oversized, recolored, right-decorated, or intruded header is a blocker and must be repaired before other polish",
