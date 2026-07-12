@@ -36,15 +36,17 @@ When the rendered hierarchy falls outside these bands, regenerate with the shell
 
 ## Content Footprint And Balance
 
-Measure the combined body silhouette, including main and supporting regions.
+Measure the combined body silhouette, including main and supporting regions, through edge margins and intentional-space coverage.
 
-- `T2_balanced`, `T3_dense`, `T4_appendix_dense`: target 90-94% of available width and 86-92% of available height; repair below 88% width or 82% height
-- `T1_sparse`: target 72-84% width and 66-80% height
+- `T2_balanced`, `T3_dense`, `T4_appendix_dense`: body side margins 24-72px inside the shell
+- `T1_sparse`: body side margins 96-160px inside the shell
+- Footer absent: bottom gap 26-80px
+- Footer present: bottom gap 30-80px
 - Horizontal center tolerance: 12px
-- Vertical center tolerance: 8px
+- Vertical center tolerance: 12px absent, 11px present
 - Left/right breathing difference: <=16px
-- Footer-absent lower edge for T2-T4: `y>=835`
-- Footer-present lower edge for T2-T4: `y>=780`
+- Coverage grid: divide the body band into 4 columns x 3 rows; classify each cell as occupied or intentionally blank
+- Intentional blank-cell cap: T1 <=5, T2 <=2, T3/T4 <=1
+- Single chart, diagram, or illustration: preserve native aspect ratio within 5%
 
-Repair a compact-island composition by scaling the focal structure and supporting regions together, widening the body silhouette, and redistributing regions toward the optical targets while preserving 20pt body text and the outer shell.
-
+Prioritize shell bounds, >=20pt body text, edge-margin bands, then optical-center refinement. Repair a compact-island composition by widening or regrouping meaningful regions and reducing undeclared blank cells. Preserve aspect ratio and satisfy balance through margins and intentional blank space.
