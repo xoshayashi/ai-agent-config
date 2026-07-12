@@ -42,7 +42,6 @@ default_config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
 config_home=$(expand_home "${AI_AGENT_CONFIG_HOME:-$default_config_home}")
 codex_home=$(expand_home "${AI_AGENT_CODEX_HOME:-$HOME/.codex}")
 claude_home=$(expand_home "${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}")
-gemini_home=$(expand_home "${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}")
 home_dir=$(expand_home "${AI_AGENT_HOME:-$HOME}")
 skill_source_root="$config_home/skills"
 retired_skill_names="daily-llm-history-instruction-review"
@@ -108,7 +107,7 @@ remove_managed_link() {
 remove_skill_links() {
   [ -d "$skill_source_root" ] || return 0
 
-  for target_home in "$codex_home" "$claude_home" "$gemini_home"; do
+  for target_home in "$codex_home" "$claude_home"; do
     target_root="$target_home/skills"
     for skill_dir in "$skill_source_root"/*; do
       [ -d "$skill_dir" ] || continue
@@ -119,7 +118,7 @@ remove_skill_links() {
 }
 
 remove_retired_skill_links() {
-  for target_home in "$codex_home" "$claude_home" "$gemini_home"; do
+  for target_home in "$codex_home" "$claude_home"; do
     target_root="$target_home/skills"
     for skill_name in $retired_skill_names; do
       remove_managed_link "$target_root/$skill_name" "$skill_source_root/$skill_name" "retired skill link"
@@ -147,8 +146,7 @@ remove_notification_hooks() {
   set -- --mode uninstall \
     --config-home "$config_home" \
     --claude-home "$claude_home" \
-    --codex-home "$codex_home" \
-    --gemini-home "$gemini_home"
+    --codex-home "$codex_home"
   if [ "$dry_run" = "1" ]; then
     set -- "$@" --dry-run
   fi
@@ -173,10 +171,6 @@ remove_managed_link "$codex_home/DESIGN.md" "$src_root/DESIGN.md" "instruction l
 remove_managed_link "$claude_home/CLAUDE.md" "$src_root/CLAUDE.md" "instruction link"
 remove_managed_link "$claude_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "instruction link"
 remove_managed_link "$claude_home/DESIGN.md" "$src_root/DESIGN.md" "instruction link"
-
-remove_managed_link "$gemini_home/GEMINI.md" "$src_root/GEMINI.md" "instruction link"
-remove_managed_link "$gemini_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "instruction link"
-remove_managed_link "$gemini_home/DESIGN.md" "$src_root/DESIGN.md" "instruction link"
 
 remove_shell_links
 
