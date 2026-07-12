@@ -131,18 +131,17 @@ def test_run_reviewer_antigravity_invokes_print_mode() -> None:
         f"agy takes the prompt as argv (no stdin mode), got {cmd!r}"
     )
     # agy's internal print-mode wait (default 5m) must be synced to our
-    # timeout, or it silently caps long reviews below --timeout. At small
-    # timeouts it is passed through unchanged...
-    assert "--print-timeout" in cmd and "30s" in cmd, (
-        f"agy dispatch must forward --print-timeout matching timeout, got {cmd!r}"
+    # timeout WITH a head start (30s, or 25% for small timeouts), so at every
+    # scale agy gives up first with its own error instead of racing our
+    # subprocess kill (external + PR review 2026-07-12: an equal value could
+    # never fire first and was decorative). timeout=30 → 30-7.5 → 23s.
+    assert "--print-timeout" in cmd and "23s" in cmd, (
+        f"agy dispatch must forward --print-timeout with a margin, got {cmd!r}"
     )
     assert result.status == "ok"
     assert result.reviewer == "antigravity"
 
-    # ...and at review-scale timeouts agy gets a 30s head start, so it gives
-    # up first with its own error instead of racing our subprocess kill
-    # (external review 2026-07-12: an equal value could never fire first and
-    # was decorative).
+    # Review-scale timeout: flat 30s head start. 600 → 570s.
     captured2: dict = {}
     _install_fake_run(captured2, completed=_FakeCompleted(stdout="hi", returncode=0))
     route_review.run_reviewer("antigravity", "Review please", timeout=600)
@@ -952,6 +951,25 @@ def test_strict_gate_scans_partial_stdout_of_failed_attempts() -> None:
             f"the gate, got {rc!r}"
         )
         assert "STRICT GATE FAILED" in err
+
+        # PR review 2026-07-12: the gate must also win when EVERY attempt
+        # failed — exit 3 (blocker seen) over exit 1 (merely degraded), or
+        # the human-must-look signal hides inside a degraded run.
+        def fake_run_all_fail(cmd, **kwargs):
+            raise _sp.TimeoutExpired(
+                cmd=cmd, timeout=kwargs.get("timeout"),
+                output="[BLOCKING] partial finding before timeout",
+            )
+
+        route_review.subprocess.run = fake_run_all_fail
+        rc, err = _run_main(
+            ["--reviewer", "codex", "--host", "claude-code", "--prompt", "p",
+             "--strict-gate", "--no-failover"]
+        )
+        assert rc == 3, (
+            f"[BLOCKING] partial output must yield exit 3 even when all "
+            f"attempts failed, got {rc!r}"
+        )
     finally:
         route_review.shutil.which = original_which
         route_review.subprocess.run = original_run

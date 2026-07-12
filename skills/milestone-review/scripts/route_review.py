@@ -75,8 +75,11 @@ DEFAULT_TIMEOUT_SECONDS: int = 600
 DOCTOR_TIMEOUT_SECONDS: int = 120
 DOCTOR_PROMPT: str = "Reply with exactly: OK"
 
-# Host-CLI session markers that must not leak into a reviewer child process:
-# a nested CLI that sees them may change behavior (or refuse to run).
+# Claude Code session markers that must not leak into a reviewer child
+# process: a nested CLI that sees them may change behavior (or refuse to
+# run). These are the only host markers verified so far — if Codex or
+# Antigravity sessions turn out to export equivalents, add them here (the
+# scrub itself is host-agnostic).
 SCRUBBED_ENV_VARS: tuple[str, ...] = (
     "CLAUDECODE",
     "CLAUDE_CODE_ENTRYPOINT",
@@ -185,10 +188,11 @@ def _build_dispatch(
         ], prompt
     if reviewer == "antigravity":
         # agy's internal wait starts after process launch, so an equal value
-        # could never fire before our subprocess kill. Give agy a 30s head
-        # start (for timeouts that can afford it): it then gives up first
-        # with its own error — a timeout stays distinguishable from a review.
-        wait = math.ceil(timeout) - 30 if timeout > 60 else math.ceil(timeout)
+        # could never fire before our subprocess kill. Give agy a head start
+        # — 30s, or 25% for timeouts too small to afford that — so at every
+        # timeout scale agy gives up first with its own error and a timeout
+        # stays distinguishable from a review.
+        wait = math.ceil(timeout - min(30.0, timeout * 0.25))
         return [
             _antigravity_binary(),
             "-p",
@@ -754,14 +758,14 @@ def _main(argv: "Sequence[str] | None" = None) -> int:
         if result.stderr:
             sys.stderr.write(result.stderr)
 
-    if result.status != "ok":
-        return 1
-
     if args.strict_gate:
         # Scan EVERY attempt's stdout, including partial output a timed-out
         # reviewer managed to emit: a [BLOCKING] from a truncated review is a
         # human-must-look signal, and only the fail-closed reading keeps a
         # clean fallback from laundering it (external review 2026-07-12).
+        # This runs BEFORE the degraded-run return below, so the signal
+        # survives even when every attempt failed (PR review 2026-07-12:
+        # exit 3 must win over exit 1 whenever a blocker was seen).
         violations: list[str] = []
         for attempted in all_results:
             for marker in check_strict_gate_violations(attempted.stdout):
@@ -772,6 +776,9 @@ def _main(argv: "Sequence[str] | None" = None) -> int:
                 f"\nroute_review: STRICT GATE FAILED! Found blocking triggers: {', '.join(violations)}\n"
             )
             return 3
+
+    if result.status != "ok":
+        return 1
 
     if any(attempted.status != "ok" for attempted in all_results):
         # Review ran, but only after one or more routes degraded. Exit 4 is

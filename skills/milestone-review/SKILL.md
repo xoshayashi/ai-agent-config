@@ -131,9 +131,9 @@ Full table + selection heuristics in `references/_reviewer_routing.md`.
 
       **Exit codes drive shell loops without `--json`:**
       - `0` = Review ran clean on the first route and passed the quality gate.
-      - `1` = Review degraded (timeout, missing CLI, final non-zero exit) — no usable review.
+      - `1` = Review degraded (timeout, missing CLI, final non-zero exit) — no usable review, and no blocking marker was seen.
       - `2` = Invocation error, nothing dispatched (host self-review, missing host guard, or unreadable prompt-file).
-      - `3` = **Strict gate failed** (a reviewer ran, but a blocking marker was found — scanned across every attempt, including partial output from a timed-out one).
+      - `3` = **Strict gate failed**: a blocking marker was found, scanned across every attempt including partial output from a timed-out one. Wins over exit 1 — a blocker seen in a degraded run must not hide behind "merely degraded".
       - `4` = **Reviewed via failover**: a valid review came back, but only after one or more routes degraded. Treat the answer as a real review, and record the failed route(s) as `degraded` in the milestone log — exit 4 exists precisely so reduced reviewer independence can never look like a clean 0 to a shell loop. The helper also prints a one-line `route_review: attempts: ...` summary to stderr on every multi-attempt dispatch.
 
       Do not let an exit-1 or exit-3 review pass the milestone; an exit-4
