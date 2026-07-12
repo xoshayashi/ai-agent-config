@@ -17,9 +17,13 @@ heavy process.
 
 - Are source facts, selected assumptions, explanatory drivers, checks, and
   decision outputs separated?
+- Does the implementation preserve the Excel generation architecture contract:
+  `openpyxl` as the canonical write/read/audit engine, no live Excel/COM
+  dependency in the core builder, and clear separation between economic
+  inference, workbook composition, and formatting/audit helpers?
 - Are material assumptions triangulated with implied values and support ratios?
-- Do weak-evidence drivers flow into scenario, sensitivity, the Evidence
-  register, or DD questions?
+- Do weak-evidence drivers flow into scenario, sensitivity, benchmarks, or DD
+  questions?
 - Are dependent outputs calculated from primitive drivers rather than assumed
   independently?
 - Does the built model honor every driver the source states — above all the
@@ -34,10 +38,7 @@ heavy process.
 ## Analysis Depth
 
 - Does KPI selection match the business mechanics and decision?
-- Are scenarios coherent cases rather than unrelated scalar shocks, and does
-  the Assumptions toggle + case table actually drive the model body?
-- Are the Summary scenario-comparison and sensitivity snapshots current — does
-  the staleness check row pass against the live Base output?
+- Are scenarios coherent cases rather than unrelated scalar shocks?
 - Are sensitivity axes chosen from material uncertainty and decision impact?
 - Does valuation state method credibility, exclusions, scenario range, and
   investor/founder return?
@@ -49,12 +50,9 @@ heavy process.
   each generated sheet against its sheet-specific gate.
 - Does each sheet have a distinct purpose and ownership surface, or should it
   be omitted/merged for a focused module?
-- Can a reviewer trace the flow from Guide through the Assumptions register
-  (driver map, scenario toggle + case table), the engine sheets (Revenue
-  Build, Cost Build, People Plan), the statements (P&L, BS, CF), Financing and
-  Cap Table, the Evidence register, and the Summary presentation — plus
-  Valuation & Exit and IC Memo when present — without hidden hardcodes or
-  unexplained jumps?
+- Can a reviewer trace the flow from Guide/Kernel to assumptions, driver tree,
+  operating schedules, checks, output analytics, benchmarks, valuation, and IC
+  memo without hidden hardcodes or unexplained jumps?
 - Do output sheets include interpretation and decision implications, not only
   calculations?
 - Do omitted sheets preserve dependency closure and avoid broken references?
@@ -79,22 +77,15 @@ heavy process.
   inspection. Apply both to the finance model itself and to sheet design.
 - For generated or repaired xlsx files, always run an inspection pass before
   closeout. At minimum, inspect the workbook with openpyxl/XML checks for
-  widths, fonts, wraps, merged cells, freeze-pane anchors, row heights, blank-cell
+  widths, fonts, wraps, merged cells, frozen panes, row heights, blank-cell
   styles, semantic fill spans, print areas, chart anchors, and number formats.
   When LibreOffice/PDF/screenshot rendering is available, render and inspect
   the visible output. Use an actual Google Sheets import/readback when the
   handoff target is Google Sheets.
 - Inspect units through formatting as well as values. Monetary cells should
-  store raw base-currency amounts while `number_format` controls the display
-  scale (円 / 千円 / 百万円, `$`, `$K`, `$M`), red `▲` negatives, and
-  dash-zero display. There is no per-cell `¥` symbol: the sheet-corner unit
-  caption plus the unit column declare scale. Verify the two-tier scale rule:
-  statement/engine sheets (P&L, BS, CF, Revenue Build, Cost Build, People
-  Plan, Summary) use one sheet-level scale declared in the caption, with
-  per-unit and ratio rows as the only exceptions; register sheets
-  (Assumptions, Evidence, Financing, Cap Table) may scale per row with the
-  caption pointing at the unit column. Unit labels must match number formats
-  row by row. Treat formulas that divide by 1,000, 1,000,000,
+  store raw base-currency amounts while `number_format` controls `円`, `千円`,
+  `百万円`, `十億円`, `兆円`, `$`, `$K`, `$M`, negative-red parentheses, and
+  dash-zero display. Treat formulas that divide by 1,000, 1,000,000,
   1,000,000,000, or 1,000,000,000,000 only for presentation as a defect unless
   the row is explicitly a ratio or interpretation text surface.
   Verify this rule is scoped to money rows only: operational units such as
@@ -102,20 +93,24 @@ heavy process.
   their native non-money formats and formulas.
 - For generator-produced xlsx files, run `--strict-audit` or the equivalent
   workbook audit before claiming readiness. Strict audit blocks broken sheet
-  references, `#REF!`, missing sheet-quality markers, merged cells, missing or
-  mis-anchored freeze panes, generated wrapping/manual line breaks,
-  non-standard fonts, and
+  references, `#REF!`, missing sheet-quality markers, merged cells, frozen
+  panes, generated wrapping/manual line breaks, non-standard fonts, and
   semantic alignment regressions. Omitted-sheet formulas should be absent
   because focused outputs include the support sheets needed for live formulas.
   Compact-mode placeholders are acceptable only for non-decision helper cells
   and must preserve the original formula for audit.
-- Verify the period-axis header contract: FY-label ruler in row 4 and
-  months-in-period ruler in row 5, period headers in row 6, freeze pane at F7,
-  and a master-check echo cell in the frozen header of every period-axis sheet
-  (grayed, mirroring the Summary master check).
+- When a spreadsheet engine is available, also run the recalculated financial
+  integrity audit. It must confirm that P&L identities, BS balance check,
+  CF roll-forward, CF cash vs BS cash, Capital Stack vs CF cash/runway,
+  Ownership check, selected EV ordering, MOIC, and IRR all reconcile on
+  `data_only=True` values. Formula strings alone are not enough.
+- Run scenario evals before closing a skill upgrade. The full set covers
+  recurring software, marketplace, hardware / asset-heavy, pre-revenue
+  milestone, and fintech balance-sheet models; each scenario must generate,
+  strict-audit, recalculate when possible, and pass the financial integrity
+  audit.
 - Verify that the workbook renders with readable columns, visible overflow
-  where intended, compact row rhythm, semantic fills, F7 freeze panes on
-  period-axis sheets,
+  where intended, compact row rhythm, semantic fills, no frozen panes,
   source / unit alignment, and calm accent usage.
 - Verify text position role-by-role: labels, sources, notes, titles, memos,
   and interpretation text are left-aligned; numeric values, formulas, money,
@@ -123,6 +118,10 @@ heavy process.
   headers, short scenario/matrix headers, and compact column headers are
   centered. Long prose, line-item labels, source caveats, and memo sentences
   should not be centered.
+- Confirm every standard period sheet ends its value block with a terminal
+  `Comment` column after the final period. The column should be wide enough for
+  row-level caveats or DD notes, left-aligned in the header/body, and no
+  populated cells should sit to its right.
 - Confirm workbook default font and populated cell fonts use the canonical
   design tokens: Arial 10pt body/default, 9pt italic gray notes, 14pt title,
   and compact bold section/header rows.
@@ -209,16 +208,28 @@ heavy process.
 - Confirm generated plans use simple editable grids, direct formulas, raw
   base-currency money values, correct unit labels, and consistent font-color
   semantics.
+- Confirm generated formulas avoid volatile functions (`OFFSET`, `INDIRECT`,
+  `RAND`, `RANDBETWEEN`, `NOW`, `TODAY`, `CELL`, `INFO`) and that strict audit
+  blocks any regression.
 
 ## Command Checks
 
 - Minimum executable closeout for generated xlsx work:
 
   ```sh
+  python3 skills/startup-financial-modeling/scripts/quality_gate.py --full
+  python3 skills/startup-financial-modeling/scripts/architecture_gate.py
+  python3 skills/startup-financial-modeling/scripts/scenario_eval.py --full
   PYTHONPYCACHEPREFIX=$(mktemp -d) python3 skills/startup-financial-modeling/build/tests/test_build_model.py
   python3 skills/startup-financial-modeling/scripts/build_model.py --mode pricing --output /tmp/pricing_check.xlsx
   python3 skills/startup-financial-modeling/scripts/build_model.py --mode cap_table --output /tmp/cap_table_check.xlsx
   ```
+
+  If full pytest is too expensive for an interim pass, run
+  `python3 skills/startup-financial-modeling/scripts/quality_gate.py --skip-pytest`
+  at minimum. This still executes the deterministic startup-finance domain
+  rubric and representative `--strict-audit` xlsx builds. The gate must score
+  at least 95/100 before a skill upgrade is called complete.
 
   When LibreOffice is available, recalculate at least one representative
   workbook and inspect cached values with `data_only=True` for spreadsheet
@@ -229,11 +240,7 @@ heavy process.
   unit and display-scale consistency, source/benchmark hygiene, no workbook
   names unless explicitly required, and mode-specific dependency closure.
 - Run the workbook-design checks that prove visible sheet quality:
-  canonical fonts, no wrap/merge/native indent, correct F7 freeze anchors,
-  ruler rows 4/5 and master-check echo on period-axis sheets, uniform period
-  column widths, two-tier scale consistency (unit label ↔ number format), red
-  `▲` negative formats with no per-cell `¥`,
-  Google-Sheets-20px
+  canonical fonts, no wrap/freeze/merge/native indent, Google-Sheets-20px
   hierarchy columns, role-based left/right/center text alignment, constrained
   9/10/11/14pt cell-size palette, no horizontal-read wrap, no styled overflow
   blockers, exact wrap-exception row heights, row heights, semantic fill spans,
@@ -250,15 +257,6 @@ item fails, treat that finding as work still in progress: fix the concrete
 failed item, rerun the same check, and repeat until both the model logic and
 the visible sheet design pass or a real blocker is documented. Do not replace
 failed verification with a narrative explanation.
-
-After the artifact is correct enough for handoff, run the self-improvement gate
-from `_self_improvement_protocol.md`. Use sanitized session evidence to ask
-whether failed commands, repeated repairs, tool degradation, user feedback, or
-cleanup work expose a reusable skill gap. Generalize only invariant process
-lessons, patch the lowest durable layer, add regression proof, and rerun the
-failed check plus a broader gate. Skip skill changes when the lesson is
-company-specific, confidential, unsupported by evidence, or lacks a testable
-regression hook.
 
 In the final response, state what was built, what was verified, and which
 assumptions, placeholders, or source gaps remain. Do not present a weak-source
