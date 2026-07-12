@@ -30,21 +30,36 @@ description: Use when the user needs a startup 収支計画 / financial plan xls
      （ラウンドイベント列方式、循環回避の数式チェーン、希薄化・プール帯）
    - `references/playbook_valuation.md` — バリュエーションシート
      （三大手法のレンジ、Exit Value・投資家リターン、フットボールフィールド、感応度）
-2. **YAMLに構造化** — `scripts/build_workbook.py` の入力スキーマ
-   （セグメント別: ending_customers / churn_rate / fixed_fee_monthly /
-   usage_fee_monthly / usage_rate_per_min / implementation_fee / cost_per_min、
-   ToCセグメントは cogs_pct_of_revenue。共通: headcount / opex / capex_yen /
-   tax_rate / financing / story_checks / scenario_reference）。年次ランプが
-   ソースに無ければ最終年目標から逆算設計し、備考に明記する。
+2. **YAMLに構造化** — `scripts/build_workbook.py` の入力スキーマ（下記は必須。
+   依存: `pip install -r scripts/requirements.txt`＝openpyxl・PyYAML）:
+   - トップレベル必須: `company` / `model_title` / `start_year` / `periods` /
+     `segments` / `implementation_cost_pct` / `headcount`（各行に function・
+     fte・avg_salary・allocation ∈ {COGS,S&M,R&D,G&A}。同一allocationの複数
+     職能は合算される） / `payroll_burden_rate` / `recruiting_cost_per_hire` /
+     `opex`（sm_pct_of_revenue・rd_program_yen・office_cost_per_fte・
+     ga_pct_of_revenue） / `capex_yen` / `depreciation_years` / `tax_rate` /
+     `ar_days` / `ap_days` / `financing`（beginning_cash・rounds[year_index/
+     label/amount]）
+   - セグメント（B2B型）: `ending_customers` / `churn_rate` /
+     `fixed_fee_monthly` / `usage_fee_monthly` / `usage_rate_per_min` /
+     `implementation_fee` / `cost_per_min`。コンシューマ型は
+     `cogs_pct_of_revenue` を持たせる（従量・導入キーは不要）。B2B型・
+     コンシューマ型の数と順序は任意
+   - 任意: `prepay_share`・`prepay_residual_months` / `story_checks`
+     （y5_recurring_revenue 等。あるキーだけ照合行が生成される） /
+     `scenario_reference` / `scenario_scales` / `kpi_thresholds` /
+     `cap_table`（資本政策シート） / `valuation`（バリュエーションシート。
+     cap_table必須） / `gm_phase_note`・`sm_ratio_note` 等の注記オーバーライド
+   年次ランプがソースに無ければ最終年目標から逆算設計し、備考に明記する。
 3. **生成** — `python3 scripts/build_workbook.py --input plan.yaml --outdir 出力先/`
    （xlsxと入力YAMLコピーを同一フォルダーへ出力。PDFも後続手順で同じフォルダーに置き、
    納品物は必ず1フォルダーに集約する）
-4. **機械検査** — `python3 scripts/inspect_workbook.py plan.xlsx`
+4. **機械検査＋再計算ゲート** — `python3 scripts/inspect_workbook.py plan.xlsx --recalc`
    （B列起点、行高デフォルト、青字入力・黒字数式・緑字リンク、書式ホワイト
-   リスト、フィル制限、結合セル・揮発関数禁止。契約は `references/ib_format_spec.md`）
-5. **再計算検証** — LibreOffice `soffice --headless --calc --convert-to xlsx`
-   で再計算し、`data_only=True` でエラーゼロ、サマリーの照合ブロック
-   （モデル値 vs 記載値）が±1%以内、現金非負チェック0を確認する。
+   リスト、フィル制限、結合セル・揮発関数禁止。--recalcはLibreOfficeで再計算し
+   数式エラーゼロ・総合判定OKを強制する。契約は `references/ib_format_spec.md`）
+5. **再計算の内訳確認** — 再計算済みコピーの`data_only=True`で、サマリーの
+   照合ブロック（モデル値 vs 記載値）が宣言許容誤差内、現金非負チェック0を確認する。
 6. **レンダリング目視** — `soffice --headless --convert-to pdf` でPDF化し、
    切れ・重なり・階層崩れを目視する。
 7. **プレイブック照合** — 各シートをプレイブックの品質チェックリストで自己検査

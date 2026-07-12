@@ -17,7 +17,7 @@ Generate final PNG pixels with Codex built-in `gpt-image-2`. Keep each approved 
 
 ## Core Master
 
-Use Noto Sans JP, a near-white ACT canvas, and `build/references/canonical-geometry.json` as the coordinate source. On the 1672x941 basis, the outer shell is `x=72..1600 y=80..861`. H1 uses `x=72 y=80 w=1528`, one line, `38pt/700 #2D332E`. Subtitle uses `x=72 y=126 w=1528`, one line, `32pt/400 #626A64`. The first body mark begins at `y>=270` after 64-96px of quiet clearance.
+Use Noto Sans JP, a near-white ACT canvas, and `build/references/canonical-geometry.json` as the coordinate source. On the 1672x941 basis, apply one 72px inset to all four sides, producing the outer shell `x=72..1600 y=72..869`. H1 uses `x=72 y=72 w=1528`, one line, `38pt/700 #2D332E`. Subtitle uses `x=72 y=136 w=1528`, one line, `32pt/400 #626A64`. The first body mark begins at `y>=238` after 64-80px of quiet clearance from the rendered subtitle.
 
 Resolve design decisions in this order: exact text and meaning; one header identity; safe shell and readable type; connected reading path; grouped body silhouette; optical balance; decorative refinement.
 
@@ -42,13 +42,13 @@ Measure the body envelope and body-only optical centroid. Compare them with the 
 
 At thumbnail size, the header acts as a compact entry point and the body carries the dominant visual mass. Recompose the responsible group when header and body compete or when the body reads as a compact island.
 
-Freeze a `zonal_mass_plan` before generation. On the 1672x941 basis, the header's visible marks stay within `y=80..170`, the body envelope uses `y=270..830` for footer-absent slides or `y=270..790` with a footer, and the outer bands retain deliberate canvas. A typical content slide uses 72-92% of the available body width and 70-90% of the available body height; the selected layout family may use the remaining space as one named quiet region. Review the header, body, and footer as three weighted zones: compact entry, dominant evidence, quiet provenance. Repair by redistributing the body as one group while preserving the fixed header and footer baselines.
+Freeze a `zonal_mass_plan` before generation. On the 1672x941 basis, header visible marks stay within `y=72..172`; the target body envelope uses `y=248..815` without a footer or `y=248..759` with a footer. A typical content slide uses 72-92% of the available body width and 70-90% of the available body height; the selected layout family uses the remaining space as one named quiet region. Without a footer, place the body-only vertical centroid at 54-58% of canvas height. Review the header, body, and footer as three weighted zones: compact entry, dominant evidence, quiet provenance. Repair by redistributing the body as one group while preserving the fixed header and footer baselines.
 
 Prompts follow a short two-layer contract: first state purpose, exact text, zone bounds, and the governing visual relationship; then state palette and material. Repeat the fixed header and edge furniture once in the final acceptance sentence. Refinement edits name one region, one measured delta, and the elements to preserve.
 
 ## Canvas Edges
 
-On the 1672x941 basis, place the topmost and bottommost meaningful pixels within the shared 56-88px edge band and keep their difference within 16px. Adjust the top through the header master and the bottom through body/footer composition. Scale proportionally for other outputs.
+On the 1672x941 basis, keep all meaningful pixels inside the four-side 72px safe shell. Measure top, right, bottom, and left clearances from the same visible-bounds method; comparable opposite-side clearances stay within 8px. Adjust the top through the header master, the sides through the body envelope, and the bottom through body/footer composition. Scale proportionally for other outputs.
 
 Apply a `canvas_furniture_allowlist` before generation and again during pixel review. The top outer band contains only the approved H1 and subtitle beginning at the shared left anchor. The side and bottom outer bands remain quiet canvas, except for a genuine traceable source placed on the approved footer baseline. Treat every visible label, running header, brand name, deck descriptor, page marker, navigation cue, decorative rail, and corner annotation outside the frozen exact-text specification as reference contamination. Repair by restoring the quiet canvas edge while preserving the approved header and body.
 

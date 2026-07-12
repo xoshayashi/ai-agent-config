@@ -10,8 +10,8 @@ Use `scripts/build_act_slide_prompt.py` as the executable scaffold. Apply the th
 
 ```text
 deck_wide_header_consistency_lock:
-  H1: x=72 y=80 w=1528, one line, Noto Sans JP, 38pt/700, #2D332E
-  subtitle: x=72 y=126 w=1528, one line, Noto Sans JP, 32pt/400, #626A64
+  H1: x=72 y=72 w=1528, one line, Noto Sans JP, 38pt/700, #2D332E
+  subtitle: x=72 y=136 w=1528, one line, Noto Sans JP, 32pt/400, #626A64
 rendered_header_scale_gate:
   H1 visible glyph height: 42-50px on 1672x941
   subtitle visible glyph height: 28-36px and 65-78% of H1
@@ -49,7 +49,7 @@ intentional_space_coverage_lock:
   vertical body utilization: pilot-calibrated; without a pilot preserve deliberate breathing rather than a fill target
   header/body proportion: compact header, body as dominant visual mass
   safe-shell containment: all meaningful body pixels remain inside x=72..1600 and the selected vertical band
-  canvas-edge balance: topmost and bottommost meaningful pixels each 56-88px from the edge, difference <=16px
+  canvas-edge balance: all meaningful pixels remain inside the four-side 72px safe shell; comparable opposite-side clearances differ by <=8px
 focal_aspect_preservation_lock:
   single chart, diagram, or illustration: native aspect ratio within 5%
 ```

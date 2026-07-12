@@ -53,6 +53,23 @@ def font(color=BLACK, bold=False, italic=False):
     return Font(name=FONT, size=SIZE, color=color, bold=bold, italic=italic)
 
 
+def b2b_indices(cfg):
+    return [i for i, s in enumerate(cfg["segments"])
+            if "cogs_pct_of_revenue" not in s]
+
+
+def toc_indices(cfg):
+    return [i for i, s in enumerate(cfg["segments"])
+            if "cogs_pct_of_revenue" in s]
+
+
+def alloc_map(cfg):
+    m = {}
+    for i, hc in enumerate(cfg["headcount"]):
+        m.setdefault(hc["allocation"], []).append(i)
+    return m
+
+
 def col_of(t):
     """期間インデックスt（0起点）の列文字。E列起点（B/C/Dはラベル・インデント列）。"""
     return get_column_letter(5 + t)
@@ -313,23 +330,23 @@ def build_assumptions(wb, reg, cfg):
         s.section(f"セグメント：{seg['name']}", note=seg.get("note"))
         s.row(f"期末稼働数（{seg['unit_label']}）", FMT_CNT,
               values=seg["ending_customers"], name=f"a_end{i}",
-              note="Y5はストーリー記載値、Y1-Y4は逆算設計")
+              note=seg.get("ramp_note", "最終年はソース記載値、中間年は逆算設計"))
         s.scalar("解約率（年）", seg["churn_rate"], FMT_PCT, name=f"a_churn{i}", italic=True,
                  note="記載なし・仮置き" if seg["churn_rate"] else "解約織り込みなし")
         s.scalar("月額固定利用料（円/月）", seg["fixed_fee_monthly"], FMT_YEN,
                  name=f"a_fix{i}",
-                 note="ストーリー記載" if is_b2b else "記載の月額5,000円（純額）")
+                 note="ソース記載" if is_b2b else "ソース記載の月額（純額）")
         if is_b2b:
             s.scalar("月額従量利用料（円/月）", seg["usage_fee_monthly"],
-                     FMT_YEN, name=f"a_ufee{i}", note="ストーリー記載")
+                     FMT_YEN, name=f"a_ufee{i}", note="ソース記載")
             s.scalar("従量単価（円/分）", seg["usage_rate_per_min"], FMT_YEN,
                      name=f"a_rate{i}",
-                     note="ストーリー記載。稼働分数＝従量料÷単価")
+                     note="ソース記載。稼働分数＝従量料÷単価")
             s.scalar("導入費（円/件）", seg["implementation_fee"], FMT_YEN,
-                     name=f"a_impl{i}", note="ストーリー記載")
+                     name=f"a_impl{i}", note="ソース記載")
             s.row("従量原価（円/分）", FMT_YEN, values=seg["cost_per_min"],
                   name=f"a_cpm{i}",
-                  note="Phase1→3の原価低減（ストーリー記載）を年次展開")
+                  note="フェーズ別原価低減（ソース記載）の年次展開")
         else:
             s.row("原価率（対売上）", FMT_PCT,
                   values=seg["cogs_pct_of_revenue"], name=f"a_cogspct{i}",
@@ -356,7 +373,7 @@ def build_assumptions(wb, reg, cfg):
     s.row("広告宣伝・販促（対売上）", FMT_PCT, values=op["sm_pct_of_revenue"],
           name="a_smpct", italic=True)
     s.row("モデル開発・GPU・データ", FMT_M, values=op["rd_program_yen"],
-          name="a_rdprog", note="日本語特化モデル内製化投資（Phase2-3）")
+          name="a_rdprog", note=op.get("rd_note", "研究開発プログラム投資"))
     s.scalar("オフィス・情報システム（円/人/年）", op["office_cost_per_fte"],
              FMT_YEN, name="a_office")
     s.scalar("士業・保険・その他管理（対売上）", op["ga_pct_of_revenue"], FMT_PCT,
@@ -394,18 +411,24 @@ def build_assumptions(wb, reg, cfg):
     s.row("エクイティ調達額", FMT_M, values=raise_series, name="a_raise",
           note="・".join(labels))
 
-    sc = cfg["story_checks"]
-    s.section("エクイティストーリー記載値（照合用）", note=src)
-    s.scalar("5年目Recurring基盤収益", sc["y5_recurring_revenue"], FMT_M,
-             name="a_ck_rec", note="ストーリー記載 642.0億円")
-    s.scalar("5年目導入費収益", sc["y5_implementation_revenue"], FMT_M,
-             name="a_ck_impl", note="ストーリー記載 20.6億円")
-    s.scalar("5年目SOM（基盤収益合計）", sc["y5_total_som"], FMT_M,
-             name="a_ck_som", note="ストーリー記載 約662.6億円")
-    s.scalar("5年目B2B稼働導入単位", sc["y5_b2b_units"], FMT_CNT,
-             name="a_ck_b2b", note="Standard 2,000＋Advanced 600＋Regulated 50")
-    s.scalar("5年目ToC/B2B2C有料ユーザー", sc["y5_toc_paid_users"], FMT_CNT,
-             name="a_ck_toc")
+    sc = cfg.get("story_checks", {})
+    if sc:
+        s.section("ソース記載値（照合用）", note=src)
+        if "y5_recurring_revenue" in sc:
+            s.scalar("最終年Recurring収益", sc["y5_recurring_revenue"], FMT_M,
+                     name="a_ck_rec", note="ソース記載値（照合用）")
+        if "y5_implementation_revenue" in sc:
+            s.scalar("最終年導入費収益", sc["y5_implementation_revenue"],
+                     FMT_M, name="a_ck_impl", note="ソース記載値（照合用）")
+        if "y5_total_som" in sc:
+            s.scalar("最終年売上合計（SOM）", sc["y5_total_som"], FMT_M,
+                     name="a_ck_som", note="ソース記載値（照合用）")
+        if "y5_b2b_units" in sc:
+            s.scalar("最終年B2B稼働導入単位", sc["y5_b2b_units"], FMT_CNT,
+                     name="a_ck_b2b", note="B2Bセグメント期末稼働の合計（ソース記載値）")
+        if "y5_toc_paid_users" in sc:
+            s.scalar("最終年ToC/B2B2C有料ユーザー", sc["y5_toc_paid_users"],
+                     FMT_CNT, name="a_ck_toc")
     if "tam" in sc:
         s.scalar("TAM（記載値）", sc["tam"], FMT_M, name="a_ck_tam",
                  note="トップダウン検証用。市場規模の再推計はソース資料側の責務")
@@ -575,12 +598,16 @@ def build_revenue(wb, reg, cfg):
           + f"+{col_of(t)}{reg.rows['r_impl_total'][1]}",
           italic=True, name="r_avg_basis",
           note="認識基準の感応度：期中平均稼働と仮定した場合の参考値")
-    b2b = end_rows[:3]
-    s.row("B2B期末稼働導入単位（社・単位）", FMT_CNT,
-          formula=lambda col, t: "=" + "+".join(f"{col}{r}" for r in b2b),
-          name="r_b2b_units", note="Standard＋Advanced＋Regulated")
-    s.row("ToC/B2B2C有料ユーザー（期末・人）", FMT_CNT,
-          formula=lambda col, t: f"={col}{end_rows[3]}", name="r_toc_users")
+    b2b = [end_rows[i] for i in b2b_indices(cfg)]
+    toc = [end_rows[i] for i in toc_indices(cfg)]
+    if b2b:
+        s.row("B2B期末稼働導入単位（社・単位）", FMT_CNT,
+              formula=lambda col, t: "=" + "+".join(f"{col}{r}" for r in b2b),
+              name="r_b2b_units", note="B2Bセグメント期末稼働の合計")
+    if toc:
+        s.row("ToC/B2B2C有料ユーザー（期末・人）", FMT_CNT,
+              formula=lambda col, t: "=" + "+".join(f"{col}{r}" for r in toc),
+              name="r_toc_users")
     return s
 
 
@@ -627,11 +654,13 @@ def build_headcount(wb, reg, cfg):
 
 def build_opex(wb, reg, cfg):
     s = Sheet(wb, reg, "費用計画", cfg)
-    hc_alloc = {hc["allocation"]: i for i, hc in enumerate(cfg["headcount"])}
-    i_cogs = hc_alloc["COGS"]
-    i_sm = hc_alloc["S&M"]
-    i_rd = hc_alloc["R&D"]
-    i_ga = hc_alloc["G&A"]
+    am = alloc_map(cfg)
+
+    def payroll_expr(col, key):
+        idxs = am.get(key, [])
+        if not idxs:
+            return None
+        return "+".join(s.ref(f"h_cost{i}", col) for i in idxs)
 
     s.section("売上原価")
     cogs_rows = []
@@ -653,9 +682,10 @@ def build_opex(wb, reg, cfg):
         formula=lambda col, t:
         f"={s.ref('r_impl_total', col)}*{s.ref('a_implcost', col)}",
         note="導入売上×導入原価率"))
-    cogs_rows.append(s.row(
-        "デリバリー人件費（オペレーション・CS）", FMT_M, name="o_delivery",
-        formula=lambda col, t: f"={s.ref(f'h_cost{i_cogs}', col)}"))
+    if am.get("COGS"):
+        cogs_rows.append(s.row(
+            "デリバリー人件費（COGS配賦人員）", FMT_M, name="o_delivery",
+            formula=lambda col, t: f"={payroll_expr(col, 'COGS')}"))
     s.row("売上原価合計", FMT_M,
           formula=lambda col, t: "=" + "+".join(f"{col}{r}" for r in cogs_rows),
           name="o_cogs", bold=True, total=True)
@@ -665,23 +695,34 @@ def build_opex(wb, reg, cfg):
                 formula=lambda col, t:
                 f"={s.ref('r_total', col)}*{s.ref('a_smpct', col)}",
                 note="売上×比率（仮置き）")
-    sm2 = s.row("セールス・マーケ人件費", FMT_M,
-                formula=lambda col, t: f"={s.ref(f'h_cost{i_sm}', col)}")
-    s.row("S&M計", FMT_M, formula=lambda col, t: f"={col}{sm1}+{col}{sm2}",
+    sm_rows = [sm1]
+    if am.get("S&M"):
+        sm_rows.append(s.row("セールス・マーケ人件費", FMT_M,
+                             formula=lambda col, t:
+                             f"={payroll_expr(col, 'S&M')}"))
+    s.row("S&M計", FMT_M,
+          formula=lambda col, t: "=" + "+".join(f"{col}{r}" for r in sm_rows),
           name="o_sm", bold=True, total=True)
 
     s.section("R&D（研究開発）")
     rd1 = s.row("モデル開発・GPU・データ", FMT_M,
                 formula=lambda col, t: f"={s.ref('a_rdprog', col)}",
                 note="日本語特化モデル内製化投資")
-    rd2 = s.row("プロダクト・R&D人件費", FMT_M,
-                formula=lambda col, t: f"={s.ref(f'h_cost{i_rd}', col)}")
-    s.row("R&D計", FMT_M, formula=lambda col, t: f"={col}{rd1}+{col}{rd2}",
+    rd_rows = [rd1]
+    if am.get("R&D"):
+        rd_rows.append(s.row("プロダクト・R&D人件費", FMT_M,
+                             formula=lambda col, t:
+                             f"={payroll_expr(col, 'R&D')}"))
+    s.row("R&D計", FMT_M,
+          formula=lambda col, t: "=" + "+".join(f"{col}{r}" for r in rd_rows),
           name="o_rd", bold=True, total=True)
 
     s.section("G&A（管理部門）")
-    ga1 = s.row("コーポレート人件費", FMT_M,
-                formula=lambda col, t: f"={s.ref(f'h_cost{i_ga}', col)}")
+    ga_rows = []
+    if am.get("G&A"):
+        ga_rows.append(s.row("コーポレート人件費", FMT_M,
+                             formula=lambda col, t:
+                             f"={payroll_expr(col, 'G&A')}"))
     ga2 = s.row("オフィス・情報システム", FMT_M,
                 formula=lambda col, t:
                 f"={s.ref('h_fte_total', col)}*{s.ref('a_office', col)}",
@@ -693,9 +734,9 @@ def build_opex(wb, reg, cfg):
     ga4 = s.row("士業・保険・その他管理", FMT_M, name="o_gapctrev",
                 formula=lambda col, t:
                 f"={s.ref('r_total', col)}*{s.ref('a_gapct', col)}")
+    ga_rows += [ga2, ga3, ga4]
     s.row("G&A計", FMT_M,
-          formula=lambda col, t:
-          f"={col}{ga1}+{col}{ga2}+{col}{ga3}+{col}{ga4}",
+          formula=lambda col, t: "=" + "+".join(f"{col}{r}" for r in ga_rows),
           name="o_ga", bold=True, total=True)
 
     s.blank()
@@ -735,7 +776,7 @@ def build_pl(wb, reg, cfg):
           formula=lambda col, t:
           f"={col}{reg.rows['p_gp'][1]}/{col}{reg.rows['p_rev'][1]}",
           name="p_gm", italic=True,
-          note="Phase1 40-50%→Phase2 65-75%→Phase3 85%+（記載）。FY2026は導入初年度の導入原価負担でバンド下限をやや下回る")
+          note=cfg.get("gm_phase_note", "粗利率はドライバーから導出（率の直打ちなし）"))
     s.blank()
     s.row("S&M", FMT_M, formula=lambda col, t: f"={s.ref('o_sm', col)}",
           name="p_sm")
@@ -885,7 +926,7 @@ def build_summary(wb, reg, cfg):
     s.row("売上総利益", FMT_M, formula=lambda col, t: f"={s.ref('p_gp', col)}")
     s.row("売上総利益率", FMT_PCT,
           formula=lambda col, t: f"={s.ref('p_gm', col)}", italic=True,
-          note="Phase1→3の原価低減（ストーリー記載）を反映")
+          note=cfg.get("gm_phase_note", "原価ドライバーから導出"))
     s.row("EBITDA", FMT_M, formula=lambda col, t: f"={s.ref('p_ebitda', col)}",
           bold=True)
     s.row("EBITDAマージン", FMT_PCT,
@@ -896,10 +937,12 @@ def build_summary(wb, reg, cfg):
     s.row("ARR（期末ランレート）", FMT_M,
           formula=lambda col, t: f"={s.ref('r_rec_total', col)}",
           note="期初稼働仮定のためリカーリング売上と一致")
-    s.row("B2B稼働導入単位（社・単位）", FMT_CNT,
-          formula=lambda col, t: f"={s.ref('r_b2b_units', col)}")
-    s.row("ToC/B2B2C有料ユーザー（人）", FMT_CNT,
-          formula=lambda col, t: f"={s.ref('r_toc_users', col)}")
+    if "r_b2b_units" in reg.rows:
+        s.row("B2B稼働導入単位（社・単位）", FMT_CNT,
+              formula=lambda col, t: f"={s.ref('r_b2b_units', col)}")
+    if "r_toc_users" in reg.rows:
+        s.row("ToC/B2B2C有料ユーザー（人）", FMT_CNT,
+              formula=lambda col, t: f"={s.ref('r_toc_users', col)}")
     s.row("従業員数（人）", FMT_CNT,
           formula=lambda col, t: f"={s.ref('h_fte_total', col)}")
     s.row("一人当たり売上高", FMT_M,
@@ -908,7 +951,7 @@ def build_summary(wb, reg, cfg):
     s.section("資金")
     s.row("エクイティ調達", FMT_M,
           formula=lambda col, t: f"={s.ref('c_raise', col)}",
-          note="シリーズA 20億円は仮置き（ストーリーに記載なし）")
+          note="調達額・時期は仮置き（ソースに記載なし）")
     s.row("フリーキャッシュフロー", FMT_M,
           formula=lambda col, t: f"={s.ref('c_fcf', col)}")
     s.row("期末現金", FMT_M, formula=lambda col, t: f"={s.ref('c_end', col)}",
@@ -947,18 +990,22 @@ def build_summary(wb, reg, cfg):
     for c in range(2, 5):
         ws.cell(row=hdr, column=c).border = Border(bottom=THIN)
     s.r += 1
-    ties = [
-        ("Recurring基盤収益", f"={s.ref('r_rec_total', last)}",
-         f"={s.sref('a_ck_rec')}", FMT_M),
-        ("導入費収益", f"={s.ref('r_impl_total', last)}",
-         f"={s.sref('a_ck_impl')}", FMT_M),
-        ("SOM（基盤収益合計）", f"={s.ref('r_total', last)}",
-         f"={s.sref('a_ck_som')}", FMT_M),
-        ("B2B稼働導入単位", f"={s.ref('r_b2b_units', last)}",
-         f"={s.sref('a_ck_b2b')}", FMT_CNT),
-        ("ToC/B2B2C有料ユーザー", f"={s.ref('r_toc_users', last)}",
-         f"={s.sref('a_ck_toc')}", FMT_CNT),
-    ]
+    ties = []
+    if "a_ck_rec" in reg.cells:
+        ties.append(("Recurring基盤収益", f"={s.ref('r_rec_total', last)}",
+                     f"={s.sref('a_ck_rec')}", FMT_M))
+    if "a_ck_impl" in reg.cells and "r_impl_total" in reg.rows:
+        ties.append(("導入費収益", f"={s.ref('r_impl_total', last)}",
+                     f"={s.sref('a_ck_impl')}", FMT_M))
+    if "a_ck_som" in reg.cells:
+        ties.append(("SOM（基盤収益合計）", f"={s.ref('r_total', last)}",
+                     f"={s.sref('a_ck_som')}", FMT_M))
+    if "a_ck_b2b" in reg.cells and "r_b2b_units" in reg.rows:
+        ties.append(("B2B稼働導入単位", f"={s.ref('r_b2b_units', last)}",
+                     f"={s.sref('a_ck_b2b')}", FMT_CNT))
+    if "a_ck_toc" in reg.cells and "r_toc_users" in reg.rows:
+        ties.append(("ToC/B2B2C有料ユーザー", f"={s.ref('r_toc_users', last)}",
+                     f"={s.sref('a_ck_toc')}", FMT_CNT))
     ties = [t + (0.01,) for t in ties]
     if "a_ck_sam" in reg.cells:
         ties += [
@@ -1121,7 +1168,7 @@ def build_kpi(wb, reg, cfg):
                            f"IF({last}{s.r}>={s.sref('a_th_rpe_ok')},\"水準内\",\"要説明\"))",
                 note="SaaS Capital中央値$130K≒2,000万円（150円/$）。最終年で評価")
     band_notes = {
-        "o_sm": "帯30-50%比で低め＝要説明。回答: 高意図接点Land&Expand前提で広告依存を保守化（GTM連動は実績後に精緻化）",
+        "o_sm": cfg.get("sm_ratio_note", "SaaS Capital帯30-50%で帯判定。帯外の場合は前提の説明を注記する"),
         "o_rd": "SaaS Capital Spending Benchmarks。最終年で帯判定",
         "o_ga": "SaaS Capital Spending Benchmarks。最終年で帯判定",
     }
@@ -1140,12 +1187,14 @@ def build_kpi(wb, reg, cfg):
                          f"\"水準内\",\"要説明\"))",
               note=band_notes[key])
 
-    s.row("（参考）B2B獲得単価（円/導入単位）", FMT_YEN,
-          formula=lambda col, t:
-          f"={s.ref('o_sm', col)}/({s.ref('r_new0', col)}"
-          f"+{s.ref('r_new1', col)}+{s.ref('r_new2', col)})",
-          name="k_cac", bench="参考値",
-          note="S&M計÷新規B2B導入単位。コホート仮定に依存しない獲得効率。LTV逆算は行わない方針")
+    b2b_ix = b2b_indices(cfg)
+    if b2b_ix:
+        s.row("（参考）B2B獲得単価（円/導入単位）", FMT_YEN,
+              formula=lambda col, t:
+              f"={s.ref('o_sm', col)}/("
+              + "+".join(s.ref(f"r_new{i}", col) for i in b2b_ix) + ")",
+              name="k_cac", bench="参考値",
+              note="S&M計÷新規B2B導入単位。コホート仮定に依存しない獲得効率。LTV逆算は行わない方針")
 
     s.section("資金効率")
     burn = s.row("Burn Multiple（Net Burn÷純増ARR）", FMT_X,
@@ -1184,10 +1233,13 @@ def build_kpi(wb, reg, cfg):
     L = col_of(p - 1)
     rev = f"'売上計画'!{L}{reg.rows['r_total'][1]}"
     usage = "+".join(f"'費用計画'!{L}{reg.rows[f'o_usage{i}'][1]}"
-                     for i in range(3))
-    mixed = (f"'費用計画'!{L}{reg.rows['o_toccogs3'][1]}"
-             f"+'費用計画'!{L}{reg.rows['o_implcogs'][1]}")
-    fixed_cogs = f"'費用計画'!{L}{reg.rows['o_delivery'][1]}"
+                     for i in b2b_ix) or "0"
+    mixed_parts = [f"'費用計画'!{L}{reg.rows[f'o_toccogs{i}'][1]}"
+                   for i in toc_indices(cfg)]
+    mixed_parts.append(f"'費用計画'!{L}{reg.rows['o_implcogs'][1]}")
+    mixed = "+".join(mixed_parts)
+    fixed_cogs = (f"'費用計画'!{L}{reg.rows['o_delivery'][1]}"
+                  if "o_delivery" in reg.rows else "0")
     ad_gap = (f"'費用計画'!{L}{reg.rows['o_ad'][1]}"
               f"+'費用計画'!{L}{reg.rows['o_gapctrev'][1]}")
     opx = f"'費用計画'!{L}{reg.rows['o_opex'][1]}"
@@ -1253,12 +1305,15 @@ def build_captable(wb, reg, cfg):
     events = ["設立時", "増資前", "増資後", "予備"]
     s = Sheet(wb, reg, "資本政策", cfg, header_labels=events)
     A = col_of(2)  # ラウンド後列
+    round0 = cfg["financing"]["rounds"][0]
+    raise_col = col_of(round0["year_index"])  # 実施年の資金繰り列
 
     s.section("ラウンド前提（シリーズA＝増資列）", note="ポスト入力→プレ差引→株価＝プレ÷既存FD株数の順で循環を回避")
     raise_r = s.row("調達額", FMT_M,
                     formula=lambda col, t:
-                    f"={s.ref('c_raise', col_of(0))}" if t == 2 else None,
-                    name="ct_raise", note="資金繰りシートの調達額を参照（再入力しない）。FY2026実施")
+                    f"={s.ref('c_raise', raise_col)}" if t == 2 else None,
+                    name="ct_raise",
+                    note=f"資金繰りシートの調達額（FY{cfg['start_year'] + round0['year_index']}実施年列）を参照。再入力しない")
     post_r = s.row("ポストマネー評価額", FMT_M,
                    formula=lambda col, t:
                    f"={s.sref('a_ct_post')}" if t == 2 else None,
@@ -1368,8 +1423,8 @@ def build_valuation(wb, reg, cfg):
     """三大手法（DCF／類似上場会社／類似取引）・Exit Value・投資家リターン。"""
     v = cfg["valuation"]
     p = cfg["periods"]
-    labels = ["低位", "中位", "高位", "", ""][:max(3, p)]
-    s = Sheet(wb, reg, "バリュエーション", cfg, header_labels=labels[:p])
+    labels = (["低位", "中位", "高位"] + [""] * max(0, p - 3))[:max(3, p)]
+    s = Sheet(wb, reg, "バリュエーション", cfg, header_labels=labels)
     lo, mid, hi = col_of(0), col_of(1), col_of(2)
     fcf = reg.rows["c_fcf"][1]
     last_fy = col_of(p - 1)
@@ -1579,9 +1634,11 @@ def build_valuation(wb, reg, cfg):
           formula=lambda col, t:
           f"={col}{exit_eq}*'資本政策'!{col_of(2)}{reg.rows['ct_pp'][1]}"
           if t < 3 else None)
-    moic = s.row("シリーズA投資家MOIC", FMT_X,
+    round0 = cfg["financing"]["rounds"][0]
+    moic = s.row("投資家MOIC（直近ラウンド）", FMT_X,
                  formula=lambda col, t:
-                 f"={col}{idist}/'資金繰り'!{col_of(0)}{reg.rows['c_raise'][1]}"
+                 f"={col}{idist}/'資金繰り'!"
+                 f"{col_of(round0['year_index'])}{reg.rows['c_raise'][1]}"
                  if t < 3 else None,
                  name="v_moic", bold=True, total=True,
                  note="優先分配・参加権は未考慮（普通株換算）")
@@ -1594,13 +1651,14 @@ def build_valuation(wb, reg, cfg):
           f'=IF({col}{moic}>={s.sref("a_v_moic")},"目標超過","要説明")'
           if t < 3 else None,
           note="シリーズA目標10-15x（Kruze）。計画達成時のリターン説明力の検証")
-    s.row("（参考）DownsideケースMOIC（売上比例縮約）", FMT_X,
-          formula=lambda col, t:
-          f"={mid}{moic}*{s.sref('a_case2')}/{s.sref('a_case0')}"
-          if t == 1 else None,
-          italic=True,
-          note="ストーリーDownside SOM 391億円をExit売上に比例適用した概算。"
-               "確率加重（First Chicago法）は実績データ取得後に導入")
+    if "a_case2" in reg.cells and "a_case0" in reg.cells:
+        s.row("（参考）DownsideケースMOIC（売上比例縮約）", FMT_X,
+              formula=lambda col, t:
+              f"={mid}{moic}*{s.sref('a_case2')}/{s.sref('a_case0')}"
+              if t == 1 else None,
+              italic=True,
+              note="ソース記載のDownsideケース売上をExit売上に比例適用した概算。"
+                   "確率加重（First Chicago法）は実績データ取得後に導入")
 
     # ---- フットボールフィールド ----
     s.section("フットボールフィールド（レンジサマリー・現在価値EVベース）")
@@ -1632,18 +1690,20 @@ def build_valuation(wb, reg, cfg):
     m_pts = five(s.sref("a_v_em0"), s.sref("a_v_em1"), s.sref("a_v_em2"))
     mini_header(["割引率:低位", "低中間", "中位", "中高間", "高位"])
     rate_r = s.row("割引率（点列）", FMT_PCT,
-                   formula=lambda col, t: f"={r_pts[t]}", italic=True)
+                   formula=lambda col, t:
+                   f"={r_pts[t]}" if t < 5 else None, italic=True)
     pv_r = s.row("ΣPV（FCF・点列）", FMT_M,
-                 formula=lambda col, t: f"={pv_fcf(f'{col}{rate_r}')}",
+                 formula=lambda col, t:
+                 f"={pv_fcf(f'{col}{rate_r}')}" if t < 5 else None,
                  italic=True, note="1行1計算のための分解行。感応度セルはここを参照")
     sens_rows = []
     m_labels = ("低位", "低中間", "中位", "中高間", "高位")
     for i in range(5):
         r = s.row(f"EBITDA倍率：{m_labels[i]}", FMT_M,
                   formula=lambda col, t, i=i:
-                  f"={col}{pv_r}+{m_pts[i]}*{ebitda_ref}"
-                  f"/(1+{col}{rate_r})^{s.sref('a_v_n')}"
-                  f"+{s.sref('a_cash0')}")
+                  (f"={col}{pv_r}+{m_pts[i]}*{ebitda_ref}"
+                   f"/(1+{col}{rate_r})^{s.sref('a_v_n')}"
+                   f"+{s.sref('a_cash0')}") if t < 5 else None)
         sens_rows.append(r)
     s.check("感応度整合（中位×中位−DCF中位・0=OK）",
             formula=lambda col, t:

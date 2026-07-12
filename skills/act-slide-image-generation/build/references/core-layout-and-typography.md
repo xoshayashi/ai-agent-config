@@ -8,15 +8,15 @@ Write every instruction as a target state, selected option, measurable range, an
 
 ## 1672x941 Master Shell
 
-- Outer shell: `x=72..1600`, `y=80..861`
-- Canvas padding: 72px left/right and 80px top/bottom
-- H1: `x=72 y=80 w=1528`, one uniform line, 38pt/700, 36pt floor, 40pt cap, `#2D332E`
-- Subtitle: `x=72 y=126 w=1528`, 32pt/400, 30pt floor, 34pt cap, neutral gray `#626A64`
+- Outer shell: `x=72..1600`, `y=72..869`
+- Canvas padding: one 72px inset on top, right, bottom, and left
+- H1: `x=72 y=72 w=1528`, one uniform line, 38pt/700, 36pt floor, 40pt cap, `#2D332E`
+- Subtitle: `x=72 y=136 w=1528`, 32pt/400, 30pt floor, 34pt cap, neutral gray `#626A64`
 - Header stack gap: actual glyph-to-glyph gap 14-22px, target 18px
-- Header/body quiet band: actual subtitle bottom to first body mark >=64px, target 72-88px
-- Body start: `y=270`
-- Footer absent: available band `y=270..861`, optical target `y=595`
-- Footer present: available band `y=270..810`, footer `y=810..861`, baseline `y=852`, optical target `y=570`
+- Header/body quiet band: actual subtitle bottom to first body mark >=64px, target 64-80px
+- Body start: `y=238`
+- Footer absent: available band `y=238..869`, target envelope `y=248..815`, body-only centroid `y=508..546`
+- Footer present: available band `y=238..806`, target envelope `y=248..759`, baseline `y=858`
 - Horizontal optical target: `x=836`
 
 Scale all coordinates proportionally for an approved output size.
@@ -45,7 +45,7 @@ Treat an oversized rendered H1 as a hierarchy blocker even when it remains on on
 
 ## Deck-Wide Header Consistency
 
-Freeze one header master before slide generation: H1 `38pt/700 #2D332E`, one line, `x=72 y=80 w=1528`; subtitle `32pt/400 #626A64`, one line, `x=72 y=126 w=1528`. Treat these as the target token system; verify the rendered PNG by comparison with the pilot because image models do not guarantee point sizes or baselines exactly. Resolve copy fit through rewriting, redistribution, or slide splitting. Approve when the header reads as the same role and scale at contact-sheet size, the rendered anchors stay within the pilot-calibrated tolerance, and no slide creates a competing header hierarchy.
+Freeze one header master before slide generation: H1 `38pt/700 #2D332E`, one line, `x=72 y=72 w=1528`; subtitle `32pt/400 #626A64`, one line, `x=72 y=136 w=1528`. Treat these as the target token system; verify the rendered PNG by comparison with the pilot because image models do not guarantee point sizes or baselines exactly. Resolve copy fit through rewriting, redistribution, or slide splitting. Approve when the header reads as the same role and scale at contact-sheet size, the rendered anchors stay within the pilot-calibrated tolerance, and no slide creates a competing header hierarchy.
 
 Apply `header_alignment_lock`: content slides use left-aligned H1 and subtitle with the shared `x=72 w=1528` anchor and ragged-right endings. Approve when their first visible glyph x-coordinates differ by <=2px and the H1 aligns to the main body grid within <=4px. Use centered headers only for an explicitly requested cover, interstitial, or closing slide recorded as `header_alignment_exception`.
 
@@ -53,7 +53,7 @@ Apply `header_alignment_lock`: content slides use left-aligned H1 and subtitle w
 
 Measure the rendered header anchor, body envelope, footer clearance, and body-only optical centroid separately. Keep the header fixed to the deck master; the lowest body element does not move the header. Use top-title and bottom-content margins as descriptive evidence rather than a symmetry target. Repair body imbalance inside the selected content band, preserving header clearance, safe-shell bounds, and footer mode.
 
-On the 1672x941 basis, keep the topmost and bottommost meaningful pixels within the shared 56-88px canvas-edge band and their difference within 16px. Repair the top through the header master and the bottom through body/footer composition. Keep all meaningful body pixels inside `x=72..1600` and the selected body band, including borders, arrowheads, and takeaway text.
+On the 1672x941 basis, keep all meaningful pixels inside `x=72..1600 y=72..869`. Measure the same visible-bound method on all four sides and keep comparable opposite-side clearance differences within 8px. Repair the top through the header master, the sides through the body envelope, and the bottom through body/footer composition.
 
 Freeze a `canvas_furniture_allowlist` with the exact-text specification. The top outer band contains the shared left-aligned H1 and subtitle only. Side and bottom outer bands remain quiet canvas; a genuine traceable source may occupy the approved footer baseline. During full-size review, inventory every visible mark in the outer bands and compare it with the allowlist. Any running header, brand label, deck descriptor, page marker, navigation cue, corner annotation, or decorative rail is classified as `outer_band_contamination` and repaired by restoring the canvas surface without moving the approved header or body.
 
@@ -80,10 +80,11 @@ Prioritize shell bounds, >=20pt body text, connected reading path, grouping prox
 
 Freeze the three-zone silhouette before prompting:
 
-- Header visible marks: `y=80..170`, compact text-only entry
-- Footer absent body envelope: `y=270..830`; footer present: `y=270..790`
+- Header visible marks: `y=72..172`, compact text-only entry
+- Footer absent target body envelope: `y=248..815`; footer present: `y=248..759`
 - Typical body width utilization: 72-92% of the available body width
 - Typical body height utilization: 70-90% of the available body height
+- Footer-absent body-only vertical centroid: 54-58% of canvas height
 - Remaining blank space: one explicitly named quiet region that supports the reading path
 
 Judge width and height together. A wide-but-shallow strip, a narrow-and-tall island, or several disconnected mini-panels returns to composition planning. Repair by scaling and redistributing the complete body group inside its fixed band, while the header and footer anchors remain unchanged.

@@ -1,13 +1,18 @@
 #!/usr/bin/env python3
 """IBフォーマット作法の機械検査。references/ib_format_spec.md の実装契約を検証する。
 
-使い方: python3 inspect_workbook.py <xlsx>
-終了コード 0=全パス / 1=違反あり
+使い方: python3 inspect_workbook.py <xlsx> [--recalc]
+  --recalc: LibreOffice(soffice)で再計算し、数式エラーゼロ・総合判定OKまで検証する
+終了コード 0=全パス / 1=違反あり / 2=recalc検証失敗
 """
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 import sys
+import tempfile
+from pathlib import Path
 
 import openpyxl
 
@@ -131,5 +136,37 @@ def main(path):
     return 0
 
 
+def recalc_gate(path):
+    """LibreOfficeで再計算し、#エラーゼロと総合判定OKを強制する。"""
+    soffice = shutil.which("soffice") or "/opt/homebrew/bin/soffice"
+    if not Path(soffice).exists():
+        print("SKIP recalc: sofficeが見つかりません（手動でLibreOffice再計算を実施すること）")
+        return 0
+    with tempfile.TemporaryDirectory() as td:
+        subprocess.run([soffice, "--headless", "--calc", "--convert-to",
+                        "xlsx", "--outdir", td, path],
+                       check=True, capture_output=True, timeout=300)
+        out = Path(td) / Path(path).name
+        wb = openpyxl.load_workbook(out, data_only=True)
+        errs = [f"{ws.title}!{c.coordinate}:{c.value}"
+                for ws in wb.worksheets for row in ws.iter_rows()
+                for c in row if isinstance(c.value, str)
+                and c.value.startswith("#")]
+        verdicts = [c.value for ws in wb.worksheets
+                    for row in ws.iter_rows() for c in row
+                    if c.value in ("OK", "要確認")]
+        if errs:
+            print(f"RECALC FAIL: 数式エラー {len(errs)}件: {errs[:5]}")
+            return 2
+        if "要確認" in verdicts or "OK" not in verdicts:
+            print(f"RECALC FAIL: 総合判定 = {verdicts or '検出不能'}")
+            return 2
+        print("recalcゲート通過（数式エラーゼロ・総合判定OK）")
+        return 0
+
+
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1]))
+    code = main(sys.argv[1])
+    if code == 0 and "--recalc" in sys.argv[2:]:
+        code = recalc_gate(sys.argv[1])
+    sys.exit(code)
