@@ -29,18 +29,14 @@ Map mechanics from facts, not labels:
 
 ## Finance Surfaces
 
-Include surfaces only when they answer the decision. They compose into the
-three-layer workbook (Assumptions → engines → Summary, 12-sheet cap):
+Include surfaces only when they answer the decision:
 
 - Revenue build, cost build, people plan, capex, working capital, P&L, BS, CF.
-- KPIs and unit economics by the real economic unit (the Summary KPI block; a
-  dedicated Unit Economics sheet only in that focused mode).
-- Financing (sources & uses, instruments, venture debt, leases, covenants,
-  cash runway) and the Cap Table rounds register (dilution, convertible
-  conversion, option pool, secondary, voting thresholds).
-- Evidence (comparables, benchmarks, isolated market sanity), valuation & exit
-  (methods, DCF, exit multiple, SOTP, exit waterfall, investor return), and
-  the IC memo when the decision needs one.
+- KPI and unit economics by the real economic unit.
+- Capital stack, dilution, convertible conversion, option pool, secondary,
+  taxes, venture debt, leases, covenants, and cash runway.
+- Market support, comparables, valuation, DCF, exit multiple, SOTP, M&A exit,
+  and investor memo.
 
 ## Modeling Standard
 
