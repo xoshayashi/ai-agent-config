@@ -15,15 +15,13 @@ SIZE_LABELS = {
     "2048x1152": "default 16:9 2K-width image-generation output size",
 }
 LAYOUT_RATIO_GUIDE = (
-    "layout_ratio_system_lock: fixed 16:9 vertical zones are recalculated from the 1920x1080 guide "
-    "header 120px / content 900px / footer 60px; at 2048x1152 output use header_zone_h=128, "
-    "content_zone_h=960, footer_zone_h=64; at the 1672x941 planning basis use header_zone_h=105, "
-    "content_zone_h=784, footer_zone_h=52"
+    "layout_ratio_system_lock: on the 1672x941 basis use outer_shell x=72..1600 y=80..861, "
+    "header_title_stack y=80..238, body_start_y=270, footer-absent body band y=270..861, "
+    "and footer-present body band y=270..810; scale proportionally"
 )
 CONTENT_PADDING_GUIDE = (
-    "outer_padding_lock and content_area_padding_policy: fixed slide padding is reused on every slide regardless of "
-    "content amount; at 2048x1152 use 64px left/right outer padding and 48px content-zone top/bottom padding; "
-    "at the 1672x941 planning basis use 52px left/right outer padding and 39px content-zone top/bottom padding"
+    "outer_padding_lock and content_area_padding_policy: on the 1672x941 basis use 72px left/right "
+    "and 80px top/bottom canvas padding, scaled proportionally and reused across the deck"
 )
 REQUIRED_PROMPT_FIELDS = [
     "slide_message",
@@ -122,13 +120,12 @@ REQUIRED_PROMPT_FIELDS = [
     "overload_controls",
     "near_white_slide_base_lock",
     "header_anchor",
-    "header_accent_geometry_lock",
-    "header_left_accent_master_lock",
-    "header_left_accent_reference_lock",
-    "header_left_accent_shape_lock",
-    "header_left_accent_title_top_alignment_lock",
-    "header_left_accent_no_protrusion_rule",
-    "header_left_accent_top_protrusion_blocker",
+    "header_clean_title_block_lock",
+    "header_title_grid_anchor_lock",
+    "header_body_clearance_lock",
+    "edge_margin_balance_lock",
+    "intentional_space_coverage_lock",
+    "focal_aspect_preservation_lock",
     "footer_anchor_baseline",
     "header_footer_text_color_lock",
     "message_box_scale_lock",
@@ -357,9 +354,9 @@ def canonical_planning_block(
   row_tracks: [header/body/supporting-context/insight/source alignment baselines; source baseline is not a visible rule]
   column_tracks: [outer shell, main columns, separator, supporting/context columns]
   separator_x: [required when the selected composition uses a visible or structural separator; none when there is no split]
-  fixed_zone_grid_16_9_lock: 16:9 vertical zones are fixed from the 1920x1080 guide and recalculated to this skill's sizes; 2048x1152 output zones are header 128px, content 960px, footer 64px; 1672x941 planning zones are header 105px, content 784px, footer 52px; content must stay in the content zone unless a declared overflow split creates a new slide
+  fixed_zone_grid_16_9_lock: on the 1672 basis use outer shell y=80..861, header title stack y=80..238, body_start_y=270, footer-absent band y=270..861, and footer-present band y=270..810
   header_zone_boundary_invisible_lock: fixed zones guide placement only; do not render a header-bottom line, footer-top line, rail, band, or shadow at the zone boundaries; no header-area bottom line
-  outer_padding_lock: fixed deck outer padding is 64px left/right on 2048x1152 output and 52px left/right on the 1672x941 planning basis; reuse it on every slide regardless of content amount
+  outer_padding_lock: use 72px left/right and 80px top/bottom canvas padding on the 1672 basis, scaled proportionally and reused across the deck
   content_area_padding_policy: fixed content-zone top/bottom padding is 48px on 2048x1152 output and 39px on the 1672x941 planning basis; reuse it for cards, tables, diagrams, evidence strips, illustrations, and optional Insight placement without density-based padding changes
   major_regions: [max three]
   coordinate_inventory_1672:
@@ -417,21 +414,16 @@ def canonical_planning_block(
   deck_header_master_lock:
     coordinate_basis: 1672x941
     status: exact_required_before_generation
-    header_safe_area: [x/y/w/h exact selected values; ACT default x=44 y=12 w=1584 h=72 within the 105px planning header zone]
-    vertical_line: [x/y/w/h/color exact selected values; ACT default x=50 y=37 w=10 h=41 color #008A80; scaled 2048 output x=61 y=45 w=12 h=50 with bottom around y=95; y is optically aligned to the visible H1 glyph top, not the H1 text-box y; width is fixed at 10px on the 1672 basis and 12px on the 2048 output]
-    header_line_top_rule: [accent top must align exactly with the first visible H1 glyph/title top; no above-title protrusion and no below-title offset]
-    header_left_accent_master_lock: [single header-block left accent copied verbatim on every slide; it spans the H1 + subtitle stack; it is not a page-edge rail, sidebar, body marker, chapter stripe, or slide-specific decoration]
-    header_left_accent_reference_lock: [match approved reference geometry on a 1672x941 basis: x=50 y=37 w=10 h=41 color #008A80]
-    header_left_accent_shape_lock: [single solid vertical rectangle, 10px wide, 0-2px radius, no pill caps, shadow, glow, gradient, split segments, or duplicate accent]
-    header_left_accent_title_top_alignment_lock: [the accent top aligns exactly with the first visible H1 glyph/title top, not the H1 text-box y; any visible offset above or below the title top is a blocker]
-    header_left_accent_no_protrusion_rule: [the accent top never sits above the H1 glyph/title top; upward protrusion is a blocker]
-    header_left_accent_top_protrusion_blocker: [any visible accent pixel above the first visible H1 glyph/title top, clipped/floating near page top, detached from H1/subtitle, or extending into body_start_y is a blocker]
-    h1: [x/y/w/max_lines/font_family/font_size/weight/line_height/color exact selected values; ACT default x=88 y=18 w=1332 max_lines=1 font_family=Noto Sans JP size=28pt weight=700 line_height=1.10 color #2D332E]
-    subtitle: [x/y/w/max_lines/font_family/font_size/weight/line_height/color exact selected values; ACT default x=88 y=52 w=1332 max_lines=1 font_family=Noto Sans JP size=18pt weight=400 line_height=1.14 color #4D544E]
-    visual_alignment: [visible accent top aligns exactly with the H1 glyph/title top; visible accent bottom lands 4-10px below subtitle lower visual edge; no upward protrusion and no below-title offset]
-    body_start_y: [exact selected value; ACT default 105, matching the fixed content-zone start; if the title cannot fit, shorten/split rather than expanding the header]
-    upper_right_clear_zone: [x/y/w/h exact selected values and empty; ACT default x=1420 y=12 w=208 h=56]
-    forbidden_header_elements: [separate ACT wordmark or brand label, slide number, title kicker, header badge, logo/right object unless the user explicitly provides it as visible exact_text, right-side header decoration, body objects above body_start_y]
+    header_safe_area: [x=72 y=80 w=1528 h=158 on the 1672 basis]
+    header_clean_title_block_lock: [quiet text-only H1 and subtitle aligned directly to the outer shell]
+    header_title_grid_anchor_lock: [H1 x=72 y=80 w=1528; subtitle x=72 y=126 w=1528; body_start_y=270]
+    header_body_clearance_lock: [actual subtitle glyph bottom to first body mark 64-96px]
+    edge_margin_balance_lock: [T2-T4 side margins 24-72px; T1 side margins 96-160px; footer-aware bottom gap]
+    intentional_space_coverage_lock: [4-column x 3-row grid; intentional blank-cell caps T1=5, T2=2, T3/T4=1]
+    focal_aspect_preservation_lock: [single chart, diagram, or illustration keeps native aspect ratio within 5%]
+    h1: [x=72 y=80 w=1528 max_lines=1 font_family=Noto Sans JP font_size=40pt weight=700 color #2D332E]
+    subtitle: [x=72 y=126 w=1528 max_lines=1 font_family=Noto Sans JP font_size=32pt weight=400 color #4D544E]
+    body_start_y: 270
   component_inventory: [master components and coordinates]
   equalized_groups: [cards, rows, phase cards, icons]
   shared_edges: [header, main structure, supporting region, insight, source alignment baseline; no visible Source separator]
@@ -490,19 +482,16 @@ def canonical_planning_block(
   information_unit_budget: [H1, subtitle, grouped body labels, decision-relevant data labels or rows, optional one-sentence Insight, required source when traceable; no default cap on decision-relevant numbers]
   density_guardrails: [preserve distinct messages, combine only repeated or shared-comparison slides, no smaller body text, no decorative illustration detail]
   header_anchor:
-    vertical_line: exact x/y/w/h/color copied from deck_header_master_lock
-    header_line_top_rule: copied from deck_header_master_lock and checked after generation
-    header_left_accent_master_lock: exact header-block left accent spanning H1 + subtitle; not a page-edge rail, sidebar, body marker, or decoration
-    header_left_accent_reference_lock: exact reference geometry x=50 y=37 w=10 h=41 on 1672x941 basis unless a newer embedded master is supplied
-    header_left_accent_shape_lock: single solid vertical rectangle, 10px wide, 0-2px radius, no cap/glow/shadow/gradient/split
-    header_left_accent_title_top_alignment_lock: accent top aligns exactly with the first visible H1 glyph/title top, not the H1 text-box y; any above-title or below-title offset is a blocker
-    header_left_accent_no_protrusion_rule: accent top never sits above the H1 glyph/title top; any upward protrusion above H1 is a blocker
-    header_left_accent_top_protrusion_blocker: any visible accent pixel above H1 glyph/title top, page-top floating, clipping, detachment from H1/subtitle, or body intrusion is a blocker; repair x/y/h before any other polish
+    header_clean_title_block_lock: copied from deck_header_master_lock
+    header_title_grid_anchor_lock: copied from deck_header_master_lock
+    header_body_clearance_lock: copied from deck_header_master_lock
+    edge_margin_balance_lock: copied from deck_header_master_lock
+    intentional_space_coverage_lock: copied from deck_header_master_lock
+    focal_aspect_preservation_lock: copied from deck_header_master_lock
     h1: exact x/y/w/max_lines/font_family/font_size/weight/line_height/color copied from deck_header_master_lock
     subtitle: exact x/y/w/max_lines/font_family/font_size/weight/line_height/color copied from deck_header_master_lock
     visual_alignment: exact visual alignment rule copied from deck_header_master_lock
     body_start_y: exact selected y copied from deck_header_master_lock
-    upper_right_clear_zone: exact x/y/w/h copied from deck_header_master_lock and kept empty
   footer_anchor_baseline: 1672 basis x=44-56 baseline y=895-912, invisible alignment position only, planned even if source_line is none; select one exact x and one exact baseline y at deck-master time and reuse them verbatim
   header_footer_text_color_lock: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E; no Petrol/Honey/arbitrary gray in header or footer text
   message_box_optionality_lock: Insight/message-box is selective and occasional, never a default slide requirement; many slides should use no message box
@@ -573,8 +562,8 @@ def mode_guidance(mode: str) -> str:
   - Apply chart_emphasis_lock, encoding_consistency_lock, and number_format_normalization_lock on chart/table/matrix slides before freezing exact_text.
   - Apply speaker_notes_persuasion_lock: stage current-state vs intended-future tension, balance logos with selective ethos and pathos, end with a landing sentence and signpost transition, record notes_persuasion_arc, and add a justified notes_hook, notes_objection_preempt, or delivery markers only where they help.
   - Apply source_real_only_lock and source_line_lock: render Source: ... only for real traceable external/provided sources; use source_line: none and draw no Source footer when no real source exists.
-  - Apply layout_ratio_system_lock and fixed_zone_grid_16_9_lock: translate the 1920x1080 ergonomic guide into this skill's sizes, using 2048x1152 zones header 128px / content 960px / footer 64px and 1672x941 planning zones header 105px / content 784px / footer 52px.
-  - Apply outer_padding_lock and content_area_padding_policy: use fixed 2048x1152 padding of 64px left/right and 48px content-zone top/bottom, or fixed 1672x941 planning padding of 52px left/right and 39px top/bottom; reuse these values on every slide regardless of content amount.
+  - Apply layout_ratio_system_lock and fixed_zone_grid_16_9_lock from the 1672 master shell x=72..1600 y=80..861 with body_start_y=270 and conditional footer bands.
+  - Apply outer_padding_lock and content_area_padding_policy: use 72px left/right and 80px top/bottom canvas padding on the 1672 basis and scale proportionally.
   - Apply output_artifact_mastering_lock, single_final_png_master_lock, and no_duplicate_png_output_lock: use slides_final/ as the single loose-PNG master; slides_package/ stores PPTX/notes/manifest only; render_check/pdf_pages/ is disposable QA output only.
   - Apply contact_sheet_mastering_lock and single_contact_sheet_policy: keep one retained contact sheet from slides_final/ by default; generate a comparison contact sheet only when delivery/render QA needs it.
   - Build layout_diversity_plan: assign layout_family for each slide across full-field, asymmetric main/supporting-context, balanced comparison, top-bottom, center-hub, process, matrix, small-multiple, swimlane, and staircase families when the argument benefits.
@@ -616,8 +605,8 @@ def mode_guidance(mode: str) -> str:
   - Start with opening_thesis_slide rather than a title-only first slide: the opener should make the main phrase memorable while also showing the thesis, tension/proof points, structure, and bridge.
   - Select layout_archetype and grid_mode for every slide.
   - Apply source_real_only_lock and source_line_lock: render Source: ... only for real traceable external/provided sources; use source_line: none and draw no Source footer when no real source exists.
-  - Apply layout_ratio_system_lock and fixed_zone_grid_16_9_lock: translate the 1920x1080 ergonomic guide into this skill's sizes, using 2048x1152 zones header 128px / content 960px / footer 64px and 1672x941 planning zones header 105px / content 784px / footer 52px.
-  - Apply outer_padding_lock and content_area_padding_policy: use fixed 2048x1152 padding of 64px left/right and 48px content-zone top/bottom, or fixed 1672x941 planning padding of 52px left/right and 39px top/bottom; reuse these values on every slide regardless of content amount.
+  - Apply layout_ratio_system_lock and fixed_zone_grid_16_9_lock from the 1672 master shell x=72..1600 y=80..861 with body_start_y=270 and conditional footer bands.
+  - Apply outer_padding_lock and content_area_padding_policy: use 72px left/right and 80px top/bottom canvas padding on the 1672 basis and scale proportionally.
   - Apply output_artifact_mastering_lock, single_final_png_master_lock, and no_duplicate_png_output_lock: use slides_final/ as the single loose-PNG master; slides_package/ stores PPTX/notes/manifest only; render_check/pdf_pages/ is disposable QA output only.
   - Apply contact_sheet_mastering_lock and single_contact_sheet_policy: keep one retained contact sheet from slides_final/ by default; generate a comparison contact sheet only when delivery/render QA needs it.
   - Create layout_diversity_plan and layout_rotation_guard before final prompts so the deck can use the expanded pattern catalogue without drifting from ACT brand and header rules.
@@ -722,9 +711,9 @@ draft_image_prompt_scaffold:
   Apply positive_quality_lock: state the desired calm editorial slide quality before blockers: clear figure-ground separation, exact text, compact fixed header, one dominant structure, grouped evidence, stable line weight, restrained accent area, and a concrete visual anchor.
   Apply design_balance_gate: freeze intended body occupancy, useful whitespace role, content-area weight, text-role sizes, background role, and accent role before generation.
   Apply layout_ratio_system_lock: use the recalculated ergonomic fixed vertical zones: header 128px, content 960px, footer 64px on 2048x1152 output; header 105px, content 784px, footer 52px on the 1672x941 planning basis.
-  Apply fixed_zone_grid_16_9_lock: reserve header, content, and footer zones before placing elements; content cannot invade header or footer, and overflow must be solved by density-tier adjustment, split/merge decision, or a new slide.
+  Apply fixed_zone_grid_16_9_lock: on the 1672 basis use outer shell y=80..861, header title stack y=80..238, and body band beginning at y=270; select footer_mode before placing body content.
   Apply header_zone_boundary_invisible_lock: fixed zones are invisible guides; a visible horizontal line, rail, band, or shadow at the header/content boundary or footer boundary is repair_required.
-  Apply outer_padding_lock and content_area_padding_policy: use fixed 2048x1152 padding of 64px left/right and 48px content-zone top/bottom; use fixed 1672x941 planning padding of 52px left/right and 39px top/bottom. Left/right and top/bottom padding are deck constants and do not change with content amount, density_tier, layout family, or illustration presence.
+  Apply outer_padding_lock and content_area_padding_policy: use 72px left/right and 80px top/bottom canvas padding on the 1672 basis, scaled proportionally. Preserve these deck constants across density tiers and layout families.
   Apply occupancy_density_fit_lock: body occupancy must match density_tier without dead zones, margin crush, overcrowding, or smaller-than-20pt body/card/table/data text.
   Apply font_scale_unity_lock and palette_role_unity_lock: reuse one deck-level type scale and one stable ACT color-role system; repair font, text color, background, or accent drift before approval.
   PPTX is a delivery wrapper only. Never create final PNGs by exporting, rendering, or screenshotting a PPTX.
@@ -748,9 +737,9 @@ draft_image_prompt_scaffold:
   Apply nonconforming_existing_png_regeneration_lock: when existing/source PNGs are 1672x941 or another non-approved package size, do not treat package-script rejection as final blockage and do not convert, upscale, HTML-render, API-render, or locally redraw them. Reuse the approved slide specification and generate new 2048x1152 slides_final/ masters with Codex built-in gpt-image-2, then review and package those generated masters.
   Apply pdf_export_source_lock: build PDF outputs from approved slides_final/ master PNGs; never duplicate final PNG masters into render_check/pdf_pages/ for PDF creation.
   Use size terminology consistently: 1672x941 is layout-coordinate basis only, and 2048x1152 is the single 16:9 2K-width generated PNG master size for delivery wrappers.
-  Apply fixed_zone_grid_16_9_lock: the 1920x1080 guide's 120/900/60px vertical split recalculates to 2048x1152 header/content/footer zones of 128/960/64px and to 1672x941 planning zones of 105/784/52px; content placement, Insight sizing, and footer clearance are judged against those zones.
+  Apply fixed_zone_grid_16_9_lock: use outer shell x=72..1600 y=80..861, header title stack y=80..238, body_start_y=270, footer-absent band y=270..861, and footer-present band y=270..810 on the 1672 basis; scale proportionally.
   Apply header_zone_boundary_invisible_lock: never add a visible y=128 or y=1088 boundary rule, separator, rail, band, or shadow; only the header left accent, content objects, and source text may make the zones perceptible.
-  Apply outer_padding_lock and content_area_padding_policy: record the fixed deck padding before generation and reuse it verbatim; solve overflow by trimming, regrouping, changing the structure, or splitting the slide, not by changing outer padding.
+  Apply outer_padding_lock and content_area_padding_policy: record 72px left/right and 80px top/bottom canvas padding on the 1672 basis and reuse it proportionally; repair overflow through trimming, regrouping, structure change, or slide split.
   Use a 12-column grid, 8px spacing rhythm, precise shared edges, and fixed header/footer anchors.
   Define deck_tone_master_lock before slide-level prompting and preserve it through the whole deck: slide base, typography scale, header/footer, Petrol role, Honey treatment, illustration style, icon family, density rhythm, whitespace/occupancy rhythm, card/table geometry, outer padding, invisible source alignment baseline, and negative prompt. Later slides must feel like the same deck as the first approved pilot slides.
   Apply deck_tone_signature_lock: preserve one material system across the deck for base, typography, rule weight, card/table surfaces, icon stroke, illustration linework, accent budget, density rhythm, Insight treatment, and Source behavior. Vary layout families from the message, not from random changes in palette, header, surface weight, icon style, or illustration finish.
@@ -776,19 +765,19 @@ draft_image_prompt_scaffold:
   Apply credential_setup_blocker: do not create, request, decrypt, configure, inspect, or wait for account credentials, local tokens, SDK setup, or environment variables. The next action after an image-ready prompt is Codex built-in image generation.
   Apply codex_image_artifact_rule before generation: call Codex built-in image generation for each final slide prompt, treat the returned image as the generated PNG artifact, and materialize approved artifacts into slides_final/ through the Codex-provided artifact/download/attachment path before PPTX packaging. Do not inspect or mention local environment setup as a reason to stop.
   Apply header_identity_lock: the header is always the same compact left vertical line + H1 + subtitle system, never a slide-specific decoration surface.
-  Apply header_left_accent_master_lock: the left accent is a fixed header-block anchor tied to the H1/subtitle stack and copied verbatim on every slide; it is not a page-edge rail, tall sidebar, body marker, chapter stripe, or slide-specific ornament.
-  Apply header_left_accent_reference_lock: match the approved reference geometry on a 1672x941 basis unless a newer embedded master is explicitly supplied: x=50 y=37 w=10 h=41, color #008A80; on 2048x1152 output use the scaled geometry x=61 y=45 w=12 h=50.
-  Apply header_left_accent_shape_lock: draw one solid vertical rectangle only, 10px wide on the 1672 basis and 12px wide on the 2048 output, with square or 0-2px radius ends and no pill caps, shadow, glow, gradient, split segments, duplicate marks, or decorative extension.
-  Apply header_left_accent_title_top_alignment_lock: the accent top must align exactly with the first visible H1 glyph/title top, not the H1 text-box y. If setting accent y equal to H1 y makes the line protrude above the visible glyph, lower only the accent y until the visible tops align. One visible pixel above the H1 glyph top is a blocker. Do not allow below-title offset, above-title protrusion, page-top floating, detached title ticks, or "close enough" placement; any offset is a blocker and the accent y/h must be repaired first.
-  Apply header_left_accent_no_protrusion_rule: the accent top must never sit above the first visible H1 glyph/title top.
-  Apply header_left_accent_top_protrusion_blocker: if any visible accent pixel sits above the first visible H1 glyph/title top, floats near the page top, clips outside the header safe area, detaches from the H1/subtitle stack, or enters body_start_y, mark the slide repair_required and fix the accent x/y/h before any other polish.
-  Define and preserve one deck_header_master_lock with exact selected values, not ranges: coordinate_basis, header_safe_area, vertical_line x/y/w/h/color, header_line_top_rule, header_left_accent_master_lock, header_left_accent_reference_lock, header_left_accent_title_top_alignment_lock, header_left_accent_no_protrusion_rule, H1 x/y/w/max_lines/font_size/weight/line_height/color, subtitle x/y/w/max_lines/font_size/weight/line_height/color, visual_alignment, body_start_y, and upper_right_clear_zone. Repeat it verbatim across the deck. Treat the header as the lowest-freedom component; no_header_ranges_in_final_prompts.
+  Apply header_clean_title_block_lock: use a quiet text-only H1 and subtitle aligned directly to the outer shell, with structural accents beginning in the body.
+  Apply header_title_grid_anchor_lock on the 1672 basis: outer shell x=72..1600 y=80..861, H1 x=72 y=80 w=1528, subtitle x=72 y=126 w=1528, and body_start_y=270. Scale proportionally.
+  Apply header_body_clearance_lock: keep the actual subtitle glyph bottom to first body mark at 64-96px.
+  Apply edge_margin_balance_lock: T2-T4 body side margins are 24-72px inside the shell and T1 margins are 96-160px; footer-absent bottom gap is 26-80px and footer-present bottom gap is 30-80px.
+  Apply intentional_space_coverage_lock: review a 4-column x 3-row body grid; declare blank cells intentionally and keep caps at T1<=5, T2<=2, T3/T4<=1.
+  Apply focal_aspect_preservation_lock: a single chart, diagram, or illustration retains its native aspect ratio within 5%; satisfy balance through margins, grouping, and declared blank space.
+  Define and preserve one deck_header_master_lock with exact H1, subtitle, body-start, edge-margin, intentional-space, and aspect-preservation values. Repeat it verbatim across the deck.
   Include coordinate_inventory_1672 and reuse master_components before generating repeated objects.
   Use Noto Sans JP for every visible text string, including Latin/English letters, numbers, symbols, and Japanese. Do not mix in any other typeface; if exact font rendering is unavailable in image generation, use the closest Noto Sans JP-like rendering without changing the font family intent.
   Apply max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
   Apply ergonomic_min_text_size_lock: body labels, card rows, table cells, data labels, annotations, and Insight text must stay at least 20pt equivalent on the generated 2048x1152 master; source/footer/table-note text may use 13-15pt equivalent. If this minimum cannot fit, trim copy, combine rows, regrid, split the slide, or remove icons/illustration rather than shrinking text.
   For ACT work, use #FFFDFC primary slide base and optional #FAFAF7 subtle warm off-white tint, #2D332E text, #4D544E subtitle, #6E756E footer/source/table-note text, and #008A80 Petrol structure. Avoid darker cream/beige page backgrounds; #F7FBF9 is reserved for mint panels/cards, not the full slide canvas.
-  H1 28-32pt weight 700 #2D332E, subtitle 18-21pt weight 400 #4D544E, body/card/table/data text 20pt equivalent minimum. Use the exact compact ACT header inside the fixed 105px planning header zone: 1672 basis header_safe_area x=44 y=12 w=1584 h=72; vertical_line x=50 y=37 w=10 h=41 #008A80, scaled to x=61 y=45 w=12 h=50 on 2048 output with bottom around y=95; header_accent_geometry_lock and header_line_top_rule keep the accent geometry exact and align its top exactly with the first visible H1 glyph/title top with no above-title protrusion and no below-title offset; H1 x=88 y=18 w=1332 max_lines=1 size=28pt weight=700 line_height=1.10 #2D332E; subtitle x=88 y=52 w=1332 max_lines=1 size=18pt weight=400 line_height=1.14 #4D544E; visual_alignment accent spans the H1 + subtitle block with top exactly aligned to the visible H1 glyph top and bottom 5-11px below subtitle lower visual edge; body_start_y=105; upper_right_clear_zone x=1420 y=12 w=208 h=56 empty. Avoid two-line H1 in this master; shorten, wrap the thought into body copy, or split the slide rather than expanding the header. No header-area bottom line. No separate ACT wordmark, logo, kicker, or badge. No Petrol H1. No right-side header decoration or body object in the header safe area.
+  H1 is one uniform 40pt/700 line with a 36pt emergency floor and 42pt cap; subtitle is 32pt/400 with a 30pt floor and 34pt cap; body/card/table/data text is 20pt equivalent minimum. Rewrite a long title before generation so it fits the fixed H1 box while preserving topic, change/tension, and implication. Keep the header as quiet text-only canvas and place all structural emphasis at or below body_start_y=270.
   Lock header and footer text colors as one Ink-family hierarchy: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E. Do not use Petrol, Honey, yellow, or arbitrary gray for header/footer text.
   Apply header_integrity_blocker_lock: malformed, missing, oversized, recolored, right-decorated, or intruded headers are blockers; repair header identity before any other visual polish.
   Let structure, numbers, rules, spacing, and typography carry the hierarchy.
@@ -877,11 +866,11 @@ post_generation_audit:
   - max_text_size_lock is honored: no visible text exceeds 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt
   - ergonomic_min_text_size_lock is honored: body labels, card rows, table cells, data labels, annotations, and Insight text are at least 20pt equivalent, while source/footer/table-note text stays in the 13-15pt equivalent range
   - header_identity_lock is honored: the header remains the compact left vertical line + H1 + subtitle system, with no slide-specific decoration surface
-  - deck_header_master_lock is visible and consistent; left header accent is present, matches header_left_accent_reference_lock unless superseded by a newer embedded master, obeys header_line_top_rule, header_left_accent_title_top_alignment_lock, and header_left_accent_master_lock, anchors the H1 + subtitle stack, is not a page-edge rail/sidebar/body marker, and H1 color follows the embedded ACT design system
-  - header_left_accent_shape_lock passes: the accent is one solid 10px vertical rectangle with no pill cap, glow, shadow, gradient, duplicate mark, or decorative extension
-  - header_left_accent_title_top_alignment_lock passes: the accent starts exactly at the first visible H1 glyph/title top, with no above-title protrusion and no below-title offset; one visible pixel above the H1 glyph top fails
-  - header_left_accent_no_protrusion_rule passes: the accent does not protrude above the first visible H1 glyph/title top
-  - header_left_accent_top_protrusion_blocker passes: no visible accent pixel sits above the first visible H1 glyph/title top, outside header_safe_area, detached from H1/subtitle, or inside body_start_y
+  - deck_header_master_lock is visible and consistent: quiet text-only H1/subtitle, fixed grid anchors, uniform type sizes, and body_start_y=270
+  - header_clean_title_block_lock passes: the header contains the H1/subtitle pair and intentional quiet canvas
+  - edge_margin_balance_lock passes for the selected density tier and footer mode
+  - intentional_space_coverage_lock passes with every blank grid cell declared and within the density-tier cap
+  - focal_aspect_preservation_lock passes for any single chart, diagram, or illustration
   - header_integrity_blocker_lock is clear: no malformed, missing, oversized, recolored, right-decorated, or intruded header remains
   - header_footer_text_color_lock is honored: H1 #2D332E, subtitle #4D544E, footer/source/table-note #6E756E
   - header/footer text does not use Petrol, Honey, yellow, or arbitrary gray
@@ -979,7 +968,7 @@ post_generation_audit:
   - credential_setup_blocker: no account credential, local token, SDK setup, or environment-variable workflow is part of the route
   - review_manifest_status: approved after validate_review_manifest confirms schema_version: 1, exact manifest keys, exact slide keys, sequential slide_id values, every generated PNG path exactly once in package order, no duplicate image input or duplicate png_path entries, slides_final/ master paths, empty weak_slide_regeneration_queue, and all final/content/design/deck-unity/completion statuses approved
   - post_generation_design_balance_check is approved on actual generated PNGs: whitespace/occupancy balance, density balance against the planned density tier, typography size/weight balance, ergonomic text minimum, color consistency, outer padding consistency, header integrity, icon justification, icon-driven box compaction, card/table height equalization, line-weight consistency, icon-family consistency, Petrol scatter, Honey strength, and human-designed operational diagram feel
-  - fixed_zone_grid_16_9_lock is fulfilled: generated output respects the 128px header, 960px content area, and 64px footer zones on 2048x1152, matching the 105/784/52 planning basis
+  - fixed_zone_grid_16_9_lock is fulfilled: the generated output scales outer shell x=72..1600 y=80..861, body_start_y=270, and the selected conditional-footer band from the 1672 basis
   - header_zone_boundary_invisible_lock is fulfilled: no visible horizontal boundary line, rail, band, shadow, or separator marks y=128 or y=1088
   - content_area_padding_consistency_status is approved: left/right content padding match each other, top/bottom content padding match each other, and any density adjustment is consistent across the deck
   - pre_package_image_review has inspected the actual generated PNG, not only the prompt
@@ -1043,10 +1032,10 @@ def deck_plan_tail() -> str:
         previous_layout_family:
         repeat_or_change_reason:
         grid_mode:
-        layout_ratio_system_lock: fixed 16:9 zones from the ergonomic 1920x1080 guide recalculated to 2048x1152 as header 128px / content 960px / footer 64px and to 1672x941 as header 105px / content 784px / footer 52px
+        layout_ratio_system_lock: scale the 1672 master shell x=72..1600 y=80..861, body_start_y=270, and conditional-footer bands proportionally
         fixed_zone_grid_16_9_lock: keep header, content, and footer zones reserved; content objects stay inside the content zone with footer clearance
         header_zone_boundary_invisible_lock: zones are invisible alignment guides; no horizontal header/footer boundary line, rail, band, or shadow
-        outer_padding_lock: fixed 2048x1152 padding is 64px left/right; fixed 1672x941 planning padding is 52px left/right; reuse regardless of content amount
+        outer_padding_lock: 72px left/right and 80px top/bottom canvas padding on the 1672 basis, scaled proportionally
         content_area_padding_policy: fixed content-zone top/bottom padding is 48px on 2048x1152 and 39px on the 1672x941 planning basis; reuse regardless of content amount
         fixed_zone_grid_status:
         header_zone_boundary_status:
@@ -1162,21 +1151,22 @@ def deck_plan_tail() -> str:
   - illustration_consistency_status:
   - visual_design_quality_traits:
   - deck_header_master_lock:
-  - layout_ratio_system_lock: fixed 16:9 zones from the ergonomic 1920x1080 guide recalculated to 2048x1152 as header 128px / content 960px / footer 64px and to 1672x941 as header 105px / content 784px / footer 52px
+  - layout_ratio_system_lock: scale the 1672 master shell x=72..1600 y=80..861, body_start_y=270, and conditional-footer bands proportionally
   - fixed_zone_grid_16_9_lock: reserve header/content/footer before placing body content; content may not invade header or footer
   - header_zone_boundary_invisible_lock: zones are invisible alignment guides; no horizontal header/footer boundary line, rail, band, or shadow
-  - outer_padding_lock: fixed 2048x1152 padding is 64px left/right; fixed 1672x941 planning padding is 52px left/right; reuse regardless of content amount
+  - outer_padding_lock: 72px left/right and 80px top/bottom canvas padding on the 1672 basis, scaled proportionally
   - content_area_padding_policy: fixed content-zone top/bottom padding is 48px on 2048x1152 and 39px on the 1672x941 planning basis; reuse regardless of content amount
   - fixed_zone_grid_status:
   - header_zone_boundary_status:
   - content_area_padding_consistency_status:
   - header_identity_lock:
   - header_line_top_rule:
-  - header_left_accent_master_lock:
-  - header_left_accent_reference_lock:
-  - header_left_accent_shape_lock:
-  - header_left_accent_no_protrusion_rule:
-  - header_left_accent_top_protrusion_blocker:
+  - header_clean_title_block_lock:
+  - header_title_grid_anchor_lock:
+  - header_body_clearance_lock:
+  - edge_margin_balance_lock:
+  - intentional_space_coverage_lock:
+  - focal_aspect_preservation_lock:
   - header_integrity_blocker_lock:
   - visible_brand_label_blocker: no separate ACT wordmark, logo, title kicker, badge, or brand label in the header unless exact_text explicitly requests it
   - petrol_usage_lock:
@@ -1365,10 +1355,10 @@ def text_structure_tail() -> str:
         tone_layout_spacing_source_findings:
       visual_design_quality_traits:
       visual_structure: comparison / table / flow / roadmap / loop / matrix / KPI strip / architecture stack / signature visual
-      layout_ratio_system_lock: fixed 16:9 zones from the ergonomic 1920x1080 guide recalculated to 2048x1152 as header 128px / content 960px / footer 64px and to 1672x941 as header 105px / content 784px / footer 52px
+      layout_ratio_system_lock: scale the 1672 master shell x=72..1600 y=80..861, body_start_y=270, and conditional-footer bands proportionally
       fixed_zone_grid_16_9_lock: keep content in the content zone, preserve footer clearance, and solve overflow by density adjustment, split/merge decision, or a new slide
       header_zone_boundary_invisible_lock: zones are invisible alignment guides; no horizontal header/footer boundary line, rail, band, or shadow
-      outer_padding_lock: fixed 2048x1152 padding is 64px left/right; fixed 1672x941 planning padding is 52px left/right; reuse regardless of content amount
+      outer_padding_lock: 72px left/right and 80px top/bottom canvas padding on the 1672 basis, scaled proportionally
       content_area_padding_policy: fixed content-zone top/bottom padding is 48px on 2048x1152 and 39px on the 1672x941 planning basis; reuse regardless of content amount
       fixed_zone_grid_status:
       header_zone_boundary_status:
@@ -1429,11 +1419,12 @@ def text_structure_tail() -> str:
       density_guardrails:
       deck_header_master_lock:
       header_line_top_rule:
-      header_left_accent_master_lock:
-      header_left_accent_reference_lock:
-      header_left_accent_shape_lock:
-      header_left_accent_no_protrusion_rule:
-      header_left_accent_top_protrusion_blocker:
+      header_clean_title_block_lock:
+      header_title_grid_anchor_lock:
+      header_body_clearance_lock:
+      edge_margin_balance_lock:
+      intentional_space_coverage_lock:
+      focal_aspect_preservation_lock:
       deck_tone_master_lock:
       illustration_tone_lock:
       illustration_style_sheet:
