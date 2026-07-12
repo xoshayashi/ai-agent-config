@@ -114,6 +114,8 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
                 notes_xml = archive.read("ppt/notesSlides/notesSlide1.xml").decode("utf-8")
                 self.assertIn('type="sld"', notes_xml)
                 self.assertIn("note 1", notes_xml)
+                theme_xml = archive.read("ppt/theme/theme1.xml").decode("utf-8")
+                self.assertIn('<a:dk2><a:srgbClr val="626A64"/></a:dk2>', theme_xml)
 
     def test_requires_review_manifest_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
