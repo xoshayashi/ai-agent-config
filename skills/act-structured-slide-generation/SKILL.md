@@ -113,20 +113,39 @@ small in the footer area; page numbers are never rendered.
 
 `speaker_notes` is the presenter's spoken script and NOTHING else. Design metadata
 (judgment fields, "reader_question", "composition", "focal", rhythm labels) must never
-appear there — a presenter reads these notes verbatim while delivering. Write each
-content slide's script so it can be spoken as-is:
+appear there — a presenter reads these notes verbatim while delivering.
 
-1. Open with the slide's claim in spoken language (not a re-read of the title string).
-2. Walk the evidence in the slide's visual reading order — name the specific numbers,
-   rows, steps, or columns the audience should look at.
-3. State the implication (so-what), and speak caveats naturally: assumptions, hearsay,
-   open items ("この期間は会議時点の見込みです" 等).
-4. Bridge to the next slide.
+**Content fidelity — the script and the slide must be the same argument.** Write scripts
+against the FINAL slide bodies (after visual QA), and re-check them whenever a slide's
+copy changes — stale notes that describe an older body are a defect ("script drift").
+Concretely:
+
+- Every number, date, and proper noun you speak must exist on that slide (or in its
+  note/assumption). A number that appears only in the script is a hallucination risk —
+  `validate_spec.py` flags unit-bearing numbers absent from the slide.
+- Every load-bearing element must be touched: the title claim (paraphrased), the focal
+  object, the key rows/steps/columns, the insight band, and any caveat note — speak the
+  caveat in natural language ("この期間は会議時点の見込みです" 等).
+- Do not read the title string verbatim as the opening; restate the claim in spoken form.
+
+**Narrative — the deck reads as ONE story, not per-slide captions.** Each script:
+
+1. picks up from the previous slide's bridge (no reset openings like 「このスライドでは」;
+   vary the openers — three slides in a row starting with 「次に」 is a template smell),
+2. opens with the claim in spoken language, then walks the evidence in the slide's visual
+   reading order, naming the actual labels and numbers the audience should look at,
+3. states the implication (so-what) before leaving the slide,
+4. ends with a bridge that hands off to the next slide's question.
+
+Spoken register throughout: natural です/ます sentences, no noun-ending fragments, no
+bullet dumps. Read the finished set aloud start-to-finish once — if any transition
+jars or a slide's script could be shuffled elsewhere without anyone noticing, the
+narrative is not yet doing its job.
 
 Depth target: ~150-300 Japanese characters per content slide (≈30-60 seconds of speech);
 calibrate the deck total against `meta.talk_minutes` (~300字/分). A one-line note is a
-defect on any slide except the cover. `validate_spec.py` warns on metadata leakage into
-speaker_notes and on thin scripts.
+defect on any slide except the cover. `validate_spec.py` warns on metadata leakage,
+thin scripts, non-spoken register, title-verbatim openings, and slide-absent numbers.
 
 ### 3. Validate, Build, Verify, Render
 

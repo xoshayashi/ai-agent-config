@@ -1347,3 +1347,25 @@ def test_validate_covers_diagram_specs_and_grid_size(tmp_path):
     assert "必須フィールドがない: edges" in r.stdout, r.stdout
     assert "diagram kind 'banana' は未対応" in r.stdout, r.stdout
     assert "パターン契約は2-4" in r.stdout, r.stdout
+
+
+def test_validate_talk_script_fidelity_and_register(tmp_path):
+    # (1) スライドに無い単位つき数値 (2) 敬体でないメモ書き (3) タイトル逐語読みの冒頭 を検出する
+    title = "導入社数120社とNRR112%で初年度の検証を完了する"
+    base_kpis = [{"label": "導入社数", "value": "120", "unit": "社"},
+                 {"label": "NRR", "value": "112", "unit": "%"}]
+    slides = [
+        {"pattern": "kpi_dashboard", "title": title, "kpis": base_kpis,
+         "speaker_notes": "初年度はこの2指標に絞ります。導入社数は120社、NRRは112%です。ここが立てば拡張投資に進めます。ARRは999億円に達する見込みです。次のスライドで前提を確認します。"},
+        {"pattern": "kpi_dashboard", "title": title, "kpis": base_kpis,
+         "speaker_notes": "導入社数120社・NRR112%の2指標。初年度はユニットエコノミクス検証。達成なら拡張投資へ。前提条件は次スライドの通り。以上の構成で全体像を先に共有する形とした。"},
+        {"pattern": "kpi_dashboard", "title": title, "kpis": base_kpis,
+         "speaker_notes": title + "、という結論です。導入社数は120社、NRRは112%を目標にします。この2つが立てば来期は拡張投資に進めますので、次のスライドで前提条件を確認します。"},
+    ]
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps({"slides": slides}, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    out = r.stdout
+    assert "スライド上に無い数値: 999億" in out, out
+    assert "話し言葉でない" in out, out
+    assert "タイトルの逐語読み" in out, out

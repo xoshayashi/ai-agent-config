@@ -206,6 +206,27 @@ def main() -> int:
         if pat not in STRUCTURAL and pat != "cover" and notes and len(notes) < 80:
             warns.append(f"{loc}: speaker_notes が薄い({len(notes)}字) — 主張→根拠の順路→含意→次スライドへの"
                          "橋渡しを話し言葉で150-300字目安に書く")
+        if notes and pat != "cover":
+            import re as _re_ts
+            # 話法: スクリプトは読み上げ用の敬体。体言止めのメモ書きはナレーションにならない
+            if len(notes) >= 80 and "です" not in notes and "ます" not in notes:
+                warns.append(f"{loc}: speaker_notes が話し言葉でない(です/ます不在) — "
+                             "読み上げられる敬体のナラティブに書き直す")
+            # タイトル逐語読みの冒頭は禁止(主張は話し言葉で言い換えて開く)
+            if title and len(title) >= 8 and title in notes[: len(title) + 15]:
+                warns.append(f"{loc}: speaker_notes の冒頭がタイトルの逐語読み — 主張を話し言葉で言い換えて開く")
+            # 内容整合: スライド(可視テキスト+note/assumption)に存在しない単位つき数値が
+            # スクリプトにあるのは、本体改稿への追従漏れ(スクリプトドリフト)か幻覚の兆候
+            slide_text = " ".join(iter_texts({k: v for k, v in s.items() if k not in ("speaker_notes", "pattern")}))
+            slide_digits = set(_re_ts.findall(r"\d+", slide_text))
+            alien = []
+            for m in _re_ts.finditer(r"(\d[\d,.]*)(億|兆|万|円|%|％|件|社|名|人|カ月|ヶ月|か月|週間|時間|倍|pt|行|列|ステップ|フェーズ|グループ|セル)", notes):
+                digits = _re_ts.findall(r"\d+", m.group(1))
+                if any(d not in slide_digits for d in digits):
+                    alien.append(m.group(0))
+            if alien:
+                warns.append(f"{loc}: speaker_notes にスライド上に無い数値: {', '.join(dict.fromkeys(alien))} — "
+                             "スクリプトは本体と同じ根拠だけを話す(本体改稿後の追従漏れ/幻覚の兆候)")
 
         import re as _re
         zenkaku = [t for t in iter_texts({k: v for k, v in s.items() if k != "pattern"})

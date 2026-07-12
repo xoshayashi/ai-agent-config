@@ -47,8 +47,13 @@ evidence-source check without printing an internal-provenance footer on every sl
 - `note` (optional): definition, caveat, or denominator.
 - `speaker_notes` (optional): the presenter's TALK SCRIPT only — spoken-form claim,
   evidence walk in reading order, so-what with caveats, bridge to the next slide
-  (~150-300 JA chars per content slide). Judgment/design metadata never goes here; it
-  belongs in working notes (outline/blueprints). See SKILL.md "Talk Script".
+  (~150-300 JA chars per content slide, natural です/ます register). The script and the
+  slide must be the same argument: every spoken number/date/noun exists on the slide (or
+  its note), and consecutive scripts read as one continuous narration, each picking up
+  from the previous bridge. Judgment/design metadata never goes here; it belongs in
+  working notes (outline/blueprints). See SKILL.md "Talk Script"; validate_spec flags
+  metadata leakage, thin scripts, non-spoken register, title-verbatim openings, and
+  slide-absent numbers.
 - `variant` (optional): primitive-specific variation when documented below.
 - `render` (optional, on a chart/diagram object): `"image"` forces the image-asset track even
   for a kind the native engine could attempt. Default (unset) keeps native unless the `kind` is
