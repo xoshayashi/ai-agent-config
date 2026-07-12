@@ -844,7 +844,10 @@ def _asset_kind(obj):
     Pure membership test — does NOT import matplotlib, so native-only decks stay light."""
     if isinstance(obj, dict):
         k = obj.get("kind")
-        if k in IMAGE_ASSET_KINDS or (obj.get("render") == "image" and k):
+        # membership のみで判定する。render:"image" だけでは未知 kind を画像経路へ
+        # 通さない — act_assets.render_asset は固定の kind 集合しか受けず、通すと
+        # ビルドが ValueError で落ちる(validate_spec が組み合わせ自体をエラーにする)
+        if k in IMAGE_ASSET_KINDS:
             return k
     return None
 

@@ -1278,3 +1278,20 @@ def test_validate_covers_chart_grid_cells(tmp_path):
     out = r.stdout
     assert "cell 1" in out and "int target" in out, out
     assert "cell 2" in out and "no_such_type" in out, out
+
+
+def test_validate_rejects_incomplete_or_unknown_image_kinds(tmp_path):
+    # 必須フィールド欠落の image kind と、非対応 kind の render:"image" 強制は
+    # build 前に validate がエラーにする(黙って通すと build が落ちる)
+    deck = {"slides": [
+        {"pattern": "chart_insight", "title": "レーダー1枚で能力バランスの偏りを確認する",
+         "chart": {"kind": "radar", "categories": ["a"], "series": [{"name": "s", "values": [1]}]}},
+        {"pattern": "chart_insight", "title": "強制image指定の未知kindは事前に弾かれることを確認",
+         "chart": {"render": "image", "kind": "column", "unit": "億円", "categories": ["a"],
+                   "series": [{"name": "s", "values": [1]}]}},
+    ]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    assert "必須フィールドがない: axes" in r.stdout, r.stdout
+    assert "image バックエンド非対応" in r.stdout, r.stdout

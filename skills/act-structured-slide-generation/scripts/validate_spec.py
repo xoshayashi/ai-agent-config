@@ -53,6 +53,24 @@ EVIDENCE_PATTERNS = {
     "diagram", "chart_grid",
 }
 # chart/diagram objects rendered via the image-asset backend (act_assets), not native charts.
+# 必須フィールドは act_assets の各レンダラーが spec[...] で直接参照するキー —
+# ここで検査しないと validate は 0 errors で通り、build が KeyError/ValueError で落ちる
+IMAGE_KIND_REQUIRED = {
+    "combo": ("categories", "bar", "line"),
+    "area": ("categories", "series"),
+    "line_multi": ("categories", "series"),
+    "scatter": ("points",),
+    "bubble": ("points",),
+    "waterfall": ("items",),
+    "radar": ("axes", "series"),
+    "ring": ("segments",),
+    "funnel": ("stages",),
+    "pyramid": ("tiers",),
+    "venn": ("sets",),
+    "matrix": ("rows", "cols"),
+    "org_tree": ("nodes", "edges"),
+    "node_graph": ("nodes", "edges"),
+}
 IMAGE_ASSET_KINDS = {
     "combo", "area", "radar", "scatter", "bubble", "waterfall", "line_multi",
     "org_tree", "node_graph", "ring", "funnel", "pyramid", "venn", "matrix",
@@ -232,13 +250,17 @@ def main() -> int:
                 if isinstance(_cell, dict):
                     _charts.append((_cell.get("chart", _cell), f"{loc} cell {_ci}"))
         for chart, cloc in _charts:
-            if chart and (chart.get("kind") in IMAGE_ASSET_KINDS or chart.get("render") == "image"):
+            if chart and chart.get("render") == "image" and chart.get("kind") not in IMAGE_ASSET_KINDS:
+                # 強制 image 指定でも未知 kind は画像バックエンドが受けない(build が落ちる)
+                errors.append(f"{cloc}: render:'image' だが kind '{chart.get('kind')}' は image バックエンド非対応 — "
+                              f"{', '.join(sorted(IMAGE_ASSET_KINDS))} から選ぶか render を外す")
+                chart = None
+            if chart and chart.get("kind") in IMAGE_ASSET_KINDS:
                 # image-asset chart (combo/area/…): rendered by act_assets, not the native engine.
                 k = chart.get("kind")
-                if k == "combo" and not (chart.get("bar") and chart.get("line") and chart.get("categories")):
-                    errors.append(f"{cloc}: combo chart needs categories, bar, and line")
-                elif k in ("area", "line_multi") and not (chart.get("categories") and chart.get("series")):
-                    errors.append(f"{cloc}: {k} chart needs categories and series")
+                missing = [fld for fld in IMAGE_KIND_REQUIRED.get(k, ()) if not chart.get(fld)]
+                if missing:
+                    errors.append(f"{cloc}: image chart '{k}' に必須フィールドがない: {', '.join(missing)}")
                 # track trap: native badge on an image chart is ignored — image uses `annotations`
                 if chart.get("annotation"):
                     warns.append(f"{cloc}: image chart '{k}' ignores native `annotation` — use `annotations:[{{target,text}}]`")
