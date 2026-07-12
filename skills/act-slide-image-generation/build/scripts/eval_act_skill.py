@@ -301,6 +301,8 @@ def approved_review_manifest(images: list[Path]) -> dict[str, object]:
             {
                 "slide_id": str(idx),
                 "png_path": str(image),
+                "top_visible_margin": 69,
+                "bottom_visible_margin": 68,
                 "image_review_status": "approved",
                 "final_image_quality_status": "approved",
                 "content_quality_status": "approved",

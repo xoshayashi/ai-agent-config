@@ -1006,7 +1006,7 @@ repair_iteration_plan:
   - iteration_0: first generated PNG review
   - iteration_n: repair prompt -> regenerated/edited PNG -> re-review -> update weak_slide_regeneration_queue
   - approval_condition: no blockers, no majors, minor issues only if they do not affect readability, brand fidelity, source integrity, or deck consistency
-  - review_manifest: [slide_id -> png_path -> image_review_status -> blockers -> majors -> final/content/design/deck-unity/completion status]
+  - review_manifest: [slide_id -> png_path -> top_visible_margin -> bottom_visible_margin -> image_review_status -> blockers -> majors -> final/content/design/deck-unity/completion status]
 """
 
 

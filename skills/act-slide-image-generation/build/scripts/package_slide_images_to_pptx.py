@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import binascii
 import json
+import math
 import posixpath
 import re
 import struct
@@ -245,7 +246,9 @@ REVIEW_MANIFEST_BASE_KEYS = frozenset(
     }
 )
 REVIEW_MANIFEST_KEYS = REVIEW_MANIFEST_BASE_KEYS | APPROVED_STATUSES
-REVIEW_MANIFEST_SLIDE_BASE_KEYS = frozenset({"slide_id", "png_path", "blockers", "majors"})
+REVIEW_MANIFEST_SLIDE_BASE_KEYS = frozenset(
+    {"slide_id", "png_path", "top_visible_margin", "bottom_visible_margin", "blockers", "majors"}
+)
 REVIEW_MANIFEST_SLIDE_KEYS = REVIEW_MANIFEST_SLIDE_BASE_KEYS | SLIDE_APPROVED_STATUSES
 
 
@@ -311,6 +314,14 @@ def validate_review_manifest(manifest_file: str | None, images: list[Path]) -> N
         require_exact_keys(slide, REVIEW_MANIFEST_SLIDE_KEYS, f"review_manifest slide {idx}")
         if slide.get("slide_id") != str(idx):
             raise SystemExit(f"review_manifest slide {idx} slide_id must be {idx} as a string.")
+        margins: dict[str, float] = {}
+        for key in ("top_visible_margin", "bottom_visible_margin"):
+            value = slide.get(key)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+                raise SystemExit(f"review_manifest slide {idx} {key} must be a finite non-negative number.")
+            margins[key] = float(value)
+        if abs(margins["top_visible_margin"] - margins["bottom_visible_margin"]) > 4:
+            raise SystemExit(f"review_manifest slide {idx} visible outer margin difference must be <= 4px on the 1672 basis.")
         for key in SLIDE_APPROVED_STATUSES:
             if slide.get(key) != "approved":
                 raise SystemExit(f"review_manifest slide {idx} {key} must be approved.")
