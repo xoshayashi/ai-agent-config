@@ -218,7 +218,7 @@ if command -v python3 >/dev/null 2>&1 && python3 -c 'import openpyxl' >/dev/null
   openpyxl_status=ok
 fi
 pptx_deps_status=missing
-if command -v python3 >/dev/null 2>&1 && python3 -c 'import pptx, PIL, lxml, fontTools, matplotlib, graphviz' >/dev/null 2>&1; then
+if command -v python3 >/dev/null 2>&1 && python3 -c 'import pptx, PIL, lxml, fontTools, matplotlib, matplotlib_venn, graphviz' >/dev/null 2>&1; then
   pptx_deps_status=ok
 fi
 libreoffice_status=$(command_status libreoffice)

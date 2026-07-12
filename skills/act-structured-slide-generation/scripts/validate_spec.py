@@ -239,7 +239,8 @@ def main() -> int:
                 if isinstance(x, (int, float)):
                     return x < 0
                 return isinstance(x, str) and x.strip()[:1] in ("△", "▲", "-", "−")
-            _neg_pairs = set()  # スライド上で負値としてのみ現れる number+unit
+            _neg_pairs = set()  # 負値として現れた number+unit
+            _pos_pairs = set()  # 正値としても現れた number+unit(負専用判定の除外用)
             # 描画制御メタデータ(強調 index・予想開始 index・注記オフセット等)はデータ値では
             # ないので unit とペアにしない — focal_category:1 が「1億円」を通してしまう
             _CTRL_KEYS = {"focal_category", "forecast_from", "emphasis_col", "emphasis_row",
@@ -273,8 +274,7 @@ def main() -> int:
                         for n in nums:
                             for var in _num_variants(n):
                                 _unit_pairs.add(var + unit)
-                                if _is_neg(n):
-                                    _neg_pairs.add(var + unit)
+                                (_neg_pairs if _is_neg(n) else _pos_pairs).add(var + unit)
                     if isinstance(o.get("headers"), list) and isinstance(o.get("rows"), list):
                         # 表: ヘッダー内の単位表記("(億円)" 等)を数値セルとペア化する。
                         # ヘッダーに単位が1種類なら表全体に適用(「(億円)」を先頭列に置く
@@ -294,8 +294,7 @@ def main() -> int:
                             for c in cells:
                                 for var in _num_variants(c):
                                     _unit_pairs.add(var + u)
-                                    if _is_neg(c):
-                                        _neg_pairs.add(var + u)
+                                    (_neg_pairs if _is_neg(c) else _pos_pairs).add(var + u)
                         elif distinct:
                             for ci_, units in enumerate(col_units):
                                 if not units:
@@ -308,8 +307,7 @@ def main() -> int:
                                     for var in _num_variants(c):
                                         for u in units:
                                             _unit_pairs.add(var + u)
-                                            if _is_neg(c):
-                                                _neg_pairs.add(var + u)
+                                            (_neg_pairs if _is_neg(c) else _pos_pairs).add(var + u)
                     for vv in o.values():
                         _walk_nums(vv)
                 elif isinstance(o, list):
@@ -332,7 +330,7 @@ def main() -> int:
                 token = m.group(1).replace(",", "") + m.group(2)
                 if token not in _unit_pairs and token not in _corpus:
                     alien.append(m.group(0))
-                elif token in _neg_pairs:
+                elif token in _neg_pairs and token not in _pos_pairs and token not in _corpus:
                     # スライド上では負値(△/−)としてのみ現れる数。スクリプト側の文脈に
                     # 負方向の語(赤字/△/減 等)が無ければ、損益の向きが反転して
                     # 語られている可能性がある

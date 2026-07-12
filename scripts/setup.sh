@@ -820,7 +820,7 @@ install_skill_runtime_support() {
 
   # act-structured-slide-generation runtime: python-pptx / Pillow / lxml / fonttools
   if command -v python3 >/dev/null 2>&1; then
-    if ! python3 -c 'import pptx, PIL, lxml, fontTools, matplotlib, graphviz' >/dev/null 2>&1; then
+    if ! python3 -c 'import pptx, PIL, lxml, fontTools, matplotlib, matplotlib_venn, graphviz' >/dev/null 2>&1; then
       requirements_file="$skill_source_root/act-structured-slide-generation/scripts/requirements.txt"
       if [ ! -f "$requirements_file" ]; then
         warn "python packages for act-structured-slide-generation missing; requirements file not found: $requirements_file"
@@ -831,7 +831,7 @@ install_skill_runtime_support() {
       else
         say "install: python packages for act-structured-slide-generation (python-pptx/Pillow/lxml/fonttools)"
         if python3 -m pip install --user --break-system-packages -r "$requirements_file" \
-          && python3 -c 'import pptx, PIL, lxml, fontTools, matplotlib, graphviz' >/dev/null 2>&1; then
+          && python3 -c 'import pptx, PIL, lxml, fontTools, matplotlib, matplotlib_venn, graphviz' >/dev/null 2>&1; then
           say "ok: python packages for act-structured-slide-generation"
         else
           warn "python packages for act-structured-slide-generation still missing; install with: python3 -m pip install --user --break-system-packages -r $requirements_file"

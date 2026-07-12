@@ -1478,3 +1478,15 @@ def test_fidelity_flags_sign_flip_against_negative_slide_values(tmp_path):
     out = r.stdout
     assert any("slide 1" in ln and "負値" in ln for ln in out.splitlines()), out
     assert not any("slide 2" in ln and "負値" in ln for ln in out.splitlines()), out
+
+
+def test_sign_flip_not_warned_when_positive_form_also_on_slide(tmp_path):
+    # 同じ数がスライド上に正・負の両形で存在するなら、符号なしのナレーションは正当
+    table = {"headers": ["(億円)", "FY25", "FY26"], "rows": [["売上", "5.0", "6.0"], ["営業利益", "△5.0", "1.0"]]}
+    deck = {"slides": [{"pattern": "comparison_table",
+                        "title": "売上5.0億円と損失解消の同時進行を1表で確認する", "table": table,
+                        "speaker_notes": "この表の見方です。売上は5億円で前期並みを確保しつつ、営業利益は赤字5億円から黒字1億円へ転換しました。両者が同じ5という数字なので読み違えにご注意ください。"}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    assert not any("負値" in ln for ln in r.stdout.splitlines()), r.stdout
