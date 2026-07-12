@@ -253,7 +253,7 @@ def get_git_context() -> str:
             return ""
 
         status = subprocess.run(
-            ["git", "status", "--porcelain"],
+            ["git", "-c", "core.quotePath=false", "status", "--porcelain"],
             capture_output=True,
             text=True,
             errors="replace",
@@ -271,23 +271,30 @@ def get_git_context() -> str:
         if diff:
             diff_runs.append(diff)
 
-        # Parse untracked files and capture their contents via git diff --no-index
-        if status:
-            for line in status.splitlines():
-                if line.startswith("?? "):
-                    path = line[3:].strip()
-                    if path.startswith('"') and path.endswith('"'):
-                        path = path[1:-1].replace('\\"', '"').replace('\\\\', '\\')
-                    
-                    untracked_diff = subprocess.run(
-                        ["git", "diff", "--no-index", "/dev/null", path],
-                        capture_output=True,
-                        text=True,
-                        errors="replace",
-                        timeout=10,
-                    ).stdout.strip()
-                    if untracked_diff:
-                        diff_runs.append(untracked_diff)
+        # Enumerate ALL untracked files accurately (resolves directory collapsing and non-ASCII quoting)
+        untracked_files_out = subprocess.run(
+            ["git", "-c", "core.quotePath=false", "ls-files", "--others", "--exclude-standard"],
+            capture_output=True,
+            text=True,
+            errors="replace",
+            timeout=10,
+        ).stdout.strip()
+
+        if untracked_files_out:
+            for line in untracked_files_out.splitlines():
+                path = line.strip()
+                if not path:
+                    continue
+                # Run git diff --no-index /dev/null <path> to capture its entire content as an added file diff
+                untracked_diff = subprocess.run(
+                    ["git", "diff", "--no-index", "--", "/dev/null", path],
+                    capture_output=True,
+                    text=True,
+                    errors="replace",
+                    timeout=10,
+                ).stdout.strip()
+                if untracked_diff:
+                    diff_runs.append(untracked_diff)
 
         combined_diff = "\n\n".join(diff_runs)
 

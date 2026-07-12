@@ -699,10 +699,12 @@ def test_git_context_capture() -> None:
             if any("rev-parse" in arg for arg in cmd_list):
                 return _FakeCompleted(stdout="true", returncode=0)
             if any("status" in arg for arg in cmd_list):
-                return _FakeCompleted(stdout=" M file.py\n?? path/to/new_file.py", returncode=0)
+                return _FakeCompleted(stdout=" M file.py\n?? path/to/new_file.py\n?? path/日本語/ファイル.py", returncode=0)
+            if any("ls-files" in arg for arg in cmd_list):
+                return _FakeCompleted(stdout="path/to/new_file.py\npath/日本語/ファイル.py", returncode=0)
             if "--no-index" in cmd_list:
-                assert cmd_list[-1] == "path/to/new_file.py"
-                return _FakeCompleted(stdout="+def new_func():\n+    pass", returncode=0)
+                assert cmd_list[-1] in ["path/to/new_file.py", "path/日本語/ファイル.py"]
+                return _FakeCompleted(stdout=f"+def new_func_{cmd_list[-1]}():\n+    pass", returncode=0)
             if any("diff" in arg for arg in cmd_list):
                 return _FakeCompleted(stdout="+print('hello')", returncode=0)
             # The actual reviewer run
@@ -720,7 +722,9 @@ def test_git_context_capture() -> None:
         assert "M file.py" in prompt_passed
         assert "+print('hello')" in prompt_passed
         assert "path/to/new_file.py" in prompt_passed
-        assert "+def new_func():" in prompt_passed
+        assert "+def new_func_path/to/new_file.py" in prompt_passed
+        assert "path/日本語/ファイル.py" in prompt_passed
+        assert "+def new_func_path/日本語/ファイル.py" in prompt_passed
     finally:
         route_review.subprocess.run = original_run
     print("ok    test_git_context_capture")

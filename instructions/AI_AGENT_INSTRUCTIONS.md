@@ -1,8 +1,8 @@
 # AI Agent Instructions
 
-Shared working contract for Claude Code, Codex, and Gemini CLI.
+Shared working contract for Claude Code and Codex.
 
-Entrypoints (`AGENTS.md`, `CLAUDE.md`, and `GEMINI.md`) route here. `DESIGN.md` is the companion guide for human-visible output.
+Entrypoints (`AGENTS.md` and `CLAUDE.md`) route here. `DESIGN.md` is the companion guide for human-visible output.
 
 ## Operating Defaults
 
