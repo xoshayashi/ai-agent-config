@@ -18,5 +18,5 @@ jobs:
         with:
           # Check all markdown files, but exclude local file:// absolute paths
           # because they are invalid inside the GitHub CI environment.
-          args: "--verbose --no-progress --exclude 'file://.*' './**/*.md'"
+          args: "--verbose --no-progress --offline --exclude 'file://.*' './**/*.md'"
           fail: true
