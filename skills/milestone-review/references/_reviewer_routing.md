@@ -8,9 +8,9 @@ and re-read when the question shape changes.
 | Reviewer | Nature | Best for | Worst for | Invocation |
 |---|---|---|---|---|
 | **advisor** (Claude Code host tool only) | Reads the full live session transcript: every tool call, every result. Deep reasoning. Single instance per call. Does not exist on other hosts — see "Host awareness" below for the substitute. | Structural soundness, "what did I miss", strategy reviews, end-of-task self-audit, deciding between two designs grounded in the conversation. | Anything the transcript does not cover. Parallel fan-out. Re-running with different prompts cheaply. | Host tool `advisor()` from inside a Claude Code agent. |
-| **Codex CLI** | External one-shot process. Sees only the prompt you pass. Strong on concrete code / diff / logic. | Reviewing a specific diff, a function for correctness bugs, a test for what it actually proves, a regex / SQL / config snippet. Parallelizable. | Questions that need the live conversation context the prompt cannot reconstruct. Reviews dispatched from a Codex host (self-review). | `codex exec <prompt>` via `scripts/route_review.py --reviewer codex`. |
-| **Claude CLI** | External one-shot process (`claude -p`). Anthropic model family. | Structural judgement and design-taste review when the host is not Claude Code; the transcript-aware substitute via a context digest. | Reviews dispatched from a Claude Code host (self-review — use `advisor()` there instead, which also sees more). | `claude -p <prompt>` via `scripts/route_review.py --reviewer claude`. |
-| **Antigravity CLI** | External one-shot process (`agy -p`, print mode). Google model family by default. | An additional independent route when the other CLIs are the host or unavailable; second opinion. | Reviews dispatched from an Antigravity host. | `agy -p <prompt>` via `scripts/route_review.py --reviewer antigravity`. |
+| **Codex CLI** | External one-shot process. Sees only the prompt you pass. Strong on concrete code / diff / logic. | Reviewing a specific diff, a function for correctness bugs, a test for what it actually proves, a regex / SQL / config snippet. Parallelizable. | Questions that need the live conversation context the prompt cannot reconstruct. Reviews dispatched from a Codex host (self-review). | `codex exec` (prompt via stdin) via `scripts/route_review.py --reviewer codex`. |
+| **Claude CLI** | External one-shot process (`claude -p`). Anthropic model family. | Structural judgement and design-taste review when the host is not Claude Code; the transcript-aware substitute via a context digest. | Reviews dispatched from a Claude Code host (self-review — use `advisor()` there instead, which also sees more). | `claude -p` (isolated, prompt via stdin) via `scripts/route_review.py --reviewer claude`. |
+| **Antigravity CLI** | External one-shot process (`agy -p`, print mode). Google model family by default. | An additional independent route when the other CLIs are the host or unavailable; second opinion. | Reviews dispatched from an Antigravity host. | `agy -p <prompt> --print-timeout <t>s` via `scripts/route_review.py --reviewer antigravity`. |
 | **self** | The calling agent immediately rechecks. | Mechanical, rule-based checks: linter exit code, schema match, regex pass, test runner green. | Anything requiring judgement or design taste. Self-review of one's own claim of correctness. | Driven directly by the calling agent's own recheck. |
 
 `route_review.py` dispatches the external CLIs (**codex**,
@@ -29,11 +29,16 @@ Antigravity. Two consequences:
    dispatch exits 2 without running anything ("claude" is accepted as
    an alias for "claude-code"). 
    
-   To simplify this, use **`--reviewer auto`** (the default):
-   - **Host Detection**: It automatically reads your `--host` and derives the safe, valid pool of non-host external CLIs.
-   - **Binary Auto-Detection**: It checks which external CLIs are actually installed and on your PATH (using `shutil.which`).
-   - **Priority Sorting**: It places available binaries at the front of the queue.
-   - **Automatic Failover & Resilience**: If the preferred peer CLI fails (timeout, missing, or rate limited), the router automatically and transparently attempts failover to the next compatible peer CLI in the pool, ensuring maximum milestone resilience (can be disabled with `--no-failover`).
+   To simplify this, use **`--reviewer auto`** (the default). It reads
+   your `--host`, derives the valid non-host pool, checks which CLIs are
+   actually installed (`shutil.which`), tries available binaries first,
+   and fails over to the next peer CLI when one fails (timeout, missing
+   binary, rate limit, non-zero exit; disable with `--no-failover`). A
+   failover is still a route change — the record must show which
+   reviewer actually answered. The helper makes this impossible to
+   miss: a failover success exits **4** (never 0), a
+   `route_review: attempts: ...` one-liner goes to stderr, and `--json`
+   carries the full `attempts` trace.
 
    Effective external pool per host:
 
@@ -197,6 +202,37 @@ the answer is too abstract; ask the reviewer for the concrete next
 action they expect. An answer that does not let you predict the next
 step is not actionable.
 
+## Latency and timeouts (measured)
+
+Bench of trivial one-shot round trips ("Reply with exactly: OK"),
+2026-07-12, macOS, all three CLIs live. These are the *floor* of any
+review — a real review of a large diff on a heavyweight default model
+adds minutes of generation on top.
+
+| Route | Trivial round trip | Notes |
+|---|---|---|
+| `claude -p` (isolated) | ~3–5s | startup is cheap once MCP/plugins are skipped |
+| `codex exec` | ~4–7s | refuses non-git dirs without `--skip-git-repo-check` (rc=1 in 0.1s) |
+| `agy -p` | ~41s | slowest floor; its internal print wait defaults to 5m |
+
+Consequences, all built into `route_review.py`:
+
+- Default `--timeout` is **600s per attempt** — sized so a legitimate
+  long review does not get misrecorded as a degraded route (a real
+  incident: a claude review of a large digest timed out at the old
+  180s default and the milestone silently fell back to a single
+  family). Lower it for mechanical checks; raise it for huge diffs.
+- The helper forwards the timeout to antigravity's `--print-timeout`
+  so agy's internal 5m wait can never silently cap a longer review.
+- On timeout the reviewer's **partial stdout is kept** in the result:
+  substantial partial output means "healthy route, question too big
+  for the timeout" → re-dispatch with a higher `--timeout`, don't
+  switch reviewer.
+- `--doctor --host <host>` re-measures the pool on demand (trivial
+  probe per route, status + seconds). Run it before the first review
+  of a session or after any degraded route, and trust its output over
+  this table — the table is a snapshot, the probe is live.
+
 ## Known limitations (read before Phase 2)
 
 - **Codex sandbox posture.** `codex exec` runs with `approval=never
@@ -208,29 +244,39 @@ step is not actionable.
   silently degrade the review (Codex refuses the action and returns
   a hedged answer that reads as a real review but is not grounded
   in execution). Route those questions to `self` (the calling agent
-  has tool access and can actually run the test) instead.
+  has tool access and can actually run the test) instead. The helper
+  passes `--skip-git-repo-check` (measured: without it, codex exec
+  hard-refuses to start outside a trusted git repo) — this only skips
+  the repo check, it does not widen the sandbox.
 - **Claude / Antigravity print-mode posture.** `claude -p` and
   `agy -p` are one-shot print modes intended for read-and-answer
   prompts. Like Codex above, do not send them "verify by actually
   running" prompts and trust the answer — route execution questions
-  to `self`. Antigravity's print mode has its own wait timeout
-  (default 5m); the helper's `--timeout` still bounds the overall
-  call.
+  to `self`. The claude route runs isolated (`--strict-mcp-config
+  --mcp-config '{"mcpServers":{}}' --setting-sources ""`): a review
+  prompt is self-contained by contract, so the reviewer must not pay
+  for — or hang on — the host user's MCP servers, plugins, and hooks.
+  Side effect: the review uses the claude CLI's stock model, not the
+  host user's configured default.
 - **Antigravity binary name.** The helper resolves `agy` first and
   falls back to `antigravity` if only that name is on PATH. If
   neither resolves, the route degrades to `status="error"` like any
   missing CLI.
-- **Prompt length, Context Capture, and argv exposure.** No external reviewer CLI has
+- **Prompt length, context capture, and argv exposure.** No external reviewer CLI has
   unbounded context. To simplify context collection:
-  - **Auto Git Context (`--include-git`)**: Recommended for live code changes. It automatically runs `git status` and `git diff HEAD`, formatting and appending them to your prompt inside a markdown block. This ensures that a cold-running reviewer has absolute clarity on your changes without any manual copy-pasting.
+  - **Auto Git Context (`--include-git`)**: Recommended for live code changes. It automatically runs `git status` and `git diff HEAD`, formatting and appending them to your prompt inside a markdown block, so a cold-running reviewer sees the live changes without manual copy-pasting. Capped at 1500 diff lines to avoid blowing the reviewer's context window.
   - **Manual Redirection (`--prompt-file <path>`)**: If you need to include massive build logs, execution traces, or custom file extracts, read the prompt from a file or stdin (`--prompt-file -`). This removes the shell-quoting pain of multi-line text and keeps the big prompt out of the `route_review.py` argv.
-  
-  Note that prompt contents are **not** hidden from local processes: the reviewer CLI still receives the prompt as a child-process argv (`codex exec <prompt>`, etc.). Treat review prompts as visible to any local process list — do not paste secrets or credentials. The automatic git diff capture is limited to 1500 lines to avoid blowing up the context window.
+
+  The helper hands the prompt to codex and claude via **their stdin**
+  (no argv length ceiling, not visible in `ps`). Antigravity has no
+  stdin prompt mode, so that route still receives the prompt as a
+  child argv — treat prompts as visible to the local process list and
+  never paste secrets or credentials.
 - **Stale aliases.** Shell aliases (e.g. `codex` / `claude` aliased
   to flag-bearing forms like `--dangerously-bypass-approvals-and-sandbox`
   or `--yolo`) are not honored by `subprocess.run`; this helper
   invokes the plain forms of all four CLIs. If a route ever needs an
-  alias-only flag, extend `_build_cmd` rather than relying on the
+  alias-only flag, extend `_build_dispatch` rather than relying on the
   shell alias.
 
 ## Failure handling
@@ -238,8 +284,11 @@ step is not actionable.
 - `route_review.py` returns `status="error"` on timeout, missing
   binary (any `OSError` including `PermissionError`), non-zero exit,
   or output decode failure. Treat as a real review skip, not silent
-  success. Retry once if the cause looks transient (rate limit, brief
-  network blip); otherwise switch reviewer or record the gap.
+  success. Diagnose before re-routing: a timeout that kept substantial
+  partial stdout means the route is healthy and the question needs a
+  higher `--timeout`; retry once if the cause looks transient (rate
+  limit, brief network blip); otherwise switch reviewer or record the
+  gap. After any degraded route, `--doctor` re-measures the pool.
 - All non-host external CLIs unavailable: on Claude Code fall back to
   `advisor()` (still independent) and record the reduced route.
   Elsewhere no independent route remains — self is the caller re-reading
@@ -305,16 +354,27 @@ For highly automated environments or CI/CD pipelines, a raw text review is hard 
 
 When `--strict-gate` is specified:
 1. The script dispatches the prompt and retrieves the reviewer's output.
-2. It scans the response text for critical blocking indicators (case-insensitively):
+2. It scans the response text for these blocking markers (case-insensitively):
    - `[BLOCKING]`
    - `[CRITICAL]`
    - `❌` (red cross emoji)
-   - `blocking issue`
-   - `critical issue`
-   - `fails gate`
-3. If **any** of these blocking indicators are found, even if the reviewer CLI exited with code `0` (success), `route_review.py` will:
+
+   Only these opt-in markers count. Free-text phrases like "blocking
+   issue" are deliberately **not** matched — they false-positive on
+   negations ("no blocking issue found") and would fail clean reviews.
+   The flip side: the gate only works if the reviewer actually uses the
+   markers — so `--strict-gate` appends the tagging instruction to the
+   prompt itself. The precondition is guaranteed by construction; the
+   caller cannot forget it.
+3. If **any** of these blocking markers are found, `route_review.py` will:
    - Output a high-visibility warning to `stderr`: `route_review: STRICT GATE FAILED! Found blocking triggers: ...`
    - Exit with **exit code 3** (Strict Gate Failed).
+
+   The scan covers **every attempt's stdout**, not just the final
+   successful one — including partial output a timed-out reviewer
+   managed to emit before the deadline. A `[BLOCKING]` from a truncated
+   review is a human-must-look signal; a clean fallback answer must not
+   launder it.
 
 This allows shell scripts and agent loops to conditionally halt or block a merge based on exit code:
 ```sh
@@ -324,10 +384,12 @@ rc=$?
 if [ $rc -eq 3 ]; then
     echo "Gate blocked! Resolving critical issues before proceeding."
     exit 3
+elif [ $rc -eq 4 ]; then
+    echo "Gate passed, but only via failover — record the degraded route."
 elif [ $rc -ne 0 ]; then
     echo "Review failed to run or degraded (rc=$rc)."
     exit $rc
+else
+    echo "Gate passed clean."
 fi
-
-echo "Gate passed!"
 ```
