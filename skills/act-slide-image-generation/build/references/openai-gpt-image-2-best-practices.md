@@ -136,7 +136,7 @@ QA:
 - Keep text short; reduce labels before asking the model to render many small words.
 - Convert abstract messages into a concrete visual anchor before generation: name the observable scene or object, viewpoint/crop, and 2-4 specific visual details.
 - Specify font style, size, color, and placement for text.
-- Apply max_text_size_lock: no visible text may exceed 34pt; H1 max 34pt, subtitle max 30pt, message-box/Insight max 26pt, body/data labels max 24pt.
+- Apply max_text_size_lock: H1 stays at the deck-wide 38pt master with 40pt cap, subtitle stays at 32pt with 34pt cap, message-box/Insight max 26pt, and body/data labels max 24pt.
 - For brand names or unusual words, spell them letter-by-letter.
 - Ask for sharp text rendering and high contrast.
 - Use `quality: "medium"` or `quality: "high"` for dense text, small labels, multi-font layouts, and final slides.
