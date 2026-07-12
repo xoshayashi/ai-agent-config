@@ -5,6 +5,7 @@
 # --- 基本設定 ---
 export LANG=ja_JP.UTF-8
 export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+export PYTHONDONTWRITEBYTECODE=1
 
 # --- 履歴設定 ---
 HISTFILE=~/.zsh_history

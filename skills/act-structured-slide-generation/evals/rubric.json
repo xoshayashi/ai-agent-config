@@ -1,0 +1,85 @@
+{
+  "$comment": "Rubric for banker-grade slide quality with controlled modern freshness. Base grammar is investment-bank / strategy-consulting: action title, one claim, aligned evidence, source discipline, consistent title/source placement, and a clear grid/flex contract. Freshness is rewarded only when it improves composition, hierarchy, density, and impact without weakening auditability. Defect-deduction scoring: each category starts at full points; deduct for concrete observed defects (minor=-1, major=-3, critical=-5 within the category, floor 0). Total = max 100. Judge of record is an independent reviewer in the other CLI's non-interactive mode, run on rendered PNGs via eval_deck.py (Claude Code host -> --judge codex; Codex host -> --judge claude), iterating to >=95. Every reported defect must be re-verified against the actual render before fixing.",
+  "categories": [
+    {
+      "id": "story",
+      "name": "Story Structure And Message",
+      "max_points": 20,
+      "criteria": [
+        "Content-slide titles are action titles that state conclusions, and the title read-through forms one coherent argument. Cover, agenda, section dividers, and quote-only close slides are structural exceptions.",
+        "The same slide's chart, table, value, diagram, or evidence directly proves the title.",
+        "Each slide has one message and one protagonist; no competing focal object or second claim.",
+        "Numbers are consistent across title, body, chart, table, source, and other slides.",
+        "The deck covers the decision-critical issues for the audience without generic completeness or self-introduction pages."
+      ]
+    },
+    {
+      "id": "layout",
+      "name": "Layout And Density",
+      "max_points": 20,
+      "criteria": [
+        "No overflow, clipping, overlap, or broken render artifacts.",
+        "Whitespace is balanced: no accidental large empty zones and no cramped clusters.",
+        "The investment-bank / strategy-consulting base is visible: stable header, clear evidence field, comparable rows/columns, and disciplined source area.",
+        "Modern freshness comes from scale contrast, asymmetry, proof rails, dense but readable fields, and composition rather than decorative effects.",
+        "The grid/flex contract is visible in the render: role map, column spans, alignment spine, body bands, edge locks, and consistent gaps.",
+        "Major body blocks are generally three or fewer unless the primitive explicitly supports structured multiples."
+      ]
+    },
+    {
+      "id": "typography",
+      "name": "Typography",
+      "max_points": 15,
+      "criteria": [
+        "Hierarchy is clear: title > heading > body/proof > metric subline > source.",
+        "Type size and weight are consistent across comparable slides.",
+        "Important body evidence is readable from the back row; only footer/source text may be small.",
+        "Japanese typesetting is clean: no awkward wrapping, full-width alphanumeric drift, or line-initial punctuation.",
+        "YoY, delta, vs plan, and prior-year text sit on a separate metric subline with visible air from the value line."
+      ]
+    },
+    {
+      "id": "color",
+      "name": "Color And Design Discipline",
+      "max_points": 15,
+      "criteria": [
+        "Act palette usage is disciplined: deep green/teal base, controlled tints, gray support, and no uncontrolled color spread.",
+        "Yellow accent appears no more than once per slide and only for a true protagonist mark.",
+        "Time-series emphasis is consistent: latest/conclusion period is strongest, prior periods recede.",
+        "Color meaning remains stable across the deck.",
+        "No gradients, shadows, neon, pure black, or decorative effects are used to manufacture impact."
+      ]
+    },
+    {
+      "id": "chart",
+      "name": "Chart And Evidence Craft",
+      "max_points": 20,
+      "criteria": [
+        "Charts are minimal, direct-labeled when practical, and use axes only when needed.",
+        "Bar/column charts provide comparison across periods, scenarios, segments, plans, peers, or prior year; no lone current-value bar.",
+        "Units, signs, decimals, denominators, and labels are consistent.",
+        "The one point supporting the conclusion is visible within three seconds.",
+        "Actuals, forecasts, plans, targets, and assumptions are visually distinguishable.",
+        "Tables use light rules, readable row heights, and a highlighted row/column that corresponds to the title."
+      ]
+    },
+    {
+      "id": "evidence",
+      "name": "Source And Footnote Discipline",
+      "max_points": 10,
+      "criteria": [
+        "Evidence slides include real-looking sources; no placeholders or impossible citations.",
+        "Internal assumptions are separated from external sources.",
+        "No material number appears without provenance, period, unit, or denominator.",
+        "Source, assumption, and note remain small and restrained without interfering with the main proof.",
+        "Future-looking claims include assumption or caveat language rather than promise-like certainty."
+      ]
+    }
+  ],
+  "deduction_scale": {
+    "minor": 1,
+    "major": 3,
+    "critical": 5
+  },
+  "pass_threshold": 95
+}
