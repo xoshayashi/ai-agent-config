@@ -235,6 +235,11 @@ def main() -> int:
                 if "." not in xs:
                     out.add(xs + ".0")
                 return out
+            def _is_neg(x):
+                if isinstance(x, (int, float)):
+                    return x < 0
+                return isinstance(x, str) and x.strip()[:1] in ("△", "▲", "-", "−")
+            _neg_pairs = set()  # スライド上で負値としてのみ現れる number+unit
             # 描画制御メタデータ(強調 index・予想開始 index・注記オフセット等)はデータ値では
             # ないので unit とペアにしない — focal_category:1 が「1億円」を通してしまう
             _CTRL_KEYS = {"focal_category", "forecast_from", "emphasis_col", "emphasis_row",
@@ -268,6 +273,8 @@ def main() -> int:
                         for n in nums:
                             for var in _num_variants(n):
                                 _unit_pairs.add(var + unit)
+                                if _is_neg(n):
+                                    _neg_pairs.add(var + unit)
                     if isinstance(o.get("headers"), list) and isinstance(o.get("rows"), list):
                         # 表: ヘッダー内の単位表記("(億円)" 等)を数値セルとペア化する。
                         # ヘッダーに単位が1種類なら表全体に適用(「(億円)」を先頭列に置く
@@ -287,6 +294,8 @@ def main() -> int:
                             for c in cells:
                                 for var in _num_variants(c):
                                     _unit_pairs.add(var + u)
+                                    if _is_neg(c):
+                                        _neg_pairs.add(var + u)
                         elif distinct:
                             for ci_, units in enumerate(col_units):
                                 if not units:
@@ -299,6 +308,8 @@ def main() -> int:
                                     for var in _num_variants(c):
                                         for u in units:
                                             _unit_pairs.add(var + u)
+                                            if _is_neg(c):
+                                                _neg_pairs.add(var + u)
                     for vv in o.values():
                         _walk_nums(vv)
                 elif isinstance(o, list):
@@ -313,15 +324,27 @@ def main() -> int:
             # 連続性は単一文字列内でのみ意味を持つため、パーツ間に区切り子を挟む
             _corpus = "|".join(_corpus_parts).replace(",", "").replace(" ", "")
             alien = []
+            sign_flips = []
+            _NEG_MARKERS = ("△", "▲", "-", "−", "マイナス", "赤字", "損失", "減少", "減益", "減収", "減")
             # 構造カウント(ステップ/フェーズ/行/列/セル等)は「スライドの構成要素を数えた」
             # 正当なナレーションなので照合対象にしない — 対象は証拠数値の単位のみ
             for m in _re_ts.finditer(r"(\d[\d,.]*)(億円|兆円|億|兆|万|円|%|％|件|社|名|人|カ月|ヶ月|か月|週間|時間|倍|pt)", notes):
                 token = m.group(1).replace(",", "") + m.group(2)
                 if token not in _unit_pairs and token not in _corpus:
                     alien.append(m.group(0))
+                elif token in _neg_pairs:
+                    # スライド上では負値(△/−)としてのみ現れる数。スクリプト側の文脈に
+                    # 負方向の語(赤字/△/減 等)が無ければ、損益の向きが反転して
+                    # 語られている可能性がある
+                    ctx = notes[max(0, m.start() - 10): m.end() + 4]
+                    if not any(mk in ctx for mk in _NEG_MARKERS):
+                        sign_flips.append(m.group(0))
             if alien:
                 warns.append(f"{loc}: speaker_notes にスライド上に無い数値: {', '.join(dict.fromkeys(alien))} — "
                              "スクリプトは本体と同じ根拠だけを話す(本体改稿後の追従漏れ/幻覚の兆候)")
+            if sign_flips:
+                warns.append(f"{loc}: speaker_notes の {', '.join(dict.fromkeys(sign_flips))} はスライド上では負値(△) — "
+                             "赤字/減少などの向きを示す語を添えるか、符号の反転がないか確認する")
 
         import re as _re
         zenkaku = [t for t in iter_texts({k: v for k, v in s.items() if k != "pattern"})

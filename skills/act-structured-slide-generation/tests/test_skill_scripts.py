@@ -1461,3 +1461,20 @@ def test_pyramid_accepts_scalar_tiers(tmp_path):
     out = tmp_path / "out.pptx"
     r = run("build_deck.py", f, "-o", out)
     assert r.returncode == 0, r.stderr
+
+
+def test_fidelity_flags_sign_flip_against_negative_slide_values(tmp_path):
+    # スライドでは △5.0(損失)のみの数を、正方向の文脈で「5億円」と語ると警告。
+    # 「赤字5億円」のように向きの語があれば通る
+    table = {"headers": ["(億円)", "FY26"], "rows": [["営業利益", "△5.0"]]}
+    base = {"pattern": "comparison_table", "title": "営業損失5.0億円までの縮小を1表で確認する", "table": table}
+    slides = [
+        dict(base, speaker_notes="今期の損益です。営業利益は5億円に到達し、収益化の目処が立ちました。この水準を維持できるかを次のスライドで確認します。八十字対策の補足文です。"),
+        dict(base, speaker_notes="今期の損益です。営業赤字5億円まで縮小し、黒字化が視野に入りました。改善ドライバーの中身は次のスライドで確認します。八十字対策の補足文です。"),
+    ]
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps({"slides": slides}, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    out = r.stdout
+    assert any("slide 1" in ln and "負値" in ln for ln in out.splitlines()), out
+    assert not any("slide 2" in ln and "負値" in ln for ln in out.splitlines()), out
