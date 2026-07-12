@@ -522,7 +522,9 @@ def check_current_master_contract() -> list[Result]:
         "edge_margin_balance_lock",
         "intentional_space_coverage_lock",
         "focal_aspect_preservation_lock",
-        "one uniform 40pt/700 line",
+        "one uniform 38pt/700 line",
+        "one uniform 32pt/400 #626A64 line",
+        "abs(top_visible_margin - bottom_visible_margin) <=4px",
     ]
     forbidden = [
         "header_left_accent",
