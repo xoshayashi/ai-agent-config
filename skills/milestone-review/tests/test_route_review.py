@@ -735,6 +735,11 @@ def test_strict_gate_violations() -> None:
     rc, err = _run_main(["--reviewer", "codex", "--host", "claude-code", "--prompt", "p", "--strict-gate"])
     assert rc == 0, f"clean review should pass strict gate, got {rc!r}"
     
+    # 3. Negated phrase like 'No blocking issue found' -> should exit 0 (regression)
+    _install_fake_run(captured, completed=_FakeCompleted(stdout="No blocking issue found. LGTM.", returncode=0))
+    rc, err = _run_main(["--reviewer", "codex", "--host", "claude-code", "--prompt", "p", "--strict-gate"])
+    assert rc == 0, f"negated phrase like 'No blocking issue found' should pass strict gate, got {rc!r}"
+    
     print("ok    test_strict_gate_violations")
 
 

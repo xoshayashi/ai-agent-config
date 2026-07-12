@@ -290,9 +290,6 @@ def check_strict_gate_violations(text: str) -> list[str]:
         (r"\[BLOCKING\]", "[BLOCKING]"),
         (r"\[CRITICAL\]", "[CRITICAL]"),
         (r"❌", "❌"),
-        (r"\bblocking issue\b", "blocking issue"),
-        (r"\bcritical issue\b", "critical issue"),
-        (r"\bfails gate\b", "fails gate"),
     ]
     violations = []
     for pattern, label in blocking_patterns:
