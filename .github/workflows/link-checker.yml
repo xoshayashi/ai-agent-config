@@ -1,0 +1,22 @@
+name: Markdown Link Checker (Lychee)
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  link-checker:
+    name: Link Checker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Run Lychee Link Checker
+        uses: lycheeverse/lychee-action@v2
+        with:
+          # Check all markdown files, but exclude local file:// absolute paths
+          # because they are invalid inside the GitHub CI environment.
+          args: "--verbose --no-progress --offline --exclude 'file://.*' './**/*.md'"
+          fail: true
