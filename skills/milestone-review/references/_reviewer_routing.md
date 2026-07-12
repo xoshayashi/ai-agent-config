@@ -338,14 +338,14 @@ in `source_plan_builder.py`.
      range `[label_col, *period_cols]` and skipped empty cells. We
      replaced that with `apply_semantic_border_span` driven by
      `detect_table_block`."
-   - Target: paste the diff for `source_plan_builder.py` and the new
-     helper.
+   - Target: paste the diff for the modified builder module and the
+     new helper.
    - Question: "For a row whose table block runs C-N with empty D and
      E, does the new code apply identical borders to D and E?"
 3. **advisor**: ask the host tool — it will see this full transcript.
-4. **Verify**: open `source_plan_builder.py` at the cited lines, run
-   `test_build_model.py`, confirm new test for D/E coverage passes,
-   reconcile any Codex/advisor disagreement against the test result.
+4. **Verify**: open the modified module at the cited lines, run its
+   unit tests, confirm the new D/E coverage test passes, reconcile any
+   Codex/advisor disagreement against the test result.
 5. **Record** the outcome in `progress.md` and continue.
 
 ## Automated Quality Gates (`--strict-gate`)
