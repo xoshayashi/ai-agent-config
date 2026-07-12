@@ -5,12 +5,14 @@ from __future__ import annotations
 
 import argparse
 import binascii
+import hashlib
 import json
 import math
 import posixpath
 import re
 import struct
 import zipfile
+import zlib
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
@@ -24,6 +26,7 @@ NOTES_CX = 6_858_000
 NOTES_CY = 9_144_000
 IMAGE_EXTENSIONS = {".png"}
 APPROVED_SLIDE_IMAGE_SIZES = {
+    (1672, 941),
     (2048, 1152),
 }
 CONTENT_TYPES = {
@@ -71,6 +74,79 @@ def validate_png_bytes(data: bytes, label: str) -> tuple[int, int]:
     return dimensions
 
 
+def measure_meaningful_vertical_margins(data: bytes) -> tuple[int, int] | None:
+    """Measure meaningful top/bottom pixels for 8-bit RGB/RGBA PNGs."""
+    offset = 8
+    width = height = color_type = bit_depth = None
+    compressed = bytearray()
+    while offset + 12 <= len(data):
+        length = struct.unpack(">I", data[offset : offset + 4])[0]
+        kind = data[offset + 4 : offset + 8]
+        payload = data[offset + 8 : offset + 8 + length]
+        if kind == b"IHDR":
+            width, height, bit_depth, color_type = struct.unpack(">IIBB", payload[:10])
+        elif kind == b"IDAT":
+            compressed.extend(payload)
+        elif kind == b"IEND":
+            break
+        offset += 12 + length
+    channels = {0: 1, 2: 3, 6: 4}.get(color_type)
+    if not width or not height or bit_depth != 8 or channels is None:
+        return None
+    raw = zlib.decompress(bytes(compressed))
+    stride = width * channels
+    rows: list[bytearray] = []
+    cursor = 0
+    previous = bytearray(stride)
+    for _ in range(height):
+        filter_type = raw[cursor]
+        cursor += 1
+        scan = bytearray(raw[cursor : cursor + stride])
+        cursor += stride
+        recon = bytearray(stride)
+        for i, value in enumerate(scan):
+            left = recon[i - channels] if i >= channels else 0
+            up = previous[i]
+            upper_left = previous[i - channels] if i >= channels else 0
+            if filter_type == 0:
+                predictor = 0
+            elif filter_type == 1:
+                predictor = left
+            elif filter_type == 2:
+                predictor = up
+            elif filter_type == 3:
+                predictor = (left + up) // 2
+            elif filter_type == 4:
+                p = left + up - upper_left
+                pa, pb, pc = abs(p - left), abs(p - up), abs(p - upper_left)
+                predictor = left if pa <= pb and pa <= pc else up if pb <= pc else upper_left
+            else:
+                return None
+            recon[i] = (value + predictor) & 0xFF
+        rows.append(recon)
+        previous = recon
+
+    meaningful_rows: list[int] = []
+    minimum_row_density = 5
+    for y in range(4, height - 4):
+        row = rows[y]
+        meaningful_count = 0
+        for x in range(4, width - 4):
+            start = x * channels
+            if color_type == 0:
+                rgb = (row[start],) * 3
+            else:
+                rgb = tuple(row[start : start + 3])
+            if min(rgb) < 210 or max(rgb) - min(rgb) > 28:
+                meaningful_count += 1
+                if meaningful_count >= minimum_row_density:
+                    meaningful_rows.append(y)
+                    break
+    if not meaningful_rows:
+        return None
+    return min(meaningful_rows), height - 1 - max(meaningful_rows)
+
+
 def validate_image_bytes(data: bytes, suffix: str, label: str) -> tuple[int, int]:
     ext = suffix.lower()
     if ext == ".png":
@@ -83,11 +159,8 @@ def validate_image_file(path: Path) -> None:
     width, height = validate_image_bytes(path.read_bytes(), path.suffix, str(path))
     if (width, height) not in APPROVED_SLIDE_IMAGE_SIZES:
         allowed = ", ".join(f"{w}x{h}" for w, h in sorted(APPROVED_SLIDE_IMAGE_SIZES))
-        message = f"{path} must be the approved 16:9 2K slide PNG master size; found {width}x{height}. Allowed: {allowed}."
-        if (width, height) == (1672, 941):
-            message += " Use 1672x941 only as layout-coordinate basis, not as a package input; generate a new 2048x1152 slides_final/ master with Codex built-in gpt-image-2 from the approved slide specification."
-        else:
-            message += " Generate a new 2048x1152 slides_final/ master with Codex built-in gpt-image-2 from the approved slide specification instead of converting or locally redrawing this file."
+        message = f"{path} must be a directly generated approved 16:9 slide PNG master; found {width}x{height}. Allowed: {allowed}."
+        message += " Generate a new approved-size slides_final/ master with Codex built-in gpt-image-2 from the approved slide specification instead of converting or locally redrawing this file."
         raise SystemExit(message)
 
 
@@ -242,6 +315,7 @@ REVIEW_MANIFEST_BASE_KEYS = frozenset(
         "schema_version",
         "all_generated_images_reviewed",
         "weak_slide_regeneration_queue",
+        "review_evidence",
         "slides",
     }
 )
@@ -305,6 +379,21 @@ def validate_review_manifest(manifest_file: str | None, images: list[Path]) -> N
     if len(slides) != len(images):
         raise SystemExit(f"review_manifest slide count {len(slides)} does not match image count {len(images)}.")
 
+    evidence = data.get("review_evidence")
+    if not isinstance(evidence, dict) or set(evidence) != {"reviewer", "reviewed_at", "png_sha256_by_slide"}:
+        raise SystemExit("review_manifest review_evidence must contain reviewer, reviewed_at, and png_sha256_by_slide.")
+    if not isinstance(evidence.get("reviewer"), str) or not evidence["reviewer"].strip():
+        raise SystemExit("review_manifest review_evidence reviewer must be non-empty.")
+    if not isinstance(evidence.get("reviewed_at"), str) or "T" not in evidence["reviewed_at"]:
+        raise SystemExit("review_manifest review_evidence reviewed_at must be an ISO-like timestamp.")
+    hashes = evidence.get("png_sha256_by_slide")
+    if not isinstance(hashes, dict) or set(hashes) != {str(i) for i in range(1, len(images) + 1)}:
+        raise SystemExit("review_manifest review_evidence png_sha256_by_slide must cover every sequential slide_id.")
+    for idx, image in enumerate(images, 1):
+        actual_hash = hashlib.sha256(image.read_bytes()).hexdigest()
+        if hashes.get(str(idx)) != actual_hash:
+            raise SystemExit(f"review_manifest review_evidence hash mismatch for slide {idx}.")
+
     expected_paths = [image.resolve() for image in images]
     manifest_paths: set[Path] = set()
     base = manifest_path.parent
@@ -320,8 +409,14 @@ def validate_review_manifest(manifest_file: str | None, images: list[Path]) -> N
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
                 raise SystemExit(f"review_manifest slide {idx} {key} must be a finite non-negative number.")
             margins[key] = float(value)
-        if abs(margins["top_visible_margin"] - margins["bottom_visible_margin"]) > 4:
-            raise SystemExit(f"review_manifest slide {idx} visible outer margin difference must be <= 4px on the 1672 basis.")
+        measured = measure_meaningful_vertical_margins(images[idx - 1].read_bytes())
+        if measured is not None:
+            recorded = (margins["top_visible_margin"], margins["bottom_visible_margin"])
+            if any(abs(actual - stated) > 8 for actual, stated in zip(measured, recorded)):
+                raise SystemExit(
+                    f"review_manifest slide {idx} visible margins do not match the PNG: "
+                    f"measured top/bottom={measured}, recorded={recorded}, tolerance=8px."
+                )
         for key in SLIDE_APPROVED_STATUSES:
             if slide.get(key) != "approved":
                 raise SystemExit(f"review_manifest slide {idx} {key} must be approved.")

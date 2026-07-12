@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "basis": {
+    "width": 1672,
+    "height": 941
+  },
+  "outer_shell": {
+    "x": 72,
+    "y": 72,
+    "width": 1528,
+    "height": 797,
+    "right": 1600,
+    "bottom": 869,
+    "padding_px": 72
+  },
+  "header": {
+    "h1": {
+      "x": 72,
+      "y": 72,
+      "width": 1528
+    },
+    "subtitle": {
+      "x": 72,
+      "y": 136,
+      "width": 1528
+    },
+    "max_visible_bottom": 172
+  },
+  "body": {
+    "start_y": 238,
+    "bottom_without_footer": 869,
+    "bottom_with_footer": 806,
+    "target_envelope_without_footer": {"top": 248, "bottom": 815},
+    "target_envelope_with_footer": {"top": 248, "bottom": 759},
+    "width_utilization_range": [0.72, 0.92],
+    "height_utilization_range": [0.70, 0.90],
+    "centroid_y_range_without_footer": [0.54, 0.58]
+  },
+  "footer": {
+    "baseline_y": 858
+  },
+  "grid": {
+    "unit_px": 8,
+    "columns": 12
+  }
+}

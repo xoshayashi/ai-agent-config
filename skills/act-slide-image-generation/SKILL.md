@@ -5,38 +5,75 @@ description: "Use when generating, reviewing, repairing, or PPTX/PDF-packaging A
 
 # ACT Slide Image Generation
 
-Read only the reference required for the current phase:
+Use the smallest reference set required for the current phase:
 
-- `build/references/core-layout-and-typography.md` for geometry, title fit, rendered type, and balance
-- `build/references/content-and-story.md` for brief-to-deck reasoning, evidence, density, and ordinal semantics
-- `build/references/generation-review-packaging.md` for production, repair, review, and delivery
-- `build/references/prompt-recipes.md` when a concrete prompt scaffold is needed
-- `build/references/openai-gpt-image-2-best-practices.md` when model/tool semantics need confirmation
+- `build/references/core-layout-and-typography.md` for geometry and rendered type
+- `build/references/content-and-story.md` for argument, evidence, and reading order
+- `build/references/generation-review-packaging.md` for production, review, and delivery
+- `build/references/prompt-recipes.md` for a prompt scaffold
+- `build/references/openai-gpt-image-2-best-practices.md` for model semantics
 
-Use `scripts/build_act_slide_prompt.py` for planning scaffolds. Produce each final master directly with Codex built-in `gpt-image-2`, keep approved masters in `slides_final/`, inspect the actual PNGs, repair until approved, then package with `scripts/package_slide_images_to_pptx.py` or `scripts/package_slide_images_to_pdf.py`.
+Generate final PNG pixels with Codex built-in `gpt-image-2`. Keep each approved master once in `slides_final/`, inspect every actual PNG, then package approved masters with the PPTX/PDF scripts.
 
-Core master: Noto Sans JP, near-white ACT surface, one fixed outer shell `x=72..1600 y=80..861` on the 1672x941 basis, 72px left/right and 80px top/bottom canvas padding, and a quiet text-only header aligned to the shell. Use H1 `x=72 y=80 w=1528`, one line, uniform 38pt/700 with 36pt emergency floor and 40pt cap. Use subtitle `x=72 y=126 w=1528`, 32pt/400 with 30pt floor and 34pt cap, in neutral gray `#626A64`. Keep the actual H1-to-subtitle glyph gap at 14-22px, target 18px. Place the first body mark at `y>=270` and keep 64-96px of quiet canvas below the subtitle.
+## Core Master
 
-Deck-wide header consistency lock: freeze the approved H1 and subtitle master before generating slide 1, then reuse it verbatim on every slide. H1 stays `38pt/700 #2D332E`, one line, at `x=72 y=80 w=1528`; subtitle stays `32pt/400 #626A64`, one line, at `x=72 y=126 w=1528`. Copy the same font family, weight, point size, color, line box, baseline, and width across the deck. Resolve fit through title rewriting, subtitle/body redistribution, or slide splitting while retaining the master. During actual-PNG review, compare all slides side by side and approve when H1 visible glyph heights differ by <=2px, subtitle heights differ by <=2px, and header baselines remain aligned after proportional scaling.
+Use Noto Sans JP, a near-white ACT canvas, and `build/references/canonical-geometry.json` as the coordinate source. On the 1672x941 basis, apply one 72px inset to all four sides, producing the outer shell `x=72..1600 y=72..869`. H1 uses `x=72 y=72 w=1528`, one line, `38pt/700 #2D332E`. Subtitle uses `x=72 y=136 w=1528`, one line, `32pt/400 #626A64`. The first body mark begins at `y>=238` after 64-80px of quiet clearance from the rendered subtitle.
 
-Header alignment lock: use left alignment as the default for every content, strategy, IR, proposal, and appendix slide. H1 and subtitle share the same left anchor `x=72`, fixed width `w=1528`, and ragged-right line ending. During actual-PNG review, require their first visible glyph x-coordinates to differ by <=2px and the H1 left edge to align with the main body grid within <=4px. Center alignment is reserved for an explicitly requested cover, interstitial, or closing slide and is recorded as `header_alignment_exception`; otherwise repair by left-aligning the complete H1/subtitle group without changing its internal spacing or type scale.
+Resolve design decisions in this order: exact text and meaning; one header identity; safe shell and readable type; connected reading path; grouped body silhouette; optical balance; decorative refinement.
 
-Title fit: estimate rendered width before freezing `exact_text`. Rewrite the title until the uniform 38pt line fits comfortably while retaining topic, change/tension, and implication. Move dates, scope qualifiers, and secondary clauses into subtitle or body. Split the message across slides when one governing claim still exceeds the title box.
+## Rendered Type
 
-Header copy-budget lock: count Japanese text in full-width equivalents before generation. Keep H1 at <=28 full-width-equivalent characters and subtitle at <=36. Treat ASCII letters, digits, and spaces by their measured rendered width, using two half-width characters as roughly one full-width equivalent for the first-pass count. Passing the count remains subordinate to actual rendered-width fit. When either line exceeds its budget or fills more than 92% of the fixed text box, rewrite by removing setup phrases, dates, scope qualifiers, duplicated nouns, and secondary clauses; move necessary detail into body copy. Generation readiness requires both lines to pass the copy budget and width check while retaining the fixed deck-wide type master.
+Approve actual pixel boxes on the 1672x941 basis:
 
-Visible outer-padding lock: approve padding from the actual rendered PNG rather than text-box coordinates. Measure `top_visible_margin` from the canvas top to the topmost meaningful title glyph and `bottom_visible_margin` from the canvas bottom to the lowest meaningful border or glyph. Require `abs(top_visible_margin - bottom_visible_margin) <= 4px` and record both values in review metadata. Resolve the signed difference symmetrically: when the top margin is larger, translate the complete header group upward by the measured difference while preserving its internal geometry and header/body clearance; when the bottom margin is larger, translate the complete bottom-most component downward by the difference; when either move would violate the safe shell, redistribute the body as one group. Preserve the fixed deck-wide type scale and corresponding normalized test at every approved output size.
+- H1 visible height: 42-50px
+- Subtitle: 28-36px and 65-78% of H1
+- Section heading: 28-34px
+- Primary body label: 22-28px
+- Supporting text: 18-24px
+- Integrated takeaway: 26-32px and at or below section-heading scale
 
-Outer-padding correction priority: compare actual visible edges first, then choose the smallest edge-local translation that closes the measured difference. Keep the H1/subtitle together as one header group and keep a bottom evidence strip or footer together as one bottom group. Preserve internal gaps, alignment, font scale, and component dimensions during translation. Use the normalized difference ratio `abs(top_visible_margin - bottom_visible_margin) / canvas_height <= 0.005` for output sizes other than the 1672 basis.
+With a pilot, keep corresponding header glyph boxes within 4px across the deck. Fit copy through rewriting, body redistribution, or slide splitting while preserving the type-role scale. Keep H1 within 28 full-width-equivalent characters and subtitle within 36 as the first-pass copy budget, followed by rendered-width review.
 
-Footer-aware balance: select `footer_mode` before layout. With no visible footer, use `available_content_band y=270..861`, bottom gap 26-80px, and soft optical target `y=595` with tolerance 12px. With a genuine visible Source or required note, use `available_content_band y=270..810`, bottom gap 30-80px, footer baseline `y=852`, and soft optical target `y=570` with tolerance 11px. Keep the horizontal optical target at `x=836` with tolerance 12px and left/right breathing within 16px.
+## Body Composition
 
-Body balance: use edge margins and intentional-space coverage rather than forcing every visual family into one rectangular fill ratio. For T2-T4, keep body side margins 24-72px inside the outer shell; for T1, use 96-160px. Divide the available body band into a 4-column x 3-row review grid. Mark each cell as occupied or intentionally blank; allow up to five blank cells for T1, two for T2, and one for T3/T4. Preserve a single chart, diagram, or illustration aspect ratio within 5% and satisfy balance through margins, grouping, and declared blank cells. Prioritize shell bounds, >=20pt body text, edge margins, then optical-center refinement.
+Select a layout family from the message and content budget. Use one governing thought, one dominant evidence object, and one meaningful reading order. Keep every body pixel inside the canonical shell and selected body band. Related-element gaps are smaller than group-separation gaps; repeated same-level gaps align to the shared 8px grid within a half-unit.
 
-Content and evidence: preserve one governing thought, a connected action-title chain, a named exhibit element proving each title, MECE support, and declared inductive or deductive body logic. Use `ordinal_semantics_lock`: visible numbering carries sequence, rank, deductive, temporal, or causal meaning; parallel groups use position, alignment, and semantic labels.
+Measure the body envelope and body-only optical centroid. Compare them with the selected content band and a same-family pilot. Without a pilot, preserve deliberate breathing above and below and judge the body as one complete group. Intentional asymmetry is approved when the visual anchor and endpoint explain it.
 
-Visible Source policy: render a Source footer only for a genuine, independently traceable published source such as an official report, public dataset, statute, research paper, or cited article with a stable title or URL. Keep meeting notes, transcripts, internal documents, uploads, filenames, company materials, and generated summaries in the source ledger or speaker notes with `source_line: none`.
+At thumbnail size, the header acts as a compact entry point and the body carries the dominant visual mass. Recompose the responsible group when header and body compete or when the body reads as a compact island.
 
-Directive language: express generation and repair guidance as the desired visible state, selected route, measurable target, and next corrective action. Use verbs such as `use`, `keep`, `place`, `select`, `preserve`, `rewrite`, and `repair by`.
+Freeze a `zonal_mass_plan` before generation. On the 1672x941 basis, header visible marks stay within `y=72..172`; the target body envelope uses `y=248..815` without a footer or `y=248..759` with a footer. A typical content slide uses 72-92% of the available body width and 70-90% of the available body height; the selected layout family uses the remaining space as one named quiet region. Without a footer, place the body-only vertical centroid at 54-58% of canvas height. Review the header, body, and footer as three weighted zones: compact entry, dominant evidence, quiet provenance. Repair by redistributing the body as one group while preserving the fixed header and footer baselines.
 
-Completion requires actual-PNG multimodal review, approved content/design/deck-unity statuses, an empty `weak_slide_regeneration_queue`, and an approved package manifest. Notes live at `slides_package/speaker_notes.json` as ordered `slides[{slide_id, per_slide_time_budget_seconds, speaker_notes_text}]`.
+Prompts follow a short two-layer contract: first state purpose, exact text, zone bounds, and the governing visual relationship; then state palette and material. Repeat the fixed header and edge furniture once in the final acceptance sentence. Refinement edits name one region, one measured delta, and the elements to preserve.
+
+## Canvas Edges
+
+On the 1672x941 basis, keep all meaningful pixels inside the four-side 72px safe shell. This equal inset is a containment contract. Measure optical balance separately: the body union keeps its left/right clearance difference within 8px, while vertical balance follows the selected body envelope and centroid target. Adjust the top through the header master, the sides through the body envelope, and the bottom through body/footer composition. Scale proportionally for other outputs.
+
+Apply a `canvas_furniture_allowlist` before generation and again during pixel review. The top outer band contains only the approved H1 and subtitle beginning at the shared left anchor. The side and bottom outer bands remain quiet canvas, except for a genuine traceable source placed on the approved footer baseline. Treat every visible label, running header, brand name, deck descriptor, page marker, navigation cue, decorative rail, and corner annotation outside the frozen exact-text specification as reference contamination. Repair by restoring the quiet canvas edge while preserving the approved header and body.
+
+## Readability And Evidence
+
+Use >=4.5:1 contrast for normal text and >=3:1 for large text. Keep Japanese paragraph lines within 40 CJK glyphs, use ragged-right alignment, and use 1.4-1.5 line height for multi-line explanatory text. Pair color with labels, shape, position, or pattern.
+
+For quantitative comparisons, use a common baseline with position, bars, or aligned dots. Place the decision-carrying value beside its mark and label series directly when space permits.
+
+Visible Source appears for a genuine independently traceable publication, public dataset, statute, research paper, or stable article. Internal notes, uploads, filenames, company materials, and generated summaries remain in the source ledger or speaker notes with `source_line: none`.
+
+## Reference And Repair Routes
+
+Approve one pilot, then create a temporary `style_board` containing its header crop, canvas tone, palette swatches, rule weight, corner treatment, and type-role examples. New slides use one style board plus text-only exact content.
+
+Assign every reference one role: `content_target`, `style_board`, or `asset_reference`. Preservation repairs use the content target as the first and primary image. Asset references contain the named asset. Visible output matches the frozen exact text and selected reference roles.
+
+Use focused editing for one local element when reading order, hierarchy, and body silhouette already pass. Use zero-base regeneration for structural, hierarchy, density, reference-fidelity, or overall-balance changes. After two focused iterations, return to the frozen specification and regenerate.
+
+## Review And Delivery
+
+Review every PNG at full size and in one contact sheet. Approve header anchors, glyph scales, canvas tone, palette roles, rule weights, corner treatment, footer behavior, reading order, body balance, and deck rhythm.
+
+Approve the contact sheet when every slide presents the shared header, one evidence-led body, and the selected footer source treatment as its complete furniture system. The deck uses these recurring elements to create unity while each body composition follows its message.
+
+Completion includes approved content, design, and deck-unity statuses; an empty `weak_slide_regeneration_queue`; and a package manifest with reviewer, timestamp, and `png_sha256_by_slide`. Packaging re-measures PNG margins and verifies hashes. Speaker notes live at `slides_package/speaker_notes.json`.
+
+Keep one composite `contact_sheet_review.png`, one requested delivery wrapper, compact metadata, and one final PNG per slide. Use a temporary directory for render-back QA and clear it after verification.

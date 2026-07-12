@@ -47,7 +47,7 @@ Use these defaults for ACT slide images:
 generation_mode: new_image / image_edit
 image_model: gpt-image-2
 image_size: 2048x1152 for generated slide output, review, PPTX packaging, and PDF packaging
-image_size_label: 2048x1152 is the single 16:9 2K-width PNG master size; 1672x941 is layout-coordinate basis only
+image_size_label: 2048x1152 is preferred; a directly generated 1672x941 result is the approved fallback
 image_quality: low for fast layout drafts, medium/high for dense text or final slides
 image_background: opaque or auto
 image_output_format: png
@@ -66,10 +66,11 @@ Important size rule:
 
 - `gpt-image-2` requires both edges to be multiples of `16`.
 - `1920x1080` is not a valid direct generation size because `1080` is not divisible by `16`.
-- Keep ACT layout planning on the `1672x941` coordinate basis, but generate and package approved PNG masters at `2048x1152`.
-- `2048x1152`: required 16:9 2K-width generated slide output for working review, final PNGs, PPTX packaging, and PDF packaging.
-- Apply `nonconforming_existing_png_regeneration_lock`: existing/source PNGs at `1672x941` or another non-approved size are not final blockers. Do not convert, upscale, HTML-render, API-render, or locally redraw them. Reuse the approved slide specification and generate new `2048x1152` `slides_final/` masters with Codex built-in gpt-image-2, then review and package those generated masters.
-- Do not create separate `1920x1080`, `1672x941`, draft-size, QHD, or 4K delivery PNG masters for this skill.
+- Keep ACT layout planning on the `1672x941` coordinate basis. Prefer directly generated `2048x1152` masters and retain a directly generated `1672x941` result when the built-in image tool returns that native output.
+- `2048x1152`: preferred 16:9 2K-width generated output for review and packaging.
+- `1672x941`: approved directly generated fallback for the same review and packaging path. Preserve the native pixels instead of converting or upscaling them.
+- Apply `nonconforming_existing_png_regeneration_lock`: source images at other sizes are not final masters. Reuse the approved slide specification and generate a new approved-size master with Codex built-in gpt-image-2; keep local conversion, upscaling, HTML rendering, and API redrawing outside the master path.
+- Keep one native approved delivery master per slide rather than creating alternate FHD, QHD, or 4K copies.
 - Strict cinema/DCI sizes such as `2048x1080` and `4096x2160` are not ACT 16:9 slide targets; `4096x2160` also exceeds the current `3840px` maximum edge constraint for this workflow.
 
 Other model constraints from the official references:
