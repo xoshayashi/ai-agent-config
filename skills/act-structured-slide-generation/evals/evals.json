@@ -1,0 +1,62 @@
+{
+  "skill_name": "act-structured-slide-generation",
+  "notes": "Clean-base evaluation: for each iteration, write deck.json from scratch, then run validate -> build -> verify -> render -> lint_render and score with eval_deck.py using rubric.json with a 95-point threshold. Do not reuse a previous iteration's deck.json as an edited base when measuring skill improvements.",
+  "evals": [
+    {
+      "id": 1,
+      "name": "earnings-deck-ja",
+      "prompt": "Use evals/scenario-earnings.md as the input prompt and generate a 10-12 slide Japanese earnings presentation.",
+      "expected_output": "All lint checks green plus rubric score >=95. Action-title read-through works, and every number in the deck comes from the scenario.",
+      "files": ["evals/scenario-earnings.md"],
+      "assertions": [
+        "validate_spec.py / verify_deck.py / lint_render.py all exit 0",
+        "slide count is 10-12",
+        "outline.md and deck.json remain in the output directory",
+        "all numbers in the deck exist in scenario-earnings.md",
+        "eval_deck.py with rubric.json scores >=95"
+      ]
+    },
+    {
+      "id": 2,
+      "name": "strategy-proposal-ja",
+      "prompt": "Use the same market-entry theme as examples/sample-deck.json, but write a new deck.json from scratch as a 14-16 slide Japanese proposal deck.",
+      "expected_output": "All lint checks green. The story covers market size, competition, entry logic, and financial impact, and includes waterfall and 2x2 positioning pages.",
+      "files": ["examples/sample-deck.json"],
+      "assertions": [
+        "validate_spec.py / verify_deck.py / lint_render.py all exit 0",
+        "slide count is 14-16",
+        "waterfall and competitive_landscape patterns are included",
+        "render/contact-sheet.png is generated",
+        "eval_deck.py with rubric.json scores >=95"
+      ]
+    }
+  ],
+  "assertions_note": "Deterministic checks are owned by validate_spec.py / verify_deck.py / lint_render.py exit codes. Visual quality is scored by the defect-deduction rubric in rubric.json. The judge is an independent reviewer in the other CLI's non-interactive mode (Claude Code host -> eval_deck.py --judge codex; Codex host -> --judge claude; --anchor required), iterating to >=95.",
+  "trigger_evals_note": "Trigger accuracy is evaluated separately from execution quality. If SKILL.md description changes, confirm that should_fire prompts select this skill and should_not_fire prompts do not select it, or route to the adjacent skill shown in parentheses. Near misses are intentionally included.",
+  "trigger_evals": {
+    "should_fire": [
+      "来週火曜の取締役会で使う決算説明資料を作って。FY26Q3 の実績メモは ~/Documents/fy26q3.md にある。10枚くらいで",
+      "シリーズB調達用のピッチデッキが欲しい。投資家はUS系グロースファンド。エクイティストーリーの骨子は既に equity-story.md にまとまってるのでそれをスライド化して",
+      "この事業計画書(v3)を役員会向けに15枚前後の資料にまとめてほしい",
+      "ACME商事向けの提案書つくって。先方の比較対象はfreeeとマネーフォワード。パワポで納品したい",
+      "前回のIR資料の deck.json があるから、ガイダンス進捗のページを足してアップデートして",
+      "パワポつくって 中計の骨子これ→(箇条書き貼り付け) 役員向けでたのむ",
+      "戦略資料を作って。図表多め、あとで自分たちで直したいからネイティブで編集できる pptx で",
+      "TAM/SAM/SOM の整理と競合ポジショニングを入れた市場参入の社内検討資料が欲しい",
+      "need a board deck for our Japan entity covering quarterly results, editable pptx please",
+      "けっさんせつめい資料つくってほしい すうじはこのメモの通り(fy26q3.md) 枚数おまかせ",
+      "とりあえず提案しょの叩き台ほしい。あいて先はACME、パワポで。こまかい体裁はあとでいい"
+    ],
+    "should_not_fire": [
+      "戦略スライドを1枚、キービジュアル的なイメージ画像として生成して(→ act-slide-image-generation)",
+      "ATOM のブランドで 16:9 の戦略スライド画像を作って(→ atom-slide-image-generation)",
+      "この決算説明資料.pptx を読んで要点を3行で教えて",
+      "エクイティストーリーの論点をまず文章で整理したい。スライドはまだいらない(→ equity-story)",
+      "5カ年の財務モデルを xlsx で組んでほしい。資料化はその後で(→ startup-financial-modeling)",
+      "明日のプレゼンの話す原稿(トークスクリプト)を書いて。スライドはもう完成してる",
+      "Marp で markdown からスライドを作りたいんだけどセットアップを教えて",
+      "Google Slides で共同編集できる形の資料にしてほしい",
+      "この提案書の誤字脱字チェックだけお願い"
+    ]
+  }
+}

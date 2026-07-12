@@ -1,0 +1,76 @@
+{
+  "$comment": "Rubric for the SKILL ITSELF, not for generated decks. Grounded in the skill-creator guidance and this repository's conventions. Defect-deduction scoring: each category starts at full points; deduct for concrete observed defects (minor=-1, major=-3, critical=-5 within the category, floor 0). Total = max 100. Judge = an independent reviewer given the full skill tree; every deduction must cite file:line evidence.",
+  "target": "SKILL.md + references/ + scripts/ + evals/ + examples/ of this skill directory",
+  "categories": [
+    {
+      "id": "triggering",
+      "name": "Trigger Design",
+      "max_points": 20,
+      "criteria": [
+        "The description explains both what the skill does and when to use it, including cases where the user does not say slide or pptx.",
+        "Boundaries with adjacent skills are explicit, with Not for cases that route to image slides, ATOM slides, narrative-only writing, Google Slides-only work, and financial models.",
+        "Trigger evals contain realistic prompts with paths, context, casual wording, and typos; should_fire and should_not_fire each have at least eight cases.",
+        "should_not_fire cases are near misses, not unrelated filler."
+      ]
+    },
+    {
+      "id": "disclosure",
+      "name": "Progressive Disclosure And Structure",
+      "max_points": 20,
+      "criteria": [
+        "SKILL.md stays under 500 lines and separates metadata, operating workflow, and reference map.",
+        "Each reference file has a clear role and is read only when relevant.",
+        "Long reference files are organized with headings.",
+        "scripts, references, evals, examples, and assets have distinct responsibilities."
+      ]
+    },
+    {
+      "id": "writing",
+      "name": "Instruction Quality",
+      "max_points": 20,
+      "criteria": [
+        "Instructions are imperative and explain the why behind major constraints.",
+        "Guidance is generalized for diverse future deck work and is not overfit to one sample deck.",
+        "Output formats and examples are concrete enough to execute.",
+        "Redundant, dead, contradictory, or unreferenced guidance is absent."
+      ]
+    },
+    {
+      "id": "determinism",
+      "name": "Determinism And Verification",
+      "max_points": 20,
+      "criteria": [
+        "Binary generation, rendering, validation, and linting live in scripts; the LLM handles judgment and content.",
+        "Machine checks and visual/subjective checks are separated and both are required.",
+        "Automated tests cover scripts and key behavioral contracts.",
+        "Evals have objective assertions and a quality rubric with a pass threshold."
+      ]
+    },
+    {
+      "id": "workflow",
+      "name": "Workflow Completeness",
+      "max_points": 10,
+      "criteria": [
+        "The phases are explicit: requirements, outline gate, generation, validation, repair loop, and final report.",
+        "Intermediate artifacts are files so work can resume across sessions.",
+        "The repair menu defines local fixes and when to return upstream."
+      ]
+    },
+    {
+      "id": "operability",
+      "name": "Operability And Safety",
+      "max_points": 10,
+      "criteria": [
+        "Dependencies, external CLIs, and rendering prerequisites are documented.",
+        "The skill follows the user's intent without surprising destructive or hidden behavior.",
+        "The tree is compatible with repo validation and avoids cache artifacts."
+      ]
+    }
+  ],
+  "deduction_scale": {
+    "minor": 1,
+    "major": 3,
+    "critical": 5
+  },
+  "pass_threshold": 95
+}

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import calendar
 import math
 import re
 from dataclasses import dataclass, field
@@ -20,35 +19,13 @@ def forecast_years(start_year: int | None = None, periods: int = DEFAULT_FORECAS
     return [base_year + idx for idx in range(periods)]
 
 
-def forecast_axis(
-    start_year: int | None = None,
-    periods: int = DEFAULT_FORECAST_PERIODS,
-    grain: str = "annual",
-    *,
-    fiscal_year_end_month: int | None = None,
-) -> tuple[list[int], list[str]]:
-    """Return period years plus display labels for annual, quarterly, or monthly models.
-
-    Monthly labels: when ``fiscal_year_end_month`` is given, columns are real
-    calendar months ("YYYY/MM") starting at the first month of fiscal year
-    ``start_year`` (FYE month M → FY label-year Y starts in month M+1 of
-    Y-1; FYE=12 starts January of Y). When it is None the legacy bare
-    "M1".."Mn" labels are kept — existing workbook consumers (and their
-    tests) still pin that format; S3a moves builders onto ``build_period_axis``,
-    which always derives real year-month labels.
-    """
+def forecast_axis(start_year: int | None = None, periods: int = DEFAULT_FORECAST_PERIODS, grain: str = "annual") -> tuple[list[int], list[str]]:
+    """Return period years plus display labels for annual, quarterly, or monthly models."""
     base_year = start_year if start_year is not None else date.today().year
     normalized = grain.lower()
     if normalized.startswith("month"):
         years = [base_year + idx // 12 for idx in range(periods)]
-        if fiscal_year_end_month is None:
-            labels = [f"M{idx + 1}" for idx in range(periods)]
-        else:
-            cal_year, cal_month = _fiscal_year_start(base_year, fiscal_year_end_month)
-            labels = []
-            for _ in range(periods):
-                labels.append(f"{cal_year}/{cal_month:02d}")
-                cal_year, cal_month = _next_month(cal_year, cal_month)
+        labels = [f"M{idx + 1}" for idx in range(periods)]
     elif normalized.startswith("quarter"):
         years = [base_year + idx // 4 for idx in range(periods)]
         labels = [f"Q{idx + 1}" for idx in range(periods)]
@@ -56,335 +33,6 @@ def forecast_axis(
         years = forecast_years(base_year, periods)
         labels = [f"FY{year}" for year in years]
     return years, labels
-
-
-def months_factor(grain: str) -> int:
-    """Months per period for a model grain.
-
-    Annual periods carry 12 months, quarterly 3, monthly 1. ``hybrid`` maps
-    to 12: hybrid facts stay ANNUAL-CANONICAL (the monthly window is derived
-    at projection/build time via ``build_period_axis``), so every kernel
-    projection over hybrid facts runs on annual periods.
-    """
-    normalized = (grain or "annual").lower()
-    if normalized.startswith("month"):
-        return 1
-    if normalized.startswith("quarter"):
-        return 3
-    return 12
-
-
-def _clamp_fye(fiscal_year_end_month: Any) -> int:
-    """Coerce a fiscal-year-end month into 1..12 (default 3 = March)."""
-    try:
-        month = int(fiscal_year_end_month)
-    except (TypeError, ValueError):
-        return 3
-    return month if 1 <= month <= 12 else 3
-
-
-def _fiscal_year_start(fy_label_year: int, fiscal_year_end_month: int) -> tuple[int, int]:
-    """First calendar (year, month) of the fiscal year labeled ``FY{fy_label_year}``.
-
-    Convention: "FY2027" is the fiscal year ENDING in 2027 when
-    ``fiscal_year_end_month != 12`` (FYE=3 → 2026/04-2027/03); for FYE=12,
-    FY2026 is calendar 2026 (2026/01-2026/12).
-    """
-    fye = _clamp_fye(fiscal_year_end_month)
-    if fye == 12:
-        return fy_label_year, 1
-    return fy_label_year - 1, fye + 1
-
-
-def _next_month(year: int, month: int) -> tuple[int, int]:
-    return (year + 1, 1) if month == 12 else (year, month + 1)
-
-
-def _month_end(year: int, month: int) -> date:
-    return date(year, month, calendar.monthrange(year, month)[1])
-
-
-def _fy_label_for_month(year: int, month: int, fiscal_year_end_month: int) -> str:
-    """Fiscal-year tag ("FY2027") of the fiscal year containing (year, month)."""
-    fye = _clamp_fye(fiscal_year_end_month)
-    if fye == 12:
-        return f"FY{year}"
-    return f"FY{year}" if month <= fye else f"FY{year + 1}"
-
-
-def anchor_start_year(
-    start_year: int,
-    grain: str,
-    fiscal_year_end_month: Any = 3,
-    *,
-    stated: bool = False,
-    today: date | None = None,
-) -> int:
-    """Anchor an UNSTATED first fiscal year to the fiscal year in progress.
-
-    Applies only to grains that render a monthly window (monthly / hybrid):
-    the calendar-year default can put the ENTIRE first fiscal year in the
-    past (run 2026-07-05 with FYE=3 → default FY2026 ended 2026/03), which
-    would render a fully historical monthly window. In that case the first
-    fiscal year moves forward to the fiscal year in progress (FY2027 —
-    monthly window from 2026/04). A stated start_year is always respected,
-    and the annual / quarterly calendar-year default stays unchanged.
-    """
-    normalized = (grain or "annual").lower()
-    if stated or not (normalized.startswith("month") or normalized == "hybrid"):
-        return int(start_year)
-    run_date = today if today is not None else date.today()
-    fye = _clamp_fye(fiscal_year_end_month)
-    year = int(start_year)
-    while _month_end(year, fye) < run_date:
-        year += 1
-    return year
-
-
-def anchor_facts_first_fiscal_year(facts: "SourceFacts") -> "SourceFacts":
-    """Re-anchor annual-canonical facts after a grain promotion.
-
-    Used when a mode default promotes already-derived annual facts onto a
-    monthly-window grain (e.g. burn_runway's hybrid-first default): the
-    derivation-time calendar default may leave the first fiscal year fully in
-    the past. Respects a stated start year (``facts.start_year_stated``)."""
-    if not facts.years:
-        return facts
-    anchored = anchor_start_year(
-        facts.years[0],
-        facts.grain,
-        facts.fiscal_year_end_month,
-        stated=facts.start_year_stated,
-    )
-    delta = anchored - facts.years[0]
-    if not delta:
-        return facts
-    years = [year + delta for year in facts.years]
-    period_labels = [
-        f"FY{years[idx]}" if re.fullmatch(r"FY20\d{2}", str(label)) else label
-        for idx, label in enumerate(facts.period_labels)
-    ]
-    return SourceFacts(**{**facts.__dict__, "years": years, "period_labels": period_labels})
-
-
-@dataclass(frozen=True)
-class PeriodAxis:
-    """Per-column period axis derived from annual-canonical facts.
-
-    ``labels`` are display headers (monthly "2026/04"; annual "FY2029"),
-    ``months_in_period`` the FAST-style ruler row (1 monthly / 3 quarterly /
-    12 annual), ``fy_labels`` the fiscal-year tag each column belongs to (an
-    annual column's own label), ``period_end`` the last calendar day of each
-    period, ``monthly_count`` the number of leading monthly columns (0 for a
-    pure annual axis), and ``grain`` one of "annual" | "monthly" |
-    "quarterly" | "hybrid".
-    """
-
-    labels: list[str]
-    months_in_period: list[int]
-    fy_labels: list[str]
-    period_end: list[date]
-    monthly_count: int
-    grain: str
-
-
-def _hybrid_window_fiscal_years(monthly_window_months: int, periods: int) -> int:
-    """Whole fiscal years covered by the hybrid monthly window.
-
-    Default (``monthly_window_months <= 0``) is two fiscal years (24 monthly
-    columns). A stated window is rounded UP to the next fiscal year end —
-    whole fiscal years only, so 12 → 12 months (1 FY), 13-24 → 24 (2 FY),
-    25-36 → 36 (3 FY) — and clamped to the plan horizon.
-    """
-    if monthly_window_months <= 0:
-        window = 2
-    else:
-        window = max(1, math.ceil(monthly_window_months / 12))
-    return min(window, periods)
-
-
-def build_period_axis(facts: "SourceFacts") -> PeriodAxis:
-    """Derive the projection/build-time period axis from annual-canonical facts.
-
-    - ``annual``: labels stay exactly the current ``["FY2026", ...]`` built
-      from ``facts.years`` (backward compatible with every existing sheet).
-    - ``hybrid``: the model starts at the first month of fiscal year
-      ``facts.years[0]``; the monthly window covers whole fiscal years
-      (default 2 → 24 monthly columns, see ``_hybrid_window_fiscal_years``),
-      followed by one annual column per remaining fiscal year. Facts stay
-      annual-canonical: ``len(facts.years)`` is the number of fiscal years.
-    - ``monthly`` / ``quarterly``: every column is one period; monthly labels
-      are real calendar months ("YYYY/MM") starting at the first month of
-      fiscal year ``facts.years[0]``.
-    """
-    grain = (getattr(facts, "grain", "annual") or "annual").lower()
-    fye = _clamp_fye(getattr(facts, "fiscal_year_end_month", 3))
-    years = list(facts.years)
-    periods = len(years)
-
-    def _fy_end(label_year: int) -> date:
-        start_y, start_m = _fiscal_year_start(label_year, fye)
-        end_y, end_m = start_y, start_m
-        for _ in range(11):
-            end_y, end_m = _next_month(end_y, end_m)
-        return _month_end(end_y, end_m)
-
-    if grain.startswith("month"):
-        cal_year, cal_month = _fiscal_year_start(years[0] if years else date.today().year, fye)
-        labels: list[str] = []
-        fy_labels: list[str] = []
-        period_end: list[date] = []
-        for _ in range(periods):
-            labels.append(f"{cal_year}/{cal_month:02d}")
-            fy_labels.append(_fy_label_for_month(cal_year, cal_month, fye))
-            period_end.append(_month_end(cal_year, cal_month))
-            cal_year, cal_month = _next_month(cal_year, cal_month)
-        return PeriodAxis(
-            labels=labels,
-            months_in_period=[1] * periods,
-            fy_labels=fy_labels,
-            period_end=period_end,
-            monthly_count=periods,
-            grain="monthly",
-        )
-
-    if grain.startswith("quarter"):
-        cal_year, cal_month = _fiscal_year_start(years[0] if years else date.today().year, fye)
-        labels = list(facts.period_labels[:periods]) if len(facts.period_labels) >= periods else [
-            f"Q{idx + 1}" for idx in range(periods)
-        ]
-        fy_labels = []
-        period_end = []
-        for _ in range(periods):
-            for _ in range(2):
-                cal_year, cal_month = _next_month(cal_year, cal_month)
-            fy_labels.append(_fy_label_for_month(cal_year, cal_month, fye))
-            period_end.append(_month_end(cal_year, cal_month))
-            cal_year, cal_month = _next_month(cal_year, cal_month)
-        return PeriodAxis(
-            labels=labels,
-            months_in_period=[3] * periods,
-            fy_labels=fy_labels,
-            period_end=period_end,
-            monthly_count=0,
-            grain="quarterly",
-        )
-
-    if grain == "hybrid":
-        window_fys = _hybrid_window_fiscal_years(
-            int(getattr(facts, "monthly_window_months", 0) or 0), periods
-        )
-        labels = []
-        fy_labels = []
-        months_in_period: list[int] = []
-        period_end = []
-        for fy_idx in range(window_fys):
-            fy_label = f"FY{years[fy_idx]}"
-            cal_year, cal_month = _fiscal_year_start(years[fy_idx], fye)
-            for _ in range(12):
-                labels.append(f"{cal_year}/{cal_month:02d}")
-                fy_labels.append(fy_label)
-                months_in_period.append(1)
-                period_end.append(_month_end(cal_year, cal_month))
-                cal_year, cal_month = _next_month(cal_year, cal_month)
-        for fy_idx in range(window_fys, periods):
-            labels.append(f"FY{years[fy_idx]}")
-            fy_labels.append(f"FY{years[fy_idx]}")
-            months_in_period.append(12)
-            period_end.append(_fy_end(years[fy_idx]))
-        return PeriodAxis(
-            labels=labels,
-            months_in_period=months_in_period,
-            fy_labels=fy_labels,
-            period_end=period_end,
-            monthly_count=window_fys * 12,
-            grain="hybrid",
-        )
-
-    # Annual (default): labels must remain exactly the current FY labels.
-    labels = [f"FY{year}" for year in years]
-    return PeriodAxis(
-        labels=labels,
-        months_in_period=[12] * periods,
-        fy_labels=list(labels),
-        period_end=[_fy_end(year) for year in years],
-        monthly_count=0,
-        grain="annual",
-    )
-
-
-def _expand_fy_months(value: Any, prior: Any, kind: str) -> list:
-    """Expand one fiscal-year value into its 12 month values.
-
-    - ``flow``: linear ramp (weights 1..12) that sums exactly to the FY
-      value; integer inputs use cumulative rounding so the sum is exact.
-    - ``stock``: linear interpolation from the prior FY-end (0 before the
-      first fiscal year) to this FY-end; month 12 equals the FY value exactly.
-    - ``rate``: the FY value held constant across its months.
-    """
-    if kind == "rate":
-        return [value for _ in range(12)]
-    if kind == "stock":
-        is_int = isinstance(value, int) and isinstance(prior, int)
-        out = []
-        for month in range(1, 13):
-            interpolated = prior + (value - prior) * month / 12.0
-            out.append(int(round(interpolated)) if is_int else interpolated)
-        if out:
-            out[-1] = value  # month 12 is the FY-end value exactly
-        return out
-    # flow: ramp weights 1..12 (sum 78), allocated by cumulative rounding so
-    # the 12 months sum exactly to the FY value even under integer rounding.
-    total_weight = 78.0
-    if isinstance(value, int):
-        out = []
-        allocated = 0
-        cum_weight = 0
-        for month in range(1, 13):
-            cum_weight += month
-            cum_target = int(round(value * cum_weight / total_weight))
-            out.append(cum_target - allocated)
-            allocated = cum_target
-        return out
-    return [value * month / total_weight for month in range(1, 13)]
-
-
-def expand_annual_series(values: list, axis: PeriodAxis, kind: str) -> list:
-    """Expand an annual-canonical series onto a (possibly hybrid) period axis.
-
-    ``values`` is the annual-canonical series — one entry per fiscal year.
-    ``kind`` selects the interpolation contract (see ``_expand_fy_months``):
-    "flow" (new units, capex, S&M, ...), "stock" (ending customers, cash, ...),
-    or "rate" (percentages, prices, per-unit costs, comp). Annual columns
-    always pass the fiscal year's value through unchanged. A trailing partial
-    fiscal year (a monthly axis whose length is not a multiple of 12) emits
-    only its leading months — a flow's emitted months then sum to less than
-    the FY value, by construction.
-    """
-    if kind not in {"flow", "stock", "rate"}:
-        raise ValueError(f"unknown expansion kind: {kind!r}")
-    total_months = sum(axis.months_in_period)
-    fiscal_years = (total_months + 11) // 12
-    if len(values) < fiscal_years:
-        raise ValueError(
-            f"expand_annual_series needs {fiscal_years} fiscal-year values "
-            f"for this axis, got {len(values)}"
-        )
-    monthly: list = []
-    prior: Any = 0
-    for fy_idx in range(fiscal_years):
-        monthly.extend(_expand_fy_months(values[fy_idx], prior, kind))
-        prior = values[fy_idx]
-    out: list = []
-    cursor = 0
-    for months in axis.months_in_period:
-        if months == 12 and cursor % 12 == 0:
-            out.append(values[cursor // 12])  # exact annual pass-through
-        else:
-            chunk = monthly[cursor: cursor + months]
-            out.append(sum(chunk) if kind == "flow" else chunk[-1])
-        cursor += months
-    return out
 
 
 @dataclass(frozen=True)
@@ -573,28 +221,6 @@ class SourceFacts:
     onboarding_months: list[float] = field(default_factory=list)
     one_time_revenue_per_unit_yen: list[int] = field(default_factory=list)
     onboarding_pinned: bool = False
-    # --- S1 hybrid-axis / JP-practice fields (annual-canonical facts) -----
-    # Fiscal year end month (JP default: March). "FY2027" ends 2027/03 for
-    # fiscal_year_end_month=3; for 12, FY2026 is calendar 2026.
-    fiscal_year_end_month: int = 3
-    # Requested hybrid monthly window in months; 0 = default (2 fiscal
-    # years). build_period_axis rounds it UP to whole fiscal years.
-    monthly_window_months: int = 0
-    # 法定福利費率. 0 = not stated (avg_comp_yen is already fully loaded).
-    # When stated, avg_comp_yen input is read as BASE salary and the derived
-    # series is scaled to base × (1 + rate); the scaling is noted in
-    # derivation_warnings so the builder can label it.
-    statutory_welfare_rate: float = 0.0
-    # 消費税率 for the tax-inclusive CF (consumed by builders in S3).
-    consumption_tax_rate: float = 0.10
-    # 回収/支払サイト in months (JP practice). 0 = unused — fall back to
-    # ar_days / ap_days. Carried for the S3 BS/CF builders.
-    ar_site_months: float = 0.0
-    ap_site_months: float = 0.0
-    # S5: True when the start year was explicitly stated (YAML start_year /
-    # fiscal_year or a narrative year signal). Unstated monthly/hybrid starts
-    # are anchored to the fiscal year in progress (see anchor_start_year).
-    start_year_stated: bool = False
 
 
 MECHANIC_PROFILES: tuple[MechanicProfile, ...] = (
@@ -752,8 +378,8 @@ def _profile(key: str) -> MechanicProfile:
     raise KeyError(key)
 
 
-def _stated_start_year(text: str) -> int | None:
-    """Explicit model/fiscal-year start signal in the narrative, or None."""
+def extract_start_year(text: str) -> int:
+    """Infer forecast start year only from explicit model/fiscal-year signals."""
     # `[^\n]{0,24}?` is non-greedy: it captures the first year after the cue,
     # so a hyphenated range ("(2026-2031)") yields the start year 2026, not
     # the end year 2031.
@@ -765,13 +391,7 @@ def _stated_start_year(text: str) -> int | None:
         match = re.search(pattern, text, flags=re.IGNORECASE)
         if match:
             return int(match.group(1))
-    return None
-
-
-def extract_start_year(text: str) -> int:
-    """Infer forecast start year only from explicit model/fiscal-year signals."""
-    stated = _stated_start_year(text)
-    return stated if stated is not None else date.today().year
+    return date.today().year
 
 
 def extract_model_grain(text: str) -> str:
@@ -1832,7 +1452,6 @@ def calibrate_cost_stack_to_gross_margin(
     churn_rate: float | None = None,
     onboarding_months: list[float] | None = None,
     one_time_revenue_per_unit_yen: list[int] | None = None,
-    months_per_period: int = 12,
 ) -> tuple[list[float], list[int], list[int], list[int]]:
     """Gross-margin governor.
 
@@ -1869,16 +1488,14 @@ def calibrate_cost_stack_to_gross_margin(
             take_rate, revenue_mode,
             onboarding_months=onboarding_months,
             one_time_revenue_per_unit_yen=one_time_revenue_per_unit_yen,
-            months_per_period=months_per_period,
         )
         revenue = subtotal * (1.0 + other_revenue_share[idx])
         variable = revenue * variable_cogs_pct[idx]
         # Field-service cost accrues on deployed units every period (post-sale
-        # maintenance), independent of the revenue model. The per-unit costs
-        # are monthly amounts, so a period books months_per_period of them.
-        delivery = average[idx] * delivery_cost_yen[idx] * months_per_period
-        cloud = average[idx] * cloud_cost_yen[idx] * months_per_period
-        support = customers[idx] * support_cost_yen[idx] * months_per_period
+        # maintenance), independent of the revenue model.
+        delivery = average[idx] * delivery_cost_yen[idx] * 12
+        cloud = average[idx] * cloud_cost_yen[idx] * 12
+        support = customers[idx] * support_cost_yen[idx] * 12
         base_cogs = variable + delivery + cloud + support
         gross_margin = min(max(target_gross_margin[idx], 0.05), 0.95)
         target_cogs = (1.0 - gross_margin) * revenue
@@ -1907,7 +1524,6 @@ def _period_subtotal_revenue(
     *,
     onboarding_months: list[float] | None = None,
     one_time_revenue_per_unit_yen: list[int] | None = None,
-    months_per_period: int = 12,
 ) -> float:
     """Pre-`other revenue` subtotal for one period, by revenue model.
 
@@ -1915,9 +1531,6 @@ def _period_subtotal_revenue(
     revenue is new units shipped x price — no recurring billing on the
     installed base. `recurring` (default): transaction take + a monthly
     subscription billed on the installed base + a one-time onboarding fee.
-    Recurring billing books ``months_per_period`` months of the monthly
-    price per period (12 annual, 3 quarterly, 1 monthly); the one-time
-    onboarding fee is per-unit and is never annualized.
 
     Task 2.5 (F): the onboarding fee is a driver. A stated per-unit one-time
     fee wins; otherwise the fee is price × onboarding_months, where the
@@ -1927,7 +1540,7 @@ def _period_subtotal_revenue(
     if revenue_mode == "unit_sale":
         return new_units[idx] * monthly_price_yen[idx]
     transaction = gmv_yen[idx] * take_rate[idx]
-    recurring = average[idx] * monthly_price_yen[idx] * months_per_period
+    recurring = average[idx] * monthly_price_yen[idx] * 12
     # Statedness, not positivity, selects the path: a provided fee schedule
     # is authoritative for every period, including stated zeros.
     if (
@@ -1976,7 +1589,6 @@ def plan_revenue_series(
     churn_rate: float | None = None,
     onboarding_months: list[float] | None = None,
     one_time_revenue_per_unit_yen: list[int] | None = None,
-    months_per_period: int = 12,
 ) -> list[float]:
     """Per-period total revenue, mirroring the Revenue Build sheet formulas.
 
@@ -2001,7 +1613,6 @@ def plan_revenue_series(
             take_rate, revenue_mode,
             onboarding_months=onboarding_months,
             one_time_revenue_per_unit_yen=one_time_revenue_per_unit_yen,
-            months_per_period=months_per_period,
         )
         revenue.append(subtotal * (1.0 + other_revenue_share[idx]))
     return revenue
@@ -2034,19 +1645,8 @@ def project_free_cash_flow(
     customer_advances_yen: list[int] | None = None,
     debt_amortization_yen: list[int] | None = None,
     depreciation_convention: str = "half_year",
-    months_per_period: int = 12,
 ) -> list[dict]:
     """Project per-period free cash flow, mirroring the P&L / BS / CF sheets.
-
-    ``months_per_period`` (12 annual, 3 quarterly, 1 monthly) de-annualizes
-    the genuinely ANNUAL inputs per period: payroll (headcount × avg annual
-    comp × m/12), the per-FTE R&D program cost (annual per FTE × m/12),
-    straight-line depreciation (base × m / life_months), interest (annual
-    rate × m/12), and the AR/AP-days working-capital balances (annualized
-    revenue/COGS run rate × days/365). Percent-of-revenue lines and the
-    per-period input series (rd floor, fixed G&A, capex) already carry
-    per-period semantics and are not rescaled. Annual models (m=12) are
-    numerically identical to the pre-factor behavior.
 
     Used to size the funding plan against real projected burn rather than a
     fixed heuristic. Equity financing is intentionally excluded — it does not
@@ -2082,15 +1682,14 @@ def project_free_cash_flow(
     # is charged. Cumulative cash tax over the plan can therefore never
     # exceed tax_rate × max(0, cumulative pre-tax income).
     nol_balance = float(opening_nol_yen)
-    month_share = months_per_period / 12.0
     for idx in range(periods):
         cogs = revenue[idx] * (1.0 - target_gross_margin[idx])
         gross_profit = revenue[idx] - cogs
-        people = total_headcount[idx] * avg_comp_yen[idx] * month_share
+        people = total_headcount[idx] * avg_comp_yen[idx]
         sales_marketing = revenue[idx] * sm_pct_revenue[idx]
         rd = max(
             rd_program_floor_yen[idx],
-            product_headcount[idx] * rd_program_per_product_fte_yen[idx] * month_share,
+            product_headcount[idx] * rd_program_per_product_fte_yen[idx],
         )
         ga = revenue[idx] * ga_pct_revenue[idx] + fixed_ga_yen[idx]
         opex = people + sales_marketing + rd + ga
@@ -2105,11 +1704,8 @@ def project_free_cash_flow(
             depreciable_base = cumulative_capex
         else:
             depreciable_base = prior_capex + 0.5 * capex_yen[idx]
-        # Straight-line: a period charges months_per_period months of the
-        # life_months schedule (annual = base × 12 / life, unchanged).
         depreciation = min(
-            depreciable_base * float(months_per_period) / life,
-            cumulative_capex - accumulated_da,
+            depreciable_base * 12.0 / life, cumulative_capex - accumulated_da
         )
         accumulated_da += depreciation
         ebit = ebitda - depreciation
@@ -2120,8 +1716,7 @@ def project_free_cash_flow(
             debt_raise_yen[idx] + convertibles[idx] + leases[idx]
             - amortization[idx]
         )
-        # debt_interest_rate is an ANNUAL rate; a period accrues m/12 of it.
-        interest = debt_balance * debt_interest_rate[idx] * month_share
+        interest = debt_balance * debt_interest_rate[idx]
         ebt = ebit - interest
         if ebt > 0:
             absorbed = min(ebt, nol_balance)
@@ -2132,15 +1727,10 @@ def project_free_cash_flow(
             nol_balance += -ebt
         tax = max(0.0, taxable * tax_rate[idx])
         net_income = ebt - tax
-        # AR / AP are balances off the ANNUALIZED run rate (revenue or COGS
-        # × 12/m) × days/365 — the days-based site math is grain-independent
-        # that way (annual: ×1, unchanged). Deferred revenue / advances keep
-        # their share-of-period-revenue semantics.
-        annualize = 12.0 / months_per_period
-        accounts_receivable = revenue[idx] * annualize * ar_days[idx] / 365
+        accounts_receivable = revenue[idx] * ar_days[idx] / 365
         inventory = capex_yen[idx] * inventory_wip_pct_capex[idx]
         ap_deferred = (
-            cogs * annualize * ap_days[idx] / 365
+            cogs * ap_days[idx] / 365
             + revenue[idx] * deferred_revenue_share[idx]
             + advances[idx]
         )
@@ -2185,15 +1775,8 @@ def size_equity_rounds(
     target_runway_months: int = 12,
     round_unit: int = 100_000_000,
     stated_first_round: int | None = None,
-    months_per_period: int = 12,
 ) -> list[int]:
     """Size each period's equity round so projected ending cash stays solvent.
-
-    ``months_per_period`` converts the month-denominated runway targets into
-    period-denominated burn buffers: the buffer is ``burn per month ×
-    target_runway_months`` = ``burn × target_runway_months / months_per_period``
-    (annual models: /12, unchanged). The final period keeps a 6-month cushion
-    (annual: the historical half-period factor 0.5).
 
     Walks the cash balance forward; whenever cash before equity would fall
     below a runway buffer (``target_runway_months`` of the period's own burn),
@@ -2222,9 +1805,7 @@ def size_equity_rounds(
         else:
             burn = max(0.0, -free_cash_flow[idx])
             runway_factor = (
-                target_runway_months / float(months_per_period)
-                if idx < periods - 1
-                else 6.0 / months_per_period
+                target_runway_months / 12.0 if idx < periods - 1 else 0.5
             )
             buffer = burn * runway_factor
             shortfall = buffer - cash_before_equity
@@ -2246,7 +1827,6 @@ def project_plan_free_cash_flow(facts: SourceFacts) -> list[dict]:
     Customer advances flow through the projection's working capital.
     """
     base = _facts_installed_base(facts)
-    factor = months_factor(facts.grain)
     revenue = plan_revenue_series(
         facts.new_units,
         facts.gmv_yen,
@@ -2258,7 +1838,6 @@ def project_plan_free_cash_flow(facts: SourceFacts) -> list[dict]:
         churn_rate=facts.churn_rate if base is not None else None,
         onboarding_months=list(facts.onboarding_months) or None,
         one_time_revenue_per_unit_yen=list(facts.one_time_revenue_per_unit_yen) or None,
-        months_per_period=factor,
     )
     total_headcount = [
         facts.product_headcount[i]
@@ -2295,7 +1874,6 @@ def project_plan_free_cash_flow(facts: SourceFacts) -> list[dict]:
         lease_financing_yen=facts.lease_financing_yen,
         customer_advances_yen=facts.customer_advances_yen,
         debt_amortization_yen=facts.debt_amortization_yen,
-        months_per_period=factor,
     )
     amortization = _pad_series(
         facts.debt_amortization_yen or [], len(projection), 0
@@ -2387,7 +1965,6 @@ def implied_gross_margin_series(facts: SourceFacts) -> list[float]:
     # facts.churn_rate (a profile default) would create a mismatch
     # between calibrate and this audit-time recomputation.
     effective_churn = facts.churn_rate if base is not None else None
-    factor = months_factor(facts.grain)
     revenue = plan_revenue_series(
         facts.new_units,
         facts.gmv_yen,
@@ -2399,7 +1976,6 @@ def implied_gross_margin_series(facts: SourceFacts) -> list[float]:
         churn_rate=effective_churn,
         onboarding_months=list(facts.onboarding_months) or None,
         one_time_revenue_per_unit_yen=list(facts.one_time_revenue_per_unit_yen) or None,
-        months_per_period=factor,
     )
     if base is not None:
         ending = base
@@ -2414,11 +1990,10 @@ def implied_gross_margin_series(facts: SourceFacts) -> list[float]:
             continue
         variable = rev * facts.variable_cogs_pct[idx]
         # Field-service cost accrues on deployed units every period (post-sale
-        # maintenance), independent of the revenue model; the per-unit costs
-        # are monthly amounts, so a period books `factor` months of them.
-        delivery = average[idx] * facts.delivery_cost_yen[idx] * factor
-        cloud = average[idx] * facts.cloud_cost_yen[idx] * factor
-        support = facts.customers[idx] * facts.support_cost_yen[idx] * factor
+        # maintenance), independent of the revenue model.
+        delivery = average[idx] * facts.delivery_cost_yen[idx] * 12
+        cloud = average[idx] * facts.cloud_cost_yen[idx] * 12
+        support = facts.customers[idx] * facts.support_cost_yen[idx] * 12
         margins.append((rev - (variable + delivery + cloud + support)) / rev)
     return margins
 
@@ -2450,7 +2025,6 @@ def audit_economic_coherence(
         churn_rate=facts.churn_rate if base is not None else None,
         onboarding_months=list(facts.onboarding_months) or None,
         one_time_revenue_per_unit_yen=list(facts.one_time_revenue_per_unit_yen) or None,
-        months_per_period=months_factor(facts.grain),
     )
     gross_margin = implied_gross_margin_series(facts)
     projection = project_plan_free_cash_flow(facts)
@@ -2661,7 +2235,6 @@ def audit_economic_warnings(facts: SourceFacts) -> list[str]:
         churn_rate=facts.churn_rate if base is not None else None,
         onboarding_months=list(facts.onboarding_months) or None,
         one_time_revenue_per_unit_yen=list(facts.one_time_revenue_per_unit_yen) or None,
-        months_per_period=months_factor(facts.grain),
     )
     if any(v > 0 for v in revenue) and not getattr(facts, "customers_pinned", False):
         warnings.append(
@@ -2814,16 +2387,6 @@ class SourcePrimitives:
     # Phase 3 review follow-up: a stated debt interest rate must reach the
     # sizing-time FCF projection, not remain a display override.
     stated_debt_interest_rate: list[float] | None = None
-    # S1 hybrid-axis / JP-practice inputs (defaults keep the legacy path
-    # byte-identical; see the matching SourceFacts fields).
-    fiscal_year_end_month: int = 3
-    monthly_window_months: int = 0
-    statutory_welfare_rate: float = 0.0
-    consumption_tax_rate: float = 0.10
-    ar_site_months: float = 0.0
-    ap_site_months: float = 0.0
-    # S5: statedness of the start year (narrative or structured signal).
-    start_year_stated: bool = False
 
 
 def _extract_source_primitives(
@@ -2838,13 +2401,7 @@ def _extract_source_primitives(
     """
     grain = extract_model_grain(text)
     periods = extract_forecast_periods(text, grain)
-    stated_start = _stated_start_year(text)
-    base_year = anchor_start_year(
-        stated_start if stated_start is not None else date.today().year,
-        grain,
-        stated=stated_start is not None,
-    )
-    years, period_labels = forecast_axis(base_year, periods, grain)
+    years, period_labels = forecast_axis(extract_start_year(text), periods, grain)
     periods = len(years)
     profile = profile_for_text(text)
     revenue_mode = detect_revenue_mode(text, profile)
@@ -2935,7 +2492,6 @@ def _extract_source_primitives(
         stated_post_money=extract_post_money(text, currency) or None,
         stated_churn=extract_churn_rate(text),
         stated_rd_headcount=extract_rd_headcount(text),
-        start_year_stated=stated_start is not None,
     )
 
 
@@ -2971,11 +2527,6 @@ def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
     segments = prims.segments
     currency = prims.currency
     money_scale = prims.money_scale
-    # Grain-correct factor: 12 annual/hybrid (facts stay annual-canonical),
-    # 3 quarterly, 1 monthly. month_share de-annualizes annual-denominated
-    # per-period heuristics; both are exactly 1x for annual plans.
-    factor = months_factor(grain)
-    month_share = factor / 12.0
     round_10m = max(1, int(10_000_000 * money_scale))
     round_100m = max(1, int(100_000_000 * money_scale))
     new_units = list(prims.new_units)
@@ -3006,23 +2557,17 @@ def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
     new_units = _pad_series(new_units, periods, 0)
     ending = ending_units(new_units)
     if revenue_mode == "unit_sale":
-        # Hardware: gmv tracks per-period unit-sale revenue (new units
-        # shipped x price), so the downstream capex / headcount / R&D sizing
+        # Hardware: gmv tracks annual unit-sale revenue (new units shipped x
+        # monthly price), so the downstream capex / headcount / R&D sizing
         # scales off real revenue, not a 12x recurring proxy.
         gmv = [units * monthly_price[idx] for idx, units in enumerate(new_units)]
     elif profile.key != "marketplace":
-        # Grain-consistent revenue proxy: a period bills `factor` months of
-        # the monthly price (12 annual/hybrid — unchanged — 1 monthly), so
-        # the take-rate ramp inside calibration sees period-scale revenue.
         gmv = [
-            units * monthly_price[idx] * factor
+            units * monthly_price[idx] * 12
             for idx, units in enumerate(ending_units(new_units))
         ]
 
     gmv = _pad_series(gmv, periods, 0)
-    # Annualized run-rate proxy for LEVEL sizing (headcount, TAM/SOM, the
-    # capex / R&D-floor heuristics): exactly gmv for annual/hybrid facts.
-    gmv_run_rate = [int(value * 12 / factor) for value in gmv]
     customers = _pad_series(retargeted_customers, periods, 0)
     variable_cogs_pct = _pad_series(prims.variable_cogs_pct, periods, 0.30)
     # FX-scaled default: applied here, not at extraction, so it follows the
@@ -3030,7 +2575,7 @@ def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
     capex_default = [int(value * money_scale) for value in profile.capex_per_unit_yen]
     capex_per_unit = _pad_series(prims.capex_per_unit or capex_default, periods, 0)
     tam_default = int(profile.tam_yen * money_scale)
-    tam = max(tam_default, gmv_run_rate[-1] * 10 if profile.key == "marketplace" else tam_default)
+    tam = max(tam_default, gmv[-1] * 10 if profile.key == "marketplace" else tam_default)
     sam = max(int(tam * 0.18), int(1_000_000_000 * money_scale))
     # Implied mature revenue: recurring billing on the installed base, or a
     # single unit-sale year. A unit-sale plan recognises only the final
@@ -3044,10 +2589,10 @@ def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
         1 if revenue_mode == "unit_sale" else 12
     )
     som = max(
-        max(gmv_run_rate[-1], implied_mature_revenue),
+        max(gmv[-1], implied_mature_revenue),
         int(1_000_000_000 * money_scale),
     )
-    product_hc, gtm_hc, ops_hc, ga_hc = _headcount_plan(profile, gmv_run_rate)
+    product_hc, gtm_hc, ops_hc, ga_hc = _headcount_plan(profile, gmv)
     # Honor a stated current R&D / engineering team size: scale the product
     # headcount ramp so period 0 lands on it, preserving the ramp shape. The
     # auto-derived ramp scales with revenue / units, which badly understates
@@ -3087,18 +2632,6 @@ def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
                 f"Validate the cost structure rather than the target."
             )
         target_gross_margin.append(tgm_clamped)
-    # Statutory welfare (法定福利費): when a rate is stated, the avg_comp
-    # input is BASE salary and the derived series is fully-loaded comp =
-    # base × (1 + rate). The default (0.0) keeps comp byte-identical.
-    welfare_rate = float(prims.statutory_welfare_rate or 0.0)
-    if welfare_rate > 0.0:
-        avg_comp = [int(round(value * (1.0 + welfare_rate))) for value in avg_comp]
-        derivation_warnings.append(
-            f"statutory welfare: avg_comp_yen is treated as base salary; "
-            f"fully-loaded comp = base × {1.0 + welfare_rate:.2f} "
-            f"(statutory_welfare_rate {welfare_rate:.1%}) is used for "
-            f"payroll, sizing, and the People Plan."
-        )
     # K1 gate: route customers as installed_base ONLY when the structured
     # input pinned demand. For narrative-derived plans customers can be a
     # logos estimate (mismatched scale vs new-unit ramp); the legacy
@@ -3138,7 +2671,6 @@ def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
         churn_rate=prims.stated_churn,
         onboarding_months=onboarding_months,
         one_time_revenue_per_unit_yen=one_time_revenue,
-        months_per_period=factor,
     )
     if profile.key == "pre_revenue_milestone":
         # A pre-revenue plan sells nothing, so it has no cost of goods sold:
@@ -3151,35 +2683,24 @@ def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
         delivery_cost = [0 for _ in range(periods)]
         cloud_cost = [0 for _ in range(periods)]
         support_cost = [0 for _ in range(periods)]
-    # The spend heuristics below are calibrated as ANNUAL amounts (facility
-    # capex per FTE, R&D program floor, fixed G&A). A period books
-    # month_share (= factor/12) of them — exactly 1x for annual/hybrid
-    # facts, 1/12 per monthly column — while gmv stays an annual run-rate
-    # proxy for level-sizing (headcount, TAM/SOM).
     other_capex = [
         _round_to(
             max(
-                gmv_run_rate[idx] * (0.025 if profile.key != "marketplace" else 0.010),
+                gmv[idx] * (0.025 if profile.key != "marketplace" else 0.010),
                 total_hc[idx] * int(1_500_000 * money_scale),
-            )
-            * month_share,
+            ),
             round_10m,
         )
         for idx in range(periods)
     ]
-    # Annual per-FTE program cost; project_free_cash_flow de-annualizes it.
     rd_program_per_product_fte = [int(4_500_000 * money_scale) for _ in range(periods)]
     rd_program_floor = [
-        _round_to(
-            max(gmv_run_rate[idx] * 0.015, int(60_000_000 * money_scale)) * month_share,
-            round_10m,
-        )
+        _round_to(max(gmv[idx] * 0.015, int(60_000_000 * money_scale)), round_10m)
         for idx in range(periods)
     ]
     fixed_ga = [
         _round_to(
-            max(total_hc[idx] * int(1_200_000 * money_scale), int(50_000_000 * money_scale))
-            * month_share,
+            max(total_hc[idx] * int(1_200_000 * money_scale), int(50_000_000 * money_scale)),
             round_10m,
         )
         for idx in range(periods)
@@ -3229,7 +2750,6 @@ def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
         churn_rate=prims.stated_churn,
         onboarding_months=onboarding_months,
         one_time_revenue_per_unit_yen=one_time_revenue,
-        months_per_period=factor,
     )
     fcf_projection = project_free_cash_flow(
         plan_revenue,
@@ -3255,7 +2775,6 @@ def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
         lease_financing_yen=lease_financing,
         customer_advances_yen=customer_advances,
         debt_amortization_yen=debt_amortization,
-        months_per_period=factor,
     )
     free_cash_flow = [period["free_cash_flow"] for period in fcf_projection]
     non_equity_financing = [
@@ -3277,7 +2796,6 @@ def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
     equity_raise = size_equity_rounds(
         beginning_cash, free_cash_flow, non_equity_financing, round_unit=round_100m,
         stated_first_round=stated_raise or None,
-        months_per_period=factor,
     )
     ownership_targets = _curve(0.22, 0.10, periods)
     post_money = [
@@ -3408,13 +2926,6 @@ def _derive_facts_from_primitives(prims: SourcePrimitives) -> SourceFacts:
         onboarding_months=onboarding_months,
         one_time_revenue_per_unit_yen=one_time_revenue,
         onboarding_pinned=onboarding_pinned,
-        fiscal_year_end_month=_clamp_fye(prims.fiscal_year_end_month),
-        monthly_window_months=max(0, int(prims.monthly_window_months or 0)),
-        statutory_welfare_rate=welfare_rate,
-        consumption_tax_rate=float(prims.consumption_tax_rate),
-        ar_site_months=max(0.0, float(prims.ar_site_months or 0.0)),
-        ap_site_months=max(0.0, float(prims.ap_site_months or 0.0)),
-        start_year_stated=bool(prims.start_year_stated),
     )
 
 
@@ -3547,23 +3058,14 @@ def extract_unknowns(text: str) -> list[str]:
     return unknowns or ["pricing validation", "cost-to-serve evidence", "financing terms"]
 
 
-def _ending_to_new_units(
-    customers: list[int],
-    *,
-    churn_rate: float | None = None,
-) -> list[int]:
+def _ending_to_new_units(customers: list[int]) -> list[int]:
     """Invert `ending_units`: back out the new-unit series from an ending series.
 
     A structured input commonly states `customers` as the *ending* installed
-    base per period. `ending_units` rolls new units forward with churn; this
-    inverts that walk so the derived new-unit ramp reproduces the stated
-    ending series — the demand primitive the rest of derivation consumes.
-
-    Mirrors `ending_units`' churn contract exactly (K2 churn honor): a stated
-    ``churn_rate`` is applied as a flat annual rate on the running balance;
-    when omitted, the legacy ramp-style schedule ``0.02 + idx * 0.005`` is
-    used, so ``ending_units(_ending_to_new_units(c, churn_rate=r),
-    churn_rate=r) == c`` holds for either path.
+    base per period. `ending_units` rolls new units forward with churn
+    (`churn = running * (0.02 + idx*0.005)`); this inverts that walk so the
+    derived new-unit ramp reproduces the stated ending series — the demand
+    primitive the rest of derivation consumes.
     """
     new_units: list[int] = []
     prior = 0
@@ -3571,8 +3073,7 @@ def _ending_to_new_units(
         if idx == 0:
             value = max(0, int(ending))
         else:
-            rate = churn_rate if churn_rate is not None else (0.02 + idx * 0.005)
-            churn = int(prior * rate)
+            churn = int(prior * (0.02 + idx * 0.005))
             value = max(0, int(ending) - prior + churn)
         new_units.append(value)
         prior = max(0, int(ending))
@@ -3613,10 +3114,6 @@ def derive_source_facts_from_mapping(raw: dict[str, Any]) -> SourceFacts:
     prims = _extract_source_primitives(narrative, jpy_per_usd=jpy_per_usd)
 
     # --- Step 2: resolve the forecast axis from the structured input --------
-    # grain "hybrid" is a valid structured value: facts stay annual-canonical
-    # (periods = NUMBER OF FISCAL YEARS, default 5; "5年"/"5 years" stays 5;
-    # years / period_labels stay the 5 annual FY labels) and the monthly ×
-    # annual expansion happens only in build_period_axis.
     periods_raw = raw.get("periods") or raw.get("horizon_periods") or raw.get("horizon")
     grain = str(raw.get("grain") or raw.get("model_grain") or prims.grain).lower()
     if isinstance(periods_raw, str):
@@ -3629,55 +3126,9 @@ def derive_source_facts_from_mapping(raw: dict[str, Any]) -> SourceFacts:
     else:
         periods = len(prims.years)
     periods = min(max(periods, 1), MAX_FORECAST_PERIODS)
-    start_raw = raw.get("start_year") or raw.get("fiscal_year")
-    start_year_stated = start_raw is not None or prims.start_year_stated
-    start_year = int(start_raw or prims.years[0])
-    # An explicitly stated fiscal_year_end_month opts monthly labels into
-    # real calendar months ("YYYY/MM"); unstated inputs keep the legacy
-    # "M1".."Mn" labels current workbook consumers pin (build_period_axis
-    # always derives real year-month labels either way).
-    fye_raw = _first_present(raw, ("fiscal_year_end_month", "fye_month"))
-    # S5: an unstated monthly/hybrid start is anchored to the fiscal year in
-    # progress so the model never opens on a fully-past first fiscal year.
-    start_year = anchor_start_year(
-        start_year, grain,
-        _clamp_fye(fye_raw) if fye_raw is not None else prims.fiscal_year_end_month,
-        stated=start_year_stated,
-    )
-    prims.start_year_stated = start_year_stated
-    years, labels = forecast_axis(
-        start_year, periods, grain,
-        fiscal_year_end_month=_clamp_fye(fye_raw) if fye_raw is not None else None,
-    )
+    start_year = int(raw.get("start_year") or raw.get("fiscal_year") or prims.years[0])
+    years, labels = forecast_axis(start_year, periods, grain)
     currency = str(raw.get("currency") or "JPY").upper()
-    if fye_raw is not None:
-        prims.fiscal_year_end_month = _clamp_fye(fye_raw)
-    window_raw = _first_present(raw, ("monthly_window_months", "monthly_periods"))
-    if window_raw is not None:
-        try:
-            prims.monthly_window_months = max(0, int(float(window_raw)))
-        except (TypeError, ValueError):
-            pass
-    welfare_raw = _first_present(raw, ("statutory_welfare_rate",))
-    if welfare_raw is not None:
-        prims.statutory_welfare_rate = _coerce_float_series(
-            welfare_raw, 1, [0.0], percent=True,
-        )[0]
-    consumption_raw = _first_present(raw, ("consumption_tax_rate",))
-    if consumption_raw is not None:
-        prims.consumption_tax_rate = _coerce_float_series(
-            consumption_raw, 1, [0.10], percent=True,
-        )[0]
-    for site_key, site_attr in (
-        ("ar_site_months", "ar_site_months"),
-        ("ap_site_months", "ap_site_months"),
-    ):
-        site_raw = _first_present(raw, (site_key,))
-        if site_raw is not None:
-            try:
-                setattr(prims, site_attr, max(0.0, float(site_raw)))
-            except (TypeError, ValueError):
-                pass
 
     prims.grain = grain
     prims.periods = periods
@@ -3718,12 +3169,7 @@ def derive_source_facts_from_mapping(raw: dict[str, Any]) -> SourceFacts:
             )
     elif raw_customers is not None:
         prims.customers = _coerce_int_series(raw_customers, periods, prims.customers)
-        # B2 units roll-forward: the inversion honors a stated churn rate so
-        # the derived new-unit ramp and the workbook's roll-forward row both
-        # walk the same churn schedule back onto the stated ending series.
-        prims.new_units = _ending_to_new_units(
-            prims.customers, churn_rate=prims.stated_churn,
-        )
+        prims.new_units = _ending_to_new_units(prims.customers)
         prims.demand_pinned = True
     else:
         prims.new_units = _pad_series(prims.new_units, periods, 0)
@@ -3917,26 +3363,19 @@ __all__ = [
     "DEFAULT_FORECAST_PERIODS",
     "MECHANIC_PROFILES",
     "MechanicProfile",
-    "PeriodAxis",
     "SourceFacts",
-    "anchor_facts_first_fiscal_year",
-    "anchor_start_year",
     "average_units",
-    "build_period_axis",
     "derive_source_facts",
     "derive_source_facts_from_mapping",
     "driver_surfaces_for",
     "assumption_decomposition_for",
     "ending_units",
-    "expand_annual_series",
     "extract_forecast_periods",
     "extract_model_grain",
     "extract_start_year",
     "extract_source_facts",
-    "forecast_axis",
     "forecast_years",
     "mechanic_key",
-    "months_factor",
     "profile_for_text",
     "score_mechanics",
 ]

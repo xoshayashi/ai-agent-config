@@ -20,14 +20,6 @@ Use this order before deciding workbook sheets, metrics, or visuals:
    scrutiny.
 6. Add only the output surfaces needed to make the selected drivers auditable.
 
-Composed workbooks follow the three-layer architecture — Assumptions (inputs,
-including the scenario toggle + case table and the driver map) → engine sheets
-(Revenue Build, Cost Build, People Plan, P&L, BS, CF, Financing, Cap Table) →
-Summary (presentation only, no new logic) — plus Guide and Evidence, with a
-hard cap of 12 sheets. The default time axis for full and three-statement
-builds is hybrid: monthly for the first two fiscal years plus annual to five,
-with a months-in-period ruler row keeping formulas grain-independent.
-
 Examples in this skill are pattern prompts. They are not defaults. A future
 agent should treat SaaS, marketplace, hardware, fintech, deeptech, service,
 consumer, bio, climate, real-estate, infrastructure, and AI-native companies as
