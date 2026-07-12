@@ -1437,3 +1437,27 @@ def test_validate_rejects_zero_only_funnel(tmp_path):
     f.write_text(json.dumps(deck, ensure_ascii=False))
     r = run("validate_spec.py", f)
     assert "全て0以下" in r.stdout, r.stdout
+
+
+def test_fidelity_corpus_has_delimiters_and_filters_control_keys(tmp_path):
+    # キー順で focal_category の「1」と unit の「億円」が隣接しても偽陰性にならない
+    deck = {"slides": [{"pattern": "chart_insight", "title": "売上は2年で12億円へ拡大し成長軌道を維持する",
+                        "chart": {"focal_category": 1, "unit": "億円", "type": "column",
+                                  "categories": ["FY24", "FY25"],
+                                  "series": [{"name": "売上", "values": [10, 12]}]},
+                        "speaker_notes": "売上の推移をご覧ください。1億円の水準からの立ち上がりを経て、FY25には12億円へ届く計画です。伸びの持続性は次のスライドで確認していきます。"}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    assert any("1億円" in ln and "スライド上に無い数値" in ln for ln in r.stdout.splitlines()), r.stdout
+
+
+def test_pyramid_accepts_scalar_tiers(tmp_path):
+    pytest.importorskip("matplotlib")
+    deck = {"slides": [{"pattern": "diagram", "title": "3層の実行体制で意思決定から現場までを接続する",
+                        "diagram": {"kind": "pyramid", "tiers": ["経営", "推進", "現場"]}}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "out.pptx"
+    r = run("build_deck.py", f, "-o", out)
+    assert r.returncode == 0, r.stderr

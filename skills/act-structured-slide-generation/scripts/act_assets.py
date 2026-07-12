@@ -294,7 +294,8 @@ def _diag_funnel(ax, spec, palette, C):
 
 def _diag_pyramid(ax, spec, palette, C):
     from matplotlib.patches import Polygon
-    tiers = spec["tiers"]  # top→bottom [{"label"}]
+    # top→bottom。[{"label": ...}] と ["経営", "現場"] のようなスカラー列の両方を受ける
+    tiers = [t if isinstance(t, dict) else {"label": str(t)} for t in spec["tiers"]]
     n = len(tiers); h = 1.0 / n
     for i, t in enumerate(tiers):
         yt = 1 - i * h; yb = 1 - (i + 1) * h

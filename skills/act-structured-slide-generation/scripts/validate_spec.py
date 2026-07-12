@@ -255,6 +255,7 @@ def main() -> int:
                     acc.add(o.strip())
             def _walk_nums(o):
                 if isinstance(o, dict):
+                    o = {kk: vv for kk, vv in o.items() if kk not in _CTRL_KEYS}
                     unit = o.get("unit") if isinstance(o.get("unit"), str) else None
                     if unit:
                         # unit はその dict のサブツリー全体の数値に適用される(チャートの
@@ -308,7 +309,9 @@ def main() -> int:
                 elif isinstance(o, (int, float)) and not isinstance(o, bool):
                     _corpus_parts.append(_numstr(o))
             _walk_nums({k: v for k, v in s.items() if k not in ("speaker_notes", "pattern")})
-            _corpus = "".join(_corpus_parts).replace(",", "").replace(" ", "")
+            # 区切りなし連結は JSON のキー順次第で「1」+「億円」が隣接し偽陰性を生む。
+            # 連続性は単一文字列内でのみ意味を持つため、パーツ間に区切り子を挟む
+            _corpus = "|".join(_corpus_parts).replace(",", "").replace(" ", "")
             alien = []
             # 構造カウント(ステップ/フェーズ/行/列/セル等)は「スライドの構成要素を数えた」
             # 正当なナレーションなので照合対象にしない — 対象は証拠数値の単位のみ
