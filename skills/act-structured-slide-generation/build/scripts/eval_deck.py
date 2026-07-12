@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
-"""Rubric-based multimodal eval of a rendered deck using gemini + codex CLIs as judges.
+"""Rubric-based multimodal eval of a rendered deck using codex CLI as judge.
 
-Usage: eval_deck.py <render_dir_with_pngs> [--judge gemini|codex|both] [--anchor <text>]
+Usage: eval_deck.py <render_dir_with_pngs> [--judge codex] [--anchor <text>]
 
---anchor: a phrase that appears on slide 1 (e.g. the deck title). Judges must read it
+--anchor: a phrase that appears on slide 1 (e.g. the deck title). Judge must read it
 back; a verdict whose readback doesn't contain the phrase is discarded as hallucination.
 
-Reads build/evals/rubric.json, sends every slide PNG to each judge with a
+Reads build/evals/rubric.json, sends every slide PNG to the judge with a
 defect-deduction rubric prompt, parses strict-JSON verdicts, and prints a
 score report. Exit 0 if mean total >= pass_threshold, else exit 1.
 """
@@ -61,16 +61,6 @@ def _extract_json(text: str) -> dict:
     return json.loads(m.group(0))
 
 
-def run_gemini(pngs: list[Path], prompt: str) -> dict:
-    refs = " ".join(f"@{p}" for p in pngs)
-    env = dict(os.environ, GEMINI_CLI_TRUST_WORKSPACE="true")
-    r = subprocess.run(["gemini", "-m", "gemini-2.5-pro", "-p", f"{refs} {prompt}"], capture_output=True,
-                       text=True, timeout=600, env=env, cwd=pngs[0].parent)
-    if r.returncode != 0:
-        raise RuntimeError(f"gemini failed: {r.stderr[:300]}")
-    return _extract_json(r.stdout)
-
-
 def run_codex(pngs: list[Path], prompt: str) -> dict:
     with tempfile.NamedTemporaryFile(suffix=".txt", delete=False) as tf:
         out_file = tf.name
@@ -107,7 +97,7 @@ def clamp_scores(verdict: dict) -> dict:
 
 def main() -> int:
     args = sys.argv[1:]
-    judge = "both"
+    judge = "codex"
     anchor = None
     if "--judge" in args:
         i = args.index("--judge")
@@ -127,8 +117,8 @@ def main() -> int:
         print(f"no slide PNGs in {render_dir}")
         return 1
     prompt = judge_prompt()
-    selected = [(name, fn) for name, fn in (("gemini", run_gemini), ("codex", run_codex))
-                if judge in ("both", name)]
+    selected = [(name, fn) for name, fn in (("codex", run_codex),)
+                if judge in ("both", "codex", name)]
     verdicts: dict[str, dict] = {}
     # 2 ジャッジは独立の外部 CLI 呼び出し — 直列だと待ち時間が合計になるため並行実行する
     with ThreadPoolExecutor(max_workers=max(1, len(selected))) as pool:

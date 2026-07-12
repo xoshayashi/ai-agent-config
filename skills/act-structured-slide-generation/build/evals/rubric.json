@@ -1,5 +1,5 @@
 {
-  "$comment": "Rubric for banker-grade slide quality. Defect-deduction scoring: each category starts at full points; judges deduct per concrete observed defect (minor=-1, major=-3, critical=-5 within the category, floor 0). Total = sum of categories (max 100). Judge of record: Claude Code Advisor consulted with the rendered PNGs in context (SKILL.md §5); codex/gemini CLI via eval_deck.py as fallback. Every reported defect must be re-verified against the actual render before fixing (judges hallucinate).",
+  "$comment": "Rubric for banker-grade slide quality. Defect-deduction scoring: each category starts at full points; judges deduct per concrete observed defect (minor=-1, major=-3, critical=-5 within the category, floor 0). Total = sum of categories (max 100). Judge of record: Claude Code Advisor consulted with the rendered PNGs in context (SKILL.md §5); codex CLI via eval_deck.py as fallback. Every reported defect must be re-verified against the actual render before fixing (judges hallucinate).",
   "categories": [
     {
       "id": "story",
