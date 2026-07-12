@@ -1369,3 +1369,37 @@ def test_validate_talk_script_fidelity_and_register(tmp_path):
     assert "スライド上に無い数値: 999億" in out, out
     assert "話し言葉でない" in out, out
     assert "タイトルの逐語読み" in out, out
+
+
+def test_validate_fidelity_gate_matches_unit_pairs(tmp_path):
+    # 数字だけの一致では通らない: スライドが 120社/112% のとき「112社」は単位違いとして検出。
+    # 逆に、数値型のチャート値(12)+chart.unit(億円)を話す「12億円」は構造ペアで通る
+    slides = [
+        {"pattern": "kpi_dashboard", "title": "導入社数120社とNRR112%で初年度の検証を完了する",
+         "kpis": [{"label": "導入社数", "value": "120", "unit": "社"},
+                  {"label": "NRR", "value": "112", "unit": "%"}],
+         "speaker_notes": "初年度の指標です。導入社数は112社を目標にします。この水準で検証が成立しますので、次のスライドで前提を確認します。八十字を超えるようにもう一文だけ補足します。"},
+        {"pattern": "chart_insight", "title": "売上は2年で12億円へ拡大し成長率を維持する",
+         "chart": {"type": "column", "unit": "億円", "categories": ["FY24", "FY25"],
+                   "series": [{"name": "売上", "values": [10, 12]}]},
+         "speaker_notes": "売上の推移をご覧ください。FY25には12億円へ届き、前年の10億円からの伸びを維持できるかが焦点になります。単価と件数のどちらが効いているかは次のスライドのドライバー分解で確認しますので、まずは水準感だけ押さえてください。"},
+    ]
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps({"slides": slides}, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    out = r.stdout
+    assert "112社" in out and "スライド上に無い数値" in out, out
+    # slide 2: 数値型チャート値(10, 12)+chart.unit(億円)の組は構造ペアで通り、警告が出ない
+    assert not any("slide 2" in ln and "スライド上に無い数値" in ln for ln in out.splitlines()), out
+
+
+def test_validate_image_chart_data_shape(tmp_path):
+    # combo の values 長さ不一致は build 前にエラーになる
+    deck = {"slides": [{"pattern": "chart_insight", "title": "売上と利益率の両立を1枚で確認する",
+                        "chart": {"kind": "combo", "categories": ["FY24", "FY25", "FY26"],
+                                  "bar": {"name": "売上", "values": [10, 12], "unit": "億円"},
+                                  "line": {"name": "利益率", "values": [10.0, 11.0, 12.0], "unit": "%"}}}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    assert "bar.values が 2 件で categories 3 件と不一致" in r.stdout, r.stdout

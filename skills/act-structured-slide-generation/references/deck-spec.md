@@ -47,7 +47,7 @@ evidence-source check without printing an internal-provenance footer on every sl
 - `note` (optional): definition, caveat, or denominator.
 - `speaker_notes` (optional): the presenter's TALK SCRIPT only — spoken-form claim,
   evidence walk in reading order, so-what with caveats, bridge to the next slide
-  (~150-300 JA chars per content slide, natural です/ます register). The script and the
+  (~150-300 JA chars per content slide, natural spoken register). The script and the
   slide must be the same argument: every spoken number/date/noun exists on the slide (or
   its note), and consecutive scripts read as one continuous narration, each picking up
   from the previous bridge. Judgment/design metadata never goes here; it belongs in

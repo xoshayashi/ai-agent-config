@@ -26,17 +26,47 @@
           "label": "業績",
           "claim": "増収と黒字幅拡大が両立",
           "metrics": [
-            { "label": "売上高", "value": "64.8", "unit": "億円", "delta": "+28% YoY", "delta_dir": "up" },
-            { "label": "調整後営業利益", "value": "2.1", "unit": "億円", "delta": "+1.8億円 YoY", "delta_dir": "up" },
-            { "label": "売上総利益率", "value": "72.4", "unit": "%", "delta": "+2.1pt YoY", "delta_dir": "up" }
+            {
+              "label": "売上高",
+              "value": "64.8",
+              "unit": "億円",
+              "delta": "+28% YoY",
+              "delta_dir": "up"
+            },
+            {
+              "label": "調整後営業利益",
+              "value": "2.1",
+              "unit": "億円",
+              "delta": "+1.8億円 YoY",
+              "delta_dir": "up"
+            },
+            {
+              "label": "売上総利益率",
+              "value": "72.4",
+              "unit": "%",
+              "delta": "+2.1pt YoY",
+              "delta_dir": "up"
+            }
           ]
         },
         {
           "label": "顧客基盤",
           "claim": "大型顧客の獲得が継続",
           "metrics": [
-            { "label": "有料顧客数", "value": "1,284", "unit": "社", "delta": "+212社 YoY", "delta_dir": "up" },
-            { "label": "NRR", "value": "114", "unit": "%", "delta": "+2pt YoY", "delta_dir": "up" }
+            {
+              "label": "有料顧客数",
+              "value": "1,284",
+              "unit": "社",
+              "delta": "+212社 YoY",
+              "delta_dir": "up"
+            },
+            {
+              "label": "NRR",
+              "value": "114",
+              "unit": "%",
+              "delta": "+2pt YoY",
+              "delta_dir": "up"
+            }
           ],
           "note": "NRR は過去12カ月の既存顧客収益の増減率"
         }
@@ -52,10 +82,34 @@
         {
           "heading": "FY2026 Q2(2025年12月-2026年2月)",
           "rows": [
-            { "label": "売上高", "value": "33.6", "unit": "億円", "delta": "+31.2% YoY", "delta_dir": "up" },
-            { "label": "売上総利益", "value": "24.5", "unit": "億円", "delta": "+34.8% YoY", "delta_dir": "up" },
-            { "label": "調整後営業利益", "value": "1.3", "unit": "億円", "delta": "+1.1億円 YoY", "delta_dir": "up" },
-            { "label": "調整後EBITDA", "value": "2.4", "unit": "億円", "delta": "+1.5億円 YoY", "delta_dir": "up" }
+            {
+              "label": "売上高",
+              "value": "33.6",
+              "unit": "億円",
+              "delta": "+31.2% YoY",
+              "delta_dir": "up"
+            },
+            {
+              "label": "売上総利益",
+              "value": "24.5",
+              "unit": "億円",
+              "delta": "+34.8% YoY",
+              "delta_dir": "up"
+            },
+            {
+              "label": "調整後営業利益",
+              "value": "1.3",
+              "unit": "億円",
+              "delta": "+1.1億円 YoY",
+              "delta_dir": "up"
+            },
+            {
+              "label": "調整後EBITDA",
+              "value": "2.4",
+              "unit": "億円",
+              "delta": "+1.5億円 YoY",
+              "delta_dir": "up"
+            }
           ]
         }
       ],
@@ -68,15 +122,34 @@
       "title": "顧客数と単価の両輪でARR 136億円ペースに到達",
       "subtitle": "ARR ドライバー分解(2026年2月末時点)",
       "factors": [
-        { "label": "有料顧客数", "value": "1,284", "unit": "社", "delta": "+19.8% YoY",
-          "note": "エンタープライズ比率 31%" },
-        { "label": "顧客単価(ARPA)", "value": "10,590", "unit": "千円", "delta": "+7.2% YoY",
-          "note": "上位プランへの移行が寄与" },
-        { "label": "ARR", "value": "136", "unit": "億円", "delta": "+28.4% YoY", "focal": true }
+        {
+          "label": "有料顧客数",
+          "value": "1,284",
+          "unit": "社",
+          "delta": "+19.8% YoY",
+          "note": "エンタープライズ比率 31%"
+        },
+        {
+          "label": "顧客単価(ARPA)",
+          "value": "10,590",
+          "unit": "千円",
+          "delta": "+7.2% YoY",
+          "note": "上位プランへの移行が寄与"
+        },
+        {
+          "label": "ARR",
+          "value": "136",
+          "unit": "億円",
+          "delta": "+28.4% YoY",
+          "focal": true
+        }
       ],
-      "operators": ["×", "="],
+      "operators": [
+        "×",
+        "="
+      ],
       "source": "社内管理数値",
-      "speaker_notes": "成長の中身を分解してご覧いただきます。ARR136億円への成長は、顧客数が約2割増、単価が7%増と両輪で伸びているのが特徴です。値上げ頼みでも件数頼みでもなく、エンタープライズ比率の上昇が単価を自然に押し上げています。この構造が続く限り、成長の持続性は高いと考えています。"
+      "speaker_notes": "成長の中身を分解してご覧いただきます。ARR136億円への成長は、顧客数が約2割増、単価が7.2%増と両輪で伸びているのが特徴です。値上げ頼みでも件数頼みでもなく、エンタープライズ比率の上昇が単価を自然に押し上げています。この構造が続く限り、成長の持続性は高いと考えています。"
     },
     {
       "pattern": "guidance_progress",
@@ -84,8 +157,16 @@
       "subtitle": "通期ガイダンス進捗(売上高)",
       "unit": "億円",
       "bars": [
-        { "label": "FY2024", "value": 78.2, "display": "78.2" },
-        { "label": "FY2025", "value": 104.5, "display": "104.5" }
+        {
+          "label": "FY2024",
+          "value": 78.2,
+          "display": "78.2"
+        },
+        {
+          "label": "FY2025",
+          "value": 104.5,
+          "display": "104.5"
+        }
       ],
       "current": {
         "label": "FY2026",
@@ -97,9 +178,18 @@
       },
       "side_heading": "上期進捗",
       "side": [
-        { "label": "進捗率", "value": "48%" },
-        { "label": "YoY", "value": "+28%" },
-        { "label": "過去2年平均の同時期進捗", "value": "45%" }
+        {
+          "label": "進捗率",
+          "value": "48%"
+        },
+        {
+          "label": "YoY",
+          "value": "+28%"
+        },
+        {
+          "label": "過去2年平均の同時期進捗",
+          "value": "45%"
+        }
       ],
       "source": "決算短信(2026年4月開示)",
       "assumption": "進捗率はガイダンスレンジ中央値に対する上期実績",

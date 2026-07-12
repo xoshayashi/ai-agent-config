@@ -215,14 +215,84 @@ def main() -> int:
             # タイトル逐語読みの冒頭は禁止(主張は話し言葉で言い換えて開く)
             if title and len(title) >= 8 and title in notes[: len(title) + 15]:
                 warns.append(f"{loc}: speaker_notes の冒頭がタイトルの逐語読み — 主張を話し言葉で言い換えて開く")
-            # 内容整合: スライド(可視テキスト+note/assumption)に存在しない単位つき数値が
-            # スクリプトにあるのは、本体改稿への追従漏れ(スクリプトドリフト)か幻覚の兆候
-            slide_text = " ".join(iter_texts({k: v for k, v in s.items() if k not in ("speaker_notes", "pattern")}))
-            slide_digits = set(_re_ts.findall(r"\d+", slide_text))
+            # 内容整合: スライドに存在しない「数値+単位」がスクリプトにあるのは、本体改稿への
+            # 追従漏れ(スクリプトドリフト)か幻覚の兆候。数字だけの照合では単位違い
+            # (スライド 120社 / スクリプト 120億円)を素通しするため、単位ペアで照合する。
+            # スライド側コーパスは可視文字列に加え、数値リーフ(チャートの values 等の
+            # int/float)も取り込む — 文字列だけだとネイティブチャートの数値を話した正しい
+            # スクリプトが偽陽性になる。value/values と unit が同じ dict にある構造
+            # (KPI・チャート系列)は「値+単位」の結合トークンとしても照合する。
+            _corpus_parts, _unit_pairs = [], set()
+            _UNIT_RE = _re_ts.compile(r"(億円|兆円|億|兆|万|円|%|％|件|社|名|人|カ月|ヶ月|か月|週間|時間|倍|pt)")
+            def _numstr(x):
+                xs = str(x)
+                return xs[:-2] if xs.endswith(".0") else xs
+            def _num_variants(xs):
+                xs = xs.lstrip("+△▲-−").replace(",", "")
+                out = {xs}
+                if xs.endswith(".0"):
+                    out.add(xs[:-2])
+                if "." not in xs:
+                    out.add(xs + ".0")
+                return out
+            def _subtree_numbers(o, acc):
+                if isinstance(o, dict):
+                    for vv in o.values():
+                        _subtree_numbers(vv, acc)
+                elif isinstance(o, list):
+                    for vv in o:
+                        _subtree_numbers(vv, acc)
+                elif isinstance(o, (int, float)) and not isinstance(o, bool):
+                    acc.add(_numstr(o))
+                elif isinstance(o, str) and _re_ts.fullmatch(r"[△▲+\-−]?\d[\d,.]*", o.strip()):
+                    acc.add(o.strip())
+            def _walk_nums(o):
+                if isinstance(o, dict):
+                    unit = o.get("unit") if isinstance(o.get("unit"), str) else None
+                    if unit:
+                        # unit はその dict のサブツリー全体の数値に適用される(チャートの
+                        # series[].values、waterfall items[].value、guidance の current 等)
+                        nums = set()
+                        _subtree_numbers(o, nums)
+                        v = o.get("value")
+                        if isinstance(v, str):
+                            nums.add(v)
+                        for n in nums:
+                            for var in _num_variants(n):
+                                _unit_pairs.add(var + unit)
+                    if isinstance(o.get("headers"), list) and isinstance(o.get("rows"), list):
+                        # 表: ヘッダー内の単位表記("(億円)" 等)を数値セルとペア化する
+                        h_units = set()
+                        for hd in o["headers"]:
+                            if isinstance(hd, str):
+                                h_units.update(_UNIT_RE.findall(hd))
+                        if h_units:
+                            cells = set()
+                            for row in o["rows"]:
+                                if isinstance(row, list):
+                                    for c in row:
+                                        _subtree_numbers(c, cells)
+                            for c in cells:
+                                for var in _num_variants(c):
+                                    for u in h_units:
+                                        _unit_pairs.add(var + u)
+                    for vv in o.values():
+                        _walk_nums(vv)
+                elif isinstance(o, list):
+                    for vv in o:
+                        _walk_nums(vv)
+                elif isinstance(o, str):
+                    _corpus_parts.append(o)
+                elif isinstance(o, (int, float)) and not isinstance(o, bool):
+                    _corpus_parts.append(_numstr(o))
+            _walk_nums({k: v for k, v in s.items() if k not in ("speaker_notes", "pattern")})
+            _corpus = "".join(_corpus_parts).replace(",", "").replace(" ", "")
             alien = []
-            for m in _re_ts.finditer(r"(\d[\d,.]*)(億|兆|万|円|%|％|件|社|名|人|カ月|ヶ月|か月|週間|時間|倍|pt|行|列|ステップ|フェーズ|グループ|セル)", notes):
-                digits = _re_ts.findall(r"\d+", m.group(1))
-                if any(d not in slide_digits for d in digits):
+            # 構造カウント(ステップ/フェーズ/行/列/セル等)は「スライドの構成要素を数えた」
+            # 正当なナレーションなので照合対象にしない — 対象は証拠数値の単位のみ
+            for m in _re_ts.finditer(r"(\d[\d,.]*)(億円|兆円|億|兆|万|円|%|％|件|社|名|人|カ月|ヶ月|か月|週間|時間|倍|pt)", notes):
+                token = m.group(1).replace(",", "") + m.group(2)
+                if token not in _unit_pairs and token not in _corpus:
                     alien.append(m.group(0))
             if alien:
                 warns.append(f"{loc}: speaker_notes にスライド上に無い数値: {', '.join(dict.fromkeys(alien))} — "
@@ -294,6 +364,52 @@ def main() -> int:
                 missing = [fld for fld in IMAGE_KIND_REQUIRED.get(k, ()) if not chart.get(fld)]
                 if missing:
                     errors.append(f"{cloc}: image chart '{k}' に必須フィールドがない: {', '.join(missing)}")
+                else:
+                    # データ形状の検査。ネイティブ検査(長さ/数値)をスキップする分、image kind も
+                    # ここで同等の検査を通す — 素通しすると matplotlib が build 時に落ちる
+                    def _nums_ok(vals):
+                        return isinstance(vals, list) and vals and all(
+                            isinstance(v, (int, float)) and not isinstance(v, bool) for v in vals)
+                    cats_n = len(chart.get("categories") or [])
+                    if k == "combo":
+                        for part in ("bar", "line"):
+                            pv = (chart.get(part) or {}).get("values")
+                            if not _nums_ok(pv):
+                                errors.append(f"{cloc}: combo の {part}.values は数値リスト必須")
+                            elif len(pv) != cats_n:
+                                errors.append(f"{cloc}: combo の {part}.values が {len(pv)} 件で categories {cats_n} 件と不一致")
+                    elif k in ("area", "line_multi"):
+                        for ser in chart.get("series", []):
+                            pv = ser.get("values")
+                            if not _nums_ok(pv):
+                                errors.append(f"{cloc}: {k} series '{ser.get('name')}' の values は数値リスト必須")
+                            elif len(pv) != cats_n:
+                                errors.append(f"{cloc}: {k} series '{ser.get('name')}' が {len(pv)} 件で categories {cats_n} 件と不一致")
+                    elif k == "radar":
+                        axes_n = len(chart.get("axes") or [])
+                        for ser in chart.get("series", []):
+                            pv = ser.get("values")
+                            if not _nums_ok(pv):
+                                errors.append(f"{cloc}: radar series '{ser.get('name')}' の values は数値リスト必須")
+                            elif len(pv) != axes_n:
+                                errors.append(f"{cloc}: radar series '{ser.get('name')}' が {len(pv)} 件で axes {axes_n} 件と不一致")
+                    elif k == "waterfall":
+                        bad = [it_.get("label") for it_ in chart.get("items", [])
+                               if not isinstance(it_.get("value"), (int, float)) or isinstance(it_.get("value"), bool)]
+                        if bad:
+                            errors.append(f"{cloc}: waterfall items の value が数値でない: {', '.join(str(b) for b in bad[:3])}")
+                    elif k in ("scatter", "bubble"):
+                        for pt_ in chart.get("points", []):
+                            if not all(isinstance(pt_.get(ax_), (int, float)) and not isinstance(pt_.get(ax_), bool)
+                                       for ax_ in ("x", "y")):
+                                errors.append(f"{cloc}: {k} points は数値の x/y 必須")
+                                break
+                    elif k in ("ring", "funnel"):
+                        key = "segments" if k == "ring" else "stages"
+                        bad = [seg.get("label") for seg in chart.get(key, [])
+                               if not isinstance(seg.get("value"), (int, float)) or isinstance(seg.get("value"), bool)]
+                        if bad:
+                            errors.append(f"{cloc}: {k} {key} の value が数値でない: {', '.join(str(b) for b in bad[:3])}")
                 # track trap: native badge on an image chart is ignored — image uses `annotations`
                 if chart.get("annotation"):
                     warns.append(f"{cloc}: image chart '{k}' ignores native `annotation` — use `annotations:[{{target,text}}]`")
