@@ -76,6 +76,8 @@ def approved_manifest(image_paths: list[Path]) -> dict[str, object]:
             {
                 "slide_id": str(idx),
                 "png_path": str(path),
+                "top_visible_margin": 69,
+                "bottom_visible_margin": 68,
                 "image_review_status": "approved",
                 "final_image_quality_status": "approved",
                 "content_quality_status": "approved",
@@ -114,6 +116,8 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
                 notes_xml = archive.read("ppt/notesSlides/notesSlide1.xml").decode("utf-8")
                 self.assertIn('type="sld"', notes_xml)
                 self.assertIn("note 1", notes_xml)
+                theme_xml = archive.read("ppt/theme/theme1.xml").decode("utf-8")
+                self.assertIn('<a:dk2><a:srgbClr val="626A64"/></a:dk2>', theme_xml)
 
     def test_requires_review_manifest_by_default(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
@@ -417,6 +421,39 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             images = pptx_packager.collect_images([str(image)])
 
             with self.assertRaisesRegex(SystemExit, "slide 1 slide_id must be 1"):
+                pptx_packager.validate_review_manifest(str(manifest), images)
+
+    def test_rejects_non_numeric_visible_margin(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
+            manifest = root / "review.json"
+            image.write_bytes(png_bytes())
+            data = approved_manifest([image])
+            data["slides"][0]["top_visible_margin"] = "69"
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+            images = pptx_packager.collect_images([str(image)])
+
+            with self.assertRaisesRegex(SystemExit, "top_visible_margin must be a finite non-negative number"):
+                pptx_packager.validate_review_manifest(str(manifest), images)
+
+    def test_rejects_visible_margin_difference_over_four_pixels(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
+            manifest = root / "review.json"
+            image.write_bytes(png_bytes())
+            data = approved_manifest([image])
+            data["slides"][0]["top_visible_margin"] = 80
+            data["slides"][0]["bottom_visible_margin"] = 65
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+            images = pptx_packager.collect_images([str(image)])
+
+            with self.assertRaisesRegex(SystemExit, "visible outer margin difference must be <= 4px"):
                 pptx_packager.validate_review_manifest(str(manifest), images)
 
 

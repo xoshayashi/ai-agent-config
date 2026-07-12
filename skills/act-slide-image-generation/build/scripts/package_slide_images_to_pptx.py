@@ -6,6 +6,7 @@ from __future__ import annotations
 import argparse
 import binascii
 import json
+import math
 import posixpath
 import re
 import struct
@@ -245,7 +246,9 @@ REVIEW_MANIFEST_BASE_KEYS = frozenset(
     }
 )
 REVIEW_MANIFEST_KEYS = REVIEW_MANIFEST_BASE_KEYS | APPROVED_STATUSES
-REVIEW_MANIFEST_SLIDE_BASE_KEYS = frozenset({"slide_id", "png_path", "blockers", "majors"})
+REVIEW_MANIFEST_SLIDE_BASE_KEYS = frozenset(
+    {"slide_id", "png_path", "top_visible_margin", "bottom_visible_margin", "blockers", "majors"}
+)
 REVIEW_MANIFEST_SLIDE_KEYS = REVIEW_MANIFEST_SLIDE_BASE_KEYS | SLIDE_APPROVED_STATUSES
 
 
@@ -311,6 +314,14 @@ def validate_review_manifest(manifest_file: str | None, images: list[Path]) -> N
         require_exact_keys(slide, REVIEW_MANIFEST_SLIDE_KEYS, f"review_manifest slide {idx}")
         if slide.get("slide_id") != str(idx):
             raise SystemExit(f"review_manifest slide {idx} slide_id must be {idx} as a string.")
+        margins: dict[str, float] = {}
+        for key in ("top_visible_margin", "bottom_visible_margin"):
+            value = slide.get(key)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not math.isfinite(value) or value < 0:
+                raise SystemExit(f"review_manifest slide {idx} {key} must be a finite non-negative number.")
+            margins[key] = float(value)
+        if abs(margins["top_visible_margin"] - margins["bottom_visible_margin"]) > 4:
+            raise SystemExit(f"review_manifest slide {idx} visible outer margin difference must be <= 4px on the 1672 basis.")
         for key in SLIDE_APPROVED_STATUSES:
             if slide.get(key) != "approved":
                 raise SystemExit(f"review_manifest slide {idx} {key} must be approved.")
@@ -483,7 +494,7 @@ def theme_xml() -> str:
     return '''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
 <a:theme xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" name="ImageOnly">
   <a:themeElements>
-    <a:clrScheme name="ImageOnly"><a:dk1><a:srgbClr val="2D332E"/></a:dk1><a:lt1><a:srgbClr val="FFFDFC"/></a:lt1><a:dk2><a:srgbClr val="4D544E"/></a:dk2><a:lt2><a:srgbClr val="FAFAF7"/></a:lt2><a:accent1><a:srgbClr val="008A80"/></a:accent1><a:accent2><a:srgbClr val="C49A2C"/></a:accent2><a:accent3><a:srgbClr val="F7FBF9"/></a:accent3><a:accent4><a:srgbClr val="6E756E"/></a:accent4><a:accent5><a:srgbClr val="004F49"/></a:accent5><a:accent6><a:srgbClr val="F5E2A8"/></a:accent6><a:hlink><a:srgbClr val="008A80"/></a:hlink><a:folHlink><a:srgbClr val="004F49"/></a:folHlink></a:clrScheme>
+    <a:clrScheme name="ImageOnly"><a:dk1><a:srgbClr val="2D332E"/></a:dk1><a:lt1><a:srgbClr val="FFFDFC"/></a:lt1><a:dk2><a:srgbClr val="626A64"/></a:dk2><a:lt2><a:srgbClr val="FAFAF7"/></a:lt2><a:accent1><a:srgbClr val="008A80"/></a:accent1><a:accent2><a:srgbClr val="C49A2C"/></a:accent2><a:accent3><a:srgbClr val="F7FBF9"/></a:accent3><a:accent4><a:srgbClr val="6E756E"/></a:accent4><a:accent5><a:srgbClr val="004F49"/></a:accent5><a:accent6><a:srgbClr val="F5E2A8"/></a:accent6><a:hlink><a:srgbClr val="008A80"/></a:hlink><a:folHlink><a:srgbClr val="004F49"/></a:folHlink></a:clrScheme>
     <a:fontScheme name="ImageOnly"><a:majorFont><a:latin typeface="Noto Sans JP"/><a:ea typeface="Noto Sans JP"/></a:majorFont><a:minorFont><a:latin typeface="Noto Sans JP"/><a:ea typeface="Noto Sans JP"/></a:minorFont></a:fontScheme>
     <a:fmtScheme name="ImageOnly"><a:fillStyleLst><a:solidFill><a:schemeClr val="lt1"/></a:solidFill></a:fillStyleLst><a:lnStyleLst><a:ln w="9525"><a:solidFill><a:schemeClr val="dk1"/></a:solidFill></a:ln></a:lnStyleLst><a:effectStyleLst><a:effectStyle><a:effectLst/></a:effectStyle></a:effectStyleLst><a:bgFillStyleLst><a:solidFill><a:schemeClr val="lt1"/></a:solidFill></a:bgFillStyleLst></a:fmtScheme>
   </a:themeElements>
