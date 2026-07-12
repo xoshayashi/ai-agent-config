@@ -492,8 +492,9 @@ def main() -> int:
             fs = s.get("focal_step")
             n_steps = len(s.get("steps", []))
             if fs is not None and not (isinstance(fs, int) and 0 <= fs < n_steps):
-                warns.append(f"slide {i}: focal_step={fs} が steps の範囲外(0..{n_steps - 1}) — "
-                             "レンダラーは範囲内へクランプするが、意図したステップか確認する")
+                warns.append(f"slide {i}: focal_step={fs} が 0..{n_steps - 1} の整数でない — "
+                             "整数の範囲外はクランプ、非数値は既定(最終ステップ)へフォールバックする。"
+                             "意図したステップか確認する")
             fat = [st.get("label", f"step{j+1}") for j, st in enumerate(s.get("steps", []))
                    if len(st.get("items", [])) > 3]
             if fat:

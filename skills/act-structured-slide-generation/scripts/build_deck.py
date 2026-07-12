@@ -1230,8 +1230,14 @@ def p_financial_summary(slide, spec, deck):
         tx, tw = grid(0, 7)
         cx, cw = grid(7, 5)
         add_act_table(slide, tx, y0 + 0.08, tw - 0.15, h - 0.16, spec["table"])
-        add_unit_note(slide, cx + 0.15, y0 + 0.02, spec["chart"].get("unit"))
-        add_act_chart(slide, cx + 0.15, y0 + 0.28, cw - 0.15, h - 0.36, spec["chart"])
+        chart = spec["chart"]
+        if _asset_kind(chart):
+            # image-kind(combo 等)はネイティブ経路に流さない — chart_insight / chart_grid
+            # と同じルーティング(native は series を要求するため KeyError/誤描画になる)
+            place_asset(slide, chart, cx + 0.15, y0 + 0.15, cw - 0.15, h - 0.30)
+        else:
+            add_unit_note(slide, cx + 0.15, y0 + 0.02, chart.get("unit"))
+            add_act_chart(slide, cx + 0.15, y0 + 0.28, cw - 0.15, h - 0.36, chart)
     elif spec.get("table"):
         p_comparison_table(slide, spec, deck)
     else:
@@ -1530,8 +1536,11 @@ def p_process_flow(slide, spec, deck):
     # 彩度は主役ステップに配給する。デフォルトは到達点(最終ステップ)だが、タイトルの
     # 主張を担うステップが途中にある場合は focal_step で指定する — タイトルの核心と
     # 強調色の位置がずれると、主張と視覚焦点の不一致になる
-    focal_i = spec.get("focal_step", len(steps) - 1)
-    focal_i = min(max(int(focal_i), 0), max(0, len(steps) - 1))  # 範囲外は黙って無強調にしない
+    try:
+        focal_i = int(spec.get("focal_step", len(steps) - 1))
+    except (TypeError, ValueError):
+        focal_i = len(steps) - 1  # 非数値は既定(最終ステップ)へフォールバック — ビルドを落とさない
+    focal_i = min(max(focal_i, 0), max(0, len(steps) - 1))  # 整数の範囲外はクランプ
     for i, st in enumerate(steps):
         sx = x + i * sw
         head_fill = C["primary"] if i == focal_i else C["primary_pale"]

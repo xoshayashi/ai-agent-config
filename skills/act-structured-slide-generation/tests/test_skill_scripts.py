@@ -1295,3 +1295,36 @@ def test_validate_rejects_incomplete_or_unknown_image_kinds(tmp_path):
     r = run("validate_spec.py", f)
     assert "必須フィールドがない: axes" in r.stdout, r.stdout
     assert "image バックエンド非対応" in r.stdout, r.stdout
+
+
+def test_financial_summary_image_chart_routes_to_asset(tmp_path):
+    pytest.importorskip("matplotlib")
+    deck = {"slides": [{"pattern": "financial_summary",
+                        "title": "売上60億円と利益率12%の同時達成をテーブルとcomboで確認",
+                        "table": {"headers": ["項目", "FY24", "FY25"],
+                                  "rows": [["売上", "10", "12"], ["利益", "1", "2"]]},
+                        "chart": {"kind": "combo", "categories": ["FY24", "FY25"],
+                                  "bar": {"name": "売上", "values": [10, 12], "unit": "億円"},
+                                  "line": {"name": "利益率", "values": [10.0, 16.7], "unit": "%"}}}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "out.pptx"
+    r = run("build_deck.py", f, "-o", out)
+    assert r.returncode == 0, r.stderr
+    from pptx import Presentation
+    from pptx.enum.shapes import MSO_SHAPE_TYPE
+    shapes = list(Presentation(str(out)).slides[0].shapes)
+    assert any(s.shape_type == MSO_SHAPE_TYPE.PICTURE for s in shapes)
+
+
+def test_non_numeric_focal_step_does_not_crash_build(tmp_path):
+    deck = {"slides": [{"pattern": "process_flow", "title": "非数値focal_stepでもビルドが完走することを確認",
+                        "focal_step": "last",
+                        "steps": [{"label": f"Step {i}", "items": ["項目"]} for i in range(1, 4)]}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    assert "focal_step" in r.stdout
+    out = tmp_path / "out.pptx"
+    rb = run("build_deck.py", f, "-o", out)
+    assert rb.returncode == 0, rb.stderr
