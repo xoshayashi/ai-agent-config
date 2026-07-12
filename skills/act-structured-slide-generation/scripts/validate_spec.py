@@ -246,9 +246,21 @@ def main() -> int:
         if s.get("chart"):
             _charts.append((s["chart"], loc))
         if pat == "chart_grid":
+            if len(s.get("charts", [])) > 4:
+                errors.append(f"{loc}: chart_grid の charts が {len(s['charts'])} 件 — パターン契約は2-4。"
+                              "5件目以降はビルドで黙って切り捨てられるため、セルを絞るかスライドを分割する")
             for _ci, _cell in enumerate(s.get("charts", []), start=1):
                 if isinstance(_cell, dict):
                     _charts.append((_cell.get("chart", _cell), f"{loc} cell {_ci}"))
+        if pat == "diagram":
+            # diagram の asset spec も同じ image-kind 検査(必須フィールド/annotations 罠)に通す。
+            # バイパスすると org_tree の edges 欠落などが 0 errors で通り、Graphviz 描画で落ちる
+            _dg = s.get("diagram") or {}
+            if _dg.get("kind") not in IMAGE_ASSET_KINDS:
+                errors.append(f"{loc}: diagram kind '{_dg.get('kind')}' は未対応 — "
+                              f"{', '.join(sorted(IMAGE_ASSET_KINDS))} から選ぶ")
+            else:
+                _charts.append((_dg, f"{loc} diagram"))
         for chart, cloc in _charts:
             if chart and chart.get("render") == "image" and chart.get("kind") not in IMAGE_ASSET_KINDS:
                 # 強制 image 指定でも未知 kind は画像バックエンドが受けない(build が落ちる)

@@ -1328,3 +1328,22 @@ def test_non_numeric_focal_step_does_not_crash_build(tmp_path):
     out = tmp_path / "out.pptx"
     rb = run("build_deck.py", f, "-o", out)
     assert rb.returncode == 0, rb.stderr
+
+
+def test_validate_covers_diagram_specs_and_grid_size(tmp_path):
+    # diagram の asset spec も image-kind 検査に通り、chart_grid の5枚超はエラーになる
+    deck = {"slides": [
+        {"pattern": "diagram", "title": "組織ツリーで意思決定ラインの重複を確認する",
+         "diagram": {"kind": "org_tree", "nodes": [{"id": "a", "label": "A"}]}},
+        {"pattern": "diagram", "title": "未知kindのダイアグラムは事前に弾かれることを確認",
+         "diagram": {"kind": "banana"}},
+        {"pattern": "chart_grid", "title": "5セルのグリッドは契約違反としてエラーになることを確認",
+         "charts": [{"chart": {"type": "column", "unit": "億円", "categories": ["a"],
+                               "series": [{"name": "s", "values": [1]}]}} for _ in range(5)]},
+    ]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    assert "必須フィールドがない: edges" in r.stdout, r.stdout
+    assert "diagram kind 'banana' は未対応" in r.stdout, r.stdout
+    assert "パターン契約は2-4" in r.stdout, r.stdout
