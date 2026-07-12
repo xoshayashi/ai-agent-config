@@ -1,5 +1,5 @@
 ---
-name: equity-story
+name: startup-equity-story
 description: >-
   Use when the user needs an equity story, fundraising narrative, investment
   thesis, IPO/IR story, roadshow message, growth-potential disclosure, "why
