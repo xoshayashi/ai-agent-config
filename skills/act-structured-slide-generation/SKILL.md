@@ -1,8 +1,7 @@
 ---
-
 name: act-structured-slide-generation
 description: "Generate native, editable 16:9 .pptx decks from a prompt — banker-grade structured slides in the Act design language (action titles, IBCS-style actual/forecast styling, native charts/tables, waterfalls, KPI dashboards, TAM/SAM/SOM, guidance progress). Use whenever the user asks for a deck, slides, a presentation, or any 資料 meant to be presented or shared as pages: 決算説明資料, IR資料, 提案書, 営業資料, 会社説明資料, 経営会議資料, 登壇・セミナー資料, ピッチ資料, 事業計画資料, or a .pptx deliverable — even without the word 'slide' or 'pptx' (e.g. 「資料を作って」「◯◯をまとめて役員に説明したい」). Not for AI-image slides (act-slide-image-generation), ATOM-brand slides (atom-slide-image-generation), narrative-only equity stories (equity-story), or xlsx financial models (startup-financial-modeling)."
--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------
+---
 
 # Act Structured Slide Generation
 

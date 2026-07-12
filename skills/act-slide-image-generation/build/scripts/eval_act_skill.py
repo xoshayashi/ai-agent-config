@@ -501,6 +501,49 @@ def check_no_old_files() -> list[Result]:
     return results
 
 
+def check_current_master_contract() -> list[Result]:
+    """Prove the current master reaches the generated scaffold, not only docs."""
+    script = ROOT / "build" / "scripts" / "build_act_slide_prompt.py"
+    proc = subprocess.run(
+        [sys.executable, str(script), "--mode", "single-slide-image"],
+        cwd=ROOT,
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        check=False,
+    )
+    output = proc.stdout
+    required = [
+        "header_clean_title_block_lock",
+        "header_title_grid_anchor_lock",
+        "H1 x=72 y=80 w=1528",
+        "subtitle x=72 y=126 w=1528",
+        "body_start_y=270",
+        "edge_margin_balance_lock",
+        "intentional_space_coverage_lock",
+        "focal_aspect_preservation_lock",
+        "one uniform 40pt/700 line",
+    ]
+    forbidden = [
+        "header_left_accent",
+        "header_accent_geometry",
+        "vertical_line x=50",
+        "H1 28-32pt",
+        "subtitle 18-21pt",
+        "body_start_y=105",
+        "105/784/52",
+    ]
+    results = [
+        Result(f"master_output_required:{needle}", needle in output, "missing from generated scaffold")
+        for needle in required
+    ]
+    results.extend(
+        Result(f"master_output_forbidden:{needle}", needle not in output, "stale master leaked into generated scaffold")
+        for needle in forbidden
+    )
+    return results
+
+
 def main() -> int:
     config = load_config()
     files = runtime_files(config["runtime_scan_globs"])
@@ -516,6 +559,7 @@ def main() -> int:
     results.extend(check_required_phrases(config, files))
     results.append(check_script_syntax())
     results.extend(check_entrypoint_symlinks())
+    results.extend(check_current_master_contract())
     for check in config["helper_checks"]:
         results.append(run_helper_check(check))
     results.append(check_final_generation_prompt_hygiene())
