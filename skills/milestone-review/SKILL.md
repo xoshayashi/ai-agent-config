@@ -88,34 +88,56 @@ Full table + selection heuristics in `references/_reviewer_routing.md`.
      each host's config home, so resolve it from where you loaded this
      file):
       ```sh
-      python3 <skill_dir>/scripts/route_review.py \
-          --reviewer auto|codex|claude|antigravity \
-          --host claude-code|codex|antigravity \
-          --prompt "<full prompt>" [--timeout 180] [--json]
-      
-      # Recommended v2 Command for Auto-Captured Context and Strict Gates:
+      # Before the first review of a session (or after any route degraded):
+      # probe every pool route with a trivial prompt, report status + seconds.
+      python3 <skill_dir>/scripts/route_review.py --doctor --host claude-code
+
+      # Dispatch one review. auto = first available non-host CLI, with
+      # automatic failover to the next peer if the primary fails.
       python3 <skill_dir>/scripts/route_review.py \
           --reviewer auto \
-          --host claude-code \
-          --prompt "Verify our architectural changes against security best practices." \
-          --include-git \
-          --strict-gate
+          --host claude-code|codex|antigravity \
+          --prompt-file <review_ask.md> \
+          [--include-git] [--strict-gate] [--timeout 600] [--json]
       ```
       Always pass `--host` (the CLI you are running inside): it enables the
       host self-review guard, which hard-blocks a dispatch to your own host
-      CLI with exit code 2 before running anything. 
-      
-      ### Advanced v2 Features:
-      - **Auto Reviewer selection (`--reviewer auto`, Default)**: Automatically detects your host CLI and selects the first available peer CLI on PATH that is not your own host. It filters the pool based on actual binary presence (`shutil.which`).
-      - **Automatic Failover & Resilience**: If the selected reviewer CLI fails (timeout, rate limit, binary missing, or non-zero exit), the router automatically attempts failover to the next compatible peer CLI in the pool, ensuring maximum milestone resilience (can be disabled with `--no-failover`).
-      - **Git Context Capture (`--include-git`)**: Automatically captures `git status` and `git diff HEAD` and appends them to the prompt context dynamically. This ensures cold-running reviewers always have the full, live changes under review.
-      - **Strict Gate Evaluation (`--strict-gate`)**: Automatically scans the reviewer output for blocking keywords (like `❌`, `[BLOCKING]`, `[CRITICAL]`, `blocking issue`). If found, `route_review.py` exits with **exit code 3**, transforming the review into an automated quality gate for CI/CD or agent loops.
-      
-      **Exit codes drive shell loops without `--json`:** 
-      - `0` = Review successfully ran and passed the quality gate (status="ok").
-      - `1` = Review degraded (timeout, missing CLI, final non-zero exit).
+      CLI with exit code 2 before running anything.
+
+      Dispatch mechanics you should know (each is measured, not assumed —
+      details and bench numbers in `_reviewer_routing.md` "Latency and
+      timeouts"):
+      - **Timeout is 600s per attempt by default** and is forwarded to
+        antigravity's internal `--print-timeout`. Real reviews on
+        heavyweight default models take minutes; a 180s-style short timeout
+        is how a healthy route gets misrecorded as degraded. Lower it only
+        for quick mechanical checks; raise it for very large diffs.
+      - **Prompts travel via stdin** for codex and claude (no argv length
+        ceiling, not visible in `ps`); antigravity takes argv. Prefer
+        `--prompt-file` for anything multi-line.
+      - **claude runs isolated** (no host MCP servers / plugins / hooks) and
+        **codex runs with `--skip-git-repo-check`** (it otherwise refuses to
+        start outside a trusted git repo). You do not need to pass these —
+        the helper builds them in.
+      - **`--include-git`** appends `git status` + `git diff HEAD` (and
+        untracked files) to the prompt so a cold reviewer sees the live
+        changes.
+      - **`--strict-gate`** exits 3 when any attempt's output contains
+        `[BLOCKING]`, `[CRITICAL]`, or `❌`. Only these opt-in markers count
+        (free-text phrases false-positive on negations like "no blocking
+        issue"). The helper appends the tagging instruction to the prompt
+        automatically, so the reviewer always knows to mark blockers with
+        `[BLOCKING]`.
+
+      **Exit codes drive shell loops without `--json`:**
+      - `0` = Review ran clean on the first route and passed the quality gate.
+      - `1` = Review degraded (timeout, missing CLI, final non-zero exit) — no usable review, and no blocking marker was seen.
       - `2` = Invocation error, nothing dispatched (host self-review, missing host guard, or unreadable prompt-file).
-      - `3` = **Strict gate failed** (the reviewer successfully ran, but blocking issues/❌ were found in the output). Do not let an exit-3 or exit-1 review pass the milestone!
+      - `3` = **Strict gate failed**: a blocking marker was found, scanned across every attempt including partial output from a timed-out one. Wins over exit 1 — a blocker seen in a degraded run must not hide behind "merely degraded".
+      - `4` = **Reviewed via failover**: a valid review came back, but only after one or more routes degraded. Treat the answer as a real review, and record the failed route(s) as `degraded` in the milestone log — exit 4 exists precisely so reduced reviewer independence can never look like a clean 0 to a shell loop. The helper also prints a one-line `route_review: attempts: ...` summary to stderr on every multi-attempt dispatch.
+
+      Do not let an exit-1 or exit-3 review pass the milestone; an exit-4
+      review passes only with the degraded route recorded.
 5. **Verify the answer** against four checks. Apply each in order; do
    not skip any.
    1. **Grounded?** Does each load-bearing claim cite a file, a line, a
@@ -178,9 +200,15 @@ Full table + selection heuristics in `references/_reviewer_routing.md`.
 ## Failure handling
 
 - CLI returned `status="error"` (timeout / missing binary / non-zero):
-  retry once if the cause might be transient (rate limit); otherwise
-  switch to a different reviewer for that question; otherwise record
-  the milestone as reviewed by a reduced route and surface the gap.
+  first look at *why* (`--json` includes the failover trace in
+  `attempts`; a timeout keeps the reviewer's partial stdout). A timeout
+  with substantial partial output means the route is healthy and the
+  question is big — re-dispatch with a higher `--timeout`, do not switch
+  reviewer. Retry once if the cause might be transient (rate limit);
+  otherwise switch to a different reviewer for that question; otherwise
+  record the milestone as reviewed by a reduced route and surface the
+  gap. After any degraded route, run `--doctor` so the next milestone
+  starts with measured knowledge of which routes work.
 - All external CLIs unavailable: on **Claude Code**, fall back to the
   `advisor()` transcript-aware tool — still an independent review —
   and record the reduced route. On **other hosts there is no
