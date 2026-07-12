@@ -66,22 +66,26 @@ def test_review_result_is_a_dataclass_with_expected_fields() -> None:
 
 
 def test_run_reviewer_codex_invokes_codex_exec() -> None:
+    """codex dispatch contract (v3, measured 2026-07-12): prompt travels via
+    stdin (`exec -`), and --skip-git-repo-check is passed because codex exec
+    hard-refuses to run outside a trusted git repo without it."""
     captured: dict = {}
     _install_fake_run(
         captured,
         completed=_FakeCompleted(stdout="codex says hi", returncode=0),
     )
     result = route_review.run_reviewer("codex", "Please review the diff.", timeout=30)
-    assert captured["cmd"][0] == "codex", f"expected first arg 'codex', got {captured['cmd']!r}"
-    assert "exec" in captured["cmd"], f"missing 'exec' in {captured['cmd']!r}"
-    assert "Please review the diff." in captured["cmd"], "prompt must be passed to codex"
+    assert captured["cmd"] == ["codex", "exec", "--skip-git-repo-check", "-"], (
+        f"expected stdin-mode codex argv, got {captured['cmd']!r}"
+    )
+    assert captured["kwargs"].get("input") == "Please review the diff.", (
+        "prompt must reach codex via stdin, not argv"
+    )
     assert result.status == "ok"
     assert result.reviewer == "codex"
     assert result.stdout == "codex says hi"
     assert result.returncode == 0
     print("ok    test_run_reviewer_codex_invokes_codex_exec")
-
-
 
 
 
@@ -92,8 +96,20 @@ def test_run_reviewer_claude_invokes_claude_p() -> None:
         completed=_FakeCompleted(stdout="claude says hi", returncode=0),
     )
     result = route_review.run_reviewer("claude", "Review please", timeout=30)
-    assert captured["cmd"] == ["claude", "-p", "Review please"], (
-        f"expected exact argv ['claude', '-p', <prompt>], got {captured['cmd']!r}"
+    cmd = captured["cmd"]
+    assert cmd[:2] == ["claude", "-p"], f"expected claude print mode, got {cmd!r}"
+    # Isolation flags (v3): a review prompt is self-contained by contract, so
+    # the reviewer must not pay for — or hang on — the host user's MCP
+    # servers, plugins, and hooks.
+    assert "--strict-mcp-config" in cmd and "--mcp-config" in cmd, (
+        f"claude dispatch must disable MCP loading, got {cmd!r}"
+    )
+    assert "--setting-sources" in cmd, (
+        f"claude dispatch must skip user setting sources, got {cmd!r}"
+    )
+    assert "Review please" not in cmd, "prompt must not be in claude argv"
+    assert captured["kwargs"].get("input") == "Review please", (
+        "prompt must reach claude via stdin"
     )
     assert result.status == "ok"
     assert result.reviewer == "claude"
@@ -109,12 +125,30 @@ def test_run_reviewer_antigravity_invokes_print_mode() -> None:
         completed=_FakeCompleted(stdout="antigravity says hi", returncode=0),
     )
     result = route_review.run_reviewer("antigravity", "Review please", timeout=30)
-    assert captured["cmd"] in (
-        ["agy", "-p", "Review please"],
-        ["antigravity", "-p", "Review please"],
-    ), f"expected exact argv [<agy|antigravity>, '-p', <prompt>], got {captured['cmd']!r}"
+    cmd = captured["cmd"]
+    assert cmd[0] in ("agy", "antigravity"), f"unexpected binary in {cmd!r}"
+    assert cmd[1:3] == ["-p", "Review please"], (
+        f"agy takes the prompt as argv (no stdin mode), got {cmd!r}"
+    )
+    # agy's internal print-mode wait (default 5m) must be synced to our
+    # timeout, or it silently caps long reviews below --timeout. At small
+    # timeouts it is passed through unchanged...
+    assert "--print-timeout" in cmd and "30s" in cmd, (
+        f"agy dispatch must forward --print-timeout matching timeout, got {cmd!r}"
+    )
     assert result.status == "ok"
     assert result.reviewer == "antigravity"
+
+    # ...and at review-scale timeouts agy gets a 30s head start, so it gives
+    # up first with its own error instead of racing our subprocess kill
+    # (external review 2026-07-12: an equal value could never fire first and
+    # was decorative).
+    captured2: dict = {}
+    _install_fake_run(captured2, completed=_FakeCompleted(stdout="hi", returncode=0))
+    route_review.run_reviewer("antigravity", "Review please", timeout=600)
+    assert "570s" in captured2["cmd"], (
+        f"agy --print-timeout must be timeout-30s at large timeouts, got {captured2['cmd']!r}"
+    )
     print("ok    test_run_reviewer_antigravity_invokes_print_mode")
 
 
@@ -213,10 +247,8 @@ def test_host_exclusion_allows_cross_family_dispatch() -> None:
     _install_fake_run(captured, completed=_FakeCompleted(stdout="hi", returncode=0))
     result = route_review.run_reviewer("antigravity", "prompt", host="codex", timeout=30)
     assert result.status == "ok", "non-host reviewer must dispatch normally"
-    assert captured["cmd"] in (
-        ["agy", "-p", "prompt"],
-        ["antigravity", "-p", "prompt"],
-    )
+    assert captured["cmd"][0] in ("agy", "antigravity")
+    assert "prompt" in captured["cmd"]
     print("ok    test_host_exclusion_allows_cross_family_dispatch")
 
 
@@ -314,9 +346,9 @@ def test_main_refuses_dispatch_when_host_guard_not_addressed() -> None:
 def test_main_reads_prompt_from_file_and_stdin() -> None:
     """G3: --prompt-file keeps the big prompt out of THIS invocation's argv
     (length limit) and the agent's shell history, and sidesteps shell quoting
-    of multi-line text. (It does NOT hide the prompt from `ps`: the reviewer
-    still receives it as a child argv — see cmd below.) File and '-' (stdin)
-    sources must reach the reviewer as the prompt."""
+    of multi-line text. codex/claude then receive it via their own stdin
+    (v3 — also hidden from `ps`); only antigravity still gets a child argv.
+    File and '-' (stdin) sources must reach the reviewer as the prompt."""
     import io
     import tempfile
 
@@ -326,8 +358,8 @@ def test_main_reads_prompt_from_file_and_stdin() -> None:
         fh.write("multi\nline\nprompt from file")
         path = fh.name
     _run_main(["--reviewer", "codex", "--host", "claude-code", "--prompt-file", path])
-    assert "multi\nline\nprompt from file" in captured["cmd"], (
-        f"file prompt must be dispatched verbatim, got {captured['cmd']!r}"
+    assert captured["kwargs"].get("input") == "multi\nline\nprompt from file", (
+        f"file prompt must be dispatched verbatim via stdin, got {captured['kwargs'].get('input')!r}"
     )
 
     # stdin via '-'
@@ -338,8 +370,8 @@ def test_main_reads_prompt_from_file_and_stdin() -> None:
         _run_main(["--reviewer", "codex", "--host", "claude-code", "--prompt-file", "-"])
     finally:
         sys.stdin = orig_stdin
-    assert "prompt from stdin" in captured["cmd"], (
-        f"stdin prompt must be dispatched, got {captured['cmd']!r}"
+    assert captured["kwargs"].get("input") == "prompt from stdin", (
+        f"stdin prompt must be dispatched, got {captured['kwargs'].get('input')!r}"
     )
     print("ok    test_main_reads_prompt_from_file_and_stdin")
 
@@ -558,9 +590,13 @@ def test_subprocess_run_receives_errors_replace_for_resilient_decoding() -> None
 
 
 def test_default_timeout_is_finite_and_reasonable() -> None:
-    """A defaulted timeout exists so a stuck CLI can't hang the loop."""
+    """A defaulted timeout exists so a stuck CLI can't hang the loop, and it
+    must be sized for real reviews on heavyweight models: the 2026-07 incident
+    was a claude review timing out at 180s. Floor of 300s guards against a
+    regression back to a too-short default; ceiling of 900s keeps a
+    two-candidate failover bounded under half an hour."""
     assert hasattr(route_review, "DEFAULT_TIMEOUT_SECONDS")
-    assert 30 <= route_review.DEFAULT_TIMEOUT_SECONDS <= 600
+    assert 300 <= route_review.DEFAULT_TIMEOUT_SECONDS <= 900
     captured: dict = {}
     _install_fake_run(captured, completed=_FakeCompleted())
     route_review.run_reviewer("codex", "p")  # no explicit timeout
@@ -606,7 +642,15 @@ def main() -> None:
     test_main_no_failover_disables_retry()
     test_git_context_capture()
     test_strict_gate_violations()
-    
+
+    # Dispatch hardening (v3) tests
+    test_child_env_scrubs_host_session_markers()
+    test_timeout_keeps_partial_stdout()
+    test_main_doctor_probes_pool_and_reports()
+    test_strict_gate_appends_marker_instruction_to_prompt()
+    test_strict_gate_scans_partial_stdout_of_failed_attempts()
+    test_docs_strict_gate_markers_match_code()
+
     print("done")
 
 
@@ -659,7 +703,11 @@ def test_main_auto_reviewer_failover() -> None:
         
         # Host is claude-code, external pool is [codex, antigravity]
         rc, err = _run_main(["--reviewer", "auto", "--host", "claude-code", "--prompt", "p"])
-        assert rc == 0, f"failover should succeed and exit 0, got {rc!r}"
+        # External review 2026-07-12: a failover success must NOT exit 0 —
+        # reduced reviewer independence has to be visible to a shell loop
+        # that never parses --json. 4 = reviewed via failover.
+        assert rc == 4, f"failover success must exit 4 (degraded route ran), got {rc!r}"
+        assert "attempts:" in err, f"stderr must carry the attempts one-liner, got {err!r}"
         assert len(runs) == 2, f"should have run 2 candidates, got {runs!r}"
         assert runs[0][0] == "codex", f"first should be codex, got {runs[0]!r}"
         assert runs[1][0] in ("agy", "antigravity"), f"second should be antigravity, got {runs[1]!r}"
@@ -692,10 +740,10 @@ def test_main_no_failover_disables_retry() -> None:
 def test_git_context_capture() -> None:
     original_run = route_review.subprocess.run
     try:
-        captured_cmds = []
+        captured_calls = []
         def fake_run(cmd, **kwargs):
             cmd_list = list(cmd)
-            captured_cmds.append(cmd_list)
+            captured_calls.append((cmd_list, kwargs))
             if any("rev-parse" in arg for arg in cmd_list):
                 return _FakeCompleted(stdout="true", returncode=0)
             if any("status" in arg for arg in cmd_list):
@@ -714,10 +762,10 @@ def test_git_context_capture() -> None:
         
         rc, err = _run_main(["--reviewer", "codex", "--host", "claude-code", "--prompt", "p", "--include-git"])
         assert rc == 0, f"expected rc 0, got {rc!r}"
-        
-        reviewer_call = [c for c in captured_cmds if "codex" in c]
+
+        reviewer_call = [(c, kw) for c, kw in captured_calls if c[0] == "codex" and "exec" in c]
         assert reviewer_call, "reviewer must have been executed"
-        prompt_passed = reviewer_call[0][-1]
+        prompt_passed = reviewer_call[0][1].get("input") or ""
         assert "Auto-Captured Git Context" in prompt_passed
         assert "M file.py" in prompt_passed
         assert "+print('hello')" in prompt_passed
@@ -750,6 +798,178 @@ def test_strict_gate_violations() -> None:
     assert rc == 0, f"negated phrase like 'No blocking issue found' should pass strict gate, got {rc!r}"
     
     print("ok    test_strict_gate_violations")
+
+
+def test_child_env_scrubs_host_session_markers() -> None:
+    """v3: host-CLI session markers (CLAUDECODE, ...) must not leak into the
+    reviewer child process — a nested CLI that sees them may change behavior
+    or refuse to run."""
+    import os
+
+    captured: dict = {}
+    _install_fake_run(captured, completed=_FakeCompleted(returncode=0))
+    os.environ["CLAUDECODE"] = "1"
+    try:
+        route_review.run_reviewer("codex", "p", timeout=30)
+    finally:
+        os.environ.pop("CLAUDECODE", None)
+    env = captured["kwargs"].get("env")
+    assert env is not None, "subprocess.run must receive an explicit env"
+    assert "CLAUDECODE" not in env, "CLAUDECODE must be scrubbed from the child env"
+    print("ok    test_child_env_scrubs_host_session_markers")
+
+
+def test_timeout_keeps_partial_stdout() -> None:
+    """v3: on timeout, whatever the reviewer managed to say is kept — it is
+    the difference between 'dead route' and 'route needs a longer timeout'
+    when a human audits the degraded milestone."""
+    import subprocess as _sp
+
+    def fake_run(cmd, **kwargs):
+        # On POSIX, TimeoutExpired.stdout is raw bytes even under text=True —
+        # exercise the bytes branch, not the convenient str one.
+        raise _sp.TimeoutExpired(cmd=cmd, timeout=kwargs.get("timeout"),
+                                 output=b"partial review text")
+
+    route_review.subprocess.run = fake_run
+    result = route_review.run_reviewer("codex", "p", timeout=1)
+    assert result.status == "error"
+    assert result.stdout == "partial review text", (
+        f"partial stdout must be kept (and decoded) on timeout, got {result.stdout!r}"
+    )
+    assert "timeout" in result.stderr.lower()
+    print("ok    test_timeout_keeps_partial_stdout")
+
+
+def test_main_doctor_probes_pool_and_reports() -> None:
+    """--doctor probes every pool reviewer with a trivial prompt: exit 0 when
+    at least one route answers, 1 when the whole pool is dead, 2 when
+    combined with a prompt (invocation error)."""
+    import contextlib
+    import io
+
+    original_which = route_review.shutil.which
+
+    def run_doctor(argv):
+        out, err = io.StringIO(), io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+            rc = route_review._main(argv)
+        return rc, out.getvalue(), err.getvalue()
+
+    try:
+        # Healthy pool: host codex → pool [claude, antigravity], both answer.
+        route_review.shutil.which = lambda name: f"/fake/{name}"
+        captured: dict = {}
+        _install_fake_run(captured, completed=_FakeCompleted(stdout="OK", returncode=0))
+        rc, out, _ = run_doctor(["--doctor", "--host", "codex"])
+        assert rc == 0, f"healthy pool must exit 0, got {rc!r}"
+        assert "claude" in out and "antigravity" in out, (
+            f"doctor report must name every probed route, got {out!r}"
+        )
+
+        # Dead pool: no binaries anywhere.
+        route_review.shutil.which = lambda name: None
+        rc, out, _ = run_doctor(["--doctor", "--host", "codex"])
+        assert rc == 1, f"dead pool must exit 1, got {rc!r}"
+        assert "not found" in out, f"doctor must say why a route is dead, got {out!r}"
+
+        # --doctor with any review-shaping flag is an invocation error: it
+        # never dispatches a review, so `--doctor --strict-gate && pass`
+        # must not be able to record a gate pass that gated nothing.
+        route_review.shutil.which = lambda name: f"/fake/{name}"
+        for extra in (["--prompt", "p"], ["--strict-gate"], ["--include-git"],
+                      ["--no-failover"]):
+            rc, _, err = run_doctor(["--doctor", "--host", "codex"] + extra)
+            assert rc == 2, f"--doctor plus {extra} must exit 2, got {rc!r}"
+            assert extra[0] in err, f"refusal must name the flag, got {err!r}"
+
+        # Challenge-response: an exit-0 route that answers garbage (did not
+        # actually consume the prompt) must be reported unhealthy.
+        _install_fake_run(captured, completed=_FakeCompleted(stdout="usage: ...", returncode=0))
+        rc, out, _ = run_doctor(["--doctor", "--host", "codex"])
+        assert rc == 1, f"pool answering garbage must exit 1, got {rc!r}"
+        assert "unexpectedly" in out, (
+            f"doctor must say the probe answer was wrong, got {out!r}"
+        )
+
+        # --doctor still respects the host guard (no --host, no opt-out).
+        rc, _, err = run_doctor(["--doctor"])
+        assert rc == 2, f"--doctor without --host must refuse with exit 2, got {rc!r}"
+    finally:
+        route_review.shutil.which = original_which
+    print("ok    test_main_doctor_probes_pool_and_reports")
+
+
+def test_strict_gate_appends_marker_instruction_to_prompt() -> None:
+    """External review 2026-07-12: the gate only matches opt-in markers, so
+    its precondition — the reviewer knows to use them — must be guaranteed by
+    construction. --strict-gate appends the instruction to the prompt itself;
+    a caller cannot forget it."""
+    captured: dict = {}
+    _install_fake_run(captured, completed=_FakeCompleted(stdout="LGTM", returncode=0))
+    _run_main(["--reviewer", "codex", "--host", "claude-code", "--prompt", "p",
+               "--strict-gate"])
+    sent = captured["kwargs"].get("input") or ""
+    assert "[BLOCKING]" in sent and "Gate instruction" in sent, (
+        f"--strict-gate must append the marker instruction to the prompt, got {sent!r}"
+    )
+
+    # Without the flag, the prompt is sent untouched.
+    _install_fake_run(captured, completed=_FakeCompleted(stdout="LGTM", returncode=0))
+    _run_main(["--reviewer", "codex", "--host", "claude-code", "--prompt", "p"])
+    assert captured["kwargs"].get("input") == "p", (
+        "prompt must not be mutated when --strict-gate is off"
+    )
+    print("ok    test_strict_gate_appends_marker_instruction_to_prompt")
+
+
+def test_strict_gate_scans_partial_stdout_of_failed_attempts() -> None:
+    """External review 2026-07-12: if a timed-out primary emitted [BLOCKING]
+    before the deadline and the fallback answered clean, the gate must still
+    fail (exit 3) — a clean fallback must not launder a blocker."""
+    import subprocess as _sp
+
+    original_which = route_review.shutil.which
+    original_run = route_review.subprocess.run
+    try:
+        route_review.shutil.which = lambda name: f"/fake/{name}"
+
+        def fake_run(cmd, **kwargs):
+            if cmd[0] == "codex":
+                raise _sp.TimeoutExpired(
+                    cmd=cmd, timeout=kwargs.get("timeout"),
+                    output="found a [BLOCKING] race in the failover loop, and als",
+                )
+            return _FakeCompleted(stdout="All good, ship it.", returncode=0)
+
+        route_review.subprocess.run = fake_run
+        rc, err = _run_main(
+            ["--reviewer", "auto", "--host", "claude-code", "--prompt", "p",
+             "--strict-gate"]
+        )
+        assert rc == 3, (
+            f"[BLOCKING] in a timed-out attempt's partial stdout must fail "
+            f"the gate, got {rc!r}"
+        )
+        assert "STRICT GATE FAILED" in err
+    finally:
+        route_review.shutil.which = original_which
+        route_review.subprocess.run = original_run
+    print("ok    test_strict_gate_scans_partial_stdout_of_failed_attempts")
+
+
+def test_docs_strict_gate_markers_match_code() -> None:
+    """Doc-drift guard: the strict-gate markers documented in
+    references/_reviewer_routing.md must be exactly the ones the code scans
+    for, so the doc can never advertise a phrase the gate ignores."""
+    ref = (SKILL_ROOT / "references" / "_reviewer_routing.md").read_text()
+    for marker in route_review.STRICT_GATE_MARKERS:
+        assert marker in ref, (
+            f"reference doc must document strict-gate marker {marker!r}"
+        )
+    skill = (SKILL_ROOT / "SKILL.md").read_text()
+    assert "[BLOCKING]" in skill, "SKILL.md must tell callers to use [BLOCKING]"
+    print("ok    test_docs_strict_gate_markers_match_code")
 
 
 if __name__ == "__main__":
