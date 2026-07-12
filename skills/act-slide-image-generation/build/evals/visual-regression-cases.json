@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "cases": [
+    {
+      "id": "typical_process",
+      "class": "typical",
+      "brief": "日本語4工程の業務フロー。各工程に短い説明。",
+      "expected_route": "new_from_style_board",
+      "hard_gates": [
+        "single_header",
+        "exact_text",
+        "meaningful_sequence",
+        "contrast",
+        "safe_shell"
+      ],
+      "pairwise_review": [
+        "reading_path",
+        "grouping_rhythm",
+        "deck_unity"
+      ]
+    },
+    {
+      "id": "typical_comparison",
+      "class": "typical",
+      "brief": "2案の比較と推奨。定量指標3つ。",
+      "expected_route": "new_from_style_board",
+      "hard_gates": [
+        "unique_action_title",
+        "common_baseline_encoding",
+        "direct_labels",
+        "contrast"
+      ],
+      "pairwise_review": [
+        "decision_clarity",
+        "visual_weight"
+      ]
+    },
+    {
+      "id": "typical_roadmap",
+      "class": "typical",
+      "brief": "3フェーズのロードマップと完了条件。",
+      "expected_route": "new_from_style_board",
+      "hard_gates": [
+        "meaningful_sequence",
+        "ordinal_semantics",
+        "exact_text"
+      ],
+      "pairwise_review": [
+        "temporal_flow",
+        "density"
+      ]
+    },
+    {
+      "id": "edge_long_japanese",
+      "class": "edge",
+      "brief": "長い日本語タイトルと説明文を含む。",
+      "expected_route": "rewrite_then_generate",
+      "hard_gates": [
+        "title_fit",
+        "cjk_line_length_40",
+        "minimum_text_size"
+      ],
+      "pairwise_review": [
+        "hierarchy",
+        "breathing_room"
+      ]
+    },
+    {
+      "id": "edge_mixed_script",
+      "class": "edge",
+      "brief": "HubSpot、Porters、API、MCPと日本語が混在。",
+      "expected_route": "new_from_style_board",
+      "hard_gates": [
+        "exact_text",
+        "font_role_consistency",
+        "contrast"
+      ],
+      "pairwise_review": [
+        "baseline_rhythm",
+        "label_clarity"
+      ]
+    },
+    {
+      "id": "edge_dense_six_items",
+      "class": "edge",
+      "brief": "6項目と補足説明、出典あり。",
+      "expected_route": "split_or_regrid",
+      "hard_gates": [
+        "minimum_text_size",
+        "traceable_source",
+        "safe_shell"
+      ],
+      "pairwise_review": [
+        "density",
+        "grouping"
+      ]
+    },
+    {
+      "id": "adversarial_foreign_header",
+      "class": "adversarial",
+      "brief": "参照画像に別タイトル、ロゴ、サイドバーが存在。",
+      "expected_route": "style_board_only",
+      "hard_gates": [
+        "reference_contamination",
+        "single_header",
+        "no_foreign_furniture"
+      ],
+      "pairwise_review": [
+        "material_similarity"
+      ]
+    },
+    {
+      "id": "adversarial_conflicting_styles",
+      "class": "adversarial",
+      "brief": "複数参照画像で色・字体・レイアウトが競合。",
+      "expected_route": "reject_multiple_full_slide_refs",
+      "hard_gates": [
+        "reference_role_isolation",
+        "one_style_board"
+      ],
+      "pairwise_review": [
+        "deck_unity"
+      ]
+    },
+    {
+      "id": "adversarial_local_edit_structure",
+      "class": "adversarial",
+      "brief": "構造崩壊した画像を局所編集で直す要求。",
+      "expected_route": "zero_base_regenerate",
+      "hard_gates": [
+        "edit_vs_regenerate_classification",
+        "single_message_canvas"
+      ],
+      "pairwise_review": [
+        "composition_quality"
+      ]
+    }
+  ]
+}

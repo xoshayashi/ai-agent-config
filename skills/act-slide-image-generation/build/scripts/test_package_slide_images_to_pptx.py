@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import binascii
 import importlib.util
+import hashlib
 import json
 import struct
 import tempfile
@@ -30,6 +31,40 @@ def png_bytes(width: int = 2048, height: int = 1152) -> bytes:
         b"\x89PNG\r\n\x1a\n"
         + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
         + chunk(b"IDAT", zlib.compress(row * height))
+        + chunk(b"IEND", b"")
+    )
+
+
+def png_bytes_with_dark_band(width: int = 2048, height: int = 1152, top: int = 100, bottom: int = 1000) -> bytes:
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", binascii.crc32(kind + data) & 0xFFFFFFFF)
+
+    rows = []
+    for y in range(height):
+        color = b"\x00\x00\x00" if top <= y <= bottom else b"\xff\xff\xff"
+        rows.append(b"\x00" + color * width)
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(b"".join(rows)))
+        + chunk(b"IEND", b"")
+    )
+
+
+def png_bytes_with_single_dark_pixel(width: int = 2048, height: int = 1152, px: int = 10, py: int = 10) -> bytes:
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", binascii.crc32(kind + data) & 0xFFFFFFFF)
+
+    rows = []
+    for y in range(height):
+        row = bytearray(b"\xff\xff\xff" * width)
+        if y == py:
+            row[px * 3 : px * 3 + 3] = b"\x00\x00\x00"
+        rows.append(b"\x00" + bytes(row))
+    return (
+        b"\x89PNG\r\n\x1a\n"
+        + chunk(b"IHDR", struct.pack(">IIBBBBB", width, height, 8, 2, 0, 0, 0))
+        + chunk(b"IDAT", zlib.compress(b"".join(rows)))
         + chunk(b"IEND", b"")
     )
 
@@ -64,6 +99,14 @@ def approved_manifest(image_paths: list[Path]) -> dict[str, object]:
         "schema_version": 1,
         "all_generated_images_reviewed": True,
         "weak_slide_regeneration_queue": [],
+        "review_evidence": {
+            "reviewer": "automated-test",
+            "reviewed_at": "2026-01-01T00:00:00Z",
+            "png_sha256_by_slide": {
+                str(idx): hashlib.sha256(path.read_bytes()).hexdigest()
+                for idx, path in enumerate(image_paths, 1)
+            },
+        },
         "final_image_quality_status": "approved",
         "content_quality_status": "approved",
         "design_quality_status": "approved",
@@ -92,6 +135,23 @@ def approved_manifest(image_paths: list[Path]) -> dict[str, object]:
 
 
 class PackageSlideImagesToPptxTest(unittest.TestCase):
+    def test_margin_measurement_ignores_single_pixel_noise(self) -> None:
+        data = png_bytes_with_single_dark_pixel()
+
+        self.assertIsNone(pptx_packager.measure_meaningful_vertical_margins(data))
+
+    def test_accepts_directly_generated_1672_fallback_master(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
+            image.write_bytes(png_bytes(width=1672, height=941))
+
+            images = pptx_packager.collect_images([str(image)])
+
+            self.assertEqual(images, [image])
+
     def test_package_preserves_media_and_notes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
@@ -243,7 +303,7 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             with self.assertRaises(SystemExit):
                 pptx_packager.collect_images([str(image)])
 
-    def test_rejects_non_2k_slide_master_sizes(self) -> None:
+    def test_accepts_direct_fallback_and_rejects_unapproved_sizes(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             slides_dir = root / "slides_final"
@@ -253,8 +313,7 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             legacy_basis.write_bytes(png_bytes(1672, 941))
             fhd.write_bytes(png_bytes(1920, 1080))
 
-            with self.assertRaisesRegex(SystemExit, "generate a new 2048x1152 slides_final/ master"):
-                pptx_packager.collect_images([str(legacy_basis)])
+            self.assertEqual(pptx_packager.collect_images([str(legacy_basis)]), [legacy_basis])
             with self.assertRaisesRegex(SystemExit, "instead of converting or locally redrawing"):
                 pptx_packager.collect_images([str(fhd)])
 
@@ -439,21 +498,37 @@ class PackageSlideImagesToPptxTest(unittest.TestCase):
             with self.assertRaisesRegex(SystemExit, "top_visible_margin must be a finite non-negative number"):
                 pptx_packager.validate_review_manifest(str(manifest), images)
 
-    def test_rejects_visible_margin_difference_over_four_pixels(self) -> None:
+    def test_accepts_asymmetric_semantic_zones_when_manifest_matches_pixels(self) -> None:
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             slides_dir = root / "slides_final"
             slides_dir.mkdir()
             image = slides_dir / "slide01.png"
             manifest = root / "review.json"
-            image.write_bytes(png_bytes())
+            image.write_bytes(png_bytes_with_dark_band(top=80, bottom=1086))
             data = approved_manifest([image])
             data["slides"][0]["top_visible_margin"] = 80
             data["slides"][0]["bottom_visible_margin"] = 65
             manifest.write_text(json.dumps(data), encoding="utf-8")
             images = pptx_packager.collect_images([str(image)])
 
-            with self.assertRaisesRegex(SystemExit, "visible outer margin difference must be <= 4px"):
+            pptx_packager.validate_review_manifest(str(manifest), images)
+
+    def test_rejects_manifest_margins_that_do_not_match_png(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            slides_dir = root / "slides_final"
+            slides_dir.mkdir()
+            image = slides_dir / "slide01.png"
+            manifest = root / "review.json"
+            image.write_bytes(png_bytes_with_dark_band(top=80, bottom=1086))
+            data = approved_manifest([image])
+            data["slides"][0]["top_visible_margin"] = 69
+            data["slides"][0]["bottom_visible_margin"] = 68
+            manifest.write_text(json.dumps(data), encoding="utf-8")
+            images = pptx_packager.collect_images([str(image)])
+
+            with self.assertRaisesRegex(SystemExit, "visible margins do not match the PNG"):
                 pptx_packager.validate_review_manifest(str(manifest), images)
 
 
