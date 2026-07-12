@@ -260,6 +260,7 @@ def get_git_context() -> str:
             timeout=10,
         ).stdout.strip()
 
+        diff_runs = []
         diff = subprocess.run(
             ["git", "diff", "HEAD"],
             capture_output=True,
@@ -267,15 +268,37 @@ def get_git_context() -> str:
             errors="replace",
             timeout=10,
         ).stdout.strip()
+        if diff:
+            diff_runs.append(diff)
+
+        # Parse untracked files and capture their contents via git diff --no-index
+        if status:
+            for line in status.splitlines():
+                if line.startswith("?? "):
+                    path = line[3:].strip()
+                    if path.startswith('"') and path.endswith('"'):
+                        path = path[1:-1].replace('\\"', '"').replace('\\\\', '\\')
+                    
+                    untracked_diff = subprocess.run(
+                        ["git", "diff", "--no-index", "/dev/null", path],
+                        capture_output=True,
+                        text=True,
+                        errors="replace",
+                        timeout=10,
+                    ).stdout.strip()
+                    if untracked_diff:
+                        diff_runs.append(untracked_diff)
+
+        combined_diff = "\n\n".join(diff_runs)
 
         context = []
         if status:
             context.append("### Git Status\n```text\n" + status + "\n```")
-        if diff:
-            lines = diff.splitlines()
+        if combined_diff:
+            lines = combined_diff.splitlines()
             if len(lines) > 1500:
-                diff = "\n".join(lines[:1500]) + "\n... [TRUNCATED DUE TO SIZE LIMIT] ..."
-            context.append("### Git Diff\n```diff\n" + diff + "\n```")
+                combined_diff = "\n".join(lines[:1500]) + "\n... [TRUNCATED DUE TO SIZE LIMIT] ..."
+            context.append("### Git Diff\n```diff\n" + combined_diff + "\n```")
 
         if context:
             return "\n\n## Auto-Captured Git Context\n" + "\n\n".join(context)
