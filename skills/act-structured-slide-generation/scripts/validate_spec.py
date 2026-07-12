@@ -235,9 +235,16 @@ def main() -> int:
                 if "." not in xs:
                     out.add(xs + ".0")
                 return out
+            # 描画制御メタデータ(強調 index・予想開始 index・注記オフセット等)はデータ値では
+            # ないので unit とペアにしない — focal_category:1 が「1億円」を通してしまう
+            _CTRL_KEYS = {"focal_category", "forecast_from", "emphasis_col", "emphasis_row",
+                          "focal_phase", "focal_step", "col_widths", "col0_spans",
+                          "dx", "dy", "target", "number_format", "axis_number_format"}
             def _subtree_numbers(o, acc):
                 if isinstance(o, dict):
-                    for vv in o.values():
+                    for kk, vv in o.items():
+                        if kk in _CTRL_KEYS:
+                            continue
                         _subtree_numbers(vv, acc)
                 elif isinstance(o, list):
                     for vv in o:
@@ -261,21 +268,36 @@ def main() -> int:
                             for var in _num_variants(n):
                                 _unit_pairs.add(var + unit)
                     if isinstance(o.get("headers"), list) and isinstance(o.get("rows"), list):
-                        # 表: ヘッダー内の単位表記("(億円)" 等)を数値セルとペア化する
-                        h_units = set()
-                        for hd in o["headers"]:
-                            if isinstance(hd, str):
-                                h_units.update(_UNIT_RE.findall(hd))
-                        if h_units:
+                        # 表: ヘッダー内の単位表記("(億円)" 等)を数値セルとペア化する。
+                        # ヘッダーに単位が1種類なら表全体に適用(「(億円)」を先頭列に置く
+                        # 財務表の慣行)。複数単位が混在する表では各単位を自列のセルに
+                        # 限定する — 表全体ペアリングは列跨ぎの誤値(売上10億円の表で
+                        # 「10%」)を素通しする
+                        col_units = [set(_UNIT_RE.findall(hd)) if isinstance(hd, str) else set()
+                                     for hd in o["headers"]]
+                        distinct = set().union(*col_units) if col_units else set()
+                        if len(distinct) == 1:
                             cells = set()
                             for row in o["rows"]:
                                 if isinstance(row, list):
                                     for c in row:
                                         _subtree_numbers(c, cells)
+                            u = next(iter(distinct))
                             for c in cells:
                                 for var in _num_variants(c):
-                                    for u in h_units:
-                                        _unit_pairs.add(var + u)
+                                    _unit_pairs.add(var + u)
+                        elif distinct:
+                            for ci_, units in enumerate(col_units):
+                                if not units:
+                                    continue
+                                cells = set()
+                                for row in o["rows"]:
+                                    if isinstance(row, list) and ci_ < len(row):
+                                        _subtree_numbers(row[ci_], cells)
+                                for c in cells:
+                                    for var in _num_variants(c):
+                                        for u in units:
+                                            _unit_pairs.add(var + u)
                     for vv in o.values():
                         _walk_nums(vv)
                 elif isinstance(o, list):
@@ -406,10 +428,19 @@ def main() -> int:
                                 break
                     elif k in ("ring", "funnel"):
                         key = "segments" if k == "ring" else "stages"
-                        bad = [seg.get("label") for seg in chart.get(key, [])
+                        segs_ = chart.get(key, [])
+                        bad = [seg.get("label") for seg in segs_
                                if not isinstance(seg.get("value"), (int, float)) or isinstance(seg.get("value"), bool)]
                         if bad:
                             errors.append(f"{cloc}: {k} {key} の value が数値でない: {', '.join(str(b) for b in bad[:3])}")
+                        else:
+                            vals_ = [seg.get("value") for seg in segs_]
+                            if vals_ and (max(vals_) <= 0):
+                                # レンダラーは最大値/合計で正規化するため、全て0以下だと
+                                # ゼロ除算で build が落ちる — preflight で弾く
+                                errors.append(f"{cloc}: {k} {key} の value が全て0以下 — 正の値を1つ以上入れる")
+                            elif any(v < 0 for v in vals_):
+                                errors.append(f"{cloc}: {k} {key} に負の値 — {k} は非負の量のみ表現できる")
                 # track trap: native badge on an image chart is ignored — image uses `annotations`
                 if chart.get("annotation"):
                     warns.append(f"{cloc}: image chart '{k}' ignores native `annotation` — use `annotations:[{{target,text}}]`")

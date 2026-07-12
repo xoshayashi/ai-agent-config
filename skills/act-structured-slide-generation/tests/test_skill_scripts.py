@@ -1403,3 +1403,37 @@ def test_validate_image_chart_data_shape(tmp_path):
     f.write_text(json.dumps(deck, ensure_ascii=False))
     r = run("validate_spec.py", f)
     assert "bar.values が 2 件で categories 3 件と不一致" in r.stdout, r.stdout
+
+
+def test_validate_fidelity_ignores_control_fields_and_scopes_table_units(tmp_path):
+    slides = [
+        # focal_category:1 は描画制御であり「1億円」の根拠にならない
+        {"pattern": "chart_insight", "title": "売上は2年で12億円へ拡大し成長軌道を維持する",
+         "chart": {"type": "column", "unit": "億円", "categories": ["FY24", "FY25"],
+                   "series": [{"name": "売上", "values": [10, 12]}], "focal_category": 1},
+         "speaker_notes": "売上の推移をご覧ください。まず1億円の水準から立ち上がり、FY25には12億円へ届く計画です。ここからの伸びの持続性を次のスライドで確認していきます。"},
+        # 複数単位ヘッダーの表では単位は自列に限定される: 10 は億円列の値で、10% は存在しない
+        {"pattern": "comparison_table", "title": "売上10億円と成長率5%の組み合わせを1表で確認する",
+         "table": {"headers": ["項目", "売上(億円)", "YoY(%)"],
+                   "rows": [["A事業", "10", "+5"]]},
+         "speaker_notes": "この表のポイントはA事業です。売上は10億円、成長率はプラス5%で、規模と成長の両立ができています。仮に10%と読み間違えると評価を誤りますので、列の対応にご注意ください。"},
+    ]
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps({"slides": slides}, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    out = r.stdout
+    assert any("slide 1" in ln and "1億円" in ln for ln in out.splitlines()), out
+    assert any("slide 2" in ln and "10%" in ln for ln in out.splitlines()), out
+    # 正当な組(12億円 / 10億円 / 5%)は警告されない
+    assert "12億円" not in out and "10億円" not in out and " 5%" not in out, out
+
+
+def test_validate_rejects_zero_only_funnel(tmp_path):
+    deck = {"slides": [{"pattern": "chart_insight", "title": "獲得ファネルの歩留まりを3段で確認する",
+                        "chart": {"kind": "funnel",
+                                  "stages": [{"label": "訪問", "value": 0},
+                                             {"label": "登録", "value": 0}]}}]}
+    f = tmp_path / "deck.json"
+    f.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", f)
+    assert "全て0以下" in r.stdout, r.stdout
