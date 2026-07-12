@@ -1,79 +1,92 @@
 # Output Shapes
 
 Choose output shape from the decision and the driver tree. Do not pick sheets
-from a fixed classification grid. Research basis: practitioner consensus is
-6–10 core tabs with a hard cap of 12 (Northstar / Kruze / Foresight); every
-sheet must own a distinct decision surface.
+from a fixed classification grid.
 
 ## Integrated Decision Workbook
 
 Use when the user asks for a fundraising model, 収支計画, financial plan,
-board plan, lender plan, or investor-ready xlsx.
+board plan, lender plan, or investor-ready xlsx. The workbook may be annual,
+quarterly, or monthly depending on model grain, but it should connect operating
+logic, cash, financing, ownership, scenarios, and valuation.
 
 Run:
 
 ```sh
 python3 skills/startup-financial-modeling/scripts/build_model.py \
-  --input model.yaml --output model_output.xlsx --strict-audit
+  --source-md path/to/source.md \
+  --output model_output.xlsx
 ```
 
-Default `full` sheet set (12 sheets; BS is included when working capital,
-inventory, capex, or debt is material — otherwise 11):
+Expected surfaces:
 
-| Sheet | Owns |
-|---|---|
-| Guide | Decision, mechanics, sheet map, formatting key, model qualifications |
-| Summary | Annual condensed P&L, cash & runway, KPI block, scenario comparison + staleness check, consolidated checks / master check, cross-checks (検算), recommendation |
-| Assumptions | Driver register (value / unit / source / evidence status), scenario toggle + case table, driver map |
-| Revenue Build | Bottom-up revenue engine + demand and price support blocks |
-| Cost Build | COGS, department opex programs, capex, cost-to-serve support |
-| People Plan | Department FTE × loaded comp (statutory welfare rate), capacity checks |
-| P&L | Statements presentation (tax-exclusive), reference-only |
-| BS | Compact balance sheet + balance check (conditional) |
-| CF | Cash plan (tax-inclusive 資金繰り): consumption tax / withholding / social-insurance balances, runway, shortfall check |
-| Financing | Sources & uses, instruments, post-raise runway check, downside funding gap |
-| Cap Table | Rounds register: pre/post, price, shares, issued & fully diluted ownership, voting thresholds, pool range check |
-| Evidence | Comparable / benchmark register (real evidence only) + isolated market sanity block |
+- Guide / source map / modeling assumptions.
+- Driver tree and operating engine.
+- Revenue, cost, people, capex, working capital, P&L, balance sheet, and cash
+  flow where the decision requires them.
+- Capital stack, ownership, venture debt/equity, dilution, secondary, lease, or
+  project-finance modules when those flows matter.
+- KPI, scenarios, sensitivity, valuation, market support, benchmarks, and IC
+  memo where they clarify the decision.
 
-Conditional sheets (never by default; via mode or `--additional-sheets`):
-`Valuation & Exit`, `IC Memo`, `Segments` (requires ≥2 real segments),
-`Pricing`, `Unit Economics`.
-
-The default time axis for the YAML route is hybrid (monthly for the first two
-fiscal years + annual to five fiscal years). The `--source-md` narrative
-fallback stays annual five-year unless the narrative requests otherwise.
+Every included sheet must satisfy `_sheet_quality_rubric.md`: a distinct
+purpose, source boundary, dependency flow, checks where errors would matter,
+and interpretation for output surfaces. The full-workbook order is a reading
+flow, not permission to include low-value tabs.
 
 ## Focused Finance Module
 
-Use when the user explicitly asks for a focused output. Bundles are lean by
-design; builders write bundle-aware formulas (a missing upstream sheet means
-the formula recomputes from Assumptions inside the bundle — never a stale
-embedded constant downstream of an editable input).
+Use when the user explicitly asks for a focused output such as pricing, unit
+economics, runway, cap table, M&A exit, valuation, market sizing, or comparables
+without asking for a full company plan.
 
-| User wording | Mode value | Bundle |
+Run:
+
+```sh
+python3 skills/startup-financial-modeling/scripts/build_model.py \
+  --mode <mode> --input model.yaml --output model_output.xlsx
+```
+
+Exact runtime mode values:
+
+| User wording | Mode value | Visible-surface target |
 |---|---|---|
-| full model / fundraising / board plan | `full` | 12-sheet set above |
-| pricing / ROI / willingness-to-pay | `pricing` | Guide, Assumptions, Pricing, Summary |
-| unit economics | `unit_economics` | Guide, Assumptions, Unit Economics, Summary |
-| cap table / SAFE / J-KISS / option pool | `cap_table` | ownership state-machine workbook (3 sheets) |
-| M&A / exit | `ma_exit` | Guide, Assumptions, Valuation & Exit, Evidence, IC Memo |
-| DCF / valuation only | `dcf_only` | Guide, Assumptions, Valuation & Exit, Evidence |
-| burn / runway | `burn_runway` | Guide, Assumptions, CF (monthly), Financing, Summary |
-| three-statement | `three_statement` | Guide, Assumptions, P&L, BS, CF, Summary |
-| market sizing | `market_sizing` | Guide, Evidence |
-| comparables / comps | `comps_only` | Guide, Evidence, Valuation & Exit, IC Memo |
+| full model / fundraising / board plan | `full` | Integrated decision workbook |
+| pricing / ROI / willingness-to-pay | `pricing` | Compact pricing workbook without P&L/BS/CF by default |
+| unit economics | `unit_economics` | KPI and scenario surfaces needed to audit economic unit |
+| cap table / SAFE / J-KISS / option pool | `cap_table` | Ownership state-machine workbook, not a full operating model |
+| M&A / exit | `ma_exit` | Proceeds, valuation, scenarios, sensitivity, memo |
+| DCF / valuation only | `dcf_only` | Valuation and sensitivity with required formula dependencies |
+| burn / runway | `burn_runway` | Cash, financing timing, runway, downside |
+| three-statement | `three_statement` | P&L, BS, CF with required dependencies |
+| market sizing | `market_sizing` | Market support and benchmark register |
+| comparables / comps | `comps_only` | Valuation, market support, benchmark register, memo |
 
 Keep the artifact as small as the decision allows, but never at the expense of
-formula completeness. Reject sheet exclusions that would leave live formulas
-pointing at missing sheets. When a user asks for an external-ready xlsx, run
-the strict audit path.
+formula completeness. Focused modes should include supporting sheets when a
+visible output needs them. If the choice is between a larger workbook and
+silently neutralized decision formulas, choose the larger workbook.
 
-The generator attempts public-market comparable refresh by default; results,
-provided private/transaction evidence, and retrieval failures land in the
-Evidence sheet. Structured inputs (`currency`, `display_scale`, `grain`,
-`fiscal_year_end_month`, `periods`, `segments`, driver series, financing
-instruments, valuation scalars, `statutory_welfare_rate`,
-`consumption_tax_rate`, AR/AP sites) are first-class model facts.
+Reject sheet exclusions that would leave remaining formulas pointing to missing
+sheets unless the dependent surfaces are also removed or rewired in the same
+pass. When a user asks for an external-ready xlsx, run the strict audit path so
+omitted-sheet references, `#REF!` markers, missing sheet-quality markers, and
+workbook design regressions block handoff.
+The generator attempts public-market comparable refresh by default. Explicit
+tickers are an override, not a prerequisite; private-company, funding-round,
+transaction, market-report, customer, or internal benchmarks should be supplied
+through structured evidence fields and remain visible in the benchmark
+register. Failed retrieval remains visible and should feed the IC gate.
+Formula dependency is not the same as visible-sheet dependency, but formulas
+that remain in the artifact must be auditable. A pricing request can still
+include CF, valuation, or KPI support if those sheets are needed to preserve
+calculation lineage. A cap-table request should route to the ownership state
+machine unless the user also asks for an operating plan.
+
+Structured inputs should be accepted as first-class model facts, not only as
+free-text narrative. In particular, `currency`, `display_scale`, `grain`,
+`periods`, `segments`, operating driver series, financing instruments, and
+valuation scalars should flow into the generated workbook.
 
 ## Candidate Depth Checks
 
@@ -81,20 +94,23 @@ Use modes as output shapes, not templates:
 
 | Request | Candidate depth checks |
 |---|---|
-| pricing | customer ROI, cost-to-serve, selected price, support ratio, margin, sales cycle, validation test |
-| unit economics | true economic unit, price, unit cost, margin, retention/utilization, payback, CAC/LTV, benchmark context |
-| burn / runway | cash roll-forward, burn drivers, financing timing, funding gap, runway breakpoint, shortfall month |
-| cap table | ownership by holder class, option pool, converts, dilution, proceeds, voting thresholds |
-| valuation | method credibility, method exclusions, selected range, investor/founder return |
-| M&A / exit | exit EV, net debt, transaction costs, proceeds waterfall, preference floor, investor MOIC/IRR |
-| market sizing | TAM/SAM/SOM method, source freshness, reachability, bottom-up plan-to-market bridge |
-| IC memo | recommendation, KPI readout, what must be true, downside triggers, ranked DD gates, walk-away conditions |
+| pricing | customer ROI, cost-to-serve, selected price, support ratio, margin, sales cycle, risk, validation test |
+| unit economics | true economic unit, price, unit cost, margin, retention/utilization, payback, capacity, benchmark context, cohort or channel gap |
+| burn / runway | cash roll-forward, burn drivers, financing timing, funding gap, runway breakpoint, milestone / covenant / facility gap |
+| cap table | ownership by holder class, option pool, converts, warrants, secondary, dilution, proceeds, exit impact, preference-stack caveats |
+| valuation | method credibility, method exclusions, selected range, supportability score, SOTP credibility, investor/founder return |
+| M&A / exit | exit EV, net debt, transaction costs, proceeds waterfall, preference floor, investor MOIC/IRR, founder proceeds, buyer-view caveats |
+| market sizing | TAM/SAM/SOM method, source freshness, reachability, bottom-up plan-to-market bridge, source gaps |
+| IC memo | recommendation, price/terms stance, KPI readout, what must be true, downside triggers, ranked DD gates, walk-away conditions, source boundary |
 
-These are not mandatory bundles. If a request uses a familiar label but the
-economic dependencies point elsewhere, follow the dependencies.
+These are not mandatory bundles. Select, substitute, or omit checks based on the
+user's decision, available evidence, and the selected driver tree. If a request
+uses a familiar label such as pricing, valuation, or cap table but the economic
+dependencies point elsewhere, follow the dependencies.
 
 The output may be xlsx, `model.yaml`, `model_spec.md`, `assumptions.csv`, or
-`audit_report.md` when that better answers the user.
+`audit_report.md` when that better answers the user. If the user explicitly
+asks for an xlsx, generate or repair the workbook and then inspect it.
 
 ## Audit Or Repair Report
 

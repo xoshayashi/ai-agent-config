@@ -1,931 +1,873 @@
 {
- "skill_name": "startup-financial-modeling",
- "description": "Eval set for the v2 startup financial modeling skill: a 12-sheet integrated architecture (Guide, Summary, Assumptions, Revenue Build, Cost Build, People Plan, P&L, BS, CF, Financing, Cap Table, Evidence) built on an economic kernel with a hybrid monthly x annual period axis, lean closed mode bundles, scenario toggle mechanism, evidence registers, and machine-audited xlsx quality gates.",
- "evals": [
-  {
-   "id": 1,
-   "name": "full_hybrid_jp_fundraising",
-   "prompt": "国内SaaSスタートアップのシリーズA調達に向けて、5年の統合財務モデルをxlsxで作って。月次の資金繰りが見たい。月額12万円のサブスク、顧客120→3,400社、調達4億円、法定福利費率15%、期首現金1.2億円。",
-   "expected_output": "Full-mode v2 workbook (12 sheets: Guide, Summary, Assumptions, Revenue Build, Cost Build, People Plan, P&L, BS, CF, Financing, Cap Table, Evidence) on the hybrid axis: a 24-column monthly window (labels YYYY/MM) anchored to the fiscal year in progress, followed by annual FY columns, months ruler in row 5, freeze at F7, one master check on Summary echoed on every period sheet.",
-   "files": [
-    "input_yaml"
-   ],
-   "applicable_references": [
-    "_assumption_decomposition_patterns",
-    "_benchmark_protocol",
-    "_generic_composition_protocol",
-    "_ib_workbook_design_system",
-    "_input_schema",
-    "_kpi_analytics",
-    "_layout_canonical",
-    "_modeling_kernel",
-    "_output_modes",
-    "_scenario_sensitivity_playbook",
-    "_self_review_protocol",
-    "_self_improvement_protocol",
-    "_sheet_quality_rubric",
-    "_terminology"
-   ],
-   "assertions": [
+  "skill_name": "startup-financial-modeling",
+  "description": "Eval set for a generic startup financial modeling skill built around an economic kernel, driver tree, capital logic, and editable xlsx outputs.",
+  "evals": [
     {
-     "id": "A1",
-     "text": "Workbook contains exactly the 12-sheet full bundle (Guide, Summary, Assumptions, Revenue Build, Cost Build, People Plan, P&L, BS, CF, Financing, Cap Table, Evidence) — no legacy sheets (Kernel, Driver Tree, Capital Stack, KPI, Scenarios, Sensitivity, Benchmarks, Exit Waterfall)",
-     "type": "structure"
+      "id": 1,
+      "name": "blank_memo_to_integrated_asset_heavy_model",
+      "prompt": "現場向けAI機器を展開する資本集約型スタートアップのエクイティストーリーMarkdownを元に、資金調達向け5年収支計画をxlsxで作って。機器販売、利用料、保守、ソフトウェア、リース、製造原価、在庫、採用、資金調達、希薄化、KPI、投資家向けIC memoまで含めて。",
+      "expected_output": "Evidence-grounded integrated xlsx that starts from economic kernel, model grain, source map, and driver tree. Workbook includes operating engine, asset/capex logic, working capital where relevant, capital stack, ownership, scenarios, sensitivity, valuation, KPI, and memo surfaces.",
+      "files": [
+        "source_md"
+      ],
+      "applicable_references": [
+        "_generic_composition_protocol",
+        "_modeling_kernel",
+        "_coverage_universe",
+        "_assumption_decomposition_patterns",
+        "_kpi_analytics",
+        "_scenario_sensitivity_playbook",
+        "_valuation_and_return_logic",
+        "_ic_memo_depth",
+        "_benchmark_protocol",
+        "_self_review_protocol",
+        "_sheet_quality_rubric",
+        "_output_modes",
+        "_layout_canonical",
+        "_terminology",
+        "_ib_workbook_design_system"
+      ],
+      "assertions": [
+        {
+          "id": "A1",
+          "text": "Model begins with decision, model grain, entity scope, source facts, assumptions, and unknowns before sheet selection",
+          "type": "structure"
+        },
+        {
+          "id": "A2",
+          "text": "Driver tree links units, price, utilization, capacity, manufacturing cost, working capital, capex, financing, and ownership",
+          "type": "logic"
+        },
+        {
+          "id": "A2b",
+          "text": "Critical assumptions include explanatory drivers, implied values, support ratios or variances, and evidence status",
+          "type": "logic"
+        },
+        {
+          "id": "A3",
+          "text": "Workbook includes raw base-currency monetary values, correct non-monetary units, direct formulas, no workbook-scoped names, no merged cells, no frozen panes, no text wrapping, and hierarchy / indent columns that render as 20px in Google Sheets (exactly 2.14 xlsx width)",
+          "type": "implementation"
+        },
+        {
+          "id": "A4",
+          "text": "KPI reflects actual economics such as fleet, utilization, payback, gross margin, runway, burn multiple, capital efficiency, and deployment capacity",
+          "type": "metric"
+        },
+        {
+          "id": "A5",
+          "text": "Valuation and funding logic tie to scenarios, cash runway, dilution, lease/debt capacity, and investor return rather than a generic revenue multiple only",
+          "type": "valuation"
+        },
+        {
+          "id": "A6",
+          "text": "IC memo is written from a clean decision-specific base, ignores legacy/backward-compatible memo layouts, and interprets KPI, downside triggers, valuation support, financing/dilution, and DD actions with only necessary and sufficient supplemental context",
+          "type": "memo"
+        },
+        {
+          "id": "A7",
+          "text": "Generated defaults are labeled by evidence status and weak default assumptions are linked to scenario, benchmark refresh, or DD actions rather than presented as sourced facts",
+          "type": "evidence"
+        },
+        {
+          "id": "XLSX_DESIGN",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, terminal Comment columns after the final period/value column on standard period sheets, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_FONT_HIERARCHY",
+          "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
+        }
+      ]
     },
     {
-     "id": "A2",
-     "text": "Period-axis sheets follow the v2 header contract: title row 2 with master-check echo, unit caption + FY ruler row 4, integer months ruler row 5, period headers row 6, data from row 8, freeze pane at the first period column row 7, uniform 11.5 period-column width",
-     "type": "implementation"
+      "id": 2,
+      "name": "seed_deeptech_milestone_financing",
+      "prompt": "研究開発中のディープテック会社です。まだ売上はありません。PoC、量産試作、初号機納入、規制対応、採用、助成金、転換社債、次回ラウンド必要額を含む24か月の資金計画と、創業者・従業員・投資家の希薄化をExcelで見たいです。",
+      "expected_output": "Focused but integrated runway and financing workbook. Revenue metrics are not forced; milestone spend, hiring, grants, convertibles, cash runway, ownership waterfall, and next financing need are modeled explicitly.",
+      "files": [],
+      "applicable_references": [
+        "_generic_composition_protocol",
+        "_modeling_kernel",
+        "_coverage_universe",
+        "_assumption_decomposition_patterns",
+        "_scenario_sensitivity_playbook",
+        "_ic_memo_depth",
+        "_self_review_protocol",
+        "_sheet_quality_rubric",
+        "_output_modes",
+        "_layout_canonical",
+        "_terminology",
+        "_ib_workbook_design_system"
+      ],
+      "assertions": [
+        {
+          "id": "B1",
+          "text": "Pre-revenue plan omits or labels non-useful revenue KPIs instead of forcing ARR or LTV/CAC",
+          "type": "logic"
+        },
+        {
+          "id": "B2",
+          "text": "Runway is linked to hiring, milestone spend, capex, grants, convertibles, and next-round timing",
+          "type": "calculation"
+        },
+        {
+          "id": "B3",
+          "text": "Ownership waterfall traces founder, employee pool, convertible holders, new investors, and financing rounds to 100.00%",
+          "type": "calculation"
+        },
+        {
+          "id": "B4",
+          "text": "Scenario and sensitivity show delayed milestone, higher prototype cost, lower grant, and larger round cases",
+          "type": "scenario"
+        },
+        {
+          "id": "B5",
+          "text": "Weak or placeholder commercial assumptions are clearly labeled and carried into validation tests rather than treated as proven revenue drivers",
+          "type": "evidence"
+        },
+        {
+          "id": "XLSX_DESIGN",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, terminal Comment columns after the final period/value column on standard period sheets, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_FONT_HIERARCHY",
+          "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
+        }
+      ]
     },
     {
-     "id": "A3",
-     "text": "Hybrid axis renders 24 monthly columns labeled YYYY/MM starting at the first month of the fiscal year in progress (never a fully-past first fiscal year), then one annual column per remaining FY, with the monthly-to-annual boundary declared by a medium rule",
-     "type": "implementation"
+      "id": 3,
+      "name": "marketplace_growth_model",
+      "prompt": "Marketplaceスタートアップで、GMV、take rate、買い手/売り手コホート、決済手数料、販促費、チャーン、リピート率、営業人員、運転資本を含む3年モデルを作りたい。資金調達額の妥当性と投資家向け説明も含めて。",
+      "expected_output": "Marketplace-specific mechanics emerge from the driver tree: GMV, take rate, two-sided cohorts, liquidity, contribution margin, working capital, CAC/payback where meaningful, funding need, scenarios, and memo.",
+      "files": [],
+      "applicable_references": [
+        "_generic_composition_protocol",
+        "_modeling_kernel",
+        "_coverage_universe",
+        "_assumption_decomposition_patterns",
+        "_kpi_analytics",
+        "_scenario_sensitivity_playbook",
+        "_benchmark_protocol",
+        "_output_modes",
+        "_layout_canonical",
+        "_terminology",
+        "_ib_workbook_design_system",
+        "_sheet_quality_rubric",
+        "_self_review_protocol"
+      ],
+      "assertions": [
+        {
+          "id": "C1",
+          "text": "Revenue build derives net revenue from GMV and take rate, with buyer/seller cohorts and retention separated",
+          "type": "calculation"
+        },
+        {
+          "id": "C2",
+          "text": "Contribution margin includes payment fees, incentives, support, fraud/loss assumptions where relevant, and sales/marketing efficiency",
+          "type": "metric"
+        },
+        {
+          "id": "C3",
+          "text": "Funding need ties to cash runway, growth investment, working capital, and downside scenario",
+          "type": "logic"
+        },
+        {
+          "id": "C4",
+          "text": "The model does not import irrelevant software-only metrics unless they are explicitly tied to the marketplace economics",
+          "type": "consistency"
+        },
+        {
+          "id": "C5",
+          "text": "Scenario and sensitivity axes are selected from marketplace-specific uncertainties such as liquidity, take rate, incentives, repeat behavior, and working capital",
+          "type": "scenario"
+        },
+        {
+          "id": "XLSX_DESIGN",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, terminal Comment columns after the final period/value column on standard period sheets, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_FONT_HIERARCHY",
+          "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
+        }
+      ]
     },
     {
-     "id": "A4",
-     "text": "Every per-period engine formula reads the months ruler (F$5) so one row formula is copy-identical across monthly and annual columns (R1C1-normalized R17)",
-     "type": "logic"
+      "id": 4,
+      "name": "late_private_multi_segment_pre_ipo",
+      "prompt": "上場前のスタートアップで、国内SaaS、海外SaaS、ハードウェア、保守、金融子会社があり、連結PL/BS/CF、NCI、税金、NOL、借入、リース、セカンダリー、IPO前後の希薄化、SOTP valuation、投資家向けDD論点を整理したい。",
+      "expected_output": "Late-private integrated workbook with multi-segment driver tree, consolidation logic, taxes, debt/lease/covenants, ownership, secondary, valuation, scenario, and DD memo surfaces.",
+      "files": [],
+      "applicable_references": [
+        "_generic_composition_protocol",
+        "_modeling_kernel",
+        "_coverage_universe",
+        "_assumption_decomposition_patterns",
+        "_kpi_analytics",
+        "_scenario_sensitivity_playbook",
+        "_valuation_and_return_logic",
+        "_ic_memo_depth",
+        "_benchmark_protocol",
+        "_output_modes",
+        "_layout_canonical",
+        "_terminology",
+        "_ib_workbook_design_system",
+        "_sheet_quality_rubric",
+        "_self_review_protocol"
+      ],
+      "assertions": [
+        {
+          "id": "D1",
+          "text": "Segments are modeled as economic units and consolidated with clear intercompany/NCI/tax handling where needed",
+          "type": "logic"
+        },
+        {
+          "id": "D2",
+          "text": "Capital stack includes debt, lease, equity, secondary, covenants, cash uses, and investor ownership effects",
+          "type": "calculation"
+        },
+        {
+          "id": "D3",
+          "text": "Valuation supports DCF, exit multiple, comparables, SOTP, and investor return logic with scenario linkage",
+          "type": "valuation"
+        },
+        {
+          "id": "D4",
+          "text": "DD memo highlights source facts, assumptions, unresolved diligence questions, and sensitivity drivers",
+          "type": "memo"
+        },
+        {
+          "id": "D5",
+          "text": "Valuation explains method credibility and exclusions across DCF, multiples, SOTP, IPO support, and investor return rather than averaging every method blindly",
+          "type": "valuation"
+        },
+        {
+          "id": "D6",
+          "text": "Investor return view includes ownership, dilution, MOIC, IRR when timing matters, net debt or preference effects where relevant, and downside breakpoints",
+          "type": "valuation"
+        },
+        {
+          "id": "XLSX_DESIGN",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, terminal Comment columns after the final period/value column on standard period sheets, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_FONT_HIERARCHY",
+          "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
+        }
+      ]
     },
     {
-     "id": "A5",
-     "text": "JP practice is carried in the statements: tax-exclusive P&L with NOL-aware tax and half-year-convention D&A note, tax-inclusive CF with 消費税/源泉・社保 balance rows and a stated simplification note, AR/AP driven by 回収・支払サイト when stated",
-     "type": "logic"
+      "id": 5,
+      "name": "focused_pricing_and_roi_module",
+      "prompt": "新しいAIプロダクトの価格を決めたい。顧客ROI、導入工数、粗利、サポート負荷、従量課金、契約期間、解約リスク、営業サイクル、値上げ余地を含めて、価格帯と投資家向け説明をExcelで作って。",
+      "expected_output": "Focused pricing workbook that stays compact but includes customer ROI, pricing ladder, gross margin, payback, capacity/load implications, revenue sensitivity, and investment narrative.",
+      "files": [],
+      "applicable_references": [
+        "_generic_composition_protocol",
+        "_modeling_kernel",
+        "_assumption_decomposition_patterns",
+        "_kpi_analytics",
+        "_scenario_sensitivity_playbook",
+        "_ic_memo_depth",
+        "_output_modes",
+        "_layout_canonical",
+        "_terminology",
+        "_ib_workbook_design_system",
+        "_sheet_quality_rubric",
+        "_self_review_protocol"
+      ],
+      "assertions": [
+        {
+          "id": "E1",
+          "text": "Artifact remains focused on pricing while including the upstream/downstream calculations needed for the decision",
+          "type": "structure"
+        },
+        {
+          "id": "E2",
+          "text": "Customer ROI, willingness-to-pay, cost-to-serve, support load, gross margin, selected price, and pricing support ratio are linked by formulas",
+          "type": "calculation"
+        },
+        {
+          "id": "E3",
+          "text": "Assumptions use units and raw base-currency monetary values correctly, with no parenthetical unit labels or hidden scale conversions",
+          "type": "implementation"
+        },
+        {
+          "id": "E4",
+          "text": "Memo explains recommended price range, risk, validation tests, and investor-facing rationale",
+          "type": "memo"
+        },
+        {
+          "id": "E5",
+          "text": "The selected price is supported by independent primitives, while dependent outputs such as revenue and margin are formulas or checks",
+          "type": "logic"
+        },
+        {
+          "id": "XLSX_DESIGN",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, terminal Comment columns after the final period/value column on standard period sheets, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_FONT_HIERARCHY",
+          "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
+        }
+      ]
     },
     {
-     "id": "A6",
-     "text": "Statutory welfare rate scales base salary into fully-loaded comp on People Plan and the scaling is labeled",
-     "type": "logic"
+      "id": 6,
+      "name": "fintech_balance_sheet_model",
+      "prompt": "Fintech lending startupのモデルを作りたい。融資実行額、貸倒、回収、資金調達コスト、warehouse line、規制資本、営業人員、運転資本、希薄化、downside case、投資家向けKPIとIC memoを含めてください。",
+      "expected_output": "Generic fintech/balance-sheet model whose assumptions start from origination, credit loss, collection, funding cost, capital constraints, and covenant or warehouse capacity rather than software ARR defaults.",
+      "files": [],
+      "applicable_references": [
+        "_generic_composition_protocol",
+        "_modeling_kernel",
+        "_coverage_universe",
+        "_assumption_decomposition_patterns",
+        "_kpi_analytics",
+        "_scenario_sensitivity_playbook",
+        "_valuation_and_return_logic",
+        "_ic_memo_depth",
+        "_benchmark_protocol",
+        "_layout_canonical",
+        "_ib_workbook_design_system",
+        "_sheet_quality_rubric",
+        "_self_review_protocol"
+      ],
+      "assertions": [
+        {
+          "id": "F1",
+          "text": "Where lending, regulatory, or warehouse mechanics are evidenced, the driver tree separates origination, loss rate, collection timing, funding cost, regulatory capital, and warehouse/debt capacity",
+          "type": "logic"
+        },
+        {
+          "id": "F2",
+          "text": "KPI selection includes credit quality, funding spread, capital adequacy, runway, and covenant or warehouse headroom where relevant rather than importing software defaults",
+          "type": "metric"
+        },
+        {
+          "id": "F3",
+          "text": "Scenarios coherently pressure the evidenced balance-sheet drivers, such as loss rate, funding availability, collection timing, and capital constraints",
+          "type": "scenario"
+        },
+        {
+          "id": "F4",
+          "text": "Memo states evidence gaps and DD questions around credit performance, funding terms, regulation, and downside liquidity",
+          "type": "memo"
+        },
+        {
+          "id": "XLSX_DESIGN",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, terminal Comment columns after the final period/value column on standard period sheets, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_FONT_HIERARCHY",
+          "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
+        }
+      ]
     },
     {
-     "id": "A7",
-     "text": "P&L, BS, CF, Cap Table, and Summary each carry at least one numeric check row (0 = OK, OK/ERROR format); Summary consolidates every registered check into a master check",
-     "type": "quality"
+      "id": 7,
+      "name": "ambiguous_generic_startup_memo",
+      "prompt": "事業概要だけが曖昧なスタートアップメモから、まず投資判断に必要な収支モデルの設計とAssumption registerを作って。まだ業態は決め打ちしないで、必要ならxlsxではなくmd/csvでもよいです。",
+      "expected_output": "Non-overfit model spec or assumption register that identifies decision, unknowns, candidate mechanics, independent drivers, evidence gaps, and validation plan before forcing a workbook.",
+      "files": [],
+      "applicable_references": [
+        "_generic_composition_protocol",
+        "_modeling_kernel",
+        "_coverage_universe",
+        "_assumption_decomposition_patterns",
+        "_output_modes",
+        "_sheet_quality_rubric",
+        "_self_review_protocol",
+        "_layout_canonical",
+        "_ib_workbook_design_system"
+      ],
+      "assertions": [
+        {
+          "id": "G1",
+          "text": "The response does not force hardware, SaaS, marketplace, or any other mechanic without evidence",
+          "type": "consistency"
+        },
+        {
+          "id": "G2",
+          "text": "Variable selection ranks candidate drivers by decision relevance, impact, evidence weakness, controllability, time variability, and investor scrutiny",
+          "type": "logic"
+        },
+        {
+          "id": "G3",
+          "text": "Assumption register separates source facts, selected assumptions, explanatory drivers, checks, dependent formulas, and decision outputs",
+          "type": "structure"
+        },
+        {
+          "id": "G4",
+          "text": "Output shape is the smallest complete artifact rather than a forced full workbook",
+          "type": "structure"
+        },
+        {
+          "id": "XLSX_DESIGN",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, terminal Comment columns after the final period/value column on standard period sheets, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_FONT_HIERARCHY",
+          "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
+        }
+      ]
     },
     {
-     "id": "A8",
-     "text": "Financing shows Sources & Uses with a cumulative-consistency check, post-raise runway floor check (>= 18 months), and a live downside funding gap",
-     "type": "logic"
+      "id": 8,
+      "name": "existing_workbook_repair_visible_readability",
+      "prompt": "既存のstartup financial model xlsxを監査して修正してください。文字が見切れる、空白セルがオーバーフローを止める、単位列の配置がバラバラ、ハイライトが多すぎる、ソースがfakeっぽい、KPI/IC memoが浅いです。",
+      "expected_output": "Audit and repair report or patched workbook with concrete sheet/cell findings, visible readability fixes, source hygiene fixes, and deeper analysis guidance for KPI and memo surfaces.",
+      "files": [
+        "xlsx"
+      ],
+      "applicable_references": [
+        "_layout_canonical",
+        "_ib_workbook_design_system",
+        "_benchmark_protocol",
+        "_kpi_analytics",
+        "_ic_memo_depth",
+        "_sheet_quality_rubric",
+        "_self_review_protocol"
+      ],
+      "assertions": [
+        {
+          "id": "H1",
+          "text": "Findings cite concrete sheet/cell locations and distinguish style blockers from formula/modeling issues",
+          "type": "audit"
+        },
+        {
+          "id": "H2",
+          "text": "Blank cells intended for overflow remain genuinely blank and unstyled after repair",
+          "type": "implementation"
+        },
+        {
+          "id": "H2a",
+          "text": "Hierarchy / indent columns render as 20px in Google Sheets (exactly 2.14 xlsx width), with no native Excel indent, no leading-space indentation, no merged cells, no frozen panes, and no generated text wrapping; visible wrap/tall-text rows are audited by role and right-side blank unstyled overflow cells, and any user-approved bounded table prose wrapping or manual-line-break exception has row height matched exactly to the rendered visible line count",
+          "type": "implementation"
+        },
+        {
+          "id": "H2b",
+          "text": "Sheet canvases and print areas stop at the real used range, with no styled trailing rows or columns that create extra rendered pages",
+          "type": "implementation"
+        },
+        {
+          "id": "H2c",
+          "text": "Borders and background fills form a calm repeated design system instead of noisy isolated cell decoration; semantic rows and section headers use rectangular column-consistent fill and border spans chosen from the attached table/block, intentionally style blank cells inside that span, and never repeat the same non-heatmap fill or heavy border pattern, per-row gridline border, memo-cell border, or ragged populated-cell-only rule across consecutive rows without a structural reason",
+          "type": "design"
+        },
+        {
+          "id": "H2d",
+          "text": "Charts, drawings, and newly inserted rows or cells remain inside an editable rendered canvas without inheriting noisy blank styles",
+          "type": "implementation"
+        },
+        {
+          "id": "H3",
+          "text": "Source fields use traceable sources or evidence status and avoid fake assumptions/analysis labels",
+          "type": "evidence"
+        },
+        {
+          "id": "H4",
+          "text": "KPI and memo gaps are repaired or translated into explicit decision interpretation and DD questions",
+          "type": "memo"
+        },
+        {
+          "id": "XLSX_DESIGN",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, terminal Comment columns after the final period/value column on standard period sheets, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_FONT_HIERARCHY",
+          "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
+        }
+      ]
     },
     {
-     "id": "XLSX_DESIGN",
-     "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
-     "type": "design"
+      "id": 9,
+      "name": "weak_evidence_pricing_register",
+      "prompt": "価格設定の根拠がまだ弱いAIサービスです。顧客ROI、業務削減時間、支払意思、サポート負荷、粗利、解約リスク、営業サイクルを使って、まずAssumption registerと検証計画を作ってください。",
+      "expected_output": "Focused assumption register and validation plan that deepens weak pricing evidence without bloating into a full company workbook.",
+      "files": [],
+      "applicable_references": [
+        "_generic_composition_protocol",
+        "_assumption_decomposition_patterns",
+        "_kpi_analytics",
+        "_scenario_sensitivity_playbook",
+        "_output_modes",
+        "_sheet_quality_rubric",
+        "_self_review_protocol",
+        "_layout_canonical",
+        "_ib_workbook_design_system"
+      ],
+      "assertions": [
+        {
+          "id": "I1",
+          "text": "Selected price is decomposed into independent value, willingness-to-pay, cost floor, margin, support load, and retention-risk primitives",
+          "type": "logic"
+        },
+        {
+          "id": "I2",
+          "text": "Evidence strength controls decomposition depth and weak assumptions are carried into validation tests",
+          "type": "evidence"
+        },
+        {
+          "id": "I3",
+          "text": "Sensitivity axes are chosen from pricing uncertainty and decision impact, not from a fixed default grid",
+          "type": "scenario"
+        },
+        {
+          "id": "I4",
+          "text": "Artifact remains focused and does not force irrelevant full three-statement sheets",
+          "type": "structure"
+        },
+        {
+          "id": "XLSX_DESIGN",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, terminal Comment columns after the final period/value column on standard period sheets, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_FONT_HIERARCHY",
+          "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
+        }
+      ]
     },
     {
-     "id": "XLSX_SHEET_QUALITY",
-     "type": "quality",
-     "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
+      "id": 10,
+      "name": "misleading_label_hybrid_startup",
+      "prompt": "AI SaaSと呼んでいるが、実態はハードウェア導入、保守、リース、利用料が混ざるスタートアップです。資金調達向けモデルを作ってください。",
+      "expected_output": "Hybrid driver model that composes recurring, asset, service, lease, and deployment-capacity mechanics from primitives rather than forcing a pure SaaS template.",
+      "files": [],
+      "applicable_references": [
+        "_generic_composition_protocol",
+        "_modeling_kernel",
+        "_assumption_decomposition_patterns",
+        "_kpi_analytics",
+        "_scenario_sensitivity_playbook",
+        "_valuation_and_return_logic",
+        "_ic_memo_depth",
+        "_output_modes",
+        "_layout_canonical",
+        "_ib_workbook_design_system",
+        "_sheet_quality_rubric",
+        "_self_review_protocol"
+      ],
+      "assertions": [
+        {
+          "id": "J1",
+          "text": "The model selects economic units from evidenced revenue/cost/capital flows instead of the SaaS label alone",
+          "type": "consistency"
+        },
+        {
+          "id": "J2",
+          "text": "KPI and scenario axes include deployment capacity, utilization, service burden, capex or lease availability, and runway where relevant",
+          "type": "metric"
+        },
+        {
+          "id": "J3",
+          "text": "Valuation and memo explain why SaaS multiples alone are insufficient if hardware/service economics drive risk",
+          "type": "valuation"
+        },
+        {
+          "id": "XLSX_DESIGN",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, terminal Comment columns after the final period/value column on standard period sheets, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_FONT_HIERARCHY",
+          "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
+        }
+      ]
     },
     {
-     "id": "XLSX_WRAP_DISCIPLINE",
-     "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
-     "type": "design"
+      "id": 11,
+      "name": "economic_coherence_K_set",
+      "prompt": "構造化YAMLで customers / churn_rate / mechanic profile / 税率を含む 5年収支計画を作って。経常収益の installed base は customers に追従し、churn の変動は終端 ARR に伝播し、欠損金は将来課税に NOL として吸収され、hardware/RaaS プランでは marketplace 系収益行 (transaction / take rate / GMV) を生成しないこと。",
+      "expected_output": "Recurring revenue tracks the structured customers series, ending units honor churn_rate, cumulative cash tax never exceeds the NOL-aware ceiling, hardware/RaaS plans suppress off-mechanics rows, and audit_economic_coherence catches violations of these invariants.",
+      "files": [
+        "input_yaml"
+      ],
+      "applicable_references": [
+        "_modeling_kernel",
+        "_assumption_decomposition_patterns",
+        "_kpi_analytics",
+        "_self_review_protocol",
+        "_layout_canonical",
+        "_ib_workbook_design_system",
+        "_sheet_quality_rubric"
+      ],
+      "assertions": [
+        {
+          "id": "K1",
+          "type": "consistency",
+          "text": "Recurring revenue uses the structured customers[t] series as the installed base when YAML provides it, not the implicit ramp from ending_units(new_units)."
+        },
+        {
+          "id": "K2",
+          "type": "consistency",
+          "text": "Changing facts.churn_rate moves the ending-unit rollforward and the terminal ARR — churn_rate is not a display-only field, it feeds the fleet model."
+        },
+        {
+          "id": "K3",
+          "type": "consistency",
+          "text": "Stated non-equity financing (grants, convertibles, lease financing, customer advances, secondary, debt and amortization schedules) reaches the FCF projection and the equity-round sizing: grants/converts/lease add ending cash and reduce auto-sized equity, converts and lease accrue interest with debt on a declining balance equal to cumulative draws minus cumulative contractual repayments, customer advances shift cash timing through working capital without double-counting as funding, secondary subtracts cash and requires a concurrent equity round, repayments never exceed cumulative draws, and the balance sheet still balances with every instrument non-zero."
+        },
+        {
+          "id": "K4",
+          "type": "consistency",
+          "text": "Net operating losses (NOL) carry forward and absorb subsequent taxable income, so cumulative cash tax over the plan never exceeds tax_rate × max(0, cumulative pre-tax income)."
+        },
+        {
+          "id": "K5",
+          "type": "consistency",
+          "text": "Hardware / RaaS / asset-heavy plans suppress off-mechanics rows: gmv_yen, take_rate, and transaction revenue are zero — these rows are generated only when a marketplace mechanic is evidenced."
+        },
+        {
+          "id": "K6",
+          "type": "evidence",
+          "text": "Material revenue whose demand drivers were never pinned by a structured input is flagged through the non-blocking warnings channel (audit_economic_warnings) as provenance resting on profile or narrative-scale defaults, routed to validation / DD instead of being presented as evidence."
+        },
+        {
+          "id": "K8",
+          "type": "quality",
+          "text": "A stated target_gross_margin outside the modelable 5%-95% range is clamped for computation but surfaced as a K8 warning (derivation_warnings via audit_economic_warnings) instead of silently rewriting the user's input; strict-audit builds print the warning without failing."
+        },
+        {
+          "id": "K7",
+          "type": "quality",
+          "text": "audit_economic_coherence detects violations of K1 / K2 / K3 / K4 / K5 (input-fidelity drift, ignored churn, financing incoherence such as secondary without a concurrent round, double-taxation under NOL, off-mechanics noise) so a strict-audit build refuses to ship a plan that breaks any of these invariants."
+        },
+        {
+          "id": "XLSX_DESIGN",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, terminal Comment columns after the final period/value column on standard period sheets, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_FONT_HIERARCHY",
+          "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
+        }
+      ]
     },
     {
-     "id": "XLSX_FONT_HIERARCHY",
-     "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
-     "type": "design"
+      "id": 12,
+      "name": "ai_prompt_research_to_auditable_model_gates",
+      "prompt": "XやAIエージェント界隈で見かけるfinancial modeling promptを汎用化し、投資銀行スタイルのスタートアップ収支計画スキルに組み込んで。バズっているプロンプトの言い回しではなく、前提、根拠、監査、Fully Dilutedリターン、xlsxの見た目まで検証できる形にして。",
+      "expected_output": "Prompt research is converted into a reusable prompt contract, not copied verbatim. Public agent-workflow ideas become source-bound model gates for decision purpose, evidence status, economic kernel, assumptions, workbook design, financing, FD ownership/returns, valuation, and strict audit.",
+      "files": [],
+      "applicable_references": [
+        "_ai_prompt_research_patterns",
+        "_skill_invocation_protocol",
+        "_self_review_protocol",
+        "_assumption_decomposition_patterns",
+        "_valuation_and_return_logic",
+        "_layout_canonical",
+        "_ib_workbook_design_system",
+        "_sheet_quality_rubric"
+      ],
+      "assertions": [
+        {
+          "id": "AI_PROMPT_RESEARCH_SYNTHESIS",
+          "type": "research",
+          "text": "X/Twitter or AI-agent prompt research is synthesized into reusable model gates and explicitly treated as workflow signal, not financial evidence."
+        },
+        {
+          "id": "AI_PROMPT_CONTRACT",
+          "type": "workflow",
+          "text": "Reusable prompts require decision user, evidence packet, economic kernel, driver tree, workbook design gates, financing/FD ownership logic, valuation/return logic, and closeout audit."
+        },
+        {
+          "id": "AI_PROMPT_TO_CHECKLIST",
+          "type": "quality",
+          "text": "Any public/generic prompt claim is converted into unsupported part, required evidence, required formula/check, target sheet/row, and closeout verification."
+        },
+        {
+          "id": "AI_PROMPT_NO_COPYPASTE",
+          "type": "evidence",
+          "text": "The skill rejects copying public prompt phrasing or AI product marketing into the model unless it is translated into source status, formulas, checks, and rendered workbook inspection."
+        },
+        {
+          "id": "XLSX_DESIGN",
+          "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, terminal Comment columns after the final period/value column on standard period sheets, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_WRAP_DISCIPLINE",
+          "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_FONT_HIERARCHY",
+          "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
+          "type": "design"
+        },
+        {
+          "id": "XLSX_SHEET_QUALITY",
+          "type": "quality",
+          "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
+        }
+      ]
     }
-   ]
-  },
-  {
-   "id": 2,
-   "name": "focused_pricing_module",
-   "prompt": "新しいAIプロダクトの価格を決めたい。顧客ROI、原価、粗利、サポート負荷、値上げ余地を踏まえた価格レンジと、投資家に説明できる根拠をExcelで。",
-   "expected_output": "Lean pricing bundle — exactly Guide, Assumptions, Pricing, Summary (4 tabs, no transitive expansion). Pricing sheet links selected price, customer ROI, value-capture share, cost-to-serve, cost-plus floor, support ratio, and a pass/DD-gate status, plus a row-wise validation plan.",
-   "files": [],
-   "applicable_references": [
-    "_assumption_decomposition_patterns",
-    "_ib_workbook_design_system",
-    "_kpi_analytics",
-    "_layout_canonical",
-    "_modeling_kernel",
-    "_output_modes",
-    "_self_review_protocol",
-    "_self_improvement_protocol",
-    "_sheet_quality_rubric",
-    "_terminology"
-   ],
-   "assertions": [
-    {
-     "id": "A1",
-     "text": "Bundle is exactly Guide, Assumptions, Pricing, Summary — a focused pricing request does not drag in the full 12-sheet workbook",
-     "type": "structure"
-    },
-    {
-     "id": "A2",
-     "text": "Selected price, customer ROI, value capture, value-based price, cost-to-serve, cost-plus floor, and price support ratio are linked by formulas back to Assumptions inputs (blue) — not restated constants",
-     "type": "calculation"
-    },
-    {
-     "id": "A3",
-     "text": "Price support ratio >= 1x reads as headroom and the pricing gate row flips between pass and DD gate against the stated validation hurdle",
-     "type": "logic"
-    },
-    {
-     "id": "A4",
-     "text": "Pricing validation plan lists WTP/LOI, pilot conversion, packaging ladder, and renewal-risk tests row-wise with thresholds and owners — without widening period columns",
-     "type": "structure"
-    },
-    {
-     "id": "A5",
-     "text": "Summary stays compact for the focused bundle: it rolls up only the sheets that exist and the master check covers the registered checks",
-     "type": "quality"
-    },
-    {
-     "id": "XLSX_DESIGN",
-     "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_SHEET_QUALITY",
-     "type": "quality",
-     "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
-    },
-    {
-     "id": "XLSX_WRAP_DISCIPLINE",
-     "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_FONT_HIERARCHY",
-     "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
-     "type": "design"
-    }
-   ]
-  },
-  {
-   "id": 3,
-   "name": "cap_table_jkiss_dilution",
-   "prompt": "J-KISSで5,000万円調達済み。シリーズAで4億円(ポスト20億円)を調達すると、創業者の持分と議決権はどうなる?SOプール12%も維持したい。資本政策表をExcelで。",
-   "expected_output": "cap_table mode keeps its 3-sheet state machine (Guide + Kernel + Ownership) with J-KISS conversion at the round, founder issued/FD ownership by round, voting-threshold flags, SO pool range check, and a 100% consistency check.",
-   "files": [],
-   "applicable_references": [
-    "_ib_workbook_design_system",
-    "_layout_canonical",
-    "_modeling_kernel",
-    "_output_modes",
-    "_self_review_protocol",
-    "_self_improvement_protocol",
-    "_sheet_quality_rubric",
-    "_terminology",
-    "_valuation_and_return_logic"
-   ],
-   "assertions": [
-    {
-     "id": "A1",
-     "text": "cap_table mode produces the Guide + Kernel + Ownership state-machine surface, not the full 12-sheet workbook",
-     "type": "structure"
-    },
-    {
-     "id": "A2",
-     "text": "J-KISS / convertible instruments convert at the priced round under their cap/discount terms and appear in the fully-diluted share count",
-     "type": "calculation"
-    },
-    {
-     "id": "A3",
-     "text": "Founder ownership is shown both issued and fully diluted per round, and the round where founder FD% crosses 66.67% / 50.01% / 33.34% voting thresholds is flagged",
-     "type": "metric"
-    },
-    {
-     "id": "A4",
-     "text": "SO pool is checked against the 10-15% convention band and the ownership total reconciles to 100% with an explicit check",
-     "type": "quality"
-    },
-    {
-     "id": "A5",
-     "text": "Pre-money, post-money, price per share, and new shares are internally consistent formulas (post = pre + investment; shares = investment / price)",
-     "type": "calculation"
-    },
-    {
-     "id": "XLSX_DESIGN",
-     "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_SHEET_QUALITY",
-     "type": "quality",
-     "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
-    },
-    {
-     "id": "XLSX_WRAP_DISCIPLINE",
-     "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_FONT_HIERARCHY",
-     "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
-     "type": "design"
-    }
-   ]
-  },
-  {
-   "id": 4,
-   "name": "burn_runway_monthly_window",
-   "prompt": "手元現金1.2億円、シード2.5億円調達直後。月次でバーンとランウェイを24ヶ月分見たい。いつ資金がショートするかも。",
-   "expected_output": "burn_runway bundle (Guide, Assumptions, CF, Financing, Summary) on a monthly-first axis anchored to the fiscal year in progress. CF carries a compact operating block (no P&L in the bundle), ending cash, runway months, and a cash-shortfall check; Financing verifies post-raise runway.",
-   "files": [],
-   "applicable_references": [
-    "_ib_workbook_design_system",
-    "_input_schema",
-    "_kpi_analytics",
-    "_layout_canonical",
-    "_modeling_kernel",
-    "_output_modes",
-    "_self_review_protocol",
-    "_self_improvement_protocol",
-    "_sheet_quality_rubric"
-   ],
-   "assertions": [
-    {
-     "id": "A1",
-     "text": "Bundle is exactly Guide, Assumptions, CF, Financing, Summary and defaults to a monthly-window axis (hybrid) when no grain is stated — anchored so the first fiscal year is not fully in the past at run time",
-     "type": "structure"
-    },
-    {
-     "id": "A2",
-     "text": "CF computes revenue, cost, and people lines in a compact in-sheet operating block referencing Assumptions directly — it does not reference a P&L sheet that is not in the bundle",
-     "type": "logic"
-    },
-    {
-     "id": "A3",
-     "text": "Runway months divides ending cash by the period-normalized burn (using the months ruler), floors at zero burn (cap), and a cash-shortfall check flags any period with negative ending cash",
-     "type": "calculation"
-    },
-    {
-     "id": "A4",
-     "text": "Financing events land in the fiscal year's first monthly column (期首調達) rather than smearing across months, and post-raise runway is checked against the >= 18-month floor",
-     "type": "logic"
-    },
-    {
-     "id": "A5",
-     "text": "Monthly labels are real calendar months (YYYY/MM) and monthly-window totals reconcile to fiscal-year totals via a bridge check",
-     "type": "quality"
-    },
-    {
-     "id": "XLSX_DESIGN",
-     "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_SHEET_QUALITY",
-     "type": "quality",
-     "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
-    },
-    {
-     "id": "XLSX_WRAP_DISCIPLINE",
-     "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_FONT_HIERARCHY",
-     "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
-     "type": "design"
-    }
-   ]
-  },
-  {
-   "id": 5,
-   "name": "ma_exit_buyer_view",
-   "prompt": "事業会社への売却を検討中。買い手目線のバリュエーションレンジ、優先分配後の創業者・投資家の手取り、MOICをExcelで整理して。",
-   "expected_output": "ma_exit bundle (Guide, Assumptions, Valuation & Exit, IC Memo). Valuation & Exit uses dedicated Low/Mid/High method-matrix columns (never period columns), credibility and use-when per method, a selected EV range, an exit waterfall through preferences, and MOIC that renders '-' when invested is zero.",
-   "files": [],
-   "applicable_references": [
-    "_benchmark_protocol",
-    "_ib_workbook_design_system",
-    "_ic_memo_depth",
-    "_layout_canonical",
-    "_output_modes",
-    "_self_review_protocol",
-    "_self_improvement_protocol",
-    "_sheet_quality_rubric",
-    "_terminology",
-    "_valuation_and_return_logic"
-   ],
-   "assertions": [
-    {
-     "id": "A1",
-     "text": "Bundle is exactly Guide, Assumptions, Valuation & Exit, IC Memo — buyer-view valuation does not require the operating engine sheets",
-     "type": "structure"
-    },
-    {
-     "id": "A2",
-     "text": "Method matrix rows (revenue multiple, GP multiple, EBITDA multiple, DCF) carry Low/Mid/High in dedicated columns with per-method credibility and use-when guidance, kept separate from any period axis",
-     "type": "structure"
-    },
-    {
-     "id": "A3",
-     "text": "Exit waterfall walks EV -> net debt -> transaction costs -> preference stack -> common pool -> founder/investor proceeds, and MOIC shows '-' (not a divide-by-zero or MAX(1,x) hack) when invested capital is zero",
-     "type": "calculation"
-    },
-    {
-     "id": "A4",
-     "text": "Downside / Base / Upside exit scenarios are shown and the IC Memo recommendation is gated on the return hurdle and valuation support rather than hardcoded prose",
-     "type": "logic"
-    },
-    {
-     "id": "A5",
-     "text": "IC Memo covers recommendation, thesis, KPI readout, funding & dilution, valuation & return, what-must-be-true, downside triggers, ranked DD gates, and walk-away conditions",
-     "type": "memo"
-    },
-    {
-     "id": "XLSX_DESIGN",
-     "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_SHEET_QUALITY",
-     "type": "quality",
-     "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
-    },
-    {
-     "id": "XLSX_WRAP_DISCIPLINE",
-     "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_FONT_HIERARCHY",
-     "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
-     "type": "design"
-    }
-   ]
-  },
-  {
-   "id": 6,
-   "name": "market_sizing_isolation",
-   "prompt": "国内の建設DX市場でTAM/SAM/SOMを整理したい。うちの計画シェアが過大でないかも確認したい。Excelで。",
-   "expected_output": "market_sizing bundle (Guide + Evidence). TAM/SAM/SOM live on Evidence as sourced blue inputs with freshness, the final-year share sanity check reads Summary -> Evidence one way only, and missing sources surface as DD-gap rows instead of placeholders.",
-   "files": [],
-   "applicable_references": [
-    "_benchmark_protocol",
-    "_coverage_universe",
-    "_ib_workbook_design_system",
-    "_layout_canonical",
-    "_output_modes",
-    "_self_review_protocol",
-    "_self_improvement_protocol",
-    "_sheet_quality_rubric",
-    "_terminology"
-   ],
-   "assertions": [
-    {
-     "id": "A1",
-     "text": "Bundle is exactly Guide + Evidence — market sizing is an evidence surface, not a revenue driver",
-     "type": "structure"
-    },
-    {
-     "id": "A2",
-     "text": "TAM/SAM/SOM are blue inputs with source and as-of date; market size never feeds the revenue chain (isolation is one-way: cross-checks reference the market, the engine does not)",
-     "type": "logic"
-    },
-    {
-     "id": "A3",
-     "text": "Missing or failed external evidence is visible as explicit rows (failed fetch status, 'No external evidence provided — DD gap') — no fabricated SRC-xx placeholders",
-     "type": "evidence"
-    },
-    {
-     "id": "A4",
-     "text": "Market sanity includes a final-year plan-share readout with an interpretation threshold (share above ~30% of SOM needs explicit share-gain evidence)",
-     "type": "metric"
-    },
-    {
-     "id": "XLSX_DESIGN",
-     "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_SHEET_QUALITY",
-     "type": "quality",
-     "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
-    },
-    {
-     "id": "XLSX_WRAP_DISCIPLINE",
-     "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_FONT_HIERARCHY",
-     "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
-     "type": "design"
-    }
-   ]
-  },
-  {
-   "id": 7,
-   "name": "narrative_source_route",
-   "prompt": "添付のエクイティストーリー(Markdown)から、資金調達に使える財務モデルをExcelで作って。",
-   "expected_output": "--source-md narrative route produces the same v2 full 12-sheet bundle (annual grain by default). Stated facts (customer target, monthly price, raise size, gross-margin target) are extracted into the kernel and every generated default is labeled by evidence status.",
-   "files": [
-    "source_md"
-   ],
-   "applicable_references": [
-    "_assumption_decomposition_patterns",
-    "_generic_composition_protocol",
-    "_ib_workbook_design_system",
-    "_kpi_analytics",
-    "_layout_canonical",
-    "_modeling_kernel",
-    "_self_review_protocol",
-    "_self_improvement_protocol",
-    "_sheet_quality_rubric",
-    "_skill_invocation_protocol",
-    "_terminology"
-   ],
-   "assertions": [
-    {
-     "id": "A1",
-     "text": "The narrative route builds the same v2 full bundle as the structured route — 12 sheets, v2 header contract, master check — with the annual grain by default",
-     "type": "structure"
-    },
-    {
-     "id": "A2",
-     "text": "Stated narrative facts (customer target, monthly price, raise size, target gross margin, stated fiscal years) are extracted and drive the kernel; the demand ramp reaches the stated targets",
-     "type": "logic"
-    },
-    {
-     "id": "A3",
-     "text": "Every assumption row carries an evidence status (actual / benchmark / management target / estimate / placeholder) and unstated defaults are labeled, not presented as sourced facts",
-     "type": "evidence"
-    },
-    {
-     "id": "A4",
-     "text": "Mechanic detection composes drivers from the narrative (recurring vs marketplace vs asset-heavy) without emitting off-mechanics template rows",
-     "type": "logic"
-    },
-    {
-     "id": "XLSX_DESIGN",
-     "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_SHEET_QUALITY",
-     "type": "quality",
-     "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
-    },
-    {
-     "id": "XLSX_WRAP_DISCIPLINE",
-     "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_FONT_HIERARCHY",
-     "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
-     "type": "design"
-    }
-   ]
-  },
-  {
-   "id": 8,
-   "name": "usd_annual_generic",
-   "prompt": "US市場向けのB2B SaaS、通貨はUSDで5年の年次プランをExcelで。$250K ARPAクラスのエンタープライズ向け。",
-   "expected_output": "USD annual full workbook: FY-labeled annual axis, USD scale ladder ($ / $K / $M with accounting formats), generic parameters (no JP-only rows unless stated), and the same v2 contract (freeze, rulers, checks, master check).",
-   "files": [],
-   "applicable_references": [
-    "_ib_workbook_design_system",
-    "_input_schema",
-    "_layout_canonical",
-    "_modeling_kernel",
-    "_output_modes",
-    "_self_review_protocol",
-    "_self_improvement_protocol",
-    "_sheet_quality_rubric",
-    "_terminology"
-   ],
-   "assertions": [
-    {
-     "id": "A1",
-     "text": "currency: USD flips number formats to the USD accounting ladder ($ / $K / $M) and unit labels to match — cell values stay raw base-currency amounts, scale lives only in the number format",
-     "type": "implementation"
-    },
-    {
-     "id": "A2",
-     "text": "Annual grain keeps FY period labels and a 12-months ruler per column; no monthly window is rendered when not requested",
-     "type": "structure"
-    },
-    {
-     "id": "A3",
-     "text": "JP-specific rows (消費税, 法定福利費, 回収・支払サイト) do not appear unless stated in the input",
-     "type": "structure"
-    },
-    {
-     "id": "A4",
-     "text": "The v2 contract holds unchanged in USD: F7 freeze, uniform period width, check rows, master check echo, R17 formula uniformity",
-     "type": "quality"
-    },
-    {
-     "id": "XLSX_DESIGN",
-     "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_SHEET_QUALITY",
-     "type": "quality",
-     "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
-    },
-    {
-     "id": "XLSX_WRAP_DISCIPLINE",
-     "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_FONT_HIERARCHY",
-     "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
-     "type": "design"
-    }
-   ]
-  },
-  {
-   "id": 9,
-   "name": "scenario_toggle_mechanism",
-   "prompt": "このモデル、シナリオを切り替えたら数字全体が動くようにしてほしい。ダウンサイドで資金がどれだけ追加で要るかも見たい。",
-   "expected_output": "Scenario mechanism: Assumptions carries a Scenario settings block (Downside/Base/Upside case columns), a blue 1/2/3 toggle, and INDEX-driven effective-scale rows that the engine formulas multiply. Summary shows the 3-case generator snapshot, a downside funding gap, and a snapshot staleness check against the live model.",
-   "files": [],
-   "applicable_references": [
-    "_ib_workbook_design_system",
-    "_kpi_analytics",
-    "_layout_canonical",
-    "_modeling_kernel",
-    "_scenario_sensitivity_playbook",
-    "_self_review_protocol",
-    "_self_improvement_protocol",
-    "_sheet_quality_rubric"
-   ],
-   "assertions": [
-    {
-     "id": "A1",
-     "text": "Assumptions ends with a Scenario settings block: per-driver Downside/Base/Upside scales, a blue scenario toggle (1/2/3), and effective-scale rows computed via INDEX over the case columns",
-     "type": "structure"
-    },
-    {
-     "id": "A2",
-     "text": "Engine rows (demand, price, variable cost, opex) multiply the effective-scale cells, so flipping the toggle changes computed engine values workbook-wide without editing formulas",
-     "type": "logic"
-    },
-    {
-     "id": "A3",
-     "text": "Summary shows a Downside/Base/Upside comparison as labeled generator snapshots (final-year revenue/EBITDA, minimum ending cash, additional funding needed) plus a sensitivity matrix snapshot with its assumption note",
-     "type": "metric"
-    },
-    {
-     "id": "A4",
-     "text": "A snapshot staleness check compares the Base snapshot against the live roll-up while the toggle sits on Base, and registers in the master check",
-     "type": "quality"
-    },
-    {
-     "id": "A5",
-     "text": "Scenario scales pressure the correct side: cost-labeled drivers raise costs in downside, financing capacity drivers do not inflate revenue",
-     "type": "logic"
-    },
-    {
-     "id": "XLSX_DESIGN",
-     "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_SHEET_QUALITY",
-     "type": "quality",
-     "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
-    },
-    {
-     "id": "XLSX_WRAP_DISCIPLINE",
-     "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_FONT_HIERARCHY",
-     "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
-     "type": "design"
-    }
-   ]
-  },
-  {
-   "id": 10,
-   "name": "evidence_dd_gap_visibility",
-   "prompt": "競合の上場企業マルチプルを取ってきて評価に使って。取れなかったらそれも分かるようにして。プライベートの調達事例も2件ある。",
-   "expected_output": "Evidence register with live public comps (ticker, EV, revenue multiple, as-of, applicability limits), provided private/transaction comps, FAILED fetches visible as failed rows that never pollute medians, and DD-gap rows where evidence is absent.",
-   "files": [],
-   "applicable_references": [
-    "_benchmark_protocol",
-    "_coverage_universe",
-    "_ib_workbook_design_system",
-    "_layout_canonical",
-    "_self_review_protocol",
-    "_self_improvement_protocol",
-    "_sheet_quality_rubric",
-    "_terminology",
-    "_valuation_and_return_logic"
-   ],
-   "assertions": [
-    {
-     "id": "A1",
-     "text": "Live comps appear on Evidence with ticker, source type, as-of date, applicability limits, and status; failed fetches are visible as failed rows and are excluded from applied medians",
-     "type": "evidence"
-    },
-    {
-     "id": "A2",
-     "text": "Provided private / transaction comps from the input are registered alongside public comps with their evidence status",
-     "type": "evidence"
-    },
-    {
-     "id": "A3",
-     "text": "Valid comparable medians flow into the valuation multiples; incomplete comps are registered but not used for medians",
-     "type": "calculation"
-    },
-    {
-     "id": "A4",
-     "text": "Where no external evidence exists the register says so explicitly ('No external evidence provided — DD gap') — the workbook never invents sources",
-     "type": "evidence"
-    },
-    {
-     "id": "A5",
-     "text": "Summary / IC readouts rank the weakest evidence and tie it to next diligence actions",
-     "type": "memo"
-    },
-    {
-     "id": "XLSX_DESIGN",
-     "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_SHEET_QUALITY",
-     "type": "quality",
-     "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
-    },
-    {
-     "id": "XLSX_WRAP_DISCIPLINE",
-     "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_FONT_HIERARCHY",
-     "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
-     "type": "design"
-    }
-   ]
-  },
-  {
-   "id": 11,
-   "name": "workbook_quality_gates",
-   "prompt": "生成したモデルが監査に耐えるかチェックして。列幅、フリーズ、単位と表示形式、行内の式の同型性、ハードコード、チェック行まで。",
-   "expected_output": "Strict audit + quality gates hold on every mode: uniform 11.5 period-column width, F7 freeze anchors, unit-label/number-format agreement, R17 row-formula consistency normalized in R1C1, hardcoded-constant whitelist ({0,1,-1,2,3,12,24,100,365,1000} + sub-1 tolerances), check-row presence with the Summary master check, bundle closure, and zero recalc errors.",
-   "files": [],
-   "applicable_references": [
-    "_ai_prompt_research_patterns",
-    "_ib_workbook_design_system",
-    "_layout_canonical",
-    "_modeling_kernel",
-    "_output_modes",
-    "_self_review_protocol",
-    "_self_improvement_protocol",
-    "_sheet_quality_rubric"
-   ],
-   "assertions": [
-    {
-     "id": "A1",
-     "text": "Strict audit fails builds with broken sheet references, missing sheet-quality markers, merged cells, wrap_text, manual line breaks, #REF!, or defined names",
-     "type": "quality"
-    },
-    {
-     "id": "A2",
-     "text": "Period-axis sheets freeze at the first period column row 7 and every period column is exactly 11.5 wide across all sheets",
-     "type": "implementation"
-    },
-    {
-     "id": "A2B",
-     "text": "Default-layout label, source/driver, and note columns are content-driven from the widest visible content for that role across the workbook, then applied as one consistent width per role; semantic fill/border spans stay table-local and do not fuse unrelated side-by-side tables.",
-     "type": "implementation"
-    },
-    {
-     "id": "A3",
-     "text": "Unit labels in column E agree with the row's number format (円/千円/百万円/十億円, $/$K/$M, %, x, months, FTE) — money scales must match exactly",
-     "type": "implementation"
-    },
-    {
-     "id": "A4",
-     "text": "Row formulas are copy-identical across period columns after R1C1 normalization, including across the monthly/annual grain boundary",
-     "type": "logic"
-    },
-    {
-     "id": "A5",
-     "text": "Formulas contain no numeric literals outside the structural whitelist; every economic constant traces to an input cell",
-     "type": "quality"
-    },
-    {
-     "id": "A6",
-     "text": "LibreOffice recalculation produces zero formula-error cells on representative builds",
-     "type": "quality"
-    },
-    {
-     "id": "A7",
-     "text": "Model creation is not completion — verify both model logic and sheet design with command-based workbook checks plus rendered-output inspection, fix the concrete failed items, and rerun the same checks until both pass",
-     "type": "quality"
-    },
-    {
-     "id": "AI_PROMPT_RESEARCH_SYNTHESIS",
-     "text": "Public AI-agent or prompt-workflow material is treated as workflow signal only: reusable ideas must become source-bound assumptions, formulas, checks, closeout inspection, or eval/rubric criteria, never financial evidence or fake provenance.",
-     "type": "quality"
-    },
-    {
-     "id": "SELF_IMPROVEMENT_PROTOCOL",
-     "text": "After artifact closeout, user improvement prompts, failed checks, retries, tool/log inefficiency, or cleanup noise, the skill inspects sanitized session evidence, separates one-off artifact fixes from reusable skill gaps, patches the lowest durable layer, adds regression proof, reruns the failed check plus a broader gate, and avoids raw logs, secrets, confidential source text, and source-specific overfitting.",
-     "type": "quality"
-    },
-    {
-     "id": "XLSX_DESIGN",
-     "text": "Any xlsx output follows the canonical workbook design tokens: Arial 10pt default/body font, semantic font colors, role-based alignment, Google-Sheets-safe column widths, compact row heights, no wrap/freeze/merge, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact row heights for approved bounded table prose exceptions, rectangular semantic fill and border spans including member blank cells, table-width row rules that start after hierarchy spacer columns, no per-row gridline borders, borderless memo/source/note cells, three semantic border styles, black border colors by default, no rainbow or decorative background fills, role-based sparse fill palette, no adjacent repeated prominent border rows, sparse non-consecutive accents, clean print/canvas bounds, and raw-value number formats, and sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation, and IB-style text positioning with left-aligned labels/sources/notes, right-aligned values/formulas/units, and centered period/scenario/matrix headers only, and IB-style font-size discipline with a 9/10/11/14pt generated cell palette and no 8pt squeezed cell text or 16pt+ presentation headings.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_SHEET_QUALITY",
-     "type": "quality",
-     "text": "Every included sheet has a sheet-specific purpose, traceable source/evidence boundary, necessary formulas or checks, explicit dependency logic to upstream sheets, and an output interpretation surface where the sheet informs a decision. Focused tasks include only sheets needed for the decision and required dependencies; they do not add full-workbook tabs merely because the template supports them."
-    },
-    {
-     "id": "XLSX_WRAP_DISCIPLINE",
-     "text": "Workbook text wrapping follows IB model discipline: generated cells keep wrap_text off by default; horizontal-read titles, instructions, notes, bullets, source caveats, and memo lines read through blank unmerged unstyled overflow cells; horizontal-read text is not trapped at the final print/render column or blocked by styled overflow cells; wrapping or manual line breaks appear only for user-approved bounded table prose with exact rendered visible-line-count row height and PDF/render verification.",
-     "type": "design"
-    },
-    {
-     "id": "XLSX_FONT_HIERARCHY",
-     "text": "Workbook cell typography follows a constrained IB hierarchy: Arial 10pt default/body/model cells, 9pt italic gray supporting source/note/unit-helper cells, 10-11pt bold compact section/header cells, and 14pt bold sheet-title cells only. Generated worksheet cells do not use 8pt squeezed text, 10.5pt or other improvised sizes, or 16pt+ presentation headings; crowded renders are fixed through layout, width, copy, or whitespace rather than shrinking text.",
-     "type": "design"
-    }
-   ]
-  },
-  {
-   "id": 12,
-   "name": "self_improvement_from_failed_session_log",
-   "prompt": "A prior startup-financial-modeling run produced an xlsx, then the user asked for an improvement. Sanitized failed command log: strict audit failed because period formulas diverged after a manual repair; a rerun passed after adding a row-formula consistency check. The run also included an X/public practitioner signal about traces becoming eval cases. Produce the skill-level self-improvement response, not a finance model.",
-   "expected_output": "A sanitized Reflection Record that classifies the issue as reusable, separates the artifact fix from the skill gap, names the lowest durable layer to patch, proposes a regression proof, strips raw logs/secrets/X handles, states why the lesson is invariant-shaped rather than company-specific, and identifies the broader gate to rerun before closeout.",
-   "files": [
-    "sanitized_failed_log"
-   ],
-   "applicable_references": [
-    "_self_improvement_protocol",
-    "_self_review_protocol",
-    "_skill_invocation_protocol",
-    "_ai_prompt_research_patterns"
-   ],
-   "assertions": [
-    {
-     "id": "SI1",
-     "text": "Output includes a Reflection Record with task type, artifact type, redacted evidence, observed failure, verification evidence, root-cause category, generalized lesson, proposed durable layer, privacy classification, and required regression proof.",
-     "type": "quality"
-    },
-    {
-     "id": "SI2",
-     "text": "The response classifies one-off artifact repair separately from a reusable skill gap and patches the lowest durable layer rather than only adding prose.",
-     "type": "quality"
-    },
-    {
-     "id": "SI3",
-     "text": "The response rejects raw logs, secrets, private source text, X handles, raw public-post quotes, company-specific facts, and numeric incident details from durable skill memory.",
-     "type": "privacy"
-    },
-    {
-     "id": "SI4",
-     "text": "The response maps the lesson to a deterministic regression proof and names the failed check plus one broader gate to rerun.",
-     "type": "implementation"
-    }
-   ]
-  },
-  {
-   "id": 13,
-   "name": "self_improvement_panel_rejects_schema_valid_degradation",
-   "prompt": "A prior SFM run has a structurally valid Reflection Record: it has all required fields, no secrets, no PII, no company-specific facts, and a nominal regression_proof. However the proposed lesson is vague ('always improve quality'), evidence is n=1, verification is manual review only, and the proposed change adds trigger prose instead of a deterministic gate. Produce the skill-level acceptance decision.",
-   "expected_output": "The record passes the structural privacy/overfit validator but is rejected before reflection by the independent reviewer panel. The response cites R2 verification weakness, R3 n=1/pruning weakness, R4 process-bloat risk, keeps validate_reflection_record/regression/privacy/human-review/git discipline intact, and records the item only as a sanitized deferred candidate unless stronger evidence and a regression proof appear.",
-   "files": [
-    "schema_valid_degraded_reflection_record"
-   ],
-   "applicable_references": [
-    "_self_improvement_protocol",
-    "_self_improvement_reviewer_panel",
-    "_self_improvement_failure_modes",
-    "_self_improvement_pruning",
-    "_skill_invocation_protocol"
-   ],
-   "assertions": [
-    {
-     "id": "PANEL1",
-     "text": "The answer preserves the existing structural validator as the first gate and explicitly says the validator is not replaced by the reviewer panel.",
-     "type": "quality"
-    },
-    {
-     "id": "PANEL2",
-     "text": "The answer rejects a validator-clean but semantically weak Reflection Record via independent panel scoring, with cited reasons under R1/R2/R3/R4 rather than uncited impressions.",
-     "type": "quality"
-    },
-    {
-     "id": "PANEL3",
-     "text": "The answer applies pruning discipline: n=1 evidence becomes a sanitized deferred candidate, not permanent doctrine, and the lowest durable layer rule is preserved.",
-     "type": "quality"
-    },
-    {
-     "id": "PANEL4",
-     "text": "The answer names a concrete regression_proof and broader gate required before acceptance, and does not weaken privacy, audit, human-review, or git-managed change requirements.",
-     "type": "implementation"
-    }
-   ]
-  },
-  {
-   "id": 14,
-   "name": "self_improvement_closeout_consistency_drift",
-   "prompt": "A skill-quality change added self-improvement references and updated eval counts. Before closeout, a sanitized review finds one local markdown link points to a missing reference and a declared count says four self-improvement references exist while only three files are present. Produce the closeout decision.",
-   "expected_output": "Closeout is blocked until the dangling local reference and count drift are fixed. The answer runs or cites a deterministic closeout consistency check, then asks an independent reviewer to inspect cross-references, frozen terms, duplicate rules, body bloat, and eval/gate cleanliness before declaring completion.",
-   "files": [
-    "closeout_protocol_markdown_fixture"
-   ],
-   "applicable_references": [
-    "_self_improvement_protocol",
-    "_self_improvement_reviewer_panel",
-    "_self_improvement_failure_modes",
-    "_self_improvement_pruning",
-    "_skill_invocation_protocol"
-   ],
-   "assertions": [
-    {
-     "id": "CLOSEOUT1",
-     "text": "The response treats dangling local references and declared-count drift as closeout blockers, not polish.",
-     "type": "quality"
-    },
-    {
-     "id": "CLOSEOUT2",
-     "text": "The response cites a deterministic closeout consistency check and an independent closeout read for cross-references, frozen terminology, duplicate guidance, body bloat, and eval/gate cleanliness.",
-     "type": "implementation"
-    },
-    {
-     "id": "CLOSEOUT3",
-     "text": "The response uses explicit convergence conditions: target score/gate met, no new reusable gap, or iteration bound with a deferred candidate.",
-     "type": "quality"
-    }
-   ]
-  },
-  {
-   "id": 15,
-   "name": "self_improvement_failure_modes_mitigated",
-   "prompt": "A proposed self-improvement change passes a small eval by copying synthetic examples into doctrine, narrows the process around one score, and claims the skill is now generic after three tuned examples. Produce the acceptance decision.",
-   "expected_output": "The change is rejected or held because it shows model-collapse, Goodhart/reward-hacking, and eval-overfit risks. The answer keeps human/artifact-derived evidence as the anchor, does not rely on one proxy score, requires privacy/audit gate sampling, and pairs any targeted regression with a broader gate or holdout/adversarial example.",
-   "files": [
-    "synthetic_only_improvement_proposal"
-   ],
-   "applicable_references": [
-    "_self_improvement_protocol",
-    "_self_improvement_reviewer_panel",
-    "_self_improvement_failure_modes",
-    "_self_improvement_pruning",
-    "_skill_invocation_protocol"
-   ],
-   "assertions": [
-    {
-     "id": "FAILMODE1",
-     "text": "The response identifies model collapse, reward hacking / Goodhart, sycophancy, eval overfit, or non-convergence where applicable.",
-     "type": "quality"
-    },
-    {
-     "id": "FAILMODE2",
-     "text": "The response ties mitigations to existing gates: validator privacy/overfit rejection, reviewer-panel evidence citations, broader gate rerun, and holdout/adversarial separation.",
-     "type": "implementation"
-    },
-    {
-     "id": "FAILMODE3",
-     "text": "The response does not let a small tuned eval set override privacy, audit, source discipline, regression proof, or artifact-quality checks.",
-     "type": "quality"
-    }
-   ]
-  },
-  {
-   "id": 16,
-   "name": "self_improvement_pruning_deferred_candidate",
-   "prompt": "A single user disliked a one-off model note and asks to make that preference a permanent SFM rule. The artifact can be fixed locally, but there is no repeated evidence, no invariant, and no regression proof yet. Produce the skill-level response.",
-   "expected_output": "The artifact issue is fixed locally, but the skill change is not reflected. The answer records at most a one-line sanitized deferred candidate, explains that reflecting nothing is a quality decision, and states what n>=2 evidence or failed-check/regression proof would be required to promote it.",
-   "files": [
-    "single_instance_user_preference"
-   ],
-   "applicable_references": [
-    "_self_improvement_protocol",
-    "_self_improvement_reviewer_panel",
-    "_self_improvement_failure_modes",
-    "_self_improvement_pruning",
-    "_skill_invocation_protocol"
-   ],
-   "assertions": [
-    {
-     "id": "PRUNE1",
-     "text": "The response separates artifact repair from durable skill change and treats not reflecting as an acceptable quality decision.",
-     "type": "quality"
-    },
-    {
-     "id": "PRUNE2",
-     "text": "The response keeps n=1 evidence as a sanitized deferred candidate and does not store raw logs, private source text, or company-specific details.",
-     "type": "privacy"
-    },
-    {
-     "id": "PRUNE3",
-     "text": "The response requires the lowest durable layer and a real regression proof before any future promotion.",
-     "type": "implementation"
-    }
-   ]
-  }
- ]
+  ],
+  "trigger_eval_queries_should_trigger": [
+    "このエクイティストーリーMarkdownを元に、現場向けAI機器を展開する資本集約型スタートアップの資金調達に向けた収支計画を作成してください。startup-financial-modelingスキルを使用してください。",
+    "まだ売上のない研究開発スタートアップです。24か月の資金繰り、助成金、転換社債、次回ラウンド、希薄化をExcelで見たいです。",
+    "MarketplaceのGMV、take rate、買い手/売り手コホート、販促費、運転資本、投資家向け説明を含むモデルを作ってください。",
+    "J-KISS 2.0 と Series A の転換、option pool、founder dilution、downside round を含むcap tableをExcelで出して。",
+    "上場前の複数事業スタートアップについて、連結三表、借入、リース、税金、SOTP valuation、セカンダリー、IPO前後の希薄化を見たい。",
+    "AIプロダクトの価格設定モデルを作りたい。顧客ROI、粗利、従量課金、営業サイクル、値上げ余地も含めて。",
+    "venture debt と equity round のtrade-offを runway、covenant、dilution、investor return の観点で比較したい。",
+    "founder secondary を含むM&A exit waterfallと税後手取り、投資家リターンを見たい。",
+    "Fintech lending startupの融資実行額、貸倒、資金調達コスト、warehouse line、規制資本を含むモデルを作って。",
+    "曖昧な事業メモから、業態を決め打ちせずにAssumption registerとモデル設計を作って。",
+    "既存のstartup financial model xlsxで文字見切れ、空白セル、単位列、KPI/IC memoの浅さを監査して修正して。",
+    "価格根拠が弱いAIサービスのAssumption registerと検証計画を作って。",
+    "Xで見たfinancial modeling promptを投資銀行スタイルの収支計画スキルに組み込んで。前提、監査、FDリターン、xlsxデザインまでチェックできる形にして。"
+  ],
+  "trigger_eval_queries_should_not_trigger": [
+    "競合SaaS上場企業の直近決算を読んで、business modelの文章解説だけしてほしい。",
+    "個人事業主の家計簿をExcelでまとめたい。確定申告用の経費仕訳が中心です。",
+    "上場企業の10-KからARRとNRRを抽出してCSVにまとめて。モデル化は不要です。",
+    "Series Aのterm sheet雛形が欲しい。数値計算はいりません。",
+    "VC向けpitch deckを10枚で作りたい。financialsは1枚の要約だけで十分です。",
+    "TAM/SAM/SOMの市場規模算定だけ知りたい。財務モデルは別で作ります。",
+    "M&Aのvirtual data roomのフォルダ構成とDD checklistが欲しい。モデル本体は不要です。",
+    "Cap table管理SaaSの比較をしてください。価格と機能の説明だけでいいです。"
+  ],
+  "notes": [
+    "The core regression is generic composition from economic kernel and driver tree.",
+    "Maturity, sector, and funding context are evidence fields, not template selectors.",
+    "All xlsx outputs should preserve raw base-currency money storage, unit integrity, no merged cells, no text wrapping, no unnecessary wrapping on horizontal-read titles/instructions/notes/bullets/source caveats when blank unmerged unstyled overflow cells are available, exact rendered visible line-count row heights for approved bounded table prose wrap/line-break exceptions, no frozen panes, Google-Sheets-20px hierarchy / indent columns, sparse rectangular semantic fill/border spans aligned to attached table/block row components including blank member cells while keeping hierarchy spacer columns and memo/source/note cells borderless, direct formulas, and editable workbook structure.",
+    "Prompt guidance must force sheet-specific quality gates, assumption epistemology, KPI interpretation, coherent scenarios, valuation method credibility, clean-base memo writing, benchmark/source hygiene, and self-inspection before completion.",
+    "Model creation is not completion: agents must verify both model logic and sheet design with command-based workbook checks plus rendered-output inspection, then fix and rerun until both are sufficient or a real blocker is documented.",
+    "Examples, maturity cues, sectors, and modes are pattern prompts only; evals should reject fixed stage-sector-purpose routing and keyword-triggered metric packs.",
+    "Xlsx design quality includes IB-style text positioning: labels/sources/notes/titles/memos left, values/formulas/units right, and period/scenario/matrix headers centered only.",
+    "Xlsx design quality includes IB-style font-size discipline: 9pt supporting notes/sources/units, 10pt body/model cells, 11pt compact section emphasis, 14pt sheet titles, and no 8pt squeezed cell text or 16pt+ presentation headings.",
+    "XLSX_WRAP_DISCIPLINE requires no generated wrap by default, blank unstyled overflow cells for horizontal-read text, no print/render boundary trapping, and exact row heights for any approved bounded table prose exception.",
+    "Public AI-agent and prompt research is workflow signal only. Evals should require conversion into source-bound model gates, unsupported-claim handling, formulas/checks, and closeout verification."
+  ]
 }

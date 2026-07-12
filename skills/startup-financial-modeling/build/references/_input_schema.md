@@ -20,10 +20,8 @@ flat 78% across the plan).
 | `mechanics`, `business_model`, `model_type` | str | `"generic startup"` | Used when no narrative is supplied; the profile selector still runs on the synthesized narrative |
 | `source_text`, `narrative`, `story`, `memo`, `description` | str | empty | If present, full mechanic / price / churn extraction runs on it |
 | `periods`, `horizon_periods`, `horizon` | int (or `"3 years"`) | from narrative or 5 | Capped at `MAX_FORECAST_PERIODS` |
-| `grain`, `model_grain` | `"annual" \| "quarterly" \| "monthly" \| "hybrid"` | `hybrid` for YAML full/three_statement; annual for `--source-md` | Period math is grain-correct via the months-in-period factor (monthly periods book one month of revenue/cost, not twelve). `hybrid` = monthly columns for the first two fiscal years + whole-fiscal-year annual columns to five fiscal years; for hybrid, `periods` counts FISCAL YEARS (default 5) |
-| `fiscal_year_end_month` | int (1-12) | `3` (March) | Fiscal-year boundary for monthly labels, FY rulers, and annual aggregation |
-| `monthly_window_months` | int | `24` (hybrid) | Monthly window length; rounded up to a whole fiscal year |
-| `start_year`, `fiscal_year` | int | inferred | Fiscal-year anchor (label year of the first fiscal year) |
+| `grain`, `model_grain` | `"annual" \| "quarterly" \| "monthly"` | inferred | Drives period labels and ramp shapes. Known limitation: kernel economics (recurring ×12, D&A ×12/life) are annualized per period — treat non-annual grains as label/ramp devices and validate any monthly/quarterly cash figures before investor use |
+| `start_year`, `fiscal_year` | int | inferred | Fiscal-year anchor |
 | `period_labels` | list[str] | inferred | Overrides the auto-built `FY2026 / Q1 26 / Jan-26` labels |
 | `currency` | str | `"JPY"` | Auth source of truth for `money_scale` |
 | `jpy_per_usd`, `fx_rate` | float | `DEFAULT_JPY_PER_USD` | Used when `currency != "JPY"` |
@@ -64,7 +62,6 @@ flat 78% across the plan).
 | Key | Type | Notes |
 |---|---|---|
 | `product_headcount`, `gtm_headcount`, `operations_headcount`, `ga_headcount` | list[int] | Per-function FTE plan |
-| `statutory_welfare_rate` | float (or %) | JP 法定福利費率 (typical 0.13–0.17). When stated, `avg_comp_yen` is read as BASE salary and loaded comp = base × (1 + rate); the People Plan shows the rate as its own row. When 0 / unstated, `avg_comp_yen` stays fully loaded |
 | `sm_pct_revenue` | list[float] (or %) | Sales & marketing as percent of revenue |
 | `rd_program_per_product_fte_yen` | list[int] | Non-people R&D per product FTE |
 | `rd_program_floor_yen` | list[int] | Minimum R&D program spend |
@@ -76,15 +73,16 @@ flat 78% across the plan).
 | Key | Type | Notes |
 |---|---|---|
 | `beginning_cash_yen`, `beginning_cash` | int | Opening cash balance |
-| `equity_raise_yen` | list[int] | Per-period rounds. Period 0 honored as stated (pinned as the first round); follow-ons still auto-sized to keep cash solvent |
-| `post_money_yen`, `post_money` | int / list[int] | Period-0 post-money valuation (pins the first round's pricing) |
+| `equity_raise_yen` | list[int] | Per-period rounds. Period 0 honored as stated; follow-ons still auto-sized to keep cash solvent |
+| `stated_first_round` | int | Convenience alias for `equity_raise_yen[0]` |
+| `stated_post_money` | int | Period-0 post-money valuation |
 | `debt_raise_yen` | list[int] | New debt drawn per period. Stated schedules replace the auto debt plan and feed sizing |
 | `debt_interest_rate` | list[float] (or %) | Per-period interest rate on the debt + convertibles + lease balance |
 | `debt_amortization_yen`, `debt_amortization` | list[int] | Contractual principal repayments; balance = cumulative drawn − cumulative repaid, interest accrues on the declining balance (K3) |
 | `grants_yen` | list[int] | Non-dilutive cash; adds to ending cash and reduces auto-sized equity (K3). Simplified BS treatment: credited to contributed capital (visible as its own Financing row), not routed through P&L income |
 | `convertibles_yen`, `lease_financing_yen` | list[int] | Join the interest-bearing balance; add to ending cash and reduce auto-sized equity (K3). Conversion dilution is a cap-table concern (Ownership / cap_table), not modeled in the debt balance |
 | `customer_advances_yen` | list[int] | Deferred-liability level per period; shifts cash timing via working capital, not funding (K3) |
-| `secondary_yen` | list[int] | Company-funded shareholder liquidity (share redemption / facilitated buyback): subtracts from ending cash and contributed capital, and must pair with a concurrent equity round (K3 audit). A pure investor-to-shareholder secondary has zero company cash impact — leave this 0 and model it as ownership transfer on the Cap Table sheet |
+| `secondary_yen` | list[int] | Company-funded shareholder liquidity (share redemption / facilitated buyback): subtracts from ending cash and contributed capital, and must pair with a concurrent equity round (K3 audit). A pure investor-to-shareholder secondary has zero company cash impact — leave this 0 and model it as ownership transfer in the Ownership sheet |
 | `onboarding_months` | float or list[float] | One-time onboarding fee = price × months (recurring plans). Unstated → 3-month default, labeled `placeholder` on Assumptions (F) |
 | `one_time_revenue_per_unit_yen` | list[int] | Direct per-unit one-time fee; overrides the onboarding-months path (F) |
 | `nol_yen` | list[int] | Opening NOL balance. Period-0 value feeds `project_free_cash_flow(opening_nol_yen=…)` |
@@ -96,8 +94,6 @@ flat 78% across the plan).
 |---|---|---|
 | `ar_days` | list[int] | Days-sales-outstanding |
 | `ap_days` | list[int] | Days-payable-outstanding |
-| `ar_site_months`, `ap_site_months` | float | JP 回収/支払サイト in months (e.g. 月末締め翌月末 = 1.0, 45日後 ≈ 1.5). When > 0, overrides the days-based balance with site-months × period sales/purchases (+ consumption tax on the CF side) |
-| `consumption_tax_rate` | float (or %) | Default `0.10`. Drives the tax-inclusive CF rows (仮受-仮払 net balance, simplified 納付) — the P&L stays tax-exclusive |
 | `deferred_revenue_share` | list[float] (or %) | Revenue billed but not yet recognized |
 | `inventory_wip_pct_capex` | list[float] (or %) | Working capital tied up in WIP |
 | `depreciation_life_months` | list[int] | Straight-line depreciation life |

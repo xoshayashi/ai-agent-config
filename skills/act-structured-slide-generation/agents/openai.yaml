@@ -1,0 +1,6 @@
+interface:
+  display_name: "Act Structured Slides"
+  short_description: "Editable Act-style banker decks"
+  default_prompt: "Use $act-structured-slide-generation to create an editable 16:9 PPTX deck from this brief."
+policy:
+  allow_implicit_invocation: true

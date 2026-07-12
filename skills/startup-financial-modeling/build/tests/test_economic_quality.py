@@ -821,16 +821,17 @@ def test_dcf_forecast_fcf_is_not_floored_at_zero() -> None:
         out = Path(tmp) / "dcf.xlsx"
         build_model.build_model(None, out, mode="dcf_only")
         wb = load_workbook(out, data_only=False)
-        ws = wb["Valuation & Exit"]
-        rows = [
-            cell.row for r in ws.iter_rows() for cell in r
-            if cell.value in ("PV of forecast FCF", "PV of FCF (per FY)")
-        ]
-        assert rows, "Valuation & Exit sheet missing the forecast-FCF PV rows"
+        ws = wb["Valuation"]
+        row = next(
+            (cell.row for r in ws.iter_rows() for cell in r
+             if cell.value == "PV of forecast FCF"),
+            None,
+        )
+        assert row is not None, "Valuation sheet missing 'PV of forecast FCF' row"
+        first_col = source_plan.START_PERIOD_COL
         formulas = [
             ws.cell(row, c).value
-            for row in rows
-            for c in range(4, ws.max_column + 1)
+            for c in range(first_col, ws.max_column + 1)
             if isinstance(ws.cell(row, c).value, str) and ws.cell(row, c).value.startswith("=")
         ]
         assert formulas, "no forecast-FCF formulas found"
@@ -853,7 +854,14 @@ def test_dcf_enterprise_value_is_positive_and_method_consistent() -> None:
             check=True, capture_output=True, timeout=120,
         )
         wb = load_workbook(Path(tmp) / "recalc" / "dcf.xlsx", data_only=True)
-        ws = wb["Valuation & Exit"]
+        ws = wb["Valuation"]
+
+        # Derive the last period column from the period header row (row 5).
+        final_col = max(
+            cell.column
+            for cell in ws[5]
+            if cell.column >= source_plan.START_PERIOD_COL and cell.value and cell.value != "Comment"
+        )
 
         def final_value(label: str) -> float:
             row = next(
@@ -861,9 +869,8 @@ def test_dcf_enterprise_value_is_positive_and_method_consistent() -> None:
                  if cell.value == label),
                 None,
             )
-            assert row is not None, f"Valuation & Exit sheet missing '{label}' row"
-            # single-value rows carry their figure in column D
-            return float(ws.cell(row, 4).value)
+            assert row is not None, f"Valuation sheet missing '{label}' row"
+            return float(ws.cell(row, final_col).value)
 
         dcf_ev = final_value("DCF EV")
         primary_ev = final_value("Primary-method EV")
@@ -937,11 +944,10 @@ def test_stated_raise_size_and_post_money_are_honored() -> None:
              "--outdir", str(Path(tmp) / "recalc"), str(out)],
             check=True, capture_output=True, timeout=120,
         )
-        ws = load_workbook(Path(tmp) / "recalc" / "raise.xlsx", data_only=True)["Cap Table"]
+        ws = load_workbook(Path(tmp) / "recalc" / "raise.xlsx", data_only=True)["Capital Stack"]
+        first_col = source_plan.START_PERIOD_COL
         own_row = _row_for_label(ws, "New investor ownership")
-        # Cap Table rounds register: column F = founding, column G = round 1
-        # (C label / D driver / E unit keep the v2 register contract).
-        ownership = ws.cell(own_row, 7).value
+        ownership = ws.cell(own_row, first_col).value
         # $3.5M into a $14M post-money is a 25% round.
         assert ownership is not None and abs(float(ownership) - 0.25) < 0.01, (
             f"new-investor ownership {ownership} does not reflect the stated "
@@ -1024,9 +1030,9 @@ def _saas_facts_with_peer_comps():
 
 
 def test_kpi_sheet_compares_plan_kpis_to_live_peers() -> None:
-    """The Evidence sheet juxtaposes plan KPIs with live-fetched peer margins."""
+    """The KPI sheet juxtaposes plan KPIs with live-fetched peer margins."""
     wb = source_plan.build_source_plan_workbook_from_facts(_saas_facts_with_peer_comps())
-    ws = wb["Evidence"]
+    ws = wb["KPI"]
     texts = [c.value for row in ws.iter_rows() for c in row if isinstance(c.value, str)]
     assert any("live public peers" in t for t in texts), "peer comparison section missing"
     # The peer median for the injected SaaS comps (0.77, 0.81) must appear live,
@@ -1060,13 +1066,13 @@ def test_peer_comparison_status_recalculates_without_error() -> None:
             check=True, capture_output=True, timeout=120,
         )
         wb = load_workbook(Path(tmp) / "recalc" / "peers.xlsx", data_only=True)
-        ws = wb["Evidence"]
+        ws = wb["KPI"]
         statuses = {"below", "above", "within"}
         found = [
             c.value for row in ws.iter_rows() for c in row
             if isinstance(c.value, str) and c.value in statuses
         ]
-        assert found, "no resolved plan-vs-peer status found on the Evidence sheet"
+        assert found, "no resolved plan-vs-peer status found on the KPI sheet"
 
 
 def test_archetype_workbooks_pass_strict_audit() -> None:
@@ -1134,14 +1140,14 @@ def test_burn_multiple_does_not_explode_in_period_zero() -> None:
             check=True, capture_output=True, timeout=120,
         )
         wb = load_workbook(Path(tmp) / "recalc" / "saas.xlsx", data_only=True)
-        ws = wb["Summary"]
+        ws = wb["KPI"]
         first_col = source_plan.START_PERIOD_COL
         burn_row = next(
             (cell.row for row in ws.iter_rows() for cell in row
              if cell.value == "Burn multiple"),
             None,
         )
-        assert burn_row is not None, "Summary sheet missing 'Burn multiple' row"
+        assert burn_row is not None, "KPI sheet missing 'Burn multiple' row"
         facts = kernel.derive_source_facts(SAAS_STORY)
         for idx in range(len(facts.years)):
             val = ws.cell(burn_row, first_col + idx).value
@@ -1221,13 +1227,13 @@ def test_kpi_dashboard_carries_vc_decision_metrics() -> None:
             check=True, capture_output=True, timeout=120,
         )
         wb = load_workbook(Path(tmp) / "recalc" / "saas.xlsx", data_only=True)
-        ws = wb["Summary"]
+        ws = wb["KPI"]
         first_col = source_plan.START_PERIOD_COL
         facts = kernel.derive_source_facts(SAAS_STORY)
         assert any(
             c.value == "VC decision metrics"
             for row in ws.iter_rows() for c in row
-        ), "Summary sheet missing the 'VC decision metrics' section"
+        ), "KPI sheet missing the 'VC decision metrics' section"
         metrics = [
             "Rule of 40", "Net revenue retention",
             "Customer acquisition cost", "CAC payback", "Magic number",
@@ -1238,7 +1244,7 @@ def test_kpi_dashboard_carries_vc_decision_metrics() -> None:
                 val = ws.cell(row, first_col + idx).value
                 assert val is not None, f"{label} period {idx} did not resolve"
                 if isinstance(val, str):
-                    assert val in ("N/A", "-"), (
+                    assert val == "N/A", (
                         f"{label} period {idx}: unexpected text {val!r}"
                     )
                 else:
@@ -1262,37 +1268,27 @@ def test_rule_of_40_is_growth_plus_ebitda_margin() -> None:
             check=True, capture_output=True, timeout=120,
         )
         wb = load_workbook(Path(tmp) / "recalc" / "saas.xlsx", data_only=True)
-        summary = wb["Summary"]
+        kpi, rb, pl = wb["KPI"], wb["Revenue Build"], wb["P&L"]
         first_col = source_plan.START_PERIOD_COL
-        r40 = _row_for_label(summary, "Rule of 40")
-        growth = _row_for_label(summary, "Revenue growth (YoY)")
-        ebitda_margin = _row_for_label(summary, "EBITDA margin")
+        r40 = _row_for_label(kpi, "Rule of 40")
+        growth = _row_for_label(rb, "Revenue growth")
+        ebitda_margin = _row_for_label(pl, "EBITDA margin")
         facts = kernel.derive_source_facts(SAAS_STORY)
-        checked = 0
         for idx in range(len(facts.years)):
-            got = summary.cell(r40, first_col + idx).value
-            growth_val = summary.cell(growth, first_col + idx).value
-            margin_val = summary.cell(ebitda_margin, first_col + idx).value
+            got = kpi.cell(r40, first_col + idx).value
+            growth_val = rb.cell(growth, first_col + idx).value
+            margin_val = pl.cell(ebitda_margin, first_col + idx).value
             # A clean failure if the recalc did not resolve a cell, rather
             # than a confusing TypeError from float(None).
             assert None not in (got, growth_val, margin_val), (
                 f"period {idx}: a Rule of 40 input did not recalculate "
                 f"(rule={got}, growth={growth_val}, margin={margin_val})"
             )
-            if growth_val == "-":
-                # The first fiscal year has no prior-year base; the composed
-                # metric must mirror that sentinel rather than fake a number.
-                assert got == "-", f"period {idx}: Rule of 40 {got!r} on '-' growth"
-                continue
             expected = float(growth_val) + float(margin_val)
             assert abs(float(got) - expected) < 1e-6, (
                 f"period {idx}: Rule of 40 {got} != growth + EBITDA margin "
                 f"{expected}"
             )
-            checked += 1
-        assert checked >= len(facts.years) - 1, (
-            "Rule of 40 resolved on too few periods to prove the composition"
-        )
 
 
 def test_kpi_dashboard_omits_vc_block_for_an_ambiguous_mechanic() -> None:
@@ -1304,7 +1300,7 @@ def test_kpi_dashboard_omits_vc_block_for_an_ambiguous_mechanic() -> None:
     )
     facts = kernel.derive_source_facts(story)
     assert kernel.mechanic_key(facts) == "generic"
-    ws = source_plan.build_source_plan_workbook_from_facts(facts)["Summary"]
+    ws = source_plan.build_source_plan_workbook_from_facts(facts)["KPI"]
     labels = [
         c.value for row in ws.iter_rows() for c in row
         if isinstance(c.value, str)
@@ -1316,9 +1312,11 @@ def test_kpi_dashboard_omits_vc_block_for_an_ambiguous_mechanic() -> None:
         assert metric not in labels, (
             f"{metric} leaked into an ambiguous-mechanic plan"
         )
-    # The generic KPI block and the consolidated master check still render.
-    assert "KPI" in labels, "generic KPI section missing from Summary"
-    assert "Master check" in labels, "master check missing from Summary"
+    # The layout is unshifted: the interpretation register stays at its base.
+    assert any(
+        c.value == "KPI interpretation register" and c.row == 62
+        for row in ws.iter_rows() for c in row
+    ), "ambiguous-mechanic KPI layout should not shift"
 
 
 PRE_REVENUE_STORY = """# Helios — pre-revenue deep-tech plan
@@ -1594,14 +1592,12 @@ def test_marketplace_kpi_uses_a_transaction_lens() -> None:
     )
     facts = kernel.derive_source_facts(story)
     assert kernel.mechanic_key(facts) == "marketplace"
-    ws = source_plan.build_source_plan_workbook_from_facts(facts)["Summary"]
-    # Restrict to the KPI block (between the "KPI" section band and the
-    # scenario block) so labels elsewhere cannot mask a missing metric row.
-    kpi_start = _row_for_label(ws, "KPI")
-    kpi_end = _row_for_label(ws, "Scenario comparison")
+    ws = source_plan.build_source_plan_workbook_from_facts(facts)["KPI"]
+    # Restrict to the metric area; the interpretation register far below
+    # also names "Take rate" and would mask a missing metric row.
     metric_labels = [
         c.value for row in ws.iter_rows() for c in row
-        if isinstance(c.value, str) and kpi_start < c.row < kpi_end
+        if isinstance(c.value, str) and c.row <= 12
     ]
     for per_seat in (
         "Monthly price / unit", "Monthly unit gross profit", "Unit payback",
@@ -1609,7 +1605,7 @@ def test_marketplace_kpi_uses_a_transaction_lens() -> None:
         assert per_seat not in metric_labels, (
             f"{per_seat} leaked into a marketplace KPI dashboard"
         )
-    for metric in ("Take rate (FY end)", "GMV per customer", "Contribution margin"):
+    for metric in ("Take rate", "GMV per customer", "Contribution margin"):
         assert metric in metric_labels, (
             f"{metric} missing from the marketplace KPI dashboard"
         )
@@ -1626,7 +1622,7 @@ def test_marketplace_kpi_uses_a_transaction_lens() -> None:
              "--outdir", str(Path(tmp) / "recalc"), str(out)],
             check=True, capture_output=True, timeout=120,
         )
-        recalced = load_workbook(Path(tmp) / "recalc" / "mkt.xlsx", data_only=True)["Summary"]
+        recalced = load_workbook(Path(tmp) / "recalc" / "mkt.xlsx", data_only=True)["KPI"]
         first_col = source_plan.START_PERIOD_COL
         cm_row = _row_for_label(recalced, "Contribution margin")
         for idx in range(len(facts.years)):
@@ -2202,9 +2198,9 @@ def test_K3_debt_amortization_flows_through_cash_and_balance_sheet() -> None:
 
 
 def test_K3_workbook_capital_stack_carries_amortization_schedule() -> None:
-    """Task 3.2 (D) — the workbook mirrors the kernel: Assumptions carries the
-    'Debt amortization' schedule as an input row, the P&L debt balance nets it
-    out, and the CF financing block subtracts the repayment."""
+    """Task 3.2 (D) — the workbook mirrors the kernel: Capital Stack carries a
+    'Debt amortization' input row, the debt balance nets it out, and the CF
+    debt-financing row subtracts the repayment."""
     from openpyxl.utils import get_column_letter
 
     with tempfile.TemporaryDirectory() as tmp:
@@ -2218,26 +2214,30 @@ def test_K3_workbook_capital_stack_carries_amortization_schedule() -> None:
         )
         build_model.build_model(input_path, out, mode="full")
         wb = load_workbook(out, data_only=False)
+        ws = wb["Capital Stack"]
+        labels = {
+            ws.cell(row, source_plan.LAYOUT.label_col).value: row
+            for row in range(5, 20)
+        }
+        assert "Debt amortization" in labels, (
+            f"K3 violated (Task 3.2): Capital Stack must carry a 'Debt "
+            f"amortization' input row; labels found: {sorted(k for k in labels if k)}"
+        )
+        amort_row = labels["Debt amortization"]
+        balance_row = labels.get("Debt balance")
+        assert balance_row is not None
         first_col = source_plan.START_PERIOD_COL
         second = get_column_letter(first_col + 1)
-        assumptions = wb["Assumptions"]
-        amort_row = _row_for_label(assumptions, "Debt amortization")
-        assert assumptions.cell(amort_row, first_col + 1).value == 200000000, (
-            "K3 violated (Task 3.2): the stated amortization schedule must land "
-            "on the Assumptions input row"
-        )
-        balance_row = _row_for_label(wb["P&L"], "Debt balance (ending)")
-        balance_formula = str(
-            wb["P&L"].cell(balance_row, first_col + 1).value).replace(" ", "")
-        assert f"-'Assumptions'!{second}{amort_row}" in balance_formula, (
+        assert ws.cell(amort_row, first_col + 1).value == 200000000
+        balance_formula = str(ws.cell(balance_row, first_col + 1).value).replace(" ", "")
+        assert f"-{second}{amort_row}" in balance_formula, (
             f"K3 violated (Task 3.2): debt balance must net out the "
             f"amortization row; got {balance_formula!r}"
         )
-        repay_row = _row_for_label(wb["CF"], "Debt principal repayment")
-        cf_repay = str(wb["CF"].cell(repay_row, first_col + 1).value).replace(" ", "")
-        assert f"-'Assumptions'!{second}{amort_row}" in cf_repay, (
-            f"K3 violated (Task 3.2): CF financing must subtract the "
-            f"repayment; got {cf_repay!r}"
+        cf_debt = str(wb["CF"].cell(20, first_col + 1).value).replace(" ", "")
+        assert f"-'CapitalStack'!{second}{amort_row}" in cf_debt, (
+            f"K3 violated (Task 3.2): CF debt financing must subtract the "
+            f"repayment; got {cf_debt!r}"
         )
 
 
@@ -2299,17 +2299,10 @@ def test_G_workbook_pl_da_mirrors_half_year_convention() -> None:
         build_model.build_model(input_path, out, mode="full")
         wb = load_workbook(out, data_only=False)
         first_col = source_plan.START_PERIOD_COL
-        da_row = _row_for_label(wb["P&L"], "D&A")
-        formula = str(wb["P&L"].cell(da_row, first_col).value).replace(" ", "")
-        # Half-year convention, gated to annual columns via the months ruler:
-        # acquisition-period CapEx contributes only half its base.
-        assert "IF(F$5=12" in formula and "/2" in formula, (
+        formula = str(wb["P&L"].cell(21, first_col).value).replace(" ", "")
+        assert "0.5*'CostBuild'!" in formula, (
             f"G violated: P&L D&A must apply the half-year convention to the "
-            f"current period's CapEx on annual columns; got {formula!r}"
-        )
-        assert "'CostBuild'!" in formula, (
-            f"G violated: the D&A base must come from the CapEx engine row; "
-            f"got {formula!r}"
+            f"current period's CapEx; got {formula!r}"
         )
 
 
@@ -2572,10 +2565,11 @@ def test_F_stated_zero_one_time_fee_is_honored_per_period() -> None:
 
 
 def test_K3_financing_inflow_subtotal_excludes_advances() -> None:
-    """Phase 3 review follow-up (Codex) — the financing-inflow subtotal must
-    not count customer advances (they flow through working capital) and must
-    net out contractual amortization, mirroring the CF financing block."""
-    import re
+    """Phase 3 review follow-up (Codex) — the Financing sheet 'Financing cash
+    inflow' subtotal must not count customer advances (they flow through
+    working capital) and must net out contractual amortization, mirroring the
+    CF financing block."""
+    from openpyxl.utils import get_column_letter
 
     with tempfile.TemporaryDirectory() as tmp:
         input_path = Path(tmp) / "model.yaml"
@@ -2589,430 +2583,18 @@ def test_K3_financing_inflow_subtotal_excludes_advances() -> None:
         )
         build_model.build_model(input_path, out, mode="full")
         wb = load_workbook(out, data_only=False)
+        ws = wb["Financing"]
         first_col = source_plan.START_PERIOD_COL
-
-        def sum_bounds(ws, row) -> tuple[int, int]:
-            formula = str(ws.cell(row, first_col).value).replace(" ", "")
-            match = re.search(r"=SUM\([A-Z]+(\d+):[A-Z]+(\d+)\)", formula)
-            assert match, f"{ws.title} subtotal is not a SUM range: {formula!r}"
-            return int(match.group(1)), int(match.group(2))
-
-        # CF financing block: repayment inside the total, advances outside it
-        # (advances live in the operating working-capital deltas).
-        cf = wb["CF"]
-        cf_total = _row_for_label(cf, "Total financing CF")
-        lo, hi = sum_bounds(cf, cf_total)
-        repay_row = _row_for_label(cf, "Debt principal repayment")
-        assert lo <= repay_row <= hi, (
-            "K3 violated: CF financing total must net out the principal repayment"
+        col = get_column_letter(first_col)
+        formula = str(ws.cell(15, first_col).value).replace(" ", "")
+        assert f"{col}12" not in formula, (
+            f"K3 violated: financing-inflow subtotal must exclude customer "
+            f"advances (row 12); got {formula!r}."
         )
-        adv_delta = _row_for_label(cf, "Δ Customer advances (前受金)")
-        assert not (lo <= adv_delta <= hi), (
-            "K3 violated: customer advances leaked into the CF financing total"
+        assert "'CapitalStack'!" in formula and "11" in formula, (
+            f"K3 violated: financing-inflow subtotal must net out the "
+            f"amortization row; got {formula!r}."
         )
-        # Financing sheet sources: repayment netted, no advances source row.
-        fin = wb["Financing"]
-        fin_total = _row_for_label(fin, "Total sources (net of repayment)")
-        lo, hi = sum_bounds(fin, fin_total)
-        fin_repay = _row_for_label(fin, "Debt principal repayment")
-        assert lo <= fin_repay <= hi, (
-            "K3 violated: financing sources must net out the principal repayment"
-        )
-        source_labels = [
-            fin.cell(row, 3).value for row in range(lo, hi + 1)
-        ]
-        assert not any(
-            isinstance(label, str) and "advance" in label.lower()
-            for label in source_labels
-        ), (
-            f"K3 violated: customer advances leaked into the funding sources: "
-            f"{source_labels!r}"
-        )
-
-
-# --- S1: period axis, annual-series expansion, grain-correct kernel math ----
-
-
-def _s1_mapping(**extra) -> dict:
-    """Structured base mapping for the S1 axis / grain tests."""
-    base = {
-        "company": "AxisCo",
-        "mechanics": "recurring software subscription",
-        "grain": "hybrid",
-        "periods": 5,
-        "start_year": 2027,
-        "fiscal_year_end_month": 3,
-        "customers": [100, 300, 700, 1200, 1800],
-        "monthly_price_yen": [50000, 50000, 50000, 50000, 50000],
-    }
-    base.update(extra)
-    return base
-
-
-def test_S1_build_period_axis_hybrid_fye3() -> None:
-    """Hybrid axis: 24 monthly columns over FY2027-FY2028, then annual.
-
-    Facts stay ANNUAL-CANONICAL (5 fiscal years, FY labels); the monthly ×
-    annual expansion happens only in build_period_axis. FY convention:
-    FY2027 with fiscal_year_end_month=3 spans 2026/04-2027/03.
-    """
-    from datetime import date as _date
-
-    facts = kernel.derive_source_facts_from_mapping(_s1_mapping())
-    assert facts.grain == "hybrid"
-    assert facts.years == [2027, 2028, 2029, 2030, 2031]
-    assert facts.period_labels == [f"FY{y}" for y in facts.years], (
-        "hybrid facts must keep annual-canonical FY labels"
-    )
-    assert facts.fiscal_year_end_month == 3
-
-    axis = kernel.build_period_axis(facts)
-    assert axis.grain == "hybrid"
-    assert axis.monthly_count == 24
-    assert axis.months_in_period == [1] * 24 + [12] * 3
-    assert sum(axis.months_in_period) == 5 * 12, (
-        "hybrid axis must cover exactly periods × 12 months"
-    )
-    assert axis.labels[0] == "2026/04"
-    assert axis.labels[11] == "2027/03"
-    assert axis.labels[12] == "2027/04"
-    assert axis.labels[23] == "2028/03"
-    assert axis.labels[24:] == ["FY2029", "FY2030", "FY2031"]
-    assert axis.fy_labels[0] == "FY2027" and axis.fy_labels[11] == "FY2027"
-    assert axis.fy_labels[12] == "FY2028" and axis.fy_labels[23] == "FY2028"
-    assert axis.fy_labels[24:] == ["FY2029", "FY2030", "FY2031"]
-    assert axis.period_end[0] == _date(2026, 4, 30)
-    assert axis.period_end[10] == _date(2027, 2, 28)
-    assert axis.period_end[23] == _date(2028, 3, 31)
-    assert axis.period_end[24] == _date(2029, 3, 31)
-    assert axis.period_end[-1] == _date(2031, 3, 31)
-
-    # A stated monthly window is rounded UP to whole fiscal years (30 → 36).
-    wide = kernel.derive_source_facts_from_mapping(
-        _s1_mapping(monthly_window_months=30)
-    )
-    wide_axis = kernel.build_period_axis(wide)
-    assert wide.monthly_window_months == 30
-    assert wide_axis.monthly_count == 36
-    assert wide_axis.months_in_period == [1] * 36 + [12] * 2
-    narrow_axis = kernel.build_period_axis(
-        kernel.derive_source_facts_from_mapping(_s1_mapping(monthly_window_months=12))
-    )
-    assert narrow_axis.monthly_count == 12
-    assert narrow_axis.months_in_period == [1] * 12 + [12] * 4
-
-    # A "5年" horizon string keeps periods = 5 fiscal years under hybrid.
-    jp = kernel.derive_source_facts_from_mapping(_s1_mapping(periods="5年"))
-    assert len(jp.years) == 5 and jp.grain == "hybrid"
-
-    # FYE=12 (calendar fiscal year): FY2027 starts 2027/01.
-    cal_axis = kernel.build_period_axis(
-        kernel.derive_source_facts_from_mapping(_s1_mapping(fiscal_year_end_month=12))
-    )
-    assert cal_axis.labels[0] == "2027/01"
-    assert cal_axis.period_end[23] == _date(2028, 12, 31)
-
-
-def test_S1_build_period_axis_annual_is_backward_compatible() -> None:
-    """Annual axis labels must remain exactly the current FY labels."""
-    facts = kernel.derive_source_facts(SAAS_STORY)
-    axis = kernel.build_period_axis(facts)
-    assert axis.grain == "annual"
-    assert axis.labels == facts.period_labels
-    assert axis.labels == [f"FY{year}" for year in facts.years]
-    assert axis.fy_labels == axis.labels
-    assert axis.months_in_period == [12] * len(facts.years)
-    assert axis.monthly_count == 0
-    # Default JP fiscal year end (March): FY{Y} ends Y/03/31.
-    assert facts.fiscal_year_end_month == 3
-    assert all(d.month == 3 and d.day == 31 for d in axis.period_end)
-    assert [d.year for d in axis.period_end] == facts.years
-
-
-def test_S1_expand_annual_series_flow_stock_rate_contracts() -> None:
-    """flow sums exactly per FY; stock hits FY-ends exactly; rate holds."""
-    facts = kernel.derive_source_facts_from_mapping(_s1_mapping())
-    axis = kernel.build_period_axis(facts)
-
-    flow = [1200, 2401, 300, 400, 500]  # 2401 is not divisible by 78
-    out = kernel.expand_annual_series(flow, axis, "flow")
-    assert len(out) == len(axis.labels)
-    assert all(isinstance(v, int) for v in out[:24]), (
-        "integer flow input must expand to integers"
-    )
-    assert sum(out[:12]) == 1200, "monthly flow must sum exactly to FY1"
-    assert sum(out[12:24]) == 2401, (
-        "integer rounding must be distributed so the FY sum is exact"
-    )
-    assert out[24:] == [300, 400, 500], "annual columns pass through"
-    assert out[0] < out[11], "flow expansion is a rising ramp within the FY"
-
-    stock = [120, 240, 480, 800, 1200]
-    s = kernel.expand_annual_series(stock, axis, "stock")
-    assert s[11] == 120 and s[23] == 240, "month 12 of each FY == FY value"
-    assert s[24:] == [480, 800, 1200], "annual columns pass through"
-    assert s[5] == 60, "linear interpolation from prior FY-end (0) to FY-end"
-    assert s[17] == 180, "FY2 interpolates from 120 to 240"
-    assert all(s[i] <= s[i + 1] for i in range(23)), "stock interp is monotone here"
-
-    rate = [0.60, 0.65, 0.70, 0.70, 0.70]
-    r = kernel.expand_annual_series(rate, axis, "rate")
-    assert r[:12] == [0.60] * 12 and r[12:24] == [0.65] * 12, "rate holds per FY"
-    assert r[24:] == [0.70, 0.70, 0.70]
-
-    with pytest.raises(ValueError):
-        kernel.expand_annual_series([1, 2], axis, "flow")
-    with pytest.raises(ValueError):
-        kernel.expand_annual_series(flow, axis, "balance")
-
-
-def test_S1_months_factor_and_monthly_axis_labels() -> None:
-    assert kernel.months_factor("annual") == 12
-    assert kernel.months_factor("hybrid") == 12, (
-        "hybrid facts are annual-canonical — kernel projections keep factor 12"
-    )
-    assert kernel.months_factor("quarterly") == 3
-    assert kernel.months_factor("monthly") == 1
-
-    # forecast_axis: real year-month labels are derived from the fiscal
-    # start when fiscal_year_end_month is given; the legacy bare "M1" form
-    # is kept when it is not (existing workbook headers pin that format).
-    _, labels = kernel.forecast_axis(2027, 6, "monthly", fiscal_year_end_month=3)
-    assert labels == ["2026/04", "2026/05", "2026/06", "2026/07", "2026/08", "2026/09"]
-    _, legacy = kernel.forecast_axis(2027, 6, "monthly")
-    assert legacy == ["M1", "M2", "M3", "M4", "M5", "M6"]
-
-    # build_period_axis always derives real year-month labels for monthly.
-    facts = kernel.derive_source_facts_from_mapping(
-        _s1_mapping(grain="monthly", periods=24,
-                    customers=[100] * 24, monthly_price_yen=[50000] * 24)
-    )
-    axis = kernel.build_period_axis(facts)
-    assert axis.grain == "monthly"
-    assert axis.monthly_count == 24
-    assert axis.months_in_period == [1] * 24
-    assert axis.labels[0] == "2026/04" and axis.labels[23] == "2028/03"
-    assert axis.fy_labels[0] == "FY2027" and axis.fy_labels[12] == "FY2028"
-
-
-def test_S1_monthly_grain_kernel_math_is_not_12x() -> None:
-    """Monthly-grain projections book one month per period, not twelve.
-
-    The kernel used to annualize every period (recurring = base × price ×
-    12, payroll = headcount × annual comp, runway buffer = burn × months/12)
-    regardless of grain, so a monthly model overstated revenue and burn 12x.
-    """
-    customers = [1000] * 24
-    price = 10_000
-    facts = kernel.derive_source_facts_from_mapping(
-        {
-            "company": "MonthlyCo",
-            "mechanics": "recurring software subscription",
-            "grain": "monthly",
-            "periods": 24,
-            "start_year": 2026,
-            "customers": customers,
-            "monthly_price_yen": [price] * 24,
-        }
-    )
-    assert facts.grain == "monthly" and facts.customers_pinned
-
-    projection = kernel.project_plan_free_cash_flow(facts)
-    average = kernel.average_units(facts.customers)
-    for idx in (1, 12, 23):
-        expected = (
-            average[idx] * price * 1  # one month of recurring billing
-            + facts.new_units[idx] * price * facts.onboarding_months[idx]
-        ) * (1.0 + facts.other_revenue_share[idx])
-        assert abs(projection[idx]["revenue"] - expected) <= max(1.0, 0.001 * expected), (
-            f"period {idx}: monthly revenue {projection[idx]['revenue']:,.0f} "
-            f"!= customers × price × 1 (+ onboarding) = {expected:,.0f}"
-        )
-        assert projection[idx]["revenue"] < customers[idx] * price * 6, (
-            f"period {idx}: revenue looks annualized (12x) again"
-        )
-
-    # Cost calibration and the audit-side recomputation share the factor:
-    # the implied gross margin still lands on target at monthly grain.
-    margins = kernel.implied_gross_margin_series(facts)
-    for idx, margin in enumerate(margins):
-        assert abs(margin - facts.target_gross_margin[idx]) <= 0.03, (
-            f"period {idx}: monthly implied margin {margin:.1%} off target"
-        )
-
-    # Payroll: one month books headcount × avg ANNUAL comp / 12.
-    payroll_kwargs = dict(
-        product_headcount=[0], sm_pct_revenue=[0.0],
-        rd_program_per_product_fte_yen=[0], rd_program_floor_yen=[0],
-        ga_pct_revenue=[0.0], fixed_ga_yen=[0], capex_yen=[0],
-        depreciation_life_months=[60], debt_raise_yen=[0],
-        debt_interest_rate=[0.0], ar_days=[0], ap_days=[0],
-        deferred_revenue_share=[0.0], inventory_wip_pct_capex=[0.0],
-        tax_rate=[0.0],
-    )
-    monthly_row = kernel.project_free_cash_flow(
-        [0.0], [0.6], [12], [12_000_000], months_per_period=1, **payroll_kwargs
-    )[0]
-    annual_row = kernel.project_free_cash_flow(
-        [0.0], [0.6], [12], [12_000_000], **payroll_kwargs
-    )[0]
-    assert monthly_row["ebitda"] == -12_000_000, (
-        f"monthly payroll must be hc × comp / 12: {monthly_row['ebitda']:,.0f}"
-    )
-    assert annual_row["ebitda"] == -144_000_000, "annual payroll changed"
-
-    # Interest and depreciation follow the factor too.
-    fin_kwargs = dict(payroll_kwargs)
-    fin_kwargs.update(
-        capex_yen=[120_000_000], debt_raise_yen=[120_000_000],
-        debt_interest_rate=[0.06], depreciation_life_months=[60],
-    )
-    fin_row = kernel.project_free_cash_flow(
-        [0.0], [0.6], [0], [0], months_per_period=1, **fin_kwargs
-    )[0]
-    assert fin_row["interest"] == pytest.approx(120_000_000 * 0.06 / 12)
-    assert fin_row["depreciation"] == pytest.approx(60_000_000 * 1 / 60)
-
-    # Runway: the buffer is target months × MONTHLY burn on a monthly axis.
-    burn = [-1_000_000.0, -1_000_000.0, -1_000_000.0]
-    monthly_equity = kernel.size_equity_rounds(
-        0, burn, [0, 0, 0], target_runway_months=12, round_unit=1,
-        months_per_period=1,
-    )
-    annual_equity = kernel.size_equity_rounds(
-        0, burn, [0, 0, 0], target_runway_months=12, round_unit=1,
-    )
-    assert monthly_equity[0] == 13_000_000, (
-        f"monthly runway buffer must be 12 months of monthly burn: "
-        f"{monthly_equity[0]:,}"
-    )
-    assert annual_equity[0] == 2_000_000, "annual runway sizing changed"
-
-
-def test_S1_statutory_welfare_rate_scales_base_comp() -> None:
-    """A stated 法定福利費率 loads base comp: avg_comp = base × (1 + rate)."""
-    base = _s1_mapping(grain="annual", avg_comp_yen=[8_000_000] * 5)
-    base.pop("fiscal_year_end_month")
-
-    loaded = kernel.derive_source_facts_from_mapping(
-        {**base, "statutory_welfare_rate": 0.15}
-    )
-    assert loaded.statutory_welfare_rate == 0.15
-    assert loaded.avg_comp_yen == [9_200_000] * 5, (
-        f"base 8M × 1.15 expected: {loaded.avg_comp_yen}"
-    )
-    assert any("statutory welfare" in note for note in loaded.derivation_warnings), (
-        "the welfare loading must be surfaced as a derivation note"
-    )
-    # The percent form is accepted too.
-    pct = kernel.derive_source_facts_from_mapping(
-        {**base, "statutory_welfare_rate": "15%"}
-    )
-    assert pct.avg_comp_yen == [9_200_000] * 5
-
-    # Default path (rate unstated) stays byte-identical: comp untouched,
-    # no welfare note.
-    plain = kernel.derive_source_facts_from_mapping(dict(base))
-    assert plain.statutory_welfare_rate == 0.0
-    assert plain.avg_comp_yen == [8_000_000] * 5
-    assert not any("statutory welfare" in note for note in plain.derivation_warnings)
-
-
-def test_S1_new_source_facts_fields_default_and_plumb() -> None:
-    """New S1 fields default safely and flow through the YAML plumbing."""
-    facts = kernel.derive_source_facts(SAAS_STORY)
-    assert facts.fiscal_year_end_month == 3
-    assert facts.monthly_window_months == 0
-    assert facts.statutory_welfare_rate == 0.0
-    assert facts.consumption_tax_rate == 0.10
-    assert facts.ar_site_months == 0.0 and facts.ap_site_months == 0.0
-
-    mapped = kernel.derive_source_facts_from_mapping(
-        _s1_mapping(
-            fiscal_year_end_month=12,
-            monthly_window_months=24,
-            statutory_welfare_rate=0.14,
-            consumption_tax_rate=0.08,
-            ar_site_months=1.5,
-            ap_site_months=2.0,
-        )
-    )
-    assert mapped.fiscal_year_end_month == 12
-    assert mapped.monthly_window_months == 24
-    assert mapped.statutory_welfare_rate == 0.14
-    assert mapped.consumption_tax_rate == 0.08
-    assert mapped.ar_site_months == 1.5 and mapped.ap_site_months == 2.0
-
-
-def test_S1_hybrid_facts_are_annual_canonical() -> None:
-    """grain=hybrid derives the same annual-canonical facts as grain=annual;
-    only the grain tag (and hence the derived period axis) differs."""
-    annual = kernel.derive_source_facts_from_mapping(_s1_mapping(grain="annual"))
-    hybrid = kernel.derive_source_facts_from_mapping(_s1_mapping(grain="hybrid"))
-    assert annual.grain == "annual" and hybrid.grain == "hybrid"
-    for field_name in (
-        "years", "period_labels", "new_units", "customers", "monthly_price_yen",
-        "avg_comp_yen", "equity_raise_yen", "delivery_cost_yen",
-        "variable_cogs_pct", "target_gross_margin", "fixed_ga_yen",
-    ):
-        assert getattr(annual, field_name) == getattr(hybrid, field_name), (
-            f"hybrid facts diverged from annual-canonical on {field_name}"
-        )
-    # And the explicit-factor call path is the identity for annual facts.
-    for story in ARCHETYPES.values():
-        story_facts = kernel.derive_source_facts(story)
-        args = (
-            story_facts.new_units, story_facts.gmv_yen,
-            story_facts.monthly_price_yen, story_facts.take_rate,
-            story_facts.other_revenue_share, story_facts.revenue_mode,
-        )
-        assert kernel.plan_revenue_series(*args) == kernel.plan_revenue_series(
-            *args, months_per_period=12
-        )
-
-
-def test_S5_unstated_monthly_window_start_anchors_to_fy_in_progress() -> None:
-    """Unstated start on a monthly-window grain anchors to the fiscal year in
-    progress (S5 fix): the calendar-year default must never render a monthly
-    window whose first fiscal year already ended before the run date."""
-    from datetime import date as _date
-
-    run = _date(2026, 7, 5)
-    # Deterministic helper contract (injected run date).
-    assert kernel.anchor_start_year(2026, "hybrid", 3, today=run) == 2027
-    assert kernel.anchor_start_year(2026, "monthly", 3, today=run) == 2027
-    # A stated start year is always respected, even when fully past.
-    assert kernel.anchor_start_year(2026, "hybrid", 3, stated=True, today=run) == 2026
-    # Annual / quarterly grains keep the calendar-year default unchanged.
-    assert kernel.anchor_start_year(2026, "annual", 3, today=run) == 2026
-    assert kernel.anchor_start_year(2026, "quarterly", 3, today=run) == 2026
-    # FYE=12: FY2026 is still in progress on 2026-07-05 — no shift.
-    assert kernel.anchor_start_year(2026, "hybrid", 12, today=run) == 2026
-    # Already-current or future years are never shifted.
-    assert kernel.anchor_start_year(2027, "hybrid", 3, today=run) == 2027
-
-    # End-to-end (live run date): a default hybrid mapping must produce a
-    # first fiscal year that does not end before the run date.
-    facts = kernel.derive_source_facts_from_mapping({"company": "AnchorCo", "grain": "hybrid"})
-    assert facts.start_year_stated is False
-    axis = kernel.build_period_axis(facts)
-    first_fy_end = axis.period_end[11]  # 12th monthly column = first FY end
-    assert first_fy_end >= _date.today().replace(day=1), (
-        "unstated hybrid start rendered a fully-past first fiscal year"
-    )
-    # A stated start_year still wins end-to-end.
-    stated = kernel.derive_source_facts_from_mapping(
-        {"company": "AnchorCo", "grain": "hybrid", "start_year": 2026}
-    )
-    assert stated.start_year_stated is True and stated.years[0] == 2026
-    # Facts-level re-anchor helper (burn_runway hybrid promotion path).
-    promoted = replace(
-        kernel.derive_source_facts_from_mapping({"company": "AnchorCo"}), grain="hybrid"
-    )
-    anchored = kernel.anchor_facts_first_fiscal_year(promoted)
-    a_axis = kernel.build_period_axis(anchored)
-    assert a_axis.period_end[11] >= _date.today().replace(day=1)
-    assert anchored.period_labels == [f"FY{y}" for y in anchored.years]
 
 
 if __name__ == "__main__":
@@ -3102,15 +2684,6 @@ if __name__ == "__main__":
         test_K3_stated_debt_interest_rate_reaches_equity_sizing,
         test_F_stated_zero_one_time_fee_is_honored_per_period,
         test_K3_financing_inflow_subtotal_excludes_advances,
-        test_S1_build_period_axis_hybrid_fye3,
-        test_S1_build_period_axis_annual_is_backward_compatible,
-        test_S1_expand_annual_series_flow_stock_rate_contracts,
-        test_S1_months_factor_and_monthly_axis_labels,
-        test_S1_monthly_grain_kernel_math_is_not_12x,
-        test_S1_statutory_welfare_rate_scales_base_comp,
-        test_S1_new_source_facts_fields_default_and_plumb,
-        test_S1_hybrid_facts_are_annual_canonical,
-        test_S5_unstated_monthly_window_start_anchors_to_fy_in_progress,
     ]
     for _test in _tests:
         try:

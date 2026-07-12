@@ -1,5 +1,7 @@
 #!/bin/sh
 set -eu
+export PYTHONDONTWRITEBYTECODE=1
+
 
 format=${AI_AGENT_HEALTH_FORMAT:-text}
 strict=${AI_AGENT_HEALTH_STRICT:-0}

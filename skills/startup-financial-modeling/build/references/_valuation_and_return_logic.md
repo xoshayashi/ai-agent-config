@@ -4,20 +4,7 @@ Valuation in a startup model is an argument about supportability, not a
 mechanical average of methods. Use the methods that match the company's
 economics, evidence, maturity, and investor decision.
 
-## Workbook Surface
-
-Valuation lives on one conditional sheet, `Valuation & Exit` (default in
-`ma_exit`, `dcf_only`, and `comps_only`; elsewhere via `--additional-sheets`):
-
-- a method matrix — rows are methods, columns are low/mid/high plus a
-  credibility role and use-when note, in dedicated matrix columns never mixed
-  with period columns;
-- the selected EV range;
-- an exit waterfall block (exit EV, net debt, transaction costs, preference,
-  proceeds by holder) inside the same sheet, not a standalone tab;
-- investor return (invested vs ownership × EV, MOIC/IRR) with guarded
-  division: `invested = 0` displays `-` via an `IF`, never a `MAX(1, invested)`
-  style floor that silently divides by a constant.
+## Method Selection
 
 For each valuation method, state whether it is primary, secondary, or excluded.
 
@@ -97,6 +84,5 @@ Investor and founder outcomes should include:
 - MOIC and, when timing is meaningful, IRR;
 - downside case where the financing plan or valuation support breaks.
 
-The IC Memo (or, when no memo sheet is included, the Summary recommendation
-block) should state what valuation must be believed, what evidence supports
-it, what method is weakest, and what diligence would change it.
+The IC memo should state what valuation must be believed, what evidence
+supports it, what method is weakest, and what diligence would change it.

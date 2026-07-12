@@ -1,5 +1,7 @@
 #!/bin/sh
 set -eu
+export PYTHONDONTWRITEBYTECODE=1
+
 
 say() {
   printf '%s\n' "$*"
