@@ -1,5 +1,7 @@
 #!/bin/sh
 set -eu
+export PYTHONDONTWRITEBYTECODE=1
+
 
 say() {
   printf '%s\n' "$*"
@@ -93,7 +95,6 @@ if [ "$rerun_setup" = "1" ]; then
     "AI_AGENT_CONFIG_HOME=$config_home" \
     "AI_AGENT_CODEX_HOME=${AI_AGENT_CODEX_HOME:-$HOME/.codex}" \
     "AI_AGENT_CLAUDE_HOME=${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}" \
-    "AI_AGENT_GEMINI_HOME=${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}" \
     "AI_AGENT_CONFLICT_MODE=${AI_AGENT_CONFLICT_MODE:-skip}" \
     "AI_AGENT_DRY_RUN=$dry_run" \
     sh "$config_home/scripts/setup.sh"

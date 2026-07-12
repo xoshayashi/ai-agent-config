@@ -6,13 +6,13 @@ Run directly:
 
 from __future__ import annotations
 
-import importlib.util
 import sys
 import tempfile
 import re
 import json
 import shutil
 import subprocess
+import zipfile
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -33,9 +33,8 @@ import cap_table_builder as cap_table  # noqa: E402
 import economic_kernel as kernel  # noqa: E402
 import ib_format as ib  # noqa: E402
 import live_comps  # noqa: E402
-import self_improvement  # noqa: E402
-import closeout_consistency  # noqa: E402
 import source_plan_builder as source_plan  # noqa: E402
+import workbook_spec  # noqa: E402
 
 FIRST_VALUE_COL = source_plan.START_PERIOD_COL
 SECOND_VALUE_COL = FIRST_VALUE_COL + 1
@@ -96,7 +95,6 @@ def test_skill_exposes_clean_build_route_only() -> None:
         "_generic_composition_protocol.md",
         "_ib_workbook_design_system.md",
         "_self_review_protocol.md",
-        "_self_improvement_protocol.md",
         "_benchmark_protocol.md",
         "_kpi_analytics.md",
         "_scenario_sensitivity_playbook.md",
@@ -176,15 +174,15 @@ def test_sheet_quality_rubric_covers_every_generated_sheet() -> None:
     combined_flat = " ".join(
         "\n".join([rubric_text, skill_text, invocation_text, output_modes_text, self_review_text, eval_text]).split()
     )
-    for sheet_name in [*source_plan.SOURCE_PLAN_SHEETS_V2, *source_plan.CONDITIONAL_SHEETS_V2]:
-        assert f"| {sheet_name} |" in rubric_text, f"rubric table row missing for {sheet_name}"
+    for sheet_name in source_plan.SOURCE_PLAN_SHEETS:
+        assert f"| {sheet_name} |" in rubric_text
     for phrase in [
         "a distinct purpose, source boundary, dependency flow, checks where errors would matter, and interpretation",
         "Do not create a sheet just because it belongs to a canonical full-workbook order",
         "sheet-specific quality gates for purpose, source boundary, dependency flow, checks, and interpretation",
         "Load `_sheet_quality_rubric.md` for every xlsx build or repair",
-        "Include a sheet only if it owns a distinct decision surface",
-        "Guide defines the decision, evidence, mechanics, and scope",
+        "Every included sheet must satisfy `_sheet_quality_rubric.md`",
+        "Guide and Kernel define the decision, evidence, mechanics, and scope",
     ]:
         assert phrase in combined_flat
 
@@ -205,12 +203,8 @@ def test_economic_kernel_is_separate_from_workbook_renderer() -> None:
     assert "class SourceFacts" not in builder_text
     assert "def _detect_mechanics" not in builder_text
     assert "def _money_yen" not in builder_text
-    # v2 builders consume the kernel through its published axis / projection
-    # API — economics never re-derive inside the renderer.
-    assert "def build_period_axis" not in builder_text
-    assert "def expand_annual_series" not in builder_text
-    assert "build_period_axis(" in builder_text
-    assert "expand_annual_series(" in builder_text
+    assert "def assumption_decomposition_for" not in builder_text
+    assert "assumption_decomposition_for(facts)" in builder_text
     assert "from economic_kernel import" in builder_text
 
 
@@ -226,204 +220,104 @@ def test_seed_to_pre_ipo_horizon_is_not_truncated_to_two_years() -> None:
     assert kernel.extract_forecast_periods("36か月のシード資金計画", "monthly") == 36
 
 
-def _sheet_labels(wb, sheet_name: str) -> str:
-    """Section labels (col B) + line-item labels (col C) of one sheet."""
-    return "\n".join(
-        str(cell.value)
-        for row in wb[sheet_name].iter_rows(min_col=2, max_col=3)
-        for cell in row
-        if cell.value is not None
-    )
-
-
 def test_generated_workbook_contains_interpretive_analysis_surfaces() -> None:
-    """v2: interpretation lives on Summary (cross-checks with judgment,
-    recommendation), on the engine sheets (support-status rows), and on the
-    conditional Valuation & Exit surface (method credibility, guarded MOIC)."""
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "full.xlsx"
         build_model.build_model(None, out, mode="full")
         wb = load_workbook(out, data_only=False)
 
-        summary = _sheet_labels(wb, "Summary")
-        for label in (
-            "Cross-check",
-            "Revenue / FTE benchmark",
-            "Revenue / FTE vs benchmark",
-            "Market growth (CAGR)",
-            "Company growth vs market growth",
-            "Funding readout",
-            "Growth readout",
-            "Weakest evidence (top 3)",
-            "Next diligence",
-        ):
-            assert label in summary, f"Summary missing interpretation surface {label!r}"
-        # The cross-check rows are real formulas with a judgment output, not
-        # label-only theater (S5 fix).
-        vs_bench = _first_year_cell_for_label(wb, "Summary", "Revenue / FTE vs benchmark").value
-        assert isinstance(vs_bench, str) and vs_bench.startswith("=IF(") and "benchmark" in vs_bench
-        vs_market = _first_year_cell_for_label(wb, "Summary", "Company growth vs market growth").value
-        assert isinstance(vs_market, str) and vs_market.startswith("=IF(") and "market" in vs_market
-        cagr = _first_year_cell_for_label(wb, "Summary", _row_label_startswith(wb, "Summary", "Revenue CAGR")).value
-        assert isinstance(cagr, str) and "^(1/(COUNT(" in cagr, "CAGR must be a live formula"
-        # Benchmark comparators are blue inputs with a sourced note.
-        assert _font_rgb(_first_year_cell_for_label(wb, "Summary", "Revenue / FTE benchmark")) == ib.IB_HARD_INPUT
-        assert _font_rgb(_first_year_cell_for_label(wb, "Summary", "Market growth (CAGR)")) == ib.IB_HARD_INPUT
+        assert wb["KPI"].cell(_row_for_label(wb, "KPI", "KPI interpretation register"), source_plan.LAYOUT.first_hierarchy_col).value == "KPI interpretation register"
+        assert wb["Scenarios"].cell(_row_for_label(wb, "Scenarios", "Scenario interpretation"), source_plan.LAYOUT.first_hierarchy_col).value == "Scenario interpretation"
+        assert wb["Sensitivity"].cell(_row_for_label(wb, "Sensitivity", "Sensitivity rationale"), source_plan.LAYOUT.first_hierarchy_col).value == "Sensitivity rationale"
+        assert wb["Valuation"].cell(_row_for_label(wb, "Valuation", "Method credibility"), source_plan.LAYOUT.first_hierarchy_col).value == "Method credibility"
+        assert wb["Benchmarks"]["C5"].value == "source_id"
+        memo_row = _row_for_label(wb, "IC Memo", "KPI readout")
+        assert wb["IC Memo"].cell(memo_row, source_plan.LAYOUT.first_hierarchy_col).value == "KPI readout"
+        assert isinstance(wb["IC Memo"].cell(memo_row + 1, source_plan.LAYOUT.label_col).value, str)
+        assert wb["IC Memo"].cell(memo_row + 1, source_plan.LAYOUT.label_col).value.startswith("=")
 
-        # Engine sheets carry their own support-status interpretation rows.
-        assert "Demand support status" in _sheet_labels(wb, "Revenue Build")
-        assert "Price support status" in _sheet_labels(wb, "Revenue Build")
-        assert "Cost-to-serve status" in _sheet_labels(wb, "Cost Build")
-        assert "CS capacity status" in _sheet_labels(wb, "People Plan")
-        assert "Runway after raise" in _sheet_labels(wb, "Financing")
-
-        # Conditional valuation surface (ma_exit) keeps credibility columns,
-        # DCF cross-check, and a guarded investor-return readout.
-        out2 = Path(tmp) / "ma.xlsx"
-        build_model.build_model(None, out2, mode="ma_exit")
-        wb2 = load_workbook(out2, data_only=False)
-        vx = _sheet_labels(wb2, "Valuation & Exit")
-        for label in ("Primary-method EV", "PV of forecast FCF", "Illustrative IRR",
-                      "Selected EV range", "MOIC at selected EV (Mid)"):
-            assert label in vx
-        moic = wb2["Valuation & Exit"].cell(
-            _row_for_label(wb2, "Valuation & Exit", "MOIC at selected EV (Mid)"), 4).value
-        invested_row = _row_for_label(wb2, "Valuation & Exit", "Equity invested (cumulative)")
-        assert isinstance(moic, str) and moic.startswith(f'=IF($D${invested_row}=0,"-"'), (
-            "MOIC must guard invested=0 with '-' — no MAX(1,x) division hacks"
-        )
-
-
-def _row_label_startswith(wb, sheet_name: str, prefix: str) -> str:
-    for row in wb[sheet_name].iter_rows(min_col=3, max_col=3):
-        for cell in row:
-            if isinstance(cell.value, str) and cell.value.startswith(prefix):
-                return cell.value
-    raise AssertionError(f"{sheet_name}: no label starting with {prefix!r}")
+        formulas = [formula for _, _, formula in _formula_cells(wb)]
+        assert not any("AVERAGE(" in formula and "'Valuation'" not in formula for formula in formulas)
+        assert "Primary-method EV" in "\n".join(str(cell.value) for cell in wb["Valuation"]["C"] if cell.value)
+        assert "PV of forecast FCF" in "\n".join(str(cell.value) for cell in wb["Valuation"]["C"] if cell.value)
+        assert "Illustrative IRR" in "\n".join(str(cell.value) for cell in wb["Valuation"]["C"] if cell.value)
 
 
 def test_mechanic_specific_kpi_and_scenario_axes_are_rendered() -> None:
-    """v2: mechanic-specific KPIs live on the Summary KPI block; mechanic-
-    specific driver rows live on Assumptions (no GMV rows for recurring,
-    no ARR rows for marketplace)."""
-    # Marketplace: transaction lens KPIs + GMV/take-rate drivers.
-    tmp, wb = _sample_source_workbook(
-        "# Marketplace\nMarketplace with GMV ¥10B, take rate 12%, buyer and seller liquidity. Source: management memo."
-    )
-    try:
-        summary = _sheet_labels(wb, "Summary")
-        assumptions = _sheet_labels(wb, "Assumptions")
-        assert "Take rate (FY end)" in summary
-        assert "Contribution margin" in summary
-        assert "ARR run-rate (FY end)" not in summary
-        assert "Gross merchandise value" in assumptions
-        assert "Take rate" in assumptions
-    finally:
-        tmp.cleanup()
-    # Recurring software: ARR lens, no marketplace rows.
-    tmp, wb = _sample_source_workbook(
-        "# SaaS\nA recurring software subscription startup with ARR and monthly pricing. Source: management memo."
-    )
-    try:
-        summary = _sheet_labels(wb, "Summary")
-        assumptions = _sheet_labels(wb, "Assumptions")
-        assert "ARR run-rate (FY end)" in summary
-        assert "Take rate (FY end)" not in summary
-        assert "Gross merchandise value" not in assumptions
-    finally:
-        tmp.cleanup()
+    cases = [
+        ("# Marketplace\nMarketplace with GMV, take rate, buyer and seller liquidity. Source: management memo.", "Take rate", "GMV / liquidity scale"),
+        ("# Robotics\nHardware robot deployment with BOM, service, lease financing and utilization. Source: management memo.", "Asset payback", "Deployment capacity scale"),
+        ("# Lending\nFintech lending model with origination, credit loss, warehouse line and collections. Source: management memo.", "Loss / collection quality", "Warehouse / debt headroom"),
+    ]
+    for source_text, expected_kpi, expected_driver in cases:
+        tmp, wb = _sample_source_workbook(source_text)
+        try:
+            kpi_text = "\n".join(str(cell.value) for row in wb["KPI"].iter_rows() for cell in row if cell.value is not None)
+            scenario_text = "\n".join(str(cell.value) for row in wb["Scenarios"].iter_rows() for cell in row if cell.value is not None)
+            assert expected_kpi in kpi_text
+            assert expected_driver in scenario_text
+        finally:
+            tmp.cleanup()
 
 
 def test_ambiguous_mechanics_use_generic_kpis_and_scenario_axes() -> None:
-    """Ambiguous mechanics: the VC decision-metrics block is mechanism-gated
-    (no Rule of 40 / CAC theater on a generic-mechanics plan), while the
-    scenario mechanism stays generic (demand/price/cost/opex scales)."""
     tmp, wb = _sample_source_workbook(
         "# PLAN\nA new startup with unclear revenue mechanics and weak evidence. Source: management memo."
     )
     try:
-        summary = _sheet_labels(wb, "Summary")
-        assumptions = _sheet_labels(wb, "Assumptions")
-        assert "Rule of 40" not in summary
-        assert "Customer acquisition cost" not in summary
-        assert "Burn multiple" not in summary
-        for label in ("Scenario toggle", "Demand scale", "Price scale",
-                      "Variable cost scale", "Opex scale"):
-            assert label in assumptions
-    finally:
-        tmp.cleanup()
-    tmp, wb = _sample_source_workbook(
-        "# SaaS\nA recurring software subscription startup with ARR and monthly pricing. Source: management memo."
-    )
-    try:
-        summary = _sheet_labels(wb, "Summary")
-        assert "Rule of 40" in summary
-        assert "Burn multiple" in summary
+        kpi_text = "\n".join(str(cell.value) for row in wb["KPI"].iter_rows() for cell in row if cell.value is not None)
+        scenario_text = "\n".join(str(cell.value) for row in wb["Scenarios"].iter_rows() for cell in row if cell.value is not None)
+        assert "Economic unit clarity" in kpi_text
+        assert "Demand evidence scale" in scenario_text
+        assert "CAC payback" not in kpi_text
+        assert "New logo / conversion scale" not in scenario_text
     finally:
         tmp.cleanup()
 
 
 def test_cost_labeled_scenario_drivers_pressure_costs_not_revenue() -> None:
-    """v2 scenario mechanism: the cost scale multiplies COGS rows, the opex
-    scale multiplies OpEx programs, and neither touches the revenue chain;
-    revenue rows multiply only the demand / price scales."""
-    with tempfile.TemporaryDirectory() as tmp:
-        out = Path(tmp) / "full.xlsx"
-        build_model.build_model(None, out, mode="full")
-        wb = load_workbook(out, data_only=False)
-
-        eff = {
-            key: f"$F${_row_for_label(wb, 'Assumptions', label)}"
-            for key, label in (
-                ("demand", "Effective demand scale"),
-                ("price", "Effective price scale"),
-                ("cost", "Effective cost scale"),
-                ("opex", "Effective opex scale"),
-            )
-        }
-        new_units = _first_year_cell_for_label(wb, "Revenue Build", "New primary units").value
-        price = _first_year_cell_for_label(wb, "Revenue Build", _row_label_startswith(wb, "Revenue Build", "Monthly price")).value
-        total_revenue = _first_year_cell_for_label(wb, "Revenue Build", "Total revenue").value
-        variable_cogs = _first_year_cell_for_label(wb, "Cost Build", "Variable COGS").value
-        sm_programs = _first_year_cell_for_label(wb, "Cost Build", "S&M programs").value
-
-        assert eff["demand"] in new_units
-        assert eff["price"] in price
-        assert eff["cost"] in variable_cogs
-        assert eff["opex"] in sm_programs
-        for revenue_formula in (new_units, price, total_revenue):
-            assert eff["cost"] not in revenue_formula
-            assert eff["opex"] not in revenue_formula
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nPre-revenue prototype company with milestone, prototype, grant, and hiring risk. Source: management memo."
+    )
+    try:
+        ws = wb["Scenarios"]
+        scenario_row = _row_for_label(wb, "Scenarios", "Prototype / program cost factor")
+        assert ws.cell(scenario_row, source_plan.LAYOUT.label_col).value == "Prototype / program cost factor"
+        revenue_formula = _first_year_cell_for_label(wb, "Scenarios", "Revenue").value
+        gross_profit_formula = _first_year_cell_for_label(wb, "Scenarios", "Gross profit").value
+        assert f"{FIRST_VALUE_LETTER}${scenario_row}" not in revenue_formula
+        assert f"{FIRST_VALUE_LETTER}${scenario_row}" in gross_profit_formula
+        hiring_row = _row_for_label(wb, "Scenarios", "Hiring capacity scale")
+        ebitda_formula = _first_year_cell_for_label(wb, "Scenarios", "EBITDA").value
+        assert f"{FIRST_VALUE_LETTER}${hiring_row}" not in revenue_formula
+        assert f"{FIRST_VALUE_LETTER}${hiring_row}" in ebitda_formula
+    finally:
+        tmp.cleanup()
 
 
 def test_unclassified_scenario_drivers_default_to_opex_not_revenue() -> None:
-    bucket = source_plan._scenario_driver_bucket
-    assert bucket(SimpleNamespace(label="Regulatory clearance readiness")) == "opex"
-    assert bucket(SimpleNamespace(label="Prototype / program cost factor")) == "cost"
-    assert bucket(SimpleNamespace(label="New logo / conversion scale")) == "revenue"
-    assert bucket(SimpleNamespace(label="Warehouse / debt headroom")) == "financing"
+    revenue_factor, cost_factor, opex_factor, financing_factor = source_plan._scenario_driver_formula_terms(
+        FIRST_VALUE_LETTER,
+        (SimpleNamespace(label="Regulatory clearance readiness"),),
+    )
+    assert revenue_factor == "1"
+    assert cost_factor == "1"
+    assert opex_factor == f"{FIRST_VALUE_LETTER}$7"
+    assert financing_factor == "1"
 
 
 def test_financing_driver_downside_widens_funding_gap() -> None:
-    """v2: Financing carries BOTH a live funding-gap formula (current toggle)
-    and a downside-case snapshot; the downside snapshot is at least the base
-    case's need, and the Summary scenario block shows the same ordering."""
-    with tempfile.TemporaryDirectory() as tmp:
-        out = Path(tmp) / "full.xlsx"
-        build_model.build_model(None, out, mode="full")
-        wb = load_workbook(out, data_only=False)
-
-        live = _first_year_cell_for_label(wb, "Financing", _row_label_startswith(wb, "Financing", "Funding gap (live")).value
-        assert isinstance(live, str) and live.startswith("=MAX(0,-MIN('CF'!")
-        downside = _first_year_cell_for_label(wb, "Financing", "Downside funding gap").value
-        assert isinstance(downside, (int, float)) and downside >= 0
-
-        gap_row = _row_for_label(wb, "Summary", "Additional funding needed")
-        down_need = wb["Summary"].cell(gap_row, 6).value
-        base_need = wb["Summary"].cell(gap_row, 7).value
-        assert isinstance(down_need, (int, float)) and isinstance(base_need, (int, float))
-        assert down_need >= base_need, "downside case must not need less funding than base"
-        assert down_need == downside, "Financing downside snapshot must match the Summary scenario block"
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nAsset-heavy deployment startup with lease financing, warehouse capacity, and deployment risk. Source: management memo."
+    )
+    try:
+        formula = _first_year_cell_for_label(wb, "Scenarios", "Funding gap").value
+        financing_row = _row_for_label(wb, "Scenarios", "Financing capacity scale")
+        assert f"MAX(0.01,{FIRST_VALUE_LETTER}${financing_row})" in formula
+        assert f"-{FIRST_VALUE_LETTER}17/MAX" in formula
+        assert f"-{FIRST_VALUE_LETTER}17*{FIRST_VALUE_LETTER}${financing_row}" not in formula
+    finally:
+        tmp.cleanup()
 
 
 def test_cost_build_does_not_double_count_detailed_service_costs_in_variable_cogs() -> None:
@@ -432,19 +326,9 @@ def test_cost_build_does_not_double_count_detailed_service_costs_in_variable_cog
         build_model.build_model(None, out, mode="full")
         wb = load_workbook(out, data_only=False)
 
-        f = FIRST_VALUE_LETTER
-        rev_row = _row_for_label(wb, "Revenue Build", "Total revenue")
-        pct_row = _row_for_label(wb, "Assumptions", "Variable COGS / revenue")
-        eff_cost_row = _row_for_label(wb, "Assumptions", "Effective cost scale")
         formula = _first_year_cell_for_label(wb, "Cost Build", "Variable COGS").value
-        assert formula == (
-            f"='Revenue Build'!{f}{rev_row}*'Assumptions'!{f}{pct_row}"
-            f"*'Assumptions'!$F${eff_cost_row}"
-        )
+        assert formula == f"={FIRST_VALUE_LETTER}7*'Assumptions'!{FIRST_VALUE_LETTER}24"
         assert "SUM('Assumptions'!" not in formula
-        # Delivery / cloud / support live in their own cost-to-serve rows.
-        for label in ("Delivery cost", "Cloud / platform cost", "Support cost"):
-            assert label in _sheet_labels(wb, "Cost Build")
 
 
 def test_orchestrator_routes_through_generic_source_plan_builder() -> None:
@@ -453,7 +337,193 @@ def test_orchestrator_routes_through_generic_source_plan_builder() -> None:
     assert "three_statement_builder" not in orchestrator_text
     assert "SaaS Series A defaults" not in orchestrator_text
     assert "00_Cover" not in orchestrator_text
-    assert build_model.resolve_bundle("full") == source_plan.SOURCE_PLAN_SHEETS_V2
+    assert build_model.resolve_bundle("full") == source_plan.SOURCE_PLAN_SHEETS
+
+
+def test_excel_generation_architecture_contract_is_documented_and_gated() -> None:
+    architecture = (SKILL_DIR / "build" / "references" / "_excel_generation_architecture.md").read_text(encoding="utf-8")
+    invocation = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
+    self_review = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
+
+    assert "Use `openpyxl` as the canonical workbook engine" in architecture
+    assert "XlsxWriter" in architecture and "write-only" in architecture
+    assert "Layering Contract" in architecture
+    assert "Intermediate Representation" in architecture
+    assert "Formula Discipline" in architecture
+    assert "_excel_generation_architecture.md" in invocation
+    assert "architecture_gate.py" in self_review
+
+
+def test_workbook_spec_renders_typed_ir_to_openpyxl_styles() -> None:
+    spec = workbook_spec.WorkbookSpec(
+        sheets=(
+            workbook_spec.SheetSpec(
+                name="IR",
+                column_widths={2: 24, 3: 16},
+                rows=(
+                    workbook_spec.RowSpec(
+                        row=1,
+                        fill_span=(2, 4, ib.BG_TABLE_HEADER),
+                        bottom_border=True,
+                        cells=(
+                            workbook_spec.CellSpec(1, 2, "Metric", workbook_spec.StyleRole.HEADER),
+                            workbook_spec.CellSpec(1, 3, "Value", workbook_spec.StyleRole.HEADER),
+                        ),
+                    ),
+                    workbook_spec.RowSpec(
+                        row=2,
+                        cells=(
+                            workbook_spec.CellSpec(2, 2, "Revenue"),
+                            workbook_spec.CellSpec(2, 3, 100, workbook_spec.StyleRole.HARD_INPUT, ib.FMT_MONEY),
+                        ),
+                    ),
+                    workbook_spec.RowSpec(
+                        row=3,
+                        cells=(
+                            workbook_spec.CellSpec(3, 2, "Gross profit"),
+                            workbook_spec.CellSpec(
+                                3,
+                                3,
+                                workbook_spec.FormulaExpr("=C2*0.7"),
+                                fmt=ib.FMT_MONEY,
+                            ),
+                        ),
+                    ),
+                    workbook_spec.RowSpec(
+                        row=4,
+                        cells=(
+                            workbook_spec.CellSpec(4, 2, "Linked"),
+                            workbook_spec.CellSpec(
+                                4,
+                                3,
+                                workbook_spec.FormulaExpr("='Other'!C3"),
+                                fmt=ib.FMT_MONEY,
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+        )
+    )
+
+    wb = workbook_spec.render_workbook_spec(spec)
+    ws = wb["IR"]
+
+    assert ws["C2"].font.color.rgb[-6:].upper() == ib.IB_HARD_INPUT
+    assert ws["C3"].font.color.rgb[-6:].upper() == ib.IB_FORMULA
+    assert ws["C4"].font.color.rgb[-6:].upper() == ib.IB_LINK_INTRA
+    assert ws["B1"].fill.fgColor.rgb[-6:].upper() == ib.BG_TABLE_HEADER
+    assert ws["D1"].fill.fgColor.rgb[-6:].upper() == ib.BG_TABLE_HEADER
+    assert ws.freeze_panes is None
+
+
+def test_strict_audit_blocks_volatile_formula_functions() -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Guide"
+    ws["A1"] = "=TODAY()"
+
+    issues = build_model.audit_workbook(wb)
+
+    assert any("volatile formula function TODAY" in issue for issue in issues)
+
+
+def test_recalculated_financial_audit_detects_broken_pnl_identity() -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "P&L"
+    ws.cell(5, source_plan.START_PERIOD_COL, "FY2026")
+    rows = {
+        "Total revenue": 100.0,
+        "Total COGS": 40.0,
+        "Gross profit": 50.0,
+        "Total OpEx": 20.0,
+        "EBITDA": 30.0,
+        "D&A": 5.0,
+        "EBIT": 25.0,
+        "Interest expense": 2.0,
+        "EBT": 23.0,
+        "Cash tax": 5.0,
+        "Net income": 18.0,
+    }
+    for idx, (label, value) in enumerate(rows.items(), start=7):
+        ws.cell(idx, source_plan.LAYOUT.label_col, label)
+        ws.cell(idx, source_plan.START_PERIOD_COL, value)
+
+    issues = build_model.audit_recalculated_financial_model(wb)
+
+    assert any("Gross profit" in issue for issue in issues)
+
+
+def test_recalculated_financial_audit_passes_representative_full_workbook() -> None:
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        pytest.skip("soffice/libreoffice not available")
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "full.xlsx"
+        build_model.build_model(None, out, mode="full")
+        recalc = Path(tmp) / "recalc"
+        recalc.mkdir()
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(recalc), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        wb = load_workbook(recalc / "full.xlsx", data_only=True)
+
+    assert build_model.audit_recalculated_financial_model(wb) == []
+
+
+def test_pre_revenue_valuation_uses_financing_implied_value_when_dcf_is_not_meaningful() -> None:
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice is None:
+        pytest.skip("soffice/libreoffice not available")
+    story = (
+        "# Deeptech milestone plan\n"
+        "Pre-revenue R&D company with PoC, prototype, regulatory, hiring, "
+        "grant, convertible, and next-round milestone financing. Source: seed IC memo."
+    )
+    with tempfile.TemporaryDirectory() as tmp:
+        src = Path(tmp) / "pre.md"
+        out = Path(tmp) / "pre.xlsx"
+        src.write_text(story, encoding="utf-8")
+        build_model.build_model(None, out, mode="full", source_md=src)
+        recalc = Path(tmp) / "recalc"
+        recalc.mkdir()
+        subprocess.run(
+            [soffice, "--headless", "--calc", "--convert-to", "xlsx",
+             "--outdir", str(recalc), str(out)],
+            check=True, capture_output=True, timeout=120,
+        )
+        wb = load_workbook(recalc / "pre.xlsx", data_only=True)
+        ws = wb["Valuation"]
+        first_col = source_plan.START_PERIOD_COL
+        financing_row = _row_for_label(wb, "Valuation", "Financing-implied EV")
+        low_row = _row_for_label(wb, "Valuation", "Selected EV low")
+        mid_row = _row_for_label(wb, "Valuation", "Selected EV midpoint")
+        high_row = _row_for_label(wb, "Valuation", "Selected EV high")
+
+        assert ws.cell(financing_row, first_col).value > 0
+        assert 0 < ws.cell(low_row, first_col).value <= ws.cell(mid_row, first_col).value <= ws.cell(high_row, first_col).value
+        assert build_model.audit_recalculated_financial_model(wb) == []
+
+
+def test_saved_workbook_default_font_is_persisted_in_styles_xml() -> None:
+    wb = Workbook()
+    ws = wb.active
+    ws["A1"] = "Default font smoke"
+    ib.normalize_workbook_fonts(wb)
+    ib.set_workbook_default_font(wb)
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "font.xlsx"
+        wb.save(out)
+        reopened = load_workbook(out, data_only=False)
+        assert reopened._fonts[0].name == ib.FONT_FAMILY
+        assert float(reopened._fonts[0].sz) == ib.FONT_SIZE_BASE
+        with zipfile.ZipFile(out) as zf:
+            styles_xml = zf.read("xl/styles.xml").decode("utf-8")
+        assert f'val="{ib.FONT_FAMILY}"' in styles_xml
+        assert f'val="{ib.FONT_SIZE_BASE}"' in styles_xml
 
 
 def test_focused_modes_use_generic_kernel_after_bundle_filter() -> None:
@@ -472,7 +542,7 @@ def test_focused_modes_use_generic_kernel_after_bundle_filter() -> None:
 
             assert wb.sheetnames == build_model.resolve_bundle(mode)
             assert "Guide" in wb.sheetnames
-            assert "Assumptions" in wb.sheetnames
+            assert "Kernel" in wb.sheetnames
             assert "12_SanityChecks" not in wb.sheetnames
             assert "Demo SaaS" not in all_text
             assert "SaaS Series A" not in all_text
@@ -498,48 +568,32 @@ def test_focused_modes_are_formula_complete_without_compact_placeholders() -> No
 
 
 def test_integrated_model_has_ib_decision_gates_not_just_readouts() -> None:
-    """v2 decision gates: the IC Memo recommendation is a formula gated on
-    the return hurdle; the selected EV range's Mid anchors on the
-    credibility-chosen Primary-method EV (not a blind average across methods),
-    while Low/High show the method spread; the exit waterfall walks the
-    preference stack; the Pricing sheet keeps its validation plan and
-    pass/DD-gate status."""
     with tempfile.TemporaryDirectory() as tmp:
-        out = Path(tmp) / "ma_exit.xlsx"
-        build_model.build_model(None, out, mode="ma_exit")
+        out = Path(tmp) / "full.xlsx"
+        build_model.build_model(None, out, mode="full")
         wb = load_workbook(out, data_only=False)
 
-        vx = wb["Valuation & Exit"]
-        sel_row = _row_for_label(wb, "Valuation & Exit", "Selected EV range")
-        primary_row = _row_for_label(wb, "Valuation & Exit", "Primary-method EV")
-        # Mid must reference the credibility-aware Primary-method EV cell
-        # (rubric bars averaging methods blindly), not MEDIAN across all methods.
-        assert str(vx.cell(sel_row, 5).value) == f"=$D${primary_row}"
-        # Low/High still show the full method spread (floor / ceiling).
-        assert str(vx.cell(sel_row, 4).value).startswith("=MIN(")
-        assert str(vx.cell(sel_row, 6).value).startswith("=MAX(")
-        method_row = _row_for_label(wb, "Valuation & Exit", "Method")
-        assert [vx.cell(method_row, c).value for c in range(4, 9)] == [
-            "Low", "Mid", "High", "Credibility", "Use when",
-        ]
-        waterfall_header_row = _row_for_label(wb, "Valuation & Exit", "Case")
-        headers = [vx.cell(waterfall_header_row, c).value for c in range(4, 11)]
-        for header in ("Exit EV", "Net debt", "Txn costs", "Preference floor",
-                       "Common pool", "Investor proceeds"):
-            assert header in headers
+        sotp_formula = _first_year_cell_for_label(wb, "Valuation", "SOTP EV").value
+        selected_formula = _first_year_cell_for_label(wb, "Valuation", "Selected EV midpoint").value
         recommendation_formula = wb["IC Memo"].cell(
-            _row_for_label(wb, "IC Memo", "Recommendation") + 1, 4).value
-        assert isinstance(recommendation_formula, str)
-        assert recommendation_formula.startswith("=IF(")
-        assert "Proceed subject to DD gates" in recommendation_formula
-        assert build_model.audit_workbook(wb) == []
+            _row_for_label(wb, "IC Memo", "Recommendation") + 1,
+            source_plan.LAYOUT.label_col,
+        ).value
+        exit_headers = [
+            wb["Exit Waterfall"].cell(5, col).value
+            for col in range(3, 15)
+        ]
 
-        out2 = Path(tmp) / "pricing.xlsx"
-        build_model.build_model(None, out2, mode="pricing")
-        wb2 = load_workbook(out2, data_only=False)
-        assert _row_for_label(wb2, "Pricing", "Pricing validation plan")
-        gate = _first_year_cell_for_label(wb2, "Pricing", "Pricing gate").value
-        assert isinstance(gate, str) and '"pass"' in gate and '"DD gate"' in gate
+        assert "Segments" in sotp_formula and "SUM" in sotp_formula
+        assert "Capital Stack" in _first_year_cell_for_label(wb, "Valuation", "Financing-implied EV").value
+        assert "SUM" in selected_formula and "Supportability" not in selected_formula
+        assert isinstance(recommendation_formula, str) and "Proceed subject to DD gates" in recommendation_formula
+        assert "Txn costs / escrow" in exit_headers
+        assert "Preference floor" in exit_headers
+        assert "Walk-away signal" in exit_headers
+        assert _row_for_label(wb, "Valuation", "Valuation committee gates")
+        assert _row_for_label(wb, "Pricing", "Pricing validation plan")
+        assert build_model.audit_workbook(wb) == []
 
 
 def test_comparable_evidence_loads_public_peers_by_default_and_overrides_multiples() -> None:
@@ -547,26 +601,14 @@ def test_comparable_evidence_loads_public_peers_by_default_and_overrides_multipl
         out = Path(tmp) / "live_comps.xlsx"
         build_model.build_model(None, out, mode="full")
         wb = load_workbook(out, data_only=False)
-        evidence_text = "\n".join(str(cell.value) for row in wb["Evidence"].iter_rows() for cell in row if cell.value is not None)
+        benchmark_text = "\n".join(str(cell.value) for row in wb["Benchmarks"].iter_rows() for cell in row if cell.value is not None)
 
-        assert "Comparable evidence" in evidence_text
-        assert "public market data" in evidence_text
-        assert "CRM Test Comparable" in evidence_text
-        assert "current" in evidence_text
-        # The register carries the peer-set multiple summary (median 9.0 /
-        # 21.0 from the fetched comps) and per-comp as-of dates.
-        rev_mult_row = _row_for_label(wb, "Evidence", _row_label_startswith(wb, "Evidence", "EV / Revenue multiple"))
-        assert wb["Evidence"].cell(rev_mult_row, 6).value == 9.0
-        ebitda_mult_row = _row_for_label(wb, "Evidence", _row_label_startswith(wb, "Evidence", "EV / EBITDA multiple"))
-        assert wb["Evidence"].cell(ebitda_mult_row, 6).value == 21.0
-        assert "2026-05-17" in evidence_text
-        # And the applied medians drive the valuation multiples when the
-        # valuation surface is generated.
-        out2 = Path(tmp) / "ma.xlsx"
-        build_model.build_model(None, out2, mode="ma_exit")
-        wb2 = load_workbook(out2, data_only=False)
-        mult_row = _row_for_label(wb2, "Valuation & Exit", "Revenue multiple")
-        assert wb2["Valuation & Exit"].cell(mult_row, 5).value == 9.0  # Mid column
+        assert _first_year_cell_for_label(wb, "Valuation", "Revenue multiple").value == 9.0
+        assert _first_year_cell_for_label(wb, "Valuation", "EBITDA multiple").value == 21.0
+        assert "Comparable evidence" in benchmark_text
+        assert "public market data" in benchmark_text
+        assert "current" in benchmark_text
+        assert wb["Benchmarks"]["H9"].value == "current"
 
 
 def test_default_live_comps_match_mechanic_labels_and_cli_overrides_yaml() -> None:
@@ -588,32 +630,9 @@ def test_default_live_comps_match_mechanic_labels_and_cli_overrides_yaml() -> No
         input_path.write_text("live_comps: [BAD1, BAD2]\n", encoding="utf-8")
         build_model.build_model(input_path, out, mode="full", live_comps=["CRM"])
         wb = load_workbook(out, data_only=False)
-        text = "\n".join(str(cell.value) for row in wb["Evidence"].iter_rows() for cell in row if cell.value is not None)
+        text = "\n".join(str(cell.value) for row in wb["Benchmarks"].iter_rows() for cell in row if cell.value is not None)
         assert "CRM Test Comparable" in text
         assert "BAD1" not in text
-
-
-def test_no_live_comps_disables_default_public_fetch() -> None:
-    original_fetch = build_model.lc.fetch_public_comps
-
-    def fail_fetch(tickers: list[str], *, timeout: float = 8.0) -> live_comps.PublicCompsResult:
-        raise AssertionError(f"live comparable fetch should be disabled, got {tickers}")
-
-    try:
-        build_model.lc.fetch_public_comps = fail_fetch
-        with tempfile.TemporaryDirectory() as tmp:
-            out = Path(tmp) / "offline.xlsx"
-            build_model.build_model(None, out, mode="full", auto_live_comps=False)
-            wb = load_workbook(out, data_only=False)
-            evidence_text = "\n".join(
-                str(cell.value)
-                for row in wb["Evidence"].iter_rows()
-                for cell in row
-                if cell.value is not None
-            )
-            assert "No external evidence provided — DD gap" in evidence_text
-    finally:
-        build_model.lc.fetch_public_comps = original_fetch
 
 
 def test_private_and_transaction_comps_are_included_in_comparable_evidence() -> None:
@@ -648,17 +667,14 @@ def test_private_and_transaction_comps_are_included_in_comparable_evidence() -> 
         )
         build_model.build_model(input_path, out, mode="full")
         wb = load_workbook(out, data_only=False)
-        text = "\n".join(str(cell.value) for row in wb["Evidence"].iter_rows() for cell in row if cell.value is not None)
+        text = "\n".join(str(cell.value) for row in wb["Benchmarks"].iter_rows() for cell in row if cell.value is not None)
 
         assert "PrivateAI" in text
         assert "private" in text
         assert "Strategic SaaS acquisition" in text
         assert "transaction" in text
         assert "ARR reported by company" in text
-        # Provided private + transaction comps join the median (12.0 + 10.0
-        # with the three 8/9/10 public fakes → median 10.0).
-        rev_mult_row = _row_for_label(wb, "Evidence", _row_label_startswith(wb, "Evidence", "EV / Revenue multiple"))
-        assert wb["Evidence"].cell(rev_mult_row, 6).value == 10.0
+        assert _first_year_cell_for_label(wb, "Valuation", "Revenue multiple").value == 10.0
 
 
 def test_incomplete_provided_comps_are_registered_but_not_used_for_medians() -> None:
@@ -731,77 +747,14 @@ def test_failed_live_comps_do_not_pollute_company_specific_sources_or_mark_live_
             out = Path(tmp) / "failed.xlsx"
             build_model.build_model(None, out, mode="full")
             wb = load_workbook(out, data_only=False)
-            evidence_text = "\n".join(str(cell.value) for row in wb["Evidence"].iter_rows() for cell in row if cell.value is not None)
-            # Failed fetches stay VISIBLE as failed rows with their error...
-            assert "failed: HTTP Error 401" in evidence_text
-            assert "HTTP Error 401: Unauthorized" in evidence_text
-            # ...the benchmark register declares the evidence gap instead of
-            # inventing sources, and multiples are flagged as fallbacks.
-            assert "No external evidence provided — DD gap" in evidence_text
-            assert "fall back to profile defaults" in evidence_text
-            # No usable median may be marked as a live peer-set multiple.
-            for row in wb["Evidence"].iter_rows(min_col=3, max_col=3):
-                for cell in row:
-                    if isinstance(cell.value, str) and cell.value.startswith("EV / Revenue multiple"):
-                        raise AssertionError("failed comps must not render a live peer multiple row")
+            assert _first_year_cell_for_label(wb, "Valuation", "Revenue multiple").value == 4
+            assert wb["Valuation"].cell(_row_for_label(wb, "Valuation", "Revenue multiple"), source_plan.LAYOUT.source_col).value == "benchmark / refresh required"
+            assert wb["Benchmarks"]["H9"].value == "needs refresh"
+            assert wb["Benchmarks"]["F6"].value == "unknown"
+            bench_text = "\n".join(str(cell.value) for row in wb["Benchmarks"].iter_rows() for cell in row if cell.value is not None)
+            assert "HTTP Error 401" in bench_text
     finally:
         build_model.lc.fetch_public_comps = original_fetch
-
-
-def _load_quality_gates_module():
-    path = SKILL_DIR / "build" / "evals" / "quality_gates.py"
-    spec = importlib.util.spec_from_file_location("startup_finance_quality_gates", path)
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    assert spec.loader is not None
-    spec.loader.exec_module(module)
-    return module
-
-
-def test_quality_gate_rejects_uniform_wrong_period_width() -> None:
-    qg = _load_quality_gates_module()
-    with tempfile.TemporaryDirectory() as tmp:
-        out = Path(tmp) / "wrong_width.xlsx"
-        wb = Workbook()
-        ws = wb.active
-        ws.title = "Period Sheet"
-        ws.freeze_panes = "F7"
-        for col in range(6, 8):
-            ws.cell(row=5, column=col).value = 12
-            ws.cell(row=6, column=col).value = f"FY{col}"
-            ws.column_dimensions[get_column_letter(col)].width = 16.0
-        wb.save(out)
-
-        result = qg.gate_widths_freeze([out])
-        assert result.points == 0.0
-        assert any("expected=11.5" in item for item in result.evidence)
-
-
-def test_quality_gate_build_targets_disable_live_comps_by_default() -> None:
-    qg = _load_quality_gates_module()
-    commands: list[list[str]] = []
-
-    def fake_run(cmd: list[str], timeout: int = 900) -> tuple[int, str]:
-        commands.append(cmd)
-        out = Path(cmd[cmd.index("--output") + 1])
-        wb = Workbook()
-        wb.save(out)
-        return 0, ""
-
-    original_run = qg._run
-    try:
-        qg._run = fake_run
-        with tempfile.TemporaryDirectory() as tmp:
-            qg.build_targets(Path(tmp), allow_live_comps=False)
-            assert commands
-            assert all("--no-live-comps" in cmd for cmd in commands)
-
-            commands.clear()
-            qg.build_targets(Path(tmp), allow_live_comps=True)
-            assert commands
-            assert all("--no-live-comps" not in cmd for cmd in commands)
-    finally:
-        qg._run = original_run
 
 
 def _formula_cells(wb) -> list[tuple[str, str, str]]:
@@ -878,14 +831,10 @@ def test_full_model_uses_direct_formula_refs() -> None:
         assert wb.sheetnames == build_model.resolve_bundle("full")
         assert _defined_name_count(wb) == 0
 
-        # Volatile / indirection functions stay banned. INDEX is a deliberate
-        # v2 mechanism (scenario toggle, COUNTIF-driven FY-end pulls) — the
-        # protective intent (no opaque aliasing, no defined names) is kept by
-        # the defined-name assertion above and the indirection ban below.
         alias_formulas = [
             f"{sheet}!{cell}: {formula}"
             for sheet, cell, formula in _formula_cells(wb)
-            if "OFFSET(" in formula or "INDIRECT(" in formula
+            if "INDEX(" in formula
         ]
         assert alias_formulas == []
 
@@ -907,14 +856,15 @@ def test_intra_sheet_formula_cells_are_black() -> None:
 
 
 def test_ic_memo_dependency_closure_matches_live_formula_readouts() -> None:
-    """--additional-sheets pulls in HARD dependencies only (no transitive
-    explosion): IC Memo's live readouts reference Valuation & Exit, so that
-    sheet joins the bundle — and nothing else does."""
     bundle = build_model.resolve_bundle("market_sizing", additional_sheets=["IC Memo"])
 
     assert "IC Memo" in bundle
-    assert "Valuation & Exit" in bundle
-    assert set(bundle) == {"Guide", "Evidence", "IC Memo", "Valuation & Exit"}
+    assert "Kernel" in bundle
+    assert "KPI" in bundle
+    assert "Scenarios" in bundle
+    assert "Capital Stack" in bundle
+    assert "Ownership" in bundle
+    assert "Valuation" in bundle
 
 
 def test_cash_flow_runway_formula_floors_and_caps_runway() -> None:
@@ -924,18 +874,10 @@ def test_cash_flow_runway_formula_floors_and_caps_runway() -> None:
 
         wb = load_workbook(out, data_only=False)
         formula = _first_year_cell_for_label(wb, "CF", "Runway months").value
-        fcf_row = _row_for_label(wb, "CF", "Free cash flow")
-        end_row = _row_for_label(wb, "CF", "Ending cash")
 
-        # Negative cash is floored at zero; a non-negative free cash flow is
-        # capped at 99 months (spelled 100-1 from the constant whitelist) so
-        # runway never blows up; burn is normalized by the months ruler (F$5)
-        # so the same row formula is grain-correct (R17).
-        f = FIRST_VALUE_LETTER
-        assert formula == (
-            f"=IF({f}{fcf_row}>=0,100-1,MIN(100-1,"
-            f"MAX(0,{f}{end_row})/(ABS({f}{fcf_row})/{f}$5)))"
-        )
+        # Negative cash is floored at zero; a near-zero-negative free cash
+        # flow is capped at 99 months so runway never blows up to thousands.
+        assert formula == f"=IF({FIRST_VALUE_LETTER}16>=0,99,MIN(99,MAX(0,{FIRST_VALUE_LETTER}31)/ABS({FIRST_VALUE_LETTER}16/12)))"
 
 
 def test_cross_sheet_formula_cells_are_green() -> None:
@@ -944,17 +886,12 @@ def test_cross_sheet_formula_cells_are_green() -> None:
         build_model.build_model(None, out, mode="full")
 
         wb = load_workbook(out, data_only=False)
-        # Declared exceptions to the green cross-sheet rule: check rows keep
-        # the numeric-delta check role (OK/ERROR format, black), and the row-2
-        # master-check echo renders as a gray note on every period sheet.
         violations = [
             f"{sheet}!{cell}: {formula} color={color}"
             for sheet, cell, formula in _formula_cells(wb)
             if "!" in formula
             for color in [_font_rgb(wb[sheet][cell])]
             if color != ib.IB_LINK_INTRA
-            and wb[sheet][cell].number_format != source_plan.FMT_CHECK_V2
-            and not (wb[sheet][cell].row == 2 and color == ib.IB_COMMENT)
         ]
         assert violations == []
 
@@ -966,12 +903,12 @@ def test_pricing_bundle_is_formula_complete() -> None:
 
         wb = load_workbook(out, data_only=False)
         assert wb.sheetnames == build_model.resolve_bundle("pricing")
-        # LEAN closed bundle: pricing = 4 tabs, no transitive explosion.
-        assert wb.sheetnames == ["Guide", "Summary", "Assumptions", "Pricing"]
+        assert "Pricing" in wb.sheetnames
+        assert "Assumptions" in wb.sheetnames
+        assert "CF" in wb.sheetnames
+        assert "Valuation" in wb.sheetnames
         all_text = "\n".join(str(cell.value) for ws in wb.worksheets for row in ws.iter_rows() for cell in row if cell.value is not None)
         assert "compact mode placeholder" not in all_text
-        assert "Price support ratio" in all_text
-        assert "Pricing validation plan" in all_text
         assert build_model.audit_workbook(wb) == []
         assert _defined_name_count(wb) == 0
 
@@ -996,33 +933,13 @@ def test_cap_table_mode_uses_state_machine_not_full_workbook() -> None:
 
 
 def test_all_modes_produce_expected_bundles() -> None:
-    # Closed lean bundles (BLUEPRINT_S3 MODE_BUNDLE_SEEDS) — no transitive
-    # dependency explosion. full may drop BS when its drivers are immaterial.
-    expected_sheet_counts = {
-        "full": {11, 12},
-        "pricing": {4},
-        "unit_economics": {4},
-        "burn_runway": {5},
-        "cap_table": {3},
-        "three_statement": {6},
-        "ma_exit": {5},
-        "dcf_only": {4},
-        "market_sizing": {2},
-        "comps_only": {4},
-    }
-    assert set(expected_sheet_counts) == set(build_model.VALID_MODES)
     with tempfile.TemporaryDirectory() as tmp:
         for mode in build_model.VALID_MODES:
             out = Path(tmp) / f"{mode}.xlsx"
             build_model.build_model(None, out, mode=mode)
 
             wb = load_workbook(out, data_only=False)
-            assert len(wb.sheetnames) in expected_sheet_counts[mode], (
-                f"{mode}: unexpected bundle {wb.sheetnames}"
-            )
-            facts, raw = build_model._facts_for_inputs(None, None)
-            facts = build_model._facts_with_mode_defaults(facts, mode, raw, None)
-            assert wb.sheetnames == build_model.resolve_bundle(mode, facts=facts)
+            assert wb.sheetnames == build_model.resolve_bundle(mode)
             assert _defined_name_count(wb) == 0
             assert _merged_count(wb) == 0
             assert _wrapped_cells(wb) == []
@@ -1030,76 +947,35 @@ def test_all_modes_produce_expected_bundles() -> None:
             assert _styled_blank_cells(wb) == []
             assert _font_design_violations(wb) == []
             assert _semantic_alignment_violations(wb) == []
-            # Freeze polarity (v2): period-axis sheets freeze at (first
-            # period col, row 7); non-period sheets carry no freeze.
             for ws in wb.worksheets:
-                anchor_col = build_model._v2_period_anchor_col(ws)
-                if anchor_col is not None:
-                    expected = ws.cell(row=7, column=anchor_col).coordinate
-                    assert ws.freeze_panes == expected, (
-                        f"{mode}:{ws.title} freeze={ws.freeze_panes} expected={expected}"
-                    )
-                else:
-                    assert ws.freeze_panes is None, f"{mode}:{ws.title}"
+                assert ws.freeze_panes is None
 
 
 def test_strict_audit_blocks_workbook_design_regressions() -> None:
-    """Build a clean workbook, corrupt it one defect at a time, and assert
-    every audit — including the S5 promoted audits — fires with a precise
-    sheet!cell message."""
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "full.xlsx"
         build_model.build_model(None, out, mode="full")
         wb = load_workbook(out, data_only=False)
         assert build_model.audit_workbook(wb) == []
 
-        # --- legacy audits ------------------------------------------------
-        guide = wb["Guide"]
-        guide.merge_cells("K1:L1")
-        marker_row = _row_for_label(wb, "Guide", "Model qualifications")
-        guide.cell(marker_row, 2).value = "Removed marker"
-        guide["C7"].alignment = Alignment(wrap_text=True)
-        guide["C7"].font = Font(name=ib.FONT_FAMILY, size=16)
-        guide["K2"].value = "manual\nline break"
-
-        # --- S5 promoted audits (synthetic violations) ---------------------
-        pl = wb["P&L"]
-        # 1. freeze anchor: break the F7 contract on a period sheet.
-        pl.freeze_panes = "A1"
-        # 2. width uniformity: widen one period column.
-        pl.column_dimensions["G"].width = 15.0
-        # 3. unit/format agreement: money row rendered with a percent format.
-        rev_row = _row_for_label(wb, "P&L", "Total revenue")
-        pl.cell(rev_row, 8).number_format = ib.FMT_JP_PERCENT
-        # (probe order: make the corrupted cell the first numeric/formula one)
-        pl.cell(rev_row, 6).value = None
-        pl.cell(rev_row, 7).value = None
-        # 4. hardcoded constant outside the whitelist.
-        ebitda_row = _row_for_label(wb, "P&L", "EBITDA")
-        pl.cell(ebitda_row, 9).value = "=F9*7777"
-        # 5. R17: the same row now differs across period columns.
-        # (the edit above already breaks row-formula consistency)
-        # 6. check-row presence: retitle the Summary master check.
-        master_row = _row_for_label(wb, "Summary", "Master check")
-        wb["Summary"].cell(master_row, 3).value = "Renamed row"
-        for row in wb["BS"].iter_rows():
-            for cell in row:
-                if cell.number_format == source_plan.FMT_CHECK_V2:
-                    cell.number_format = "General"
+        ws = wb["Guide"]
+        ws.freeze_panes = "C6"
+        ws.merge_cells("K1:L1")
+        # C10 holds "Workbook map" in the generated Guide sheet (canonical layout: B=indent, C=label).
+        ws["C10"].value = "Removed marker"
+        ws["C7"].alignment = Alignment(wrap_text=True)
+        ws["C7"].font = Font(name=ib.FONT_FAMILY, size=16)
+        ws["K2"].value = "manual\nline break"
+        wb["P&L"]["F7"].alignment = Alignment(horizontal="left")
 
         issues = build_model.audit_workbook(wb)
+        assert any("Guide has frozen panes" in issue for issue in issues)
         assert any("Guide has merged cell range" in issue for issue in issues)
-        assert any("Guide is missing sheet-quality marker" in issue and "Model qualifications" in issue for issue in issues)
+        assert any("Guide is missing sheet-quality marker" in issue and "Workbook map" in issue for issue in issues)
         assert any("C7 has wrap_text enabled" in issue for issue in issues)
         assert any("C7 uses non-standard font size" in issue for issue in issues)
         assert any("K2 contains a manual line break" in issue for issue in issues)
-        assert any("P&L period-axis sheet must freeze at F7" in issue for issue in issues)
-        assert any("P&L!G period column width 15.0 != 11.5" in issue for issue in issues)
-        assert any(f"P&L!H{rev_row}" in issue and "disagrees" in issue for issue in issues)
-        assert any(f"P&L!I{ebitda_row} hardcoded constant 7777" in issue for issue in issues)
-        assert any(f"row formula varies across period columns" in issue and "P&L" in issue for issue in issues)
-        assert any("Summary has no master check row" in issue for issue in issues)
-        assert any("BS has no check row" in issue for issue in issues)
+        assert any("P&L!F7 numeric/formula cell is left" in issue for issue in issues)
 
 
 def test_generated_modes_do_not_reference_removed_sheets() -> None:
@@ -1125,10 +1001,6 @@ def test_generated_modes_do_not_reference_removed_sheets() -> None:
 
 
 def test_structured_yaml_controls_grain_periods_and_drivers() -> None:
-    """YAML controls the v2 axis and drivers: grain/periods/start_year/
-    fiscal_year_end_month shape the period columns; statutory_welfare_rate,
-    consumption_tax_rate, and AR/AP site months reach their JP-practice
-    consumers; stated driver series land as blue inputs."""
     with tempfile.TemporaryDirectory() as tmp:
         input_path = Path(tmp) / "model.yaml"
         out = Path(tmp) / "structured.xlsx"
@@ -1139,16 +1011,15 @@ def test_structured_yaml_controls_grain_periods_and_drivers() -> None:
                     "grain: monthly",
                     "periods: 6",
                     "start_year: 2026",
-                    "fiscal_year_end_month: 6",
-                    "statutory_welfare_rate: 15%",
-                    "consumption_tax_rate: 10%",
-                    "ar_site_months: 1.5",
-                    "ap_site_months: 2",
-                    "customers: [10, 20, 30, 40, 50, 60]",
+                    "segments: [Japan SaaS, Hardware]",
+                    "new_units: [10, 20, 30, 40, 50, 60]",
                     "monthly_price_yen: [100000, 110000, 120000, 130000, 140000, 150000]",
+                    "value_capture_share: [30%, 30%, 28%, 28%, 25%, 25%]",
                     "target_gross_margin: [65%, 65%, 68%, 68%, 70%, 70%]",
-                    "equity_raise_yen: [10000000, 0, 0, 0, 0, 0]",
-                    "beginning_cash_yen: 50000000",
+                    "support_tickets_per_customer: [10, 9, 8, 7, 6, 5]",
+                    "evidence_status: pipeline-backed estimate",
+                    "grants_yen: [10000000, 0, 0, 0, 0, 0]",
+                    "convertibles_yen: [0, 50000000, 0, 0, 0, 0]",
                 ]
             ),
             encoding="utf-8",
@@ -1157,69 +1028,30 @@ def test_structured_yaml_controls_grain_periods_and_drivers() -> None:
         wb = load_workbook(out, data_only=False)
 
         first_col = FIRST_VALUE_COL
-        a = wb["Assumptions"]
-        # FY2026 with FYE=6 starts 2025/07: six real calendar-month columns.
-        assert [a.cell(6, c).value for c in range(first_col, first_col + 6)] == [
-            "2025/07", "2025/08", "2025/09", "2025/10", "2025/11", "2025/12",
-        ]
-        # Months ruler: monthly grain = 1 month per column.
-        assert [a.cell(5, c).value for c in range(first_col, first_col + 6)] == [1] * 6
-        # Stated drivers land as blue inputs at the stated per-period values.
-        customers_row = _row_for_label(wb, "Assumptions", "Total customers (ending)")
-        assert a.cell(customers_row, first_col).value == 10
-        price_row = _row_for_label(wb, "Assumptions", _row_label_startswith(wb, "Assumptions", "Monthly price"))
-        assert a.cell(price_row, first_col).value == 100000
-        assert a.cell(price_row, first_col + 5).value == 150000
-        assert _font_rgb(a.cell(price_row, first_col)) == ib.IB_HARD_INPUT
-        gm_row = _row_for_label(wb, "Assumptions", "Target gross margin")
-        assert a.cell(gm_row, first_col).value == 0.65
-        # JP-practice parameters reach their consumers.
-        welfare_row = _row_for_label(wb, "Assumptions", "Statutory welfare rate")
-        assert a.cell(welfare_row, first_col).value == 0.15
-        loaded_row = _row_for_label(wb, "People Plan", _row_label_startswith(wb, "People Plan", "Fully loaded comp"))
-        base_row = _row_for_label(wb, "People Plan", _row_label_startswith(wb, "People Plan", "Avg base salary"))
-        rate_row = _row_for_label(wb, "People Plan", "Statutory welfare rate")
-        assert wb["People Plan"].cell(loaded_row, first_col).value == (
-            f"={FIRST_VALUE_LETTER}{base_row}*(1+{FIRST_VALUE_LETTER}{rate_row})"
-        )
-        ar_formula = _first_year_cell_for_label(wb, "CF", "Accounts receivable").value
-        ar_site_row = _row_for_label(wb, "Assumptions", "AR collection site")
-        assert f"'Assumptions'!F{ar_site_row}" in ar_formula, "stated AR site months must drive AR (サイト優先)"
-        fye_row = _row_for_label(wb, "Assumptions", "Fiscal year end month")
-        assert a.cell(fye_row, first_col).value == 6
-        tax_row = _row_for_label(wb, "Assumptions", "Consumption tax rate")
-        assert a.cell(tax_row, first_col).value == 0.10
-        # Financing + opening cash.
-        equity_row = _row_for_label(wb, "Assumptions", "Equity financing")
-        assert a.cell(equity_row, first_col).value == 10000000
-        cash_row = _row_for_label(wb, "Assumptions", _row_label_startswith(wb, "Assumptions", "Beginning cash"))
-        assert a.cell(cash_row, first_col).value == 50000000
+        assert [wb["Assumptions"].cell(5, c).value for c in range(first_col, first_col + 6)] == ["M1", "M2", "M3", "M4", "M5", "M6"]
+        assert wb["Guide"]["C7"].value == "Purpose"
+        assert wb["Assumptions"].cell(7, first_col).value == 10
+        assert wb["Assumptions"].cell(11, first_col + 5).value == 150000
+        assert wb["Financing"].cell(7, first_col).value == 10000000
+        assert wb["Financing"].cell(8, first_col + 1).value == 50000000
+        assert wb["Segments"].cell(6, source_plan.LAYOUT.label_col).value == "Japan SaaS"
+        assert wb["Assumptions"].cell(_row_for_label(wb, "Assumptions", "Value capture share"), first_col).value == 0.30
+        assert wb["Assumptions"].cell(_row_for_label(wb, "Assumptions", "Target gross margin"), first_col).value == 0.65
+        assert wb["Assumptions"].cell(_row_for_label(wb, "Assumptions", "Support tickets / customer / year"), first_col).value == 10
+        assert wb["Assumptions"].cell(_row_for_label(wb, "Assumptions", "Pricing evidence status"), first_col).value == "pipeline-backed"
 
 
 def test_balance_sheet_has_opening_capital_counterpart() -> None:
-    """The BS books opening cash as paid-in capital (first period only, via
-    the months-ruler prior-column guard) plus cumulative equity raises, and
-    reconciles with an explicit rounded balance check."""
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "full.xlsx"
         build_model.build_model(None, out, mode="full")
         wb = load_workbook(out, data_only=False)
 
-        f = FIRST_VALUE_LETTER
-        capital_row = _row_for_label(wb, "BS", _row_label_startswith(wb, "BS", "Paid-in capital"))
-        cash_row = _row_for_label(wb, "Assumptions", _row_label_startswith(wb, "Assumptions", "Beginning cash"))
-        equity_row = _row_for_label(wb, "Assumptions", "Equity financing")
-        assert wb["BS"].cell(capital_row, FIRST_VALUE_COL).value == (
-            f"=N(E{capital_row})+IF(N(E$5)=0,'Assumptions'!$F${cash_row},0)"
-            f"+'Assumptions'!{f}{equity_row}"
-        )
-        assets_row = _row_for_label(wb, "BS", "Total assets")
-        liabilities_row = _row_for_label(wb, "BS", "Total liabilities")
-        equity_total_row = _row_for_label(wb, "BS", "Total equity")
-        check_row = _row_for_label(wb, "BS", "Balance check")
-        assert wb["BS"].cell(check_row, FIRST_VALUE_COL).value == (
-            f"=ROUND({f}{assets_row}-{f}{liabilities_row}-{f}{equity_total_row},0)"
-        )
+        first_col = FIRST_VALUE_COL
+        first_letter = FIRST_VALUE_LETTER
+        assert wb["Assumptions"].cell(57, source_plan.LAYOUT.label_col).value == "Opening equity / prior capital"
+        assert wb["BS"].cell(23, first_col).value == f"='Assumptions'!{first_letter}57+'Capital Stack'!{first_letter}7+'Financing'!{first_letter}7-'Financing'!{first_letter}13"
+        assert wb["BS"].cell(27, first_col).value == f"={first_letter}15-{first_letter}21-{first_letter}25"
 
 
 def test_mfn_applied_only_for_changed_safe_terms() -> None:
@@ -1504,13 +1336,14 @@ def test_skill_guidance_makes_no_wrap_rule_explicit() -> None:
     assert "Do not use merged cells as the repair" in design_flat
     assert "明示的に wrap_text=True" not in ib_text
     assert "set row height to the exact rendered visible line count" in skill_flat
-    assert "exact line-count row heights" in layout_flat
-    assert "No merged cells, ever" in layout_flat
-    assert "No wrapped text in generated cells" in layout_flat
+    assert "clipped text, auto-height guesses, or oversized padded rows are design defects" in layout_flat
+    assert "No-Merge Rule" in layout_text
+    assert "let the text read horizontally through those blank cells without merging" in layout_flat
     assert "exact rendered visible line count" in design_flat
     assert "wrapped_text_row_height" in ib_text
     assert "set_wrapped_exception_row_height" in ib_text
-    assert "exact rendered visible-line-count row height" in eval_text
+    assert "row height matched exactly to the rendered visible line count" in eval_text
+    assert "visible wrap/tall-text rows are audited by role" in eval_text
     assert "no unnecessary wrapping on horizontal-read" in eval_text
     assert "IB wrap decision ladder" in design_text
     assert "Use the IB wrap decision ladder" in skill_full
@@ -1548,217 +1381,6 @@ def test_skill_guidance_requires_fix_and_rerun_iteration() -> None:
     assert "verify both model logic and sheet design with command-based workbook checks plus rendered-output inspection" in eval_flat
 
 
-def test_self_improvement_protocol_triggers_from_logs_and_feedback() -> None:
-    skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
-    invocation_text = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
-    self_improve_text = (SKILL_DIR / "build" / "references" / "_self_improvement_protocol.md").read_text(encoding="utf-8")
-    prompt_research_text = (SKILL_DIR / "build" / "references" / "_ai_prompt_research_patterns.md").read_text(encoding="utf-8")
-    combined_flat = " ".join("\n".join([skill_text, invocation_text, self_improve_text, prompt_research_text]).split())
-
-    for phrase in [
-        "post-output/session-log-driven improvements",
-        "At every closeout and every improvement prompt",
-        "user asks to improve or repair a prior skill output",
-        "Tests, strict audit, quality gates, recalc/render checks",
-        "failed checks, repeated workarounds, cleanup noise, or tool/routing inefficiency",
-        "User feedback reveals a gap between the intended decision and the delivered workbook",
-        "route session-log, trace, eval, reflection, and X-practitioner signals through `_self_improvement_protocol.md`",
-    ]:
-        assert phrase in combined_flat
-
-
-def test_self_improvement_protocol_requires_regression_proof_and_privacy() -> None:
-    review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
-    improve_text = (SKILL_DIR / "build" / "references" / "_self_improvement_protocol.md").read_text(encoding="utf-8")
-    evals = json.loads((SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8"))["evals"]
-    combined_flat = " ".join("\n".join([review_text, improve_text]).split())
-
-    for phrase in [
-        "Inspect only the minimum sanitized evidence needed to learn the failure mode",
-        "Never store raw local logs, secrets, API keys, private source text, customer data, full conversation transcripts, or personal identifiers",
-        "Classify the signal: one-off artifact issue, reusable skill gap, eval gap, runtime helper bug, reference/protocol gap, dependency/tooling gap, or documentation ambiguity",
-        "Patch the lowest durable layer",
-        "Add regression proof",
-        "validate_reflection_record",
-        "Before writing any Reflection Record",
-        "Reflection Record",
-        "failure pattern -> generalized rule -> required check",
-        "Capability evals prove broad skill behavior",
-        "regression evals protect known failures and should stay near-perfect",
-        "holdout/adversarial examples should not be tuned against during the same iteration",
-        "cost and efficiency signals such as wall time, repeated tool calls",
-        "cost/latency or tool-call impact when it affected the run",
-        "milestone/human review",
-        "Rerun the check that failed and one broader gate",
-        "Use X/public social posts only as weak signals",
-        "Do not generalize a lesson into the skill",
-        "company-specific, confidential, unsupported by evidence, or lacks a testable regression hook",
-    ]:
-        assert phrase in combined_flat
-
-    missing = []
-    for item in evals:
-        refs = set(item.get("applicable_references", []))
-        if "_self_improvement_protocol" not in refs:
-            missing.append(f"{item['id']}:{item['name']} missing _self_improvement_protocol")
-    assert missing == []
-    assert any(
-        assertion.get("id") == "SELF_IMPROVEMENT_PROTOCOL"
-        for item in evals
-        for assertion in item.get("assertions", [])
-    )
-    assert any(
-        item.get("name") == "self_improvement_from_failed_session_log"
-        and "failed command log" in item.get("prompt", "").lower()
-        and "Reflection Record" in item.get("expected_output", "")
-        for item in evals
-    )
-
-
-def test_self_improvement_reflection_validator_rejects_privacy_and_overfit_records() -> None:
-    valid = {
-        "task_type": "post_output_repair",
-        "artifact_type": "xlsx",
-        "redacted_evidence": "strict audit failed on row-formula consistency, then passed",
-        "observed_failure": "manual repair loop repeated because the check was missing",
-        "verification_evidence": "targeted pytest and quality gate passed",
-        "root_cause_category": "eval_gap",
-        "generalized_lesson": "When a repeated repair loop reveals a formula-shape defect, promote the invariant into a deterministic gate.",
-        "proposed_change_layer": "quality_gate",
-        "privacy_classification": "sanitized",
-        "regression_proof": "pytest: self-improvement validator and quality gate G-J",
-        "is_reusable": True,
-        "public_signal_type": "x",
-        "x_public_signal": "public posts summarized as weak workflow signal only",
-        "milestone_review": True,
-    }
-    assert self_improvement.validate_reflection_record(valid) == []
-
-    invalid = dict(valid)
-    invalid.update({
-        "redacted_evidence": "token=sk-proj-1234567890abcdefghijklmnop",
-        "generalized_lesson": "For GateCo, hard-code 120000 yen after seeing @example_user's post.",
-        "company_names": ["GateCo"],
-        "raw_public_post": "copied post text",
-        "changes_audit_pass_criteria": True,
-        "milestone_review": False,
-    })
-    errors = set(self_improvement.validate_reflection_record(invalid))
-    assert {
-        "sensitive:named_secret",
-        "sensitive:openai_key",
-        "overfit:company_specific_lesson",
-        "overfit:instance_numeric_lesson",
-        "x_signal:handle_not_stripped",
-        "x_signal:raw_post_not_allowed",
-        "review_required:audit_or_doctrine_change",
-    } <= errors
-
-
-def test_self_improvement_panel_rejects_schema_valid_quality_degradation() -> None:
-    degraded = {
-        "task_type": "post_output_repair",
-        "artifact_type": "xlsx",
-        "redacted_evidence": "user said the workbook should feel more premium",
-        "observed_failure": "closeout wording did not persuade the user",
-        "verification_evidence": "manual review only",
-        "root_cause_category": "documentation_ambiguity",
-        "generalized_lesson": "Always improve.",
-        "proposed_change_layer": "skill_trigger",
-        "privacy_classification": "sanitized",
-        "regression_proof": "self-review",
-        "is_reusable": True,
-        "record_author": "codex-runner",
-        "panel_reviewer": "independent-reviewer-r1",
-        "panel_evidence_citations": [],
-        "evidence_count": 1,
-    }
-    assert self_improvement.validate_reflection_record(degraded) == []
-    panel = self_improvement.score_reflection_panel(degraded)
-    assert panel["accepted"] is False
-    assert {
-        "panel:weak_regression_proof",
-        "panel:weak_generalized_lesson",
-        "pruning:n1_requires_deferred_candidate",
-    } <= set(panel["blockers"])
-
-
-def test_self_improvement_panel_accepts_evidence_backed_independent_record() -> None:
-    accepted = {
-        "task_type": "post_output_repair",
-        "artifact_type": "xlsx",
-        "redacted_evidence": "quality gate G-D failed in two runs, then passed after a formula-shape assertion",
-        "observed_failure": "period formulas diverged after repeated manual repair loops",
-        "verification_evidence": "targeted pytest passed and quality_gates.py reran clean",
-        "root_cause_category": "quality_gate_gap",
-        "generalized_lesson": "When repeated workbook repairs expose the same formula-shape gap, promote the invariant into a deterministic gate before accepting closeout.",
-        "proposed_change_layer": "quality_gate",
-        "privacy_classification": "sanitized",
-        "regression_proof": "pytest: self-improvement panel regression and quality gate G-K",
-        "is_reusable": True,
-        "record_author": "codex-runner",
-        "panel_reviewer": "independent-reviewer-r2",
-        "panel_evidence_citations": ["redacted_evidence", "verification_evidence", "regression_proof"],
-        "evidence_count": 2,
-        "broader_gate_to_rerun": "quality_gates.py",
-        "expected_quality_effect": "turns a recurring manual repair into an auditable workbook gate",
-        "milestone_review": True,
-    }
-    assert self_improvement.validate_reflection_record_for_acceptance(accepted) == []
-    missing_reviewer = dict(accepted)
-    missing_reviewer.pop("panel_reviewer")
-    assert "panel:reviewer_required" in self_improvement.validate_reflection_record_for_acceptance(missing_reviewer)
-    specific_language = dict(accepted)
-    specific_language["generalized_lesson"] = (
-        "When repeated workbook repairs expose the same formula-shape gap, "
-        "promote the invariant into a deterministic gate to preserve high quality financial-model output."
-    )
-    specific_language["regression_proof"] = (
-        "none of the previously passing tests regressed; pytest and quality_gates.py both passed clean"
-    )
-    assert self_improvement.validate_reflection_record_for_acceptance(specific_language) == []
-
-
-def test_self_improvement_closeout_consistency_catches_links_and_count_drift(tmp_path: Path) -> None:
-    protocol = tmp_path / "protocol.md"
-    protocol.write_text(
-        "[good](kept.md)\n"
-        "[missing](missing.md)\n"
-        "<!-- sfm-closeout-count name=\"refs\" expected=\"3\" glob=\"*.md\" -->\n",
-        encoding="utf-8",
-    )
-    (tmp_path / "kept.md").write_text("ok\n", encoding="utf-8")
-
-    errors = set(closeout_consistency.check_closeout_consistency([protocol]))
-    assert "dangling_ref:protocol.md->missing.md" in errors
-    assert "count_drift:protocol.md:refs:expected=3:found=2:glob=*.md" in errors
-
-
-def test_self_improvement_failure_modes_and_pruning_are_linked_from_gates() -> None:
-    protocol_text = (SKILL_DIR / "build" / "references" / "_self_improvement_protocol.md").read_text(encoding="utf-8")
-    failure_text = (SKILL_DIR / "build" / "references" / "_self_improvement_failure_modes.md").read_text(encoding="utf-8")
-    pruning_text = (SKILL_DIR / "build" / "references" / "_self_improvement_pruning.md").read_text(encoding="utf-8")
-    gate_text = (SKILL_DIR / "build" / "evals" / "quality_gates.py").read_text(encoding="utf-8")
-    eval_text = (SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8")
-    combined = "\n".join([protocol_text, failure_text, pruning_text, gate_text, eval_text])
-
-    for phrase in [
-        "_self_improvement_reviewer_panel.md",
-        "_self_improvement_failure_modes.md",
-        "_self_improvement_pruning.md",
-        "model collapse",
-        "reward hacking / Goodhart",
-        "sycophancy",
-        "eval overfit",
-        "non-convergence",
-        "n=1 evidence normally becomes a sanitized deferred candidate",
-        "Rules fail at the prompt and succeed at the boundary",
-        "score_reflection_panel",
-        "closeout_consistency.py",
-    ]:
-        assert phrase in combined
-
-
 def test_skill_guidance_uses_meaningful_sparse_fills_and_borders() -> None:
     skill_text = (SKILL_DIR / "SKILL.md").read_text(encoding="utf-8")
     invocation_text = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
@@ -1784,9 +1406,8 @@ def test_skill_guidance_uses_meaningful_sparse_fills_and_borders() -> None:
     assert "do not stop a fill because a cell is blank" in " ".join(skill_full.split()).lower()
     assert "for every filled row, name its role and inspect the start column, end column" in " ".join(self_review_text.split()).lower()
     assert "semantic row-span helper in\n`ib_format.py` for fill/border row components" in design_text
-    assert "rectangular semantic fill and border spans including member blank cells" in eval_text
-    assert "not a ragged set of populated cells" in combined_flat
-    assert "consecutive heavy borders" in combined_flat
+    assert "rectangular column-consistent fill and border spans chosen from the attached table/block" in eval_text
+    assert "heavy border pattern or ragged populated-cell-only rule" in combined_flat
     assert "prominent borders follow the same meaning-first rule as fills" in combined_flat
     assert "do not stop a border because a cell is blank" in " ".join(skill_full.split()).lower()
     assert "draw the rule across that full span, including blank cells inside the component" in combined_flat
@@ -1859,25 +1480,9 @@ def test_skill_guidance_enforces_ib_font_size_discipline() -> None:
 
 def test_xlsx_evals_load_full_design_reference_stack() -> None:
     evals = json.loads((SKILL_DIR / "build" / "evals" / "evals.json").read_text(encoding="utf-8"))["evals"]
-    required = {
-        "_layout_canonical",
-        "_ib_workbook_design_system",
-        "_self_review_protocol",
-        "_self_improvement_protocol",
-        "_sheet_quality_rubric",
-    }
+    required = {"_layout_canonical", "_ib_workbook_design_system", "_self_review_protocol", "_sheet_quality_rubric"}
     missing = []
     for item in evals:
-        if str(item.get("name", "")).startswith("self_improvement_"):
-            refs = set(item.get("applicable_references", []))
-            assertions = {assertion.get("id") for assertion in item.get("assertions", [])}
-            if "_self_improvement_protocol" not in refs:
-                missing.append(f"{item['id']}:{item['name']} missing _self_improvement_protocol")
-            if item.get("name") == "self_improvement_from_failed_session_log":
-                for assertion_id in ("SI1", "SI2", "SI3", "SI4"):
-                    if assertion_id not in assertions:
-                        missing.append(f"{item['id']}:{item['name']} missing {assertion_id}")
-            continue
         refs = set(item.get("applicable_references", []))
         if not required <= refs:
             missing.append(f"{item['id']}:{item['name']} missing {sorted(required - refs)}")
@@ -2294,20 +1899,10 @@ def _border_density_violations(wb) -> list[str]:
             if not row_has_value:
                 continue
             populated_rows += 1
-            # Horizontal rules only: vertical rules are structural column
-            # declarations (e.g. the hybrid monthly→annual boundary), and
-            # semantic band rows (header/section fills) declare their rule
-            # through the fill role — neither is per-row gridline decoration.
-            row_cells = [ws.cell(row=row_idx, column=col) for col in range(1, ws.max_column + 1)]
-            if any(
-                _fill_rgb(cell) in {ib.BG_TABLE_HEADER, ib.BG_HEADER_BAND, ib.BG_TOTAL_BAND}
-                for cell in row_cells
-            ):
-                continue
             has_border = any(
-                getattr(getattr(cell.border, side_name), "style", None)
-                for cell in row_cells
-                for side_name in ("top", "bottom")
+                getattr(getattr(ws.cell(row=row_idx, column=col).border, side_name), "style", None)
+                for col in range(1, ws.max_column + 1)
+                for side_name in ("top", "bottom", "left", "right")
             )
             if has_border:
                 bordered_rows += 1
@@ -2410,11 +2005,9 @@ def _font_design_violations(wb) -> list[str]:
 
 def _semantic_alignment_violations(wb) -> list[str]:
     violations = []
-    header_rows = {4, 5, ib.HEADER_PERIOD_ROW}
     for ws in wb.worksheets:
         if not source_plan.uses_default_layout(ws):
             continue
-        period_cols = set(build_model._v2_period_cols(ws))
         for row in ws.iter_rows():
             for cell in row:
                 if cell.value is None:
@@ -2422,20 +2015,25 @@ def _semantic_alignment_violations(wb) -> list[str]:
                 alignment = cell.alignment
                 horizontal = alignment.horizontal
                 indent = getattr(alignment, "indent", 0)
-                if cell.row in {4, ib.HEADER_PERIOD_ROW} and cell.column in period_cols and horizontal != "center":
-                    violations.append(f"{ws.title}!{cell.coordinate}: period header horizontal={horizontal}")
-                elif cell.row == 5 and cell.column in period_cols and horizontal not in ("right", "center"):
-                    violations.append(f"{ws.title}!{cell.coordinate}: months ruler horizontal={horizontal}")
-                elif cell.row not in header_rows and cell.column == source_plan.LAYOUT.source_col:
+                if cell.row == 5 and cell.column >= FIRST_VALUE_COL:
+                    if cell.value == "Comment":
+                        if horizontal != "left":
+                            violations.append(f"{ws.title}!{cell.coordinate}: comment header horizontal={horizontal}")
+                    elif horizontal != "center":
+                        violations.append(f"{ws.title}!{cell.coordinate}: period header horizontal={horizontal}")
+                elif cell.row != 5 and cell.column == source_plan.LAYOUT.source_col:
                     if horizontal != "left" or not cell.font.italic or _font_rgb(cell) != ib.IB_COMMENT:
                         violations.append(f"{ws.title}!{cell.coordinate}: source alignment/font")
-                elif cell.row not in header_rows and cell.column == source_plan.LAYOUT.unit_col:
+                elif cell.row != 5 and cell.column == source_plan.LAYOUT.unit_col:
                     if horizontal != "right" or _font_rgb(cell) != ib.IB_COMMENT:
                         violations.append(f"{ws.title}!{cell.coordinate}: unit alignment/font")
-                elif cell.row not in header_rows and cell.column in (source_plan.LAYOUT.first_hierarchy_col, source_plan.LAYOUT.label_col):
+                elif cell.row != 5 and ws.cell(5, cell.column).value == "Comment":
+                    if horizontal != "left" or not cell.font.italic or _font_rgb(cell) != ib.IB_COMMENT:
+                        violations.append(f"{ws.title}!{cell.coordinate}: comment alignment/font")
+                elif cell.row != 5 and cell.column in (source_plan.LAYOUT.first_hierarchy_col, source_plan.LAYOUT.label_col):
                     if horizontal != "left" or indent:
                         violations.append(f"{ws.title}!{cell.coordinate}: label horizontal={horizontal} indent={indent}")
-                elif cell.row not in header_rows and cell.column >= FIRST_VALUE_COL:
+                elif cell.row != 5 and cell.column >= FIRST_VALUE_COL:
                     if isinstance(cell.value, (int, float)) or (isinstance(cell.value, str) and cell.value.startswith("=")):
                         if horizontal != "right":
                             violations.append(f"{ws.title}!{cell.coordinate}: value horizontal={horizontal}")
@@ -2444,10 +2042,12 @@ def _semantic_alignment_violations(wb) -> list[str]:
 
 def _money_unit_format_mismatches(wb) -> list[str]:
     expected = {
-        "円": {ib.FMT_JP_YEN},
-        "千円": {ib.FMT_JP_THOUSAND},
-        "百万円": {ib.FMT_JP_MILLION},
-        "十億円": {ib.FMT_JP_BILLION},
+        "円": {ib.FMT_JPY_YEN},
+        "千円": {ib.FMT_JPY_THOUSAND},
+        "百万円": {ib.FMT_MONEY, ib.FMT_MONEY_DECIMAL, ib.FMT_JPY_MILLION},
+        "億円": {ib.FMT_JPY_HUNDRED_MILLION},
+        "十億円": {ib.FMT_JPY_BILLION},
+        "兆円": {ib.FMT_JPY_TRILLION},
         "$": {ib.FMT_USD_DOLLAR},
         "$K": {ib.FMT_USD_THOUSAND},
         "$M": {ib.FMT_USD_MILLION},
@@ -2474,24 +2074,21 @@ def _money_unit_format_mismatches(wb) -> list[str]:
 
 
 def _semantic_unit_format_mismatches(wb) -> list[str]:
-    count_like = {source_plan.FMT_COUNT_V2, "0", "0.0", ib.FMT_INTEGER, ib.FMT_NUM}
     expected = {
         "%": {
-            ib.FMT_JP_PERCENT,
             ib.FMT_PERCENT,
             ib.FMT_PERCENT_BPS,
             ib.FMT_PCT_0,
             ib.FMT_PCT_1,
             ib.FMT_PCT_2,
         },
-        "x": {ib.FMT_MULTIPLE, ib.FMT_MULTIPLE_1, ib.FMT_MULTIPLE_2, ib.FMT_FACTOR},
-        "FTE": count_like,
-        "units": count_like,
-        "customers": count_like,
-        "count": count_like,
-        "months": count_like | {ib.FMT_MONTHS_1DP},
-        "days": count_like,
-        "check": {source_plan.FMT_CHECK_V2},
+        "x": {ib.FMT_MULTIPLE, ib.FMT_MULTIPLE_1, ib.FMT_MULTIPLE_2},
+        "FTE": {ib.FMT_INTEGER, ib.FMT_NUM},
+        "units": {ib.FMT_INTEGER, ib.FMT_NUM},
+        "customers": {ib.FMT_INTEGER, ib.FMT_NUM},
+        "count": {ib.FMT_INTEGER, ib.FMT_NUM},
+        "months": {ib.FMT_NUM, ib.FMT_INTEGER},
+        "days": {ib.FMT_NUM, ib.FMT_INTEGER},
     }
     mismatches = []
     for ws in wb.worksheets:
@@ -2591,26 +2188,34 @@ Source: customer discovery memo, market sizing memo, lender discussion notes.
         source_plan.build_source_plan_workbook(source_md, out)
         wb = load_workbook(out, data_only=False)
 
-        # Narrative route → the v2 12-sheet surface (BS conditional).
-        assert set(wb.sheetnames) <= set(source_plan.SOURCE_PLAN_SHEETS_V2)
-        for sheet_name in ["Guide", "Summary", "Assumptions", "Revenue Build",
-                           "Cost Build", "People Plan", "P&L", "CF",
-                           "Financing", "Cap Table", "Evidence"]:
+        assert wb.sheetnames == source_plan.SOURCE_PLAN_SHEETS
+        for sheet_name in [
+            "Kernel",
+            "Driver Tree",
+            "Cost Build",
+            "People Plan",
+            "Capital Stack",
+            "Ownership",
+            "Market Support",
+        ]:
             assert sheet_name in wb.sheetnames
         assert _defined_name_count(wb) == 0
         assert _merged_count(wb) == 0
-        assert _formula_count(wb) >= 400
+        assert _formula_count(wb) >= 600
+        assert _chart_count(wb) >= 5
         years = kernel.forecast_years(kernel.extract_start_year(source_text))
-        assert wb["Assumptions"].cell(6, FIRST_VALUE_COL).value == f"FY{years[0]}"
-        assert wb["Assumptions"].cell(6, FIRST_VALUE_COL + len(years) - 1).value == f"FY{years[-1]}"
-        # Stated facts reach the kernel: 月額32万円 pricing.
-        price_row = _row_for_label(wb, "Assumptions", _row_label_startswith(wb, "Assumptions", "Monthly price"))
-        assert wb["Assumptions"].cell(price_row, FIRST_VALUE_COL).value == 320_000
+        assert wb["Assumptions"].cell(5, FIRST_VALUE_COL).value == f"FY{years[0]}"
+        assert wb["Assumptions"].cell(5, FIRST_VALUE_COL + len(years) - 1).value == f"FY{years[-1]}"
+        assert "Economic kernel" in str(wb["Kernel"]["B2"].value)
+        assert "Monthly price" in str(wb["Guide"]["D8"].value)
+        assert "customer discovery memo" in str(wb["Market Support"]["B8"].value)
         assert _wrapped_cells(wb) == []
         assert _manual_line_break_violations(wb) == []
+        assert _unit_label_violations(wb) == []
         assert _raw_money_scale_formula_violations(wb) == []
         assert _numbered_section_labels(wb) == []
         assert _leading_space_labels(wb) == []
+        assert _missing_section_band_fills(wb) == []
         assert _styled_blank_cells(wb) == []
         assert _design_band_span_violations(wb) == []
         assert _repeated_semantic_fill_rows(wb) == []
@@ -2620,26 +2225,59 @@ Source: customer discovery memo, market sizing memo, lender discussion notes.
         assert _font_design_violations(wb) == []
         assert _semantic_alignment_violations(wb) == []
         assert _border_density_violations(wb) == []
+        assert _memo_note_border_violations(wb) == []
         assert _border_style_violations(wb) == []
         assert _border_color_violations(wb) == []
+        assert _money_unit_format_mismatches(wb) == []
         assert _unit_for_label(wb, "Assumptions", "New primary units") == "units"
-        assert _unit_for_label(wb, "Assumptions", "Total customers (ending)") == "customers"
+        assert _unit_for_label(wb, "Assumptions", "Ending primary units") == "units"
+        assert _unit_for_label(wb, "Assumptions", "Total customers") == "customers"
+        assert _unit_for_label(wb, "Assumptions", "Monthly price / unit") == "円"
+        assert _unit_for_label(wb, "Assumptions", "CapEx / primary unit") == "円"
+        assert _unit_for_label(wb, "Assumptions", "Total headcount") == "FTE"
+        assert _unit_for_label(wb, "Assumptions", "Avg loaded comp / FTE") == "円"
+        assert source_plan._display_unit("JPY") == "円"
+        assert source_plan._display_unit("JPY", ib.FMT_MONEY) == "百万円"
+        assert source_plan._display_unit("JPY", ib.FMT_JPY_THOUSAND) == "千円"
+        assert source_plan._display_unit("JPY K") == "千円"
+        assert _unit_for_label(wb, "Capital Stack", "Equity financing") == "百万円"
+        assert _unit_for_label(wb, "Ownership", "Founder ownership") == "%"
+        assert _unit_for_label(wb, "Revenue Build", "Total customers") == "count"
+        assert _unit_for_label(wb, "KPI", "Ending primary units") == "units"
+        assert _unit_for_label(wb, "KPI", "Runway") == "months"
         assert _unit_for_label(wb, "People Plan", "Total headcount") == "FTE"
-        assert _unit_for_label(wb, "CF", "Runway months") == "months"
-        assert _unit_for_label(wb, "Revenue Build", "Demand support coverage") == "x"
+        assert _unit_for_label(wb, "Market Support", "TAM") == "百万円"
+        for label in [
+            "Demand support coverage",
+            "Pricing support ratio",
+            "COGS support ratio",
+            "Ops-CS capacity coverage",
+            "Runway support coverage",
+        ]:
+            assert _unit_for_label(wb, "Assumptions", label) == "x"
+        for label in [
+            "Demand evidence status",
+            "Pricing evidence status",
+            "COGS evidence status",
+            "People evidence status",
+            "Capital evidence status",
+        ]:
+            assert _unit_for_label(wb, "Assumptions", label) == "status"
+            assert _first_year_cell_for_label(wb, "Assumptions", label).value == "estimate"
+        assert _first_year_cell_for_label(wb, "Assumptions", "Implied variable COGS %").value == f"=IF({FIRST_VALUE_LETTER}11=0,0,{FIRST_VALUE_LETTER}88/({FIRST_VALUE_LETTER}11*12))"
+        assert _first_year_cell_for_label(wb, "Assumptions", "Required Ops-CS FTE from ticket load").value == f"=IF({FIRST_VALUE_LETTER}86=0,0,{FIRST_VALUE_LETTER}13*{FIRST_VALUE_LETTER}84/{FIRST_VALUE_LETTER}86)"
         assert _first_year_cell_for_label(wb, "Assumptions", "New primary units").value > 0
-        assert _first_year_cell_for_label(wb, "Assumptions", _row_label_startswith(wb, "Assumptions", "CapEx / ")).value > 0
-        # Evidence status is declared per assumption row in the notes column.
-        note_col = 6 + len(years)
-        statuses = {
-            str(wb["Assumptions"].cell(row, note_col).value or "")
-            for row in range(8, wb["Assumptions"].max_row + 1)
-        }
-        assert any("estimate" in status for status in statuses), (
-            "Assumptions rows must carry evidence status in the notes column"
-        )
-        # The full strict audit (incl. the S5 promoted audits) holds.
-        assert build_model.audit_workbook(wb) == []
+        assert _first_year_cell_for_label(wb, "Assumptions", "New primary units").number_format == ib.FMT_INTEGER
+        assert _first_year_cell_for_label(wb, "Assumptions", "CapEx / primary unit").value > 0
+        assert _first_year_cell_for_label(wb, "Assumptions", "Avg loaded comp / FTE").value > 0
+        assert _first_year_cell_for_label(wb, "Capital Stack", "Equity financing").value > 0
+        assert _first_year_cell_for_label(wb, "KPI", "Runway").number_format == ib.FMT_NUM
+        assert _first_year_cell_for_label(wb, "Market Support", "TAM").value >= 1_000_000_000_000
+        assert _first_year_cell_for_label(wb, "Revenue Build", "Recurring revenue").value == f"={FIRST_VALUE_LETTER}9*{FIRST_VALUE_LETTER}11*12"
+        assert _first_year_cell_for_label(wb, "KPI", "Unit payback").value == f'=IF({FIRST_VALUE_LETTER}9<=0,"N/A",\'Assumptions\'!{FIRST_VALUE_LETTER}38/{FIRST_VALUE_LETTER}9)'
+        assert _fill_rgb(wb["BS"].cell(_row_for_label(wb, "BS", "Balance check"), FIRST_VALUE_COL)) == ib.BG_WORKING
+        assert _fill_rgb(wb["Ownership"].cell(_row_for_label(wb, "Ownership", "Ownership check"), FIRST_VALUE_COL)) == ib.BG_WORKING
+        assert _fill_rgb(wb["Valuation"].cell(_row_for_label(wb, "Valuation", "Selected EV midpoint"), FIRST_VALUE_COL)) == ib.BG_WORKING
 
 
 def test_generated_workbook_has_sheet_specific_quality_markers() -> None:
@@ -2649,42 +2287,49 @@ AI device deployment with 月額32万円 pricing, capex, financing, ownership,
 valuation, market sizing, benchmark refresh, and DD needs.
 Source: management memo, customer discovery memo.
 """
-    # v2 sheet-quality markers are the audit contract itself: every sheet in
-    # REQUIRED_SHEET_MARKERS must render its markers. Verify against real
-    # builds across the mode surface (full + all conditional sheets).
+    expected_markers = {
+        "Guide": ["Sheet-level acceptance criteria", "Workbook map"],
+        "Kernel": ["Economic kernel", "Mechanics", "Engine composition"],
+        "Assumptions": ["Source / driver", "Support ratio"],
+        "Driver Tree": ["Decision relevance", "Workbook owner"],
+        "Revenue Build": ["Revenue drivers", "Total revenue"],
+        "Cost Build": ["Gross profit bridge", "Gross margin"],
+        "People Plan": ["Total headcount", "Avg loaded comp / FTE"],
+        "P&L": ["Gross profit", "EBITDA"],
+        "BS": ["Balance check", "Total assets"],
+        "CF": ["Operating cash flow", "Ending cash", "Runway"],
+        "Capital Stack": ["Runway", "Illustrative post-money"],
+        "Ownership": ["Ownership check", "Founder ownership"],
+        "Pricing": ["Customer ROI", "Suggested floor price"],
+        "Financing": ["Funding gap", "Financing cash inflow"],
+        "Exit Waterfall": ["Investor proceeds", "Founder proceeds"],
+        "Segments": ["Decision implication", "Source status"],
+        "KPI": ["KPI interpretation register", "IC implication"],
+        "Scenarios": ["Scenario interpretation", "Funding gap"],
+        "Sensitivity": ["Sensitivity rationale", "Decision implication"],
+        "Valuation": ["Method credibility", "Selected EV midpoint", "Valuation committee gates"],
+        "Market Support": ["TAM / SAM / SOM bridge", "Source anchors"],
+        "Benchmarks": ["source_id", "Applicability limits", "Refresh needed"],
+        "IC Memo": ["Recommendation", "What must be true", "Ranked DD gates", "Walk-away conditions", "Source boundary"],
+    }
     with tempfile.TemporaryDirectory() as tmp:
         source_md = Path(tmp) / "asset_deployment_story.md"
         out = Path(tmp) / "source_plan.xlsx"
         source_md.write_text(source_text, encoding="utf-8")
+
         source_plan.build_source_plan_workbook(source_md, out)
-        covered: set[str] = set()
+        wb = load_workbook(out, data_only=False)
 
-        def check(wb) -> None:
-            for ws in wb.worksheets:
-                markers = build_model.REQUIRED_SHEET_MARKERS.get(ws.title, [])
-                sheet_text = " ".join(
-                    str(cell.value)
-                    for row in ws.iter_rows()
-                    for cell in row
-                    if cell.value is not None
-                )
-                missing = [marker for marker in markers if marker not in sheet_text]
-                assert missing == [], f"{ws.title}: missing {missing}"
-                covered.add(ws.title)
-
-        check(load_workbook(out, data_only=False))
-        for mode in ("ma_exit", "pricing", "unit_economics", "cap_table"):
-            mode_out = Path(tmp) / f"{mode}.xlsx"
-            build_model.build_model(None, mode_out, mode=mode)
-            check(load_workbook(mode_out, data_only=False))
-        segments_out = Path(tmp) / "segments.xlsx"
-        segments_input = Path(tmp) / "segments.yaml"
-        segments_input.write_text("segments: [Enterprise, SMB]\n", encoding="utf-8")
-        build_model.build_model(segments_input, segments_out, mode="full",
-                                additional_sheets=["Segments"])
-        check(load_workbook(segments_out, data_only=False))
-        # Every sheet with a marker contract is exercised at least once.
-        assert set(build_model.REQUIRED_SHEET_MARKERS) <= covered
+        for sheet_name, markers in expected_markers.items():
+            sheet_text = " ".join(
+                str(cell.value)
+                for row in wb[sheet_name].iter_rows()
+                for cell in row
+                if cell.value is not None
+            )
+            sheet_text_lower = sheet_text.lower()
+            missing = [marker for marker in markers if marker.lower() not in sheet_text_lower]
+            assert missing == [], f"{sheet_name}: missing {missing}"
 
 
 def test_structured_yaml_currency_and_display_scale_are_generic() -> None:
@@ -2696,7 +2341,6 @@ def test_structured_yaml_currency_and_display_scale_are_generic() -> None:
                 [
                     "company: CurrencyCo",
                     "currency: USD",
-                    "mechanics: marketplace with GMV and take rate",
                     "display_scale: thousand",
                     "periods: 3",
                     "new_units: [1, 2, 3]",
@@ -2710,28 +2354,14 @@ def test_structured_yaml_currency_and_display_scale_are_generic() -> None:
         build_model.build_model(input_path, out, mode="full")
         wb = load_workbook(out, data_only=False)
 
-        # currency: USD flips money rows onto the USD accounting ladder while
-        # non-money units keep their own formats; cell values stay raw.
-        gmv_label = "Gross merchandise value"
-        gmv_row = _row_for_label(wb, "Assumptions", gmv_label)
-        gmv_cell = wb["Assumptions"].cell(gmv_row, FIRST_VALUE_COL)
-        assert gmv_cell.value == 1000000  # raw base-currency value
-        assert _unit_for_label(wb, "Assumptions", gmv_label) in {"$", "$K", "$M"}
-        assert gmv_cell.number_format in {ib.FMT_USD_DOLLAR, ib.FMT_USD_THOUSAND, ib.FMT_USD_MILLION}
-        assert gmv_cell.number_format == {
-            "$": ib.FMT_USD_DOLLAR, "$K": ib.FMT_USD_THOUSAND, "$M": ib.FMT_USD_MILLION,
-        }[_unit_for_label(wb, "Assumptions", gmv_label)]
+        assert _unit_for_label(wb, "Assumptions", "Gross merchandise value") == "$K"
+        assert _first_year_cell_for_label(wb, "Assumptions", "Gross merchandise value").number_format == ib.FMT_USD_THOUSAND
+        assert _unit_for_label(wb, "Assumptions", "Monthly price / unit") == "$"
+        assert _first_year_cell_for_label(wb, "Assumptions", "Monthly price / unit").number_format == ib.FMT_USD_DOLLAR
         assert _unit_for_label(wb, "Assumptions", "New primary units") == "units"
         assert _unit_for_label(wb, "People Plan", "Total headcount") == "FTE"
-        assert "円" not in "\n".join(
-            str(cell.value)
-            for ws in wb.worksheets
-            for row in ws.iter_rows(min_col=5, max_col=5)
-            for cell in row
-            if cell.value is not None
-        )
-        # The promoted unit/format audit is the canonical mismatch check.
-        assert build_model._audit_unit_format_agreement(wb) == []
+        assert _money_unit_format_mismatches(wb) == []
+        assert _semantic_unit_format_mismatches(wb) == []
 
 
 def test_money_units_are_raw_values_with_number_formats_not_scaled_values() -> None:
@@ -2742,28 +2372,22 @@ units, and hardware cost around ¥8m per unit. Source: management memo.
 """
     tmp, wb = _sample_source_workbook(source_text)
     try:
-        price_label = _row_label_startswith(wb, "Assumptions", "Monthly price")
-        price_cell = _first_year_cell_for_label(wb, "Assumptions", price_label)
+        price_cell = _first_year_cell_for_label(wb, "Assumptions", "Monthly price / unit")
         revenue_cell = _first_year_cell_for_label(wb, "Revenue Build", "Recurring revenue")
         total_revenue_cell = _first_year_cell_for_label(wb, "Revenue Build", "Total revenue")
-        cf_cash_cell = _first_year_cell_for_label(wb, "CF", "Ending cash")
+        capital_stack_cell = _first_year_cell_for_label(wb, "Capital Stack", "Ending cash")
 
-        # Raw yen value; display scale lives ONLY in the number format, and
-        # the unit label matches that format exactly (2-layer scale rule).
         assert price_cell.value == 320000
-        assert price_cell.number_format == ib.FMT_JP_THOUSAND
-        assert _unit_for_label(wb, "Assumptions", price_label) == "千円"
+        assert price_cell.number_format == ib.FMT_JPY_YEN
+        assert _unit_for_label(wb, "Assumptions", "Monthly price / unit") == "円"
         assert isinstance(revenue_cell.value, str) and "/1000000" not in revenue_cell.value
         assert isinstance(total_revenue_cell.value, str) and "/1000000" not in total_revenue_cell.value
-        # The sheet-wide money scale is one of the JP ladder scales and the
-        # unit label matches the number format exactly.
-        jp_fmt_by_unit = {unit: ib.FMT_JP_BY_SCALE[scale] for scale, unit in ib.JP_UNIT_BY_SCALE.items()}
-        revenue_unit = _unit_for_label(wb, "Revenue Build", "Total revenue")
-        assert total_revenue_cell.number_format == jp_fmt_by_unit[revenue_unit]
-        cash_unit = _unit_for_label(wb, "CF", "Ending cash")
-        assert cf_cash_cell.number_format == jp_fmt_by_unit[cash_unit]
+        assert total_revenue_cell.number_format == ib.FMT_MONEY
+        assert _unit_for_label(wb, "Revenue Build", "Total revenue") == "百万円"
+        assert capital_stack_cell.number_format == ib.FMT_MONEY
+        assert _unit_for_label(wb, "Capital Stack", "Ending cash") == "百万円"
         assert _raw_money_scale_formula_violations(wb) == []
-        assert build_model._audit_unit_format_agreement(wb) == []
+        assert _semantic_unit_format_mismatches(wb) == []
     finally:
         tmp.cleanup()
 
@@ -2831,7 +2455,7 @@ def test_benchmark_guidance_covers_material_evidence_lenses() -> None:
     invocation_text = (SKILL_DIR / "build" / "references" / "_skill_invocation_protocol.md").read_text(encoding="utf-8")
     review_text = (SKILL_DIR / "build" / "references" / "_self_review_protocol.md").read_text(encoding="utf-8")
     rubric_text = (SKILL_DIR / "build" / "references" / "_sheet_quality_rubric.md").read_text(encoding="utf-8")
-    combined = " ".join("\n".join([benchmark_text, invocation_text, review_text, rubric_text]).split())
+    combined = "\n".join([benchmark_text, invocation_text, review_text, rubric_text])
 
     for phrase in [
         "Material Evidence Lenses",
@@ -2868,15 +2492,10 @@ Source: management memo.
             if cell.value is not None
         )
 
-        assert "Marketplace / transaction" in str(wb["Guide"].cell(_row_for_label(wb, "Guide", "Mechanics"), 4).value)
-        assert _unit_for_label(wb, "Assumptions", "Gross merchandise value") in {"百万円", "十億円"}
+        assert wb["Kernel"]["D9"].value == "Marketplace / transaction"
+        assert _unit_for_label(wb, "Assumptions", "Gross merchandise value") == "百万円"
         assert _unit_for_label(wb, "Assumptions", "Take rate") == "%"
-        f = FIRST_VALUE_LETTER
-        gmv_row = _row_for_label(wb, "Revenue Build", "Gross merchandise value")
-        take_row = _row_for_label(wb, "Revenue Build", "Take rate")
-        assert _first_year_cell_for_label(wb, "Revenue Build", "Transaction revenue").value == (
-            f"={f}{gmv_row}*{f}{take_row}"
-        )
+        assert _first_year_cell_for_label(wb, "Revenue Build", "Transaction revenue").value == f"={FIRST_VALUE_LETTER}7*{FIRST_VALUE_LETTER}10"
         assert [term for term in ["fleet", "hardware", "field devices"] if term.lower() in all_text.lower()] == []
 
 
@@ -2902,72 +2521,87 @@ def test_source_plan_starting_cash_is_hard_input_blue() -> None:
         "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
     )
     try:
-        cash_label = _row_label_startswith(wb, "Assumptions", "Beginning cash")
-        beginning_cash_row = _row_for_label(wb, "Assumptions", cash_label)
-        # Opening cash is a single blue model-start input (first period column
-        # only) — never restated across columns or re-derived as a link.
+        beginning_cash_row = _row_for_label(wb, "Assumptions", "Beginning cash")
         assert _font_rgb(wb["Assumptions"].cell(beginning_cash_row, FIRST_VALUE_COL)) == ib.IB_HARD_INPUT
-        assert wb["Assumptions"].cell(beginning_cash_row, SECOND_VALUE_COL).value is None
-        # And a stated multi-period input row stays blue in every column.
-        equity_row = _row_for_label(wb, "Assumptions", "Equity financing")
-        assert _font_rgb(wb["Assumptions"].cell(equity_row, FIRST_VALUE_COL)) == ib.IB_HARD_INPUT
-        assert _font_rgb(wb["Assumptions"].cell(equity_row, SECOND_VALUE_COL)) == ib.IB_HARD_INPUT
+        assert _font_rgb(wb["Assumptions"].cell(beginning_cash_row, SECOND_VALUE_COL)) == ib.IB_LINK_INTRA
+    finally:
+        tmp.cleanup()
+
+
+def test_source_plan_ownership_waterfall_dilutes_prior_holders_symmetrically() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
+    )
+    try:
+        ws = wb["Ownership"]
+        f = FIRST_VALUE_LETTER
+        g = SECOND_VALUE_LETTER
+        h = source_plan.get_column_letter(FIRST_VALUE_COL + 2)
+        i = source_plan.get_column_letter(FIRST_VALUE_COL + 3)
+        for row in (7, 8, 9, 10, 13, 14):
+            assert _font_rgb(ws.cell(row, FIRST_VALUE_COL)) == ib.IB_HARD_INPUT
+        for row in (7, 8, 9, 10):
+            assert _font_rgb(ws.cell(row, SECOND_VALUE_COL)) == ib.IB_FORMULA
+        assert ws[f"{g}8"].value == f"={f}8*(1-{g}12-{g}13-{g}14)+{g}13"
+        assert ws[f"{h}8"].value == f"={g}8*(1-{h}12-{h}13-{h}14)+{h}13"
+        assert ws[f"{i}8"].value == f"={h}8*(1-{i}12-{i}13-{i}14)+{i}13"
+        assert ws[f"{g}9"].value == f"={f}9*(1-{g}12-{g}13-{g}14)+{g}12"
+        assert ws[f"{h}9"].value == f"={g}9*(1-{h}12-{h}13-{h}14)+{h}12"
+        assert ws[f"{i}9"].value == f"={h}9*(1-{i}12-{i}13-{i}14)+{i}12"
+        assert ws[f"{g}10"].value == f"={f}10*(1-{g}12-{g}13-{g}14)+{g}14"
+        assert ws[f"{h}10"].value == f"={g}10*(1-{h}12-{h}13-{h}14)+{h}14"
+        assert ws[f"{i}10"].value == f"={h}10*(1-{i}12-{i}13-{i}14)+{i}14"
     finally:
         tmp.cleanup()
 
 
 def test_source_plan_bold_rows_preserve_ib_cell_colors() -> None:
-    """Bold band rows keep the provenance color: intra-sheet formulas stay
-    black, cross-sheet pulls stay green, inputs stay blue — bolding never
-    repaints the provenance."""
     tmp, wb = _sample_source_workbook(
         "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
     )
     try:
-        total_revenue = _first_year_cell_for_label(wb, "Revenue Build", "Total revenue")
-        assert total_revenue.font.bold and _font_rgb(total_revenue) == ib.IB_FORMULA
-        ending_cash = _first_year_cell_for_label(wb, "CF", "Ending cash")
-        assert ending_cash.font.bold and _font_rgb(ending_cash) == ib.IB_FORMULA
-        net_income = _first_year_cell_for_label(wb, "CF", "Net income")
-        assert _font_rgb(net_income) == ib.IB_LINK_INTRA  # ='P&L'!... pull
-        equity = _first_year_cell_for_label(wb, "Assumptions", "Equity financing")
-        assert _font_rgb(equity) == ib.IB_HARD_INPUT
+        assert _font_rgb(_first_year_cell_for_label(wb, "Capital Stack", "Equity financing")) == ib.IB_HARD_INPUT
+        assert _font_rgb(_first_year_cell_for_label(wb, "Capital Stack", "Ending cash")) == ib.IB_LINK_INTRA
+        assert _font_rgb(_first_year_cell_for_label(wb, "Capital Stack", "Runway")) == ib.IB_LINK_INTRA
+        assert _font_rgb(wb["Cost Build"].cell(16, FIRST_VALUE_COL)) == ib.IB_LINK_INTRA
+        assert _font_rgb(wb["People Plan"].cell(11, FIRST_VALUE_COL)) == ib.IB_LINK_INTRA
     finally:
         tmp.cleanup()
 
 
 def test_source_plan_uses_column_based_hierarchy_layout() -> None:
-    """v2 header contract: title row 2 / purpose row 3 / caption + FY ruler
-    row 4 / months ruler row 5 / period header row 6 / data from row 8;
-    canonical column widths; freeze at F7."""
     tmp, wb = _sample_source_workbook(
         "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
     )
     try:
         ws = wb["Assumptions"]
-        assert ws.column_dimensions["A"].width == ib.COL_GUTTER_WIDTH_V2
-        assert abs(ws.column_dimensions["B"].width - ib.COL_HIERARCHY_WIDTH) < ib.COL_WIDTH_TOL
-        assert ws.column_dimensions["C"].width >= ib.COL_LABEL_WIDTH_V2
-        assert ws.column_dimensions["D"].width >= ib.COL_SOURCE_WIDTH_INPUT
-        assert ws.column_dimensions["E"].width >= ib.COL_UNIT_WIDTH_V2
-        assert ws.column_dimensions[FIRST_VALUE_LETTER].width == ib.COL_PERIOD_WIDTH_V2
-        assert ws.freeze_panes == f"{FIRST_VALUE_LETTER}7"
-        # Title / purpose / caption rows.
-        assert isinstance(ws.cell(2, 3).value, str) and "Assumptions" in ws.cell(2, 3).value
-        assert isinstance(ws.cell(3, 3).value, str)
-        assert isinstance(ws.cell(4, 3).value, str) and ws.cell(4, 3).value.startswith("(単位")
-        # FY ruler (row 4), months ruler (row 5), period header (row 6).
-        assert str(ws.cell(4, FIRST_VALUE_COL).value).startswith("FY")
-        assert ws.cell(5, FIRST_VALUE_COL).value == 12
-        assert str(ws.cell(6, FIRST_VALUE_COL).value).startswith("FY")
-        assert [ws.cell(6, c).value for c in range(3, 6)] == ["Line item", "Driver", "Unit"]
-        # Role alignment: labels left, units right, values right.
-        row = _row_for_label(wb, "Assumptions", "New primary units")
-        assert ws.cell(row, 3).alignment.horizontal == "left"
-        assert ws.cell(row, 5).alignment.horizontal == "right"
-        assert ws.cell(row, FIRST_VALUE_COL).alignment.horizontal == "right"
-        # Non-period sheets (Guide) carry no freeze pane.
-        assert wb["Guide"].freeze_panes is None
+        layout = source_plan.LAYOUT
+        assert source_plan.START_PERIOD_COL == layout.unit_col + 1
+        assert ws.column_dimensions["A"].width == ib.COL_MARGIN_WIDTH
+        assert ws.column_dimensions["B"].width == layout.hierarchy_width
+        assert ws.column_dimensions["C"].width == layout.label_width
+        assert ws.column_dimensions["D"].width == layout.source_width
+        assert ws.column_dimensions["E"].width == layout.unit_width
+        assert ws.column_dimensions[FIRST_VALUE_LETTER].width == layout.period_width
+        assert ws.freeze_panes is None
+        assert [ws.cell(5, c).value for c in range(2, FIRST_VALUE_COL + 1)] == [
+            None,
+            "Line item",
+            "Source / driver",
+            "Unit",
+            "FY2026",
+        ]
+        assert ws["B6"].value == "Volume and demand"
+        assert ws["C6"].value is None
+        assert ws["C7"].value == "New primary units"
+        assert ws["B7"].value is None
+        assert wb["Guide"]["C8"].value == "Source story signals"
+        assert ws["E7"].value == "units"
+        assert ws["F7"].value is not None
+        assert ws["C7"].alignment.horizontal == "left"
+        assert ws["D7"].alignment.horizontal == "left"
+        assert ws["E7"].alignment.horizontal == "right"
+        assert ws["F7"].alignment.horizontal == "right"
     finally:
         tmp.cleanup()
 
@@ -3000,18 +2634,20 @@ def test_source_plan_chart_axes_and_tabs_follow_currency_and_semantic_roles() ->
             for ws in wb.worksheets
             for chart in getattr(ws, "_charts", [])
         ]
-        assert axis_titles, "v2 monthly/hybrid builds render charts"
         assert "円" not in " ".join(axis_titles)
-        assert all(title in {"$", "$K", "$M"} for title in axis_titles), axis_titles
-        # Tab colors follow the v2 per-sheet declaration.
-        for sheet_name in wb.sheetnames:
-            assert _tab_rgb(wb[sheet_name]) == source_plan.TAB_COLORS_V2[sheet_name], sheet_name
+        assert "$K" in axis_titles
+        assert "months" in axis_titles
+        assert "$K / months" not in axis_titles
+        assert "units" in axis_titles
+        assert "units / $K" not in axis_titles
+        assert ib.validate_sheet_naming(source_plan.SOURCE_PLAN_SHEETS) == []
+        assert [name for name in source_plan.SOURCE_PLAN_SHEETS if name not in ib.SHEET_ROLE_MAPPING] == []
+        assert _tab_rgb(wb["Market Support"]) == ib.BRAND_SLATE
+        assert _tab_rgb(wb["Benchmarks"]) == ib.BRAND_WARNING
+        assert _tab_rgb(wb["IC Memo"]) == ib.BRAND_ACCENT
 
 
 def test_segment_lens_handles_long_generic_segment_names_without_clipping() -> None:
-    """Segments is a conditional sheet (YAML segments ≥ 2 + explicit add):
-    long segment names autosize the label column above its floor so they are
-    not clipped, and the consolidation bridge check is present."""
     with tempfile.TemporaryDirectory() as tmp:
         input_path = Path(tmp) / "long_segments.yaml"
         out = Path(tmp) / "long_segments.xlsx"
@@ -3020,207 +2656,43 @@ def test_segment_lens_handles_long_generic_segment_names_without_clipping() -> N
                 [
                     "company: Generic Segment Co",
                     "segments:",
-                    "  - Enterprise expansion segment with partners",
-                    "  - Embedded platform integration segment",
-                    "  - International distributor segment",
+                    "  - Enterprise expansion segment with regulated deployment partners",
+                    "  - Embedded platform segment with long-cycle integration partners",
+                    "  - International distributor segment with multi-entity reporting",
                 ]
             ),
             encoding="utf-8",
         )
-        build_model.build_model(input_path, out, mode="full", additional_sheets=["Segments"])
+        build_model.build_model(input_path, out, mode="full")
         wb = load_workbook(out, data_only=False)
         ws = wb["Segments"]
-        width = ws.column_dimensions["C"].width or 0
-        assert width > ib.COL_LABEL_WIDTH_V2, "long segment names must autosize the label column"
+        segment_col = source_plan.get_column_letter(source_plan.LAYOUT.label_col)
+        width = ws.column_dimensions[segment_col].width or 0
         clipped = [
             f"{cell.coordinate}: width={width} value={cell.value}"
-            for cell in ws["C"]
+            for cell in ws[segment_col]
             if isinstance(cell.value, str)
             and cell.row >= 6
-            and ws.cell(cell.row, 4).value is not None
             and len(cell.value) > width * 1.15
         ]
+
         assert clipped == []
-        assert "Consolidation bridge check" in _sheet_labels(wb, "Segments")
 
 
-def test_scenario_toggle_drives_effective_scales_and_engine() -> None:
-    """The scenario mechanism is live: a blue 1/2/3 toggle, Downside/Base/
-    Upside case columns, INDEX-driven effective scales, and — verified by
-    recalculation — flipping the toggle changes the computed engine values."""
-    with tempfile.TemporaryDirectory() as tmp:
-        out = Path(tmp) / "full.xlsx"
-        build_model.build_model(None, out, mode="full")
-        wb = load_workbook(out, data_only=False)
-        ws = wb["Assumptions"]
-
-        toggle_row = _row_for_label(wb, "Assumptions", "Scenario toggle")
-        toggle_cell = ws.cell(toggle_row, FIRST_VALUE_COL)
-        assert toggle_cell.value == 2  # Base
-        assert _font_rgb(toggle_cell) == ib.IB_HARD_INPUT
-        demand_row = _row_for_label(wb, "Assumptions", "Demand scale")
-        down, base, up = (ws.cell(demand_row, c).value for c in (6, 7, 8))
-        assert down < base <= up, "case columns must order Downside/Base/Upside"
-        eff_row = _row_for_label(wb, "Assumptions", "Effective demand scale")
-        assert ws.cell(eff_row, FIRST_VALUE_COL).value == (
-            f"=INDEX($F${demand_row}:$H${demand_row},$F${toggle_row})"
-        )
-
-        soffice = shutil.which("soffice")
-        if not soffice:
-            return
-        recalc_dir = Path(tmp) / "recalc"
-        recalc_dir.mkdir()
-
-        def recalc_revenue(path: Path) -> float:
-            subprocess.run(
-                [soffice, "--headless", "--convert-to", "xlsx",
-                 "--outdir", str(recalc_dir), str(path)],
-                check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
-            )
-            data = load_workbook(recalc_dir / path.name, data_only=True)
-            row = _row_for_label(data, "Summary", "Revenue")
-            summary = data["Summary"]
-            period_cols = [
-                c for c in range(6, summary.max_column + 1)
-                if isinstance(summary.cell(5, c).value, (int, float))
-            ]
-            return float(summary.cell(row, period_cols[-1]).value or 0)
-
-        base_revenue = recalc_revenue(out)
-        downside = Path(tmp) / "downside.xlsx"
-        wb_toggle = load_workbook(out, data_only=False)
-        wb_toggle["Assumptions"].cell(toggle_row, FIRST_VALUE_COL).value = 1
-        wb_toggle.save(downside)
-        downside_revenue = recalc_revenue(downside)
-        assert downside_revenue < base_revenue, (
-            f"flipping the toggle to Downside must reduce revenue "
-            f"({downside_revenue} !< {base_revenue})"
-        )
-
-
-def test_quarterly_grain_is_per_period_not_annual_expanded() -> None:
-    """Quarterly facts are PER-PERIOD canonical (one value per quarter), like
-    monthly — they must pass through the v2 expansion unchanged, not be routed
-    through annual-canonical expansion (which dropped quarters 3+ and
-    understated every money series ~4x). Verified against the kernel and a
-    LibreOffice recalc of the workbook P&L."""
-    import economic_kernel as ek
-
-    with tempfile.TemporaryDirectory() as tmp:
-        yml = Path(tmp) / "q.yaml"
-        yml.write_text(
-            "\n".join([
-                "company: QCo",
-                "grain: quarterly",
-                "periods: 8",
-                "customers: [10, 20, 30, 40, 50, 60, 70, 80]",
-                "monthly_price_yen: 100000",
-                "equity_raise_yen: [400000000, 0, 0, 0, 0, 0, 0, 0]",
-            ]),
-            encoding="utf-8",
-        )
-        out = Path(tmp) / "q.xlsx"
-        build_model.build_model(yml, out, mode="full")
-
-        facts = ek.derive_source_facts_from_mapping(
-            {"company": "QCo", "grain": "quarterly", "periods": 8,
-             "customers": [10, 20, 30, 40, 50, 60, 70, 80],
-             "monthly_price_yen": 100000,
-             "equity_raise_yen": [400000000, 0, 0, 0, 0, 0, 0, 0]})
-        kernel_rev = [round(p["revenue"]) for p in ek.project_plan_free_cash_flow(facts)]
-        assert len(kernel_rev) == 8 and kernel_rev[-1] > kernel_rev[0]
-
-        soffice = shutil.which("soffice")
-        if not soffice:
-            return
-        recalc_dir = Path(tmp) / "recalc"
-        recalc_dir.mkdir()
-        subprocess.run(
-            [soffice, "--headless", "--convert-to", "xlsx",
-             "--outdir", str(recalc_dir), str(out)],
-            check=True, capture_output=True, timeout=180,
-        )
-        wb = load_workbook(recalc_dir / out.name, data_only=True)
-        pl = wb["P&L"]
-        rev_row = _row_for_label(wb, "P&L", "Total revenue")
-        workbook_rev = [pl.cell(rev_row, c).value for c in range(FIRST_VALUE_COL, FIRST_VALUE_COL + 8)]
-        # The workbook must reproduce all eight per-quarter figures, not a
-        # ~4x-understated annual-expanded shape.
-        assert [round(v) for v in workbook_rev] == kernel_rev, (
-            f"quarterly workbook revenue {workbook_rev} != kernel {kernel_rev}"
-        )
-
-
-def test_hybrid_statement_scale_never_crushes_material_money_to_zero() -> None:
-    """Digit-crush guard: on a hybrid JP model the statement sheets carry
-    small working-capital / tax-timing balance rows (未払消費税等,
-    預り金・未払社会保険料) that are ~2 orders below revenue. The sheet scale must
-    drop (百万円 → 千円) so no MATERIAL nonzero money cell recalculates to a value
-    that displays as "0"/"▲0". Verified against LibreOffice-computed values."""
-    def _scale_div(fmt: str | None) -> int | None:
-        if not fmt or not ("▲" in fmt or ",," in fmt or fmt == "#,##0"):
-            return None
-        if "#,##0,,," in fmt:
-            return 1_000_000_000
-        if "#,##0,," in fmt:
-            return 1_000_000
-        if "#,##0," in fmt:
-            return 1_000
-        if "#,##0" in fmt:
-            return 1
-        return None
-
-    with tempfile.TemporaryDirectory() as tmp:
-        yml = Path(tmp) / "hybrid.yaml"
-        yml.write_text(
-            "\n".join([
-                "company: CrushCo",
-                "grain: hybrid",
-                "periods: 5",
-                "customers: [120, 360, 900, 1900, 3400]",
-                "monthly_price_yen: 120000",
-                "target_gross_margin: 0.65",
-                "equity_raise_yen: [400000000, 0, 0, 0, 0]",
-                "statutory_welfare_rate: 0.15",
-                "beginning_cash_yen: 120000000",
-            ]),
-            encoding="utf-8",
-        )
-        out = Path(tmp) / "hybrid.xlsx"
-        build_model.build_model(yml, out, mode="full")
-
-        soffice = shutil.which("soffice")
-        if not soffice:
-            return
-        recalc_dir = Path(tmp) / "recalc"
-        recalc_dir.mkdir()
-        subprocess.run(
-            [soffice, "--headless", "--convert-to", "xlsx",
-             "--outdir", str(recalc_dir), str(out)],
-            check=True, capture_output=True, timeout=180,
-        )
-        form = load_workbook(out, data_only=False)
-        val = load_workbook(recalc_dir / out.name, data_only=True)
-        # Immaterial tax-timing / rounding noise below the guard floor is
-        # allowed to round to zero; every material figure must stay visible.
-        floor = 10_000.0
-        crushed: list[str] = []
-        for ws in form.worksheets:
-            vs = val[ws.title]
-            for row in ws.iter_rows():
-                for cell in row:
-                    div = _scale_div(cell.number_format)
-                    if div is None:
-                        continue
-                    cv = vs.cell(row=cell.row, column=cell.column).value
-                    if (isinstance(cv, (int, float)) and not isinstance(cv, bool)
-                            and abs(cv) >= floor and abs(cv) / div < 0.5):
-                        crushed.append(f"{ws.title}!{cell.coordinate}={cv} (÷{div})")
-        assert not crushed, (
-            "material money cells render as 0 at the chosen sheet scale: "
-            + "; ".join(crushed[:12])
-        )
+def test_source_plan_tables_do_not_overlap_metadata_columns() -> None:
+    tmp, wb = _sample_source_workbook(
+        "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
+    )
+    try:
+        assert [wb["Scenarios"].cell(7, c).value for c in range(FIRST_VALUE_COL, FIRST_VALUE_COL + 3)] == [0.70, 1.00, 1.30]
+        assert wb["Scenarios"].cell(7, source_plan.LAYOUT.label_col).value == "New logo / conversion scale"
+        assert wb["Scenarios"].cell(7, source_plan.LAYOUT.unit_col).value == "x"
+        assert wb["Financing"].cell(16, FIRST_VALUE_COL).value == f"='Scenarios'!{FIRST_VALUE_LETTER}19"
+        assert [wb["Sensitivity"].cell(7, c).value for c in range(FIRST_VALUE_COL, FIRST_VALUE_COL + 5)] == [0.60, 0.80, 1.00, 1.20, 1.40]
+        assert wb["Sensitivity"].cell(8, FIRST_VALUE_COL - 1).value == 0.80
+        assert wb["Sensitivity"].cell(8, FIRST_VALUE_COL).value == f"=('Revenue Build'!J18*{FIRST_VALUE_LETTER}$7*$E8)-('Cost Build'!J12*1)-('P&L'!J17*1)"
+    finally:
+        tmp.cleanup()
 
 
 def test_source_plan_design_surface_uses_generic_blue_palette() -> None:
@@ -3270,10 +2742,7 @@ def test_source_plan_has_no_excel_indent_or_clipped_role_columns() -> None:
     try:
         indent_violations = []
         clipped = []
-        # v2 role columns: only the label column (C) promises full display —
-        # the driver column (D) is a compact tag column that may read through
-        # a blank unit cell.
-        role_cols = (source_plan.LAYOUT.label_col,)
+        role_cols = (source_plan.LAYOUT.label_col, source_plan.LAYOUT.source_col)
         for ws in wb.worksheets:
             for row in ws.iter_rows():
                 for cell in row:
@@ -3322,26 +2791,38 @@ def test_source_plan_ib_design_rhythm_and_visibility() -> None:
         "# PLAN\nA recurring software startup with ARR and subscription pricing. Source: management memo."
     )
     try:
-        guide = wb["Guide"]
-        assert guide["C7"].value == "Decision"
-        assert guide["D7"].value
+        kernel = wb["Kernel"]
+        assert kernel["B7"].value is None
+        assert kernel["C7"].value == "Decision"
+        assert kernel["D7"].value
+        assert _column_width(kernel, "B") == ib.COL_HIERARCHY_WIDTH
+        assert _column_width(kernel, "C") >= 32
+        assert _column_width(kernel, "D") >= 92
         for ws in wb.worksheets:
             assert ws.sheet_view.showGridLines is False
             assert ws.sheet_view.zoomScale == 90
             assert ws.page_setup.orientation == "landscape"
             assert ws.page_setup.fitToWidth == 1
-            assert ws.print_title_rows in {"1:5", "$1:$5", "1:6", "$1:$6"}
-            assert ws.print_title_cols in {"A:E", "$A:$E"}
-            assert ws.print_area
-            assert _column_width(ws, "A") == ib.COL_GUTTER_WIDTH_V2
-            assert abs(_column_width(ws, "B") - ib.COL_HIERARCHY_WIDTH) < ib.COL_WIDTH_TOL
-            # Period sheets carry the v2 label/unit widths and the F7 freeze.
-            if build_model._v2_period_anchor_col(ws) is not None:
-                assert _column_width(ws, "C") >= ib.COL_LABEL_WIDTH_V2
-                assert _column_width(ws, "E") >= ib.COL_UNIT_WIDTH_V2
-                assert ws.freeze_panes is not None
-            else:
-                assert ws.freeze_panes is None
+            assert ws.print_title_rows in {"1:5", "$1:$5"}
+            expected_title_cols = f"A:{source_plan.get_column_letter(source_plan.LAYOUT.unit_col)}"
+            expected_title_cols_abs = f"$A:${source_plan.get_column_letter(source_plan.LAYOUT.unit_col)}"
+            assert ws.print_title_cols in {expected_title_cols, expected_title_cols_abs}
+            assert _column_width(ws, "A") == ib.COL_MARGIN_WIDTH
+            for col in range(source_plan.LAYOUT.first_hierarchy_col, source_plan.LAYOUT.label_col):
+                if ws.max_column >= col:
+                    # Indent columns are pinned exactly (no >=) — wider B breaks the 20px Google Sheets rhythm.
+                    assert abs(_column_width(ws, source_plan.get_column_letter(col)) - ib.COL_HIERARCHY_WIDTH) < ib.COL_WIDTH_TOL
+            if ws.max_column >= source_plan.LAYOUT.label_col:
+                assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.label_col)) >= ib.COL_LABEL_WIDTH
+            if ws.max_column >= source_plan.LAYOUT.source_col:
+                assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.source_col)) >= ib.COL_SOURCE_WIDTH
+            if ws.max_column >= source_plan.LAYOUT.unit_col:
+                assert _column_width(ws, source_plan.get_column_letter(source_plan.LAYOUT.unit_col)) >= ib.COL_UNIT_WIDTH
+            assert (ws.row_dimensions[2].height or 0) <= 20
+            assert (ws.row_dimensions[5].height or 0) <= 18
+            assert ws.freeze_panes is None
+        assert _column_width(wb["Assumptions"], "C") >= 54
+        assert _column_width(wb["Assumptions"], "D") >= 54
     finally:
         tmp.cleanup()
 
@@ -3381,13 +2862,7 @@ def test_all_generated_modes_pass_visual_design_invariants() -> None:
             assert _semantic_unit_format_mismatches(wb) == []
             assert _row_height_violations(wb) == []
             for ws in wb.worksheets:
-                # v2 freeze polarity: period-axis sheets freeze at row 7 of
-                # the first period column, non-period sheets carry no freeze.
-                anchor_col = build_model._v2_period_anchor_col(ws)
-                if anchor_col is not None:
-                    assert ws.freeze_panes == ws.cell(row=7, column=anchor_col).coordinate
-                else:
-                    assert ws.freeze_panes is None
+                assert ws.freeze_panes is None
                 assert ws.sheet_view.showGridLines is False
                 assert ws.print_area
                 rendered_row, rendered_col = ib.rendered_bounds(ws)
@@ -3490,14 +2965,13 @@ def test_source_plan_custom_tables_keep_text_columns_readable() -> None:
     )
     try:
         clipped = []
-        # v2 register / matrix sheets whose tables carry text in data columns.
-        for sheet_name in ["Summary", "Evidence", "Cap Table", "Guide"]:
+        for sheet_name in ["KPI", "Scenarios", "Sensitivity", "Valuation", "Benchmarks", "IC Memo"]:
             ws = wb[sheet_name]
-            for row in ws.iter_rows(min_col=3, max_col=3):
+            for row in ws.iter_rows():
                 for cell in row:
                     if not isinstance(cell.value, str) or cell.value.startswith("="):
                         continue
-                    width = ws.column_dimensions["C"].width or 0
+                    width = ws.column_dimensions[source_plan.get_column_letter(cell.column)].width or 0
                     if ws.cell(cell.row, cell.column + 1).value is not None and len(cell.value) > width * 1.15:
                         clipped.append(f"{ws.title}!{cell.coordinate}: width={width} value={cell.value}")
         assert clipped == []
@@ -3506,17 +2980,13 @@ def test_source_plan_custom_tables_keep_text_columns_readable() -> None:
 
 
 def test_excluded_sheets_cannot_create_broken_references() -> None:
-    for mode, excluded in (
-        ("full", ["Assumptions"]),   # every engine sheet requires Assumptions
-        ("full", ["CF"]),            # BS / Financing hard-require CF
-        ("comps_only", ["Valuation & Exit"]),  # IC Memo readouts require it
-    ):
+    for excluded in (["Valuation"], ["Assumptions"], ["CF"]):
         try:
-            build_model.resolve_bundle(mode, excluded_sheets=excluded)
+            build_model.resolve_bundle("full", excluded_sheets=excluded)
         except ValueError as exc:
             assert "broken workbook references" in str(exc)
         else:
-            raise AssertionError(f"excluded_sheets accepted unsafe bundle: {mode}:{excluded}")
+            raise AssertionError(f"excluded_sheets accepted unsafe bundle: {excluded}")
 
 
 def test_ib_helpers_do_not_use_native_indent_for_hierarchy() -> None:
@@ -3631,15 +3101,108 @@ def test_every_sheet_pins_indent_block_to_google_sheets_20px() -> None:
 
 
 def test_set_column_widths_refuses_to_override_indent_column() -> None:
-    """`_set_column_widths` must raise when callers try to widen the indent
-    block — the regression class that once broke the 20px Google Sheets
-    hierarchy rhythm. (The v2 builders pin B via apply_indent_column_widths;
-    the guard protects any direct width caller.)"""
+    """`_set_column_widths` must raise when callers try to widen the indent block.
+
+    Catches the regression class that originally created the Guide/Driver Tree/
+    Exit Waterfall/Benchmarks indent violations.
+    """
     wb = Workbook()
     ws = wb.active
-    ib.apply_indent_column_widths(ws, [source_plan.LAYOUT.first_hierarchy_col])
+    source_plan._setup_sheet(ws, "Indent guard check")
     with pytest.raises(ValueError, match="indent column"):
         source_plan._set_column_widths(ws, {source_plan.LAYOUT.first_hierarchy_col: 30.0})
+
+
+def test_added_hierarchy_columns_use_google_sheets_20px_width() -> None:
+    wb = Workbook()
+    ws = wb.active
+    original_layout = source_plan.LAYOUT
+    try:
+        source_plan.LAYOUT = source_plan.LayoutSpec(hierarchy_cols=3)
+        facts = kernel.derive_source_facts("# PLAN\nSource: management memo.")
+        ws._startup_facts = facts
+        source_plan._setup_sheet(ws, "Hierarchy width check")
+        source_plan._write_period_header(ws, facts)
+
+        assert ws.column_dimensions["B"].width == ib.COL_HIERARCHY_WIDTH
+        assert ws.column_dimensions["C"].width == ib.COL_HIERARCHY_WIDTH
+        assert ws.column_dimensions["D"].width == ib.COL_HIERARCHY_WIDTH
+        assert ib.COL_HIERARCHY_WIDTH == 2.14
+        assert ws.column_dimensions["E"].width == ib.COL_LABEL_WIDTH
+        assert ws.column_dimensions["F"].width == ib.COL_SOURCE_WIDTH
+        assert ws.column_dimensions["G"].width == ib.COL_UNIT_WIDTH
+        assert ws.cell(5, source_plan.LAYOUT.label_col).value == "Line item"
+        assert ws.cell(5, source_plan.LAYOUT.source_col).value == "Source / driver"
+        assert ws.cell(5, source_plan.LAYOUT.unit_col).value == "Unit"
+        assert ws.cell(5, source_plan.LAYOUT.first_value_col).value == facts.period_labels[0]
+        assert source_plan.uses_default_layout(ws) is True
+        assert ws.freeze_panes is None
+    finally:
+        source_plan.LAYOUT = original_layout
+
+
+def test_standard_period_sheets_end_with_terminal_comment_column() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "full.xlsx"
+        build_model.build_model(None, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+
+        for ws in wb.worksheets:
+            if not source_plan.uses_default_layout(ws):
+                continue
+            headers = [
+                cell
+                for cell in ws[5]
+                if cell.column >= source_plan.LAYOUT.first_value_col and cell.value not in (None, "")
+            ]
+            if not headers:
+                continue
+            comment = headers[-1]
+            assert comment.value == "Comment", ws.title
+            assert comment.alignment.horizontal == "left"
+            assert ws.column_dimensions[comment.column_letter].width == source_plan.LAYOUT.note_width
+            assert all(
+                cell.value in (None, "")
+                for row in ws.iter_rows(min_col=comment.column + 1)
+                for cell in row
+            ), ws.title
+
+        assert build_model.audit_workbook(wb) == []
+
+
+def test_terminal_comment_column_is_production_audited_and_reused_for_neutralized_formulas() -> None:
+    with tempfile.TemporaryDirectory() as tmp:
+        out = Path(tmp) / "full.xlsx"
+        build_model.build_model(None, out, mode="full")
+        wb = load_workbook(out, data_only=False)
+        ws = wb["Assumptions"]
+        headers = [
+            cell
+            for cell in ws[5]
+            if cell.column >= source_plan.LAYOUT.first_value_col and cell.value not in (None, "")
+        ]
+        comment_col = headers[-1].column
+
+        ws.cell(7, comment_col, "bad style")
+        ws.cell(7, comment_col).alignment = Alignment(horizontal="center")
+        ws.cell(7, comment_col).font = Font(name=ib.FONT_FAMILY, size=ib.FONT_SIZE_BASE, color=ib.IB_INK)
+        assert any("terminal Comment cell style" in issue for issue in build_model.audit_workbook(wb))
+
+        ws.cell(7, comment_col).value = None
+        source_plan._write_values(
+            ws,
+            90,
+            "Neutralize test",
+            "JPY",
+            ["='Missing Sheet'!F7"],
+            kind="formula",
+            fmt=ib.FMT_MONEY,
+        )
+        touched = build_model._neutralize_removed_sheet_references(wb)
+        assert touched >= 1
+        assert ws.cell(90, comment_col).value.startswith("Original formula omitted")
+        assert ws.cell(90, comment_col + 1).value in (None, "")
+        assert build_model.audit_workbook(wb) == []
 
 
 def test_generic_kernel_does_not_promote_domain_specific_mentions_to_sources() -> None:
@@ -3655,13 +3218,11 @@ def test_benchmark_register_uses_evidence_status_not_fake_source_placeholders() 
         "# PLAN\nA generic startup plan. Source: management memo."
     )
     try:
-        text = "\n".join(str(cell.value) for row in wb["Evidence"].iter_rows() for cell in row if cell.value is not None)
-        # No fabricated placeholder sources (the legacy SRC-xx register is
-        # retired); absent evidence is declared as an explicit DD gap.
-        forbidden = ["provided source / owner", "external benchmark TBD", "TBD", "SRC-0"]
+        text = "\n".join(str(cell.value) for row in wb["Benchmarks"].iter_rows() for cell in row if cell.value is not None)
+        forbidden = ["provided source / owner", "external benchmark TBD", "TBD"]
         assert [term for term in forbidden if term in text] == []
-        assert "Benchmark register" in text
-        assert "No external evidence provided — DD gap" in text
+        assert "management memo" in text
+        assert "unresolved evidence" in text
     finally:
         tmp.cleanup()
 
@@ -3686,11 +3247,8 @@ def test_build_model_routes_source_markdown_to_source_plan() -> None:
         build_model.build_model(None, out, source_md=source_md)
         wb = load_workbook(out, data_only=False)
 
-        # The narrative route builds the same v2 full bundle as the
-        # structured route (annual grain default → BS materiality applies).
-        assert set(wb.sheetnames) <= set(source_plan.SOURCE_PLAN_SHEETS_V2)
-        assert {"Guide", "Summary", "Assumptions", "Revenue Build", "P&L", "CF"} <= set(wb.sheetnames)
-        assert build_model.audit_workbook(wb) == []
+        assert wb.sheetnames == source_plan.SOURCE_PLAN_SHEETS
+        assert _chart_count(wb) >= 4
 
 
 def test_detect_table_block_returns_header_row_bounds_for_simple_period_grid() -> None:
@@ -3752,57 +3310,6 @@ def test_detect_table_block_includes_empty_middle_cells_as_block_members() -> No
     assert start <= 4 <= end and start <= 5 <= end, (
         f"empty middle cols 4, 5 must be inside the block ({start}, {end})"
     )
-
-
-def test_detect_table_block_does_not_fuse_side_by_side_tables() -> None:
-    """A helper derived from the sfm-overhaul future-risk log.
-
-    When two semantic tables share one worksheet row, the detector must choose
-    the table used by the target row instead of min/maxing every header-filled
-    cell into one giant block. The C/F-G gap is still a legitimate source/unit
-    gap inside the left table, but the unrelated K-M table must stay outside.
-    """
-    wb = Workbook()
-    ws = wb.active
-    header_fill = PatternFill("solid", fgColor=ib.BG_TABLE_HEADER)
-    for col in (3, 6, 7):
-        ws.cell(5, col, "Left").fill = header_fill
-    for col in range(11, 14):
-        ws.cell(5, col, "Right").fill = header_fill
-
-    ws.cell(11, 3, "Left total")
-    ws.cell(11, 6, 100)
-    ws.cell(11, 7, 200)
-
-    start, end = ib.detect_table_block(ws, 11)
-    assert (start, end) == (3, 7), (
-        f"side-by-side header block leaked into target row span: ({start}, {end})"
-    )
-
-
-def test_apply_semantic_border_span_stays_inside_side_by_side_table() -> None:
-    """Border helper must inherit the same side-by-side isolation contract."""
-    wb = Workbook()
-    ws = wb.active
-    header_fill = PatternFill("solid", fgColor=ib.BG_TABLE_HEADER)
-    for col in (3, 6, 7):
-        ws.cell(5, col, "Left").fill = header_fill
-    for col in range(11, 14):
-        ws.cell(5, col, "Right").fill = header_fill
-    ws.cell(11, 3, "Left total")
-    ws.cell(11, 6, 100)
-    ws.cell(11, 7, 200)
-
-    ib.apply_semantic_border_span(ws, 11, top=ib.THIN_LINE)
-
-    for col in range(3, 8):
-        assert ws.cell(11, col).border.top.style == "thin", (
-            f"left table col {col} missing top border"
-        )
-    for col in range(8, 14):
-        assert ws.cell(11, col).border.top.style is None, (
-            f"unrelated side-by-side col {col} received a leaked border"
-        )
 
 
 def test_detect_table_block_falls_back_to_row_content_when_no_header_fill_exists() -> None:
@@ -3954,45 +3461,6 @@ def test_autosize_role_columns_handles_unit_and_period_roles() -> None:
     assert period_floor <= period_width <= period_max
 
 
-def test_default_layout_role_widths_are_workbook_consistent() -> None:
-    """Role widths should be resolved from the widest content across the
-    workbook, then applied to every default-layout sheet using that role.
-
-    This abstracts the sfm-overhaul design-research G5 rule: a reviewer should
-    not see a 54-wide source column on one sheet and a 56-wide source column on
-    another just because only one sheet carried the longest source note.
-    """
-    with tempfile.TemporaryDirectory() as tmp:
-        out = Path(tmp) / "model.xlsx"
-        build_model.build_model(None, out, auto_live_comps=False)
-        wb = load_workbook(out, data_only=False)
-        widths_by_role: dict[str, set[float]] = {"label": set(), "source": set(), "note": set()}
-        default_layout_sheets = []
-        for ws in wb.worksheets:
-            if not source_plan.uses_default_layout(ws):
-                continue
-            default_layout_sheets.append(ws.title)
-            widths_by_role["label"].add(
-                ws.column_dimensions[get_column_letter(source_plan.LAYOUT.label_col)].width
-            )
-            widths_by_role["source"].add(
-                ws.column_dimensions[get_column_letter(source_plan.LAYOUT.source_col)].width
-            )
-            for col in range(source_plan._start_period_col() + 1, ws.max_column + 1):
-                if ws.cell(row=6, column=col).value == "Notes":
-                    widths_by_role["note"].add(ws.column_dimensions[get_column_letter(col)].width)
-                    break
-
-        assert default_layout_sheets, "real build should expose v2 default-layout sheets"
-
-        for role, widths in widths_by_role.items():
-            if not widths:
-                continue
-            assert len(widths) == 1, (
-                f"{role} widths must be workbook-consistent; got {sorted(widths)}"
-            )
-
-
 def test_highlight_row_paints_continuous_border_across_source_and_unit() -> None:
     """Regression for the _highlight_row gap (Task 1.3b).
 
@@ -4027,28 +3495,46 @@ def test_highlight_row_paints_continuous_border_across_source_and_unit() -> None
 
 
 def test_write_values_bold_path_paints_continuous_border_across_d_and_e() -> None:
-    """Bold subtotal rows must carry a CONTINUOUS top rule across the whole
-    table block — including the driver (D) and unit (E) columns even when
-    those cells are empty. The v2 witness is the People Plan "Total
-    headcount" subtotal written through `_v2_series_row(bold=True)`, whose
-    border comes from `apply_semantic_border_span`."""
+    """Regression for the _write_values bold-path table-block gap.
+
+    Pre-Task-1.3, the bold subtotal path applied BORDER_SUBTOTAL (thin
+    top) only to ``[LAYOUT.label_col, *period_cols]`` and additionally
+    skipped any cell whose value was None. That left the source (D) and
+    unit (E) columns without the rule, producing a ragged underline on
+    every bold subtotal row in every period sheet.
+
+    The Assumptions sheet's "Total headcount" row (row 35) is the
+    canonical witness — it is written with ``bold=True`` via
+    ``_write_values``. After Task 1.3 replaces the border-application
+    with ``apply_semantic_border_span``, the underline must be
+    continuous across the whole detected table block, including the
+    empty D and E cells."""
     with tempfile.TemporaryDirectory() as tmp:
         out = Path(tmp) / "model.xlsx"
         build_model.build_model(None, out)
         wb = load_workbook(out, data_only=False)
-        ws = wb["People Plan"]
+        ws = wb["Assumptions"]
 
-        target_row = _row_for_label(wb, "People Plan", "Total headcount")
+        target_row = None
+        for r in range(1, ws.max_row + 1):
+            if ws.cell(r, source_plan.LAYOUT.label_col).value == "Total headcount":
+                target_row = r
+                break
+        assert target_row is not None, "Total headcount subtotal row not found in Assumptions"
+
+        # D (source) and E (unit) sit inside the detected block.
         block_start, block_end = ib.detect_table_block(ws, target_row)
-        assert block_start <= 4 <= block_end
-        assert block_start <= 5 <= block_end
+        source_col = source_plan.LAYOUT.source_col
+        unit_col = source_plan.LAYOUT.unit_col
+        assert block_start <= source_col <= block_end
+        assert block_start <= unit_col <= block_end
 
-        for col in (3, 4, 5, FIRST_VALUE_COL):
+        for col in (source_plan.LAYOUT.label_col, source_col, unit_col):
             style = ws.cell(target_row, col).border.top.style
             assert style == "thin", (
-                f"People Plan!row {target_row} col {col}: missing thin top border "
-                f"(got {style!r}) — the bold path must apply the underline "
-                f"across the full table block including empty D/E cells."
+                f"Assumptions!row {target_row} col {col}: missing thin top border "
+                f"(got {style!r}) — `_write_values` bold path must apply the "
+                f"underline across the full table block."
             )
 
 
@@ -4095,10 +3581,9 @@ def test_apply_semantic_border_span_paints_empty_middle_cells_inside_block() -> 
 
 def test_apply_semantic_border_span_excludes_indent_columns_via_border_start_col() -> None:
     """Real period header band fills B-L with BG_TABLE_HEADER (B is the
-    indent gutter). The detector resolves the target row to the table body
-    span, and the caller passes border_start_col=3 so B stays borderless —
-    the indent column reads as a visual gutter, not a table member with a
-    rule. The choice of
+    indent gutter). The detector returns (2, 12), but the caller passes
+    border_start_col=3 so B stays borderless — the indent column reads
+    as a visual gutter, not a table member with a rule. The choice of
     border_start_col comes from the row's role / content, not from
     hard-coded column numbers."""
     wb = Workbook()
@@ -4112,9 +3597,8 @@ def test_apply_semantic_border_span_excludes_indent_columns_via_border_start_col
     for col in range(6, 13):
         ws.cell(11, col, 100)
 
-    # Sanity: detector uses target-row content, so the quiet indent gutter is
-    # outside the table-body span even though the header fill reaches B.
-    assert ib.detect_table_block(ws, 11) == (3, 12)
+    # Sanity: detector picks up B in the span.
+    assert ib.detect_table_block(ws, 11) == (2, 12)
 
     ib.apply_semantic_border_span(ws, 11, top=ib.THIN_LINE, border_start_col=3)
 
@@ -4211,133 +3695,6 @@ def test_detect_table_block_honors_explicit_header_row_override() -> None:
     assert ib.detect_table_block(ws, 25, header_row=5) == (2, 7)
 
 
-def test_hybrid_axis_renders_monthly_window_annual_tail_and_uniform_formulas() -> None:
-    """Hybrid axis contract: 24 monthly columns labeled YYYY/MM anchored to
-    the fiscal year in progress, an annual FY tail, an integer months ruler
-    (1s then 12s), a declared medium boundary rule, R17 formula uniformity
-    ACROSS the grain boundary, and charts bound to the monthly window only."""
-    with tempfile.TemporaryDirectory() as tmp:
-        input_path = Path(tmp) / "hybrid.yaml"
-        out = Path(tmp) / "hybrid.xlsx"
-        input_path.write_text(
-            "\n".join([
-                "company: HybridCo",
-                "grain: hybrid",
-                "periods: 5",
-                "customers: [120, 360, 900, 1900, 3400]",
-                "monthly_price_yen: 120000",
-                "equity_raise_yen: [400000000, 0, 0, 0, 0]",
-                "beginning_cash_yen: 120000000",
-            ]),
-            encoding="utf-8",
-        )
-        build_model.build_model(input_path, out, mode="full")
-        wb = load_workbook(out, data_only=False)
-
-        ws = wb["Revenue Build"]
-        labels = [ws.cell(6, c).value for c in range(6, 6 + 27)]
-        months = [ws.cell(5, c).value for c in range(6, 6 + 27)]
-        assert all(re.fullmatch(r"20\d{2}/\d{2}", str(v)) for v in labels[:24]), labels[:24]
-        assert all(re.fullmatch(r"FY20\d{2}", str(v)) for v in labels[24:]), labels[24:]
-        assert months == [1] * 24 + [12] * 3
-        # Unstated start year anchors to the fiscal year in progress: the
-        # first fiscal year must not already be over at build time.
-        from datetime import date
-        first_fy_end_label = labels[11]  # 12th month = first FY end
-        year, month = (int(part) for part in str(first_fy_end_label).split("/"))
-        assert date(year, month, 1) >= date.today().replace(day=1), (
-            f"hybrid window opens on a fully-past fiscal year ({labels[0]}..{labels[11]})"
-        )
-        # Boundary declaration: medium left rule on the first annual column.
-        boundary_col = 6 + 24
-        assert ws.cell(8, boundary_col).border.left.style == "medium"
-        # R17 across the boundary (promoted audit is the canonical check).
-        assert build_model._audit_row_formula_consistency(wb) == []
-        # Charts bind to a single grain: the monthly window only.
-        rb_chart = wb["Revenue Build"]._charts[0]
-        cats_ref = str(rb_chart.series[0].cat.strRef.f if rb_chart.series[0].cat.strRef else rb_chart.series[0].cat.numRef.f)
-        bounds = range_boundaries(cats_ref.split("!")[-1].replace("$", ""))
-        assert bounds[2] <= 6 + 23, f"chart categories cross the grain boundary: {cats_ref}"
-
-
-def test_tab_count_stays_within_cap_for_all_default_modes() -> None:
-    """Default mode builds keep ≤ 12 tabs (explicit --additional-sheets are
-    the only sanctioned way past the cap)."""
-    with tempfile.TemporaryDirectory() as tmp:
-        for mode in build_model.VALID_MODES:
-            out = Path(tmp) / f"{mode}.xlsx"
-            build_model.build_model(None, out, mode=mode)
-            wb = load_workbook(out, data_only=False)
-            assert len(wb.sheetnames) <= 12, f"{mode}: {wb.sheetnames}"
-
-
-def test_no_all_zero_period_rows_without_declaration() -> None:
-    """No generated period row is all-zero noise: a row whose every period
-    cell is the literal 0 is either dropped by the mechanism profile or must
-    not appear at all (0-as-information rows carry formulas or notes)."""
-    with tempfile.TemporaryDirectory() as tmp:
-        out = Path(tmp) / "full.xlsx"
-        build_model.build_model(None, out, mode="full")
-        wb = load_workbook(out, data_only=False)
-        offenders = []
-        for ws in wb.worksheets:
-            cols = build_model._v2_period_cols(ws)
-            if len(cols) < 2:
-                continue
-            for row in range(8, ws.max_row + 1):
-                label = ws.cell(row, 3).value
-                if not label:
-                    continue
-                values = [ws.cell(row, col).value for col in cols]
-                numeric = [v for v in values if isinstance(v, (int, float))]
-                if (
-                    len(numeric) == len([v for v in values if v is not None])
-                    and len(numeric) > 1
-                    and all(v == 0 for v in numeric)
-                ):
-                    offenders.append(f"{ws.title}!{row} {label}")
-        assert offenders == []
-
-
-def test_summary_snapshot_staleness_check_guards_generator_snapshots() -> None:
-    """The Summary scenario block is generator-snapshot data; a staleness
-    check compares the Base snapshot to the live roll-up while the toggle
-    sits on Base, and that check is consolidated into the master check."""
-    with tempfile.TemporaryDirectory() as tmp:
-        out = Path(tmp) / "full.xlsx"
-        build_model.build_model(None, out, mode="full")
-        wb = load_workbook(out, data_only=False)
-
-        toggle_row = _row_for_label(wb, "Assumptions", "Scenario toggle")
-        staleness_row = _row_for_label(wb, "Summary", "Snapshot staleness check")
-        formula = wb["Summary"].cell(staleness_row, 6).value
-        assert isinstance(formula, str)
-        assert f"'Assumptions'!$F${toggle_row}=2" in formula, (
-            "staleness check must be gated on the Base toggle position"
-        )
-        assert wb["Summary"].cell(staleness_row, 6).number_format == source_plan.FMT_CHECK_V2
-        # Consolidated: a "Check — Summary" row aggregates it into the master check.
-        assert "Check — Summary" in _sheet_labels(wb, "Summary")
-        master_row = _row_for_label(wb, "Summary", "Master check")
-        assert str(wb["Summary"].cell(master_row, 6).value).startswith("=SUM(")
-
-
-def test_master_check_is_echoed_on_every_period_sheet() -> None:
-    with tempfile.TemporaryDirectory() as tmp:
-        out = Path(tmp) / "full.xlsx"
-        build_model.build_model(None, out, mode="full")
-        wb = load_workbook(out, data_only=False)
-        master_row = _row_for_label(wb, "Summary", "Master check")
-        for ws in wb.worksheets:
-            if ws.title in ("Guide", "Summary") or build_model._v2_period_anchor_col(ws) is None:
-                continue
-            echo = ws.cell(2, build_model._v2_period_anchor_col(ws)).value
-            assert isinstance(echo, str) and f"'Summary'!$F${master_row}" in echo, (
-                f"{ws.title}: master-check echo missing from row 2"
-            )
-            assert "checks OK" in echo and "CHECK FAILED" in echo
-
-
 if __name__ == "__main__":
     test_skill_exposes_clean_build_route_only()
     test_skill_uses_generic_economic_kernel_not_stage_matrix()
@@ -4359,13 +3716,10 @@ if __name__ == "__main__":
     test_integrated_model_has_ib_decision_gates_not_just_readouts()
     test_comparable_evidence_loads_public_peers_by_default_and_overrides_multiples()
     test_default_live_comps_match_mechanic_labels_and_cli_overrides_yaml()
-    test_no_live_comps_disables_default_public_fetch()
     test_private_and_transaction_comps_are_included_in_comparable_evidence()
     test_incomplete_provided_comps_are_registered_but_not_used_for_medians()
     test_sec_ticker_lookup_is_cached_and_errors_are_compact()
     test_failed_live_comps_do_not_pollute_company_specific_sources_or_mark_live_multiples()
-    test_quality_gate_rejects_uniform_wrong_period_width()
-    test_quality_gate_build_targets_disable_live_comps_by_default()
     test_full_model_uses_direct_formula_refs()
     test_intra_sheet_formula_cells_are_black()
     test_ic_memo_dependency_closure_matches_live_formula_readouts()
@@ -4374,7 +3728,6 @@ if __name__ == "__main__":
     test_pricing_bundle_is_formula_complete()
     test_cap_table_mode_uses_state_machine_not_full_workbook()
     test_all_modes_produce_expected_bundles()
-    test_strict_audit_blocks_workbook_design_regressions()
     test_generated_modes_do_not_reference_removed_sheets()
     test_structured_yaml_controls_grain_periods_and_drivers()
     test_balance_sheet_has_opening_capital_counterpart()
@@ -4384,11 +3737,9 @@ if __name__ == "__main__":
     test_cap_table_sheet_uses_canonical_design_surface()
     test_ib_helpers_reject_wrap_text_true()
     test_runtime_builders_do_not_use_wrap_or_merge_layout_shortcuts()
+    test_strict_audit_blocks_workbook_design_regressions()
     test_skill_guidance_makes_no_wrap_rule_explicit()
     test_skill_guidance_requires_fix_and_rerun_iteration()
-    test_self_improvement_protocol_triggers_from_logs_and_feedback()
-    test_self_improvement_protocol_requires_regression_proof_and_privacy()
-    test_self_improvement_reflection_validator_rejects_privacy_and_overfit_records()
     test_skill_guidance_uses_meaningful_sparse_fills_and_borders()
     test_skill_guidance_enforces_ib_text_positioning()
     test_skill_guidance_enforces_ib_font_size_discipline()
@@ -4404,11 +3755,12 @@ if __name__ == "__main__":
     test_marketplace_source_does_not_emit_unrelated_asset_heavy_template()
     test_hardware_source_ignores_low_usd_competitor_price_noise()
     test_source_plan_starting_cash_is_hard_input_blue()
+    test_source_plan_ownership_waterfall_dilutes_prior_holders_symmetrically()
     test_source_plan_bold_rows_preserve_ib_cell_colors()
     test_source_plan_uses_column_based_hierarchy_layout()
     test_source_plan_chart_axes_and_tabs_follow_currency_and_semantic_roles()
     test_segment_lens_handles_long_generic_segment_names_without_clipping()
-    test_scenario_toggle_drives_effective_scales_and_engine()
+    test_source_plan_tables_do_not_overlap_metadata_columns()
     test_source_plan_design_surface_uses_generic_blue_palette()
     test_source_plan_has_no_excel_indent_or_clipped_role_columns()
     test_source_plan_has_no_long_centered_prose_headers()
@@ -4423,8 +3775,7 @@ if __name__ == "__main__":
     test_ib_helpers_encode_role_based_alignment_tokens()
     test_ib_helpers_encode_role_based_font_size_tokens()
     test_font_design_audit_rejects_tiny_fractional_and_presentation_sizes()
-    test_every_sheet_pins_indent_block_to_google_sheets_20px()
-    test_set_column_widths_refuses_to_override_indent_column()
+    test_added_hierarchy_columns_use_google_sheets_20px_width()
     test_generic_kernel_does_not_promote_domain_specific_mentions_to_sources()
     test_benchmark_register_uses_evidence_status_not_fake_source_placeholders()
     test_scenario_formulas_are_not_built_with_fragile_substring_replacement()
@@ -4432,10 +3783,10 @@ if __name__ == "__main__":
     test_detect_table_block_returns_header_row_bounds_for_simple_period_grid()
     test_detect_table_block_excludes_annotation_column_outside_header_band()
     test_detect_table_block_includes_empty_middle_cells_as_block_members()
-    test_detect_table_block_does_not_fuse_side_by_side_tables()
-    test_apply_semantic_border_span_stays_inside_side_by_side_table()
     test_detect_table_block_falls_back_to_row_content_when_no_header_fill_exists()
     test_detect_table_block_raises_for_empty_row_with_no_header()
+    test_detect_table_block_uses_nearest_header_above_not_topmost()
+    test_detect_table_block_honors_explicit_header_row_override()
     test_default_build_label_and_source_columns_fit_their_content()
     test_display_width_counts_cjk_chars_as_two()
     test_autosize_role_columns_grows_label_col_above_floor_for_long_content()
@@ -4443,7 +3794,6 @@ if __name__ == "__main__":
     test_autosize_role_columns_treats_cjk_at_two_units_for_label()
     test_autosize_role_columns_clamps_to_role_max_for_label()
     test_autosize_role_columns_handles_unit_and_period_roles()
-    test_default_layout_role_widths_are_workbook_consistent()
     test_highlight_row_paints_continuous_border_across_source_and_unit()
     test_write_values_bold_path_paints_continuous_border_across_d_and_e()
     test_apply_semantic_border_span_takes_no_start_or_end_col_args()
@@ -4451,10 +3801,3 @@ if __name__ == "__main__":
     test_apply_semantic_border_span_excludes_indent_columns_via_border_start_col()
     test_apply_semantic_border_span_supports_top_and_bottom_in_one_call()
     test_apply_semantic_border_span_is_a_noop_when_no_sides_supplied()
-    test_detect_table_block_uses_nearest_header_above_not_topmost()
-    test_detect_table_block_honors_explicit_header_row_override()
-    test_hybrid_axis_renders_monthly_window_annual_tail_and_uniform_formulas()
-    test_tab_count_stays_within_cap_for_all_default_modes()
-    test_no_all_zero_period_rows_without_declaration()
-    test_summary_snapshot_staleness_check_guards_generator_snapshots()
-    test_master_check_is_echoed_on_every_period_sheet()

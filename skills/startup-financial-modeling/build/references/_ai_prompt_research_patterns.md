@@ -4,9 +4,6 @@ Public AI-agent and financial-modeling-prompt material belongs in the workflow
 only after it has been translated into the same evidence discipline as a
 workbook, benchmark set, or diligence note. Use this reference to turn prompt
 ideas into auditable model gates, not into model evidence.
-For skill self-improvement research, route session-log, trace, eval, reflection,
-and X-practitioner signals through `_self_improvement_protocol.md`; this file
-only governs how prompt/workflow material may influence the finance artifact.
 
 ## Research Snapshot
 
@@ -64,7 +61,7 @@ audit plan:
    explanatory drivers, implied value, support ratio/variance, evidence status,
    and decision impact.
 5. Workbook design: apply the IB design system for colors, units, raw money
-   values, font sizes, no wrap/merge, F7 freeze panes on period-axis sheets, 20px hierarchy columns, sparse
+   values, font sizes, no wrap/merge/freeze, 20px hierarchy columns, sparse
    fills/borders, and role-based alignment.
 6. Financing and ownership: calculate runway, funding gap, dilution, option
    pool, converts, SAFEs/J-KISS, debt, warrants, preference, and investor /

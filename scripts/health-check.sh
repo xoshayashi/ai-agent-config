@@ -1,5 +1,7 @@
 #!/bin/sh
 set -eu
+export PYTHONDONTWRITEBYTECODE=1
+
 
 format=${AI_AGENT_HEALTH_FORMAT:-text}
 strict=${AI_AGENT_HEALTH_STRICT:-0}
@@ -156,14 +158,12 @@ default_config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
 config_home=$(expand_home "${AI_AGENT_CONFIG_HOME:-$default_config_home}")
 codex_home=$(expand_home "${AI_AGENT_CODEX_HOME:-$HOME/.codex}")
 claude_home=$(expand_home "${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}")
-gemini_home=$(expand_home "${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}")
 home_dir=$(expand_home "${AI_AGENT_HOME:-$HOME}")
 skill_source_root="$config_home/skills"
 
 git_status=$(command_status git)
 claude_status=$(command_status claude)
 codex_status=$(command_status codex)
-gemini_status=$(command_status gemini)
 agy_status=$(command_status agy)
 
 repo_status=fail
@@ -199,16 +199,11 @@ claude_entry_status=$(link_status_for "$claude_home/CLAUDE.md" "$config_home/ins
 claude_shared_status=$(link_status_for "$claude_home/AI_AGENT_INSTRUCTIONS.md" "$config_home/instructions/AI_AGENT_INSTRUCTIONS.md")
 claude_design_status=$(link_status_for "$claude_home/DESIGN.md" "$config_home/instructions/DESIGN.md")
 claude_skills_status=$(skills_status_for "$claude_home")
-gemini_entry_status=$(link_status_for "$gemini_home/GEMINI.md" "$config_home/instructions/GEMINI.md")
-gemini_shared_status=$(link_status_for "$gemini_home/AI_AGENT_INSTRUCTIONS.md" "$config_home/instructions/AI_AGENT_INSTRUCTIONS.md")
-gemini_design_status=$(link_status_for "$gemini_home/DESIGN.md" "$config_home/instructions/DESIGN.md")
-gemini_skills_status=$(skills_status_for "$gemini_home")
 
 shell_zshrc_status=$(link_status_for "$home_dir/.zshrc" "$config_home/shell/.zshrc")
 
 codex_notify_status=$(notify_status_for "$codex_home/hooks.json")
 claude_notify_status=$(notify_status_for "$claude_home/settings.json")
-gemini_notify_status=$(notify_status_for "$gemini_home/settings.json")
 
 python3_status=$(command_status python3)
 pip_status=$(command_status pip)
@@ -227,9 +222,8 @@ pdftoppm_status=$(command_status pdftoppm)
 for status in \
   "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status" \
   "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status" \
-  "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status" \
   "$shell_zshrc_status" \
-  "$codex_notify_status" "$claude_notify_status" "$gemini_notify_status" \
+  "$codex_notify_status" "$claude_notify_status" \
   "$python3_status" "$openpyxl_status" "$pptx_deps_status"; do
   [ "$status" = "ok" ] || mark_status warn
 done
@@ -241,16 +235,14 @@ if [ "$format" = "json" ]; then
   printf '  "config_home": "%s",\n' "$(json_escape "$(display_path "$config_home")")"
   printf '  "codex_home": "%s",\n' "$(json_escape "$(display_path "$codex_home")")"
   printf '  "claude_home": "%s",\n' "$(json_escape "$(display_path "$claude_home")")"
-  printf '  "gemini_home": "%s",\n' "$(json_escape "$(display_path "$gemini_home")")"
   printf '  "repository": {"status": "%s", "branch": "%s", "dirty": %s},\n' "$repo_status" "$(json_escape "$repo_branch")" "$(json_nullable_bool "$repo_dirty")"
-  printf '  "commands": {"git": "%s", "claude": "%s", "codex": "%s", "gemini": "%s", "agy": "%s"},\n' "$git_status" "$claude_status" "$codex_status" "$gemini_status" "$agy_status"
+  printf '  "commands": {"git": "%s", "claude": "%s", "codex": "%s", "agy": "%s"},\n' "$git_status" "$claude_status" "$codex_status" "$agy_status"
   printf '  "links": {\n'
   printf '    "codex_AGENTS.md": "%s", "codex_AI_AGENT_INSTRUCTIONS.md": "%s", "codex_DESIGN.md": "%s", "codex_skills": "%s",\n' "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status"
   printf '    "claude_CLAUDE.md": "%s", "claude_AI_AGENT_INSTRUCTIONS.md": "%s", "claude_DESIGN.md": "%s", "claude_skills": "%s",\n' "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status"
-  printf '    "gemini_GEMINI.md": "%s", "gemini_AI_AGENT_INSTRUCTIONS.md": "%s", "gemini_DESIGN.md": "%s", "gemini_skills": "%s",\n' "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status"
   printf '    "shell_.zshrc": "%s"\n' "$shell_zshrc_status"
   printf '  },\n'
-  printf '  "notifications": {"codex": "%s", "claude": "%s", "gemini": "%s"},\n' "$codex_notify_status" "$claude_notify_status" "$gemini_notify_status"
+  printf '  "notifications": {"codex": "%s", "claude": "%s"},\n' "$codex_notify_status" "$claude_notify_status"
   printf '  "skill_dependencies": {"python3": "%s", "pip": "%s", "pip3": "%s", "openpyxl": "%s", "pptx_deps": "%s", "libreoffice": "%s", "pdftoppm": "%s"}\n' "$python3_status" "$pip_status" "$pip3_status" "$openpyxl_status" "$pptx_deps_status" "$libreoffice_status" "$pdftoppm_status"
   printf '}\n'
 else
@@ -258,14 +250,13 @@ else
   printf 'redacted: %s\n' "$([ "$redact_output" = "1" ] && printf yes || printf no)"
   printf 'config: %s\n' "$(display_path "$config_home")"
   printf 'repository: %s branch=%s dirty=%s\n' "$repo_status" "$repo_branch" "$repo_dirty"
-  printf 'commands: git=%s claude=%s codex=%s gemini=%s agy=%s\n' "$git_status" "$claude_status" "$codex_status" "$gemini_status" "$agy_status"
-  printf 'links: codex(AGENTS=%s shared=%s design=%s skills=%s) claude(CLAUDE=%s shared=%s design=%s skills=%s) gemini(GEMINI=%s shared=%s design=%s skills=%s)\n' \
+  printf 'commands: git=%s claude=%s codex=%s agy=%s\n' "$git_status" "$claude_status" "$codex_status" "$agy_status"
+  printf 'links: codex(AGENTS=%s shared=%s design=%s skills=%s) claude(CLAUDE=%s shared=%s design=%s skills=%s)\n' \
     "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status" \
-    "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status" \
-    "$gemini_entry_status" "$gemini_shared_status" "$gemini_design_status" "$gemini_skills_status"
+    "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status"
   printf 'shell: zshrc=%s\n' "$shell_zshrc_status"
-  printf 'notifications: codex=%s claude=%s gemini=%s\n' \
-    "$codex_notify_status" "$claude_notify_status" "$gemini_notify_status"
+  printf 'notifications: codex=%s claude=%s\n' \
+    "$codex_notify_status" "$claude_notify_status"
   printf 'skill dependencies: python3=%s pip=%s pip3=%s openpyxl=%s pptx_deps=%s libreoffice=%s pdftoppm=%s\n' \
     "$python3_status" "$pip_status" "$pip3_status" "$openpyxl_status" "$pptx_deps_status" "$libreoffice_status" "$pdftoppm_status"
 fi

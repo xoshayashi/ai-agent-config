@@ -35,17 +35,22 @@ const valuation = read("build/references/_valuation_and_return_logic.md");
 const sheetRubric = read("build/references/_sheet_quality_rubric.md");
 const promptResearch = read("build/references/_ai_prompt_research_patterns.md");
 const selfReview = read("build/references/_self_review_protocol.md");
-const selfImprove = read("build/references/_self_improvement_protocol.md");
-const selfImprovePanel = read("build/references/_self_improvement_reviewer_panel.md");
-const selfImproveFailureModes = read("build/references/_self_improvement_failure_modes.md");
-const selfImprovePruning = read("build/references/_self_improvement_pruning.md");
-const selfImproveRuntime = read("build/runtime/self_improvement.py");
-const closeoutConsistency = read("build/runtime/closeout_consistency.py");
+const architecture = read("build/references/_excel_generation_architecture.md");
 const ibFormat = read("build/runtime/ib_format.py");
 const kernel = read("build/runtime/economic_kernel.py");
 const sourcePlan = read("build/runtime/source_plan_builder.py");
 const capTable = read("build/runtime/cap_table_builder.py");
-const tests = read("build/tests/test_build_model.py") + "\n" + read("build/tests/test_economic_quality.py");
+const buildModel = read("build/runtime/build_model.py");
+const workbookSpec = read("build/runtime/workbook_spec.py");
+const qualityGate = read("scripts/quality_gate.py");
+const architectureGate = read("scripts/architecture_gate.py");
+const scenarioEval = read("scripts/scenario_eval.py");
+const tests =
+  read("build/tests/test_build_model.py") +
+  "\n" +
+  read("build/tests/test_economic_quality.py") +
+  "\n" +
+  read("tests/test_build_model_wrapper.py");
 const evals = read("build/evals/evals.json");
 
 const criteria = [
@@ -71,20 +76,13 @@ const criteria = [
         "External link font",
         "Arial 10pt",
         "Money formats",
+        "Terminal Comment",
         "20px",
         "No-Wrap Rule",
         "Fill span rules",
         "Borders are sparse accents",
-        "one width per role",
-        "Side-by-side tables",
       ]) &&
-      includesAll(layout, [
-        "No merged cells",
-        "No wrapped text",
-        "2.14",
-        "one uniform width",
-        "side-by-side semantic tables",
-      ]) &&
+      includesAll(layout, ["No-Merge Rule", "No-Wrap Rule", "INDENT_COL_WIDTH", "terminal `Comment` column"]) &&
       includesAll(ibFormat, [
         "IB_HARD_INPUT",
         "IB_FORMULA",
@@ -94,7 +92,6 @@ const criteria = [
         "INDENT_COL_WIDTH",
         "FMT_JPY_MILLION",
         "apply_semantic_border_span",
-        "role_column_width_for_content",
       ])
   ),
   criterion(
@@ -176,101 +173,28 @@ const criteria = [
       evals.includes("AI_PROMPT_RESEARCH_SYNTHESIS")
   ),
   criterion(
-    "session-log-self-improvement",
+    "excel-generation-architecture",
     10,
     [
-      "SKILL.md",
-      "build/references/_skill_invocation_protocol.md",
-      "build/references/_self_improvement_protocol.md",
-      "build/runtime/self_improvement.py",
-      "build/evals/evals.json",
-      "build/tests/test_build_model.py",
+      "build/references/_excel_generation_architecture.md",
+      "scripts/architecture_gate.py",
+      "build/runtime/build_model.py",
     ],
     () =>
-      exists("build/references/_self_improvement_protocol.md") &&
-      skill.includes("post-output/session-log-driven improvements") &&
-      protocol.includes("_self_improvement_protocol.md") &&
-      protocol.includes("At every closeout and every improvement prompt") &&
-      includesAll(selfReview, ["self-improvement gate", "sanitized session evidence", "lowest durable layer"]) &&
-      includesAll(selfImprove, [
-        "Trigger Signals",
-        "Evidence To Inspect",
-        "Improvement Loop",
-        "Research Intake",
-        "Stop Conditions",
-        "sanitized evidence",
-        "one-off artifact issue",
-        "reusable skill gap",
-        "lowest durable layer",
-        "regression proof",
-        "validate_reflection_record",
-        "Reflection Record",
-        "Capability evals",
-        "regression evals",
-        "holdout/adversarial examples",
-        "cost/latency",
-        "milestone/human review",
-        "raw local logs",
-        "secrets",
-        "X/public social posts only as weak signals",
-        "_self_improvement_reviewer_panel.md",
-        "_self_improvement_failure_modes.md",
-        "_self_improvement_pruning.md",
-        "validate_reflection_record_for_acceptance",
-        "closeout_consistency.py",
+      includesAll(architecture, [
+        "Use `openpyxl` as the canonical workbook engine",
+        "XlsxWriter",
+        "Layering Contract",
+        "Intermediate Representation",
+        "Formula Discipline",
+        "volatile functions",
       ]) &&
-      includesAll(selfImprovePanel, [
-        "Four Lenses",
-        "R1 correctness and doctrine compliance",
-        "R2 verification depth and honesty",
-        "R3 generality and design health",
-        "R4 artifact quality and readability",
-        "The writer of the Reflection Record does not score it",
-        "impression scores without citations are not admissible",
-      ]) &&
-      includesAll(selfImproveFailureModes, [
-        "Model Collapse",
-        "Reward Hacking / Goodhart",
-        "Sycophancy",
-        "Eval Overfit",
-        "Non-Convergence",
-        "Linked gates",
-      ]) &&
-      includesAll(selfImprovePruning, [
-        "do not reflect",
-        "n=1 evidence",
-        "lowest durable layer",
-        "Rules fail at the prompt and succeed at the boundary",
-        "Deferred Candidate Format",
-      ]) &&
-      includesAll(selfImproveRuntime, [
-        "validate_reflection_record",
-        "validate_reflection_record_for_acceptance",
-        "score_reflection_panel",
-        "detect_sensitive_text",
-        "SENSITIVE_PATTERNS",
-        "overfit:company_specific_lesson",
-        "x_signal:handle_not_stripped",
-        "review_required:audit_or_doctrine_change",
-      ]) &&
-      includesAll(closeoutConsistency, [
-        "check_closeout_consistency",
-        "dangling_ref",
-        "count_drift",
-      ]) &&
-      evals.includes("SELF_IMPROVEMENT_PROTOCOL") &&
-      evals.includes("self_improvement_from_failed_session_log") &&
-      evals.includes("self_improvement_panel_rejects_schema_valid_degradation") &&
-      evals.includes("self_improvement_closeout_consistency_drift") &&
-      evals.includes("self_improvement_failure_modes_mitigated") &&
-      evals.includes("self_improvement_pruning_deferred_candidate") &&
-      evals.includes("Reflection Record") &&
-      tests.includes("test_self_improvement_protocol_triggers_from_logs_and_feedback") &&
-      tests.includes("test_self_improvement_protocol_requires_regression_proof_and_privacy") &&
-      tests.includes("test_self_improvement_reflection_validator_rejects_privacy_and_overfit_records") &&
-      tests.includes("test_self_improvement_panel_rejects_schema_valid_quality_degradation") &&
-      tests.includes("test_self_improvement_closeout_consistency_catches_links_and_count_drift") &&
-      tests.includes("test_self_improvement_failure_modes_and_pruning_are_linked_from_gates")
+      includesAll(workbookSpec, ["WorkbookSpec", "SheetSpec", "RowSpec", "CellSpec", "FormulaExpr", "StyleRole", "render_workbook_spec"]) &&
+      includesAll(architectureGate, ["FORBIDDEN_IMPORTS", "ast.parse", "architecture_issues", "openpyxl>=3.1"]) &&
+      includesAll(qualityGate, ["architecture_command", "architecture_gate.py", "scenario_eval_command", "scenario_eval.py", "recalc_and_inspect", "data_only=True", "audit_recalculated_financial_model"]) &&
+      includesAll(scenarioEval, ["SCENARIOS", "recurring-software", "marketplace", "hardware-asset-heavy", "pre-revenue-milestone", "fintech-balance-sheet", "startup-finance-scenario-eval-score"]) &&
+      includesAll(buildModel, ["VOLATILE_FORMULA_RE", "_audit_formula_engine", "audit_recalculated_financial_model"]) &&
+      includesAll(tests, ["test_excel_generation_architecture_contract_is_documented_and_gated", "test_workbook_spec_renders_typed_ir_to_openpyxl_styles", "test_strict_audit_blocks_volatile_formula_functions", "test_saved_workbook_default_font_is_persisted_in_styles_xml", "test_recalculated_financial_audit_detects_broken_pnl_identity", "test_recalculated_financial_audit_passes_representative_full_workbook", "test_pre_revenue_valuation_uses_financing_implied_value_when_dcf_is_not_meaningful", "test_quality_gate_runs_scenario_eval"])
   ),
   criterion(
     "validation-and-closeout-discipline",
@@ -282,8 +206,6 @@ const criteria = [
         "test_strict_audit_blocks_workbook_design_regressions",
         "test_generated_workbook_has_sheet_specific_quality_markers",
         "test_source_plan_has_no_excel_indent_or_clipped_role_columns",
-        "test_default_layout_role_widths_are_workbook_consistent",
-        "test_detect_table_block_does_not_fuse_side_by_side_tables",
       ])
   ),
 ];

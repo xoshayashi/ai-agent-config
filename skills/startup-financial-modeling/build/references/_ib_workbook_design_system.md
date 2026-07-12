@@ -10,38 +10,38 @@ Every sheet follows the same reading rhythm:
 
 | Zone                | Design intent                                                                                                       |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------- |
-| Title area          | Row 2 in the first wide label/text column contains the sheet title; row 3 contains a short gray italic purpose line; the first period column of row 2 carries the master-check echo |
-| Ruler rows          | Row 4: unit caption (C) and fiscal-year label ruler; row 5: months-in-period ruler referenced by period formulas    |
-| Header row          | Row 6 anchors metadata columns and period/value columns                                                             |
-| Body                | Data starts at row 8; each row has one role: section, line item, source/note, unit, value, or output                |
-| Interpretation area | KPI, scenario, valuation, benchmark, and memo surfaces include concise judgment rows                                |
+| Title area          | Row 2 in the first wide label/text column contains the sheet title; row 3 contains a short gray italic purpose line |
+| Header row          | Row 5 anchors metadata columns and period/value columns                                                             |
+| Body                | Each row has one role: section, line item, source/note, unit, value, or output                                      |
+| Interpretation area | KPI, scenario, sensitivity, valuation, benchmark, and memo sheets include concise judgment rows                     |
 
-Period-axis sheets freeze panes at F7 (ICAEW/FAST/IB consensus) so labels and
-header rulers stay visible while scrolling the timeline. The sheet should feel
+The first useful row should be visible without scrolling. The sheet should feel
 compact enough for repeated model review, with blank space used as breathing
 room rather than as decoration.
 
 ## Column System
 
-Use columns to express hierarchy and readability. Widths follow the single
-workbook grid defined in `_layout_canonical.md` (FAST consistent-column rule):
+Use columns to express hierarchy and readability:
 
 | Column role            |                               Width guide | Alignment                                         |
 | ---------------------- | ----------------------------------------: | ------------------------------------------------- |
-| A gutter               |                                       1.5 | visual margin                                     |
+| A gutter               |                                         3 | visual margin                                     |
 | Hierarchy columns      | 20px in Google Sheets (`2.14` xlsx width) | left                                              |
-| Lowest-level line item |                                        38 | left                                              |
-| Source / driver        | 30 on input registers; 10 (driver tag) on engine/statement sheets | left, gray italic |
-| Unit                   |                                         9 | right, gray                                       |
-| Period / value         |     11.5 — one uniform width on all sheets | right for numbers, center only for period headers |
-| Notes / interpretation |                                        64 | left, gray italic                                 |
+| Lowest-level line item |                               54 or wider | left                                              |
+| Source / driver        |                               54 or wider | left, gray italic                                 |
+| Unit                   |                                        14 | right, gray                                       |
+| Period / value         |                                        16 | right for numbers, center only for period headers |
+| Terminal Comment       |                                     60-72 | final column after periods, left gray italic      |
+| Notes / interpretation |                                     60-72 | left, gray italic                                 |
 
 Long labels receive enough width in their role column or move to a dedicated
-notes / interpretation column. Resolve label, source/driver, and note widths
-from the widest content anywhere in the workbook and apply one width per role
-across all default-layout sheets; a sheet-local width change is a defect unless
-the sheet uses a documented custom layout. Adjacent cells that support text
-overflow remain plain empty cells, so Google Sheets can show the full text.
+notes / interpretation column. Adjacent cells that support text overflow remain
+plain empty cells, so Google Sheets can show the full text.
+
+Default period sheets end with a `Comment` column immediately after the final
+period/value column. Use it for row-level caveats, source notes, DD reminders,
+and interpretation that belongs to the line item rather than to a period. Do
+not place populated cells to the right of this terminal comment column.
 
 ## Text Position And Alignment
 
@@ -142,8 +142,8 @@ Use these tokens instead of inventing local formatting:
 | Header row height        | 18pt                                   | Row 5 or compact header/label rows                                                          |
 | Section row height       | 20-22pt                                | Section/block divider rows                                                                  |
 | Wrapped exception height | 15pt x visible line count              | User-approved wrap/manual-break exceptions only                                             |
-| Money formats            | Raw stored values with display formats | JPY ladder `円`/`千円`/`百万円`/`十億円` with red `▲` negatives and dash zeros (`#,##0,,;[Red]"▲"#,##0,,;"-"`); USD `$`/`$K`/`$M` with paren negatives; no per-cell `¥` symbols — the row-4 caption declares the scale |
-| Percent / multiple       | `%`, `x` formats                       | Percent `0.0%` italic with `▲` negatives, right-aligned; multiples as `0.0x`; factors 4dp   |
+| Money formats            | Raw stored values with display formats | `円`, `千円`, `百万円`, `億円`, `$`, `$K`, `$M`; negatives show red and zeros may show dash |
+| Percent / multiple       | `%`, `x` formats                       | Percentages right-aligned, multiples as `0.0x` / `0.00x`                                    |
 
 The xlsx default font must also be Arial 10pt so newly inserted rows inherit
 the same look after the user opens the workbook.
@@ -235,10 +235,6 @@ Fill span rules:
 - Fill blank cells inside that span when they complete the row component. A
   blank cell can belong to the section/header/check band even though it has no
   value.
-- When a worksheet row holds side-by-side tables, detect the span from the
-  target row's table, not from all header-filled cells on the row. The gutter
-  and the unrelated right-hand table stay unfilled. Internal source/unit gaps
-  inside the chosen table still count as member cells.
 - Keep trailing canvas, overflow spacer cells outside the component, and
   unrelated blank columns unfilled.
 - Section headers inherit the width of the table/block they introduce. If the
@@ -284,9 +280,6 @@ Use borders as sparse structural accents:
   or comparable row width; then draw the rule across that full span, including
   blank cells inside the component. A blank cell inside the table/header/check
   width still receives the border so the reviewer sees one clean vertical edge.
-- Side-by-side tables do not share one border span merely because their header
-  fills sit on the same row. Draw the rule across the target row's table only;
-  preserve the quiet gutter and the unrelated neighboring table.
 - Hierarchy / indent columns are intentionally quiet. Fills may include a
   hierarchy column when it is part of the visual band, but borders begin at the
   row's real label/data start column. In the default layout that means B stays
@@ -342,9 +335,8 @@ Design for the rendered sheet, not only the xlsx file:
 - Unit labels are consistently right-aligned next to values.
 - Prose cells are left-aligned, while period headers are the main centered text.
 - Empty spacer cells remain truly empty and unstyled, preserving overflow.
-- Period-axis sheets keep frozen panes at F7 so labels, unit column, and the
-  header rulers stay in view (imports cleanly into Google Sheets). Non-period
-  register or memo sheets may omit panes.
+- Do not freeze rows or columns; generated workbooks should open without fixed
+  panes and remain readable through column widths and repeated header structure.
 - The workbook canvas ends at the last rendered row and column on every sheet:
   values, charts, and drawings stay inside the print area, while trailing blank
   rows or columns do not carry fills, borders, or row-height styling.

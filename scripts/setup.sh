@@ -1,5 +1,7 @@
 #!/bin/sh
 set -eu
+export PYTHONDONTWRITEBYTECODE=1
+
 
 say() {
   printf '%s\n' "$*"
@@ -93,7 +95,6 @@ default_config_home=$(CDPATH= cd "$script_dir/.." && pwd -P)
 config_home=$(abs_existing_dir "${AI_AGENT_CONFIG_HOME:-$default_config_home}")
 codex_home=$(abs_dir "${AI_AGENT_CODEX_HOME:-$HOME/.codex}")
 claude_home=$(abs_dir "${AI_AGENT_CLAUDE_HOME:-$HOME/.claude}")
-gemini_home=$(abs_dir "${AI_AGENT_GEMINI_HOME:-$HOME/.gemini}")
 home_dir=$(abs_dir "${AI_AGENT_HOME:-$HOME}")
 timestamp=$(date +%Y%m%d-%H%M%S)
 skill_source_root="$config_home/skills"
@@ -242,7 +243,6 @@ brew_install_formulae() {
     git \
     gh \
     hf \
-    gemini-cli \
     mas \
     python \
     pipx \
@@ -578,7 +578,6 @@ say "AI agent config setup"
 say "config: $config_home"
 say "codex home: $codex_home"
 say "claude home: $claude_home"
-say "gemini home: $gemini_home"
 say "home: $home_dir"
 
 install_macos_bootstrap
@@ -686,10 +685,6 @@ install_instruction_links() {
   install_link "$src_root/CLAUDE.md" "$claude_home/CLAUDE.md"
   install_link "$src_root/AI_AGENT_INSTRUCTIONS.md" "$claude_home/AI_AGENT_INSTRUCTIONS.md"
   install_link "$src_root/DESIGN.md" "$claude_home/DESIGN.md"
-
-  install_link "$src_root/GEMINI.md" "$gemini_home/GEMINI.md"
-  install_link "$src_root/AI_AGENT_INSTRUCTIONS.md" "$gemini_home/AI_AGENT_INSTRUCTIONS.md"
-  install_link "$src_root/DESIGN.md" "$gemini_home/DESIGN.md"
 }
 
 install_shell_links() {
@@ -699,7 +694,7 @@ install_shell_links() {
 install_skill_links() {
   [ -d "$skill_source_root" ] || return 0
 
-  for target_home in "$codex_home" "$claude_home" "$gemini_home"; do
+  for target_home in "$codex_home" "$claude_home"; do
     target_root="$target_home/skills"
     run mkdir -p "$target_root"
 
@@ -718,7 +713,7 @@ install_skill_links() {
 }
 
 remove_retired_skill_links() {
-  for target_home in "$codex_home" "$claude_home" "$gemini_home"; do
+  for target_home in "$codex_home" "$claude_home"; do
     target_root="$target_home/skills"
     for skill_name in $retired_skill_names; do
       dst="$target_root/$skill_name"
@@ -759,7 +754,7 @@ move_skill_backups_out_of_root() {
 }
 
 move_existing_skill_backups() {
-  for target_home in "$codex_home" "$claude_home" "$gemini_home"; do
+  for target_home in "$codex_home" "$claude_home"; do
     move_skill_backups_out_of_root "$target_home/skills" "$target_home/skill-backups"
   done
 
@@ -783,8 +778,7 @@ install_notification_hooks() {
   set -- --mode install \
     --config-home "$config_home" \
     --claude-home "$claude_home" \
-    --codex-home "$codex_home" \
-    --gemini-home "$gemini_home"
+    --codex-home "$codex_home"
   if [ "$dry_run" = "1" ]; then
     set -- "$@" --dry-run
   fi
