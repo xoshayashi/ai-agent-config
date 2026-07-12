@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import ast
 import fnmatch
+import hashlib
 import json
 import os
 import re
@@ -171,11 +172,9 @@ def check_final_generation_prompt_hygiene() -> Result:
     combined = proc.stdout + proc.stderr
     if proc.returncode != 0:
         return Result("final_generation_prompt_hygiene", False, combined[:2000])
-    start = combined.find("final_generation_prompt_payload:")
-    end = combined.find("\n\nnon_rendered_workflow_qa:", start)
-    if start < 0 or end < 0:
-        return Result("final_generation_prompt_hygiene", False, "missing final_generation_prompt_payload boundary")
-    payload = combined[start:end]
+    payload = combined
+    if "ACT slide image generation contract" not in payload:
+        return Result("final_generation_prompt_hygiene", False, "missing lean generation contract")
     forbidden = [
         "review_manifest",
         "weak_slide_regeneration_queue",
@@ -188,8 +187,23 @@ def check_final_generation_prompt_hygiene() -> Result:
     hits = [needle for needle in forbidden if needle in payload]
     if hits:
         return Result("final_generation_prompt_hygiene", False, "forbidden generation-prompt terms: " + ", ".join(hits))
-    if "image_size 2048x1152" not in payload:
+    if "size 2048x1152" not in payload:
         return Result("final_generation_prompt_hygiene", False, "default 2048x1152 image size missing from generation prompt payload")
+    if len(payload.encode("utf-8")) > 4096:
+        return Result("final_generation_prompt_hygiene", False, f"generation contract exceeds 4096 bytes: {len(payload.encode('utf-8'))}")
+    negative_directives = [
+        r"\bdo not\b",
+        r"\bnever\b",
+        r"\bavoid\b",
+        r"\breject\b",
+        r"\bblocker\b",
+        r"\bwrong\b",
+        r"\bmissing\b",
+        r"\bmalformed\b",
+    ]
+    hits = [pattern for pattern in negative_directives if re.search(pattern, payload, flags=re.IGNORECASE)]
+    if hits:
+        return Result("final_generation_prompt_hygiene", False, "negative directive leaked into generation contract: " + ", ".join(hits))
     return Result("final_generation_prompt_hygiene", True)
 
 
@@ -241,6 +255,62 @@ def check_deck_plan_output_hygiene() -> Result:
     return Result("deck_plan_output_hygiene", True)
 
 
+def check_visual_regression_cases() -> Result:
+    path = ROOT / "build" / "evals" / "visual-regression-cases.json"
+    if not path.exists():
+        return Result("visual_regression_cases", False, "missing visual-regression-cases.json")
+    data = json.loads(path.read_text(encoding="utf-8"))
+    cases = data.get("cases") if isinstance(data, dict) else None
+    if data.get("schema_version") != 1 or not isinstance(cases, list):
+        return Result("visual_regression_cases", False, "invalid schema")
+    classes = {case.get("class") for case in cases if isinstance(case, dict)}
+    ids = [case.get("id") for case in cases if isinstance(case, dict)]
+    if len(cases) < 9 or classes != {"typical", "edge", "adversarial"} or len(ids) != len(set(ids)):
+        return Result("visual_regression_cases", False, f"cases={len(cases)} classes={sorted(classes)} unique_ids={len(set(ids))}")
+    incomplete = [
+        case.get("id")
+        for case in cases
+        if not case.get("expected_route") or not case.get("hard_gates") or not case.get("pairwise_review")
+    ]
+    if incomplete:
+        return Result("visual_regression_cases", False, "incomplete cases: " + ", ".join(map(str, incomplete)))
+    return Result("visual_regression_cases", True)
+
+
+def check_source_none_contract() -> Result:
+    script = ROOT / "build" / "scripts" / "build_act_slide_prompt.py"
+    with tempfile.TemporaryDirectory() as tmp:
+        brief = Path(tmp) / "brief.md"
+        brief.write_text("H1: サンプル\nsource_line: none\n", encoding="utf-8")
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                str(brief),
+                "--mode",
+                "single-slide-image",
+                "--archetype",
+                "process",
+                "--grid-mode",
+                "12-column message-led",
+            ],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+    required = [
+        "source_line: none",
+        "literal state none",
+        "keeps the footer area quiet",
+    ]
+    missing = [needle for needle in required if needle not in proc.stdout]
+    if proc.returncode != 0 or missing:
+        return Result("source_none_contract", False, proc.stderr[:1000] or "missing: " + ", ".join(missing))
+    return Result("source_none_contract", True)
+
+
 def valid_png_bytes(rgb: tuple[int, int, int] = (255, 255, 255), width: int = 2048, height: int = 1152) -> bytes:
     import binascii
     import struct
@@ -289,6 +359,14 @@ def approved_review_manifest(images: list[Path]) -> dict[str, object]:
         "schema_version": 1,
         "all_generated_images_reviewed": True,
         "weak_slide_regeneration_queue": [],
+        "review_evidence": {
+            "reviewer": "skill-eval",
+            "reviewed_at": "2026-01-01T00:00:00Z",
+            "png_sha256_by_slide": {
+                str(idx): hashlib.sha256(path.read_bytes()).hexdigest()
+                for idx, path in enumerate(images, 1)
+            },
+        },
         "final_image_quality_status": "approved",
         "content_quality_status": "approved",
         "design_quality_status": "approved",
@@ -507,7 +585,16 @@ def check_current_master_contract() -> list[Result]:
     """Prove the current master reaches the generated scaffold, not only docs."""
     script = ROOT / "build" / "scripts" / "build_act_slide_prompt.py"
     proc = subprocess.run(
-        [sys.executable, str(script), "--mode", "single-slide-image"],
+        [
+            sys.executable,
+            str(script),
+            "--mode",
+            "single-slide-image",
+            "--archetype",
+            "asymmetric-main-supporting-context",
+            "--grid-mode",
+            "12-column message-led",
+        ],
         cwd=ROOT,
         text=True,
         stdout=subprocess.PIPE,
@@ -515,23 +602,22 @@ def check_current_master_contract() -> list[Result]:
         check=False,
     )
     output = proc.stdout
+    if proc.returncode != 0:
+        return [Result("master_output_execution", False, proc.stderr[:2000])]
     required = [
-        "header_clean_title_block_lock",
-        "header_title_grid_anchor_lock",
+        "ACT slide image generation contract",
+        "exact_text: freeze the visible strings",
+        "canonical_geometry: 1672x941 basis",
         "H1 x=72 y=80 w=1528",
         "subtitle x=72 y=126 w=1528",
-        "body_start_y=270",
-        "edge_margin_balance_lock",
-        "intentional_space_coverage_lock",
-        "focal_aspect_preservation_lock",
-        "one uniform 38pt/700 line",
-        "one uniform 32pt/400 #626A64 line",
-        "abs(top_visible_margin - bottom_visible_margin) <=4px",
+        "body y=270..861 without footer",
+        "related gaps are smaller than group-separation gaps",
+        "body-only optical balance",
+        "source_line: freeze either one traceable publication string or the literal state none",
+        "the literal state none keeps the footer area quiet",
+        "acceptance_focus:",
     ]
     forbidden = [
-        "header_left_accent",
-        "header_accent_geometry",
-        "vertical_line x=50",
         "H1 28-32pt",
         "subtitle 18-21pt",
         "body_start_y=105",
@@ -545,6 +631,7 @@ def check_current_master_contract() -> list[Result]:
         Result(f"master_output_forbidden:{needle}", needle not in output, "stale master leaked into generated scaffold")
         for needle in forbidden
     )
+    results.append(Result("master_output_prompt_budget", len(output.encode("utf-8")) <= 4096, f"prompt bytes={len(output.encode('utf-8'))}"))
     return results
 
 
@@ -568,6 +655,8 @@ def main() -> int:
         results.append(run_helper_check(check))
     results.append(check_final_generation_prompt_hygiene())
     results.append(check_deck_plan_output_hygiene())
+    results.append(check_visual_regression_cases())
+    results.append(check_source_none_contract())
     results.append(run_pptx_package_check())
     results.append(run_pdf_package_check())
 

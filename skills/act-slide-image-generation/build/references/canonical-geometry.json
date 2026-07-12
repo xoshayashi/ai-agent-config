@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "basis": {
+    "width": 1672,
+    "height": 941
+  },
+  "outer_shell": {
+    "x": 72,
+    "y": 80,
+    "width": 1528,
+    "height": 781,
+    "right": 1600,
+    "bottom": 861
+  },
+  "header": {
+    "h1": {
+      "x": 72,
+      "y": 80,
+      "width": 1528
+    },
+    "subtitle": {
+      "x": 72,
+      "y": 126,
+      "width": 1528
+    },
+    "stack_bottom": 238
+  },
+  "body": {
+    "start_y": 270,
+    "bottom_without_footer": 861,
+    "bottom_with_footer": 810
+  },
+  "footer": {
+    "baseline_y": 852
+  },
+  "grid": {
+    "unit_px": 8,
+    "columns": 12
+  }
+}
