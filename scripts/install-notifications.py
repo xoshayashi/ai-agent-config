@@ -37,11 +37,6 @@ CLI_CONFIG = {
         "config_file": "hooks.json",
         "events": {"Stop": "done", "PermissionRequest": "attention"},
     },
-    "gemini": {
-        "label": "Gemini CLI",
-        "config_file": "settings.json",
-        "events": {"AfterAgent": "done", "Notification": "attention"},
-    },
 }
 
 
@@ -207,7 +202,6 @@ def main() -> int:
                         help="repository root holding notifications/notify.sh")
     parser.add_argument("--claude-home", required=True)
     parser.add_argument("--codex-home", required=True)
-    parser.add_argument("--gemini-home", required=True)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
 
@@ -219,7 +213,6 @@ def main() -> int:
     homes = {
         "claude": Path(args.claude_home).expanduser(),
         "codex": Path(args.codex_home).expanduser(),
-        "gemini": Path(args.gemini_home).expanduser(),
     }
 
     status = 0

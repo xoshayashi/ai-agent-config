@@ -1,5 +1,5 @@
 #!/bin/sh
-# Shared desktop-notification hook for Claude Code / Codex / Gemini CLI.
+# Shared desktop-notification hook for Claude Code / Codex.
 #
 # Invoked as a hook command:  notify.sh <label> <category>
 #   label    human-facing source name, e.g. "Claude Code"
@@ -9,7 +9,7 @@
 # Each CLI pipes a hook JSON payload on stdin. This script does not need any
 # field from it, so stdin is intentionally left unread.
 #
-# Every CLI parses the hook's stdout as JSON. Gemini CLI treats non-JSON
+# Every CLI parses the hook's stdout as JSON. Some CLI clients treat non-JSON
 # stdout as a parse failure, so this script must end by printing an empty
 # JSON object. All log/bell output therefore goes to stderr only.
 set -u
