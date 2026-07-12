@@ -216,6 +216,9 @@ pptx_deps_status=missing
 if command -v python3 >/dev/null 2>&1 && python3 -c 'import pptx, PIL, lxml, fontTools, matplotlib, matplotlib_venn, graphviz' >/dev/null 2>&1; then
   pptx_deps_status=ok
 fi
+if ! command -v dot >/dev/null 2>&1; then
+  warn "graphviz CLI (dot) not found — org_tree/node_graph diagrams will fail; install with: brew install graphviz"
+fi
 libreoffice_status=$(command_status libreoffice)
 pdftoppm_status=$(command_status pdftoppm)
 

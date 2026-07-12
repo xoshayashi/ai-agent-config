@@ -834,6 +834,11 @@ install_skill_runtime_support() {
     else
       say "ok: python packages for act-structured-slide-generation"
     fi
+    # graphviz の python パッケージは CLI(dot)が無いと動かない(org_tree/node_graph が
+    # ビルド時に失敗する)。import プローブでは検出できないため実行ファイルを確認する
+    if ! command -v dot >/dev/null 2>&1; then
+      warn "graphviz CLI (dot) not found — org_tree/node_graph diagrams will fail; install with: brew install graphviz"
+    fi
   fi
 
   # pdftoppm (poppler) renders the PDF to per-slide PNGs for the deck QA loop.

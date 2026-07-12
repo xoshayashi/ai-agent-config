@@ -1490,3 +1490,23 @@ def test_sign_flip_not_warned_when_positive_form_also_on_slide(tmp_path):
     f.write_text(json.dumps(deck, ensure_ascii=False))
     r = run("validate_spec.py", f)
     assert not any("負値" in ln for ln in r.stdout.splitlines()), r.stdout
+
+
+def test_venn_subsets_derive_from_sizes_and_overlaps():
+    pytest.importorskip("matplotlib")
+    sys.path.insert(0, str(SCRIPTS))
+    import importlib
+    import act_assets
+    act_assets = importlib.reload(act_assets)
+    # 2集合: サイズと重なりから排他リージョンを導出
+    sub2 = act_assets._venn_subsets([{"label": "A", "size": 20}, {"label": "B", "size": 10}], {"AB": 4})
+    assert sub2 == (16.0, 6.0, 4.0)
+    # 3集合: 包除原理で導出され、負にならない
+    sub3 = act_assets._venn_subsets(
+        [{"label": "A", "size": 20}, {"label": "B", "size": 15}, {"label": "C", "size": 10}],
+        {"AB": 5, "AC": 4, "BC": 3, "ABC": 2})
+    assert sub3 == (13.0, 9.0, 3.0, 5.0, 2.0, 1.0, 2.0)
+    assert all(v >= 0 for v in sub3)
+    # サイズ違いは異なるリージョン値になる(固定既定値で潰れない)
+    other = act_assets._venn_subsets([{"label": "A", "size": 40}, {"label": "B", "size": 10}], {"AB": 4})
+    assert other != sub2
