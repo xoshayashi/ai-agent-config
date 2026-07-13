@@ -68,6 +68,11 @@ own field testing.
     a:solidFill` into the master's `cSld`) — layouts and slides inherit it, and no object
     appears on the slide. `cSld` has a fixed child order, so `bg` must be inserted FIRST
     (before `spTree`) or the file is invalid OOXML.
+    `lint_render.is_ground()` counts a pixel as ground when it is near the `canvas` token
+    OR near plain white (tol 8 in `balance_scan`). `canvas` is close to white but not white,
+    so without the white clause a render that lost the template background would come out
+    plain white, read as a wall of content, and every whitespace check would silently pass.
+    Card fills (`surface_tint`) stay far enough from both to remain structure.
 13. Bullet glyphs (`buChar`) cannot be vertically centered — draw the dot yourself.
     A DrawingML bullet is set on the BASELINE, so its height is `glyph ink center ×
     buSzPct`. Against a Japanese line, the target is the ideographic center at 0.3805em:
