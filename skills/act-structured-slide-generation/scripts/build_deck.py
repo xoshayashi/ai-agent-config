@@ -1096,14 +1096,20 @@ def p_market_sizing(slide, spec, deck):
 TABLE_CLOSING_RULE_PT = 1.0
 
 
-def _cell_borders(cell, bottom_hex: str | None = None, width_pt: float = 0.5,
+RULE_TOKEN = "__rule__"   # bottom_hex の既定: rule トークンを使う(色の直値を持たない)
+NO_RULE = ""              # 下罫を引かない。None は「既定=rule トークン」の意味なので使わない
+
+
+def _cell_borders(cell, bottom_hex: str = RULE_TOKEN, width_pt: float = 0.5,
                   dash: str | None = None):
     """Kill vertical/top borders; keep a thin bottom rule (banker table look).
     width_pt controls the bottom rule weight (header uses a heavier accent line).
     dash: prstDash 値(例 "dash")。行グループ境界のセパレータなど、通常のヘアラインと
     役割の違う罫を破線で区別するときに使う。
-    bottom_hex 既定は rule トークン — 色を直値で持つとパレット変更に追従できない。"""
-    if bottom_hex is None:
+
+    bottom_hex: 既定(RULE_TOKEN)は rule トークンの色 — 直値を持つとパレット変更が
+    テーブルに届かない。下罫を消したいときは NO_RULE を渡す(None ではない)。"""
+    if bottom_hex == RULE_TOKEN:
         bottom_hex = str(C["rule"])
     tcPr = cell._tc.get_or_add_tcPr()
     for tag in ("lnL", "lnR", "lnT", "lnB"):
