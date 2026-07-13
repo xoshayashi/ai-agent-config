@@ -73,24 +73,22 @@ own field testing.
     so without the white clause a render that lost the template background would come out
     plain white, read as a wall of content, and every whitespace check would silently pass.
     Card fills (`surface_tint`) stay far enough from both to remain structure.
-13. Bullet glyphs (`buChar`) cannot be vertically centered — draw the dot yourself.
-    A DrawingML bullet is set on the BASELINE, so its height is `glyph ink center ×
-    buSzPct`. Against a Japanese line, the target is the ideographic center at 0.3805em:
-    Geist's `●` centers at 0.357em, so at the usual 60% it lands at 0.214em — about
-    **2.7pt below** the character center at 16pt body. Noto Sans JP's `・` does center at
-    0.380em, but only at 100% (any scale multiplies the center too), which forces a dot
-    the same size as the `・` separators inside the copy. LibreOffice hides the defect by
-    re-centering bullets itself; PowerPoint and Keynote do not — so the .pptx a client
-    opens looks wrong while our QA render looks fine.
-    `add_bullets()` therefore emits `buNone` and draws the dot as an ellipse
-    (`add_ellipse`) at the first line's center, with size and position under our control
-    and identical in every viewer. Each item gets its OWN text box: the first line is then
-    always at the box top, so a bullet can never drift when an item wraps to more lines
-    than estimated. Line geometry (measured, see `BULLET_LINE_BOX` / `BULLET_FIRST_LINE`):
-    line pitch = `size/72 × line_spacing × 1.20`, first-line ink center = `0.62 × pitch`
-    below the box top. Wrapping for that estimate uses `_wrapped_lines()`, which floors
-    the per-line character capacity — `_text_lines()` keeps it fractional (13.85 chars)
-    and would call a 4-line item 3 lines.
+13. Bullets are REAL paragraph bullets (`buChar`) — never shapes drawn beside the text.
+    A circle placed next to a text box is not a bullet: it does not belong to the
+    paragraph, so it stays put when the text is edited or reflows, and PowerPoint shows a
+    floating dot instead of a list. Use the paragraph's own bullet with a hanging indent
+    (`marL` + negative `indent`), so the marker moves with its line in every viewer.
+    The catch: a DrawingML bullet sits on the BASELINE, so its height is
+    `glyph ink center × buSzPct`. Against a Japanese line the target is the ideographic
+    center at 0.3805em, and:
+      - Geist `●` centers at 0.357em → at the usual 60% it lands at 0.214em, about
+        **2.7pt below** the character center at 16pt body (the old defect);
+      - Noto Sans JP `・` centers at 0.380em → dead on the ideographic center, but ONLY at
+        100%, because any scale multiplies the center along with the glyph.
+    So the only combination that centers is **the EA font's middle dot at 100%**
+    (`BULLET_CHAR` / `BULLET_SIZE_PCT`). Do not shrink it to "make it look like a bullet" —
+    that is exactly what pushes it back below the line. LibreOffice re-centers bullets on
+    its own and hides the error; PowerPoint and Keynote do not, so verify in the .pptx.
 14. CJK line-box correction. When estimating text height to size a container, the naive
     `pt/72 × line_spacing` under-measures Japanese lines by ~20% — LibreOffice/PowerPoint
     give CJK glyphs a taller line box. Multiply by ~1.22 (empirical) and use the SAME

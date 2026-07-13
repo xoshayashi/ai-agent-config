@@ -451,13 +451,63 @@ def test_validate_warns_fat_process_step(tmp_path):
     assert r.returncode == 0 and "3個超" in r.stdout
 
 
-def test_bullet_block_honors_middle_anchor(tmp_path):
-    """anchor=MIDDLE の呼び出し(roadmap の items カード)では、箇条書きブロック全体が
-    枠の中で縦中央に置かれる — 項目の箱を上寄せに固定した副作用で上に張り付かせない。"""
+def test_bullets_are_real_paragraph_bullets_centered_by_glyph_design(tmp_path):
+    """箇条書きは段落の bullet(buChar)+ぶら下げインデントで組む — 図形の円を本文の横に
+    置くと、記号が本文と連動せず編集で取り残される(一般的な箇条書きにならない)。
+
+    記号はベースライン揃えで打たれるので、縦位置は「グリフのインク中心 × buSzPct」で
+    決まる。字面中央(0.3805em)に乗るのは和文中黒(中心 0.380em)を等倍で使うときだけ —
+    縮小すると中心も比例して下がり、点が本文より低く見える(以前の不具合)。"""
     from pptx.enum.shapes import MSO_SHAPE
     from pptx.util import Inches
     sys.path.insert(0, str(SKILL / "scripts"))
     import build_deck as B
+
+    A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    deck = {"meta": {}, "slides": [{
+        "pattern": "process_flow",
+        "title": "箇条書きの記号は段落の bullet で組む",
+        "subtitle": "記号の縦位置と字下げの検証",
+        "steps": [{"label": "Step 1", "desc": "検証",
+                   "items": ["折返しを起こすために十分に長い項目をここに置いて二行以上にする",
+                             "短い項目"]}],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    slide = pptx.Presentation(out).slides[0]
+    paras = [p for sh in slide.shapes if sh.has_text_frame
+             for p in sh.text_frame.paragraphs
+             if p._p.find(f"{A_NS}pPr/{A_NS}buChar") is not None]
+    assert len(paras) == 2, f"項目数ぶんの箇条書き段落: {len(paras)}"
+
+    for p in paras:
+        pPr = p._p.find(f"{A_NS}pPr")
+        # 和文の中黒を等倍で: これ以外だと記号の中心が字面中央から下へずれる
+        assert pPr.find(f"{A_NS}buChar").get("char") == B.BULLET_CHAR
+        assert pPr.find(f"{A_NS}buSzPct").get("val") == "100000"
+        assert pPr.find(f"{A_NS}buFont").get("typeface") == B.FONTS["ea"]
+        # ぶら下げインデント: 1行目に記号、折返し行は marL に揃う
+        marL, indent = int(pPr.get("marL")), int(pPr.get("indent"))
+        assert marL == Inches(B.BULLET_INDENT_IN) and indent == -marL
+
+    # 記号を図形で置いていないこと(本文と連動しない浮いた点を作らない)
+    def _is_oval(sh):
+        try:
+            return sh.auto_shape_type == MSO_SHAPE.OVAL
+        except (ValueError, AttributeError):
+            return False
+
+    assert not any(_is_oval(sh) for sh in slide.shapes), "記号が図形の円で描かれている"
+
+
+def test_bullet_block_honors_middle_anchor(tmp_path):
+    """anchor=MIDDLE の呼び出し(roadmap の items カード)では、箇条書きブロック全体が
+    枠の中で縦中央に置かれる(テキストフレームの縦位置指定に委ねる)。"""
+    from pptx.enum.text import MSO_ANCHOR
+    sys.path.insert(0, str(SKILL / "scripts"))
 
     deck = {"meta": {}, "slides": [{
         "pattern": "roadmap",
@@ -475,42 +525,14 @@ def test_bullet_block_honors_middle_anchor(tmp_path):
     out = tmp_path / "deck.pptx"
     assert run("build_deck.py", spec, "-o", out).returncode == 0
 
+    A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
     slide = pptx.Presentation(out).slides[0]
-
-    def _is_dot(sh):
-        try:
-            return sh.auto_shape_type == MSO_SHAPE.OVAL and sh.width == sh.height
-        except (ValueError, AttributeError):
-            return False
-
-    dots = sorted((sh for sh in slide.shapes if _is_dot(sh)), key=lambda s: (s.left, s.top))
-    assert len(dots) == 6, f"記号は全項目数と同数: {len(dots)}"
-
-    # 各フェーズのカード(surface_tint の角丸矩形)の中で、記号ブロックが縦中央にあること
-    def _is_card(sh):
-        try:
-            return (sh.auto_shape_type == MSO_SHAPE.ROUNDED_RECTANGLE
-                    and sh.fill.fore_color.rgb == B.C["surface_tint"])
-        except (ValueError, AttributeError, TypeError):
-            return False
-
-    cards = sorted((sh for sh in slide.shapes if _is_card(sh)), key=lambda s: s.left)
-    assert len(cards) == 3, f"フェーズカード3枚: {len(cards)}"
-    short_card, long_card = cards[0], cards[1]
-    short_dots = [d for d in dots if short_card.left <= d.left < short_card.left + short_card.width]
-    long_dots = [d for d in dots if long_card.left <= d.left < long_card.left + long_card.width]
-    assert len(short_dots) == 1 and len(long_dots) == 4
-
-    # 中央寄せなら、項目1つのカードの記号は、項目4つのカードの1つ目の記号より
-    # 「ブロック高さの差の半分」だけ下にある(上寄せのままなら差は 0 になる)
-    size = B.TS["body_small"]
-    line_h = size / 72.0 * 1.25 * B.BULLET_LINE_BOX
-    gap = 7 / 72.0
-    block_short, block_long = line_h, 4 * line_h + 3 * gap
-    expected = Inches((block_long - block_short) / 2)
-    actual = short_dots[0].top - long_dots[0].top
-    assert abs(actual - expected) < Inches(0.03), (
-        f"MIDDLE 寄せが効いていない: 実測 {actual} / 期待 {expected}")
+    bullet_boxes = [sh for sh in slide.shapes if sh.has_text_frame
+                    and any(p._p.find(f"{A_NS}pPr/{A_NS}buChar") is not None
+                            for p in sh.text_frame.paragraphs)]
+    assert len(bullet_boxes) == 3, f"フェーズごとに1つの箇条書き枠: {len(bullet_boxes)}"
+    for box in bullet_boxes:
+        assert box.text_frame.vertical_anchor == MSO_ANCHOR.MIDDLE, "MIDDLE 寄せが効いていない"
 
 
 def test_table_closing_rule_is_heavier_than_the_row_hairlines(tmp_path):
@@ -579,62 +601,6 @@ def test_ground_color_comes_from_the_template_not_an_object(tmp_path):
             full = [s for s in slide.shapes
                     if s.width >= sw * 0.98 and s.height >= sh * 0.98]
             assert not full, f"{sample.name} slide {i}: 全面を覆うオブジェクトがある"
-
-
-def test_bullet_dot_sits_on_the_first_line_center(tmp_path):
-    """箇条書き記号は本文1行目の字面中央に乗る。記号をフォントのグリフ(buChar)で置くと
-    ベースライン揃えのぶん低く出る(ビューアによって位置が変わる)ため、図形の円で描く。
-    項目ごとに箱を分けているので、折返しが何行になっても記号は必ずその項目の1行目に乗る。"""
-    from pptx.enum.shapes import MSO_SHAPE
-    from pptx.util import Inches
-    sys.path.insert(0, str(SKILL / "scripts"))
-    import build_deck as B
-
-    deck = {"meta": {}, "slides": [{
-        "pattern": "process_flow",
-        "title": "折返しの有無によらず記号は1行目に乗る",
-        "subtitle": "箇条書き記号の縦位置の検証",
-        "steps": [{
-            "label": "Step 1", "desc": "検証",
-            # 1項目目を長くして折り返させる — 2項目目の記号がその分だけ下がるはず
-            "items": ["折返しを起こすために十分に長い項目をここに置いて二行以上にする", "短い項目"],
-        }],
-    }]}
-    spec = tmp_path / "deck.json"
-    spec.write_text(json.dumps(deck, ensure_ascii=False))
-    out = tmp_path / "deck.pptx"
-    assert run("build_deck.py", spec, "-o", out).returncode == 0
-
-    slide = pptx.Presentation(out).slides[0]
-    def _is_dot(sh):
-        try:
-            return sh.auto_shape_type == MSO_SHAPE.OVAL and sh.width == sh.height
-        except (ValueError, AttributeError):   # 図形以外(テキストボックス等)
-            return False
-
-    dots = [sh for sh in slide.shapes if _is_dot(sh)]
-    # 本文の箱は「記号のすぐ右」にある textbox。記号と同数あり、1対1で対応する
-    assert len(dots) == 2, f"記号は項目数と同数: {len(dots)}"
-
-    # 記号がフォントのグリフで描かれていないこと(buChar を使わない)
-    assert b"buChar" not in out.read_bytes()
-
-    size = B.TS["body"]
-    line_h = Inches(size / 72.0 * 1.30 * B.BULLET_LINE_BOX)
-    tol = Inches(0.02)
-    for dot in dots:
-        dot_cy = dot.top + dot.height // 2
-        # この記号に対応する本文ボックス = 記号の右にあり、上端が最も近いもの
-        body = min((sh for sh in slide.shapes
-                    if sh.has_text_frame and sh.left > dot.left and sh.text_frame.text.strip()),
-                   key=lambda sh: abs(sh.top + int(line_h * B.BULLET_FIRST_LINE) - dot_cy))
-        first_line_center = body.top + int(line_h * B.BULLET_FIRST_LINE)
-        assert abs(dot_cy - first_line_center) < tol, (
-            f"記号が1行目の中央からずれている: dot={dot_cy} line1={first_line_center}")
-
-    # 2項目目の記号は、1項目目の折返し行数ぶんだけ下にある(記号だけが取り残されない)
-    d1, d2 = sorted(dots, key=lambda s: s.top)
-    assert d2.top - d1.top > line_h, "折返した項目の次の記号が下がっていない"
 
 
 def test_process_flow_outcome_is_centered_destination_label(tmp_path):
