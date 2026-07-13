@@ -1179,18 +1179,22 @@ def test_image_asset_track_combo_and_diagram(tmp_path):
     if shutil.which("dot") is None:
         pytest.skip("Graphviz CLI (dot) not installed")
     deck = {"slides": [
-        {"pattern": "chart_insight", "title": "売上と利益率を2軸で示す", "source": "Act分析",
+        {"pattern": "chart_insight", "title": "売上と利益率を2軸で示す",
+         "subtitle": "売上高と営業利益率の推移", "source": "Act分析",
          "chart": {"kind": "combo", "categories": ["'23", "'24", "'25"],
                    "bar": {"name": "売上", "values": [138, 162, 190], "unit": "億円"},
                    "line": {"name": "利益率", "values": [10.1, 12.2, 13.4], "unit": "%"}}},
-        {"pattern": "diagram", "title": "資本関係を一枚で示す", "source": "Act分析",
+        {"pattern": "diagram", "title": "資本関係を一枚で示す",
+         "subtitle": "グループの資本構成", "source": "Act分析",
          "diagram": {"kind": "org_tree",
                      "nodes": [{"id": "h", "label": "持株", "focal": True}, {"id": "a", "label": "A社"}],
                      "edges": [{"from": "h", "to": "a", "label": "100%"}]}},
-        {"pattern": "chart_insight", "title": "自社は品質と実績で優位", "source": "Act分析",
+        {"pattern": "chart_insight", "title": "自社は品質と実績で優位",
+         "subtitle": "3軸での競合比較", "source": "Act分析",
          "chart": {"kind": "radar", "axes": ["価格", "品質", "実績"],
                    "series": [{"name": "自社", "values": [4, 5, 5]}, {"name": "他社", "values": [3, 3, 3]}]}},
-        {"pattern": "diagram", "title": "地域別の製品カバレッジ", "source": "Act分析",
+        {"pattern": "diagram", "title": "地域別の製品カバレッジ",
+         "subtitle": "地域×製品の展開状況", "source": "Act分析",
          "diagram": {"kind": "matrix", "rows": ["東", "西"], "cols": ["X", "Y"],
                      "cells": {"0,0": True, "1,1": True}}}]}
     spec = tmp_path / "d.json"; spec.write_text(json.dumps(deck))
@@ -1240,7 +1244,8 @@ def test_image_annotations_layer_renders(tmp_path):
     if shutil.which("dot") is None:
         pytest.skip("dot not installed")
     deck = {"slides": [{
-        "pattern": "chart_insight", "title": "増減を要因別に注記した2軸コンボ", "source": "Act分析",
+        "pattern": "chart_insight", "title": "増減を要因別に注記した2軸コンボ",
+        "subtitle": "売上と利益率の要因注記", "source": "Act分析",
         "chart": {"kind": "combo", "categories": ["'24", "'25", "'26"],
                   "bar": {"name": "売上", "values": [138, 162, 190], "unit": "億円"},
                   "line": {"name": "利益率", "values": [10.1, 12.2, 13.4], "unit": "%"},
