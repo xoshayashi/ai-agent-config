@@ -71,7 +71,7 @@ def edge_scan(im: Image.Image) -> list[str]:
 def balance_scan(im: Image.Image) -> list[str]:
     """Vertical whitespace balance inside the body band (below header, above footer).
     許容差は edge_scan(26)より厳しい 8 — surface_tint のカード面(canvas との色差は
-    最大 19)は空白ではなく構造なので、バランス判定ではコンテンツとして数える。"""
+    最大 17)は空白ではなく構造なので、バランス判定ではコンテンツとして数える。"""
     w, h = im.size
     p = im.load()
     # 0.23: kicker+2行タイトル+subtitle のヘッダー下端(1.63in/7.5in)より下から走査する
