@@ -751,7 +751,7 @@ def test_edge_scan_tolerance_lets_pale_full_bleed_panels_through(tmp_path):
 
 
 def test_lint_treats_plain_white_as_ground_not_content(tmp_path):
-    """canvas は白に近いが白ではない(F7F7F6 で最大差9)。純白を地として扱わないと、
+    """canvas は白に近いが白ではない(FAFAF9 で最大差6)。純白を地として扱わないと、
     テンプレート背景が抜けて白く出たレンダーが「一面コンテンツ」に見え、空白系の検査が
     黙って効かなくなる。カード面(surface_tint)は白とも差が大きいので構造のまま残る。"""
     from PIL import Image, ImageDraw
