@@ -774,6 +774,53 @@ def test_lint_treats_plain_white_as_ground_not_content(tmp_path):
     assert r.returncode == 1 and "下部に大きな空白" in r.stdout, r.stdout
 
 
+def test_footer_holds_two_lines_inside_the_bottom_padding(tmp_path):
+    """フッター(source / assumption / note)は2行まで描け、下端には外周パディングが残る。
+    はみ出しは帯を広げて直すのではなく、コピーを短くして直す — 3行ぶんの長さは
+    validate_spec が仕様欠陥として弾く。"""
+    from pptx.util import Emu
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import build_deck as B
+    from deck_text import ja_len
+
+    foot = B.LAY["footer"]
+    slide_h = B.TOKENS["slide"]["height_in"]
+
+    # 1. 帯は下端の外周パディングを侵さない
+    assert abs((slide_h - foot["y_in"] - foot["h_in"]) - foot["bottom_pad_in"]) < 1e-6
+    # 2. 帯の高さは max_lines 行ぶんある
+    line_h = B.TS["footnote"] / 72.0 * foot["line_spacing"] * 1.22   # 和文行ボックス補正
+    assert foot["h_in"] >= line_h * foot["max_lines"] * 0.95
+
+    # 3. 2行ぶんの長さは通り、描かれた帯はスライド内に収まる
+    two_line = "あ" * 150
+    deck = {"meta": {}, "slides": [{
+        "pattern": "comparison_table",
+        "title": "2行フッターが下端に収まることを確認する",
+        "subtitle": "フッターの行数と外周パディング",
+        "table": {"headers": ["区分", "A"], "rows": [["行1", "1"]]},
+        "source": two_line,
+    }]}
+    assert ja_len(f"Source: {two_line}   ") <= B.TOKENS["text_budget"]["footnote_max_chars_ja"]
+    spec = tmp_path / "ok.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    assert run("validate_spec.py", spec).returncode == 0
+    out = tmp_path / "ok.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    boxes = [sh for sh in pptx.Presentation(out).slides[0].shapes
+             if sh.has_text_frame and two_line[:8] in sh.text_frame.text]
+    assert boxes, "フッターが描かれていない"
+    bottom = Emu(boxes[0].top + boxes[0].height).inches
+    assert bottom <= slide_h - foot["bottom_pad_in"] + 1e-6, f"フッターが下端余白を侵している: {bottom}"
+
+    # 4. 3行ぶんの長さは仕様欠陥として弾く(帯を広げて誤魔化さない)
+    deck["slides"][0]["source"] = "あ" * 220
+    bad = tmp_path / "ng.json"
+    bad.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", bad)
+    assert r.returncode == 1 and "フッターが長い" in r.stdout
+
+
 def test_lint_render_detects_bottom_whitespace(tmp_path):
     from PIL import Image, ImageDraw
 

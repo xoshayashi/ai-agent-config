@@ -40,29 +40,37 @@ with an audit sidecar. Escalate only the single hard object; keep the rest of th
 
 ### 0. Environment
 
-Run from this skill directory unless an output path is explicit:
+Run from this skill directory unless an output path is explicit. **Check first — the machine
+may already have everything, in which case use the system `python3` and do NOT create a venv**
+(a venv only adds an activation step to every command):
 
 ```bash
-python3 -m venv .venv
-. .venv/bin/activate
+python3 -c "import pptx, PIL, lxml, fontTools, matplotlib, matplotlib_venn, graphviz" && \
+  command -v soffice dot >/dev/null && echo "ready — no venv needed"
+```
+
+If something is missing, install it into the system Python (macOS / Homebrew):
+
+```bash
+brew install python-matplotlib          # matplotlib + numpy for the image-asset track
+brew install graphviz                   # the `dot` CLI (relationship graphs)
+brew install --cask libreoffice         # `soffice`, used to render .pptx → PDF/PNG
+python3 -m pip install --break-system-packages python-pptx Pillow lxml fonttools \
+                                        matplotlib-venn graphviz pytest
+```
+
+Homebrew's Python is PEP 668 "externally managed", so plain `pip install` is refused —
+`--break-system-packages` is what lets these (pure-Python) packages land in it. Only reach
+for a venv if you cannot install into the system Python:
+
+```bash
+python3 -m venv .venv && . .venv/bin/activate
 python3 -m pip install -r scripts/requirements.txt
 ```
 
-If PowerPoint rendering is needed on macOS and LibreOffice is missing:
-
-```bash
-brew install --cask libreoffice
-```
-
-The image-asset track (combo/dual-axis charts, relationship and schematic diagrams) needs the
-Graphviz CLI in addition to the pip deps:
-
-```bash
-brew install graphviz
-```
-
-Native-only decks never import the image backend, so this is only required when a deck uses an
-image chart `kind` or the `diagram` pattern.
+The image-asset deps (matplotlib, matplotlib-venn, Graphviz) are imported lazily — a
+native-only deck runs without them, and they are only needed when a deck uses an image chart
+`kind` or the `diagram` pattern.
 
 ### 1. Requirements And Outline
 

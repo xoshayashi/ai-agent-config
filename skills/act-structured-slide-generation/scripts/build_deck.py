@@ -431,7 +431,11 @@ def add_footer(slide, spec: dict, page_no: int, total: int, deck: dict) -> None:
         pre = "   " if frags else ""
         frags.append((pre + "Note: " + spec["note"], TS["footnote"], 400, C["ink_faint"]))
     if frags:
-        add_text(slide, foot["source_x_in"], foot["y_in"], CONTENT_W, foot["h_in"], [frags])
+        # フッターは max_lines 行まで。1行に収まらない出典・前提・注記は折り返して2行目へ
+        # 落ちる — 行送りと箱の高さをトークンから取り、下端の外周パディングを侵さない。
+        # 2行を超える長さは仕様側の欠陥(validate_spec が footnote_max_chars_ja で弾く)
+        add_text(slide, foot["source_x_in"], foot["y_in"], CONTENT_W, foot["h_in"], [frags],
+                 line_spacing=foot["line_spacing"])
 
 
 
