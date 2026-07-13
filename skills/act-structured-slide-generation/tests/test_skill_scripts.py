@@ -827,7 +827,15 @@ def test_footer_holds_two_lines_inside_the_bottom_padding(tmp_path):
     r = run("validate_spec.py", combined)
     assert r.returncode == 1 and "フッターが長い" in r.stdout, "合算で溢れる footer を見逃している"
 
-    # 6. 描画される文字列で判定する: 「Act分析」だけの source は描かれないので数えない
+    # 6. 改行は字数と無関係に行を増やす(add_text が段落に割る) — 短くても弾く
+    deck["slides"][0].update(source="一行目\n二行目\n三行目", assumption=None, note=None)
+    deck["slides"][0] = {k: v for k, v in deck["slides"][0].items() if v is not None}
+    nl = tmp_path / "newline.json"
+    nl.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", nl)
+    assert r.returncode == 1 and "フッターに改行" in r.stdout, "改行入りフッターを見逃している"
+
+    # 7. 描画される文字列で判定する: 「Act分析」だけの source は描かれないので数えない
     #    (build と別々に組むと「検証は落ちるのに描画は空」がすぐ起きる)
     from deck_text import footer_text
     assert footer_text({"source": "Act分析"}) == ""

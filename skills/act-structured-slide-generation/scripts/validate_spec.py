@@ -211,7 +211,12 @@ def main() -> int:
         # なく、出典・前提・注記を短く書くのが正しい直し方。判定する文字列は描画と同じ
         # 実装(deck_text.footer_text)から取る — 別々に組むと「検証は通るのに溢れる」が起きる
         foot_txt = footer_text(s)
-        if ja_len(foot_txt) > BUDGET["footnote_max_chars_ja"]:
+        if "\n" in foot_txt:
+            # 明示的な改行は add_text が段落に割るので、字数が短くても行数が増えて帯を溢れる
+            # (ヘッダー契約が改行を弾くのと同じ理由)。フッターは折返しに任せる
+            errors.append(f"{loc}: フッターに改行 — source / assumption / note は改行を持たない"
+                          "(帯は2行ぶんしかなく、改行は字数と無関係に行を増やす)")
+        elif ja_len(foot_txt) > BUDGET["footnote_max_chars_ja"]:
             errors.append(f"{loc}: フッターが長い ({ja_len(foot_txt):.0f} > "
                           f"{BUDGET['footnote_max_chars_ja']} 全角相当) — source / assumption / note は"
                           "合わせて2行以内。出典名を短くするか、注記を本文へ移す")
