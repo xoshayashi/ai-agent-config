@@ -2211,12 +2211,11 @@ def set_template_background(prs, color: RGBColor) -> None:
         cSld = master._element.find(f"{P_NS}cSld")
         for old in cSld.findall(f"{P_NS}bg"):
             cSld.remove(old)
-        bg = etree.SubElement(cSld, f"{P_NS}bg")
+        bg = etree.Element(f"{P_NS}bg")
         bgPr = etree.SubElement(bg, f"{P_NS}bgPr")
         fill = etree.SubElement(bgPr, f"{A_NS}solidFill")
         etree.SubElement(fill, f"{A_NS}srgbClr").set("val", str(color))
         etree.SubElement(bgPr, f"{A_NS}effectLst")
-        cSld.remove(bg)
         cSld.insert(0, bg)
 
 
