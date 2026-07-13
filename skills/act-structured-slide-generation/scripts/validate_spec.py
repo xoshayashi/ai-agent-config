@@ -592,6 +592,10 @@ def main() -> int:
             errors.append(f"{loc}: {len(s['steps'])} steps — max 5")
         if pat == "roadmap" and len(s.get("phases", [])) > 4:
             errors.append(f"{loc}: {len(s['phases'])} phases — max 4")
+        # 因数は横一列のカードで並ぶ。増やすほど1枚あたりの幅が痩せ、5つを超えると
+        # カードに本文が入らない(そもそも読み手が追える分解ではない)
+        if pat == "driver_decomposition" and len(s.get("factors", [])) > 5:
+            errors.append(f"{loc}: {len(s['factors'])} factors — max 5")
         if len(s.get("takeaways", [])) > 3:
             errors.append(f"{loc}: {len(s['takeaways'])} takeaways — max 3")
         if pat == "financial_summary" and not (s.get("table") or s.get("chart")):

@@ -16,6 +16,7 @@ SKILL = Path(__file__).resolve().parent.parent
 SCRIPTS = SKILL / "scripts"
 SAMPLE = SKILL / "examples" / "sample-deck.json"
 SAMPLE_EARNINGS = SKILL / "examples" / "sample-earnings-deck.json"
+TOKENS = json.loads((SKILL / "references" / "tokens.json").read_text())
 
 # 合成 PNG の地の色はトークンから引く — 直値で書くと canvas を変えた瞬間に
 # lint(トークン基準)と食い違い、テストだけが古い色を主張する
@@ -1951,3 +1952,396 @@ def test_venn_subsets_derive_from_sizes_and_overlaps():
     # サイズ違いは異なるリージョン値になる(固定既定値で潰れない)
     other = act_assets._venn_subsets([{"label": "A", "size": 40}, {"label": "B", "size": 10}], {"AB": 4})
     assert other != sub2
+
+
+# ---------------------------------------------------------------------------
+# 改行(文節)と 光学的な積み(インク基準)
+# ---------------------------------------------------------------------------
+
+def _deck_text():
+    sys.path.insert(0, str(SCRIPTS))
+    import deck_text
+    return deck_text
+
+
+@pytest.mark.parametrize("text,width_in,size_pt,expected", [
+    ("導入費＋固定利用料", 0.9, 10, "導入費＋\n固定利用料"),
+    ("基盤利用量の複利成長", 1.0, 10, "基盤利用量の\n複利成長"),
+    ("HCPで実行文脈へ変換", 1.1, 10, "HCPで\n実行文脈へ変換"),
+])
+def test_display_wrap_breaks_at_bunsetsu_boundaries(text, width_in, size_pt, expected):
+    """行の切れ目は意味の切れ目に一致させる — 助詞の直後・並列記号の直後で割る。
+    箱の幅だけを見るレンダラ任せの折返しは「導入費＋固定利用/料」のように語を割る。"""
+    D = _deck_text()
+    assert D.wrap_display(text, width_in, size_pt, 3) == expected
+
+
+def test_display_wrap_never_splits_a_word_or_a_quantity():
+    """送り仮名(問い/合わせ)、数量と単位(2030/年)、外来語の接尾辞(スイート/化)は割らない。
+    どれも「行は埋まるが文がほどける」典型で、字数だけを見る折返しが作る欠陥。"""
+    D = _deck_text()
+    for text in ("問い合わせ履歴・顧客満足", "国内SaaS市場は2030年に3.2兆円へ拡大", "統合スイート化を進める"):
+        for chunk in D._segments(text)[0]:
+            pass
+        broken = D.wrap_display(text, 1.0, 12, 5)
+        for bad in ("問い\n", "合わせ", "2030\n", "\n年", "スイート\n化"):
+            if bad.startswith("\n"):
+                assert not any(ln.startswith(bad[1:]) for ln in broken.split("\n")[1:]), broken
+            else:
+                assert not broken.endswith(bad.rstrip("\n")) or "\n" not in broken, broken
+        assert "問い\n合わせ" not in broken and "スイート\n化" not in broken
+
+
+def test_display_wrap_keeps_particles_and_symbols_off_the_line_head():
+    """行頭に助詞や記号が立つと文が切れて見える(…実行文脈 / へ変換)。前の語へ吸収する。"""
+    D = _deck_text()
+    for text in ("HCPで実行文脈へ変換", "導入費＋固定利用料", "基盤利用量の複利成長", "Sales / CS / Workstation Act"):
+        for line in D.wrap_display(text, 0.9, 10, 5).split("\n")[1:]:
+            assert line[0] not in "をにがはでとへもやのか、。・＋+/／", f"{text!r} -> {line!r}"
+
+
+def test_display_wrap_leaves_body_copy_to_the_renderer():
+    """長い本文に手で改行を打つと、編集のたびに行が壊れる。触らずに自然折返しへ委ねる。"""
+    D = _deck_text()
+    body = "生産年齢人口は2040年までに約1,100万人減少し、説明・相談・CSといった対人業務の担い手が構造的に枯渇していく見通しである"
+    assert "\n" not in D.wrap_display(body, 3.0, 10, 3)
+    # 1行に入らない語がある = 箱に対してコピーが長すぎる。折返しで取り繕わない(直すのはコピー)
+    assert "\n" not in D.wrap_display("グローバルスタンダード", 0.4, 12, 3)
+
+
+def test_wrapped_bullet_keeps_a_single_bullet_and_hangs_the_second_line(tmp_path):
+    """折返しはソフト改行(a:br)で打つ。段落を割ると折返し行の頭にもう1つ記号が付き、
+    項目間の段落後スペースが同じ文の行間へ入り込む。"""
+    A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    deck = {"slides": [{
+        "pattern": "process_flow",
+        "title": "折返しのある箇条書きでも記号は1項目に1つだけ付く",
+        "subtitle": "ソフト改行で折返し、ぶら下げインデントを保つ",
+        "steps": [
+            {"label": "Step 1", "desc": "検証", "items": [
+                "基盤利用量の複利成長が継続と拡張の根拠になり、導入費＋固定利用料の二層で回収する",
+                "短い項目"]},
+            {"label": "Step 2", "desc": "展開", "items": ["HCPで実行文脈へ変換する"]},
+            {"label": "Step 3", "desc": "回収", "items": ["導入費＋固定利用料で回収する"]},
+        ],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    wrapped = 0
+    for shape in pptx.Presentation(out).slides[0].shapes:
+        if not shape.has_text_frame:
+            continue
+        for para in shape.text_frame.paragraphs:
+            pPr = para._p.find(f"{A_NS}pPr")
+            if pPr is None or pPr.find(f"{A_NS}buChar") is None:
+                continue
+            assert len(pPr.findall(f"{A_NS}buChar")) == 1, "1段落に記号は1つ"
+            brs = para._p.findall(f"{A_NS}br")
+            wrapped += 1 if brs else 0
+            # 折返しがあっても段落は1つ = 記号も1つ、ぶら下げインデントも保たれる
+            assert int(pPr.get("marL", "0")) > 0 and int(pPr.get("indent", "0")) < 0
+    assert wrapped >= 1, "折返した箇条書きが1つも無い(テストが何も検証していない)"
+
+
+def test_kpi_card_gaps_above_and_below_the_value_are_equal(tmp_path):
+    """カード内の縦積みは箱ではなくインク(字面)の間隔で組む。ラベル→数値の間隔と
+    数値→注記の間隔が目で揃って見えるのは、この2つのインク間隔が等しいときだけ
+    (箱の間隔で組むと、数字は字面が上寄りなぶんだけ下側が広く見える)。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import verify_deck as V
+    from pptx.util import Emu
+
+    deck = {"slides": [{
+        "pattern": "kpi_dashboard",
+        "title": "ラベル・数値・注記の3段で上下の余白が揃う",
+        "subtitle": "インク基準の縦積み",
+        "kpis": [{"label": "導入社数", "value": "120", "unit": "社", "note": "経理SaaS単体での獲得目標"}],
+        "source": "社内分析",
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    slide = pptx.Presentation(out).slides[0]
+    card_x = next(Emu(sh.left).inches for sh in slide.shapes
+                  if sh.has_text_frame and sh.text_frame.text.strip() == "導入社数")
+    stack = sorted((V._ink_bbox(sh) for sh in slide.shapes
+                    if sh.shape_type == 17 and sh.has_text_frame and sh.text_frame.text.strip()
+                    and abs(Emu(sh.left).inches - card_x) < 0.01),
+                   key=lambda b: b[1])
+    assert len(stack) == 3, f"ラベル/数値/注記の3段になっていない: {len(stack)}"
+    above = (stack[1][1] - stack[0][3]) * 72          # ラベル → 数値
+    below = (stack[2][1] - stack[1][3]) * 72          # 数値 → 注記
+    assert abs(above - below) < 1.5, f"数値の上下でインク間隔がずれている: {above:.1f}pt vs {below:.1f}pt"
+
+
+def test_verify_flags_text_that_fell_back_to_natural_wrap(tmp_path):
+    """文節で折り返せず自然折返しへ落ちた表示テキストは警告する — その列幅にはコピーが
+    長すぎるという意味で、放置すると語の途中(初/回相談)で割れた行が黙って残る。
+    切れ目の無い1語(社名など)は折返しでは直せないので数えない。"""
+    deck = {"slides": [{
+        "pattern": "process_flow",
+        "title": "列幅に対してコピーが長すぎる箇条書きは警告で表に出す",
+        "subtitle": "自然折返しへ落ちた表示テキストの検出",
+        "steps": [
+            {"label": "Step 1", "desc": "検証", "items": [
+                "LP・問い合わせ・初回相談に企業代表のデジタルヒューマンを配置し、運用まで担う"]},
+            {"label": "Step 2", "desc": "展開", "items": ["HCPで実行文脈へ変換"]},
+            {"label": "Step 3", "desc": "接続", "items": ["MCPでToolsを呼び出し"]},
+            {"label": "Step 4", "desc": "回収", "items": ["導入費で回収"]},
+        ],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    r = run("verify_deck.py", out)
+    assert r.returncode == 0, "自然折返しは警告であって失敗ではない(直すのはコピー)"
+    assert any("自然折返し" in ln for ln in r.stdout.splitlines()), r.stdout
+
+
+def test_verify_does_not_warn_on_copy_that_breaks_cleanly(tmp_path):
+    """文節で折り返せている表示テキストや、そもそも1行に収まる語には警告を出さない
+    (警告が鳴りっぱなしになれば、誰も読まなくなる)。"""
+    deck = {"slides": [{
+        "pattern": "process_flow",
+        "title": "文節で折り返せているコピーには警告を出さない",
+        "subtitle": "偽陽性を出さないことの確認",
+        "steps": [
+            {"label": "Step 1", "desc": "検証", "items": ["高意図接点へ導入"]},
+            {"label": "Step 2", "desc": "展開", "items": ["HCPで実行文脈へ変換"]},
+            {"label": "Step 3", "desc": "回収", "items": ["導入費＋固定利用料で回収"]},
+        ],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    r = run("verify_deck.py", out)
+    assert not any("自然折返し" in ln for ln in r.stdout.splitlines()), r.stdout
+
+
+def test_no_soft_break_after_a_line_that_overflows_the_box():
+    """箱幅を超える語が含まれるときは、ソフト改行を1つも打たない。
+
+    はみ出した行はレンダラ側が先に折り返し(句読点はぶら下がる)、こちらのソフト改行が
+    その後ろへ重なって空行が1本入る — LibreOffice で実測した挙動。折返しで取り繕わず
+    自然折返しへ委ね、verify_deck の警告でコピーを直させる。"""
+    D = _deck_text()
+    # 「本人らしい分身として向き合い、」は切れ目の無い1文節で、この幅には入らない
+    text = "本人らしい分身として向き合い、相手の文脈・意図・権限を理解"
+    assert "\n" not in D.wrap_display(text, 3.16, 16, 4)
+    # 語が収まるコピーへ縮めれば、文節で折り返す
+    assert "\n" in D.wrap_display("本人らしい分身として、相手の文脈・意図・権限を理解", 3.16, 16, 4)
+
+
+def test_box_height_and_line_break_are_measured_at_the_same_weight(tmp_path):
+    """箱の高さを決める側と改行を打つ側は、同じ重み(SemiBold/Bold)で測らなければならない。
+    400 で数えて 600 で描くと、増えた1行ぶんがカードの下側から黙って差し引かれ、
+    数値の上下のインク間隔が崩れる(このズレは検証では拾えない)。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import verify_deck as V
+    from pptx.util import Emu
+
+    kpis = [{"label": "導入企業の Net Revenue Retentionの改善", "value": "120", "unit": "社",
+             "note": "経理SaaS単体"},
+            {"label": "ARR", "value": "38", "unit": "億円", "note": "経理SaaS単体"},
+            {"label": "NRR", "value": "112", "unit": "%", "note": "既存拡張"},
+            {"label": "CAC", "value": "14", "unit": "カ月", "note": "回収期間"}]
+    deck = {"slides": [{"pattern": "kpi_dashboard", "title": "重みの違いで行数を読み違えない",
+                        "subtitle": "SemiBoldのラベルが折返しても上下は揃う", "kpis": kpis,
+                        "source": "社内分析"}]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    slide = pptx.Presentation(out).slides[0]
+    label = next(sh for sh in slide.shapes if sh.has_text_frame and "導入企業" in sh.text_frame.text)
+    assert "\v" in label.text_frame.text, "折返すはずのラベルが1行のまま(テストが効いていない)"
+    x = Emu(label.left).inches
+    stack = sorted((V._ink_bbox(sh) for sh in slide.shapes
+                    if sh.shape_type == 17 and sh.has_text_frame and sh.text_frame.text.strip()
+                    and abs(Emu(sh.left).inches - x) < 0.01), key=lambda b: b[1])
+    gaps = [(stack[i + 1][1] - stack[i][3]) * 72 for i in range(len(stack) - 1)]
+    assert abs(gaps[0] - gaps[-1]) < 1.5, f"折返したラベルの下で上下のインク間隔が崩れた: {gaps}"
+
+
+def test_chevron_head_grows_when_its_label_wraps(tmp_path):
+    """折返しはソフト改行で打たれるので、word_wrap=False の箱でも行は増える。高さを直値で
+    固定した箱は、その増えた行があふれて隣の面へ食い込む — 見出し高は実測行数から決める。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import verify_deck as V
+    from pptx.util import Emu
+
+    steps = [{"label": "顧客接点の統合と標準化を段階的に進める", "desc": "検証", "items": ["短い項目"]}]
+    steps += [{"label": f"Step {i}", "desc": "展開", "items": ["短い項目"]} for i in range(2, 6)]
+    deck = {"slides": [{"pattern": "process_flow", "title": "矢羽の見出しが折返しても箱からあふれない",
+                        "subtitle": "見出しの高さは実測行数から導く", "steps": steps}]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    head = next(sh for sh in pptx.Presentation(out).slides[0].shapes
+                if sh.has_text_frame and "顧客接点" in sh.text_frame.text)
+    used = sum(h + sa for h, sa, _, _ in V._para_metrics(head.text_frame, Emu(head.width).inches - 0.02))
+    assert "\v" in head.text_frame.text, "折返すはずの見出しが1行のまま(テストが効いていない)"
+    assert used <= Emu(head.height).inches + 0.01, \
+        f"見出しが箱からあふれる: {used:.2f}in / 箱 {Emu(head.height).inches:.2f}in"
+
+
+def test_ink_kind_is_declared_by_the_builder_not_guessed_by_the_verifier(tmp_path):
+    """インク種別(数値/和文)は描く側が図形に刻む。検証側が文字列から推測すると、値が
+    「黒字化」のような語のときに builder と違うインクを測る(数字比率で判定するため)。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import deck_text as D
+    import verify_deck as V
+
+    deck = {"slides": [{"pattern": "kpi_dashboard", "title": "値が語であってもインクは数値として測る",
+                        "subtitle": "インク種別は宣言する",
+                        "kpis": [{"label": "損益", "value": "黒字化", "note": "FY2027"},
+                                 {"label": "ARR", "value": "38", "unit": "億円", "note": "経理"}],
+                        "source": "社内分析"}]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    value = next(sh for sh in pptx.Presentation(out).slides[0].shapes
+                 if sh.has_text_frame and sh.text_frame.text.strip() == "黒字化")
+    assert D.ink_kind("黒字化") == "text", "前提: 文字列からの推測では text になる"
+    assert V._ink_kind_of(value) == "numeral", "描く側の宣言(numeral)を検証側が読めていない"
+
+
+def test_table_cells_break_at_phrase_boundaries(tmp_path):
+    """表のセルも表示テキスト。列幅で機械的に割ると「導入費＋固定利用/料」と語が割れる。"""
+    A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    table = {"headers": ["区分", "課金", "根拠"],
+             "col_widths": [5, 1.3, 5],
+             "rows": [["Standard", "導入費＋固定利用料", "継続・拡張の根拠"],
+                      ["Advanced", "基盤利用量の複利成長", "解約障壁の形成"]]}
+    deck = {"slides": [{"pattern": "comparison_table", "title": "セルの改行も文節の切れ目で割る",
+                        "subtitle": "狭い列でも語を割らない", "table": table, "source": "社内分析"}]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    texts = []
+    for shape in pptx.Presentation(out).slides[0].shapes:
+        if not shape.has_table:
+            continue
+        for row in shape.table.rows:
+            for cell in row.cells:
+                for para in cell.text_frame.paragraphs:
+                    if para._p.find(f"{A_NS}br") is not None:
+                        texts.append("".join(r.text for r in para.runs))
+    assert texts, "セルが1つも折り返していない(テストが効いていない)"
+    for t in texts:
+        assert "導入費" not in t or t.startswith("導入費＋"), t
+
+
+def test_chevron_label_is_measured_against_the_box_it_is_drawn_in(tmp_path):
+    """矢先(tip)は見出し高に比例するので、高さが伸びるとテキスト幅は逆に狭くなる。
+    最小高の tip で行数を数えると「描く箱より広い幅」で見積もることになり、実際には1行増えて
+    折返し予算を外す — 文節で割れず自然折返し(語の途中で割れる)へ落ちる。"""
+    steps = [{"label": "実行文脈への変換と回収の仕組み化", "desc": "検証", "items": ["短い項目"]}]
+    steps += [{"label": f"Step {i}", "desc": "展開", "items": ["短い項目"]} for i in range(2, 6)]
+    deck = {"slides": [{"pattern": "process_flow", "title": "矢先で狭くなる幅で行数を数える",
+                        "subtitle": "見出しの幅と高さを収束させてから決める", "steps": steps}]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    head = next(sh for sh in pptx.Presentation(out).slides[0].shapes
+                if sh.has_text_frame and "実行文脈" in sh.text_frame.text)
+    assert "\v" in head.text_frame.text, "文節で折り返せず自然折返しへ落ちた(幅の見積りが箱より広い)"
+    r = run("verify_deck.py", out)
+    assert not any("自然折返し" in ln for ln in r.stdout.splitlines()), r.stdout
+
+
+def test_table_header_row_budgets_the_lines_it_will_wrap_to(tmp_path):
+    """ヘッダーも文節で折り返す。1行ぶんで高さを取ると、折返したぶんだけレンダラが行を足し、
+    表が計画より下へ伸びる(フッターへ近づく)。ヘッダー行の高さも実測行数から取る。"""
+    from pptx.util import Emu
+
+    headers = ["項目", "導入費＋固定利用料の合計金額", "年間経常収益の複利成長率",
+               "継続率(ネットレベニュー)", "問い合わせ対応の自動化率"]
+    rows = [[f"行{i}", "80万円", "38%", "112%", "64%"] for i in range(1, 9)]
+    deck = {"slides": [{"pattern": "comparison_table",
+                        "title": "ヘッダーが折返しても表は計画どおりの高さに収まる",
+                        "subtitle": "ヘッダー行の高さも実測行数から導く",
+                        "table": {"headers": headers, "rows": rows}, "source": "社内分析"}]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    table_shape = next(sh for sh in pptx.Presentation(out).slides[0].shapes if sh.has_table)
+    table = table_shape.table
+    hdr_lines = max(c.text.count("\v") + 1 for c in table.rows[0].cells)
+    assert hdr_lines >= 2, "折返すはずのヘッダーが1行のまま(テストが効いていない)"
+    hdr_h = Emu(table.rows[0].height).inches
+    line_h = TOKENS["type_scale_pt"]["table_header"] / 72.0 * 1.34
+    assert hdr_h >= hdr_lines * line_h, f"ヘッダー行が折返し行数ぶんの高さを持たない: {hdr_h:.3f}in"
+
+
+@pytest.mark.parametrize("n_steps,label", [
+    (6, "顧客接点の統合と標準化を段階的に進めて全社へ定着させる運用体制の構築"),
+    (7, "実行文脈への変換と回収の仕組み化"),
+])
+def test_chevron_head_cannot_grow_without_bound(tmp_path, n_steps, label):
+    """見出しが伸びると矢先も伸びてテキスト幅は狭くなる = 行数がまた増える、という正のループ。
+    上限が無いと発散し、幅が負になってスライドの外へ出る巨大な矢羽が生まれる(実際に起きた)。
+    3行で頭打ちにし、それでも入らないコピーは自然折返し + 警告に委ねる。"""
+    from pptx.util import Emu
+
+    steps = [{"label": label, "desc": "検証", "items": ["短い項目"]}]
+    steps += [{"label": f"Step {i}", "desc": "展開", "items": ["短い項目"]}
+              for i in range(2, n_steps + 1)]
+    deck = {"slides": [{"pattern": "process_flow", "title": "矢羽の見出しは3行で頭打ちにする",
+                        "subtitle": "収束しない高さの見積りは発散する", "steps": steps}]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    slide = pptx.Presentation(out).slides[0]
+    for sh in slide.shapes:
+        if sh.width is None or sh.top is None:
+            continue
+        assert Emu(sh.width).inches > 0, f"幅が負の図形が出た: {sh.shape_type}"
+        assert Emu(sh.top).inches + Emu(sh.height).inches <= TOKENS["slide"]["height_in"] + 0.01, \
+            f"図形がスライドの外へ出た: {sh.shape_type}"
+    assert run("verify_deck.py", out).returncode == 0
+
+
+def test_text_lines_rejects_a_non_positive_width():
+    """幅 0 以下で呼ばれるのは呼び出し側の算術の誤り。黙って丸めると「142行」のような答えを
+    返し、それが高さへ流れ込んで壊れたスライドを生む。ここで止める。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import build_deck as B
+
+    with pytest.raises(ValueError):
+        B._text_lines("導入費＋固定利用料", -0.5, 15, 600)
+
+
+def test_driver_decomposition_caps_its_factors(tmp_path):
+    """因数は横一列のカードで並ぶ。数に上限が無いと1枚あたりの幅が痩せて負になり、
+    幅の見積りが破綻する(他のパターンと同じく上限を宣言する)。ビルダー側も幅に床を持つ。"""
+    factors = [{"label": f"因数{i}", "value": str(i), "note": "補足"} for i in range(1, 12)]
+    deck = {"slides": [{"pattern": "driver_decomposition", "title": "因数が多すぎるスペックは検証で止める",
+                        "subtitle": "横一列のカードは数だけ痩せる", "factors": factors,
+                        "source": "社内分析"}]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    assert r.returncode == 1 and any("factors" in ln for ln in r.stdout.splitlines()), r.stdout
+    # 検証をすり抜けた場合でも、ビルダーは負の幅で図形を作らない
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0

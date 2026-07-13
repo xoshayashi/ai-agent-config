@@ -105,6 +105,29 @@ an edge while another edge floats.
   from the normal row hairline. This is a judgment call, not a default: a short table whose
   groups read at a glance needs no extra line. Decide per table and opt in explicitly.
 
+## Optical Stack Contract (ink, not boxes)
+
+A vertical stack inside a container — label -> value -> delta -> note, heading -> body,
+metric -> subline — is spaced by the **ink** (the glyph faces the reader sees), not by the
+text boxes that hold it. A line box is taller than its ink and the ink does not sit in the
+middle of it: Japanese text leaves descender room below, and Latin numerals sit high.
+Stacking boxes with equal box gaps therefore renders with unequal *visible* gaps — a value
+appears to hang closer to the label above it than to the note below it, which is the defect
+that keeps getting reported as "the spacing under the number is wrong".
+
+- **Space the ink.** Compute each block's ink height (`deck_text.ink_height_in`) and place
+  boxes so the ink centers land on the intended rhythm (`build_deck.stack_optical`). The two
+  gaps around a value must be authored as one token, not two independent numbers.
+- **Numerals and text are different inks.** They have their own ink ratio and center offset;
+  the block declares which it is (`kind: "numeral" | "text"`). Never hand-tune a single
+  card's `y` to fix an optical gap — fix the model or the token.
+- **Calibration lives in tokens.** `layout.optical_stack` (`ink_ratio`,
+  `ink_center_offset_em`, `gap_in`) is the single source, measured from 300dpi renders. The
+  builder and `verify_deck` both read it, so the verifier measures the same ink the renderer
+  draws; if only one side knows the model, correct slides get flagged as overlapping.
+- **Insets stay symmetric.** Leftover height is split evenly above and below the stack. A
+  stack that grows must eat slack, never the bottom inset.
+
 ## Flexbox Mental Model
 
 For every body cluster, define:
