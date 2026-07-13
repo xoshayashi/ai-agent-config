@@ -89,6 +89,15 @@ own field testing.
     (`BULLET_CHAR` / `BULLET_SIZE_PCT`). Do not shrink it to "make it look like a bullet" —
     that is exactly what pushes it back below the line. LibreOffice re-centers bullets on
     its own and hides the error; PowerPoint and Keynote do not, so verify in the .pptx.
+    Use the HALF-width middle dot (U+FF65 `･`), not the full-width one (U+30FB `・`): both
+    centre at 0.380em, but the full-width glyph carries a 1em advance with the dot in the
+    middle of it, so half an em of blank hangs to the dot's right and the marker drifts
+    away from the text it labels. The half-width dot keeps the vertical centering with a
+    0.5em advance. Horizontal spacing is then set by `marL` alone (`BULLET_INDENT_IN`), and
+    `marL` must stay ≥ the bullet's advance — go below it and the renderer pushes the first
+    line's text past `marL`, so it no longer lines up with the wrapped lines underneath.
+    Keep `indent = -marL` (a true hanging indent); any other value and LibreOffice drops
+    the wrapped lines back under the marker.
 14. CJK line-box correction. When estimating text height to size a container, the naive
     `pt/72 × line_spacing` under-measures Japanese lines by ~20% — LibreOffice/PowerPoint
     give CJK glyphs a taller line box. Multiply by ~1.22 (empirical) and use the SAME

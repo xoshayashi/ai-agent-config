@@ -197,13 +197,23 @@ def add_text(slide, x, y, w, h, runs, *, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.
 # 決まる。ここを外すと点が下にずれる:
 #   和文字面(全角の四角)の中心 : ベースラインから 0.3805em ← 記号を乗せたい高さ
 #   Geist の「●」の中心        : 0.357em → 60% に縮めると 0.214em、本文16ptで約2.7pt 下
-#   Noto Sans JP の「・」の中心 : 0.380em → 字面中央と一致(等倍のときだけ)
+#   和文の中黒(・/･)の中心      : 0.380em → 字面中央と一致(等倍のときだけ)
 # 縮小率は中心も比例して下げるので、中央に乗る倍率は 100% だけ。したがって
-# 「和文フォントの中黒(・)を等倍で」以外の組み合わせにしないこと。LibreOffice は独自に
+# 「和文フォントの中黒を等倍で」以外の組み合わせにしないこと。LibreOffice は独自に
 # 中央寄せして欠陥を隠すが、PowerPoint / Keynote はベースライン揃えのまま描く。
-BULLET_CHAR = "・"
+#
+# 記号は半角中黒(U+FF65)を使う。全角中黒(U+30FB)は送り幅が 1em あり、点はその中央に
+# 打たれるので、点の右に 0.5em の空白がぶら下がる — 本文との間が間延びして、点だけが
+# 左へ取り残されて見える。半角中黒は縦中心が同じ 0.380em のまま送り幅が 0.5em なので、
+# 縦位置を保ったまま点を本文へ寄せられる。
+#   記号の水平位置 = 行頭(marL + indent) + グリフのインク中心(半角中黒 0.249em)
+#   本文の左端     = marL   ← 折返し行もここに揃う(ぶら下げインデント)
+# ぶら下げは indent = -marL(行頭に記号、折返しは marL)。これを崩すと LibreOffice が
+# 折返し行を記号の下へ回してしまう。点と本文の間隔は marL そのもので決める —
+# 半角中黒の送り幅(0.5em = 本文16ptで 0.111in)に必要な余白を足した値にする。
+BULLET_CHAR = "･"            # U+FF65 半角中黒(縦中心 0.380em / 送り幅 0.5em)
 BULLET_SIZE_PCT = "100000"   # 等倍。縮小すると記号の中心が字面中央から下へずれる
-BULLET_INDENT_IN = 0.24      # ぶら下げインデント(折返し行の左端)
+BULLET_INDENT_IN = 0.16      # marL: 本文の左端(折返し行もここ)。半角中黒 0.111in + 余白
 
 
 def add_bullets(slide, x, y, w, h, items, size, color, *, line_spacing=1.3,
@@ -230,7 +240,7 @@ def add_bullets(slide, x, y, w, h, items, size, color, *, line_spacing=1.3,
         _add_script_runs(p, txt, size, weight, color)
         pPr = p._p.get_or_add_pPr()
         pPr.set("marL", str(int(indent)))
-        pPr.set("indent", str(-int(indent)))   # ぶら下げ: 1行目に記号、折返しは marL へ
+        pPr.set("indent", str(-int(indent)))   # ぶら下げ: 行頭に記号、折返しは marL へ
         buClr = etree.SubElement(pPr, f"{A_NS}buClr")
         etree.SubElement(buClr, f"{A_NS}srgbClr").set("val", str(color))
         etree.SubElement(pPr, f"{A_NS}buSzPct").set("val", BULLET_SIZE_PCT)
@@ -1569,10 +1579,11 @@ def p_process_flow(slide, spec, deck):
     line_h = (TS["body"] / 72.0) * 1.30 * 1.22  # 1.22 = 和文フォントの行ボックス補正(実測)
     sp_h = 8 / 72.0
     card_pad = 0.56  # カード内左右の余白合計に相当する差し引き(gutter 別)
-    # 箇条書きは ● のぶら下げインデント(add_bullets の 0.24in)分だけ折返し幅が狭い。
-    # 行数見積もりは描画箱幅からインデントと安全余白を引いた実効幅で行う(引き忘れると
-    # card_h が足りず、折り返した項目が outcome の罫線に食い込む)
-    bullet_text_w = sw - LAY["gutter_in"] - card_pad - 0.24 - 0.20
+    # 箇条書きはぶら下げインデント(BULLET_INDENT_IN)の分だけ折返し幅が狭い。行数見積もり
+    # は描画箱幅からインデントと安全余白を引いた実効幅で行う(引き忘れると card_h が足りず、
+    # 折り返した項目が outcome の罫線に食い込む)。字下げ幅を直値で持たないこと — 記号や
+    # インデントを変えたときに、ここだけ古い前提のまま残る
+    bullet_text_w = sw - LAY["gutter_in"] - card_pad - BULLET_INDENT_IN - 0.20
     outcome_text_w = sw - LAY["gutter_in"] - card_pad
     outcome_pt = TS["section_heading"]
     content_h = 0.0
