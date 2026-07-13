@@ -13,7 +13,7 @@ import json
 import sys
 from pathlib import Path
 
-from deck_text import header_slots, ja_len
+from deck_text import footer_text, header_slots, ja_len
 
 TOKENS = json.loads((Path(__file__).resolve().parent.parent / "references" / "tokens.json").read_text())
 BUDGET = TOKENS["text_budget"]
@@ -205,6 +205,21 @@ def main() -> int:
         title = s.get("title", "")
         if s.get("insight") and ja_len(s["insight"]) > BUDGET["insight_max_chars_ja"]:
             errors.append(f"{loc}: insight too long ({ja_len(s['insight']):.0f} > {BUDGET['insight_max_chars_ja']}) — one short judgment sentence only")
+
+        # フッター(source / assumption / note)は帯の高さぶん = 2行までしか描かれない。
+        # 超えた分は下端の外周パディングへはみ出し、レンダーで見切れる — 帯を広げるのでは
+        # なく、出典・前提・注記を短く書くのが正しい直し方。判定する文字列は描画と同じ
+        # 実装(deck_text.footer_text)から取る — 別々に組むと「検証は通るのに溢れる」が起きる
+        foot_txt = footer_text(s)
+        if "\n" in foot_txt:
+            # 明示的な改行は add_text が段落に割るので、字数が短くても行数が増えて帯を溢れる
+            # (ヘッダー契約が改行を弾くのと同じ理由)。フッターは折返しに任せる
+            errors.append(f"{loc}: フッターに改行 — source / assumption / note は改行を持たない"
+                          "(帯は2行ぶんしかなく、改行は字数と無関係に行を増やす)")
+        elif ja_len(foot_txt) > BUDGET["footnote_max_chars_ja"]:
+            errors.append(f"{loc}: フッターが長い ({ja_len(foot_txt):.0f} > "
+                          f"{BUDGET['footnote_max_chars_ja']} 全角相当) — source / assumption / note は"
+                          "合わせて2行以内。出典名を短くするか、注記を本文へ移す")
         if pat == "statement" and s.get("statement"):
             # 孤立行対策の節分割は中央ヒーロー文(既定)のみ。recap 駆動の strip/split 変種は
             # 左寄せの別レイアウトのため、この警告は中央ヒーロー描画に限定する。

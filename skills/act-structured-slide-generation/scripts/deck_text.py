@@ -78,6 +78,29 @@ def header_slots(pattern: str, tokens: dict | None = None) -> list[dict]:
     return slots
 
 
+def clean_source(src: str) -> str:
+    """出典欄には実際に参照した外部出所だけを残す。自社の内部分析を指す「Act分析」単独の
+    断片は出典として表示しない(「各社IR資料を基にAct作成」等の実在の作成主体表記は残す)。
+    全断片が内部分析なら空文字を返し Source 行ごと省く。"""
+    keep = [f.strip() for f in (src or "").split("、") if f.strip() and f.strip() != "Act分析"]
+    return "、".join(keep)
+
+
+def footer_text(spec: dict) -> str:
+    """フッターに実際に描かれる1本の文字列。build_deck の描画と validate_spec の字数判定が
+    同じ実装を見るための単一実装 — 別々に組むと、区切りや Act分析 の除去の有無で
+    「検証は通るのに描画は溢れる(逆もある)」がすぐ起きる。"""
+    frags = []
+    src = clean_source(spec.get("source", ""))
+    if src:
+        frags.append("Source: " + src)
+    if spec.get("assumption"):
+        frags.append("Assumption: " + spec["assumption"])
+    if spec.get("note"):
+        frags.append("Note: " + spec["note"])
+    return "   ".join(frags)      # 断片の「間」だけを3スペースで区切る(末尾には付けない)
+
+
 # Full-width alnum/% → half-width. Applied to every rendered string so spec
 # sloppiness cannot leak mixed-width digits into the deliverable (執筆規律).
 HW = {c: c - 0xFEE0 for c in [*range(0xFF10, 0xFF1A), *range(0xFF21, 0xFF3B),
