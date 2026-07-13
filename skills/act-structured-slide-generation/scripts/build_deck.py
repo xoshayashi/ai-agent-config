@@ -412,9 +412,10 @@ def header_metrics(spec: dict) -> dict:
 
 
 def add_chrome(slide, spec: dict, page_no: int, total: int, deck: dict) -> None:
-    """Background, header (optional kicker + action title + subtitle), footer.
-    ヘッダーに縦アクセントバーは置かない — タイトル・サブタイトルの級差だけで階層を作る。"""
-    add_rect(slide, 0, 0, TOKENS["slide"]["width_in"], TOKENS["slide"]["height_in"], C["canvas"])
+    """Header (optional kicker + action title + subtitle) and footer.
+    ヘッダーに縦アクセントバーは置かない — タイトル・サブタイトルの級差だけで階層を作る。
+    背景は敷かない — 全面を覆う矩形は、編集時に本文の下で毎回つかんでしまう邪魔な
+    オブジェクトになるだけで、地の色はスライドの背景に任せればよい。"""
     hdr = LAY["header"]
     m = header_metrics(spec)
     if spec.get("kicker"):
@@ -646,7 +647,6 @@ def add_unit_note(slide, x, y, unit: str | None):
 # ---------------------------------------------------------------- patterns
 
 def p_cover(slide, spec, deck):
-    add_rect(slide, 0, 0, TOKENS["slide"]["width_in"], TOKENS["slide"]["height_in"], C["canvas"])
     m = deck.get("meta", {})
     add_rect(slide, MX, 2.28, 0.5, 0.055, C["primary"])
     add_text(slide, MX, 2.62, CONTENT_W, 1.6,
@@ -696,7 +696,6 @@ def p_section_divider(slide, spec, deck):
     surface_tint の面パネル+章ナビ(現在章スポットライト)で、扉をサムネイルでも
     識別できるマクロ形状にする。左ブロックは光学中心(50%-0.25in リフト)に置く。"""
     W, H = TOKENS["slide"]["width_in"], TOKENS["slide"]["height_in"]
-    add_rect(slide, 0, 0, W, H, C["canvas"])
     chapters = deck.get("_chapters") or []
     # 章扉のパネル位置とテキスト折返し幅は tokens(layout.divider)が単一ソース —
     # header_contract の 'divider' ボックス幅もここから導出される(検証と描画が同じ幅を見る)

@@ -444,6 +444,20 @@ def test_validate_warns_fat_process_step(tmp_path):
     assert r.returncode == 0 and "3個超" in r.stdout
 
 
+def test_no_full_bleed_background_object(tmp_path):
+    """地の色のためだけに全面を覆う矩形は置かない — 編集時に本文の下で毎回つかんでしまう
+    邪魔なオブジェクトになる。背景はスライドの地に任せる。"""
+    for sample in (SAMPLE, SAMPLE_EARNINGS):
+        out = tmp_path / f"{sample.stem}.pptx"
+        assert run("build_deck.py", sample, "-o", out).returncode == 0
+        prs = pptx.Presentation(out)
+        sw, sh = prs.slide_width, prs.slide_height
+        for i, slide in enumerate(prs.slides, 1):
+            full = [s for s in slide.shapes
+                    if s.width >= sw * 0.98 and s.height >= sh * 0.98]
+            assert not full, f"{sample.name} slide {i}: 全面を覆うオブジェクトが残っている"
+
+
 def test_bullet_dot_sits_on_the_first_line_center(tmp_path):
     """箇条書き記号は本文1行目の字面中央に乗る。記号をフォントのグリフ(buChar)で置くと
     ベースライン揃えのぶん低く出る(ビューアによって位置が変わる)ため、図形の円で描く。
