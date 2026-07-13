@@ -13,7 +13,7 @@ import json
 import sys
 from pathlib import Path
 
-from deck_text import header_slots, ja_len
+from deck_text import footer_text, header_slots, ja_len
 
 TOKENS = json.loads((Path(__file__).resolve().parent.parent / "references" / "tokens.json").read_text())
 BUDGET = TOKENS["text_budget"]
@@ -208,11 +208,9 @@ def main() -> int:
 
         # フッター(source / assumption / note)は帯の高さぶん = 2行までしか描かれない。
         # 超えた分は下端の外周パディングへはみ出し、レンダーで見切れる — 帯を広げるのでは
-        # なく、出典・前提・注記を短く書くのが正しい直し方
-        foot_txt = "".join(
-            f"{label}: {s[key]}   " for key, label in
-            (("source", "Source"), ("assumption", "Assumption"), ("note", "Note"))
-            if s.get(key))
+        # なく、出典・前提・注記を短く書くのが正しい直し方。判定する文字列は描画と同じ
+        # 実装(deck_text.footer_text)から取る — 別々に組むと「検証は通るのに溢れる」が起きる
+        foot_txt = footer_text(s)
         if ja_len(foot_txt) > BUDGET["footnote_max_chars_ja"]:
             errors.append(f"{loc}: フッターが長い ({ja_len(foot_txt):.0f} > "
                           f"{BUDGET['footnote_max_chars_ja']} 全角相当) — source / assumption / note は"

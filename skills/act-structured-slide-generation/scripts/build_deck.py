@@ -44,7 +44,7 @@ A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 
 # 表示長(_ja_len)と全角→半角(hw)は deck_text.py の単一実装を使う — validate_spec の
 # 字数バジェット・lint_render の readback 照合と同一実装であることが契約
-from deck_text import header_slots, hw, ja_len as _ja_len
+from deck_text import footer_text, header_slots, hw, ja_len as _ja_len
 
 
 def _text_lines(text: str, width_in: float, size_pt: float) -> int:
@@ -410,27 +410,11 @@ def add_chrome(slide, spec: dict, page_no: int, total: int, deck: dict) -> None:
     add_footer(slide, spec, page_no, total, deck)
 
 
-def _clean_source(src: str) -> str:
-    """出典欄には実際に参照した外部出所だけを残す。自社の内部分析を指す
-    「Act分析」単独の断片は出典として表示しない(「各社IR資料を基にAct作成」等の
-    実在の作成主体表記は残す)。全断片が内部分析なら空文字を返し Source 行ごと省く。"""
-    keep = [f.strip() for f in src.split("、") if f.strip() and f.strip() != "Act分析"]
-    return "、".join(keep)
-
-
 def add_footer(slide, spec: dict, page_no: int, total: int, deck: dict) -> None:
     foot = LAY["footer"]
-    frags = []
-    source = _clean_source(spec.get("source", ""))
-    if source:
-        frags.append(("Source: " + source, TS["footnote"], 400, C["ink_faint"]))
-    if spec.get("assumption"):
-        pre = "   " if frags else ""
-        frags.append((pre + "Assumption: " + spec["assumption"], TS["footnote"], 400, C["ink_faint"]))
-    if spec.get("note"):
-        pre = "   " if frags else ""
-        frags.append((pre + "Note: " + spec["note"], TS["footnote"], 400, C["ink_faint"]))
-    if frags:
+    text = footer_text(spec)      # 描画も検証も deck_text の単一実装を見る
+    if text:
+        frags = [(text, TS["footnote"], 400, C["ink_faint"])]
         # フッターは max_lines 行まで。1行に収まらない出典・前提・注記は折り返して2行目へ
         # 落ちる — 行送りと箱の高さをトークンから取り、下端の外周パディングを侵さない。
         # 2行を超える長さは仕様側の欠陥(validate_spec が footnote_max_chars_ja で弾く)
@@ -456,7 +440,7 @@ def body_region(spec: dict) -> tuple[float, float]:
     # スライドでは、フッター文の上に確保していた呼吸 0.34 は何も守っていない。
     # 下端はスライド余白そのものなので小さなガードだけ残して本文領域を解放する
     # (カード束や表がこの高さを呼吸に変換できる)。
-    has_footer = bool(_clean_source(spec.get("source", ""))) or spec.get("assumption") or spec.get("note")
+    has_footer = bool(footer_text(spec))
     bottom_gap = gap if (spec.get("insight") or has_footer) else 0.12
     h = (floor - bottom_gap) - y
     return y, h

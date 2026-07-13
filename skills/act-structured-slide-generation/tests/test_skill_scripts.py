@@ -820,6 +820,22 @@ def test_footer_holds_two_lines_inside_the_bottom_padding(tmp_path):
     r = run("validate_spec.py", bad)
     assert r.returncode == 1 and "フッターが長い" in r.stdout
 
+    # 5. 判定は source / assumption / note の「合算」— 単体では収まるが3つ合わせると溢れる
+    deck["slides"][0].update(source="あ" * 80, assumption="い" * 80, note="う" * 80)
+    combined = tmp_path / "combined.json"
+    combined.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", combined)
+    assert r.returncode == 1 and "フッターが長い" in r.stdout, "合算で溢れる footer を見逃している"
+
+    # 6. 描画される文字列で判定する: 「Act分析」だけの source は描かれないので数えない
+    #    (build と別々に組むと「検証は落ちるのに描画は空」がすぐ起きる)
+    from deck_text import footer_text
+    assert footer_text({"source": "Act分析"}) == ""
+    deck["slides"][0].update(source="Act分析", assumption="い" * 80, note="う" * 80)
+    inner = tmp_path / "inner.json"
+    inner.write_text(json.dumps(deck, ensure_ascii=False))
+    assert run("validate_spec.py", inner).returncode == 0
+
 
 def test_lint_render_detects_bottom_whitespace(tmp_path):
     from PIL import Image, ImageDraw
