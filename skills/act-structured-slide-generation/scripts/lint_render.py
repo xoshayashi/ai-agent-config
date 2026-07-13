@@ -29,7 +29,7 @@ from PIL import Image
 
 from deck_text import HW as _HW, token_rgb as _token_rgb
 
-CANVAS = _token_rgb("canvas", (0xFD, 0xFB, 0xF7))
+CANVAS = _token_rgb("canvas", (0xFF, 0xFD, 0xFC))
 WHITE = (0xFF, 0xFF, 0xFF)
 TOL = 26  # per-channel tolerance: antialiasing over near-white
 BAND = 6  # px
@@ -37,7 +37,7 @@ BAND = 6  # px
 
 def is_ground(px, tol: int) -> bool:
     """地(=何も置かれていない面)か。canvas だけでなく純白も地として扱う — canvas は
-    白に近いが白そのものではない(FDFBF7 なら最大差 8)ので、テンプレート背景が抜けて
+    白に近いが白そのものではない(FFFDFC なら最大差 3)ので、テンプレート背景が抜けて
     白く出たレンダーを「一面コンテンツ」と誤読し、空白系の検査が黙って効かなくなる。
     カード面(surface_tint)は canvas とも白とも差が大きいので、構造として残る。"""
     return all(abs(px[i] - CANVAS[i]) <= tol for i in range(3)) or \
@@ -71,7 +71,7 @@ def edge_scan(im: Image.Image) -> list[str]:
 def balance_scan(im: Image.Image) -> list[str]:
     """Vertical whitespace balance inside the body band (below header, above footer).
     許容差は edge_scan(26)より厳しい 8 — surface_tint のカード面(canvas との色差は
-    最大 18)は空白ではなく構造なので、バランス判定ではコンテンツとして数える。"""
+    最大 19)は空白ではなく構造なので、バランス判定ではコンテンツとして数える。"""
     w, h = im.size
     p = im.load()
     # 0.23: kicker+2行タイトル+subtitle のヘッダー下端(1.63in/7.5in)より下から走査する
