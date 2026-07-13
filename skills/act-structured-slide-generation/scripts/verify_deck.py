@@ -72,6 +72,18 @@ def _run_weight(run) -> int:
     return 400
 
 
+def _text_indent_in(para) -> float:
+    """箇条書き段落の字下げ(marL)。本文が使える幅は箱の幅から これを引いた分しかない —
+    引き忘れると1行に入る量を多く見積もり、実際は折り返す行を「折り返さない」と数える。"""
+    pPr = para._p.find(f"{A}pPr")
+    if pPr is None or pPr.find(f"{A}buChar") is None:
+        return 0.0
+    try:
+        return max(0.0, int(pPr.get("marL", "0")) / 914400.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
 def _para_metrics(tf, w_in):
     """Yield (line_stack_h_in, space_after_in, line_w_in) per non-empty paragraph.
     overflow 判定と ink-box 判定が同じ行高モデルを共有するための単一実装。"""
@@ -85,7 +97,8 @@ def _para_metrics(tf, w_in):
             for r in para.runs
             if r.text
         )
-        lines = max(1, -(-int(width * 100) // max(1, int(w_in * 100))))
+        text_w = max(0.05, w_in - _text_indent_in(para))
+        lines = max(1, -(-int(width * 100) // max(1, int(text_w * 100))))
         spacing = para.line_spacing if isinstance(para.line_spacing, float) else 1.15
         space_after = para.space_after.pt / 72.0 if para.space_after is not None else 0.0
         yield lines * (size / 72.0) * spacing, space_after, width
