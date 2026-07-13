@@ -112,6 +112,40 @@ own field testing.
     everywhere. Verify presence in the pptx XML (`<p:cxnSp>` count), not only in the
     LibreOffice PNG.
 
+### 14. A wrapped line is a soft break (`<a:br/>`), never a new paragraph
+
+Splitting a wrapped line into a second paragraph looks identical in a quick render and is
+wrong twice over: a bulleted paragraph gets a **second bullet** on the continuation line,
+and `space_after` (authored as the gap *between items*) lands inside a single sentence. Emit
+`<a:br/>` inside the paragraph instead — the hanging indent, the bullet, and the paragraph
+spacing all keep their meaning, and the continuation line aligns to `marL` as it should.
+
+Consequence for verification: a paragraph is no longer one line. `verify_deck` splits each
+paragraph at `<a:br/>` before measuring width and counting wrapped lines; measuring the
+paragraph as one run of text over-estimates its width and mis-counts its lines.
+
+### 15. Vertically centered text: the box center is not the ink center
+
+With `MSO_ANCHOR.MIDDLE` the renderer centers the *line box*. Japanese text carries descender
+room below its ink, and Latin numerals sit high in the line box, so the ink lands off-center
+by a predictable fraction of the type size. Two rules follow:
+
+- To place ink on a rhythm, offset the box (`build_deck.stack_optical`), do not nudge `y` by
+  eye. The offsets are tokens (`layout.optical_stack.ink_center_offset_em`), calibrated at
+  300dpi, separately for text and numerals.
+- The verifier must use the same model. `verify_deck._ink_bbox` reconstructs the ink box from
+  those tokens; if it assumes box-center == ink-center, correctly composed KPI cards are
+  reported as overlapping text and the "fix" would be to break the layout.
+
+### 16. Measure text with the real font, in one place
+
+Estimating a wrapped line count from character counts ("full-width = 1, half-width = 0.55")
+diverges from the renderer as soon as Latin words or SemiBold weights appear — the estimate
+says a label fits, the renderer wraps it mid-word. `deck_text.text_width_in` measures with the
+actual Noto Sans JP metrics and is shared by the builder (where to break), the validator
+(does the header fit one line) and `verify_deck` (does the text overflow). One measuring
+stick, or the three disagree silently.
+
 ## Charts
 
 15. chartEx types (native waterfall etc.) cannot be generated. waterfall / roadmap /

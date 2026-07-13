@@ -1951,3 +1951,127 @@ def test_venn_subsets_derive_from_sizes_and_overlaps():
     # サイズ違いは異なるリージョン値になる(固定既定値で潰れない)
     other = act_assets._venn_subsets([{"label": "A", "size": 40}, {"label": "B", "size": 10}], {"AB": 4})
     assert other != sub2
+
+
+# ---------------------------------------------------------------------------
+# 改行(文節)と 光学的な積み(インク基準)
+# ---------------------------------------------------------------------------
+
+def _deck_text():
+    sys.path.insert(0, str(SCRIPTS))
+    import deck_text
+    return deck_text
+
+
+@pytest.mark.parametrize("text,width_in,size_pt,expected", [
+    ("導入費＋固定利用料", 0.9, 10, "導入費＋\n固定利用料"),
+    ("基盤利用量の複利成長", 1.0, 10, "基盤利用量の\n複利成長"),
+    ("HCPで実行文脈へ変換", 1.0, 10, "HCPで\n実行文脈へ変換"),
+])
+def test_display_wrap_breaks_at_bunsetsu_boundaries(text, width_in, size_pt, expected):
+    """行の切れ目は意味の切れ目に一致させる — 助詞の直後・並列記号の直後で割る。
+    箱の幅だけを見るレンダラ任せの折返しは「導入費＋固定利用/料」のように語を割る。"""
+    D = _deck_text()
+    assert D.wrap_display(text, width_in, size_pt, 3) == expected
+
+
+def test_display_wrap_never_splits_a_word_or_a_quantity():
+    """送り仮名(問い/合わせ)、数量と単位(2030/年)、外来語の接尾辞(スイート/化)は割らない。
+    どれも「行は埋まるが文がほどける」典型で、字数だけを見る折返しが作る欠陥。"""
+    D = _deck_text()
+    for text in ("問い合わせ履歴・顧客満足", "国内SaaS市場は2030年に3.2兆円へ拡大", "統合スイート化を進める"):
+        for chunk in D._segments(text)[0]:
+            pass
+        broken = D.wrap_display(text, 1.0, 12, 5)
+        for bad in ("問い\n", "合わせ", "2030\n", "\n年", "スイート\n化"):
+            if bad.startswith("\n"):
+                assert not any(ln.startswith(bad[1:]) for ln in broken.split("\n")[1:]), broken
+            else:
+                assert not broken.endswith(bad.rstrip("\n")) or "\n" not in broken, broken
+        assert "問い\n合わせ" not in broken and "スイート\n化" not in broken
+
+
+def test_display_wrap_keeps_particles_and_symbols_off_the_line_head():
+    """行頭に助詞や記号が立つと文が切れて見える(…実行文脈 / へ変換)。前の語へ吸収する。"""
+    D = _deck_text()
+    for text in ("HCPで実行文脈へ変換", "導入費＋固定利用料", "基盤利用量の複利成長", "Sales / CS / Workstation Act"):
+        for line in D.wrap_display(text, 0.9, 10, 5).split("\n")[1:]:
+            assert line[0] not in "をにがはでとへもやのか、。・＋+/／", f"{text!r} -> {line!r}"
+
+
+def test_display_wrap_leaves_body_copy_to_the_renderer():
+    """長い本文に手で改行を打つと、編集のたびに行が壊れる。触らずに自然折返しへ委ねる。"""
+    D = _deck_text()
+    body = "生産年齢人口は2040年までに約1,100万人減少し、説明・相談・CSといった対人業務の担い手が構造的に枯渇していく見通しである"
+    assert "\n" not in D.wrap_display(body, 3.0, 10, 3)
+    # 1行に入らない語がある = 箱に対してコピーが長すぎる。折返しで取り繕わない(直すのはコピー)
+    assert "\n" not in D.wrap_display("グローバルスタンダード", 0.4, 12, 3)
+
+
+def test_wrapped_bullet_keeps_a_single_bullet_and_hangs_the_second_line(tmp_path):
+    """折返しはソフト改行(a:br)で打つ。段落を割ると折返し行の頭にもう1つ記号が付き、
+    項目間の段落後スペースが同じ文の行間へ入り込む。"""
+    A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    deck = {"slides": [{
+        "pattern": "process_flow",
+        "title": "折返しのある箇条書きでも記号は1項目に1つだけ付く",
+        "subtitle": "ソフト改行で折返し、ぶら下げインデントを保つ",
+        "steps": [
+            {"label": "Step 1", "desc": "検証", "items": [
+                "基盤利用量の複利成長が継続と拡張の根拠になり、導入費＋固定利用料の二層で回収する",
+                "短い項目"]},
+            {"label": "Step 2", "desc": "展開", "items": ["HCPで実行文脈へ変換する"]},
+            {"label": "Step 3", "desc": "回収", "items": ["導入費＋固定利用料で回収する"]},
+        ],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    wrapped = 0
+    for shape in pptx.Presentation(out).slides[0].shapes:
+        if not shape.has_text_frame:
+            continue
+        for para in shape.text_frame.paragraphs:
+            pPr = para._p.find(f"{A_NS}pPr")
+            if pPr is None or pPr.find(f"{A_NS}buChar") is None:
+                continue
+            assert len(pPr.findall(f"{A_NS}buChar")) == 1, "1段落に記号は1つ"
+            brs = para._p.findall(f"{A_NS}br")
+            wrapped += 1 if brs else 0
+            # 折返しがあっても段落は1つ = 記号も1つ、ぶら下げインデントも保たれる
+            assert int(pPr.get("marL", "0")) > 0 and int(pPr.get("indent", "0")) < 0
+    assert wrapped >= 1, "折返した箇条書きが1つも無い(テストが何も検証していない)"
+
+
+def test_kpi_card_gaps_above_and_below_the_value_are_equal(tmp_path):
+    """カード内の縦積みは箱ではなくインク(字面)の間隔で組む。ラベル→数値の間隔と
+    数値→注記の間隔が目で揃って見えるのは、この2つのインク間隔が等しいときだけ
+    (箱の間隔で組むと、数字は字面が上寄りなぶんだけ下側が広く見える)。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import verify_deck as V
+    from pptx.util import Emu
+
+    deck = {"slides": [{
+        "pattern": "kpi_dashboard",
+        "title": "ラベル・数値・注記の3段で上下の余白が揃う",
+        "subtitle": "インク基準の縦積み",
+        "kpis": [{"label": "導入社数", "value": "120", "unit": "社", "note": "経理SaaS単体での獲得目標"}],
+        "source": "社内分析",
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    slide = pptx.Presentation(out).slides[0]
+    card_x = next(Emu(sh.left).inches for sh in slide.shapes
+                  if sh.has_text_frame and sh.text_frame.text.strip() == "導入社数")
+    stack = sorted((V._ink_bbox(sh) for sh in slide.shapes
+                    if sh.shape_type == 17 and sh.has_text_frame and sh.text_frame.text.strip()
+                    and abs(Emu(sh.left).inches - card_x) < 0.01),
+                   key=lambda b: b[1])
+    assert len(stack) == 3, f"ラベル/数値/注記の3段になっていない: {len(stack)}"
+    above = (stack[1][1] - stack[0][3]) * 72          # ラベル → 数値
+    below = (stack[2][1] - stack[1][3]) * 72          # 数値 → 注記
+    assert abs(above - below) < 1.5, f"数値の上下でインク間隔がずれている: {above:.1f}pt vs {below:.1f}pt"

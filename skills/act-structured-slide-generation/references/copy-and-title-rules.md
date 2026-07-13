@@ -48,6 +48,33 @@ one source of truth and no per-slide-type rules to remember:
 - Treat YoY, QoQ, vs plan, prior-year, and delta text as metric sublines with their own
   spacing, not as glued suffixes.
 
+## Line Breaks (文節)
+
+Where a line breaks is part of the writing, not an accident of box width. A renderer wraps
+on geometry alone and will happily split a word (`導入費＋固定利用/料`), an okurigana stem
+(`問い合/わせ`), a quantity and its unit (`2030/年`), or leave a particle stranded at the
+head of a line (`実行文脈 / へ変換`). Each of those fills the line and breaks the sentence.
+
+The builder breaks display text at 文節 boundaries automatically
+(`deck_text.wrap_display`), so the rules below are about what you write, not about where you
+type a newline:
+
+- **Do not hand-break display text.** Labels, headings, bullets, cell text, callouts and
+  conclusion lines are wrapped by the builder at the boundary that reads best for the width
+  it will actually be drawn at. A `\n` you type is a *forced* break the builder preserves —
+  reserve it for the few slots that require an exact line count (the cover subtitle's two
+  lines), not for fixing a wrap you did not like.
+- **A break lands after a particle, after a punctuation or a list separator, or between two
+  content words.** Nothing else is a break: okurigana never leaves its stem, a number never
+  leaves its counter, a suffix never starts a line.
+- **If a word cannot fit the box on one line, the copy is too long.** The engine refuses to
+  mangle it and lets the renderer wrap naturally, so the defect stays visible. Shorten the
+  copy or widen the container — do not shrink the type.
+- **Long body copy is left alone.** Beyond `tokens.line_break.max_display_chars_ja`, text is
+  body, not display text: forced breaks there rot the moment anyone edits a word.
+- Write phrases that survive wrapping: put the metric and its unit in one chunk, and avoid
+  clause-length labels that only fit by breaking mid-word.
+
 ## Words To Replace
 
 Replace generic language with proof. (This section owns REPLACE-WITH-PROOF mappings;

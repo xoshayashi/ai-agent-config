@@ -12,6 +12,7 @@ import sys
 from functools import lru_cache
 from pathlib import Path
 
+from deck_text import ink_center_offset_in, ink_height_in, ink_kind
 from pptx import Presentation
 from pptx.util import Emu
 
@@ -84,24 +85,41 @@ def _text_indent_in(para) -> float:
         return 0.0
 
 
+def _display_lines(para):
+    """段落を「実際に描かれる行」へ割る。<a:br/> はソフト改行なので、幅も行数も
+    その手前で切れる — 段落全体を1行として測ると幅を過大に見積もり、折返し数を誤る。"""
+    lines, cur = [], []
+    for el in para._p:
+        if el.tag == f"{A}r":
+            cur.append(el)
+        elif el.tag == f"{A}br":
+            lines.append(cur)
+            cur = []
+    lines.append(cur)
+    return lines
+
+
 def _para_metrics(tf, w_in):
-    """Yield (line_stack_h_in, space_after_in, line_w_in) per non-empty paragraph.
-    overflow 判定と ink-box 判定が同じ行高モデルを共有するための単一実装。"""
+    """Yield (line_stack_h_in, space_after_in, widest_line_w_in, n_lines) per non-empty
+    paragraph. overflow 判定と ink-box 判定が同じ行高モデルを共有するための単一実装。"""
+    from pptx.text.text import _Run
     for para in tf.paragraphs:
         text = "".join(r.text for r in para.runs)
         if not text.strip():
             continue
         size = max((r.font.size.pt if r.font.size else 11) for r in para.runs)
-        width = sum(
-            text_width_in(r.text, r.font.size.pt if r.font.size else size, _run_weight(r))
-            for r in para.runs
-            if r.text
-        )
         text_w = max(0.05, w_in - _text_indent_in(para))
-        lines = max(1, -(-int(width * 100) // max(1, int(text_w * 100))))
+        widths = []
+        for line in _display_lines(para):
+            runs = [_Run(r_el, para) for r_el in line]
+            widths.append(sum(
+                text_width_in(r.text, r.font.size.pt if r.font.size else size, _run_weight(r))
+                for r in runs if r.text
+            ))
+        lines = sum(max(1, -(-int(w * 100) // max(1, int(text_w * 100)))) for w in widths)
         spacing = para.line_spacing if isinstance(para.line_spacing, float) else 1.15
         space_after = para.space_after.pt / 72.0 if para.space_after is not None else 0.0
-        yield lines * (size / 72.0) * spacing, space_after, width
+        yield lines * (size / 72.0) * spacing, space_after, max(widths), lines
 
 
 def check_overflow(shape, issues, where):
@@ -109,7 +127,7 @@ def check_overflow(shape, issues, where):
     h_in = Emu(shape.height).inches
     if w_in <= 0.05:
         return
-    used_h = sum(h + sa for h, sa, _ in _para_metrics(shape.text_frame, w_in))
+    used_h = sum(h + sa for h, sa, _, _ in _para_metrics(shape.text_frame, w_in))
     # textboxes are allowed to visually overrun their nominal box a bit (top-anchored,
     # autosize off) as long as they don't collide; flag only meaningful overruns
     if used_h > h_in * 1.35 + 0.22:
@@ -140,17 +158,27 @@ def _ink_bbox(shape):
     if not _measure_ok:
         return box
     w_in = box[2] - box[0]
-    max_w, used_h = 0.0, 0.0
+    max_w, used_h, n_lines = 0.0, 0.0, 0
     # space_after はボックス内の余白であってインクではないため ink 高には含めない
-    for line_h, _space_after, width in _para_metrics(shape.text_frame, w_in):
+    for line_h, _space_after, width, lines in _para_metrics(shape.text_frame, w_in):
         used_h += line_h
+        n_lines += lines
         max_w = max(max_w, min(width, w_in))
     if max_w <= 0:
         return box
     anchor = shape.text_frame.vertical_anchor
     from pptx.enum.text import MSO_ANCHOR as _MA
     if anchor == _MA.MIDDLE:
-        y0 = (box[1] + box[3]) / 2 - used_h / 2
+        # 縦中央寄せの箱では、インクは箱の中心にちょうど座らない(和文は行ボックスの下に
+        # ディセンダ余白、欧文数字は字面が上寄り)。build_deck の stack_optical はこの
+        # ズレを見込んで箱を置くので、検証も同じモデルで測らないと「実際は重なっていない
+        # のに重なりと判定する」ことになる — 較正値は tokens.optical_stack が単一ソース
+        text = shape.text_frame.text
+        size = max((r.font.size.pt if r.font.size else 11)
+                   for p_ in shape.text_frame.paragraphs for r in p_.runs) \
+            if shape.text_frame.text.strip() else 11
+        used_h = ink_height_in(size, ink_kind(text), lines=n_lines)
+        y0 = (box[1] + box[3]) / 2 + ink_center_offset_in(size, ink_kind(text)) - used_h / 2
     else:
         y0 = box[1]
     x0 = box[0]
