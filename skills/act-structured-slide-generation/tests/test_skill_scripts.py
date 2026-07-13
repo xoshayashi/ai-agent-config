@@ -503,6 +503,39 @@ def test_bullets_are_real_paragraph_bullets_centered_by_glyph_design(tmp_path):
     assert not any(_is_oval(sh) for sh in slide.shapes), "記号が図形の円で描かれている"
 
 
+def test_verify_deck_counts_the_bullet_indent_when_wrapping(tmp_path):
+    """箇条書きの本文が使える幅は、箱の幅から字下げ(marL)を引いた分しかない。
+    verify_deck がこれを引かないと、1行に入る量を多く見積もり、実際は折り返す行を
+    「折り返さない」と数える(= 溢れを見逃す)。"""
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import build_deck as B
+    import verify_deck as V
+
+    deck = {"meta": {}, "slides": [{
+        "pattern": "process_flow",
+        "title": "箇条書きの折返しを字下げ込みで数える",
+        "subtitle": "verify_deck の幅計算の検証",
+        "steps": [{"label": "Step 1", "desc": "検証",
+                   "items": ["折返しの境目付近に置いた長さの項目で字下げ分の影響を確認する"]}],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    paras = [(sh, p) for sh in pptx.Presentation(out).slides[0].shapes if sh.has_text_frame
+             for p in sh.text_frame.paragraphs if V._text_indent_in(p) > 0]
+    assert paras, "箇条書き段落が見つからない"
+    for sh, para in paras:
+        # 字下げは marL の実値として読めていること(0 を返すと幅計算が甘くなる)
+        assert abs(V._text_indent_in(para) - B.BULLET_INDENT_IN) < 1e-6
+
+    # 箇条書きでない段落(タイトル等)からは字下げを読まない
+    plain = next(p for sh in pptx.Presentation(out).slides[0].shapes if sh.has_text_frame
+                 for p in sh.text_frame.paragraphs if V._text_indent_in(p) == 0)
+    assert plain is not None
+
+
 def test_bullet_block_honors_middle_anchor(tmp_path):
     """anchor=MIDDLE の呼び出し(roadmap の items カード)では、箇条書きブロック全体が
     枠の中で縦中央に置かれる(テキストフレームの縦位置指定に委ねる)。"""
