@@ -227,7 +227,12 @@ def add_bullets(slide, x, y, w, h, items, size, color, *, line_spacing=1.3,
     ためである。同じ箱に流すと、記号の y は「前の項目が何行に折り返したか」の見積りに
     依存し、見積りが1行でも外れると以降の記号が丸ごとずれる。項目ごとに箱を持てば、
     1行目は常にその箱の上端にあるので、実際の折返し行数によらず記号は必ず1行目に乗る。
-    折返し行は記号の右(インデント位置)に揃う。"""
+    折返し行は記号の右(インデント位置)に揃う。
+
+    anchor は (x, y, w, h) の枠に対する箇条書き「ブロック全体」の寄せ方。項目の箱は
+    常に上寄せ(記号の基準を固定するため)なので、MIDDLE / BOTTOM は枠の中でブロックの
+    開始位置をずらして実現する — 短い項目群を高さ h のカードに置く呼び出し(roadmap)は
+    これで中央に揃う。"""
     line_h = size / 72.0 * line_spacing * BULLET_LINE_BOX
     gap = space_after_pt / 72.0
     dot_d = size / 72.0 * BULLET_DOT_EM
@@ -235,10 +240,18 @@ def add_bullets(slide, x, y, w, h, items, size, color, *, line_spacing=1.3,
     text_w = w - BULLET_INDENT_IN
     dot_cx = x + BULLET_INDENT_IN * 0.31      # 記号はインデント帯の中で本文寄りに置く
 
+    heights = [_wrapped_lines(t, text_w, size) * line_h for t in items]
+    block_h = sum(heights) + gap * max(0, len(items) - 1)
+    slack = max(0.0, h - block_h)
+    if anchor == MSO_ANCHOR.MIDDLE:
+        cy = y + slack / 2
+    elif anchor == MSO_ANCHOR.BOTTOM:
+        cy = y + slack
+    else:
+        cy = y
+
     boxes = []
-    cy = y
-    for txt in items:
-        item_h = _wrapped_lines(txt, text_w, size) * line_h
+    for txt, item_h in zip(items, heights):
         tb = slide.shapes.add_textbox(Inches(text_x), Inches(cy), Inches(text_w), Inches(item_h))
         tf = tb.text_frame
         tf.word_wrap = True

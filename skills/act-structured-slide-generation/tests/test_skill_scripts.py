@@ -444,6 +444,68 @@ def test_validate_warns_fat_process_step(tmp_path):
     assert r.returncode == 0 and "3個超" in r.stdout
 
 
+def test_bullet_block_honors_middle_anchor(tmp_path):
+    """anchor=MIDDLE の呼び出し(roadmap の items カード)では、箇条書きブロック全体が
+    枠の中で縦中央に置かれる — 項目の箱を上寄せに固定した副作用で上に張り付かせない。"""
+    from pptx.enum.shapes import MSO_SHAPE
+    from pptx.util import Inches
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import build_deck as B
+
+    deck = {"meta": {}, "slides": [{
+        "pattern": "roadmap",
+        "title": "フェーズごとの打ち手を3段階で示す",
+        "subtitle": "ロードマップ(items 指定)",
+        "phases": [
+            {"label": "Phase 1", "period": "FY27", "items": ["短い項目"]},
+            {"label": "Phase 2", "period": "FY28",
+             "items": ["項目A", "項目B", "項目C", "項目D"]},
+            {"label": "Phase 3", "period": "FY29", "items": ["短い項目"]},
+        ],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    slide = pptx.Presentation(out).slides[0]
+
+    def _is_dot(sh):
+        try:
+            return sh.auto_shape_type == MSO_SHAPE.OVAL and sh.width == sh.height
+        except (ValueError, AttributeError):
+            return False
+
+    dots = sorted((sh for sh in slide.shapes if _is_dot(sh)), key=lambda s: (s.left, s.top))
+    assert len(dots) == 6, f"記号は全項目数と同数: {len(dots)}"
+
+    # 各フェーズのカード(surface_tint の角丸矩形)の中で、記号ブロックが縦中央にあること
+    def _is_card(sh):
+        try:
+            return (sh.auto_shape_type == MSO_SHAPE.ROUNDED_RECTANGLE
+                    and sh.fill.fore_color.rgb == B.C["surface_tint"])
+        except (ValueError, AttributeError, TypeError):
+            return False
+
+    cards = sorted((sh for sh in slide.shapes if _is_card(sh)), key=lambda s: s.left)
+    assert len(cards) == 3, f"フェーズカード3枚: {len(cards)}"
+    short_card, long_card = cards[0], cards[1]
+    short_dots = [d for d in dots if short_card.left <= d.left < short_card.left + short_card.width]
+    long_dots = [d for d in dots if long_card.left <= d.left < long_card.left + long_card.width]
+    assert len(short_dots) == 1 and len(long_dots) == 4
+
+    # 中央寄せなら、項目1つのカードの記号は、項目4つのカードの1つ目の記号より
+    # 「ブロック高さの差の半分」だけ下にある(上寄せのままなら差は 0 になる)
+    size = B.TS["body_small"]
+    line_h = size / 72.0 * 1.25 * B.BULLET_LINE_BOX
+    gap = 7 / 72.0
+    block_short, block_long = line_h, 4 * line_h + 3 * gap
+    expected = Inches((block_long - block_short) / 2)
+    actual = short_dots[0].top - long_dots[0].top
+    assert abs(actual - expected) < Inches(0.03), (
+        f"MIDDLE 寄せが効いていない: 実測 {actual} / 期待 {expected}")
+
+
 def test_no_full_bleed_background_object(tmp_path):
     """地の色のためだけに全面を覆う矩形は置かない — 編集時に本文の下で毎回つかんでしまう
     邪魔なオブジェクトになる。背景はスライドの地に任せる。"""
