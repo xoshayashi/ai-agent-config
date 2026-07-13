@@ -135,6 +135,10 @@ def check_overflow(shape, issues, where):
     h_in = Emu(shape.height).inches
     if w_in <= 0.05:
         return
+    if _ink_kind_of(shape) is not None:
+        # インク積みの箱は「文字の器」ではなく「位置決めの枠」で、行ボックスより意図的に低い。
+        # はみ出しの尺度は箱ではなくインクどうしの重なり(check_collisions)で見る
+        return
     used_h = sum(h + sa for h, sa, _, _ in _para_metrics(shape.text_frame, w_in))
     # textboxes are allowed to visually overrun their nominal box a bit (top-anchored,
     # autosize off) as long as they don't collide; flag only meaningful overruns
@@ -218,6 +222,23 @@ def _ink_bbox(shape):
     except Exception:
         pass
     return (x0, y0, x0 + max_w, y0 + used_h)
+
+
+def check_frame_overlaps(slide, idx, warns) -> None:
+    """テキストボックスの「枠」どうしの重なり。描かれるインクが正しくても、枠が重なった
+    pptx は編集で掴み違える(下の枠を選べない)。枠は文字を囲むだけの大きさに保つこと —
+    行ボックスの余白や固定高をそのまま枠にすると、余白が隣の枠へ食い込む。"""
+    boxes = [(_bbox(sh), sh.text_frame.text[:16]) for sh in slide.shapes
+             if sh.shape_type == 17 and sh.has_text_frame and sh.text_frame.text.strip()
+             and sh.left is not None]
+    for i in range(len(boxes)):
+        for j in range(i + 1, len(boxes)):
+            a, b = boxes[i][0], boxes[j][0]
+            ov_w = min(a[2], b[2]) - max(a[0], b[0])
+            ov_h = min(a[3], b[3]) - max(a[1], b[1])
+            if ov_w > 0.01 and ov_h > 0.01:
+                warns.append(f"slide {idx}: テキストボックスの枠が重なる {ov_h * 72:.1f}pt — "
+                             f"'{boxes[i][1]}' × '{boxes[j][1]}'(枠は文字ぶんの高さに)")
 
 
 def check_collisions(slide, idx, issues) -> None:
@@ -305,6 +326,7 @@ def main() -> int:
         if n_text == 0:
             issues.append(f"slide {idx}: no text at all")
         check_collisions(slide, idx, issues)
+        check_frame_overlaps(slide, idx, warns)
 
     if not _measure_ok:
         warns.append("NotoSansJP-{400,600,700}.ttf not found — overflow measurement skipped (install fonts)")

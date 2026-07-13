@@ -133,6 +133,13 @@ that keeps getting reported as "the spacing under the number is wrong".
   estimated box heights is what produced the two failures this contract exists to prevent:
   an estimate one line too high leaves a visible one-line hole above the next block, and one
   line too low makes the blocks collide.
+- **A frame is the size of its text.** A text box's height is the ink it holds (for an
+  ink-placed block) or the lines it draws (everywhere else), and its width, for a no-wrap
+  label, is the measured width of the string. Padding a frame beyond its text — a line box's
+  descender room, a generous fixed height, a round number of inches — pushes that padding
+  into the neighbouring frame: the render looks right while the .pptx has overlapping boxes,
+  and whoever edits it grabs the wrong one. `verify_deck` warns on any two text frames that
+  overlap. A no-wrap label sized *below* its text is the mirror defect: it wraps.
 - **Count lines in exactly one place.** Any height that depends on how many lines a string
   wraps to must come from the measured estimator (`build_deck._text_lines`), never from a
   local characters-per-line approximation. Two estimators in the same file will disagree, and

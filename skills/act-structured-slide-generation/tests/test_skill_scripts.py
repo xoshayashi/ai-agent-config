@@ -2473,3 +2473,30 @@ def test_canon_decks_pass_their_own_tts_check():
         for i, s in enumerate(json.loads(path.read_text())["slides"], start=1):
             risks = D.tts_risks(s.get("speaker_notes", ""))
             assert not risks, f"{path.name} slide {i}: {risks}"
+
+
+@pytest.mark.parametrize("spec_path", ["sample", "earnings"])
+def test_no_two_text_frames_overlap(tmp_path, spec_path):
+    """テキストボックスの「枠」は重ねない。描かれる文字が正しくても、枠が重なった pptx は
+    編集で掴み違える(下の枠を選べない)。枠は文字を囲むだけの大きさに保つこと — 行ボックスの
+    余白や固定高をそのまま枠にすると、その余白が隣の枠へ食い込む。"""
+    from pptx.util import Emu
+
+    src = SAMPLE if spec_path == "sample" else SAMPLE_EARNINGS
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", src, "-o", out).returncode == 0
+    overlaps = []
+    for idx, slide in enumerate(pptx.Presentation(out).slides, start=1):
+        boxes = [((Emu(s.left).inches, Emu(s.top).inches,
+                   Emu(s.left).inches + Emu(s.width).inches,
+                   Emu(s.top).inches + Emu(s.height).inches), s.text_frame.text[:12])
+                 for s in slide.shapes
+                 if s.shape_type == 17 and s.has_text_frame and s.text_frame.text.strip()]
+        for i in range(len(boxes)):
+            for j in range(i + 1, len(boxes)):
+                a, b = boxes[i][0], boxes[j][0]
+                ov_w = min(a[2], b[2]) - max(a[0], b[0])
+                ov_h = min(a[3], b[3]) - max(a[1], b[1])
+                if ov_w > 0.01 and ov_h > 0.01:
+                    overlaps.append(f"slide {idx}: '{boxes[i][1]}' × '{boxes[j][1]}' {ov_h * 72:.1f}pt")
+    assert not overlaps, "枠が重なっている: " + "; ".join(overlaps[:5])
