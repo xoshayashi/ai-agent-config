@@ -417,9 +417,11 @@ def add_footer(slide, spec: dict, page_no: int, total: int, deck: dict) -> None:
         frags = [(text, TS["footnote"], 400, C["ink_faint"])]
         # フッターは max_lines 行まで。1行に収まらない出典・前提・注記は折り返して2行目へ
         # 落ちる — 行送りと箱の高さをトークンから取り、下端の外周パディングを侵さない。
-        # 2行を超える長さは仕様側の欠陥(validate_spec が footnote_max_chars_ja で弾く)
+        # 2行を超える長さは仕様側の欠陥(validate_spec が footnote_max_chars_ja で弾く)。
+        # 帯の中では縦中央に置く: 上寄せだと1行のときだけ帯の上端に張り付き、2行のときと
+        # 光学的な位置が変わってしまう。中央寄せなら1行は2行ぶんの帯の中間に座る
         add_text(slide, foot["source_x_in"], foot["y_in"], CONTENT_W, foot["h_in"], [frags],
-                 line_spacing=foot["line_spacing"])
+                 line_spacing=foot["line_spacing"], anchor=MSO_ANCHOR.MIDDLE)
 
 
 
