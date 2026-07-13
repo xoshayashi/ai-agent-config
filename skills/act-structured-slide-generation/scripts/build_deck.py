@@ -51,7 +51,12 @@ from deck_text import (MEASURE_OK, footer_text, header_slots, hw, ja_len as _ja_
 
 def _text_lines(text: str, width_in: float, size_pt: float, weight: int = 400) -> int:
     """描かれる行数。箱の高さを決める側と、改行を打つ側は同じ答えを見なければならない —
-    字数近似で数えると、文節で1行増えたぶんがカードの下側余白から黙って差し引かれる。"""
+    字数近似で数えると、文節で1行増えたぶんがカードの下側余白から黙って差し引かれる。
+
+    幅が 0 以下で呼ばれるのは呼び出し側の算術の誤り。黙って丸めると「142行」のような
+    答えを返し、それが高さへ流れ込んでスライドの外へ出る図形を生む(実際に起きた)。"""
+    if width_in <= 0:
+        raise ValueError(f"_text_lines: 描画幅が正でない ({width_in:.3f}in) — 呼び出し側の算術を疑う")
     if not text:
         return 0
     total = 0
@@ -1709,13 +1714,18 @@ def p_process_flow(slide, spec, deck):
     # ただし矢先(tip)は見出し高に比例するので、高さが伸びるとテキスト幅は逆に狭くなる。
     # 最小高の tip で測ると「描く箱より広い幅」で行数を数えることになり、実際には1行増えて
     # 折返し予算を外す(=文節で割れず自然折返しへ落ちる)。高さと幅を収束させてから決める
-    HEAD_PT, HEAD_MIN_H, TIP_RATIO = 15, 0.52, 0.6
+    # 高さが伸びると矢先も伸びてテキスト幅は狭くなる = 行数がまた増える、という正のループ。
+    # 上限を置かないと発散する(幅が負になり、スライドの外へ出る巨大な矢羽が生まれる)。
+    # 矢羽の見出しは3行までとし、それでも入らないなら組版ではなくコピーの問題として
+    # 自然折返し + verify の警告に委ねる
+    HEAD_PT, HEAD_MIN_H, TIP_RATIO, HEAD_MAX_ROWS, HEAD_MIN_W = 15, 0.52, 0.6, 3, 0.6
     head_line = (HEAD_PT / 72.0) * 1.30 * 1.22
     head_h, head_rows = HEAD_MIN_H, 1
     for _ in range(4):                                # 高さは単調に増えるだけなので数回で収束
-        head_w = sw - gut + overhang - head_h * TIP_RATIO - 0.12
-        head_rows = max((_text_lines(st.get("label", ""), head_w, HEAD_PT, 600) for st in steps),
-                        default=1)
+        head_w = max(HEAD_MIN_W, sw - gut + overhang - head_h * TIP_RATIO - 0.12)
+        head_rows = min(HEAD_MAX_ROWS,
+                        max((_text_lines(st.get("label", ""), head_w, HEAD_PT, 600)
+                             for st in steps), default=1))
         grown = max(HEAD_MIN_H, head_rows * head_line + 0.20)
         if grown <= head_h + 1e-6:
             break

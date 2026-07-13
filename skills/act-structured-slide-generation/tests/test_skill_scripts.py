@@ -2289,3 +2289,43 @@ def test_table_header_row_budgets_the_lines_it_will_wrap_to(tmp_path):
     hdr_h = Emu(table.rows[0].height).inches
     line_h = TOKENS["type_scale_pt"]["table_header"] / 72.0 * 1.34
     assert hdr_h >= hdr_lines * line_h, f"ヘッダー行が折返し行数ぶんの高さを持たない: {hdr_h:.3f}in"
+
+
+@pytest.mark.parametrize("n_steps,label", [
+    (6, "顧客接点の統合と標準化を段階的に進めて全社へ定着させる運用体制の構築"),
+    (7, "実行文脈への変換と回収の仕組み化"),
+])
+def test_chevron_head_cannot_grow_without_bound(tmp_path, n_steps, label):
+    """見出しが伸びると矢先も伸びてテキスト幅は狭くなる = 行数がまた増える、という正のループ。
+    上限が無いと発散し、幅が負になってスライドの外へ出る巨大な矢羽が生まれる(実際に起きた)。
+    3行で頭打ちにし、それでも入らないコピーは自然折返し + 警告に委ねる。"""
+    from pptx.util import Emu
+
+    steps = [{"label": label, "desc": "検証", "items": ["短い項目"]}]
+    steps += [{"label": f"Step {i}", "desc": "展開", "items": ["短い項目"]}
+              for i in range(2, n_steps + 1)]
+    deck = {"slides": [{"pattern": "process_flow", "title": "矢羽の見出しは3行で頭打ちにする",
+                        "subtitle": "収束しない高さの見積りは発散する", "steps": steps}]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    slide = pptx.Presentation(out).slides[0]
+    for sh in slide.shapes:
+        if sh.width is None or sh.top is None:
+            continue
+        assert Emu(sh.width).inches > 0, f"幅が負の図形が出た: {sh.shape_type}"
+        assert Emu(sh.top).inches + Emu(sh.height).inches <= TOKENS["slide"]["height_in"] + 0.01, \
+            f"図形がスライドの外へ出た: {sh.shape_type}"
+    assert run("verify_deck.py", out).returncode == 0
+
+
+def test_text_lines_rejects_a_non_positive_width():
+    """幅 0 以下で呼ばれるのは呼び出し側の算術の誤り。黙って丸めると「142行」のような答えを
+    返し、それが高さへ流れ込んで壊れたスライドを生む。ここで止める。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import build_deck as B
+
+    with pytest.raises(ValueError):
+        B._text_lines("導入費＋固定利用料", -0.5, 15, 600)
