@@ -533,6 +533,15 @@ def test_bullet_block_honors_middle_anchor(tmp_path):
     assert len(bullet_boxes) == 3, f"フェーズごとに1つの箇条書き枠: {len(bullet_boxes)}"
     for box in bullet_boxes:
         assert box.text_frame.vertical_anchor == MSO_ANCHOR.MIDDLE, "MIDDLE 寄せが効いていない"
+        # 段落後スペースは項目の「間」だけ。最終段落にも付けると中身の下に見えない
+        # 余白が残り、中央寄せがその分だけ上へずれる(数えるビューアがある)
+        paras = box.text_frame.paragraphs
+        for i, para in enumerate(paras):
+            spc = para._p.find(f"{A_NS}pPr/{A_NS}spcAft")
+            if i < len(paras) - 1:
+                assert spc is not None, "項目間の段落後スペースが無い"
+            else:
+                assert spc is None, "最終段落に段落後スペースが残っている"
 
 
 def test_table_closing_rule_is_heavier_than_the_row_hairlines(tmp_path):

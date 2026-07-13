@@ -222,7 +222,11 @@ def add_bullets(slide, x, y, w, h, items, size, color, *, line_spacing=1.3,
         p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
         p.alignment = PP_ALIGN.LEFT
         p.line_spacing = line_spacing
-        p.space_after = Pt(space_after_pt)
+        # 段落後スペースは項目の「間」にだけ置く。最終段落にも付けると、中身の下に
+        # 見えない余白が1つ増え、縦中央寄せ(MIDDLE)がその分だけ上へずれる
+        # (LibreOffice は末尾を除外するが、PowerPoint は数えるビューアがある)
+        if i < len(items) - 1:
+            p.space_after = Pt(space_after_pt)
         _add_script_runs(p, txt, size, weight, color)
         pPr = p._p.get_or_add_pPr()
         pPr.set("marL", str(int(indent)))
@@ -1454,7 +1458,10 @@ def p_roadmap(slide, spec, deck):
         for i, ph in enumerate(phases):
             px = x + i * pw
             add_rect(slide, px, ry, pw - 0.06, row_h, C["surface_tint"], radius_pt=LAY["card"]["radius_pt"])
-            add_bullets(slide, px + 0.2, ry, pw - 0.44, row_h - 0.2,
+            # 箇条書き枠の上下インセットは対称にする。上端をカードに合わせて高さだけ
+            # 削ると、枠の中心がカードの中心より上にずれ、MIDDLE 寄せの結果も上に浮く
+            pad = 0.1
+            add_bullets(slide, px + 0.2, ry + pad, pw - 0.44, row_h - 2 * pad,
                         ph.get("items", []), TS["body_small"], C["ink_subtle"],
                         line_spacing=1.25, space_after_pt=7, anchor=MSO_ANCHOR.MIDDLE)
 
