@@ -813,6 +813,11 @@ def test_footer_holds_two_lines_inside_the_bottom_padding(tmp_path):
     bottom = Emu(boxes[0].top + boxes[0].height).inches
     assert bottom <= slide_h - foot["bottom_pad_in"] + 1e-6, f"フッターが下端余白を侵している: {bottom}"
 
+    # 帯の中では縦中央。上寄せだと1行のときだけ帯の上端に張り付き、2行のときと光学的な
+    # 位置が変わる — 中央寄せなら1行は2行ぶんの帯の中間(= 2行の1行目と2行目の間)に座る
+    from pptx.enum.text import MSO_ANCHOR
+    assert boxes[0].text_frame.vertical_anchor == MSO_ANCHOR.MIDDLE, "フッターが帯の中で上寄せ"
+
     # 4. 3行ぶんの長さは仕様欠陥として弾く(帯を広げて誤魔化さない)
     deck["slides"][0]["source"] = "あ" * 220
     bad = tmp_path / "ng.json"
