@@ -2123,7 +2123,8 @@ def p_driver_decomposition(slide, spec, deck):
     has_delta = any(f.get("delta") for f in factors)
     factor_note_pt = TS["kpi_sub"]
     note_line_h = (factor_note_pt / 72.0) * 1.22 * 1.13
-    note_lines = max((_text_lines(f.get("note", ""), cw - 0.3, factor_note_pt, 400) for f in factors),
+    note_w = max(0.4, cw - 0.3)     # 因数が増えるほどカードは痩せる — 幅は正のまま床を持つ
+    note_lines = max((_text_lines(f.get("note", ""), note_w, factor_note_pt, 400) for f in factors),
                      default=0)
     card_h = min(h - 0.75, max(1.7, 0.30 + 0.34 + 0.66 + (0.46 if has_delta else 0.0)
                                + (0.12 + note_lines * note_line_h if note_lines else 0.0) + 0.26))

@@ -2329,3 +2329,19 @@ def test_text_lines_rejects_a_non_positive_width():
 
     with pytest.raises(ValueError):
         B._text_lines("導入費＋固定利用料", -0.5, 15, 600)
+
+
+def test_driver_decomposition_caps_its_factors(tmp_path):
+    """因数は横一列のカードで並ぶ。数に上限が無いと1枚あたりの幅が痩せて負になり、
+    幅の見積りが破綻する(他のパターンと同じく上限を宣言する)。ビルダー側も幅に床を持つ。"""
+    factors = [{"label": f"因数{i}", "value": str(i), "note": "補足"} for i in range(1, 12)]
+    deck = {"slides": [{"pattern": "driver_decomposition", "title": "因数が多すぎるスペックは検証で止める",
+                        "subtitle": "横一列のカードは数だけ痩せる", "factors": factors,
+                        "source": "社内分析"}]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    assert r.returncode == 1 and any("factors" in ln for ln in r.stdout.splitlines()), r.stdout
+    # 検証をすり抜けた場合でも、ビルダーは負の幅で図形を作らない
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
