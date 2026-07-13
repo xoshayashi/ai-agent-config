@@ -2088,10 +2088,11 @@ def test_verify_flags_text_that_fell_back_to_natural_wrap(tmp_path):
         "subtitle": "自然折返しへ落ちた表示テキストの検出",
         "steps": [
             {"label": "Step 1", "desc": "検証", "items": [
-                "LP・問い合わせ・初回相談に企業代表のデジタルヒューマンを配置し、運用まで担う"]},
+                "デジタルヒューマン運用基盤の全社展開"]},
             {"label": "Step 2", "desc": "展開", "items": ["HCPで実行文脈へ変換"]},
             {"label": "Step 3", "desc": "接続", "items": ["MCPでToolsを呼び出し"]},
             {"label": "Step 4", "desc": "回収", "items": ["導入費で回収"]},
+            {"label": "Step 5", "desc": "拡張", "items": ["従量利用料の積み上げ"]},
         ],
     }]}
     spec = tmp_path / "deck.json"
@@ -2131,11 +2132,10 @@ def test_no_soft_break_after_a_line_that_overflows_the_box():
     その後ろへ重なって空行が1本入る — LibreOffice で実測した挙動。折返しで取り繕わず
     自然折返しへ委ね、verify_deck の警告でコピーを直させる。"""
     D = _deck_text()
-    # 「本人らしい分身として向き合い、」は切れ目の無い1文節で、この幅には入らない
-    text = "本人らしい分身として向き合い、相手の文脈・意図・権限を理解"
-    assert "\n" not in D.wrap_display(text, 3.16, 16, 4)
-    # 語が収まるコピーへ縮めれば、文節で折り返す
-    assert "\n" in D.wrap_display("本人らしい分身として、相手の文脈・意図・権限を理解", 3.16, 16, 4)
+    # 「デジタルヒューマン運用基盤」は切れ目の無い1語で、この幅には入らない
+    assert "\n" not in D.wrap_display("デジタルヒューマン運用基盤の全社展開", 1.2, 16, 4)
+    # 語が収まる幅なら、文節で折り返す
+    assert "\n" in D.wrap_display("デジタルヒューマン運用基盤の全社展開", 2.2, 16, 4)
 
 
 def test_box_height_and_line_break_are_measured_at_the_same_weight(tmp_path):
@@ -2345,3 +2345,103 @@ def test_driver_decomposition_caps_its_factors(tmp_path):
     # 検証をすり抜けた場合でも、ビルダーは負の幅で図形を作らない
     out = tmp_path / "deck.pptx"
     assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+
+def test_prose_keeps_its_line_breaks_from_the_renderer():
+    """文章(読点を持つ文、列挙でない長文)の改行には手を出さない。狭い箱で文節ごとに割ると
+    短い行が階段状に並び、文としてはかえって読みにくい — ラベルと文章では要求が逆になる。"""
+    D = _deck_text()
+    prose = ["サービスを跨いで接点数と稼働量を増やし、従量利用料を積み上げ",
+             "SaaS / RPAが担えない説明・相談・ケアなど非定型コミュニケーション業務が人手依存のまま"]
+    for text in prose:
+        assert D.is_prose(text), text
+        assert "\n" not in D.wrap_display(text, 1.35, 13, 5), text
+    labels = ["導入費＋固定利用料", "基盤利用量の複利成長", "Coreへ戻るデータ",
+              "本人確認・利用同意・権利管理・商用利用条件・報酬設計"]   # 短い項目が並ぶ列挙はラベルの列
+    for text in labels:
+        assert not D.is_prose(text), text
+        assert "\n" in D.wrap_display(text, 1.35, 13, 5), text
+
+
+def test_line_counts_come_only_from_the_measured_estimator():
+    """行数を数える実装は _text_lines だけ。字数近似(_ja_len / 1行の字数)を別に持つと、
+    見積りが1行ずれたぶんがブロック間の空白のズレや重なりとして出る(実際に起きた)。"""
+    src = (SCRIPTS / "build_deck.py").read_text()
+    assert "chars_per_line" not in src, "字数近似の行数見積りが復活している"
+    assert "math.ceil(_ja_len(" not in src, "字数近似の行数見積りが復活している"
+
+
+def test_interpretation_rail_blocks_keep_one_rhythm(tmp_path):
+    """図表の横の要点レールもインクで積む。箱の見積り高で積むと、見積りと実描画の差が
+    そのままブロック間の空白の不揃い(1行ぶんの空き)や重なりになる。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import verify_deck as V
+    from pptx.util import Emu
+
+    takeaways = [
+        {"heading": "人口構造の縮小", "body": "生産年齢人口は2025年7,310万人→2040年6,213万人、15年で約1,100万人減"},
+        {"heading": "専門人材の不足", "body": "2040年にAI・ロボット利活用人材が約340万人、医療・福祉の就業者が96万人不足の試算"},
+        {"heading": "不足は対人接点に集中", "body": "SaaS / RPAが担えない説明・相談・ケアなど非定型コミュニケーション業務が人手依存のまま"},
+    ]
+    deck = {"slides": [{
+        "pattern": "chart_insight",
+        "title": "要点レールのブロックは同じリズムで積む",
+        "subtitle": "見積り高ではなくインクで積む",
+        "takeaways_heading": "構造要因",
+        "takeaways": takeaways,
+        "chart": {"type": "bar", "categories": ["事務", "専門・技術", "サービス", "販売"],
+                  "series": [{"name": "不足時間", "values": [365, 302, 266, 245]}], "unit": "万時間/日"},
+        "source": "社内分析",
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    slide = pptx.Presentation(out).slides[0]
+    rail = sorted((V._ink_bbox(sh) for sh in slide.shapes
+                   if sh.shape_type == 17 and sh.has_text_frame and sh.text_frame.text.strip()
+                   and Emu(sh.left).inches > 7.4), key=lambda b: b[1])
+    assert len(rail) == 7, f"見出し1 + (見出し+本文)×3 = 7ブロックのはず: {len(rail)}"
+    pair_gaps = [(rail[i + 1][1] - rail[i][3]) * 72 for i in (1, 3, 5)]      # 見出し→本文
+    item_gaps = [(rail[i + 1][1] - rail[i][3]) * 72 for i in (2, 4)]         # 項目→項目
+    assert max(pair_gaps) - min(pair_gaps) < 1.0, f"見出しと本文の間隔が不揃い: {pair_gaps}"
+    assert max(item_gaps) - min(item_gaps) < 1.0, f"項目どうしの間隔が不揃い: {item_gaps}"
+    assert min(item_gaps) > max(pair_gaps), "かたまり内の間隔がかたまり間より広い(近接の原則に反する)"
+    assert all(g > 0 for g in pair_gaps + item_gaps), "ブロックが重なっている"
+
+
+def test_tts_risks_flag_only_what_a_voice_cannot_say():
+    """スクリプトは声で読む。記号のままでは読み飛ばされる断片だけを開き、読み方を提案する。
+    数字・桁区切り・%のように普通に読み上げられるものまで開くと、こんどは発表者が自分の
+    メモを読めなくなる(過剰変換も欠陥)。"""
+    D = _deck_text()
+    risky = D.tts_risks("2025年→2040年に約1,100万人減、CAGR 38.3%、S&M÷新規粗利は2.4x、1/3の水準です")
+    frags = [f for f, _ in risky]
+    assert "→" in frags and "÷" in frags and "&" in frags
+    assert any(f == "CAGR" for f in frags) and any("1/3" == f for f in frags) and any("2.4x" == f for f in frags)
+    hints = dict(risky)
+    assert "から" in hints["→"] and "分の" in hints["1/3"]
+    # 普通に読み上げられる表記は開かない
+    assert D.tts_risks("売上は1,250億円で、前年から12.4%増えました") == []
+    assert D.tts_risks("KPIとARRの推移をご覧ください") == []
+
+
+def test_validate_warns_on_unspeakable_speaker_notes(tmp_path):
+    """読み上げできない表記は validate で表に出す(警告 — 正しい読みは文脈が決めるので、
+    置換ではなく判断を書き手に残す)。スライド表示テキストは記号のままでよい。"""
+    deck = {"slides": [{
+        "pattern": "kpi_dashboard",
+        "title": "読み上げできない表記はスクリプト側だけを開く",
+        "subtitle": "スライドの記号はそのままでよい",
+        "kpis": [{"label": "ARR", "value": "38", "unit": "億円", "note": "経理SaaS単体"}],
+        "source": "社内分析",
+        "speaker_notes": "ARRは38億円です。2025年→2040年にかけて市場はCAGR 38.3%で拡大し、"
+                         "S&M÷新規粗利で見た回収期間も改善しています。次のスライドで単価の設計をご説明します。",
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    warns = [ln for ln in r.stdout.splitlines() if "読み上げ" in ln]
+    assert warns, r.stdout
+    assert "→" in warns[0] or "CAGR" in warns[0]

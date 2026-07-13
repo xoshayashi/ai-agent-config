@@ -97,6 +97,7 @@ Read these references before writing or substantially repairing `deck.json`:
 - `references/design-principles.md`
 - `references/grid-and-flex-strategy.md`
 - `references/copy-and-title-rules.md`
+- `references/talk-script-and-tts.md` (when writing `speaker_notes`)
 - `references/evidence-and-claim-rules.md`
 
 For IR / earnings / evidence-heavy decks, also read
@@ -180,6 +181,20 @@ Spoken register throughout: natural です/ます sentences, no noun-ending frag
 bullet dumps. Read the finished set aloud start-to-finish once — if any transition
 jars or a slide's script could be shuffled elsewhere without anyone noticing, the
 narrative is not yet doing its job.
+
+**Readable by a voice, and by the presenter.** The script is read aloud — by a person or by
+a speech engine — so a fragment a voice cannot say is a defect there, even though the same
+character is right on the slide (which is read with the eyes). Open the fragments that a TTS
+engine skips, spells out, or reads in English: arrows, range tildes, math and relation signs,
+the accounting triangle, `&`, inline fractions, `2.4x`, `vs`, `CAGR`, `YoY`, `SaaS`, an
+em-dash used as a pause. Open them into the words a presenter would actually say — the form
+follows the kind of fragment (operators and relations into kana/kanji, units into
+katakana/kanji, fractions reordered denominator-first, letter-wise acronyms like KPI/ARR left
+as Latin, word-like ones like SaaS into katakana). Stop there: rewriting every Latin string
+into katakana makes the notes unreadable for the human holding them.
+`validate_spec.py` warns on each un-speakable fragment and names the reading; the table is
+`references/tts_readings.json`, the reasoning `references/talk-script-and-tts.md`. Never
+apply these conversions to slide-visible text.
 
 Depth target: ~150-300 Japanese characters per content slide (≈30-60 seconds of speech);
 calibrate the deck total against `meta.talk_minutes` (~300字/分). A one-line note is a
@@ -305,7 +320,8 @@ Read only what the task needs, but do not skip the required workflow references.
 | `references/evidence-and-claim-rules.md` | Claim/evidence/status/source discipline |
 | `references/data-and-diagram-rules.md` | Chart and diagram selection rules |
 | `references/visual-hierarchy-rules.md` | Reading path, emphasis, alignment, accessibility |
-| `references/copy-and-title-rules.md` | Action titles and Japanese slide copy discipline |
+| `references/copy-and-title-rules.md` | Action titles, Japanese slide copy, line-break discipline |
+| `references/talk-script-and-tts.md` | Speaker-notes readings a voice can say (table: `tts_readings.json`) |
 | `references/design-richness-rules.md` | Freshness and impact without decoration |
 | `references/humanize.md` | Remove AI-like generic output |
 | `references/anti-patterns.md` | Failure modes to hunt before delivery |

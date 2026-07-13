@@ -127,6 +127,16 @@ that keeps getting reported as "the spacing under the number is wrong".
   draws; if only one side knows the model, correct slides get flagged as overlapping.
 - **Insets stay symmetric.** Leftover height is split evenly above and below the stack. A
   stack that grows must eat slack, never the bottom inset.
+- **Rails stack the same way.** The interpretation rail beside an exhibit (heading + body
+  blocks) is a stack, so it is placed by ink too, with one gap inside a heading/body pair and
+  a wider one between items (`optical_stack.gap_in.heading_body` / `.item`). Stacking it by
+  estimated box heights is what produced the two failures this contract exists to prevent:
+  an estimate one line too high leaves a visible one-line hole above the next block, and one
+  line too low makes the blocks collide.
+- **Count lines in exactly one place.** Any height that depends on how many lines a string
+  wraps to must come from the measured estimator (`build_deck._text_lines`), never from a
+  local characters-per-line approximation. Two estimators in the same file will disagree, and
+  the difference lands in the gaps between blocks.
 
 ## Flexbox Mental Model
 

@@ -1048,33 +1048,44 @@ def p_chart_insight(slide, spec, deck):
     _takeaways_rail(slide, spec, takeaways, tx, tw, y0, chart_y, chart_h)
 
 
+# 要点レール(図表の横に置く解釈列)も、カードと同じく「インクで積む」。箱の高さを見積もって
+# 積むと、見積りと実描画の差がそのままブロック間の空白の不揃いになり、1行ぶんの空きや重なりに
+# 見える(字数近似なら尚更ずれる)。行数は _text_lines、位置は stack_optical — 数える実装も
+# 積む実装も1つずつしか持たない。
+RAIL_HEAD_PT = 15
+RAIL_LINE_SPACING = 1.28
+
+
+def _rail_blocks(items, width_in):
+    """見出し+本文の並びを、インク積みのブロック列にする。見出しと本文は1つの意味のかたまり
+    (かたまり内の間隔 < かたまり間の間隔)。"""
+    gap = OPT["gap_in"]
+    blocks = []
+    for i, t in enumerate(items):
+        head = t.get("heading") if isinstance(t, dict) else None
+        body = t.get("body") if isinstance(t, dict) else str(t)
+        if head:
+            blocks.append({"parts": [(head, RAIL_HEAD_PT, 600, C["ink"])], "size": RAIL_HEAD_PT,
+                           "kind": "text", "line_spacing": RAIL_LINE_SPACING,
+                           "gap_before": gap["item"] if i else 0.0})
+        if body:
+            blocks.append({"parts": [(body, TS["body"], 400, C["ink_subtle"])], "size": TS["body"],
+                           "kind": "text", "line_spacing": RAIL_LINE_SPACING,
+                           "gap_before": gap["heading_body"] if head else (gap["item"] if i else 0.0)})
+    return blocks
+
+
 def _takeaways_rail(slide, spec, takeaways, tx, tw, y0, region_y, region_h):
     """Interpretation rail beside a chart/diagram: heading + rule + heading/body blocks,
     vertically centred on the exhibit region. Shared by chart_insight and diagram."""
-    line_h = (TS["body"] / 72.0) * 1.28 * 1.13  # 1.13 = 和文フォントの行ボックス補正
-    chars_per_line = max(8.0, (tw - 0.04) / (TS["body"] / 72.0))
-    blocks = []
-    for t in takeaways:
-        head = t.get("heading") if isinstance(t, dict) else None
-        body = t.get("body") if isinstance(t, dict) else str(t)
-        body_lines = math.ceil(_ja_len(body) / chars_per_line) if body else 0
-        bh = (0.32 if head else 0.0) + body_lines * line_h + 0.05
-        blocks.append((head, body, bh))
-    total_h = sum(b[2] for b in blocks)
-    gap = min(0.40, max(0.20, (region_h - 0.55 - total_h) / max(1, len(blocks) - 1))) if len(blocks) > 1 else 0
-    group_h = 0.5 + total_h + gap * max(0, len(blocks) - 1)
+    text_w = tw - 0.04
+    blocks = _rail_blocks(takeaways, text_w)
+    stack_h = stack_optical_height(blocks, text_w)
+    group_h = 0.5 + stack_h
     ty = max(y0 + 0.05, region_y + (region_h - group_h) / 2)
     add_text(slide, tx, ty, tw, 0.3, [[(spec.get("takeaways_heading", "要点"), 16, 600, C["primary_deep"])]])
     add_line(slide, tx, ty + 0.34, tx + tw, ty + 0.34, C["rule"], 0.75)
-    ty += 0.5
-    for head, body, bh in blocks:
-        paras = []
-        if head:
-            paras.append([(head, 15, 600, C["ink"])])
-        if body:
-            paras.append([(body, TS["body"], 400, C["ink_subtle"])])
-        add_text(slide, tx + 0.02, ty, tw - 0.04, bh, paras, line_spacing=1.28, space_after_pt=2)
-        ty += bh + gap
+    stack_optical(slide, tx, ty + 0.5, text_w, stack_h, blocks)
 
 
 def p_diagram(slide, spec, deck):
@@ -1398,26 +1409,13 @@ def p_competitive_landscape(slide, spec, deck):
     notes = spec.get("notes", [])
     if notes:
         nx, nw = grid(8, 4)
-        line_h = (TS["body"] / 72.0) * 1.28 * 1.13
-        chars_per_line = max(8.0, nw / (TS["body"] / 72.0))
-        note_gap = 0.24
-        blocks = []
-        for t in notes:
-            head = t.get("heading") if isinstance(t, dict) else None
-            body = t.get("body") if isinstance(t, dict) else str(t)
-            body_lines = math.ceil(_ja_len(body) / chars_per_line) if body else 0
-            block_h = (0.32 if head else 0.0) + body_lines * line_h + 0.05
-            blocks.append((head, body, block_h))
+        blocks = _rail_blocks(notes, nw)
+        stack_h = stack_optical_height(blocks, nw)
         # 右の要点列は左の2x2マップ(cy..cy+size)の垂直中心に揃える(上に張り付けない)
-        group_h = 0.5 + sum(b[2] for b in blocks) + note_gap * max(0, len(blocks) - 1)
-        ny = max(cy, cy + (size - group_h) / 2)
+        ny = max(cy, cy + (size - (0.5 + stack_h)) / 2)
         add_text(slide, nx, ny, nw, 0.3, [[(spec.get("notes_heading", "Positioning"), 16, 600, C["primary_deep"])]])
         add_line(slide, nx, ny + 0.34, nx + nw, ny + 0.34, C["rule"], 0.75)
-        ny += 0.5
-        for head, body, block_h in blocks:
-            paras = ([[(head, 15, 600, C["ink"])]] if head else []) + ([[(body, TS["body"], 400, C["ink_subtle"])]] if body else [])
-            add_text(slide, nx, ny, nw, block_h, paras, line_spacing=1.28, space_after_pt=2)
-            ny += block_h + note_gap
+        stack_optical(slide, nx, ny + 0.5, nw, stack_h, blocks)
 
 
 def p_financial_summary(slide, spec, deck):

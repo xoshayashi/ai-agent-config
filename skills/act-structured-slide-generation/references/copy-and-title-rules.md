@@ -70,6 +70,15 @@ type a newline:
 - **If the phrasing cannot be wrapped inside the box, the copy is too long for that column.**
   The engine refuses to mangle it and lets the renderer wrap naturally, and `verify_deck`
   warns. Shorten the copy or widen the container — never shrink the type.
+- **Prose is left to the renderer.** A sentence — anything carrying a Japanese comma or full
+  stop, and any long run of text that is not a list of short items — keeps the renderer's
+  wrap. Breaking a sentence at every phrase boundary in a narrow column produces a staircase
+  of half-empty lines, which reads worse than a filled line that happens to break inside a
+  word. Labels and sentences want opposite things from a line break: a label wants the break
+  to land on meaning, a sentence wants the line to fill. The classifier is
+  `deck_text.is_prose` (`tokens.line_break.label_max_chars_ja`,
+  `enum_segment_max_chars_ja`); a list of short items separated by `・` or `/` is a row of
+  labels, not prose, and is broken at the separators.
 - **Long body copy is left alone.** Beyond `tokens.line_break.max_display_chars_ja`, text is
   body, not display text: forced breaks there rot the moment anyone edits a word.
 - Write phrases that survive wrapping: keep a metric and its unit in one chunk, and avoid

@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 from deck_text import (MEASURE_OK, _segments as segments, ink_center_offset_in, ink_height_in,
-                       ja_len, text_width_in as _measure)
+                       is_prose, ja_len, text_width_in as _measure)
 from pptx import Presentation
 from pptx.util import Emu
 
@@ -114,6 +114,8 @@ def check_natural_wrap(shape, warns, where):
         text = "".join(r.text for r in para.runs)
         if not text.strip() or ja_len(text) > LINE_BREAK["max_display_chars_ja"]:
             continue                                  # 長文は本文 — 自然折返しでよい
+        if is_prose(text):
+            continue                                  # 文章の折返しはレンダラに委ねる(仕様)
         if para._p.find(f"{A}br") is not None:
             continue                                  # 文節で折り返し済み
         if len(segments(text)[0]) < 2:

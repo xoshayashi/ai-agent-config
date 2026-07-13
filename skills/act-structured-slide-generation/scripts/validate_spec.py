@@ -13,7 +13,7 @@ import json
 import sys
 from pathlib import Path
 
-from deck_text import footer_text, header_slots, ja_len
+from deck_text import footer_text, header_slots, ja_len, tts_risks
 
 TOKENS = json.loads((Path(__file__).resolve().parent.parent / "references" / "tokens.json").read_text())
 BUDGET = TOKENS["text_budget"]
@@ -268,6 +268,14 @@ def main() -> int:
             if len(notes) >= 80 and "です" not in notes and "ます" not in notes:
                 warns.append(f"{loc}: speaker_notes が話し言葉でない(です/ます不在) — "
                              "読み上げられる敬体のナラティブに書き直す")
+            # 読み上げ(TTS): スライドは目で読むので記号のままでよいが、スクリプトは声で読む。
+            # 記号や語形のままでは読み飛ばされる/英語で綴られる断片だけを、話し言葉へ開く
+            risks = tts_risks(notes)
+            if risks:
+                shown = "、".join(f"「{frag}」→ {hint}" for frag, hint in risks[:3])
+                more = f" ほか{len(risks) - 3}件" if len(risks) > 3 else ""
+                warns.append(f"{loc}: speaker_notes に読み上げできない表記 — {shown}{more}"
+                             "(スライド側は記号のままでよい。開くのはスクリプトだけ)")
             # タイトル逐語読みの冒頭は禁止(主張は話し言葉で言い換えて開く)
             if title and len(title) >= 8 and title in notes[: len(title) + 15]:
                 warns.append(f"{loc}: speaker_notes の冒頭がタイトルの逐語読み — 主張を話し言葉で言い換えて開く")

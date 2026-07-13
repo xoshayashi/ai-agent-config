@@ -6,6 +6,7 @@ contact_sheet で共有する単一実装。複製すると validate⇔build の
 """
 import json
 import math
+import re
 import sys
 from functools import lru_cache
 from pathlib import Path
@@ -299,6 +300,34 @@ def _segments(text: str) -> tuple[list[str], list[float]]:
     return chunks, scores
 
 
+# 文章とラベルでは、改行に求めるものが逆になる。
+#   ラベル・見出し・結論句・列挙 : 意味の切れ目と行の切れ目を一致させたい(文節で割る)
+#   文章(読点を持つ文)           : 行はできるだけ埋めたい。文節ごとに割ると短い行が階段状に
+#                                並び、読み進めるリズムが崩れる — 折返しはレンダラに委ねる
+_SENTENCE_MARKS = "、。，．"
+_ENUM_MARKS = ("・", "/", "／")
+
+
+def _is_enumeration(text: str) -> bool:
+    """短い項目が中黒・スラッシュで並ぶ「列挙」か。列挙は文ではなくラベルの列なので、
+    項目の切れ目で割るのが正しい。区切りがあっても項目が長ければ、それは文の中に中黒が
+    混じっているだけ(「SaaS / RPAが担えない説明・相談・ケアなど…」)。"""
+    limit = load_tokens()["line_break"]["enum_segment_max_chars_ja"]
+    parts = [p for p in re.split(r"[・/／]", text) if p.strip()]
+    return len(parts) >= 3 and all(ja_len(p.strip()) <= limit for p in parts)
+
+
+def is_prose(text: str) -> bool:
+    """その文字列を「文章」として扱うか。文章の改行位置には手を出さない。"""
+    if not text:
+        return False
+    if any(ch in text for ch in _SENTENCE_MARKS):
+        return True                                  # 読点・句点を持つ = 節でできた文
+    if ja_len(text) <= load_tokens()["line_break"]["label_max_chars_ja"]:
+        return False                                 # 短い = ラベル・見出し・結論句
+    return not _is_enumeration(text)                 # 長くても純粋な列挙ならラベルの列
+
+
 def wrap_display(text: str, width_in: float, size_pt: float, max_lines: int = 3,
                  weight: int = 400) -> str:
     """表示テキストを文節の切れ目で折り返した文字列("\n" 入り)にして返す。
@@ -306,7 +335,7 @@ def wrap_display(text: str, width_in: float, size_pt: float, max_lines: int = 3,
     1行に収まるならそのまま返す。max_lines に収まらない長文にも手を出さない(本文は無理に
     改行を打つより自然折返しに任せたほうが崩れない)。幅はすべて実測(in)で扱う。
     """
-    if not text or "\n" in text:
+    if not text or "\n" in text or is_prose(text):
         return text
     # 行はレンダラの折返し閾値の手前で切る。閾値ぎりぎりの行を作ると、レンダラ側が先に
     # 折り返し、こちらのソフト改行がそこへ重なって「空行」が1本入る(実測とレンダラの
@@ -362,3 +391,43 @@ def wrap_display(text: str, width_in: float, size_pt: float, max_lines: int = 3,
         lines.append("".join(chunks[i:j]))
         i, k = j, k - 1
     return "\n".join(lines) if i >= n else text
+
+
+# ---------------------------------------------------------------------------
+# トークスクリプトの読み上げ(TTS)
+# ---------------------------------------------------------------------------
+# スライドは目で読むので記号のままでよい。speaker_notes は声で読むので、記号のままだと
+# 読み飛ばされるか英語で綴られる。開くのは「声が詰まるところ」だけ — すべてをカタカナに
+# すると、こんどは人(発表者)が自分のメモを読めなくなる。読み方の表は
+# references/tts_readings.json、選び方の理屈は talk-script-and-tts.md。
+
+TTS_PATH = Path(__file__).resolve().parent.parent / "references" / "tts_readings.json"
+
+
+@lru_cache(maxsize=1)
+def load_tts_readings() -> dict:
+    return json.loads(TTS_PATH.read_text())
+
+
+def tts_risks(text: str) -> list[tuple[str, str]]:
+    """読み上げに耐えない断片と、その読み方の提案を返す [(断片, 提案), ...]。
+
+    提案であって置換ではない — 「×」は式では「かける」、倍率では「倍」であり、
+    正しい読みは文が決める。判断は書き手に残す(検証は警告どまり)。"""
+    if not text:
+        return []
+    table = load_tts_readings()
+    found: list[tuple[str, str]] = []
+    for sym in table["symbols"]:
+        if sym["pattern"] in text:
+            readings = [r for r in sym["readings"] if r]
+            hint = "／".join(readings) if readings else "文を切るか接続詞に置き換える"
+            found.append((sym["pattern"], hint))
+    for pat in table["patterns"]:
+        m = re.search(pat["regex"], text)
+        if m:
+            hint = pat["hint"]
+            for i, g in enumerate(m.groups(), start=1):
+                hint = hint.replace("{%d}" % i, g or "")
+            found.append((m.group(0), hint))
+    return found
