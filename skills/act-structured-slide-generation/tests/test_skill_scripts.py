@@ -16,6 +16,7 @@ SKILL = Path(__file__).resolve().parent.parent
 SCRIPTS = SKILL / "scripts"
 SAMPLE = SKILL / "examples" / "sample-deck.json"
 SAMPLE_EARNINGS = SKILL / "examples" / "sample-earnings-deck.json"
+TOKENS = json.loads((SKILL / "references" / "tokens.json").read_text())
 
 # 合成 PNG の地の色はトークンから引く — 直値で書くと canvas を変えた瞬間に
 # lint(トークン基準)と食い違い、テストだけが古い色を主張する
@@ -2242,3 +2243,49 @@ def test_table_cells_break_at_phrase_boundaries(tmp_path):
     assert texts, "セルが1つも折り返していない(テストが効いていない)"
     for t in texts:
         assert "導入費" not in t or t.startswith("導入費＋"), t
+
+
+def test_chevron_label_is_measured_against_the_box_it_is_drawn_in(tmp_path):
+    """矢先(tip)は見出し高に比例するので、高さが伸びるとテキスト幅は逆に狭くなる。
+    最小高の tip で行数を数えると「描く箱より広い幅」で見積もることになり、実際には1行増えて
+    折返し予算を外す — 文節で割れず自然折返し(語の途中で割れる)へ落ちる。"""
+    steps = [{"label": "実行文脈への変換と回収の仕組み化", "desc": "検証", "items": ["短い項目"]}]
+    steps += [{"label": f"Step {i}", "desc": "展開", "items": ["短い項目"]} for i in range(2, 6)]
+    deck = {"slides": [{"pattern": "process_flow", "title": "矢先で狭くなる幅で行数を数える",
+                        "subtitle": "見出しの幅と高さを収束させてから決める", "steps": steps}]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    head = next(sh for sh in pptx.Presentation(out).slides[0].shapes
+                if sh.has_text_frame and "実行文脈" in sh.text_frame.text)
+    assert "\v" in head.text_frame.text, "文節で折り返せず自然折返しへ落ちた(幅の見積りが箱より広い)"
+    r = run("verify_deck.py", out)
+    assert not any("自然折返し" in ln for ln in r.stdout.splitlines()), r.stdout
+
+
+def test_table_header_row_budgets_the_lines_it_will_wrap_to(tmp_path):
+    """ヘッダーも文節で折り返す。1行ぶんで高さを取ると、折返したぶんだけレンダラが行を足し、
+    表が計画より下へ伸びる(フッターへ近づく)。ヘッダー行の高さも実測行数から取る。"""
+    from pptx.util import Emu
+
+    headers = ["項目", "導入費＋固定利用料の合計金額", "年間経常収益の複利成長率",
+               "継続率(ネットレベニュー)", "問い合わせ対応の自動化率"]
+    rows = [[f"行{i}", "80万円", "38%", "112%", "64%"] for i in range(1, 9)]
+    deck = {"slides": [{"pattern": "comparison_table",
+                        "title": "ヘッダーが折返しても表は計画どおりの高さに収まる",
+                        "subtitle": "ヘッダー行の高さも実測行数から導く",
+                        "table": {"headers": headers, "rows": rows}, "source": "社内分析"}]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    table_shape = next(sh for sh in pptx.Presentation(out).slides[0].shapes if sh.has_table)
+    table = table_shape.table
+    hdr_lines = max(c.text.count("\v") + 1 for c in table.rows[0].cells)
+    assert hdr_lines >= 2, "折返すはずのヘッダーが1行のまま(テストが効いていない)"
+    hdr_h = Emu(table.rows[0].height).inches
+    line_h = TOKENS["type_scale_pt"]["table_header"] / 72.0 * 1.34
+    assert hdr_h >= hdr_lines * line_h, f"ヘッダー行が折返し行数ぶんの高さを持たない: {hdr_h:.3f}in"

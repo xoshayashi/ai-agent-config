@@ -1243,15 +1243,27 @@ def add_act_table(slide, x, y, w, h, tspec: dict):
     cell_pt, hdr_pt = TS["table_cell"], TS["table_header"]
     line_h = cell_pt / 72.0 * 1.34 * 1.13   # 1 行あたりの高さ(和文行ボックス補正込み)
     v_pad = 0.30                            # 1 行の内容最小余白(上下対称)。痩せると文字が罫に近接
-    def _row_lines(cells):
+    emph_col, emph_row = tspec.get("emphasis_col"), tspec.get("emphasis_row")
+
+    def _cell_weight(ri: int, ci: int) -> int:
+        """そのセルを実際に描く重み。行数見積りは描画と同じ重みで測る(強調列は太い)。"""
+        if ci == 0:
+            return 700
+        focal = (emph_col is not None and ci == emph_col) or (emph_row is not None and ri == emph_row)
+        return 600 if focal else 400
+
+    def _row_lines(cells, ri: int):
         ln = 1
         for ci in range(ncols):
             txt = str(cells[ci]) if ci < len(cells) else ""
-            ln = max(ln, _text_lines(txt, _cell_text_w(col_w_in[ci]), cell_pt,
-                                     700 if ci == 0 else 600))
+            ln = max(ln, _text_lines(txt, _cell_text_w(col_w_in[ci]), cell_pt, _cell_weight(ri, ci)))
         return ln
-    row_min = [_row_lines(r) * line_h + v_pad for r in rows] or [line_h + v_pad]
-    hdr_min = hdr_pt / 72.0 * 1.34 + v_pad * 0.7
+    row_min = [_row_lines(r, ri) * line_h + v_pad for ri, r in enumerate(rows)] or [line_h + v_pad]
+    # ヘッダーも本文と同じく文節で折り返す — 1行ぶんで高さを取ると、折返したぶんだけ表が
+    # 計画より下へ伸びる(レンダラが行を足す)。ヘッダーの実測行数から高さを取る
+    hdr_rows = max((_text_lines(str(h_), _cell_text_w(col_w_in[ci]), hdr_pt, 700)
+                    for ci, h_ in enumerate(headers)), default=1)
+    hdr_min = hdr_rows * (hdr_pt / 72.0 * 1.34) + v_pad * 0.7
     n = len(row_min)
     sum_min = sum(row_min)
     # 余白を詰めて本文領域を埋める(全体の高さを出す)。追加高は主にデータ行へ配分し、
@@ -1284,8 +1296,6 @@ def add_act_table(slide, x, y, w, h, tspec: dict):
         table.columns[ci].width = Emu(int(Inches(cwin)))
     aligns = tspec.get("align", ["l"] * ncols)
     amap = {"l": PP_ALIGN.LEFT, "r": PP_ALIGN.RIGHT, "c": PP_ALIGN.CENTER}
-    emph_col = tspec.get("emphasis_col")
-    emph_row = tspec.get("emphasis_row")
     color_neg = bool(tspec.get("color_negatives"))  # △/▲/▼/- 始まりの数値セルを danger 色に
     table.rows[0].height = Inches(hdr_h_in)
     for ri in range(1, nrows):
@@ -1695,12 +1705,21 @@ def p_process_flow(slide, spec, deck):
     gut = LAY["gutter_in"]
     overhang = gut  # 矢先をカード右端より前へ出す(次の矢羽の左辺には触れるだけ)
     # 矢羽の見出しは折返す(狭い列に長いラベルが入ると2行以上になる)。高さを直値で固定すると、
-    # 折返したぶんが箱からあふれてカードへ食い込む — ラベルの実測行数から高さを決める
-    HEAD_PT, HEAD_MIN_H = 15, 0.52
-    head_w = sw - gut + overhang - HEAD_MIN_H * 0.6 - 0.12   # 0.6 = 矢先(tip)の比率
-    head_rows = max((_text_lines(st.get("label", ""), head_w, HEAD_PT, 600) for st in steps),
-                    default=1)
-    head_h = max(HEAD_MIN_H, head_rows * (HEAD_PT / 72.0) * 1.30 * 1.22 + 0.20)
+    # 折返したぶんが箱からあふれてカードへ食い込む — ラベルの実測行数から高さを決める。
+    # ただし矢先(tip)は見出し高に比例するので、高さが伸びるとテキスト幅は逆に狭くなる。
+    # 最小高の tip で測ると「描く箱より広い幅」で行数を数えることになり、実際には1行増えて
+    # 折返し予算を外す(=文節で割れず自然折返しへ落ちる)。高さと幅を収束させてから決める
+    HEAD_PT, HEAD_MIN_H, TIP_RATIO = 15, 0.52, 0.6
+    head_line = (HEAD_PT / 72.0) * 1.30 * 1.22
+    head_h, head_rows = HEAD_MIN_H, 1
+    for _ in range(4):                                # 高さは単調に増えるだけなので数回で収束
+        head_w = sw - gut + overhang - head_h * TIP_RATIO - 0.12
+        head_rows = max((_text_lines(st.get("label", ""), head_w, HEAD_PT, 600) for st in steps),
+                        default=1)
+        grown = max(HEAD_MIN_H, head_rows * head_line + 0.20)
+        if grown <= head_h + 1e-6:
+            break
+        head_h = grown
     line_h = (TS["body"] / 72.0) * 1.30 * 1.22  # 1.22 = 和文フォントの行ボックス補正(実測)
     sp_h = 8 / 72.0
     card_pad = 0.56  # カード内左右の余白合計に相当する差し引き(gutter 別)
