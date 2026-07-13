@@ -48,6 +48,33 @@ one source of truth and no per-slide-type rules to remember:
 - Treat YoY, QoQ, vs plan, prior-year, and delta text as metric sublines with their own
   spacing, not as glued suffixes.
 
+## Line Breaks (phrase boundaries)
+
+Where a line breaks is part of the writing, not an accident of box width. A renderer wraps on
+geometry alone: it will split a compound noun mid-word, tear okurigana off its stem, separate
+a number from its counter, or leave a particle or a symbol stranded at the head of a line.
+Each of those fills the line and breaks the sentence.
+
+The builder wraps display text at phrase (bunsetsu) boundaries automatically
+(`deck_text.wrap_display`), so the rules below are about what you write, not about where you
+type a newline:
+
+- **Do not hand-break display text.** Labels, headings, bullets, cell text, callouts and
+  conclusion lines are wrapped by the builder at the boundary that reads best for the width
+  they will actually be drawn at. A `\n` you type is a *forced* break the builder preserves —
+  reserve it for the few slots that require an exact line count (the cover subtitle's two
+  lines), not for fixing a wrap you did not like.
+- **A break lands after a particle, after punctuation or a list separator, or between two
+  content words.** Nothing else is a break: okurigana never leaves its stem, a number never
+  leaves its counter, a suffix never starts a line.
+- **If the phrasing cannot be wrapped inside the box, the copy is too long for that column.**
+  The engine refuses to mangle it and lets the renderer wrap naturally, and `verify_deck`
+  warns. Shorten the copy or widen the container — never shrink the type.
+- **Long body copy is left alone.** Beyond `tokens.line_break.max_display_chars_ja`, text is
+  body, not display text: forced breaks there rot the moment anyone edits a word.
+- Write phrases that survive wrapping: keep a metric and its unit in one chunk, and avoid
+  clause-length labels that only fit a narrow column by breaking mid-word.
+
 ## Words To Replace
 
 Replace generic language with proof. (This section owns REPLACE-WITH-PROOF mappings;

@@ -9,13 +9,16 @@ from __future__ import annotations
 import json
 import re
 import sys
-from functools import lru_cache
 from pathlib import Path
 
+from deck_text import (MEASURE_OK, _segments as segments, ink_center_offset_in, ink_height_in,
+                       ja_len, text_width_in as _measure)
 from pptx import Presentation
 from pptx.util import Emu
 
 TOKENS = json.loads((Path(__file__).resolve().parent.parent / "references" / "tokens.json").read_text())
+LINE_BREAK = TOKENS["line_break"]
+INK_KIND_PREFIX = "ink:"   # build_deck が図形名に刻む宣言タグ
 ALLOWED = {v.upper() for v in TOKENS["colors"].values()}
 FORBIDDEN = {v.upper() for v in TOKENS["color_policy"]["forbidden_colors"]}
 OK_FONTS = {TOKENS["fonts"]["latin"], TOKENS["fonts"]["latin_semibold"],
@@ -24,35 +27,10 @@ SLIDE_W_IN = TOKENS["slide"]["width_in"]
 SLIDE_H_IN = TOKENS["slide"]["height_in"]
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 
-FONT_DIRS = [Path.home() / "Library/Fonts", Path("/Library/Fonts"), Path(__file__).parent]
-
-
-def _font_file(weight: int) -> Path | None:
-    for d in FONT_DIRS:
-        p = d / f"NotoSansJP-{weight}.ttf"
-        if p.exists():
-            return p
-    return None
-
-
-try:
-    from PIL import ImageFont
-    _FONTS = {w: (str(f) if (f := _font_file(w)) else None) for w in (400, 600, 700)}
-    _measure_ok = all(_FONTS.values())
-except ImportError:
-    _measure_ok = False
-
-
-@lru_cache(maxsize=None)
-def _load_font(weight: int, size_px: int):
-    # 段落ごとの再ロードを避ける: (weight, size) の組は高々十数種
-    return ImageFont.truetype(_FONTS[weight], size=size_px)
-
-
-def text_width_in(text: str, size_pt: float, weight: int) -> float:
-    """Measured width in inches using real Noto Sans JP metrics (widest of our pair)."""
-    font = _load_font(weight if weight in (400, 600, 700) else 400, int(size_pt * 4))
-    return font.getlength(text) / 4 / 72.0
+# 計測は deck_text の単一実装を使う — ビルダーが「どこで切るか」を決めた物差しと、検証が
+# 「はみ出すか/重なるか」を判定する物差しは、同じでなければ意味がない
+_measure_ok = MEASURE_OK
+text_width_in = _measure
 
 
 def _para_weight(para) -> int:
@@ -84,24 +62,70 @@ def _text_indent_in(para) -> float:
         return 0.0
 
 
+def _display_lines(para):
+    """段落を「実際に描かれる行」へ割る。<a:br/> はソフト改行なので、幅も行数も
+    その手前で切れる — 段落全体を1行として測ると幅を過大に見積もり、折返し数を誤る。"""
+    lines, cur = [], []
+    for el in para._p:
+        if el.tag == f"{A}r":
+            cur.append(el)
+        elif el.tag == f"{A}br":
+            lines.append(cur)
+            cur = []
+    lines.append(cur)
+    return lines
+
+
 def _para_metrics(tf, w_in):
-    """Yield (line_stack_h_in, space_after_in, line_w_in) per non-empty paragraph.
-    overflow 判定と ink-box 判定が同じ行高モデルを共有するための単一実装。"""
+    """Yield (line_stack_h_in, space_after_in, widest_line_w_in, n_lines) per non-empty
+    paragraph. overflow 判定と ink-box 判定が同じ行高モデルを共有するための単一実装。"""
+    from pptx.text.text import _Run
     for para in tf.paragraphs:
         text = "".join(r.text for r in para.runs)
         if not text.strip():
             continue
         size = max((r.font.size.pt if r.font.size else 11) for r in para.runs)
-        width = sum(
-            text_width_in(r.text, r.font.size.pt if r.font.size else size, _run_weight(r))
-            for r in para.runs
-            if r.text
-        )
         text_w = max(0.05, w_in - _text_indent_in(para))
-        lines = max(1, -(-int(width * 100) // max(1, int(text_w * 100))))
+        widths = []
+        for line in _display_lines(para):
+            runs = [_Run(r_el, para) for r_el in line]
+            widths.append(sum(
+                text_width_in(r.text, r.font.size.pt if r.font.size else size, _run_weight(r))
+                for r in runs if r.text
+            ))
+        lines = sum(max(1, -(-int(w * 100) // max(1, int(text_w * 100)))) for w in widths)
         spacing = para.line_spacing if isinstance(para.line_spacing, float) else 1.15
         space_after = para.space_after.pt / 72.0 if para.space_after is not None else 0.0
-        yield lines * (size / 72.0) * spacing, space_after, width
+        yield lines * (size / 72.0) * spacing, space_after, max(widths), lines
+
+
+def check_natural_wrap(shape, warns, where):
+    """文節で割れずに自然折返しへ落ちた表示テキストを拾う。
+
+    ビルダーは表示テキスト(ラベル・箇条書き・セル)を文節の切れ目で折り返すが、その列幅に
+    対してコピーが長すぎると、どこで切っても行が足りず自然折返しに委ねる。そのときレンダラは
+    語の途中(初/回相談)で割る — 静かに崩れるので、ここで見えるようにする。直すのはコピーか
+    列幅であって、字を小さくすることではない。"""
+    tf = shape.text_frame
+    w_in = Emu(shape.width).inches - 0.02
+    if w_in <= 0.05:
+        return
+    for para in tf.paragraphs:
+        text = "".join(r.text for r in para.runs)
+        if not text.strip() or ja_len(text) > LINE_BREAK["max_display_chars_ja"]:
+            continue                                  # 長文は本文 — 自然折返しでよい
+        if para._p.find(f"{A}br") is not None:
+            continue                                  # 文節で折り返し済み
+        if len(segments(text)[0]) < 2:
+            continue                                  # 切れ目が無い語(社名など) — 折返しでは直せない
+        # 幅はランごとの実サイズで測る(値40pt+単位16pt のような混在段落を最大サイズで
+        # 測ると、収まっている行を「はみ出す」と誤って数える)
+        default = max((r.font.size.pt if r.font.size else 11) for r in para.runs)
+        width = sum(text_width_in(r.text, r.font.size.pt if r.font.size else default, _run_weight(r))
+                    for r in para.runs if r.text)
+        if width > max(0.05, w_in - _text_indent_in(para)):
+            warns.append(f"{where}: 文節で折り返せず自然折返し(語の途中で割れる) — "
+                         f"'{text[:24]}' … コピーを短くするか列幅を広げる")
 
 
 def check_overflow(shape, issues, where):
@@ -109,7 +133,7 @@ def check_overflow(shape, issues, where):
     h_in = Emu(shape.height).inches
     if w_in <= 0.05:
         return
-    used_h = sum(h + sa for h, sa, _ in _para_metrics(shape.text_frame, w_in))
+    used_h = sum(h + sa for h, sa, _, _ in _para_metrics(shape.text_frame, w_in))
     # textboxes are allowed to visually overrun their nominal box a bit (top-anchored,
     # autosize off) as long as they don't collide; flag only meaningful overruns
     if used_h > h_in * 1.35 + 0.22:
@@ -133,6 +157,16 @@ def _overlap_frac(a, b) -> float:
     return inter / area if area > 0 else 0.0
 
 
+def _ink_kind_of(shape) -> str | None:
+    """描く側が図形名に刻んだインク種別(build_deck.stack_optical)。無ければ None。"""
+    name = shape.name or ""
+    if name.startswith(INK_KIND_PREFIX):
+        kind = name[len(INK_KIND_PREFIX):]
+        if kind in ("text", "numeral"):
+            return kind
+    return None
+
+
 def _ink_bbox(shape):
     """Approximate the rendered text extent (ink box), not the nominal textbox:
     width = measured widest line (capped at box width), height = computed line stack."""
@@ -140,16 +174,34 @@ def _ink_bbox(shape):
     if not _measure_ok:
         return box
     w_in = box[2] - box[0]
-    max_w, used_h = 0.0, 0.0
+    max_w, used_h, n_lines = 0.0, 0.0, 0
     # space_after はボックス内の余白であってインクではないため ink 高には含めない
-    for line_h, _space_after, width in _para_metrics(shape.text_frame, w_in):
+    for line_h, _space_after, width, lines in _para_metrics(shape.text_frame, w_in):
         used_h += line_h
+        n_lines += lines
         max_w = max(max_w, min(width, w_in))
     if max_w <= 0:
         return box
     anchor = shape.text_frame.vertical_anchor
     from pptx.enum.text import MSO_ANCHOR as _MA
-    if anchor == _MA.MIDDLE:
+    kind = _ink_kind_of(shape)
+    if anchor == _MA.MIDDLE and kind is not None:
+        # 縦中央寄せの箱では、インクは箱の中心にちょうど座らない(和文は行ボックスの下に
+        # ディセンダ余白、欧文数字は字面が上寄り)。build_deck の stack_optical はこの
+        # ズレを見込んで箱を置くので、検証も同じモデルで測らないと「実際は重なっていない
+        # のに重なりと判定する」ことになる — 較正値は tokens.optical_stack が単一ソース。
+        # 種別は図形名に刻まれた宣言を読む(文字列から推測すると「黒字化」のような数値
+        # ブロックを text として測り、ビルダーと違うインクを見ることになる)
+        sizes = [r.font.size.pt if r.font.size else 11
+                 for p_ in shape.text_frame.paragraphs for r in p_.runs]
+        size = max(sizes) if sizes else 11
+        spacing = next((p_.line_spacing for p_ in shape.text_frame.paragraphs
+                        if isinstance(p_.line_spacing, float)), 1.2)
+        used_h = ink_height_in(size, kind, lines=n_lines, line_spacing=spacing)
+        y0 = (box[1] + box[3]) / 2 + ink_center_offset_in(size, kind) - used_h / 2
+    elif anchor == _MA.MIDDLE:
+        # インク宣言の無い縦中央寄せ(見出し+本文のような複数段落・複数級数の箱)は、
+        # 単一級数のインクモデルでは測れない。行スタックの高さで中央に置く
         y0 = (box[1] + box[3]) / 2 - used_h / 2
     else:
         y0 = box[1]
@@ -247,6 +299,7 @@ def main() -> int:
                 n_text += 1
                 if _measure_ok:
                     check_overflow(shape, issues, f"slide {idx}")
+                    check_natural_wrap(shape, warns, f"slide {idx}")
         if n_text == 0:
             issues.append(f"slide {idx}: no text at all")
         check_collisions(slide, idx, issues)

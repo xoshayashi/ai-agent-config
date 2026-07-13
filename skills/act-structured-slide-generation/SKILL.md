@@ -136,6 +136,15 @@ Per-line character limits are never written down: they are derived from the rend
 renderer read. Changing a type scale or a layout width moves the limit automatically — do not
 reintroduce hard-coded character budgets for headers.
 
+**Line breaks (hard rule).** Do not hand-break display text. Labels, headings, bullets, cell
+text, callouts and conclusion lines are wrapped by the builder at 文節 boundaries for the
+width they are actually drawn at (`deck_text.wrap_display`), so a line never splits a word,
+an okurigana stem, or a number from its unit, and never strands a particle at the head of a
+line. A `\n` you type is a FORCED break the builder keeps — use it only where an exact line
+count is part of the contract (the cover subtitle's two lines). If a chunk cannot fit the box
+on one line, the engine refuses to mangle it and lets the wrap stay visible: that is a copy
+defect, so shorten the copy — never shrink the type. See `references/copy-and-title-rules.md`.
+
 Source, assumption, and note fields stay small in the footer area; page numbers are never
 rendered.
 
@@ -189,6 +198,11 @@ sh scripts/render_deck.sh deck.pptx render/
 python3 scripts/lint_render.py render/ --spec deck.json
 ```
 
+`verify_deck.py` warns when display text could not be broken at a phrase boundary and fell
+back to the renderer's own wrap (which splits words). Treat every such warning as a copy
+defect on that slide: shorten the line or widen its column — do not shrink the type, and do
+not hand-insert a `\n`.
+
 Use `--baseline` after the first render so regression checks focus on intended changes:
 
 ```bash
@@ -203,6 +217,10 @@ rendered PNGs. Inspect at least these issues:
 - unreadable small text, especially body copy and numeric labels
 - a missing subtitle, or a title/subtitle that wrapped to a second line (cover subtitle:
   anything other than exactly two lines)
+- a line broken mid-word, mid-okurigana, between a number and its unit, or a particle /
+  symbol left at the head of a line (the break must fall at a 文節 boundary)
+- a stacked card (label -> value -> note) whose gap under the value differs from the gap
+  above it — the stack is spaced by ink, so unequal gaps mean the model or the copy is off
 - metric delta / YoY text glued to the value line
 - excessive whitespace, low information density, or cramped clusters
 - objects not aligned to the declared grid/flex contract
