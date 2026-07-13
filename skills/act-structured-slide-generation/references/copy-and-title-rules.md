@@ -3,12 +3,28 @@
 Use this file when writing slide-visible text. The manual is English; generated slide copy is
 usually Japanese.
 
-## Titles
+## Titles And Subtitles (the header contract)
 
-- The title states the conclusion, not the topic.
+Every slide carries a main title and a subtitle, and each occupies exactly the number of
+lines the contract declares — one line, except the cover subtitle, which is two. The
+contract lives in `tokens.json` → `header_contract` and is resolved by
+`deck_text.header_slots(pattern)`; the validator and the renderer both read it, so there is
+one source of truth and no per-slide-type rules to remember:
+
+- **Slots.** By default the slots are `title` + `subtitle`, one line each — this default
+  applies to every pattern, including any new one. `cover` overrides the subtitle to exactly
+  two lines (authored with `\n`). `section_divider` has no header chrome, so its subtitle
+  slot is the `desc` field; writing `subtitle` there is an error because it would never be
+  drawn.
+- **One line means one line.** No `\n` in a one-line slot, and no wrapping. The per-line
+  limit is derived from the render geometry (box width ÷ type size), not a number you copy
+  from a table. `validate_spec.py` rejects overflow as an error.
+- **Fix overflow by sharpening the copy.** Never shrink the type, never let it wrap, never
+  split the claim across two header lines.
+- The title states the conclusion, not the topic. The subtitle scopes it (period, segment,
+  audience, metric) and is not a second claim.
 - One title carries one claim. Split the slide if two claims compete.
 - Evidence-slide titles should include the key number when the number is the proof.
-- Keep title line count controlled across the deck.
 - Do not use a kicker line above the title.
 - Avoid empty labels such as overview, background, approach, or summary unless the page is
   genuinely structural.

@@ -20,12 +20,18 @@ through composition, object scale, asymmetry, and density control.
 
 ## Canvas And Header
 
-- The header is a navigation contract, not a decorative template.
-- The title states the conclusion. The subtitle scopes period, segment, audience, or metric.
+- The header is a navigation contract, not a decorative template — and it is literally a
+  contract: `tokens.json` → `header_contract` declares, per slot, which field carries it,
+  how many lines it occupies, and (via the render geometry) how much text fits on a line.
+- Every slide carries both a main title and a subtitle. The title states the conclusion. The
+  subtitle scopes period, segment, audience, or metric.
 - Do not add a kicker line above the title.
-- Keep title line count and subtitle use consistent enough that the deck feels controlled.
-- The body starts after the header with a consistent content top. If a two-line title changes
-  body position, review the header strip.
+- Each header slot occupies exactly its declared line count — one line by default, so it must
+  never wrap and never contain a line break. Overflow is a spec defect: sharpen the copy, do
+  not shrink the type. A fixed header height is what keeps the body start position identical
+  on every slide.
+- Two patterns override the default because they genuinely render differently: the cover
+  subtitle is exactly two lines, and the section divider carries its subtitle in `desc`.
 - Do not render page numbers.
 
 ## Color

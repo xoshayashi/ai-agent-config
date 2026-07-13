@@ -106,8 +106,30 @@ rhythm_role, fill_repair, failure_mode, repair_instruction); `slide-decision-eng
 list here — when in doubt, follow slide-judgment-system.md.
 
 Write Japanese slide text in noun-ending / headline style with no sentence-final full stop.
-The title must state the conclusion, not the topic. Source, assumption, and note fields stay
-small in the footer area; page numbers are never rendered.
+The title must state the conclusion, not the topic.
+
+**Header contract (hard rule).** Every slide carries BOTH a main title and a subtitle, and
+each fits on exactly ONE rendered line — no `\n`, no wrapping. Overflow is a spec defect:
+shorten the copy, never the type size (`validate_spec.py` errors on violations).
+
+The contract is declared as data in `tokens.json` → `header_contract`, not hard-coded per
+slide type. A `default` entry (title + subtitle, one line each) applies to every pattern, so
+new patterns inherit it automatically; only patterns whose renderer genuinely differs
+override it:
+
+| Pattern | Title | Subtitle slot | Lines |
+|---|---|---|---|
+| (default — all patterns) | `title` | `subtitle` | 1 / 1 |
+| `cover` | `title` | `subtitle` | 1 / **2** (exactly two lines joined with `\n`) |
+| `section_divider` | `title` | **`desc`** (it has no header chrome) | 1 / 1 |
+
+Per-line character limits are never written down: they are derived from the render geometry
+(box width ÷ type size) by `deck_text.header_slots()`, which both the validator and the
+renderer read. Changing a type scale or a layout width moves the limit automatically — do not
+reintroduce hard-coded character budgets for headers.
+
+Source, assumption, and note fields stay small in the footer area; page numbers are never
+rendered.
 
 ### 2b. Talk Script (speaker_notes)
 
@@ -171,6 +193,8 @@ Never finish on machine checks alone. Review the contact sheet, header strip, an
 rendered PNGs. Inspect at least these issues:
 
 - unreadable small text, especially body copy and numeric labels
+- a missing subtitle, or a title/subtitle that wrapped to a second line (cover subtitle:
+  anything other than exactly two lines)
 - metric delta / YoY text glued to the value line
 - excessive whitespace, low information density, or cramped clusters
 - objects not aligned to the declared grid/flex contract

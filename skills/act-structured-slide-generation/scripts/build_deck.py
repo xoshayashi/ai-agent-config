@@ -44,7 +44,7 @@ A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 
 # 表示長(_ja_len)と全角→半角(hw)は deck_text.py の単一実装を使う — validate_spec の
 # 字数バジェット・lint_render の readback 照合と同一実装であることが契約
-from deck_text import hw, ja_len as _ja_len
+from deck_text import header_slots, hw, ja_len as _ja_len
 
 
 def _text_lines(text: str, width_in: float, size_pt: float) -> int:
@@ -311,10 +311,19 @@ def _kpi_delta_text(k: dict) -> str:
 
 # ---------------------------------------------------------------- chrome
 
-def title_lines(title: str) -> int:
-    budget_lines = 1 if _ja_len(title) <= TOKENS["text_budget"]["action_title_max_chars_ja"] else 2
-    measured_lines = _text_lines(title, LAY["header"]["title_w_in"], TS["action_title"])
-    return min(3, max(budget_lines, measured_lines))
+def slot_lines(pattern: str, slot: str, text: str) -> int:
+    """見出しスロットが実際に占める行数。契約(header_contract)が宣言する行数を下限に、
+    実測の折返し行数と突き合わせる。validate_spec を通ったスペックでは常に契約どおりの
+    行数になる — 実測側は、検証を経ずに build へ回されたスペックで文字が箱から
+    はみ出さないための保険であって、字数超過を許容する意味ではない。"""
+    cfg = next(c for c in header_slots(pattern) if c["slot"] == slot)
+    measured = _text_lines(text, cfg["width_in"], cfg["size_pt"]) if text else 0
+    declared = cfg["lines"] if text else 0
+    return min(3, max(declared, measured, text.count("\n") + 1 if text else 0))
+
+
+def title_lines(title: str, pattern: str = "default") -> int:
+    return slot_lines(pattern, "title", title)
 
 
 def header_offset(spec: dict) -> float:
@@ -323,19 +332,23 @@ def header_offset(spec: dict) -> float:
 
 def header_metrics(spec: dict) -> dict:
     """Deterministic header geometry: title cap-top to the bottom of the last
-    header line (title or subtitle) fixes where the body region starts."""
+    header line (title or subtitle) fixes where the body region starts.
+
+    行数はヘッダー契約(slot_lines)から取る — 幅・級数の出所を validate と共有し、
+    箱の高さだけが別式で決まる状態を作らない。"""
     hdr = LAY["header"]
     off = header_offset(spec)
+    pattern = spec.get("pattern", "default")
     title = spec.get("title", "")
-    lines = title_lines(title)
+    lines = title_lines(title, pattern)
     # タイトルサイズは行数によらず一定。縮小して収める操作は AutoFit と同種の一貫性破壊
-    # (スライド間でタイトルの見た目が揺れる)。28pt 化後は実幅推定を併用し、
-    # 長い action title はボックス自体を高くして、本文との衝突を避ける。
+    # (スライド間でタイトルの見た目が揺れる)。契約上タイトルは常に1行だが、検証を経ずに
+    # build へ回されたスペックでも文字が箱からはみ出さないよう、実測行数で箱を高くする。
     t_size = TS["action_title"]
     title_y = hdr["title_y_in"] + off
     title_h = lines * (t_size / 72.0) * 1.27
     sub_y = title_y + title_h + hdr["title_subtitle_gap_in"]
-    sub_lines = _text_lines(spec.get("subtitle", ""), hdr["title_w_in"], TS["subtitle"]) if spec.get("subtitle") else 0
+    sub_lines = slot_lines(pattern, "subtitle", spec.get("subtitle", ""))
     sub_h = max(1, sub_lines) * (TS["subtitle"] / 72.0) * 1.35
     block_bottom = sub_y + sub_h if spec.get("subtitle") else title_y + title_h
     return {
@@ -588,8 +601,13 @@ def p_cover(slide, spec, deck):
              [[(spec.get("title", m.get("title", "")), TS["cover_title"], 700, C["ink"])]],
              line_spacing=1.18)
     if spec.get("subtitle"):
-        add_text(slide, MX, 3.95, CONTENT_W, 0.6,
-                 [[(spec["subtitle"], TS["cover_subtitle"], 400, C["ink_subtle"])]])
+        # 副題の行数は契約(header_contract: cover.subtitle.lines)が決める。ボックス高は
+        # その行数から算出する — 1行分の固定高のままだと2行目が下端で切れる
+        sub_lines = slot_lines("cover", "subtitle", spec["subtitle"])
+        sub_h = max(0.6, sub_lines * (TS["cover_subtitle"] / 72.0) * 1.45 + 0.06)
+        add_text(slide, MX, 3.95, CONTENT_W, sub_h,
+                 [[(spec["subtitle"], TS["cover_subtitle"], 400, C["ink_subtle"])]],
+                 line_spacing=1.3)
     meta_bits = [b for b in [spec.get("date", m.get("date")), spec.get("author", m.get("author"))] if b]
     if meta_bits:
         # メタ行(日付・作成者)は出所情報であり強調対象ではない。weight 400 で組む —
@@ -628,7 +646,11 @@ def p_section_divider(slide, spec, deck):
     W, H = TOKENS["slide"]["width_in"], TOKENS["slide"]["height_in"]
     add_rect(slide, 0, 0, W, H, C["canvas"])
     chapters = deck.get("_chapters") or []
-    panel_x = 8.83
+    # 章扉のパネル位置とテキスト折返し幅は tokens(layout.divider)が単一ソース —
+    # header_contract の 'divider' ボックス幅もここから導出される(検証と描画が同じ幅を見る)
+    dv = LAY["divider"]
+    panel_x, text_pad = dv["panel_x_in"], dv["text_x_pad_in"]
+    text_w = panel_x - MX - dv["text_gap_in"]
     if len(chapters) >= 2:
         add_rect(slide, panel_x, 0, W - panel_x, H, C["surface_tint"])
     num_pt = 96
@@ -646,12 +668,12 @@ def p_section_divider(slide, spec, deck):
     bar_bottom = by + num_h + num_gap + title_h + desc_h - 0.10
     add_rect(slide, MX - 0.1, bar_top, 0.075, bar_bottom - bar_top, C["primary"])
     if has_num:
-        add_text(slide, MX + 0.2, by, 3.4, num_h, [[(str(spec["number"]).zfill(2), num_pt, 600, C["primary"])]])
-    add_text(slide, MX + 0.2, by + num_h + num_gap, panel_x - MX - 0.7, title_h,
+        add_text(slide, MX + text_pad, by, 3.4, num_h, [[(str(spec["number"]).zfill(2), num_pt, 600, C["primary"])]])
+    add_text(slide, MX + text_pad, by + num_h + num_gap, text_w, title_h,
              [[(spec.get("title", ""), TS["divider_title"], 700, C["ink"])]])
     if spec.get("desc"):
-        add_text(slide, MX + 0.2, by + num_h + num_gap + title_h, panel_x - MX - 0.7, desc_h,
-                 [[(spec["desc"], 15, 400, C["ink_subtle"])]], line_spacing=1.3)
+        add_text(slide, MX + text_pad, by + num_h + num_gap + title_h, text_w, desc_h,
+                 [[(spec["desc"], TS["divider_desc"], 400, C["ink_subtle"])]], line_spacing=1.3)
     if len(chapters) >= 2:
         row_h = 0.5
         nav_h = len(chapters) * row_h
