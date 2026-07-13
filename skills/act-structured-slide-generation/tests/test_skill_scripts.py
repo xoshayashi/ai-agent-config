@@ -444,6 +444,62 @@ def test_validate_warns_fat_process_step(tmp_path):
     assert r.returncode == 0 and "3個超" in r.stdout
 
 
+def test_bullet_dot_sits_on_the_first_line_center(tmp_path):
+    """箇条書き記号は本文1行目の字面中央に乗る。記号をフォントのグリフ(buChar)で置くと
+    ベースライン揃えのぶん低く出る(ビューアによって位置が変わる)ため、図形の円で描く。
+    項目ごとに箱を分けているので、折返しが何行になっても記号は必ずその項目の1行目に乗る。"""
+    from pptx.enum.shapes import MSO_SHAPE
+    from pptx.util import Inches
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import build_deck as B
+
+    deck = {"meta": {}, "slides": [{
+        "pattern": "process_flow",
+        "title": "折返しの有無によらず記号は1行目に乗る",
+        "subtitle": "箇条書き記号の縦位置の検証",
+        "steps": [{
+            "label": "Step 1", "desc": "検証",
+            # 1項目目を長くして折り返させる — 2項目目の記号がその分だけ下がるはず
+            "items": ["折返しを起こすために十分に長い項目をここに置いて二行以上にする", "短い項目"],
+        }],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    slide = pptx.Presentation(out).slides[0]
+    def _is_dot(sh):
+        try:
+            return sh.auto_shape_type == MSO_SHAPE.OVAL and sh.width == sh.height
+        except (ValueError, AttributeError):   # 図形以外(テキストボックス等)
+            return False
+
+    dots = [sh for sh in slide.shapes if _is_dot(sh)]
+    # 本文の箱は「記号のすぐ右」にある textbox。記号と同数あり、1対1で対応する
+    assert len(dots) == 2, f"記号は項目数と同数: {len(dots)}"
+
+    # 記号がフォントのグリフで描かれていないこと(buChar を使わない)
+    assert b"buChar" not in out.read_bytes()
+
+    size = B.TS["body"]
+    line_h = Inches(size / 72.0 * 1.30 * B.BULLET_LINE_BOX)
+    tol = Inches(0.02)
+    for dot in dots:
+        dot_cy = dot.top + dot.height // 2
+        # この記号に対応する本文ボックス = 記号の右にあり、上端が最も近いもの
+        body = min((sh for sh in slide.shapes
+                    if sh.has_text_frame and sh.left > dot.left and sh.text_frame.text.strip()),
+                   key=lambda sh: abs(sh.top + int(line_h * B.BULLET_FIRST_LINE) - dot_cy))
+        first_line_center = body.top + int(line_h * B.BULLET_FIRST_LINE)
+        assert abs(dot_cy - first_line_center) < tol, (
+            f"記号が1行目の中央からずれている: dot={dot_cy} line1={first_line_center}")
+
+    # 2項目目の記号は、1項目目の折返し行数ぶんだけ下にある(記号だけが取り残されない)
+    d1, d2 = sorted(dots, key=lambda s: s.top)
+    assert d2.top - d1.top > line_h, "折返した項目の次の記号が下がっていない"
+
+
 def test_process_flow_outcome_is_centered_destination_label(tmp_path):
     from pptx.enum.text import PP_ALIGN
 

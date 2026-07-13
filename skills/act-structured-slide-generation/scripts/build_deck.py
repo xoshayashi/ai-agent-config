@@ -189,31 +189,71 @@ def add_text(slide, x, y, w, h, runs, *, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.
     return tb
 
 
+# 箇条書き記号はフォントのグリフ(buChar)ではなく、こちらで描くベクター円にする。
+#
+# なぜグリフをやめたか: 記号はベースライン揃えで打たれるので、その縦位置は
+# 「グリフのインク中心 × buSzPct」で決まってしまう。
+#   和文字面(全角の四角)の中心 : ベースラインから 0.3805em ← ここに乗せたい
+#   Geist の「●」の中心        : 0.357em → 60% に縮めると 0.214em、本文16ptで約2.7pt 下がる
+#   Noto Sans JP の「・」の中心 : 0.380em → 等倍なら中央に乗るが、点が本文中の「・」と
+#                                同じ大きさになり、箇条書き記号として弱い
+# 縮小率をかけると中心も比例して下がるため、グリフでは「中央」と「必要な大きさ」を
+# 両立できない。LibreOffice は独自に中央寄せしてこの欠陥を隠すが、PowerPoint / Keynote は
+# ベースライン揃えのまま描くので低く見える(ビューアで結果が変わる状態自体が欠陥)。
+# 円を自前で描けば、大きさと中央位置をどちらもこちらで決められ、どのビューアでも同じ。
+#
+# 行位置は LibreOffice 実測から: 行送り = size/72 × line_spacing × BULLET_LINE_BOX、
+# 1行目のインク中心 = 上端から 行送り × BULLET_FIRST_LINE (和文の行ボックスは上に余白が
+# 多いので 0.5 ではない)。
+BULLET_LINE_BOX = 1.20
+BULLET_FIRST_LINE = 0.62
+BULLET_DOT_EM = 0.30      # 記号の直径(本文サイズ比) — 本文16ptで約4.8pt
+BULLET_INDENT_IN = 0.24   # ぶら下げインデント(折返し行の左端)
+
+
+def _wrapped_lines(text: str, width_in: float, size_pt: float) -> int:
+    """描画側に忠実な折返し行数。1行に入るのは「整数個」の全角文字なので、容量は
+    切り捨てる — _text_lines は容量を小数(例 13.85字)のまま使うため、13字しか入らない
+    行を余裕ありと誤判定し、実際は4行になる項目を3行と数えてしまう。"""
+    cpl = max(1.0, math.floor(width_in / (size_pt / 72.0)))
+    return max(1, math.ceil(_ja_len(text) / cpl))
+
+
 def add_bullets(slide, x, y, w, h, items, size, color, *, line_spacing=1.3,
                 space_after_pt=8, anchor=MSO_ANCHOR.TOP, weight=400):
-    """Real DrawingML bullets (●, ぶら下げインデント付き)。「・」文字連結と違い、
-    折返し行が箇条書き記号の右に揃う。段落後スペースで項目の切れ目を作る。"""
-    tb = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
-    tf = tb.text_frame
-    tf.word_wrap = True
-    tf.vertical_anchor = anchor
-    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
-    indent = Inches(0.24)
-    for i, txt in enumerate(items):
-        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+    """箇条書き: 項目ごとに独立したテキストボックス + その1行目の字面中央に置くベクター円。
+
+    項目を1つの箱に段落として流し込まず、項目ごとに箱を分けているのは記号の縦位置の
+    ためである。同じ箱に流すと、記号の y は「前の項目が何行に折り返したか」の見積りに
+    依存し、見積りが1行でも外れると以降の記号が丸ごとずれる。項目ごとに箱を持てば、
+    1行目は常にその箱の上端にあるので、実際の折返し行数によらず記号は必ず1行目に乗る。
+    折返し行は記号の右(インデント位置)に揃う。"""
+    line_h = size / 72.0 * line_spacing * BULLET_LINE_BOX
+    gap = space_after_pt / 72.0
+    dot_d = size / 72.0 * BULLET_DOT_EM
+    text_x = x + BULLET_INDENT_IN
+    text_w = w - BULLET_INDENT_IN
+    dot_cx = x + BULLET_INDENT_IN * 0.31      # 記号はインデント帯の中で本文寄りに置く
+
+    boxes = []
+    cy = y
+    for txt in items:
+        item_h = _wrapped_lines(txt, text_w, size) * line_h
+        tb = slide.shapes.add_textbox(Inches(text_x), Inches(cy), Inches(text_w), Inches(item_h))
+        tf = tb.text_frame
+        tf.word_wrap = True
+        tf.vertical_anchor = MSO_ANCHOR.TOP   # 1行目を箱の上端に固定する(記号の基準)
+        tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+        p = tf.paragraphs[0]
         p.alignment = PP_ALIGN.LEFT
         p.line_spacing = line_spacing
-        p.space_after = Pt(space_after_pt)
         _add_script_runs(p, txt, size, weight, color)
-        pPr = p._p.get_or_add_pPr()
-        pPr.set("marL", str(int(indent)))
-        pPr.set("indent", str(-int(indent)))
-        buClr = etree.SubElement(pPr, f"{A_NS}buClr")
-        etree.SubElement(buClr, f"{A_NS}srgbClr").set("val", str(color))
-        etree.SubElement(pPr, f"{A_NS}buSzPct").set("val", "60000")
-        etree.SubElement(pPr, f"{A_NS}buFont").set("typeface", FONTS["latin"])
-        etree.SubElement(pPr, f"{A_NS}buChar").set("char", "●")
-    return tb
+        etree.SubElement(p._p.get_or_add_pPr(), f"{A_NS}buNone")
+        add_ellipse(slide, dot_cx - dot_d / 2, cy + line_h * BULLET_FIRST_LINE - dot_d / 2,
+                    dot_d, dot_d, color)
+        boxes.append(tb)
+        cy += item_h + gap
+    return boxes[-1] if boxes else None
 
 
 P_NS = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
@@ -250,6 +290,18 @@ def add_rect(slide, x, y, w, h, fill: RGBColor | None, *, line: RGBColor | None 
             if d is None:
                 d = etree.SubElement(ln, f"{A_NS}prstDash")
             d.set("val", dash)
+    sh.shadow.inherit = False
+    _strip_style(sh)
+    return sh
+
+
+def add_ellipse(slide, x, y, w, h, fill: RGBColor):
+    """塗りつぶしの円/楕円(枠線なし)。箇条書き記号のように、位置と大きさを
+    フォントに委ねず自分で決めたい小さなオブジェクトに使う。"""
+    sh = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(x), Inches(y), Inches(w), Inches(h))
+    sh.fill.solid()
+    sh.fill.fore_color.rgb = fill
+    sh.line.fill.background()
     sh.shadow.inherit = False
     _strip_style(sh)
     return sh
