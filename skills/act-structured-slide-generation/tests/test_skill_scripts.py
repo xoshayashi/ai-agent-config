@@ -513,6 +513,41 @@ def test_bullet_block_honors_middle_anchor(tmp_path):
         f"MIDDLE 寄せが効いていない: 実測 {actual} / 期待 {expected}")
 
 
+def test_table_closing_rule_is_heavier_than_the_row_hairlines(tmp_path):
+    """表の最下段の下罫は「表を閉じる罫」なので、行間のヘアラインより太くする。
+    罫の色は rule トークンから引く(直値を持つとパレット変更がテーブルに届かない)。"""
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import build_deck as B
+
+    A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    deck = {"meta": {}, "slides": [{
+        "pattern": "comparison_table",
+        "title": "3行の表で下端の締め罫を確認する",
+        "subtitle": "罫の太さの検証",
+        "table": {"headers": ["区分", "当社", "他社"],
+                  "rows": [["A", "1", "2"], ["B", "3", "4"], ["C", "5", "6"]]},
+        "source": "テスト統計2026",
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    table = next(sh.table for sh in pptx.Presentation(out).slides[0].shapes if sh.has_table)
+
+    def bottom_rule(cell):
+        lnB = cell._tc.find(f".//{A_NS}lnB")
+        clr = lnB.find(f".//{A_NS}srgbClr")
+        return int(lnB.get("w")) / 12700, clr.get("val")
+
+    inner_w, inner_hex = bottom_rule(table.cell(1, 0))     # 1行目(行間のヘアライン)
+    last_w, last_hex = bottom_rule(table.cell(3, 0))       # 最終行(表を閉じる罫)
+    assert inner_w == 0.5, inner_w
+    assert last_w == B.TABLE_CLOSING_RULE_PT > inner_w, (last_w, inner_w)
+    # 色は両方とも rule トークン(直値のハードコードが復活していないこと)
+    assert inner_hex == last_hex == str(B.C["rule"])
+
+
 def test_ground_color_comes_from_the_template_not_an_object(tmp_path):
     """地の色はテンプレート(スライドマスターの背景)で与える。全面を覆う矩形で塗ると、
     編集時に本文の下で毎回つかんでしまうオブジェクトが1枚ずつ増えるだけになる。"""
@@ -696,8 +731,27 @@ def test_build_forecast_styling_stays_on_palette(tmp_path):
     assert r.returncode == 0, r.stdout + r.stderr
 
 
+def test_edge_scan_tolerance_lets_pale_full_bleed_panels_through(tmp_path):
+    """edge_scan の許容差(TOL 26)は緩いままにする。章扉の淡いパネル(surface_tint)は
+    設計として端まで敷くので、これを「端で見切れ」と鳴らしてはいけない。
+    balance_scan の tol 8 をここへ持ち込むと、章扉が丸ごと誤検知になる。"""
+    from PIL import Image, ImageDraw
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import lint_render as L
+
+    tint = tuple(int(json.loads((SKILL / "references" / "tokens.json").read_text())
+                     ["colors"]["surface_tint"][i:i + 2], 16) for i in (0, 2, 4))
+    im = Image.new("RGB", (1466, 825), CANVAS_RGB)
+    ImageDraw.Draw(im).rectangle([970, 0, 1465, 824], fill=tint)   # 章扉の右パネル(端まで)
+
+    assert L.edge_scan(im) == [], "淡い全面パネルを見切れとして誤検知している"
+    # 濃い要素が端に触れていれば従来どおり鳴る(検知力は落ちていない)
+    ImageDraw.Draw(im).rectangle([0, 0, 400, 3], fill=(0x2D, 0x33, 0x2E))
+    assert any("top edge" in h for h in L.edge_scan(im))
+
+
 def test_lint_treats_plain_white_as_ground_not_content(tmp_path):
-    """canvas は白に近いが白ではない(FFFDFC で最大差3)。純白を地として扱わないと、
+    """canvas は白に近いが白ではない(F7F7F6 で最大差9)。純白を地として扱わないと、
     テンプレート背景が抜けて白く出たレンダーが「一面コンテンツ」に見え、空白系の検査が
     黙って効かなくなる。カード面(surface_tint)は白とも差が大きいので構造のまま残る。"""
     from PIL import Image, ImageDraw

@@ -1092,12 +1092,25 @@ def p_market_sizing(slide, spec, deck):
                  anchor=MSO_ANCHOR.MIDDLE, line_spacing=1.26, space_after_pt=3)
 
 
-def _cell_borders(cell, bottom_hex: str | None = "D8D4C9", width_pt: float = 0.5,
+# 表を閉じる罫(最終行の下)。行間のヘアライン(0.5pt)より少し太くして、表の下端を締める
+TABLE_CLOSING_RULE_PT = 1.0
+
+
+RULE_TOKEN = "__rule__"   # bottom_hex の既定: rule トークンを使う(色の直値を持たない)
+NO_RULE = ""              # 下罫を引かない。None は「既定=rule トークン」の意味なので使わない
+
+
+def _cell_borders(cell, bottom_hex: str = RULE_TOKEN, width_pt: float = 0.5,
                   dash: str | None = None):
     """Kill vertical/top borders; keep a thin bottom rule (banker table look).
     width_pt controls the bottom rule weight (header uses a heavier accent line).
     dash: prstDash 値(例 "dash")。行グループ境界のセパレータなど、通常のヘアラインと
-    役割の違う罫を破線で区別するときに使う。"""
+    役割の違う罫を破線で区別するときに使う。
+
+    bottom_hex: 既定(RULE_TOKEN)は rule トークンの色 — 直値を持つとパレット変更が
+    テーブルに届かない。下罫を消したいときは NO_RULE を渡す(None ではない)。"""
+    if bottom_hex == RULE_TOKEN:
+        bottom_hex = str(C["rule"])
     tcPr = cell._tc.get_or_add_tcPr()
     for tag in ("lnL", "lnR", "lnT", "lnB"):
         el = tcPr.find(f"{A_NS}{tag}")
@@ -1208,7 +1221,7 @@ def add_act_table(slide, x, y, w, h, tspec: dict):
         cell.fill.fore_color.rgb = C["surface_tint"]
         _table_font(cell, str(htxt), TS["table_header"], 700, C["primary_deep"], amap.get(aligns[ci], PP_ALIGN.LEFT))
         cell.vertical_anchor = MSO_ANCHOR.MIDDLE
-        _cell_borders(cell, "004F49", 1.75)  # primary_deep のヘッダー下線(濃いアクセント罫)
+        _cell_borders(cell, str(C["primary_deep"]), 1.75)  # ヘッダー下線(濃いアクセント罫)
     for ri, row in enumerate(rows, start=1):
         for ci, val in enumerate(row):
             cell = table.cell(ri, ci)
@@ -1221,7 +1234,8 @@ def add_act_table(slide, x, y, w, h, tspec: dict):
                 color = C["danger"]  # 減益/減少など負値の下方向を色でも冗長に伝える
             _table_font(cell, str(val), TS["table_cell"], weight, color, amap.get(aligns[ci], PP_ALIGN.LEFT))
             cell.vertical_anchor = MSO_ANCHOR.MIDDLE
-            _cell_borders(cell)
+            # 最終行の下だけは表を閉じる罫なので、行間のヘアラインより少し太くする
+            _cell_borders(cell, width_pt=TABLE_CLOSING_RULE_PT if ri == nrows - 1 else 0.5)
     # 行グループの見出しセルを縦結合(例: 「電機関連」が売上高/利益の2行にまたがる)。
     # col0_spans: [[start_data_row, length], ...] — 0-based。ラベルは各グループ先頭行に置き、
     # 残り行は空文字にしておく(結合セルは先頭セルのテキストを保持)。編集可能なネイティブ表のまま。
