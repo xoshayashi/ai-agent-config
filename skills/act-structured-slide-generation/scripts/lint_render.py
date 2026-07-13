@@ -70,8 +70,8 @@ def edge_scan(im: Image.Image) -> list[str]:
 
 def balance_scan(im: Image.Image) -> list[str]:
     """Vertical whitespace balance inside the body band (below header, above footer).
-    許容差は edge_scan(26)より厳しい 8 — surface_tint のカード面(canvas との色差は
-    最大 17)は空白ではなく構造なので、バランス判定ではコンテンツとして数える。"""
+    許容差は edge_scan(26)より厳しい 8 — surface_tint のカード面は canvas との色差が
+    これを超えるため、空白ではなく構造としてコンテンツに数える。"""
     w, h = im.size
     p = im.load()
     # 0.23: kicker+2行タイトル+subtitle のヘッダー下端(1.63in/7.5in)より下から走査する
@@ -114,7 +114,8 @@ def diff_frac(a: Path, b: Path) -> float:
     pa, pb = ia.load(), ib.load()
     w, h = ia.size
     total = changed = 0
-    # tol 12: pale-tint fill changes (E2EFED vs surface_tint ≒ Δ19) must register as diffs
+    # tol 12: pale-tint fill changes (primary_pale vs surface_tint) must register as diffs
+    # — 数値の色差はコメントに焼かない(パレットを触るたびに古い数字が残る)
     for y in range(0, h, 4):
         for x in range(0, w, 4):
             total += 1
