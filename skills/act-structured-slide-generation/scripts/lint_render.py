@@ -29,7 +29,7 @@ from PIL import Image
 
 from deck_text import HW as _HW, token_rgb as _token_rgb
 
-CANVAS = _token_rgb("canvas", (0xFA, 0xF7, 0xF1))
+CANVAS = _token_rgb("canvas", (0xFD, 0xFB, 0xF7))
 WHITE = (0xFF, 0xFF, 0xFF)
 TOL = 26  # per-channel tolerance: antialiasing over near-white
 BAND = 6  # px
@@ -37,7 +37,7 @@ BAND = 6  # px
 
 def is_ground(px, tol: int) -> bool:
     """地(=何も置かれていない面)か。canvas だけでなく純白も地として扱う — canvas は
-    白に近いが白そのものではない(FAF7F1 なら最大差 14)ので、テンプレート背景が抜けて
+    白に近いが白そのものではない(FDFBF7 なら最大差 8)ので、テンプレート背景が抜けて
     白く出たレンダーを「一面コンテンツ」と誤読し、空白系の検査が黙って効かなくなる。
     カード面(surface_tint)は canvas とも白とも差が大きいので、構造として残る。"""
     return all(abs(px[i] - CANVAS[i]) <= tol for i in range(3)) or \
