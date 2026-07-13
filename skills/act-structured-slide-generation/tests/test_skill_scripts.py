@@ -17,6 +17,13 @@ SCRIPTS = SKILL / "scripts"
 SAMPLE = SKILL / "examples" / "sample-deck.json"
 SAMPLE_EARNINGS = SKILL / "examples" / "sample-earnings-deck.json"
 
+# 合成 PNG の地の色はトークンから引く — 直値で書くと canvas を変えた瞬間に
+# lint(トークン基準)と食い違い、テストだけが古い色を主張する
+CANVAS_RGB = tuple(
+    int(json.loads((SKILL / "references" / "tokens.json").read_text())["colors"]["canvas"][i:i + 2], 16)
+    for i in (0, 2, 4)
+)
+
 
 def run(script, *args):
     return subprocess.run([sys.executable, str(SCRIPTS / script), *map(str, args)],
@@ -267,7 +274,7 @@ def test_verify_catches_forbidden_color(tmp_path):
 def test_lint_render_clean_canvas_passes(tmp_path):
     from PIL import Image
 
-    Image.new("RGB", (1466, 825), (0xFF, 0xFD, 0xFC)).save(tmp_path / "deck-01.png")
+    Image.new("RGB", (1466, 825), CANVAS_RGB).save(tmp_path / "deck-01.png")
     r = run("lint_render.py", tmp_path)
     assert r.returncode == 0, r.stdout + r.stderr
 
@@ -275,7 +282,7 @@ def test_lint_render_clean_canvas_passes(tmp_path):
 def test_lint_render_detects_edge_clipping(tmp_path):
     from PIL import Image, ImageDraw
 
-    im = Image.new("RGB", (1466, 825), (0xFF, 0xFD, 0xFC))
+    im = Image.new("RGB", (1466, 825), CANVAS_RGB)
     # 下端に部分的にかかる濃色ブロック = 見切れ(全幅ではないので full-bleed 扱いにならない)
     ImageDraw.Draw(im).rectangle([300, 790, 900, 824], fill=(0x2D, 0x33, 0x2E))
     im.save(tmp_path / "deck-01.png")
@@ -420,7 +427,7 @@ def test_build_renders_both_cover_subtitle_lines(tmp_path):
 def test_lint_render_detects_internal_gap(tmp_path):
     from PIL import Image, ImageDraw
 
-    im = Image.new("RGB", (1466, 825), (0xFF, 0xFD, 0xFC))
+    im = Image.new("RGB", (1466, 825), CANVAS_RGB)
     d = ImageDraw.Draw(im)
     d.rectangle([100, 200, 1300, 300], fill=(0x2D, 0x33, 0x2E))   # 上部ブロック
     d.rectangle([100, 700, 1300, 750], fill=(0x2D, 0x33, 0x2E))   # 下部バンド(中抜け大)
@@ -506,18 +513,37 @@ def test_bullet_block_honors_middle_anchor(tmp_path):
         f"MIDDLE 寄せが効いていない: 実測 {actual} / 期待 {expected}")
 
 
-def test_no_full_bleed_background_object(tmp_path):
-    """地の色のためだけに全面を覆う矩形は置かない — 編集時に本文の下で毎回つかんでしまう
-    邪魔なオブジェクトになる。背景はスライドの地に任せる。"""
+def test_ground_color_comes_from_the_template_not_an_object(tmp_path):
+    """地の色はテンプレート(スライドマスターの背景)で与える。全面を覆う矩形で塗ると、
+    編集時に本文の下で毎回つかんでしまうオブジェクトが1枚ずつ増えるだけになる。"""
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import build_deck as B
+
+    P_NS = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
+    A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+
     for sample in (SAMPLE, SAMPLE_EARNINGS):
         out = tmp_path / f"{sample.stem}.pptx"
         assert run("build_deck.py", sample, "-o", out).returncode == 0
         prs = pptx.Presentation(out)
+
+        # 1. マスターの背景に canvas 色が入っている(= テンプレートとして継承される)
+        master = prs.slide_masters[0]._element
+        cSld = master.find(f"{P_NS}cSld")
+        bg = cSld.find(f"{P_NS}bg")
+        assert bg is not None, f"{sample.name}: マスターに背景が設定されていない"
+        clr = bg.find(f".//{A_NS}srgbClr")
+        assert clr is not None and clr.get("val") == str(B.C["canvas"]), (
+            f"{sample.name}: マスター背景が canvas 色でない")
+        # cSld の子要素は bg が先頭でなければ不正な OOXML になる
+        assert cSld[0].tag == f"{P_NS}bg"
+
+        # 2. スライド側には全面を覆うオブジェクトが1つも無い
         sw, sh = prs.slide_width, prs.slide_height
         for i, slide in enumerate(prs.slides, 1):
             full = [s for s in slide.shapes
                     if s.width >= sw * 0.98 and s.height >= sh * 0.98]
-            assert not full, f"{sample.name} slide {i}: 全面を覆うオブジェクトが残っている"
+            assert not full, f"{sample.name} slide {i}: 全面を覆うオブジェクトがある"
 
 
 def test_bullet_dot_sits_on_the_first_line_center(tmp_path):
@@ -673,7 +699,7 @@ def test_build_forecast_styling_stays_on_palette(tmp_path):
 def test_lint_render_detects_bottom_whitespace(tmp_path):
     from PIL import Image, ImageDraw
 
-    im = Image.new("RGB", (1466, 825), (0xFF, 0xFD, 0xFC))
+    im = Image.new("RGB", (1466, 825), CANVAS_RGB)
     # 本文帯の上端だけにブロック → 下部に大きな空白(器と中身の不釣り合い)
     ImageDraw.Draw(im).rectangle([100, 185, 1300, 260], fill=(0x2D, 0x33, 0x2E))
     im.save(tmp_path / "deck-01.png")
@@ -686,7 +712,7 @@ def test_lint_render_detects_bottom_whitespace(tmp_path):
 def test_lint_render_detects_tiny_center_island(tmp_path):
     from PIL import Image, ImageDraw
 
-    im = Image.new("RGB", (1466, 825), (0xFF, 0xFD, 0xFC))
+    im = Image.new("RGB", (1466, 825), CANVAS_RGB)
     # 本文帯の中央に小さいブロックだけが浮く = 上下とも広い余白
     ImageDraw.Draw(im).rectangle([420, 410, 1040, 470], fill=(0x2D, 0x33, 0x2E))
     im.save(tmp_path / "deck-01.png")
@@ -702,11 +728,11 @@ def test_lint_render_baseline_diff_reports_changed_slides(tmp_path):
     cur, base = tmp_path / "cur", tmp_path / "base"
     cur.mkdir(); base.mkdir()
     for d in (cur, base):
-        Image.new("RGB", (733, 412), (0xFF, 0xFD, 0xFC)).save(d / "deck-01.png")
-    im = Image.new("RGB", (733, 412), (0xFF, 0xFD, 0xFC))
+        Image.new("RGB", (733, 412), CANVAS_RGB).save(d / "deck-01.png")
+    im = Image.new("RGB", (733, 412), CANVAS_RGB)
     ImageDraw.Draw(im).rectangle([100, 100, 400, 200], fill=(0x00, 0x8A, 0x80))
     im.save(cur / "deck-02.png")
-    Image.new("RGB", (733, 412), (0xFF, 0xFD, 0xFC)).save(base / "deck-02.png")
+    Image.new("RGB", (733, 412), CANVAS_RGB).save(base / "deck-02.png")
     r = run("lint_render.py", cur, "--baseline", base)
     assert "DIFF: slide 2" in r.stdout and "slide 1" not in r.stdout.replace("2 slides", "")
 
@@ -1208,7 +1234,7 @@ def test_lint_render_flags_slide_count_mismatch(tmp_path):
     from PIL import Image
 
     for i in (1, 2):
-        Image.new("RGB", (733, 412), (0xFF, 0xFD, 0xFC)).save(tmp_path / f"deck-{i}.png")
+        Image.new("RGB", (733, 412), CANVAS_RGB).save(tmp_path / f"deck-{i}.png")
     spec = tmp_path / "deck.json"
     spec.write_text(json.dumps(_minimal_deck(), ensure_ascii=False))
     r = run("lint_render.py", tmp_path, "--spec", spec)

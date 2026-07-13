@@ -61,12 +61,13 @@ own field testing.
     spec for rewriting. Titles and subtitles are one-line by contract (validate_spec errors
     on overflow); build_deck's multi-line header path survives only as renderer robustness
     for specs that bypassed validation, never as an authoring allowance.
-12b. No full-bleed background rectangle. Do not paint the canvas color with a shape that
-    covers the whole 16:9 slide: it becomes an object the author grabs under every body
-    element while editing, and it buys nothing — the slide's own background already
-    supplies the ground. `canvas` stays a token for text and fills ON dark shapes, not for
-    a background layer. (`lint_render` compares against the `canvas` token with a
-    tolerance, so a plain white ground still reads as background, not content.)
+12b. The ground color belongs to the template, not to a shape. Do not paint `canvas` with
+    a rectangle covering the whole 16:9 slide: that adds one object per slide sitting under
+    every body element, which the author grabs on every click while editing. Set it once on
+    the SLIDE MASTER's background (`set_template_background()` writes `p:bg/p:bgPr/
+    a:solidFill` into the master's `cSld`) — layouts and slides inherit it, and no object
+    appears on the slide. `cSld` has a fixed child order, so `bg` must be inserted FIRST
+    (before `spTree`) or the file is invalid OOXML.
 13. Bullet glyphs (`buChar`) cannot be vertically centered — draw the dot yourself.
     A DrawingML bullet is set on the BASELINE, so its height is `glyph ink center ×
     buSzPct`. Against a Japanese line, the target is the ideographic center at 0.3805em:

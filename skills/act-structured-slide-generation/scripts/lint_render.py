@@ -29,7 +29,7 @@ from PIL import Image
 
 from deck_text import HW as _HW, token_rgb as _token_rgb
 
-CANVAS = _token_rgb("canvas", (0xFF, 0xFD, 0xFC))
+CANVAS = _token_rgb("canvas", (0xFA, 0xF7, 0xF1))
 TOL = 26  # per-channel tolerance: antialiasing over near-white
 BAND = 6  # px
 
@@ -105,7 +105,7 @@ def diff_frac(a: Path, b: Path) -> float:
     pa, pb = ia.load(), ib.load()
     w, h = ia.size
     total = changed = 0
-    # tol 12: pale-tint fill changes (E2EFED vs F5F3EC ≒ Δ19) must register as diffs
+    # tol 12: pale-tint fill changes (E2EFED vs surface_tint ≒ Δ19) must register as diffs
     for y in range(0, h, 4):
         for x in range(0, w, 4):
             total += 1

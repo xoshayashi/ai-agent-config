@@ -2200,12 +2200,33 @@ def _strip_visible_periods(obj):
     return obj
 
 
+def set_template_background(prs, color: RGBColor) -> None:
+    """地の色をスライドマスター(テンプレート)の背景として設定する。
+
+    全面を覆う矩形は置かない — 図形で地を塗ると、編集時に本文の下で毎回つかんでしまう
+    オブジェクトが1枚ずつ増えるだけである。背景はテンプレート側の属性なので、マスターに
+    一度置けば全レイアウト・全スライドが継承し、スライド上にオブジェクトは現れない。
+    cSld の子要素は順序が決まっている(bg → spTree → …)ため、bg は先頭に差し込む。"""
+    for master in prs.slide_masters:
+        cSld = master._element.find(f"{P_NS}cSld")
+        for old in cSld.findall(f"{P_NS}bg"):
+            cSld.remove(old)
+        bg = etree.SubElement(cSld, f"{P_NS}bg")
+        bgPr = etree.SubElement(bg, f"{P_NS}bgPr")
+        fill = etree.SubElement(bgPr, f"{A_NS}solidFill")
+        etree.SubElement(fill, f"{A_NS}srgbClr").set("val", str(color))
+        etree.SubElement(bgPr, f"{A_NS}effectLst")
+        cSld.remove(bg)
+        cSld.insert(0, bg)
+
+
 def build(spec_path: Path, out_path: Path) -> Path:
     global _ASSET_ROOT
     _ASSET_ROOT = out_path.resolve().parent  # image assets + manifest cache beside the .pptx
     deck = _strip_visible_periods(json.loads(spec_path.read_text()))
     prs = Presentation()
     prs.slide_width, prs.slide_height = SLIDE_W, SLIDE_H
+    set_template_background(prs, C["canvas"])
     blank = prs.slide_layouts[6]
     slides = deck["slides"]
     total = len(slides)
