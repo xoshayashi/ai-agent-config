@@ -1966,7 +1966,7 @@ def _deck_text():
 @pytest.mark.parametrize("text,width_in,size_pt,expected", [
     ("導入費＋固定利用料", 0.9, 10, "導入費＋\n固定利用料"),
     ("基盤利用量の複利成長", 1.0, 10, "基盤利用量の\n複利成長"),
-    ("HCPで実行文脈へ変換", 1.0, 10, "HCPで\n実行文脈へ変換"),
+    ("HCPで実行文脈へ変換", 1.1, 10, "HCPで\n実行文脈へ変換"),
 ])
 def test_display_wrap_breaks_at_bunsetsu_boundaries(text, width_in, size_pt, expected):
     """行の切れ目は意味の切れ目に一致させる — 助詞の直後・並列記号の直後で割る。
@@ -2121,3 +2121,17 @@ def test_verify_does_not_warn_on_copy_that_breaks_cleanly(tmp_path):
     assert run("build_deck.py", spec, "-o", out).returncode == 0
     r = run("verify_deck.py", out)
     assert not any("自然折返し" in ln for ln in r.stdout.splitlines()), r.stdout
+
+
+def test_no_soft_break_after_a_line_that_overflows_the_box():
+    """箱幅を超える語が含まれるときは、ソフト改行を1つも打たない。
+
+    はみ出した行はレンダラ側が先に折り返し(句読点はぶら下がる)、こちらのソフト改行が
+    その後ろへ重なって空行が1本入る — LibreOffice で実測した挙動。折返しで取り繕わず
+    自然折返しへ委ね、verify_deck の警告でコピーを直させる。"""
+    D = _deck_text()
+    # 「本人らしい分身として向き合い、」は切れ目の無い1文節で、この幅には入らない
+    text = "本人らしい分身として向き合い、相手の文脈・意図・権限を理解"
+    assert "\n" not in D.wrap_display(text, 3.16, 16, 4)
+    # 語が収まるコピーへ縮めれば、文節で折り返す
+    assert "\n" in D.wrap_display("本人らしい分身として、相手の文脈・意図・権限を理解", 3.16, 16, 4)
