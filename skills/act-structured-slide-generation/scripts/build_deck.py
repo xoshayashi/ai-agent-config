@@ -1492,8 +1492,14 @@ def p_two_column(slide, spec, deck):
         for it in blk.get("items", []):
             head = it.get("heading") if isinstance(it, dict) else None
             body = it.get("body") if isinstance(it, dict) else str(it)
+            # 行数見積もりは、その item を実際に描く経路と同じ実効幅で行う:
+            #   見出しあり → add_text(幅 w - 0.4)
+            #   見出しなし → add_bullets(箱 w - 0.48、本文はさらに字下げ分だけ狭い)
+            # 字下げ幅を直値で持たないこと — 変えたときにここだけ古い前提が残る
+            # (p_process_flow で実際に起きた)
+            text_w = (w - 0.4) if head else (w - 0.48 - BULLET_INDENT_IN)
             out.append((HEAD_LINE if head else 0.0)
-                       + _text_lines(body, w - 0.68, TS["body"]) * LINE_H + 0.06)
+                       + _text_lines(body, text_w, TS["body"]) * LINE_H + 0.06)
         return out
     side_blocks = {s: _blocks(spec.get(s, {}), w_probe) for s in ("left", "right")}
     # 対比プリミティブの item は左右で行単位に比較される。item 数が同じ場合は各行の
