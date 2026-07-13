@@ -198,6 +198,11 @@ sh scripts/render_deck.sh deck.pptx render/
 python3 scripts/lint_render.py render/ --spec deck.json
 ```
 
+`verify_deck.py` warns when display text could not be broken at a phrase boundary and fell
+back to the renderer's own wrap (which splits words). Treat every such warning as a copy
+defect on that slide: shorten the line or widen its column — do not shrink the type, and do
+not hand-insert a `\n`.
+
 Use `--baseline` after the first render so regression checks focus on intended changes:
 
 ```bash

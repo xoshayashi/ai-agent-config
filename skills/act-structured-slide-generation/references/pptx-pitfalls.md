@@ -115,9 +115,9 @@ own field testing.
 ### 14. A wrapped line is a soft break (`<a:br/>`), never a new paragraph
 
 Splitting a wrapped line into a second paragraph looks identical in a quick render and is
-wrong twice over: a bulleted paragraph gets a **second bullet** on the continuation line,
-and `space_after` (authored as the gap *between items*) lands inside a single sentence. Emit
-`<a:br/>` inside the paragraph instead — the hanging indent, the bullet, and the paragraph
+wrong twice over: a bulleted paragraph gets a **second bullet** on the continuation line, and
+`space_after` (authored as the gap *between items*) lands inside a single sentence. Emit
+`<a:br/>` inside the paragraph instead — the hanging indent, the bullet and the paragraph
 spacing all keep their meaning, and the continuation line aligns to `marL` as it should.
 
 Consequence for verification: a paragraph is no longer one line. `verify_deck` splits each
@@ -130,21 +130,22 @@ With `MSO_ANCHOR.MIDDLE` the renderer centers the *line box*. Japanese text carr
 room below its ink, and Latin numerals sit high in the line box, so the ink lands off-center
 by a predictable fraction of the type size. Two rules follow:
 
-- To place ink on a rhythm, offset the box (`build_deck.stack_optical`), do not nudge `y` by
+- To place ink on a rhythm, offset the box (`build_deck.stack_optical`); do not nudge `y` by
   eye. The offsets are tokens (`layout.optical_stack.ink_center_offset_em`), calibrated at
   300dpi, separately for text and numerals.
 - The verifier must use the same model. `verify_deck._ink_bbox` reconstructs the ink box from
-  those tokens; if it assumes box-center == ink-center, correctly composed KPI cards are
+  those tokens; if it assumes box-center == ink-center, correctly composed KPI cards get
   reported as overlapping text and the "fix" would be to break the layout.
 
 ### 16. Measure text with the real font, in one place
 
-Estimating a wrapped line count from character counts ("full-width = 1, half-width = 0.55")
+Estimating a wrapped line count from character counts (full-width = 1, half-width = 0.55)
 diverges from the renderer as soon as Latin words or SemiBold weights appear — the estimate
 says a label fits, the renderer wraps it mid-word. `deck_text.text_width_in` measures with the
-actual Noto Sans JP metrics and is shared by the builder (where to break), the validator
-(does the header fit one line) and `verify_deck` (does the text overflow). One measuring
-stick, or the three disagree silently.
+actual Noto Sans JP metrics and is shared by the builder (where to break), the box-sizing
+helpers (how tall a card must be) and `verify_deck` (does the text overflow). One measuring
+stick, or the three disagree silently. Without the fonts installed it falls back to the
+character estimate, so keep `NotoSansJP-{400,600,700}.ttf` present when it matters.
 
 ## Charts
 

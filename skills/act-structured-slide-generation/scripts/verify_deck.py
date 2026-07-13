@@ -12,11 +12,13 @@ import sys
 from functools import lru_cache
 from pathlib import Path
 
-from deck_text import ink_center_offset_in, ink_height_in, ink_kind
+from deck_text import (_segments as segments, ink_center_offset_in, ink_height_in, ink_kind,
+                       ja_len, text_width_in as _measure)
 from pptx import Presentation
 from pptx.util import Emu
 
 TOKENS = json.loads((Path(__file__).resolve().parent.parent / "references" / "tokens.json").read_text())
+LINE_BREAK = TOKENS["line_break"]
 ALLOWED = {v.upper() for v in TOKENS["colors"].values()}
 FORBIDDEN = {v.upper() for v in TOKENS["color_policy"]["forbidden_colors"]}
 OK_FONTS = {TOKENS["fonts"]["latin"], TOKENS["fonts"]["latin_semibold"],
@@ -50,10 +52,10 @@ def _load_font(weight: int, size_px: int):
     return ImageFont.truetype(_FONTS[weight], size=size_px)
 
 
-def text_width_in(text: str, size_pt: float, weight: int) -> float:
-    """Measured width in inches using real Noto Sans JP metrics (widest of our pair)."""
-    font = _load_font(weight if weight in (400, 600, 700) else 400, int(size_pt * 4))
-    return font.getlength(text) / 4 / 72.0
+def text_width_in(text: str, size_pt: float, weight: int = 400) -> float:
+    """実測幅(in)。計測は deck_text の単一実装 — ビルダーが「切る/切らない」を決めた物差しと
+    検証が「はみ出す/はみ出さない」を判定する物差しは、同じでなければ意味がない。"""
+    return _measure(text, size_pt, weight)
 
 
 def _para_weight(para) -> int:
@@ -120,6 +122,35 @@ def _para_metrics(tf, w_in):
         spacing = para.line_spacing if isinstance(para.line_spacing, float) else 1.15
         space_after = para.space_after.pt / 72.0 if para.space_after is not None else 0.0
         yield lines * (size / 72.0) * spacing, space_after, max(widths), lines
+
+
+def check_natural_wrap(shape, warns, where):
+    """文節で割れずに自然折返しへ落ちた表示テキストを拾う。
+
+    ビルダーは表示テキスト(ラベル・箇条書き・セル)を文節の切れ目で折り返すが、その列幅に
+    対してコピーが長すぎると、どこで切っても行が足りず自然折返しに委ねる。そのときレンダラは
+    語の途中(初/回相談)で割る — 静かに崩れるので、ここで見えるようにする。直すのはコピーか
+    列幅であって、字を小さくすることではない。"""
+    tf = shape.text_frame
+    w_in = Emu(shape.width).inches - 0.02
+    if w_in <= 0.05:
+        return
+    for para in tf.paragraphs:
+        text = "".join(r.text for r in para.runs)
+        if not text.strip() or ja_len(text) > LINE_BREAK["max_display_chars_ja"]:
+            continue                                  # 長文は本文 — 自然折返しでよい
+        if para._p.find(f"{A}br") is not None:
+            continue                                  # 文節で折り返し済み
+        if len(segments(text)[0]) < 2:
+            continue                                  # 切れ目が無い語(社名など) — 折返しでは直せない
+        # 幅はランごとの実サイズで測る(値40pt+単位16pt のような混在段落を最大サイズで
+        # 測ると、収まっている行を「はみ出す」と誤って数える)
+        default = max((r.font.size.pt if r.font.size else 11) for r in para.runs)
+        width = sum(text_width_in(r.text, r.font.size.pt if r.font.size else default, _run_weight(r))
+                    for r in para.runs if r.text)
+        if width > max(0.05, w_in - _text_indent_in(para)):
+            warns.append(f"{where}: 文節で折り返せず自然折返し(語の途中で割れる) — "
+                         f"'{text[:24]}' … コピーを短くするか列幅を広げる")
 
 
 def check_overflow(shape, issues, where):
@@ -275,6 +306,7 @@ def main() -> int:
                 n_text += 1
                 if _measure_ok:
                     check_overflow(shape, issues, f"slide {idx}")
+                    check_natural_wrap(shape, warns, f"slide {idx}")
         if n_text == 0:
             issues.append(f"slide {idx}: no text at all")
         check_collisions(slide, idx, issues)

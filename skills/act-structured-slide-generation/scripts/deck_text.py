@@ -313,10 +313,6 @@ def wrap_display(text: str, width_in: float, size_pt: float, max_lines: int = 3,
         return text
     chunks, scores = _segments(text)
     widths = [text_width_in(c, size_pt, weight) for c in chunks]
-    if any(w > cap for w in widths):
-        # 1行に入らない語がある = 箱に対してコピーが長すぎる。ここで語を割って取り繕うより、
-        # 自然折返しに委ねて「語が割れている」ことを見えるままにする(直すのはコピーの側)
-        return text
     n = len(chunks)
     if n < 2:
         return text
@@ -333,12 +329,18 @@ def wrap_display(text: str, width_in: float, size_pt: float, max_lines: int = 3,
                 w += widths[j]
                 if w > cap and j > i:                        # この行に入りきらない
                     break
+                # 1行に入らない語(長いカタカナ語など)は、その語だけを自分の行に置いて
+                # 自然折返しへ委ねる。全体を素通しすると、割れなくてよい他の切れ目まで
+                # レンダラ任せになり、語の途中で割れた行が並ぶ
+                used = 1 if w <= cap else math.ceil(w / cap - 1e-9)
+                if used > k:
+                    continue
                 slack = cap - w
                 # 最終行の余りは咎めない(短い最終行は自然)。それ以外は行長の不揃いを罰する
-                cost = 0.0 if j == n - 1 else slack * slack
+                cost = 0.0 if j == n - 1 or w > cap else slack * slack
                 if j < n - 1:
                     cost += (3.0 - scores[j]) * cap * 0.6    # 切れ目の悪さ
-                rest = dp[j + 1][k - 1]
+                rest = dp[j + 1][k - used]
                 if rest == INF:
                     continue
                 if cost + rest < dp[i][k]:
@@ -351,6 +353,8 @@ def wrap_display(text: str, width_in: float, size_pt: float, max_lines: int = 3,
     lines, i, k = [], 0, best_k
     while i < n and k > 0:
         j = nxt[i][k]
-        lines.append("".join(chunks[i:j]))
-        i, k = j, k - 1
+        line = "".join(chunks[i:j])
+        lines.append(line)
+        used = max(1, math.ceil(text_width_in(line, size_pt, weight) / cap - 1e-9))
+        i, k = j, k - used
     return "\n".join(lines) if i >= n else text

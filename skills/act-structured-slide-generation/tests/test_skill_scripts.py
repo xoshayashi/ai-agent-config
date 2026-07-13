@@ -2075,3 +2075,49 @@ def test_kpi_card_gaps_above_and_below_the_value_are_equal(tmp_path):
     above = (stack[1][1] - stack[0][3]) * 72          # ラベル → 数値
     below = (stack[2][1] - stack[1][3]) * 72          # 数値 → 注記
     assert abs(above - below) < 1.5, f"数値の上下でインク間隔がずれている: {above:.1f}pt vs {below:.1f}pt"
+
+
+def test_verify_flags_text_that_fell_back_to_natural_wrap(tmp_path):
+    """文節で折り返せず自然折返しへ落ちた表示テキストは警告する — その列幅にはコピーが
+    長すぎるという意味で、放置すると語の途中(初/回相談)で割れた行が黙って残る。
+    切れ目の無い1語(社名など)は折返しでは直せないので数えない。"""
+    deck = {"slides": [{
+        "pattern": "process_flow",
+        "title": "列幅に対してコピーが長すぎる箇条書きは警告で表に出す",
+        "subtitle": "自然折返しへ落ちた表示テキストの検出",
+        "steps": [
+            {"label": "Step 1", "desc": "検証", "items": [
+                "LP・問い合わせ・初回相談に企業代表のデジタルヒューマンを配置し、運用まで担う"]},
+            {"label": "Step 2", "desc": "展開", "items": ["HCPで実行文脈へ変換"]},
+            {"label": "Step 3", "desc": "接続", "items": ["MCPでToolsを呼び出し"]},
+            {"label": "Step 4", "desc": "回収", "items": ["導入費で回収"]},
+        ],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    r = run("verify_deck.py", out)
+    assert r.returncode == 0, "自然折返しは警告であって失敗ではない(直すのはコピー)"
+    assert any("自然折返し" in ln for ln in r.stdout.splitlines()), r.stdout
+
+
+def test_verify_does_not_warn_on_copy_that_breaks_cleanly(tmp_path):
+    """文節で折り返せている表示テキストや、そもそも1行に収まる語には警告を出さない
+    (警告が鳴りっぱなしになれば、誰も読まなくなる)。"""
+    deck = {"slides": [{
+        "pattern": "process_flow",
+        "title": "文節で折り返せているコピーには警告を出さない",
+        "subtitle": "偽陽性を出さないことの確認",
+        "steps": [
+            {"label": "Step 1", "desc": "検証", "items": ["高意図接点へ導入"]},
+            {"label": "Step 2", "desc": "展開", "items": ["HCPで実行文脈へ変換"]},
+            {"label": "Step 3", "desc": "回収", "items": ["導入費＋固定利用料で回収"]},
+        ],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    r = run("verify_deck.py", out)
+    assert not any("自然折返し" in ln for ln in r.stdout.splitlines()), r.stdout
