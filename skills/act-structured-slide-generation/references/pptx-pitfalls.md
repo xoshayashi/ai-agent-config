@@ -61,8 +61,30 @@ own field testing.
     spec for rewriting. Titles and subtitles are one-line by contract (validate_spec errors
     on overflow); build_deck's multi-line header path survives only as renderer robustness
     for specs that bypassed validation, never as an authoring allowance.
-13. There is no bullet API. This skill standardizes on plain text boxes with a leading
-    「・」 (no collision with placeholder-derived buChar, so no double bullets).
+12b. No full-bleed background rectangle. Do not paint the canvas color with a shape that
+    covers the whole 16:9 slide: it becomes an object the author grabs under every body
+    element while editing, and it buys nothing — the slide's own background already
+    supplies the ground. `canvas` stays a token for text and fills ON dark shapes, not for
+    a background layer. (`lint_render` compares against the `canvas` token with a
+    tolerance, so a plain white ground still reads as background, not content.)
+13. Bullet glyphs (`buChar`) cannot be vertically centered — draw the dot yourself.
+    A DrawingML bullet is set on the BASELINE, so its height is `glyph ink center ×
+    buSzPct`. Against a Japanese line, the target is the ideographic center at 0.3805em:
+    Geist's `●` centers at 0.357em, so at the usual 60% it lands at 0.214em — about
+    **2.7pt below** the character center at 16pt body. Noto Sans JP's `・` does center at
+    0.380em, but only at 100% (any scale multiplies the center too), which forces a dot
+    the same size as the `・` separators inside the copy. LibreOffice hides the defect by
+    re-centering bullets itself; PowerPoint and Keynote do not — so the .pptx a client
+    opens looks wrong while our QA render looks fine.
+    `add_bullets()` therefore emits `buNone` and draws the dot as an ellipse
+    (`add_ellipse`) at the first line's center, with size and position under our control
+    and identical in every viewer. Each item gets its OWN text box: the first line is then
+    always at the box top, so a bullet can never drift when an item wraps to more lines
+    than estimated. Line geometry (measured, see `BULLET_LINE_BOX` / `BULLET_FIRST_LINE`):
+    line pitch = `size/72 × line_spacing × 1.20`, first-line ink center = `0.62 × pitch`
+    below the box top. Wrapping for that estimate uses `_wrapped_lines()`, which floors
+    the per-line character capacity — `_text_lines()` keeps it fractional (13.85 chars)
+    and would call a 4-line item 3 lines.
 14. CJK line-box correction. When estimating text height to size a container, the naive
     `pt/72 × line_spacing` under-measures Japanese lines by ~20% — LibreOffice/PowerPoint
     give CJK glyphs a taller line box. Multiply by ~1.22 (empirical) and use the SAME
