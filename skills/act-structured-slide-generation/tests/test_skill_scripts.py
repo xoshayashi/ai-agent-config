@@ -178,9 +178,11 @@ def test_anti_template_audit_and_no_page_numbers_are_contractual(tmp_path):
 
 
 def _minimal_deck(**slide_overrides):
+    # ヘッダー契約: title と subtitle は全スライド必須で、それぞれ必ず1行
     slide = {
         "pattern": "chart_insight",
         "title": "テスト市場は年率10%で拡大し、2030年に1兆円に到達する見込み",
+        "subtitle": "テスト市場規模の推移(2024-2030年)",
         "chart": {"type": "column", "unit": "億円", "categories": ["2029", "2030"],
                   "series": [{"name": "市場", "values": [1, 2]}]},
         "source": "テスト統計2026",
@@ -281,23 +283,131 @@ def test_lint_render_detects_edge_clipping(tmp_path):
     assert r.returncode == 1 and "見切れ" in r.stdout
 
 
-def test_validate_warns_title_line_mixing(tmp_path):
+def _write(tmp_path, deck):
+    p = tmp_path / "deck.json"
+    p.write_text(json.dumps(deck, ensure_ascii=False))
+    return p
+
+
+# --- ヘッダー契約: title と subtitle は全スライド必須・それぞれ必ず1行 -----------------
+
+def test_header_contract_is_declarative_and_derived(tmp_path):
+    """契約はデータ(tokens)で宣言し、字数上限は描画幾何から導出する — スライド個別の
+    ハードコードを持たない。ゆえに(1)未知のパターンにも既定契約が効き、(2)型スケールを
+    変えれば上限も自動追従する。"""
+    sys.path.insert(0, str(SKILL / "scripts"))
+    from deck_text import header_slots, load_tokens, one_line_chars
+
+    tokens = load_tokens()
+
+    # (1) 契約に個別定義のないパターンでも既定(タイトル+副題、各1行)が効く
+    slots = {s["slot"]: s for s in header_slots("some_future_pattern", tokens)}
+    assert set(slots) == {"title", "subtitle"}
+    assert all(s["lines"] == 1 for s in slots.values())
+    assert slots["subtitle"]["field"] == "subtitle"
+
+    # 上限は tokens に直書きされた数値ではなく、幅 ÷ 字送り から導出されている
+    hdr_w = tokens["layout"]["header"]["title_w_in"]
+    assert slots["title"]["max_chars"] == int(one_line_chars(hdr_w, tokens["type_scale_pt"]["action_title"]))
+    assert not any("max_chars" in k for k in tokens["text_budget"] if k.startswith(("action_title", "subtitle", "cover", "divider")))
+
+    # (2) 型スケールを大きくすると1行容量は自動的に縮む(定数の二重管理がない)
+    bigger = json.loads(json.dumps(tokens))
+    bigger["type_scale_pt"]["action_title"] *= 2
+    shrunk = {s["slot"]: s for s in header_slots("some_future_pattern", bigger)}
+    assert shrunk["title"]["max_chars"] < slots["title"]["max_chars"]
+
+    # 描画のしかたが違うパターンだけが上書きする(カバーの副題は2行、章扉の副題は desc)
+    cover = {s["slot"]: s for s in header_slots("cover", tokens)}
+    assert cover["subtitle"]["lines"] == 2
+    divider = {s["slot"]: s for s in header_slots("section_divider", tokens)}
+    assert divider["subtitle"]["field"] == "desc" and divider["subtitle"]["lines"] == 1
+
+
+def test_validate_rejects_title_that_would_wrap(tmp_path):
+    # 2行に折り返す長さのタイトルは仕様欠陥 — 縮小も折返しもさせず ERROR で突き返す
     long_title = "国内SaaS市場は年率13%で成長し、中堅企業セグメントの浸透率拡大が2030年まで続く見込みである"
+    r = run("validate_spec.py", _write(tmp_path, _minimal_deck(title=long_title)))
+    assert r.returncode == 1 and "title が1行に収まらない" in r.stdout
+
+
+def test_validate_rejects_subtitle_that_would_wrap(tmp_path):
+    long_sub = "国内SaaS市場規模の推移と予測、および中堅企業セグメントの浸透率と競合ポジションの比較"
+    r = run("validate_spec.py", _write(tmp_path, _minimal_deck(subtitle=long_sub)))
+    assert r.returncode == 1 and "subtitle が1行に収まらない" in r.stdout
+
+
+def test_validate_rejects_newline_in_title_or_subtitle(tmp_path):
+    r = run("validate_spec.py", _write(tmp_path, _minimal_deck(title="市場は拡大\n2030年に1兆円へ")))
+    assert r.returncode == 1 and "title は1行ちょうどで書く" in r.stdout and "改行禁止" in r.stdout
+    r = run("validate_spec.py", _write(tmp_path, _minimal_deck(subtitle="市場規模\n推移")))
+    assert r.returncode == 1 and "subtitle は1行ちょうどで書く" in r.stdout
+
+
+def test_validate_requires_subtitle_on_every_slide(tmp_path):
     deck = _minimal_deck()
-    deck["slides"].append({**_minimal_deck()["slides"][0], "title": long_title})
-    bad = tmp_path / "deck.json"
-    bad.write_text(json.dumps(deck, ensure_ascii=False))
-    r = run("validate_spec.py", bad)
-    assert r.returncode == 0 and "タイトル1行と2行が混在" in r.stdout
+    del deck["slides"][0]["subtitle"]
+    r = run("validate_spec.py", _write(tmp_path, deck))
+    assert r.returncode == 1 and "subtitle がない" in r.stdout
 
 
-def test_validate_warns_subtitle_mixing(tmp_path):
-    deck = _minimal_deck(subtitle="市場規模の推移")
-    deck["slides"].append(_minimal_deck()["slides"][0])  # subtitle なし
-    bad = tmp_path / "deck.json"
-    bad.write_text(json.dumps(deck, ensure_ascii=False))
-    r = run("validate_spec.py", bad)
-    assert r.returncode == 0 and "サブタイトルの有無が混在" in r.stdout
+def test_validate_requires_title_on_statement_and_agenda(tmp_path):
+    for slide in ({"pattern": "statement", "statement": "結びの一文", "subtitle": "提言の要旨"},
+                  {"pattern": "agenda", "items": ["市場", "戦略"], "subtitle": "本日の論点構成"}):
+        r = run("validate_spec.py", _write(tmp_path, {"meta": {}, "slides": [slide]}))
+        assert r.returncode == 1 and "missing required field 'title'" in r.stdout
+
+
+def test_validate_requires_exactly_two_line_cover_subtitle(tmp_path):
+    def cover(sub):
+        return {"meta": {"title": "t"}, "slides": [
+            {"pattern": "cover", "title": "国内SaaS参入戦略", "subtitle": sub}]}
+
+    # 1行 → NG(カバーだけは必ず2行)
+    r = run("validate_spec.py", _write(tmp_path, cover("市場機会の評価と参入シナリオの提言")))
+    assert r.returncode == 1 and "ちょうど2行" in r.stdout
+    # 3行 → NG
+    r = run("validate_spec.py", _write(tmp_path, cover("一行目\n二行目\n三行目")))
+    assert r.returncode == 1 and "ちょうど2行" in r.stdout
+    # 各行が折返す長さ → NG
+    long_line = "市場機会の評価と参入シナリオの提言および中堅企業セグメントの浸透率と競合ポジションの比較検討"
+    r = run("validate_spec.py", _write(tmp_path, cover(f"{long_line}\n二行目")))
+    assert r.returncode == 1 and "1行目 が1行に収まらない" in r.stdout
+    # ちょうど2行 → OK
+    r = run("validate_spec.py", _write(tmp_path, cover("市場機会の評価と参入シナリオの提言\n経理領域を起点とした段階参入")))
+    assert r.returncode == 0, r.stdout
+
+
+def test_validate_section_divider_uses_desc_not_subtitle(tmp_path):
+    # 章扉はヘッダー chrome を持たない — subtitle を書いても描画されないので誤りとして弾き、
+    # 副題は desc に書かせる(desc も1行)
+    base = {"pattern": "section_divider", "number": 1, "title": "市場・競争環境"}
+    r = run("validate_spec.py", _write(tmp_path, {"meta": {}, "slides": [dict(base, subtitle="副題", desc="市場規模と競合の位置")]}))
+    assert r.returncode == 1 and "描画しない" in r.stdout and "desc" in r.stdout
+
+    r = run("validate_spec.py", _write(tmp_path, {"meta": {}, "slides": [base]}))
+    assert r.returncode == 1 and "desc がない" in r.stdout
+
+    r = run("validate_spec.py", _write(tmp_path, {"meta": {}, "slides": [dict(base, desc="市場規模と競合の位置")]}))
+    assert r.returncode == 0, r.stdout
+
+
+def test_build_renders_both_cover_subtitle_lines(tmp_path):
+    from pptx.util import Inches
+
+    deck = {"meta": {}, "slides": [{
+        "pattern": "cover",
+        "title": "国内SaaS参入戦略",
+        "subtitle": "市場機会の評価と参入シナリオの提言\n経理領域を起点とした段階参入",
+    }]}
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", _write(tmp_path, deck), "-o", out).returncode == 0
+    texts = [sh.text_frame.text for sh in pptx.Presentation(out).slides[0].shapes if sh.has_text_frame]
+    sub = next(t for t in texts if "市場機会の評価" in t)
+    assert "経理領域を起点とした段階参入" in sub  # 2行目が切り落とされていない
+    box = next(sh for sh in pptx.Presentation(out).slides[0].shapes
+               if sh.has_text_frame and "市場機会の評価" in sh.text_frame.text)
+    assert box.height > Inches(0.6)  # 2行分の高さが確保されている
 
 
 def test_lint_render_detects_internal_gap(tmp_path):
@@ -317,7 +427,8 @@ def test_lint_render_detects_internal_gap(tmp_path):
 def test_validate_warns_fat_process_step(tmp_path):
     deck = {"meta": {}, "slides": [{
         "pattern": "process_flow",
-        "title": "参入判断後は、90日でローンチ準備を完了させる実行体制を組む",
+        "title": "参入判断後は90日でローンチ準備を完了させる",
+        "subtitle": "ローンチまでの実行ステップ",
         "steps": [{"label": "Step 1", "items": ["a", "b", "c", "d"]}],
     }]}
     bad = tmp_path / "deck.json"
@@ -603,6 +714,7 @@ def test_validate_allows_current_only_guidance_progress(tmp_path):
     deck = {"meta": {}, "slides": [{
         "pattern": "guidance_progress",
         "title": "Q2進捗率48%で通期132〜136億円を追走",
+        "subtitle": "通期ガイダンス進捗(売上高)",
         "unit": "%",
         "bars": [],
         "current": {
@@ -835,7 +947,8 @@ def test_validate_warns_long_content_run(tmp_path):
     slides = []
     for i in range(18):
         if i and i % 4 == 0:
-            slides.append({"pattern": "section_divider", "number": i // 4, "title": f"章{i // 4}"})
+            slides.append({"pattern": "section_divider", "number": i // 4,
+                           "title": f"章{i // 4}", "desc": "章の論点"})
         slides.append(mk(i))
     broken = {"meta": {"title": "t"}, "slides": slides}
     spec = tmp_path / "broken.json"
@@ -853,9 +966,9 @@ def test_validate_flags_divider_overuse_in_short_deck(tmp_path):
         return dict(content, title=f"テスト市場は年率1{i % 9}%で拡大し、2030年に{i + 1}兆円に到達する見込み")
 
     slides = [
-        {"pattern": "section_divider", "number": 1, "title": "章1"}, mk(0),
-        {"pattern": "section_divider", "number": 2, "title": "章2"}, mk(1),
-        {"pattern": "section_divider", "number": 3, "title": "章3"}, mk(2), mk(3),
+        {"pattern": "section_divider", "number": 1, "title": "章1", "desc": "章の論点"}, mk(0),
+        {"pattern": "section_divider", "number": 2, "title": "章2", "desc": "章の論点"}, mk(1),
+        {"pattern": "section_divider", "number": 3, "title": "章3", "desc": "章の論点"}, mk(2), mk(3),
     ]
     deck = {"meta": {"title": "t"}, "slides": slides}
     spec = tmp_path / "deck.json"
@@ -875,7 +988,8 @@ def test_validate_allows_dividers_in_long_read_deck(tmp_path):
 
     slides = []
     for c in range(4):  # 4 chapters x 4 content slides = 20 slides total
-        slides.append({"pattern": "section_divider", "number": c + 1, "title": f"章{c + 1}"})
+        slides.append({"pattern": "section_divider", "number": c + 1,
+                       "title": f"章{c + 1}", "desc": "章の論点"})
         slides += [mk(c * 4 + j) for j in range(4)]
     deck = {"meta": {"title": "t"}, "slides": slides}
     spec = tmp_path / "deck.json"
@@ -888,7 +1002,8 @@ def test_validate_allows_dividers_in_long_read_deck(tmp_path):
 def test_validate_warns_wide_comparison_table(tmp_path):
     deck = {"meta": {"title": "t"}, "slides": [{
         "pattern": "comparison_table",
-        "title": "4社比較でも当社の機能カバレッジ優位は変わらないことを示す",
+        "title": "4社比較でも当社の機能カバレッジ優位は不変",
+        "subtitle": "機能・価格・サポート体制の比較",
         "table": {"headers": ["評価軸", "当社", "A社", "B社", "C社"],
                   "rows": [["対応領域", "◎", "○", "○", "△"]]},
         "source": "テスト統計2026",
@@ -1032,7 +1147,8 @@ def test_build_writes_speaker_notes_into_pptx(tmp_path):
 
 def test_native_table_col0_spans_merges_and_builds(tmp_path):
     deck = {"slides": [{
-        "pattern": "comparison_table", "title": "セグメント別は電機が牽引し+2,559", "source": "Act分析",
+        "pattern": "comparison_table", "title": "セグメント別は電機が牽引し+2,559",
+        "subtitle": "セグメント別の売上・利益", "source": "Act分析",
         "table": {"headers": ["区分", "科目", "前期", "当期"],
                   "rows": [["電機", "売上", "29,265", "31,824"], ["", "利益", "1,585", "1,370"],
                            ["機械", "売上", "9,189", "9,469"], ["", "利益", "269", "417"]],
@@ -1094,7 +1210,8 @@ def test_act_theme_reads_one_token_core(tmp_path):
 
 def test_native_chart_grid_small_multiples(tmp_path):
     deck = {"slides": [{
-        "pattern": "chart_grid", "title": "3事業とも増収しCAGR11%成長", "source": "Act分析",
+        "pattern": "chart_grid", "title": "3事業とも増収しCAGR11%成長",
+        "subtitle": "事業別の売上・利益推移", "source": "Act分析",
         "charts": [
             {"title": "売上", "chart": {"type": "column", "unit": "百万円", "categories": ["24", "25", "26"],
              "series": [{"name": "売上", "values": [118, 125, 130]}], "value_labels": True,

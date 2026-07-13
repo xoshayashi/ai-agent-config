@@ -36,8 +36,16 @@ evidence-source check without printing an internal-provenance footer on every sl
 ## Fields Common To Slides
 
 - `pattern` (required): one of the implemented primitives below.
-- `title` (required except special appendix cases): conclusion-oriented action title.
-- `subtitle` (optional): scope line, not a second claim.
+- `title` (required on EVERY slide, cover and statement included): conclusion-oriented action
+  title. Always ONE line — no `\n`, no wrapping.
+- `subtitle` (required on every slide): scope line, not a second claim. One line — except on
+  the `cover`, where it is exactly TWO lines joined with `\n`. On `section_divider` the
+  subtitle slot is the `desc` field instead (that pattern draws no header chrome, so a
+  `subtitle` there would be silently dropped and is rejected).
+- The slots, their line counts, and their per-line character limits are not restated here:
+  they are declared in `tokens.json` → `header_contract` and derived from the render geometry
+  by `deck_text.header_slots()`. `validate_spec.py` errors on any violation; fix it by
+  shortening the copy, never by shrinking the type.
 - `source` (evidence slides with external data): a TRUE citation only — organization, report or
   dataset, and date, or a verifiable named internal system. Never stamp a deck-wide internal
   artifact (meeting minutes, a workshop, one internal doc) as a per-slide Source footer; that is
@@ -64,6 +72,8 @@ evidence-source check without printing an internal-provenance footer on every sl
 ### 1. `cover`
 
 Opening title slide. Use for title, subtitle, date, and optional presenter context.
+The cover subtitle is always exactly two lines, authored with `\n` (see Fields Common
+To Slides); the cover title stays one line.
 
 ### 2. `agenda`
 

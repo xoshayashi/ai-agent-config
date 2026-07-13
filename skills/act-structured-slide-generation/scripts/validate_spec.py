@@ -13,7 +13,7 @@ import json
 import sys
 from pathlib import Path
 
-from deck_text import ja_len
+from deck_text import header_slots, ja_len
 
 TOKENS = json.loads((Path(__file__).resolve().parent.parent / "references" / "tokens.json").read_text())
 BUDGET = TOKENS["text_budget"]
@@ -23,9 +23,11 @@ ACCENT = TOKENS["colors"]["accent"]
 # build_deck.py の CHART_TYPES と同期(テスト test_chart_type_lists_stay_in_sync が担保)
 SUPPORTED_CHART_TYPES = ("column", "stacked_column", "bar", "line", "donut")
 
+# 各パターンの必須データフィールド。title は全パターン必須(ヘッダー契約) —
+# subtitle / desc の必須判定は _one_line 側のヘッダー契約チェックが担う(重複エラーを出さない)
 PATTERNS = {
-    "cover": [],
-    "agenda": ["items"],
+    "cover": ["title"],
+    "agenda": ["title", "items"],
     "section_divider": ["title"],
     "executive_summary": ["title", "points"],
     "kpi_dashboard": ["title", "kpis"],
@@ -38,7 +40,7 @@ PATTERNS = {
     "roadmap": ["title", "phases"],
     "two_column": ["title", "left", "right"],
     "process_flow": ["title", "steps"],
-    "statement": ["statement"],
+    "statement": ["title", "statement"],
     "financial_highlights": ["title", "groups"],
     "metrics_rows": ["title", "columns"],
     "driver_decomposition": ["title", "factors"],
@@ -114,6 +116,47 @@ def iter_colors(obj):
 STRUCTURAL = ("cover", "section_divider", "statement", "agenda")
 
 
+def _check_header_contract(errors: list, loc: str, pattern: str, slide: dict) -> None:
+    """ヘッダー契約(tokens.json の header_contract)をパターン非依存に検査する。
+
+    契約はデータで宣言され、ここはそれを機械的に適用するだけ — パターンごとの分岐や
+    字数のマジックナンバーは持たない。規則は3つだけ:
+      1. 契約の全スロット(タイトル・副題)が埋まっていること
+      2. 各スロットは lines で宣言された行数ちょうどであること(既定1行)
+      3. どの行も描画幅から導出した1行容量に収まること(折返し禁止 — 縮小もしない)
+    描画されないフィールドを書いた場合(章扉の subtitle 等)は、黙って捨てられるより
+    誤りとして返すほうが安全なので弾く。
+    """
+    slots = header_slots(pattern)
+    for cfg in slots:
+        field, text = cfg["field"], slide.get(cfg["field"], "") or ""
+        want = cfg["lines"]
+        if not text.strip():
+            errors.append(f"{loc}: {field} がない — 全スライドにメインタイトルと副題を必ず付ける"
+                          f"({pattern} の副題フィールドは "
+                          f"'{next(c['field'] for c in slots if c['slot'] == 'subtitle')}')")
+            continue
+        lines = text.split("\n")
+        if len([l for l in lines if l.strip()]) != want or len(lines) != want:
+            got = len([l for l in lines if l.strip()])
+            detail = ("改行禁止" if want == 1 else f'"\\n" 区切りでちょうど{want}行')
+            errors.append(f"{loc}: {field} は{want}行ちょうどで書く({detail}) — 現在 {got} 行")
+        for i, line in enumerate(lines, start=1):
+            if ja_len(line) > cfg["max_chars"]:
+                where = f"{i}行目" if want > 1 else field
+                errors.append(
+                    f"{loc}: {where} が1行に収まらない "
+                    f"({ja_len(line):.0f} > {cfg['max_chars']:.0f} 全角相当、{cfg['size_pt']}pt × "
+                    f"{cfg['width_in']:.1f}in) — 字を小さくせずコピーを短く研ぐ")
+
+    # 契約に無い見出しフィールドを書いても描画されない(黙って消えるのを防ぐ)
+    declared = {c["field"] for c in slots}
+    for ghost in ({"title", "subtitle", "desc"} - declared) & set(slide):
+        if slide.get(ghost):
+            owner = next(c["field"] for c in slots if c["slot"] == "subtitle")
+            errors.append(f"{loc}: {pattern} は '{ghost}' を描画しない — 副題は '{owner}' に書く")
+
+
 def print_outline(slides: list) -> None:
     """Ghost-deck readout: titles in sequence. Read top to bottom — if this is not
     one continuous argument, fix the outline before touching slide bodies."""
@@ -157,11 +200,8 @@ def main() -> int:
             if not s.get(req):
                 errors.append(f"{loc}: missing required field '{req}'")
 
+        _check_header_contract(errors, loc, pat, s)
         title = s.get("title", "")
-        if title and ja_len(title) > BUDGET["action_title_two_line_max_chars_ja"]:
-            errors.append(f"{loc}: title too long ({ja_len(title):.0f} > {BUDGET['action_title_two_line_max_chars_ja']} 全角相当) — shorten or split the message")
-        if s.get("subtitle") and ja_len(s["subtitle"]) > BUDGET["subtitle_max_chars_ja"]:
-            errors.append(f"{loc}: subtitle too long — shorten")
         if s.get("insight") and ja_len(s["insight"]) > BUDGET["insight_max_chars_ja"]:
             errors.append(f"{loc}: insight too long ({ja_len(s['insight']):.0f} > {BUDGET['insight_max_chars_ja']}) — one short judgment sentence only")
         if pat == "statement" and s.get("statement"):
@@ -673,16 +713,8 @@ def main() -> int:
     if len(titled) != len(set(titled)):
         warns.append("duplicate action titles across slides — each slide should carry one distinct message")
 
-    # header uniformity: 行数が混在すると本文開始位置とバー高がスライド毎に揺れる
-    # (サイズは常に一定 — 行数で縮小しない)。1行に揃えるのが最も確実
-    one_line_max = BUDGET["action_title_max_chars_ja"]
-    two_liners = [(i, ja_len(s.get("title", ""))) for i, s in enumerate(slides, start=1)
-                  if s.get("pattern") not in ("cover", "section_divider")
-                  and s.get("title") and ja_len(s["title"]) > one_line_max]
-    n_chrome = sum(1 for s in slides if s.get("pattern") not in ("cover", "section_divider") and s.get("title"))
-    if two_liners and len(two_liners) < n_chrome:
-        detail = ", ".join(f"slide {i}({n:.0f}字)" for i, n in two_liners)
-        warns.append(f"タイトル1行と2行が混在 — 本文開始位置とバー高がスライド毎に揺れる。{detail} を{one_line_max}字以内に短縮して全スライド1行に揃える")
+    # NOTE: タイトル行数・サブタイトル有無の「混在」警告は廃止 — 1行超過も subtitle 欠落も
+    # per-slide の ERROR に昇格したため(全スライド必須・各1行)、混在は起こり得ない
 
     # kicker length budget (short label, not a sentence)
     for i, s in enumerate(slides, start=1):
@@ -703,13 +735,6 @@ def main() -> int:
                    if len(st.get("items", [])) > 3]
             if fat:
                 warns.append(f"slide {i}: ステップの項目が3個超({', '.join(fat)}) — カードあたり3項目以内。超える分は詳細スライドか speaker_notes へ")
-
-    # subtitle uniformity: content slides follow all-or-none (有無が混ざると
-    # ヘッダー高と本文開始位置がスライド毎に変わる)
-    content = [(i, s) for i, s in enumerate(slides, start=1) if s.get("pattern") not in STRUCTURAL]
-    no_sub = [i for i, s in content if not s.get("subtitle")]
-    if no_sub and len(no_sub) < len(content):
-        warns.append(f"サブタイトルの有無が混在(無し: slide {', '.join(map(str, no_sub))}) — ヘッダー高が揺れる。全コンテンツスライドに付けるか全て外す")
 
     # 文体規約: スライド表示テキストは体言止め・句点なし。speaker_notes を除く可視文字列に
     # 句点(。／．)が残っていれば体言止めへの直し漏れとして警告する(build は末尾のみ自動除去)
@@ -732,6 +757,7 @@ def main() -> int:
 
     # talk script: 全コンテンツスライドに語り原稿(speaker_notes)を書く。
     # meta.talk_minutes(発表分数)があれば 300字/分 目安で総量を照合する
+    content = [(i, s) for i, s in enumerate(slides, start=1) if s.get("pattern") not in STRUCTURAL]
     notes_total = sum(ja_len(s.get("speaker_notes", "")) for s in slides)
     missing_notes = [i for i, s in content if not s.get("speaker_notes")]
     if missing_notes:
