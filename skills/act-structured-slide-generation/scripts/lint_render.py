@@ -31,7 +31,11 @@ from deck_text import HW as _HW, token_rgb as _token_rgb
 
 CANVAS = _token_rgb("canvas", (0xF7, 0xF7, 0xF6))
 WHITE = (0xFF, 0xFF, 0xFF)
-TOL = 26  # per-channel tolerance: antialiasing over near-white
+# edge_scan 用の緩い許容差。淡いパネル(章扉の surface_tint 面、カバー帯)は設計として
+# 端まで敷くので、これを「端で見切れたコンテンツ」と鳴らしてはいけない。26 まで許して
+# 濃い要素(文字・濃色面)の見切れだけを拾う — 実測: 8 まで絞ると章扉1枚につき
+# top/bottom/right の3辺が誤検知になる。見切れ判定の本体は 0.02〜0.85 の被覆率ゲート
+TOL = 26
 BAND = 6  # px
 
 
@@ -39,7 +43,9 @@ def is_ground(px, tol: int) -> bool:
     """地(=何も置かれていない面)か。canvas だけでなく純白も地として扱う — canvas は
     白に近いが白そのものではない(F7F7F6 なら最大差 9)ので、テンプレート背景が抜けて
     白く出たレンダーを「一面コンテンツ」と誤読し、空白系の検査が黙って効かなくなる。
-    カード面(surface_tint)は canvas とも白とも差が大きいので、構造として残る。"""
+    カード面(surface_tint)の扱いは呼び出し側の tol で決まる: balance_scan(tol 8)では
+    構造としてコンテンツに数え、edge_scan(TOL 26)では地として見逃す(上の注記のとおり、
+    淡いパネルは端まで敷く設計だから)。"""
     return all(abs(px[i] - CANVAS[i]) <= tol for i in range(3)) or \
         all(abs(px[i] - WHITE[i]) <= tol for i in range(3))
 

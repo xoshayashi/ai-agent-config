@@ -731,6 +731,25 @@ def test_build_forecast_styling_stays_on_palette(tmp_path):
     assert r.returncode == 0, r.stdout + r.stderr
 
 
+def test_edge_scan_tolerance_lets_pale_full_bleed_panels_through(tmp_path):
+    """edge_scan の許容差(TOL 26)は緩いままにする。章扉の淡いパネル(surface_tint)は
+    設計として端まで敷くので、これを「端で見切れ」と鳴らしてはいけない。
+    balance_scan の tol 8 をここへ持ち込むと、章扉が丸ごと誤検知になる。"""
+    from PIL import Image, ImageDraw
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import lint_render as L
+
+    tint = tuple(int(json.loads((SKILL / "references" / "tokens.json").read_text())
+                     ["colors"]["surface_tint"][i:i + 2], 16) for i in (0, 2, 4))
+    im = Image.new("RGB", (1466, 825), CANVAS_RGB)
+    ImageDraw.Draw(im).rectangle([970, 0, 1465, 824], fill=tint)   # 章扉の右パネル(端まで)
+
+    assert L.edge_scan(im) == [], "淡い全面パネルを見切れとして誤検知している"
+    # 濃い要素が端に触れていれば従来どおり鳴る(検知力は落ちていない)
+    ImageDraw.Draw(im).rectangle([0, 0, 400, 3], fill=(0x2D, 0x33, 0x2E))
+    assert any("top edge" in h for h in L.edge_scan(im))
+
+
 def test_lint_treats_plain_white_as_ground_not_content(tmp_path):
     """canvas は白に近いが白ではない(F7F7F6 で最大差9)。純白を地として扱わないと、
     テンプレート背景が抜けて白く出たレンダーが「一面コンテンツ」に見え、空白系の検査が
