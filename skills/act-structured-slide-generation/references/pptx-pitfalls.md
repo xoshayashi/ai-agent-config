@@ -58,7 +58,9 @@ own field testing.
     verify_deck.py's Pillow real-font measurement (getlength on the actual TTFs); write
     only confirmed values.
 12. No auto-shrink on overflow. Text-budget violations (validate_spec.py) go back to the
-    spec for rewriting. Only titles get the two-line fallback (handled by build_deck.py).
+    spec for rewriting. Titles and subtitles are one-line by contract (validate_spec errors
+    on overflow); build_deck's multi-line header path survives only as renderer robustness
+    for specs that bypassed validation, never as an authoring allowance.
 13. There is no bullet API. This skill standardizes on plain text boxes with a leading
     「・」 (no collision with placeholder-derived buChar, so no double bullets).
 14. CJK line-box correction. When estimating text height to size a container, the naive
