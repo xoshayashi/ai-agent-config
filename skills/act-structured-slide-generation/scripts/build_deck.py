@@ -332,19 +332,23 @@ def header_offset(spec: dict) -> float:
 
 def header_metrics(spec: dict) -> dict:
     """Deterministic header geometry: title cap-top to the bottom of the last
-    header line (title or subtitle) fixes where the body region starts."""
+    header line (title or subtitle) fixes where the body region starts.
+
+    行数はヘッダー契約(slot_lines)から取る — 幅・級数の出所を validate と共有し、
+    箱の高さだけが別式で決まる状態を作らない。"""
     hdr = LAY["header"]
     off = header_offset(spec)
+    pattern = spec.get("pattern", "default")
     title = spec.get("title", "")
-    lines = title_lines(title)
+    lines = title_lines(title, pattern)
     # タイトルサイズは行数によらず一定。縮小して収める操作は AutoFit と同種の一貫性破壊
-    # (スライド間でタイトルの見た目が揺れる)。28pt 化後は実幅推定を併用し、
-    # 長い action title はボックス自体を高くして、本文との衝突を避ける。
+    # (スライド間でタイトルの見た目が揺れる)。契約上タイトルは常に1行だが、検証を経ずに
+    # build へ回されたスペックでも文字が箱からはみ出さないよう、実測行数で箱を高くする。
     t_size = TS["action_title"]
     title_y = hdr["title_y_in"] + off
     title_h = lines * (t_size / 72.0) * 1.27
     sub_y = title_y + title_h + hdr["title_subtitle_gap_in"]
-    sub_lines = _text_lines(spec.get("subtitle", ""), hdr["title_w_in"], TS["subtitle"]) if spec.get("subtitle") else 0
+    sub_lines = slot_lines(pattern, "subtitle", spec.get("subtitle", ""))
     sub_h = max(1, sub_lines) * (TS["subtitle"] / 72.0) * 1.35
     block_bottom = sub_y + sub_h if spec.get("subtitle") else title_y + title_h
     return {

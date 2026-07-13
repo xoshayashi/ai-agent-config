@@ -351,11 +351,18 @@ def test_validate_requires_subtitle_on_every_slide(tmp_path):
     assert r.returncode == 1 and "subtitle がない" in r.stdout
 
 
-def test_validate_requires_title_on_statement_and_agenda(tmp_path):
+def test_validate_requires_title_on_every_pattern_reported_once(tmp_path):
+    # タイトル欠落はヘッダー契約チェックだけが報告する(PATTERNS 側と二重に出さない)
     for slide in ({"pattern": "statement", "statement": "結びの一文", "subtitle": "提言の要旨"},
-                  {"pattern": "agenda", "items": ["市場", "戦略"], "subtitle": "本日の論点構成"}):
+                  {"pattern": "agenda", "items": ["市場", "戦略"], "subtitle": "本日の論点構成"},
+                  {"pattern": "cover", "subtitle": "副題1行目\n副題2行目"}):
         r = run("validate_spec.py", _write(tmp_path, {"meta": {}, "slides": [slide]}))
-        assert r.returncode == 1 and "missing required field 'title'" in r.stdout
+        title_errors = [l for l in r.stdout.splitlines()
+                        if l.startswith("ERROR") and ("title" in l or "タイトル" in l)]
+        assert r.returncode == 1
+        assert len(title_errors) == 1, title_errors
+        assert "title がない" in title_errors[0]
+        assert "missing required field 'title'" not in r.stdout
 
 
 def test_validate_requires_exactly_two_line_cover_subtitle(tmp_path):

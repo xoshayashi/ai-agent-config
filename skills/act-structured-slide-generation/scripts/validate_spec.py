@@ -23,30 +23,31 @@ ACCENT = TOKENS["colors"]["accent"]
 # build_deck.py の CHART_TYPES と同期(テスト test_chart_type_lists_stay_in_sync が担保)
 SUPPORTED_CHART_TYPES = ("column", "stacked_column", "bar", "line", "donut")
 
-# 各パターンの必須データフィールド。title は全パターン必須(ヘッダー契約) —
-# subtitle / desc の必須判定は _one_line 側のヘッダー契約チェックが担う(重複エラーを出さない)
+# 各パターンの必須「データ」フィールド(本文の中身)。見出し(title / subtitle / desc)は
+# ここに書かない — 有無も行数も _check_header_contract がヘッダー契約から一元的に見る
+# (両方で見ると同じ欠落に二重のエラーが出る)
 PATTERNS = {
-    "cover": ["title"],
-    "agenda": ["title", "items"],
-    "section_divider": ["title"],
-    "executive_summary": ["title", "points"],
-    "kpi_dashboard": ["title", "kpis"],
-    "chart_insight": ["title", "chart"],
-    "market_sizing": ["title", "stages"],
-    "comparison_table": ["title", "table"],
-    "competitive_landscape": ["title", "players"],
-    "financial_summary": ["title"],
-    "waterfall": ["title", "items"],
-    "roadmap": ["title", "phases"],
-    "two_column": ["title", "left", "right"],
-    "process_flow": ["title", "steps"],
-    "statement": ["title", "statement"],
-    "financial_highlights": ["title", "groups"],
-    "metrics_rows": ["title", "columns"],
-    "driver_decomposition": ["title", "factors"],
-    "guidance_progress": ["title", "current"],
-    "diagram": ["title", "diagram"],
-    "chart_grid": ["title", "charts"],
+    "cover": [],
+    "agenda": ["items"],
+    "section_divider": [],
+    "executive_summary": ["points"],
+    "kpi_dashboard": ["kpis"],
+    "chart_insight": ["chart"],
+    "market_sizing": ["stages"],
+    "comparison_table": ["table"],
+    "competitive_landscape": ["players"],
+    "financial_summary": [],
+    "waterfall": ["items"],
+    "roadmap": ["phases"],
+    "two_column": ["left", "right"],
+    "process_flow": ["steps"],
+    "statement": ["statement"],
+    "financial_highlights": ["groups"],
+    "metrics_rows": ["columns"],
+    "driver_decomposition": ["factors"],
+    "guidance_progress": ["current"],
+    "diagram": ["diagram"],
+    "chart_grid": ["charts"],
 }
 EVIDENCE_PATTERNS = {
     "chart_insight", "market_sizing", "comparison_table", "competitive_landscape",
