@@ -9,16 +9,16 @@ from __future__ import annotations
 import json
 import re
 import sys
-from functools import lru_cache
 from pathlib import Path
 
-from deck_text import (_segments as segments, ink_center_offset_in, ink_height_in, ink_kind,
+from deck_text import (MEASURE_OK, _segments as segments, ink_center_offset_in, ink_height_in,
                        ja_len, text_width_in as _measure)
 from pptx import Presentation
 from pptx.util import Emu
 
 TOKENS = json.loads((Path(__file__).resolve().parent.parent / "references" / "tokens.json").read_text())
 LINE_BREAK = TOKENS["line_break"]
+INK_KIND_PREFIX = "ink:"   # build_deck が図形名に刻む宣言タグ
 ALLOWED = {v.upper() for v in TOKENS["colors"].values()}
 FORBIDDEN = {v.upper() for v in TOKENS["color_policy"]["forbidden_colors"]}
 OK_FONTS = {TOKENS["fonts"]["latin"], TOKENS["fonts"]["latin_semibold"],
@@ -27,35 +27,10 @@ SLIDE_W_IN = TOKENS["slide"]["width_in"]
 SLIDE_H_IN = TOKENS["slide"]["height_in"]
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 
-FONT_DIRS = [Path.home() / "Library/Fonts", Path("/Library/Fonts"), Path(__file__).parent]
-
-
-def _font_file(weight: int) -> Path | None:
-    for d in FONT_DIRS:
-        p = d / f"NotoSansJP-{weight}.ttf"
-        if p.exists():
-            return p
-    return None
-
-
-try:
-    from PIL import ImageFont
-    _FONTS = {w: (str(f) if (f := _font_file(w)) else None) for w in (400, 600, 700)}
-    _measure_ok = all(_FONTS.values())
-except ImportError:
-    _measure_ok = False
-
-
-@lru_cache(maxsize=None)
-def _load_font(weight: int, size_px: int):
-    # 段落ごとの再ロードを避ける: (weight, size) の組は高々十数種
-    return ImageFont.truetype(_FONTS[weight], size=size_px)
-
-
-def text_width_in(text: str, size_pt: float, weight: int = 400) -> float:
-    """実測幅(in)。計測は deck_text の単一実装 — ビルダーが「切る/切らない」を決めた物差しと
-    検証が「はみ出す/はみ出さない」を判定する物差しは、同じでなければ意味がない。"""
-    return _measure(text, size_pt, weight)
+# 計測は deck_text の単一実装を使う — ビルダーが「どこで切るか」を決めた物差しと、検証が
+# 「はみ出すか/重なるか」を判定する物差しは、同じでなければ意味がない
+_measure_ok = MEASURE_OK
+text_width_in = _measure
 
 
 def _para_weight(para) -> int:
@@ -182,6 +157,16 @@ def _overlap_frac(a, b) -> float:
     return inter / area if area > 0 else 0.0
 
 
+def _ink_kind_of(shape) -> str | None:
+    """描く側が図形名に刻んだインク種別(build_deck.stack_optical)。無ければ None。"""
+    name = shape.name or ""
+    if name.startswith(INK_KIND_PREFIX):
+        kind = name[len(INK_KIND_PREFIX):]
+        if kind in ("text", "numeral"):
+            return kind
+    return None
+
+
 def _ink_bbox(shape):
     """Approximate the rendered text extent (ink box), not the nominal textbox:
     width = measured widest line (capped at box width), height = computed line stack."""
@@ -199,17 +184,25 @@ def _ink_bbox(shape):
         return box
     anchor = shape.text_frame.vertical_anchor
     from pptx.enum.text import MSO_ANCHOR as _MA
-    if anchor == _MA.MIDDLE:
+    kind = _ink_kind_of(shape)
+    if anchor == _MA.MIDDLE and kind is not None:
         # 縦中央寄せの箱では、インクは箱の中心にちょうど座らない(和文は行ボックスの下に
         # ディセンダ余白、欧文数字は字面が上寄り)。build_deck の stack_optical はこの
         # ズレを見込んで箱を置くので、検証も同じモデルで測らないと「実際は重なっていない
-        # のに重なりと判定する」ことになる — 較正値は tokens.optical_stack が単一ソース
-        text = shape.text_frame.text
-        size = max((r.font.size.pt if r.font.size else 11)
-                   for p_ in shape.text_frame.paragraphs for r in p_.runs) \
-            if shape.text_frame.text.strip() else 11
-        used_h = ink_height_in(size, ink_kind(text), lines=n_lines)
-        y0 = (box[1] + box[3]) / 2 + ink_center_offset_in(size, ink_kind(text)) - used_h / 2
+        # のに重なりと判定する」ことになる — 較正値は tokens.optical_stack が単一ソース。
+        # 種別は図形名に刻まれた宣言を読む(文字列から推測すると「黒字化」のような数値
+        # ブロックを text として測り、ビルダーと違うインクを見ることになる)
+        sizes = [r.font.size.pt if r.font.size else 11
+                 for p_ in shape.text_frame.paragraphs for r in p_.runs]
+        size = max(sizes) if sizes else 11
+        spacing = next((p_.line_spacing for p_ in shape.text_frame.paragraphs
+                        if isinstance(p_.line_spacing, float)), 1.2)
+        used_h = ink_height_in(size, kind, lines=n_lines, line_spacing=spacing)
+        y0 = (box[1] + box[3]) / 2 + ink_center_offset_in(size, kind) - used_h / 2
+    elif anchor == _MA.MIDDLE:
+        # インク宣言の無い縦中央寄せ(見出し+本文のような複数段落・複数級数の箱)は、
+        # 単一級数のインクモデルでは測れない。行スタックの高さで中央に置く
+        y0 = (box[1] + box[3]) / 2 - used_h / 2
     else:
         y0 = box[1]
     x0 = box[0]
