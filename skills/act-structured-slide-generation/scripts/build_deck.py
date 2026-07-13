@@ -189,84 +189,54 @@ def add_text(slide, x, y, w, h, runs, *, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.
     return tb
 
 
-# 箇条書き記号はフォントのグリフ(buChar)ではなく、こちらで描くベクター円にする。
+# 箇条書きは「本物の箇条書き」で組む — 段落の bullet(DrawingML buChar)+ぶら下げインデント。
+# 図形の円を本文の横に置く方式はやめた: 記号が本文と連動せず、編集で行が増減しても点が
+# 取り残される(PowerPoint で開くと、点だけ浮いた妙な箇条書きになる)。
 #
-# なぜグリフをやめたか: 記号はベースライン揃えで打たれるので、その縦位置は
-# 「グリフのインク中心 × buSzPct」で決まってしまう。
-#   和文字面(全角の四角)の中心 : ベースラインから 0.3805em ← ここに乗せたい
-#   Geist の「●」の中心        : 0.357em → 60% に縮めると 0.214em、本文16ptで約2.7pt 下がる
-#   Noto Sans JP の「・」の中心 : 0.380em → 等倍なら中央に乗るが、点が本文中の「・」と
-#                                同じ大きさになり、箇条書き記号として弱い
-# 縮小率をかけると中心も比例して下がるため、グリフでは「中央」と「必要な大きさ」を
-# 両立できない。LibreOffice は独自に中央寄せしてこの欠陥を隠すが、PowerPoint / Keynote は
-# ベースライン揃えのまま描くので低く見える(ビューアで結果が変わる状態自体が欠陥)。
-# 円を自前で描けば、大きさと中央位置をどちらもこちらで決められ、どのビューアでも同じ。
-#
-# 行位置は LibreOffice 実測から: 行送り = size/72 × line_spacing × BULLET_LINE_BOX、
-# 1行目のインク中心 = 上端から 行送り × BULLET_FIRST_LINE (和文の行ボックスは上に余白が
-# 多いので 0.5 ではない)。
-BULLET_LINE_BOX = 1.20
-BULLET_FIRST_LINE = 0.62
-BULLET_DOT_EM = 0.30      # 記号の直径(本文サイズ比) — 本文16ptで約4.8pt
-BULLET_INDENT_IN = 0.24   # ぶら下げインデント(折返し行の左端)
-
-
-def _wrapped_lines(text: str, width_in: float, size_pt: float) -> int:
-    """描画側に忠実な折返し行数。1行に入るのは「整数個」の全角文字なので、容量は
-    切り捨てる — _text_lines は容量を小数(例 13.85字)のまま使うため、13字しか入らない
-    行を余裕ありと誤判定し、実際は4行になる項目を3行と数えてしまう。"""
-    cpl = max(1.0, math.floor(width_in / (size_pt / 72.0)))
-    return max(1, math.ceil(_ja_len(text) / cpl))
+# ただし記号はベースライン揃えで打たれるので、縦位置は「グリフのインク中心 × buSzPct」で
+# 決まる。ここを外すと点が下にずれる:
+#   和文字面(全角の四角)の中心 : ベースラインから 0.3805em ← 記号を乗せたい高さ
+#   Geist の「●」の中心        : 0.357em → 60% に縮めると 0.214em、本文16ptで約2.7pt 下
+#   Noto Sans JP の「・」の中心 : 0.380em → 字面中央と一致(等倍のときだけ)
+# 縮小率は中心も比例して下げるので、中央に乗る倍率は 100% だけ。したがって
+# 「和文フォントの中黒(・)を等倍で」以外の組み合わせにしないこと。LibreOffice は独自に
+# 中央寄せして欠陥を隠すが、PowerPoint / Keynote はベースライン揃えのまま描く。
+BULLET_CHAR = "・"
+BULLET_SIZE_PCT = "100000"   # 等倍。縮小すると記号の中心が字面中央から下へずれる
+BULLET_INDENT_IN = 0.24      # ぶら下げインデント(折返し行の左端)
 
 
 def add_bullets(slide, x, y, w, h, items, size, color, *, line_spacing=1.3,
                 space_after_pt=8, anchor=MSO_ANCHOR.TOP, weight=400):
-    """箇条書き: 項目ごとに独立したテキストボックス + その1行目の字面中央に置くベクター円。
+    """箇条書き: 段落の bullet(buChar)+ぶら下げインデント。折返し行は記号の右に揃う。
 
-    項目を1つの箱に段落として流し込まず、項目ごとに箱を分けているのは記号の縦位置の
-    ためである。同じ箱に流すと、記号の y は「前の項目が何行に折り返したか」の見積りに
-    依存し、見積りが1行でも外れると以降の記号が丸ごとずれる。項目ごとに箱を持てば、
-    1行目は常にその箱の上端にあるので、実際の折返し行数によらず記号は必ず1行目に乗る。
-    折返し行は記号の右(インデント位置)に揃う。
-
-    anchor は (x, y, w, h) の枠に対する箇条書き「ブロック全体」の寄せ方。項目の箱は
-    常に上寄せ(記号の基準を固定するため)なので、MIDDLE / BOTTOM は枠の中でブロックの
-    開始位置をずらして実現する — 短い項目群を高さ h のカードに置く呼び出し(roadmap)は
-    これで中央に揃う。"""
-    line_h = size / 72.0 * line_spacing * BULLET_LINE_BOX
-    gap = space_after_pt / 72.0
-    dot_d = size / 72.0 * BULLET_DOT_EM
-    text_x = x + BULLET_INDENT_IN
-    text_w = w - BULLET_INDENT_IN
-    dot_cx = x + BULLET_INDENT_IN * 0.31      # 記号はインデント帯の中で本文寄りに置く
-
-    heights = [_wrapped_lines(t, text_w, size) * line_h for t in items]
-    block_h = sum(heights) + gap * max(0, len(items) - 1)
-    slack = max(0.0, h - block_h)
-    if anchor == MSO_ANCHOR.MIDDLE:
-        cy = y + slack / 2
-    elif anchor == MSO_ANCHOR.BOTTOM:
-        cy = y + slack
-    else:
-        cy = y
-
-    boxes = []
-    for txt, item_h in zip(items, heights):
-        tb = slide.shapes.add_textbox(Inches(text_x), Inches(cy), Inches(text_w), Inches(item_h))
-        tf = tb.text_frame
-        tf.word_wrap = True
-        tf.vertical_anchor = MSO_ANCHOR.TOP   # 1行目を箱の上端に固定する(記号の基準)
-        tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
-        p = tf.paragraphs[0]
+    記号は本文と同じ段落に属するので、行が増減しても、編集されても、どのビューアでも
+    本文と一緒に動く。縦位置は和文中黒の字形設計で字面中央に乗る(上の注記)。"""
+    tb = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
+    tf = tb.text_frame
+    tf.word_wrap = True
+    tf.vertical_anchor = anchor
+    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+    indent = Inches(BULLET_INDENT_IN)
+    for i, txt in enumerate(items):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
         p.alignment = PP_ALIGN.LEFT
         p.line_spacing = line_spacing
+        # 段落後スペースは項目の「間」にだけ置く。最終段落にも付けると、中身の下に
+        # 見えない余白が1つ増え、縦中央寄せ(MIDDLE)がその分だけ上へずれる
+        # (LibreOffice は末尾を除外するが、PowerPoint は数えるビューアがある)
+        if i < len(items) - 1:
+            p.space_after = Pt(space_after_pt)
         _add_script_runs(p, txt, size, weight, color)
-        etree.SubElement(p._p.get_or_add_pPr(), f"{A_NS}buNone")
-        add_ellipse(slide, dot_cx - dot_d / 2, cy + line_h * BULLET_FIRST_LINE - dot_d / 2,
-                    dot_d, dot_d, color)
-        boxes.append(tb)
-        cy += item_h + gap
-    return boxes[-1] if boxes else None
+        pPr = p._p.get_or_add_pPr()
+        pPr.set("marL", str(int(indent)))
+        pPr.set("indent", str(-int(indent)))   # ぶら下げ: 1行目に記号、折返しは marL へ
+        buClr = etree.SubElement(pPr, f"{A_NS}buClr")
+        etree.SubElement(buClr, f"{A_NS}srgbClr").set("val", str(color))
+        etree.SubElement(pPr, f"{A_NS}buSzPct").set("val", BULLET_SIZE_PCT)
+        etree.SubElement(pPr, f"{A_NS}buFont").set("typeface", FONTS["ea"])
+        etree.SubElement(pPr, f"{A_NS}buChar").set("char", BULLET_CHAR)
+    return tb
 
 
 P_NS = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
@@ -303,18 +273,6 @@ def add_rect(slide, x, y, w, h, fill: RGBColor | None, *, line: RGBColor | None 
             if d is None:
                 d = etree.SubElement(ln, f"{A_NS}prstDash")
             d.set("val", dash)
-    sh.shadow.inherit = False
-    _strip_style(sh)
-    return sh
-
-
-def add_ellipse(slide, x, y, w, h, fill: RGBColor):
-    """塗りつぶしの円/楕円(枠線なし)。箇条書き記号のように、位置と大きさを
-    フォントに委ねず自分で決めたい小さなオブジェクトに使う。"""
-    sh = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(x), Inches(y), Inches(w), Inches(h))
-    sh.fill.solid()
-    sh.fill.fore_color.rgb = fill
-    sh.line.fill.background()
     sh.shadow.inherit = False
     _strip_style(sh)
     return sh
@@ -1500,7 +1458,10 @@ def p_roadmap(slide, spec, deck):
         for i, ph in enumerate(phases):
             px = x + i * pw
             add_rect(slide, px, ry, pw - 0.06, row_h, C["surface_tint"], radius_pt=LAY["card"]["radius_pt"])
-            add_bullets(slide, px + 0.2, ry, pw - 0.44, row_h - 0.2,
+            # 箇条書き枠の上下インセットは対称にする。上端をカードに合わせて高さだけ
+            # 削ると、枠の中心がカードの中心より上にずれ、MIDDLE 寄せの結果も上に浮く
+            pad = 0.1
+            add_bullets(slide, px + 0.2, ry + pad, pw - 0.44, row_h - 2 * pad,
                         ph.get("items", []), TS["body_small"], C["ink_subtle"],
                         line_spacing=1.25, space_after_pt=7, anchor=MSO_ANCHOR.MIDDLE)
 
