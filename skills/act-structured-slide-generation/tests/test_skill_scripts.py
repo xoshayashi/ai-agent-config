@@ -696,6 +696,22 @@ def test_build_forecast_styling_stays_on_palette(tmp_path):
     assert r.returncode == 0, r.stdout + r.stderr
 
 
+def test_lint_treats_plain_white_as_ground_not_content(tmp_path):
+    """canvas は白に近いが白ではない(FAF7F1 で最大差14)。純白を地として扱わないと、
+    テンプレート背景が抜けて白く出たレンダーが「一面コンテンツ」に見え、空白系の検査が
+    黙って効かなくなる。カード面(surface_tint)は白とも差が大きいので構造のまま残る。"""
+    from PIL import Image, ImageDraw
+
+    # 背景が抜けた(純白)レンダー: 本文帯の上端だけにブロック → 下部空白を検出できること
+    im = Image.new("RGB", (1466, 825), (0xFF, 0xFF, 0xFF))
+    ImageDraw.Draw(im).rectangle([100, 185, 1300, 260], fill=(0x2D, 0x33, 0x2E))
+    im.save(tmp_path / "deck-01.png")
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(_minimal_deck(), ensure_ascii=False))
+    r = run("lint_render.py", tmp_path, "--spec", spec)
+    assert r.returncode == 1 and "下部に大きな空白" in r.stdout, r.stdout
+
+
 def test_lint_render_detects_bottom_whitespace(tmp_path):
     from PIL import Image, ImageDraw
 

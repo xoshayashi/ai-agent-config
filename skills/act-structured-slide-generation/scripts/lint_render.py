@@ -30,12 +30,22 @@ from PIL import Image
 from deck_text import HW as _HW, token_rgb as _token_rgb
 
 CANVAS = _token_rgb("canvas", (0xFA, 0xF7, 0xF1))
+WHITE = (0xFF, 0xFF, 0xFF)
 TOL = 26  # per-channel tolerance: antialiasing over near-white
 BAND = 6  # px
 
 
+def is_ground(px, tol: int) -> bool:
+    """地(=何も置かれていない面)か。canvas だけでなく純白も地として扱う — canvas は
+    白に近いが白そのものではない(FAF7F1 なら最大差 14)ので、テンプレート背景が抜けて
+    白く出たレンダーを「一面コンテンツ」と誤読し、空白系の検査が黙って効かなくなる。
+    カード面(surface_tint)は canvas とも白とも差が大きいので、構造として残る。"""
+    return all(abs(px[i] - CANVAS[i]) <= tol for i in range(3)) or \
+        all(abs(px[i] - WHITE[i]) <= tol for i in range(3))
+
+
 def is_content(px) -> bool:
-    return any(abs(px[i] - CANVAS[i]) > TOL for i in range(3))
+    return not is_ground(px, TOL)
 
 
 def edge_scan(im: Image.Image) -> list[str]:
@@ -68,8 +78,7 @@ def balance_scan(im: Image.Image) -> list[str]:
     band_top, band_bot = int(h * 0.23), int(h * 0.92)
     ink_rows = []
     for y in range(band_top, band_bot, 2):
-        n = sum(1 for x in range(0, w, 4)
-                if any(abs(p[x, y][i] - CANVAS[i]) > 8 for i in range(3)))
+        n = sum(1 for x in range(0, w, 4) if not is_ground(p[x, y], 8))
         if n > w // 4 * 0.02:
             ink_rows.append(y)
     if not ink_rows:
