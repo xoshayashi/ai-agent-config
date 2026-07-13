@@ -2352,7 +2352,7 @@ def test_prose_keeps_its_line_breaks_from_the_renderer():
     短い行が階段状に並び、文としてはかえって読みにくい — ラベルと文章では要求が逆になる。"""
     D = _deck_text()
     prose = ["サービスを跨いで接点数と稼働量を増やし、従量利用料を積み上げ",
-             "SaaS / RPAが担えない説明・相談・ケアなど非定型コミュニケーション業務が人手依存のまま"]
+             "CRM・SFA・社内ナレッジと連携し、記録まで埋め込み"]
     for text in prose:
         assert D.is_prose(text), text
         assert "\n" not in D.wrap_display(text, 1.35, 13, 5), text
@@ -2361,6 +2361,15 @@ def test_prose_keeps_its_line_breaks_from_the_renderer():
     for text in labels:
         assert not D.is_prose(text), text
         assert "\n" in D.wrap_display(text, 1.35, 13, 5), text
+    # 長い名詞句は文ではなくラベル。長さで文章と決めつけると、レンダラが語の途中で割る
+    # (「単一のワークフ/ローで完結」)。スライドの表示テキストは体言止めが原則である
+    noun_phrases = ["電子帳簿保存法とインボイス制度への対応を単一のワークフローで完結",
+                    "中堅企業の業務複雑性に対応した統合スイートの提供体制"]
+    for text in noun_phrases:
+        assert not D.is_prose(text), text
+        broken = D.wrap_display(text, 3.0, 16, 5)
+        assert "\n" in broken, text
+        assert "ワークフ\n" not in broken and "統合ス\n" not in broken, broken
 
 
 def test_line_counts_come_only_from_the_measured_estimator():
@@ -2445,3 +2454,22 @@ def test_validate_warns_on_unspeakable_speaker_notes(tmp_path):
     warns = [ln for ln in r.stdout.splitlines() if "読み上げ" in ln]
     assert warns, r.stdout
     assert "→" in warns[0] or "CAGR" in warns[0]
+
+
+def test_tts_tells_a_fraction_from_a_date():
+    """「1/3」は分数、「9/1」は日付、「2025/26」は年度。区別せずに「1分の9」と読ませると、
+    警告そのものが誤読を教えることになる。"""
+    D = _deck_text()
+    assert dict(D.tts_risks("粗利は1/3の水準です"))["1/3"].startswith("分数")
+    assert "9月1日" in dict(D.tts_risks("9/1に正式リリースします"))["9/1"]
+    assert D.tts_risks("2025/26年度の実績です") == []
+    assert "12月25日" in dict(D.tts_risks("12/25にローンチします"))["12/25"]
+
+
+def test_canon_decks_pass_their_own_tts_check():
+    """スキルの手本(examples)が自分の検査に落ちていては、警告は読まれなくなる。"""
+    D = _deck_text()
+    for path in (SAMPLE, SAMPLE_EARNINGS):
+        for i, s in enumerate(json.loads(path.read_text())["slides"], start=1):
+            risks = D.tts_risks(s.get("speaker_notes", ""))
+            assert not risks, f"{path.name} slide {i}: {risks}"

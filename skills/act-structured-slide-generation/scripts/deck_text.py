@@ -14,7 +14,10 @@ from pathlib import Path
 TOKENS_PATH = Path(__file__).resolve().parent.parent / "references" / "tokens.json"
 
 
+@lru_cache(maxsize=1)
 def load_tokens() -> dict:
+    """トークンは1回だけ読む。折返しの判定は文字列ごとに走るので、毎回読み直すと
+    ビルド時間の2割がJSONの再パースに消える。"""
     return json.loads(TOKENS_PATH.read_text())
 
 
@@ -305,27 +308,18 @@ def _segments(text: str) -> tuple[list[str], list[float]]:
 #   文章(読点を持つ文)           : 行はできるだけ埋めたい。文節ごとに割ると短い行が階段状に
 #                                並び、読み進めるリズムが崩れる — 折返しはレンダラに委ねる
 _SENTENCE_MARKS = "、。，．"
-_ENUM_MARKS = ("・", "/", "／")
-
-
-def _is_enumeration(text: str) -> bool:
-    """短い項目が中黒・スラッシュで並ぶ「列挙」か。列挙は文ではなくラベルの列なので、
-    項目の切れ目で割るのが正しい。区切りがあっても項目が長ければ、それは文の中に中黒が
-    混じっているだけ(「SaaS / RPAが担えない説明・相談・ケアなど…」)。"""
-    limit = load_tokens()["line_break"]["enum_segment_max_chars_ja"]
-    parts = [p for p in re.split(r"[・/／]", text) if p.strip()]
-    return len(parts) >= 3 and all(ja_len(p.strip()) <= limit for p in parts)
 
 
 def is_prose(text: str) -> bool:
-    """その文字列を「文章」として扱うか。文章の改行位置には手を出さない。"""
+    """その文字列を「文章」として扱うか。文章の改行位置には手を出さない。
+
+    判定は「節でできているか」— 読点・句点は、文が節に分かれている印である。長さでは
+    判定しない: スライドの表示テキストは体言止めが原則で、長い名詞句(「電子帳簿保存法と
+    インボイス制度への対応を単一のワークフローで完結」)は文ではなくラベルであり、
+    レンダラに任せれば「ワークフ/ロー」のように語の途中で割れる。"""
     if not text:
         return False
-    if any(ch in text for ch in _SENTENCE_MARKS):
-        return True                                  # 読点・句点を持つ = 節でできた文
-    if ja_len(text) <= load_tokens()["line_break"]["label_max_chars_ja"]:
-        return False                                 # 短い = ラベル・見出し・結論句
-    return not _is_enumeration(text)                 # 長くても純粋な列挙ならラベルの列
+    return any(ch in text for ch in _SENTENCE_MARKS)
 
 
 def wrap_display(text: str, width_in: float, size_pt: float, max_lines: int = 3,
@@ -424,10 +418,39 @@ def tts_risks(text: str) -> list[tuple[str, str]]:
             hint = "／".join(readings) if readings else "文を切るか接続詞に置き換える"
             found.append((sym["pattern"], hint))
     for pat in table["patterns"]:
-        m = re.search(pat["regex"], text)
-        if m:
-            hint = pat["hint"]
-            for i, g in enumerate(m.groups(), start=1):
+        for m in re.finditer(pat["regex"], text):
+            guard = pat.get("guard")
+            if guard == "fraction" and not _looks_like_fraction(m):
+                continue                             # 「9/1」は日付、「2025/26」は年度 — 分数ではない
+            if guard == "date" and not _looks_like_date(m):
+                continue
+            hint, label = pat["hint"], pat.get("label", "{0}")
+            for i, g in enumerate((m.group(0),) + m.groups()):
                 hint = hint.replace("{%d}" % i, g or "")
-            found.append((m.group(0), hint))
-    return found
+                label = label.replace("{%d}" % i, g or "")
+            found.append((label, hint))
+            break
+    seen, out = set(), []
+    for frag, hint in found:
+        if frag not in seen:
+            seen.add(frag)
+            out.append((frag, hint))
+    return out
+
+
+def _looks_like_fraction(m) -> bool:
+    """「1/3」は分数、「9/1」は日付、「2025/26」は年度。分子<分母、分母12以下のときだけ分数。"""
+    try:
+        num, den = int(m.group(1)), int(m.group(2))
+    except (TypeError, ValueError):
+        return False
+    return num < den <= 12
+
+
+def _looks_like_date(m) -> bool:
+    """月/日として読める組(1-12 / 1-31)で、分数として読めないもの。"""
+    try:
+        month, day = int(m.group(1)), int(m.group(2))
+    except (TypeError, ValueError):
+        return False
+    return 1 <= month <= 12 and 1 <= day <= 31 and not _looks_like_fraction(m)
