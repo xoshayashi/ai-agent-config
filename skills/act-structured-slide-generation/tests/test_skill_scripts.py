@@ -697,7 +697,7 @@ def test_build_forecast_styling_stays_on_palette(tmp_path):
 
 
 def test_lint_treats_plain_white_as_ground_not_content(tmp_path):
-    """canvas は白に近いが白ではない(FAF7F1 で最大差14)。純白を地として扱わないと、
+    """canvas は白に近いが白ではない(FDFBF7 で最大差8)。純白を地として扱わないと、
     テンプレート背景が抜けて白く出たレンダーが「一面コンテンツ」に見え、空白系の検査が
     黙って効かなくなる。カード面(surface_tint)は白とも差が大きいので構造のまま残る。"""
     from PIL import Image, ImageDraw
