@@ -26,6 +26,7 @@ OK_FONTS = {TOKENS["fonts"]["latin"], TOKENS["fonts"]["latin_semibold"],
 SLIDE_W_IN = TOKENS["slide"]["width_in"]
 SLIDE_H_IN = TOKENS["slide"]["height_in"]
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+CELL_INSET_IN = 0.18   # 表セルの左右余白+折返しの安全余白(build_deck._cell_text_w と同じ)
 
 # 計測は deck_text の単一実装を使う — ビルダーが「どこで切るか」を決めた物差しと、検証が
 # 「はみ出すか/重なるか」を判定する物差しは、同じでなければ意味がない
@@ -100,7 +101,7 @@ def _para_metrics(tf, w_in):
         yield lines * drawn_line_h(size, None, spacing), space_after, max(widths), lines
 
 
-def check_natural_wrap(shape, warns, where):
+def check_natural_wrap(shape, warns, where, width_in: float | None = None):
     """その列に収まらない語を拾う。
 
     行の切れ目は、短いラベルなら文節へ寄せ、それ以外は自然に詰めながら語をまたぐときだけ
@@ -109,7 +110,7 @@ def check_natural_wrap(shape, warns, where):
     tf = shape.text_frame
     # 折返しの判定は、ビルダーが行を決めたときと同じ幅で行う — ここで数 mm でも差をつけると、
     # ぎりぎり1行に収まった文を「2行になる」と読み違え、直すところのない警告が出る
-    w_in = Emu(shape.width).inches
+    w_in = width_in if width_in is not None else Emu(shape.width).inches
     if w_in <= 0.05:
         return
     for para in tf.paragraphs:
@@ -150,6 +151,19 @@ def check_natural_wrap(shape, warns, where):
             if broken:
                 warns.append(f"{where}: 語を割らずには組めない文 — '{broken[0]}' が行をまたぐ"
                              f"(コピーを短くするか列を広げる)")
+
+
+def check_table_wrap(shape, warns, where):
+    """表のセルも列である。セル内で使える幅は、列幅から左右の内側余白を引いた分しかない —
+    ビルダーが折返しを決めた幅と同じ幅で見る(scripts/build_deck._cell_text_w)。"""
+    table = shape.table
+    widths = [Emu(c.width).inches for c in table.columns]
+    for ri, row in enumerate(table.rows):
+        for ci, cell in enumerate(row.cells):
+            if not cell.text.strip():
+                continue
+            avail = max(0.4, widths[ci] - CELL_INSET_IN)
+            check_natural_wrap(cell, warns, f"{where}: 表 r{ri + 1}c{ci + 1}", width_in=avail)
 
 
 def check_overflow(shape, issues, where):
@@ -308,6 +322,11 @@ def main() -> int:
                 if _measure_ok:
                     check_overflow(shape, issues, f"slide {idx}")
                     check_natural_wrap(shape, warns, f"slide {idx}")
+            elif getattr(shape, "has_table", False):
+                # 表もテキストである。セルを見ないと、列に収まらない語がそのまま割れて描かれる
+                n_text += 1
+                if _measure_ok:
+                    check_table_wrap(shape, warns, f"slide {idx}")
         if n_text == 0:
             issues.append(f"slide {idx}: no text at all")
         check_collisions(slide, idx, issues)

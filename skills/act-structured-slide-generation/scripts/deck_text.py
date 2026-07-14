@@ -166,8 +166,9 @@ def _pil_font(family: str, weight: int, size_px: int):
     return ImageFont.truetype(_FONT_FILES[(family, weight)], size=size_px)
 
 
-_ASCII_RUN = re.compile(r"[!-~]+(?: [!-~]+)*")
-_DIGITS_ONLY = re.compile(r"^[0-9.,%\-+/]+$")
+# 走りの切り方は、測るときと描くときで同じでなければ意味がない — build_deck もこれを使う
+SCRIPT_RUN = re.compile(r"[\x20-\x7E]+")                              # 欧文・数字の連続区間
+EA_DIGIT_RUN = re.compile(r"^[0-9 /:.,()%+\-]*[0-9][0-9 /:.,()%+\-]*$")  # 和文中の数字だけの区間
 
 
 def text_width_in(text: str, size_pt: float, weight: int = 400) -> float:
@@ -180,18 +181,19 @@ def text_width_in(text: str, size_pt: float, weight: int = 400) -> float:
         return ja_len(text) * size_pt / 72.0
     w = weight if weight in (400, 600, 700) else 400
     px = int(size_pt * 4)
-    has_cjk = any(ord(ch) > 0x2E7F for ch in text)
+    s = hw(text)                                   # 描くときと同じ正規化(全角英数は半角へ)
+    has_cjk = any(ord(ch) > 0x2E7F for ch in s)
     total, pos = 0.0, 0
-    for m in _ASCII_RUN.finditer(text):
+    for m in SCRIPT_RUN.finditer(s):
         if m.start() > pos:
-            total += _pil_font("NotoSansJP", w, px).getlength(text[pos:m.start()])
+            total += _pil_font("NotoSansJP", w, px).getlength(s[pos:m.start()])
         seg = m.group()
-        latin_is_ea = has_cjk and _DIGITS_ONLY.match(seg) is not None
+        latin_is_ea = has_cjk and EA_DIGIT_RUN.match(seg) is not None
         fam = "NotoSansJP" if (latin_is_ea or not GEIST_OK) else "Geist"
         total += _pil_font(fam, w, px).getlength(seg)
         pos = m.end()
-    if pos < len(text):
-        total += _pil_font("NotoSansJP", w, px).getlength(text[pos:])
+    if pos < len(s):
+        total += _pil_font("NotoSansJP", w, px).getlength(s[pos:])
     return total / 4 / 72.0
 
 
@@ -496,7 +498,6 @@ def wrap_prose(text: str, width_in: float, size_pt: float, weight: int = 400) ->
     if text_width_in(text, size_pt, weight) <= cap:
         return text
 
-    natural = _natural_lines(text, cap, size_pt, weight)
     words = _wrap_words(text)
 
     def w_of(ln):

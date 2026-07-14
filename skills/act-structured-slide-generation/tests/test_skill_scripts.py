@@ -2318,9 +2318,10 @@ def test_a_lead_is_drawn_on_every_statement_variant(tmp_path):
     誰にも読まれないまま消える — 実際、center_hero では lead が捨てられ、締めから48%が消えた。"""
     from pptx import Presentation
     lead, support = "上期進捗率48%は計画超過", "既存顧客の拡張が通期達成の確度を裏付け"
-    variants = [{}, {"variant": "closing_grid",
-                     "recap": [{"label": "進捗率", "value": "48", "unit": "%"},
-                               {"label": "ARR", "value": "4.3", "unit": "億円"}]}]
+    recap = [{"label": "進捗率", "value": "48", "unit": "%"},
+             {"label": "ARR", "value": "4.3", "unit": "億円"}]
+    variants = [{}] + [{"variant": v, "recap": recap} for v in
+                       ("closing_grid", "evidence_strip", "split_evidence", "editorial_split")]
     for i, extra in enumerate(variants):
         slide = {"pattern": "statement", "title": "結論", "subtitle": "上期実績が示す通期計画の確度",
                  "lead": lead, "statement": support}
@@ -2332,6 +2333,31 @@ def test_a_lead_is_drawn_on_every_statement_variant(tmp_path):
                         if sh.has_text_frame).replace("\n", "")
         assert lead in drawn, f"lead が描かれていない({extra.get('variant', 'center_hero')})"
         assert support in drawn, f"支える一文が描かれていない({extra.get('variant', 'center_hero')})"
+
+
+def test_table_cells_are_checked_for_words_wider_than_their_column(tmp_path):
+    """表もテキストである。セルを見ないと、列に収まらない語がそのまま割れて描かれる —
+    セル内で使える幅は列幅から内側余白を引いた分(build_deck._cell_text_w と同じ物差し)。"""
+    deck = {"meta": {"title": "t"}, "slides": [{
+        "pattern": "comparison_table",
+        "title": "狭い列に長い語を入れると、語の途中で割れて描かれる",
+        "subtitle": "列幅と語長の関係",
+        "table": {"headers": ["区分", "A", "B", "C"], "col_widths": [0.10, 0.30, 0.30, 0.30],
+                  "rows": [["電子帳簿保存法対応", "あ", "い", "う"]]},
+        "source": "テスト"}]}
+    out = tmp_path / "t.pptx"
+    assert run("build_deck.py", _write(tmp_path, deck), "-o", out).returncode == 0
+    r = run("verify_deck.py", out)
+    assert "電子帳簿保存法対応" in r.stdout, r.stdout
+
+
+def test_the_ruler_that_measures_is_the_ruler_that_draws():
+    """折返しを決める幅と、実際に描かれる幅がずれると、行が1行早く折り返したり、こちらの
+    ソフト改行にレンダラの折返しが重なって空行が入る。走りの切り方は1か所しか持たない。"""
+    B = _import_build_deck()
+    D = _deck_text()
+    assert B.SCRIPT_RUN is D.SCRIPT_RUN, "欧文区間の切り方が二重定義されている"
+    assert B.EA_DIGIT_RUN is D.EA_DIGIT_RUN, "和文中の数字区間の判定が二重定義されている"
 
 
 def test_prose_fills_its_lines_but_never_splits_a_word():

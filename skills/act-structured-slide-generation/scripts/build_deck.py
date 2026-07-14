@@ -45,9 +45,9 @@ A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 
 # 表示長(_ja_len)と全角→半角(hw)は deck_text.py の単一実装を使う — validate_spec の
 # 字数バジェット・lint_render の readback 照合と同一実装であることが契約
-from deck_text import (MEASURE_OK, drawn_line_h, footer_text, header_slots, hw, ink_slacks,
-                       is_prose, ja_len as _ja_len, leading, text_width_in, wrap_display,
-                       wrap_prose)
+from deck_text import (EA_DIGIT_RUN, MEASURE_OK, SCRIPT_RUN, drawn_line_h, footer_text,
+                       header_slots, hw, ink_slacks, is_prose, ja_len as _ja_len, leading,
+                       text_width_in, wrap_display, wrap_prose)
 
 
 def _label_w(text: str, size_pt: float, weight: int = 400) -> float:
@@ -291,10 +291,6 @@ def _set_run_fonts(run, size_pt: float, weight: int = 400, color: RGBColor | Non
         el.set("typeface", ea)
 
 
-_ASCII_SEG = re.compile(r"[\x20-\x7E]+")
-_DIGIT_SEG = re.compile(r"^[0-9 /:.,()%+\-]*[0-9][0-9 /:.,()%+\-]*$")
-
-
 def _add_script_runs(p, text, size_pt, weight, color):
     """1段落ぶんのテキストを追加する。改行(\n)は段落を割らず、段落内のソフト改行
     (DrawingML の <a:br/>)として打つ。
@@ -321,7 +317,7 @@ def _add_line_runs(p, text, size_pt, weight, color):
     s = hw(text)
     has_cjk = any(ord(ch) > 0x2E7F for ch in s)
     pos = 0
-    for m in _ASCII_SEG.finditer(s):
+    for m in SCRIPT_RUN.finditer(s):
         if m.start() > pos:
             r = p.add_run(); r.text = s[pos:m.start()]
             _set_run_fonts(r, size_pt, weight, color, lang="ja-JP")
@@ -330,7 +326,7 @@ def _add_line_runs(p, text, size_pt, weight, color):
         # Geist の数字は 0.625em と広く(Noto Sans JP の半角数字は 0.55em)、和文中では
         # 全角数字のように見える。欧文単語(文字を含む区間)はブランドフォントの Geist を維持し、
         # CJK を含まない純欧文文字列(KPI 値等)には適用しない。
-        if has_cjk and _DIGIT_SEG.match(m.group()):
+        if has_cjk and EA_DIGIT_RUN.match(m.group()):
             _set_run_fonts(r, size_pt, weight, color, latin_ea=True, lang="en-US")
         else:
             _set_run_fonts(r, size_pt, weight, color, ea_latin=True, lang="en-US")
@@ -2200,20 +2196,32 @@ def p_quote_or_statement(slide, spec, deck):
     if variant in ("split_evidence", "editorial_split") and recap:
         lx, lw = grid(0, 7)
         rx, rw = grid(8, 4)
-        s_pt = TS["statement"] if _ja_len(stmt) <= 60 else max(30, TS["statement"] - 6)
-        lines = _text_lines(stmt, lw, s_pt, 700)
+        lead, support = split_message(spec)
+        s_pt = TS["statement"] if _ja_len(lead) <= 60 else max(30, TS["statement"] - 6)
+        lines = _text_lines(lead, lw, s_pt, 700)
         # Split-evidence closers use a large editorial statement; mixed JP/ASCII numerals
         # often wrap one line earlier in the rendered font than the simple JA estimate.
         text_h = (lines + 0.35) * (s_pt / 72.0) * 1.52 * 1.15 + 0.16
+        sup_pt = TS["subtitle"]
+        sup_lines = wrap_prose(support, lw, sup_pt).split("\n") if support else []
+        sup_h = (len(sup_lines) * drawn_line_h(sup_pt, None, leading(sup_pt)) + 0.06
+                 if sup_lines else 0.0)
+        sup_gap = 0.22 if sup_lines else 0.0
         attr_h = 0.40 if spec.get("attribution") else 0.0
-        group_h = 0.36 + text_h + attr_h
+        group_h = 0.36 + text_h + sup_gap + sup_h + attr_h
         rail_h = min(h - 0.30, max(2.75, 0.55 + len(recap) * 0.72 + 0.28))
         gy = y0 + max(0.0, (h - max(group_h, rail_h)) * 0.45)
         add_rect(slide, lx, gy, 0.82, 0.055, C["primary"])
-        add_text(slide, lx, gy + 0.32, lw, text_h, [[(stmt, s_pt, 700, C["ink"])]],
+        add_text(slide, lx, gy + 0.32, lw, text_h, [[(lead, s_pt, 700, C["ink"])]],
                  line_spacing=1.34, align=PP_ALIGN.LEFT)
+        by = gy + 0.32 + text_h
+        if sup_lines:
+            add_text(slide, lx, by + sup_gap, lw, sup_h,
+                     [[("\n".join(sup_lines), sup_pt, 400, C["ink_subtle"])]],
+                     display_wrap=False)
+            by += sup_gap + sup_h
         if spec.get("attribution"):
-            add_text(slide, lx, gy + 0.32 + text_h + 0.10, lw, 0.32,
+            add_text(slide, lx, by + 0.10, lw, 0.32,
                      [[(spec["attribution"], TS["body_small"], 400, C["ink_faint"])]])
         ry = gy
         add_rect(slide, rx, ry, rw, rail_h, C["surface_tint"], radius_pt=LAY["card"]["radius_pt"])

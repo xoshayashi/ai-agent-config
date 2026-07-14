@@ -249,6 +249,13 @@ def main() -> int:
             if pat in EVIDENCE_PATTERNS and pat not in ("competitive_landscape", "diagram") and not any(ch.isdigit() for ch in title):
                 warns.append(f"{loc}: エビデンススライドのタイトルに数字がない — 図表が証明する結論の数値を1つ入れる")
 
+        dg = s.get("diagram") or {}
+        if dg.get("kind") == "ring" and "cycle" not in dg:
+            vals = [seg.get("value") for seg in dg.get("segments", [])]
+            if len(vals) >= 3 and len(set(vals)) == 1:
+                warns.append(f"{loc}: 均等な ring は循環として描かれる(時計回り・番号・矢) — "
+                             "比率を見せたいなら diagram.cycle: false、循環なら true と明示する")
+
         if pat == "financial_highlights" and len(s.get("groups", [])) > 3:
             warns.append(f"{loc}: financial_highlights の groups が {len(s['groups'])} 件 — ヒーローカードは3枚まで。"
                          "4件目以降の主指標は補助ストリップへ回るため、グループを3つに絞るかスライドを分割する")
