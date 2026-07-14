@@ -435,8 +435,16 @@ def wrap_prose(text: str, width_in: float, size_pt: float, weight: int = 400) ->
     cap = max(0.05, width_in - 0.3 * size_pt / 72.0)
     if text_width_in(text, size_pt, weight) <= cap:
         return text
+    # 行頭に立てない字(、。・など)は、前の語にくっつけたまま詰める — あとから戻すと、
+    # 戻した1字ぶんで行が溢れ、レンダラが先に折り返してしまう
+    words: list[str] = []
+    for wd in _words(text):
+        if words and wd and wd[0] in _NO_LINE_START:
+            words[-1] += wd
+        else:
+            words.append(wd)
     lines, cur, cur_w, moved = [], "", 0.0, False
-    for word in _words(text):
+    for word in words:
         w = text_width_in(word, size_pt, weight)
         if cur and cur_w + w > cap:
             if len(word) > 1 and w <= cap:
@@ -453,16 +461,9 @@ def wrap_prose(text: str, width_in: float, size_pt: float, weight: int = 400) ->
         # 箱に入らない語がある行を作ってしまった。はみ出した行の後ろにソフト改行を置くと、
         # レンダラが先に折り返して空行が1本入る — その場合は一切手を出さない
         return text
-    # 行頭禁則: 句読点や閉じ括弧で行を始めない(前の行の末尾へ戻す)
-    for i in range(1, len(lines)):
-        while lines[i] and lines[i][0] in _NO_LINE_START:
-            lines[i - 1] += lines[i][0]
-            lines[i] = lines[i][1:]
     lines = [ln for ln in lines if ln]
     if any(text_width_in(ln, size_pt, weight) > cap for ln in lines):
-        # 禁則で戻した1字が行を溢れさせた。溢れた行の後ろにソフト改行を置くと、レンダラが
-        # 先に折り返して空行が入る — その場合は一切手を出さない
-        return text
+        return text                                   # 1語で溢れる行がある = レンダラに委ねる
     return "\n".join(lines)
 
 

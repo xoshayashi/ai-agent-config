@@ -11,7 +11,7 @@ import re
 import sys
 from pathlib import Path
 
-from deck_text import MEASURE_OK, _words as words, text_width_in as _measure
+from deck_text import MEASURE_OK, _words as words, drawn_line_h, text_width_in as _measure
 from pptx import Presentation
 from pptx.util import Emu
 
@@ -92,9 +92,10 @@ def _para_metrics(tf, w_in):
                 for r in runs if r.text
             ))
         lines = sum(max(1, -(-int(w * 100) // max(1, int(text_w * 100)))) for w in widths)
-        spacing = para.line_spacing if isinstance(para.line_spacing, float) else 1.15
+        spacing = para.line_spacing if isinstance(para.line_spacing, float) else None
         space_after = para.space_after.pt / 72.0 if para.space_after is not None else 0.0
-        yield lines * (size / 72.0) * spacing, space_after, max(widths), lines
+        # 行の高さは「実際に描かれる高さ」で測る(レンダラはフォント本来の行高より低い行を作らない)
+        yield lines * drawn_line_h(size, None, spacing), space_after, max(widths), lines
 
 
 def check_natural_wrap(shape, warns, where):
