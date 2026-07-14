@@ -2313,6 +2313,27 @@ def test_driver_decomposition_caps_its_factors(tmp_path):
     assert run("build_deck.py", spec, "-o", out).returncode == 0
 
 
+def test_a_lead_is_drawn_on_every_statement_variant(tmp_path):
+    """言い切る一行(lead)は、変種によらず必ず描く。描かれない欄に文を置かせると、その主張は
+    誰にも読まれないまま消える — 実際、center_hero では lead が捨てられ、締めから48%が消えた。"""
+    from pptx import Presentation
+    lead, support = "上期進捗率48%は計画超過", "既存顧客の拡張が通期達成の確度を裏付け"
+    variants = [{}, {"variant": "closing_grid",
+                     "recap": [{"label": "進捗率", "value": "48", "unit": "%"},
+                               {"label": "ARR", "value": "4.3", "unit": "億円"}]}]
+    for i, extra in enumerate(variants):
+        slide = {"pattern": "statement", "title": "結論", "subtitle": "上期実績が示す通期計画の確度",
+                 "lead": lead, "statement": support}
+        slide.update(extra)
+        deck = {"meta": {"title": "t"}, "slides": [slide]}
+        out = tmp_path / f"s{i}.pptx"
+        assert run("build_deck.py", _write(tmp_path, deck), "-o", out).returncode == 0
+        drawn = "".join(sh.text_frame.text for sh in Presentation(str(out)).slides[0].shapes
+                        if sh.has_text_frame).replace("\n", "")
+        assert lead in drawn, f"lead が描かれていない({extra.get('variant', 'center_hero')})"
+        assert support in drawn, f"支える一文が描かれていない({extra.get('variant', 'center_hero')})"
+
+
 def test_prose_fills_its_lines_but_never_splits_a_word():
     """文章は行を埋めて流す。ただし、はみ出す文の折返しをレンダラに任せると、字送りの
     わずかな差で語の途中に切れ目が落ちる(「結果まで続/く運用は」)— 行が埋まっていることと、

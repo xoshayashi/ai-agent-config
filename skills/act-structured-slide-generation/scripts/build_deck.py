@@ -2241,25 +2241,38 @@ def p_quote_or_statement(slide, spec, deck):
 
     x, w = grid(1, 10)
     eff_w = w * 0.94  # 中央揃えの実効幅
-    s_pt = TS["statement"] if _ja_len(stmt) <= 60 else max(30, TS["statement"] - 6)
-    stmt_lines = _statement_lines(stmt, eff_w, s_pt)  # 、で節分割し末尾の孤立行を防ぐ
+    # 言い切る一行と、それを支える一文。lead を書いたら、どの変種でも必ず描く —
+    # 描かれない欄に文を置かせると、その主張は誰にも読まれないまま消える
+    lead, support = split_message(spec)
+    s_pt = TS["statement"] if _ja_len(lead) <= 60 else max(30, TS["statement"] - 6)
+    stmt_lines = _statement_lines(lead, eff_w, s_pt)  # 、で節分割し末尾の孤立行を防ぐ
     # 節が実効幅を超えて折返す間はフォントを1ptずつ縮小(28pt下限)。節自体が長すぎて
     # 28ptでも1行に収まらない場合は validate_spec が短縮を警告する(縮小より短文化が原則)。
     while s_pt > 28 and any(_text_lines(ln, eff_w, s_pt, 700) > 1 for ln in stmt_lines):
         s_pt -= 1
-        stmt_lines = _statement_lines(stmt, eff_w, s_pt)
+        stmt_lines = _statement_lines(lead, eff_w, s_pt)
     lines = sum(max(1, _text_lines(ln, eff_w, s_pt, 700)) for ln in stmt_lines)  # 実効幅で行数見積
     text_h = lines * (s_pt / 72.0) * 1.5 * 1.15 + 0.06  # 1.15 = 和文行ボックス補正
+    sup_pt = TS["subtitle"]
+    sup_lines = wrap_prose(support, eff_w, sup_pt).split("\n") if support else []
+    sup_h = (len(sup_lines) * drawn_line_h(sup_pt, None, leading(sup_pt)) + 0.06
+             if sup_lines else 0.0)
+    sup_gap = 0.26 if sup_lines else 0.0
     rule_h = 0.30
     attr_h = 0.44 if spec.get("attribution") else 0.0
     recap_h = 1.37 if recap else 0.0
-    group_h = rule_h + text_h + attr_h + recap_h
+    group_h = rule_h + text_h + sup_gap + sup_h + attr_h + recap_h
     gy = y0 + max(0.0, (h - group_h) * 0.45)
     add_rect(slide, x + w / 2 - 0.35, gy, 0.7, 0.05, C["primary"])
     ty = gy + rule_h
     add_text(slide, x, ty, w, text_h, [[("\n".join(stmt_lines), s_pt, 600, C["ink"])]],
              line_spacing=1.5, align=PP_ALIGN.CENTER)
     ay = ty + text_h + 0.14
+    if sup_lines:
+        add_text(slide, x, ty + text_h + sup_gap, w, sup_h,
+                 [[("\n".join(sup_lines), sup_pt, 400, C["ink_subtle"])]],
+                 align=PP_ALIGN.CENTER, display_wrap=False)
+        ay = ty + text_h + sup_gap + sup_h + 0.14
     if spec.get("attribution"):
         add_text(slide, x, ay, w, 0.3, [[(spec["attribution"], 13, 400, C["ink_faint"])]],
                  align=PP_ALIGN.CENTER)
