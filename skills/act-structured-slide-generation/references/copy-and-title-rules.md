@@ -48,32 +48,48 @@ one source of truth and no per-slide-type rules to remember:
 - Treat YoY, QoQ, vs plan, prior-year, and delta text as metric sublines with their own
   spacing, not as glued suffixes.
 
-## Line Breaks (phrase boundaries)
+## Line Breaks
 
-Where a line breaks is part of the writing, not an accident of box width. A renderer wraps on
-geometry alone: it will split a compound noun mid-word, tear okurigana off its stem, separate
-a number from its counter, or leave a particle or a symbol stranded at the head of a line.
-Each of those fills the line and breaks the sentence.
+A line break is part of the writing. Two kinds of text want two different things from it,
+and the builder gives each what it wants — the author writes copy, not line breaks.
 
-The builder wraps display text at phrase (bunsetsu) boundaries automatically
-(`deck_text.wrap_display`), so the rules below are about what you write, not about where you
-type a newline:
-
-- **Do not hand-break display text.** Labels, headings, bullets, cell text, callouts and
-  conclusion lines are wrapped by the builder at the boundary that reads best for the width
-  they will actually be drawn at. A `\n` you type is a *forced* break the builder preserves —
-  reserve it for the few slots that require an exact line count (the cover subtitle's two
-  lines), not for fixing a wrap you did not like.
-- **A break lands after a particle, after punctuation or a list separator, or between two
-  content words.** Nothing else is a break: okurigana never leaves its stem, a number never
-  leaves its counter, a suffix never starts a line.
-- **If the phrasing cannot be wrapped inside the box, the copy is too long for that column.**
-  The engine refuses to mangle it and lets the renderer wrap naturally, and `verify_deck`
-  warns. Shorten the copy or widen the container — never shrink the type.
-- **Long body copy is left alone.** Beyond `tokens.line_break.max_display_chars_ja`, text is
-  body, not display text: forced breaks there rot the moment anyone edits a word.
-- Write phrases that survive wrapping: keep a metric and its unit in one chunk, and avoid
-  clause-length labels that only fit a narrow column by breaking mid-word.
+- **Short display text — labels, headings, cell text, conclusion lines — breaks on meaning.**
+  Up to `tokens.line_break.label_max_chars_ja`, the break lands on a phrase boundary
+  (bunsetsu), so the phrasing shows in the shape of the block — a fee label breaks after the
+  connective, a growth phrase breaks after its particle. Particles and symbols stay with the
+  word they belong to, a number stays with its counter, and okurigana stays with its stem.
+- **Everything longer — sentences and body copy — fills its lines, and the builder writes the
+  breaks.** A sentence that fits its column is left alone. One that does not is set by
+  `deck_text.wrap_prose`: each line is filled to the last whole word, and the word that would
+  straddle the break starts the next line. Leaving that wrap to the renderer is what puts a
+  break inside a word — its letter spacing differs from ours by a fraction, and a fraction is
+  all it takes to land between a stem and its okurigana. A filled line and an unbroken word
+  are not in tension; you get both by deciding the break yourself.
+- **A line never opens on a character that cannot open one.** A comma, a full stop, a middle
+  dot or a closing bracket belongs to the line above, and a qualifier stays with what it
+  qualifies: a demonstrative and its noun, an approximator and its figure, a number and its
+  counter are one word each, however the particle before them reads.
+- **A number keeps the size that fits its card.** A value and its unit are one line; when that
+  line is wider than the card, the renderer drops the unit onto a second line and splits it.
+  The builder steps the numeral down until the line fits, and uses one size across the cards
+  so the comparison is not distorted.
+- **A symbolic message is composed as a form.** See the message-slide contract in
+  `grid-and-flex-strategy.md`: measure, balance and breathing are chosen together.
+- **Copy that fits its column is copy that survives layout.** Keeping a word whole must not
+  cost a line: when it does, the column is carrying more copy than it can hold, and the lines
+  come out short and stepped. `verify_deck` names the paragraph; say it in fewer words.
+- **A last line carries weight.** A line holding a single word is a widow; the builder pulls a
+  word down from the line above to balance the pair. Copy that ends on a two-character
+  fragment is copy to tighten.
+- **Copy that fits its column is copy that survives layout.** When a single word is wider than
+  its column, `verify_deck` names it: shorten the word or widen the column. Type size stays
+  as designed.
+- **Meaning is carried by commas and by line breaks.** A slide reads at a glance, so a clause
+  break is a comma and an emphasis break is a new line. When a point deserves to stand alone,
+  give it its own line — a statement slide gives it the `lead`. (`validate_spec` flags a dash
+  in slide-visible text and points to those two moves.)
+- A hand-typed `\n` is honoured as a forced break, which is what makes it right for the few
+  slots that require an exact line count (the cover subtitle's two lines).
 
 ## Words To Replace
 

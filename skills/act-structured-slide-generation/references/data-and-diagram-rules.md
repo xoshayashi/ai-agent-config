@@ -22,7 +22,10 @@ Every object routes to the most editable representation it can faithfully take (
   - **area / stacked-area** (`area`), **radar / scatter / bubble / waterfall / line_multi**
   - **org / ownership tree**, **freeform node graph / ecosystem** — `diagram.kind: org_tree | node_graph`
   - **ring / flywheel / cycle**, **funnel**, **pyramid**, **area-proportional Venn**, **coverage
-    matrix** — `diagram.kind: ring | funnel | pyramid | venn | matrix`
+    matrix** — `diagram.kind: ring | funnel | pyramid | venn | matrix`. A `ring` whose segments
+    all carry the same value is read as a cycle, not a share: it is drawn clockwise, its steps
+    are numbered and arrows sit at the joins. Set `diagram.cycle: false` when equal segments
+    really are equal shares.
 
   When a simple 2×2, ≤6-node tree, or ≤5-step flow reads fine natively, keep it native — do not
   reach for an image just because the image track exists.

@@ -137,7 +137,18 @@ by a predictable fraction of the type size. Two rules follow:
   those tokens; if it assumes box-center == ink-center, correctly composed KPI cards get
   reported as overlapping text and the "fix" would be to break the layout.
 
-### 16. Measure text with the real font, in one place
+### 16. Overlapping text frames are a defect even when the ink is fine
+
+A vertically centred box places its text at the box's centre, so a box taller than its text
+still renders correctly — and quietly overlaps the box above it. In a viewer nothing looks
+wrong; in PowerPoint the editor grabs the wrong frame, and a small change in font metrics
+turns the frame overlap into a text overlap. Give every frame the size of its text: an
+ink-placed block gets the height of its ink (`stack_optical`), a fixed-position label gets
+the height of its line stack, and a no-wrap label gets the measured width of its string
+(`build_deck._label_w`). Never pad a frame "for safety" — the padding lands in the next
+frame. `verify_deck.check_frame_overlaps` warns on any pair that overlaps.
+
+### 17. Measure text with the real font, in one place
 
 Estimating a wrapped line count from character counts (full-width = 1, half-width = 0.55)
 diverges from the renderer as soon as Latin words or SemiBold weights appear — the estimate

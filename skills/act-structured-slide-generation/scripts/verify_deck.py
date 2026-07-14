@@ -7,18 +7,18 @@ Exit 0 = all checks green, exit 1 = violations found (fix deck.json / builder, r
 from __future__ import annotations
 
 import json
+import math
 import re
 import sys
 from pathlib import Path
 
-from deck_text import (MEASURE_OK, _segments as segments, ink_center_offset_in, ink_height_in,
-                       ja_len, text_width_in as _measure)
+from deck_text import (MEASURE_OK, _natural_lines, _words as words, drawn_line_h,
+                       text_width_in as _measure)
 from pptx import Presentation
 from pptx.util import Emu
 
 TOKENS = json.loads((Path(__file__).resolve().parent.parent / "references" / "tokens.json").read_text())
 LINE_BREAK = TOKENS["line_break"]
-INK_KIND_PREFIX = "ink:"   # build_deck が図形名に刻む宣言タグ
 ALLOWED = {v.upper() for v in TOKENS["colors"].values()}
 FORBIDDEN = {v.upper() for v in TOKENS["color_policy"]["forbidden_colors"]}
 OK_FONTS = {TOKENS["fonts"]["latin"], TOKENS["fonts"]["latin_semibold"],
@@ -26,6 +26,7 @@ OK_FONTS = {TOKENS["fonts"]["latin"], TOKENS["fonts"]["latin_semibold"],
 SLIDE_W_IN = TOKENS["slide"]["width_in"]
 SLIDE_H_IN = TOKENS["slide"]["height_in"]
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+CELL_INSET_IN = 0.18   # 表セルの左右余白+折返しの安全余白(build_deck._cell_text_w と同じ)
 
 # 計測は deck_text の単一実装を使う — ビルダーが「どこで切るか」を決めた物差しと、検証が
 # 「はみ出すか/重なるか」を判定する物差しは、同じでなければ意味がない
@@ -94,38 +95,75 @@ def _para_metrics(tf, w_in):
                 for r in runs if r.text
             ))
         lines = sum(max(1, -(-int(w * 100) // max(1, int(text_w * 100)))) for w in widths)
-        spacing = para.line_spacing if isinstance(para.line_spacing, float) else 1.15
+        spacing = para.line_spacing if isinstance(para.line_spacing, float) else None
         space_after = para.space_after.pt / 72.0 if para.space_after is not None else 0.0
-        yield lines * (size / 72.0) * spacing, space_after, max(widths), lines
+        # 行の高さは「実際に描かれる高さ」で測る(レンダラはフォント本来の行高より低い行を作らない)
+        yield lines * drawn_line_h(size, None, spacing), space_after, max(widths), lines
 
 
-def check_natural_wrap(shape, warns, where):
-    """文節で割れずに自然折返しへ落ちた表示テキストを拾う。
+def check_natural_wrap(shape, warns, where, width_in: float | None = None):
+    """その列に収まらない語を拾う。
 
-    ビルダーは表示テキスト(ラベル・箇条書き・セル)を文節の切れ目で折り返すが、その列幅に
-    対してコピーが長すぎると、どこで切っても行が足りず自然折返しに委ねる。そのときレンダラは
-    語の途中(初/回相談)で割る — 静かに崩れるので、ここで見えるようにする。直すのはコピーか
-    列幅であって、字を小さくすることではない。"""
+    行の切れ目は、短いラベルなら文節へ寄せ、それ以外は自然に詰めながら語をまたぐときだけ
+    その語を次行へ送る — どちらの経路でも語は割れない。割れるのは「1語が列幅より広い」ときで、
+    それは組版ではなくコピーの問題(語を短くするか、列を広げる)。ここで見えるようにする。"""
     tf = shape.text_frame
-    w_in = Emu(shape.width).inches - 0.02
+    # 折返しの判定は、ビルダーが行を決めたときと同じ幅で行う — ここで数 mm でも差をつけると、
+    # ぎりぎり1行に収まった文を「2行になる」と読み違え、直すところのない警告が出る
+    w_in = width_in if width_in is not None else Emu(shape.width).inches
     if w_in <= 0.05:
         return
     for para in tf.paragraphs:
         text = "".join(r.text for r in para.runs)
-        if not text.strip() or ja_len(text) > LINE_BREAK["max_display_chars_ja"]:
-            continue                                  # 長文は本文 — 自然折返しでよい
-        if para._p.find(f"{A}br") is not None:
-            continue                                  # 文節で折り返し済み
-        if len(segments(text)[0]) < 2:
-            continue                                  # 切れ目が無い語(社名など) — 折返しでは直せない
-        # 幅はランごとの実サイズで測る(値40pt+単位16pt のような混在段落を最大サイズで
-        # 測ると、収まっている行を「はみ出す」と誤って数える)
-        default = max((r.font.size.pt if r.font.size else 11) for r in para.runs)
-        width = sum(text_width_in(r.text, r.font.size.pt if r.font.size else default, _run_weight(r))
-                    for r in para.runs if r.text)
-        if width > max(0.05, w_in - _text_indent_in(para)):
-            warns.append(f"{where}: 文節で折り返せず自然折返し(語の途中で割れる) — "
-                         f"'{text[:24]}' … コピーを短くするか列幅を広げる")
+        if not text.strip():
+            continue
+        size = max((r.font.size.pt if r.font.size else 11) for r in para.runs)
+        avail = max(0.05, w_in - _text_indent_in(para))
+        weight = _para_weight(para)
+        if len({r.font.size.pt if r.font.size else 11 for r in para.runs}) > 1:
+            # 値と単位のように大きさの違う走りが並ぶ行。1つの大きさで行を組み直しても
+            # 実際の描かれ方にならない — この行は「収まるか」だけを、走りごとに測って見る
+            drawn_w = sum(text_width_in(r.text, r.font.size.pt if r.font.size else size,
+                                        _run_weight(r)) for r in para.runs)
+            if drawn_w > avail:
+                warns.append(f"{where}: 値と単位が列に収まらない — '{text[:20]}'"
+                             f"(数字の大きさを下げるか、列を広げる。単位が割れて描かれる)")
+            continue
+        too_wide = [w for w in words(text)
+                    if len(w) > 1 and text_width_in(w, size, weight) > avail]
+        if too_wide:
+            warns.append(f"{where}: 列幅に収まらない語 — '{too_wide[0]}'"
+                         f"(語を短くするか列を広げる。語の途中で割れて描かれる)")
+            continue
+        # 語を割らずに組むと行が増える = その列にはコピーが密すぎる。行が短く階段状に並ぶ
+        drawn = len(para._p.findall(f"{A}br")) + 1
+        cap = max(0.05, avail - 0.3 * size / 72.0)
+        natural = math.ceil(text_width_in(text, size, weight) / cap - 1e-9)
+        if drawn > natural >= 2:      # 1行→2行は、契約で行数を決めた見出し(表紙の副題)もある
+            warns.append(f"{where}: 語を割らずに組むと行が増える — '{text[:20]}'"
+                         f"({natural}行ぶんのコピーが{drawn}行になる。短く言い切る)")
+            continue
+        # 折返しを任せた段落。レンダラの行が語をまたぐなら、その列にはこの文が長すぎる
+        if drawn == 1 and text_width_in(text, size, weight) > cap:
+            lines = _natural_lines(text, cap, size, weight)
+            broken = [w for w in words(text)
+                      if len(w) > 1 and all(w not in ln for ln in lines)]
+            if broken:
+                warns.append(f"{where}: 語を割らずには組めない文 — '{broken[0]}' が行をまたぐ"
+                             f"(コピーを短くするか列を広げる)")
+
+
+def check_table_wrap(shape, warns, where):
+    """表のセルも列である。セル内で使える幅は、列幅から左右の内側余白を引いた分しかない —
+    ビルダーが折返しを決めた幅と同じ幅で見る(scripts/build_deck._cell_text_w)。"""
+    table = shape.table
+    widths = [Emu(c.width).inches for c in table.columns]
+    for ri, row in enumerate(table.rows):
+        for ci, cell in enumerate(row.cells):
+            if not cell.text.strip():
+                continue
+            avail = max(0.4, widths[ci] - CELL_INSET_IN)
+            check_natural_wrap(cell, warns, f"{where}: 表 r{ri + 1}c{ci + 1}", width_in=avail)
 
 
 def check_overflow(shape, issues, where):
@@ -157,54 +195,22 @@ def _overlap_frac(a, b) -> float:
     return inter / area if area > 0 else 0.0
 
 
-def _ink_kind_of(shape) -> str | None:
-    """描く側が図形名に刻んだインク種別(build_deck.stack_optical)。無ければ None。"""
-    name = shape.name or ""
-    if name.startswith(INK_KIND_PREFIX):
-        kind = name[len(INK_KIND_PREFIX):]
-        if kind in ("text", "numeral"):
-            return kind
-    return None
-
-
 def _ink_bbox(shape):
-    """Approximate the rendered text extent (ink box), not the nominal textbox:
-    width = measured widest line (capped at box width), height = computed line stack."""
+    """描かれる文字の範囲(インク箱)。段落を積んだ箱では、段落後スペースも文字を押し下げる —
+    行の高さだけで測ると、下の段落のぶんが見えず、重なりを見逃す。"""
     box = _bbox(shape)
     if not _measure_ok:
         return box
     w_in = box[2] - box[0]
-    max_w, used_h, n_lines = 0.0, 0.0, 0
-    # space_after はボックス内の余白であってインクではないため ink 高には含めない
-    for line_h, _space_after, width, lines in _para_metrics(shape.text_frame, w_in):
-        used_h += line_h
-        n_lines += lines
+    max_w, used_h = 0.0, 0.0
+    for line_h, space_after, width, _lines in _para_metrics(shape.text_frame, w_in):
+        used_h += line_h + space_after
         max_w = max(max_w, min(width, w_in))
     if max_w <= 0:
         return box
-    anchor = shape.text_frame.vertical_anchor
     from pptx.enum.text import MSO_ANCHOR as _MA
-    kind = _ink_kind_of(shape)
-    if anchor == _MA.MIDDLE and kind is not None:
-        # 縦中央寄せの箱では、インクは箱の中心にちょうど座らない(和文は行ボックスの下に
-        # ディセンダ余白、欧文数字は字面が上寄り)。build_deck の stack_optical はこの
-        # ズレを見込んで箱を置くので、検証も同じモデルで測らないと「実際は重なっていない
-        # のに重なりと判定する」ことになる — 較正値は tokens.optical_stack が単一ソース。
-        # 種別は図形名に刻まれた宣言を読む(文字列から推測すると「黒字化」のような数値
-        # ブロックを text として測り、ビルダーと違うインクを見ることになる)
-        sizes = [r.font.size.pt if r.font.size else 11
-                 for p_ in shape.text_frame.paragraphs for r in p_.runs]
-        size = max(sizes) if sizes else 11
-        spacing = next((p_.line_spacing for p_ in shape.text_frame.paragraphs
-                        if isinstance(p_.line_spacing, float)), 1.2)
-        used_h = ink_height_in(size, kind, lines=n_lines, line_spacing=spacing)
-        y0 = (box[1] + box[3]) / 2 + ink_center_offset_in(size, kind) - used_h / 2
-    elif anchor == _MA.MIDDLE:
-        # インク宣言の無い縦中央寄せ(見出し+本文のような複数段落・複数級数の箱)は、
-        # 単一級数のインクモデルでは測れない。行スタックの高さで中央に置く
-        y0 = (box[1] + box[3]) / 2 - used_h / 2
-    else:
-        y0 = box[1]
+    y0 = ((box[1] + box[3]) / 2 - used_h / 2
+          if shape.text_frame.vertical_anchor == _MA.MIDDLE else box[1])
     x0 = box[0]
     try:
         from pptx.enum.text import PP_ALIGN as _PA
@@ -216,6 +222,22 @@ def _ink_bbox(shape):
     except Exception:
         pass
     return (x0, y0, x0 + max_w, y0 + used_h)
+
+
+def check_frame_overlaps(slide, idx, warns) -> None:
+    """テキストボックスの「枠」どうしの重なり。描かれる文字が正しくても、枠が重なった pptx は
+    編集で掴み違える(下の枠を選べない)。枠は文字を囲むだけの大きさに保つこと。"""
+    boxes = [(_bbox(sh), sh.text_frame.text[:16]) for sh in slide.shapes
+             if sh.shape_type == 17 and sh.has_text_frame and sh.text_frame.text.strip()
+             and sh.left is not None]
+    for i in range(len(boxes)):
+        for j in range(i + 1, len(boxes)):
+            a, b = boxes[i][0], boxes[j][0]
+            ov_w = min(a[2], b[2]) - max(a[0], b[0])
+            ov_h = min(a[3], b[3]) - max(a[1], b[1])
+            if ov_w > 0.01 and ov_h > 0.01:
+                warns.append(f"slide {idx}: テキストボックスの枠が重なる {ov_h * 72:.1f}pt — "
+                             f"'{boxes[i][1]}' × '{boxes[j][1]}'(枠は文字ぶんの大きさに)")
 
 
 def check_collisions(slide, idx, issues) -> None:
@@ -300,9 +322,15 @@ def main() -> int:
                 if _measure_ok:
                     check_overflow(shape, issues, f"slide {idx}")
                     check_natural_wrap(shape, warns, f"slide {idx}")
+            elif getattr(shape, "has_table", False):
+                # 表もテキストである。セルを見ないと、列に収まらない語がそのまま割れて描かれる
+                n_text += 1
+                if _measure_ok:
+                    check_table_wrap(shape, warns, f"slide {idx}")
         if n_text == 0:
             issues.append(f"slide {idx}: no text at all")
         check_collisions(slide, idx, issues)
+        check_frame_overlaps(slide, idx, warns)
 
     if not _measure_ok:
         warns.append("NotoSansJP-{400,600,700}.ttf not found — overflow measurement skipped (install fonts)")

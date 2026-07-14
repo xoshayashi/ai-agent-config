@@ -6,6 +6,7 @@ contact_sheet で共有する単一実装。複製すると validate⇔build の
 """
 import json
 import math
+import re
 import sys
 from functools import lru_cache
 from pathlib import Path
@@ -13,7 +14,10 @@ from pathlib import Path
 TOKENS_PATH = Path(__file__).resolve().parent.parent / "references" / "tokens.json"
 
 
+@lru_cache(maxsize=1)
 def load_tokens() -> dict:
+    """トークンは1回だけ読む。折返しの判定は文字列ごとに走るので、毎回読み直すと
+    ビルド時間の2割がJSONの再パースに消える。"""
     return json.loads(TOKENS_PATH.read_text())
 
 
@@ -139,9 +143,9 @@ def token_rgb(key: str, fallback: tuple) -> tuple:
 _FONT_DIRS = [Path.home() / "Library/Fonts", Path("/Library/Fonts"), Path(__file__).resolve().parent]
 
 
-def _font_file(weight: int) -> Path | None:
-    for d in _FONT_DIRS:
-        f = d / f"NotoSansJP-{weight}.ttf"
+def _font_file(family: str, weight: int) -> Path | None:
+    for base in _FONT_DIRS:
+        f = base / f"{family}-{weight}.ttf"
         if f.exists():
             return f
     return None
@@ -149,25 +153,80 @@ def _font_file(weight: int) -> Path | None:
 
 try:
     from PIL import ImageFont
-    _FONT_FILES = {w: (str(f) if (f := _font_file(w)) else None) for w in (400, 600, 700)}
-    MEASURE_OK = all(_FONT_FILES.values())
+    _FONT_FILES = {(fam, w): (str(f) if (f := _font_file(fam, w)) else None)
+                   for fam in ("NotoSansJP", "Geist") for w in (400, 600, 700)}
+    MEASURE_OK = all(_FONT_FILES[("NotoSansJP", w)] for w in (400, 600, 700))
+    GEIST_OK = all(_FONT_FILES[("Geist", w)] for w in (400, 600, 700))
 except ImportError:
-    MEASURE_OK = False
+    MEASURE_OK = GEIST_OK = False
 
 
 @lru_cache(maxsize=None)
-def _pil_font(weight: int, size_px: int):
-    return ImageFont.truetype(_FONT_FILES[weight], size=size_px)
+def _pil_font(family: str, weight: int, size_px: int):
+    return ImageFont.truetype(_FONT_FILES[(family, weight)], size=size_px)
+
+
+# 走りの切り方は、測るときと描くときで同じでなければ意味がない — build_deck もこれを使う
+SCRIPT_RUN = re.compile(r"[\x20-\x7E]+")                              # 欧文・数字の連続区間
+EA_DIGIT_RUN = re.compile(r"^[0-9 /:.,()%+\-]*[0-9][0-9 /:.,()%+\-]*$")  # 和文中の数字だけの区間
 
 
 def text_width_in(text: str, size_pt: float, weight: int = 400) -> float:
-    """描画される文字列の幅(in)。フォントが無い環境では ja_len 近似へ落ちる。"""
+    """描画される文字列の幅(in)。描くときと同じフォントで測る — 欧文は Geist、和文は Noto、
+    和文中の数字だけの区間は Noto の半角数字(build_deck の _add_script_runs と同じ割り当て)。
+    片方のフォントだけで測ると、欧文の多い行で実幅を読み違え、レンダラが先に折り返す。"""
     if not text:
         return 0.0
     if not MEASURE_OK:
         return ja_len(text) * size_pt / 72.0
     w = weight if weight in (400, 600, 700) else 400
-    return _pil_font(w, int(size_pt * 4)).getlength(text) / 4 / 72.0
+    px = int(size_pt * 4)
+    s = hw(text)                                   # 描くときと同じ正規化(全角英数は半角へ)
+    has_cjk = any(ord(ch) > 0x2E7F for ch in s)
+    total, pos = 0.0, 0
+    for m in SCRIPT_RUN.finditer(s):
+        if m.start() > pos:
+            total += _pil_font("NotoSansJP", w, px).getlength(s[pos:m.start()])
+        seg = m.group()
+        latin_is_ea = has_cjk and EA_DIGIT_RUN.match(seg) is not None
+        fam = "NotoSansJP" if (latin_is_ea or not GEIST_OK) else "Geist"
+        total += _pil_font(fam, w, px).getlength(seg)
+        pos = m.end()
+    if pos < len(s):
+        total += _pil_font("NotoSansJP", w, px).getlength(s[pos:])
+    return total / 4 / 72.0
+
+
+# ---------------------------------------------------------------------------
+# 行間(leading)
+# ---------------------------------------------------------------------------
+# 行間は級数が決める。同じ級数の文字は、どのスライドのどのカードでも同じ行間で組む
+# (tokens.leading が単一ソース)。役割で例外を置きたいときだけ role で上書きする。
+
+
+def drawn_line_h(size_pt: float, role: str | None = None,
+                 line_spacing: float | None = None) -> float:
+    """実際に描かれる1行の高さ(in)。
+
+    レンダラはフォント本来の行高(natural_em)より低い行ボックスを作らない。指定した行間が
+    それを上回るときだけ行が伸びる(和文の行ボックス補正 cjk_line_box 込み)。塊の高さも、
+    段落間の余白も、この「描かれる高さ」から計算する — 公称値で計算すると、行の高い側
+    (大きな数字)で余白が食い違う。"""
+    tok = load_tokens()["leading"]
+    ls = line_spacing if line_spacing else leading(size_pt, role)
+    em = max(float(tok.get("natural_em", 1.28)), ls * float(tok.get("cjk_line_box", 1.15)))
+    return size_pt / 72.0 * em
+
+
+def leading(size_pt: float, role: str | None = None) -> float:
+    """その級数で組むときの行間(倍率)。"""
+    tok = load_tokens()["leading"]
+    if role and role in tok["roles"]:
+        return float(tok["roles"][role])
+    for min_pt, value in tok["by_size"]:
+        if size_pt >= min_pt:
+            return float(value)
+    return 1.28
 
 
 # ---------------------------------------------------------------------------
@@ -191,6 +250,21 @@ def ink_center_offset_in(size_pt: float, kind: str = "text") -> float:
     """縦中央寄せした箱の中心から、実際のインク中心までのズレ(in)。"""
     opt = load_tokens()["layout"]["optical_stack"]
     return size_pt / 72.0 * opt["ink_center_offset_em"][kind]
+
+
+def ink_slacks(size_pt: float, kind: str = "text", line_spacing: float | None = None) -> tuple[float, float]:
+    """1行の「行ボックスの上端からインク上端まで」と「インク下端から行ボックス下端まで」(in)。
+
+    段落を積むときの余白(spcAft)は、この2つを差し引いて決める — 行ボックスの隙間ではなく
+    インクの隙間が目に見える間隔だから。和文は下にディセンダ余白を持ち、欧文数字は字面が
+    上寄りに座る(較正値は tokens.optical_stack)。"""
+    opt = load_tokens()["layout"]["optical_stack"]
+    line_h = drawn_line_h(size_pt, None, line_spacing)
+    ink_h = size_pt / 72.0 * opt["ink_ratio"][kind]
+    offset = size_pt / 72.0 * opt["ink_center_offset_em"][kind]
+    above = line_h / 2 + offset - ink_h / 2
+    below = line_h / 2 - offset - ink_h / 2
+    return max(0.0, above), max(0.0, below)
 
 
 def ink_height_in(size_pt: float, kind: str = "text", lines: int = 1,
@@ -222,6 +296,8 @@ def ink_height_in(size_pt: float, kind: str = "text", lines: int = 1,
 _NO_LINE_START = "、。，．・：；！？）］｝」』〉》】〕”’ー々ぁぃぅぇぉっゃゅょゎヵヶ%％℃ "
 # 行末禁則: これらで行が終わらない
 _NO_LINE_END = "（［｛「『〈《【〔“‘￥＄＃"
+# 語を閉じる接尾(「1日あたり」「1件ごと」)。ここまでで1語 — 次の語とはくっつけない
+_SUFFIX_TAILS = ("あたり", "ごと", "ずつ", "など", "ほど", "くらい", "ぐらい")
 # 付属語(助詞)。文節はここで終わる — 直後は切ってよい
 _PARTICLES = ("の", "を", "に", "が", "は", "で", "と", "へ", "や", "も", "から", "まで",
               "より", "など", "への", "での", "とは", "には", "では", "からの", "による",
@@ -299,6 +375,160 @@ def _segments(text: str) -> tuple[list[str], list[float]]:
     return chunks, scores
 
 
+# 文章とラベルでは、改行に求めるものが逆になる。
+#   ラベル・見出し・結論句・列挙 : 意味の切れ目と行の切れ目を一致させたい(文節で割る)
+#   文章(読点を持つ文)           : 行はできるだけ埋めたい。文節ごとに割ると短い行が階段状に
+#                                並び、読み進めるリズムが崩れる — 折返しはレンダラに委ねる
+_SENTENCE_MARKS = "、。，．"
+# 数値に続く助数詞・単位(語の一部として扱い、数字から引き離さない)
+_COUNTERS = "万億兆円年月日時分秒人件社名倍割点回個台歳週期版号"
+
+
+def is_prose(text: str) -> bool:
+    """その文字列を「文章」として扱うか。文章の改行位置には手を出さない。
+
+    判定は「節でできているか」— 読点・句点は、文が節に分かれている印である。長さでは
+    判定しない: スライドの表示テキストは体言止めが原則で、長い名詞句(「電子帳簿保存法と
+    インボイス制度への対応を単一のワークフローで完結」)は文ではなくラベルであり、
+    レンダラに任せれば「ワークフ/ロー」のように語の途中で割れる。"""
+    if not text:
+        return False
+    return any(ch in text for ch in _SENTENCE_MARKS)
+
+
+def _words(text: str) -> list[str]:
+    """行の途中で割ってはいけない最小単位に割る。
+
+    同じ表記の連なりは1つの語として扱う — 漢字の連なり(予約・接続・承認)、カタカナ語
+    (ワークフロー)、欧文語、数値。読みが壊れるのは、この連なりが途中で割れたときで、
+    表記の変わり目(漢字→かな、かな→漢字)で行が変わるぶんには読める。
+    """
+    out: list[str] = []
+    i = 0
+    while i < len(text):
+        cls = _char_class(text[i])
+        j = i + 1
+        if cls in ("ascii", "kana_kata", "kanji", "kana_hira"):
+            while j < len(text) and _char_class(text[j]) == cls:
+                j += 1
+            if cls == "ascii":                        # 数値に続く単位・助数詞まで含める
+                while j < len(text) and text[j] in "%％":
+                    j += 1
+                # 「13万5,718人」のように、助数詞のあとに数が続くこともある。数と助数詞が
+                # 交互に続くかぎり1語として扱う(数を途中で割らない)
+                while j < len(text) and (text[j] in _COUNTERS or text[j].isdigit()
+                                         or (text[j] == "," and j + 1 < len(text)
+                                             and text[j + 1].isdigit())):
+                    j += 1
+                # 「Operation-centric」「GPT-4」— つなぎ字で結ばれた欧文は1語
+                while (j + 1 < len(text) and text[j] in "-‐–/"
+                       and _char_class(text[j + 1]) == "ascii"):
+                    j += 1
+                    while j < len(text) and _char_class(text[j]) == "ascii":
+                        j += 1
+            if cls in ("ascii", "kana_kata", "kanji"):
+                # 続くひらがなは送り仮名・助詞。語から引き離さない(「跨/いで」「文脈/を」)
+                while j < len(text) and _char_class(text[j]) == "kana_hira":
+                    j += 1
+        out.append(text[i:j])
+        i = j
+    # 次の語に掛かる前置き(「その場」「約1,630人」)は、そこで切ると意味が宙に浮く
+    _DEMONSTRATIVE = ("その", "この", "あの", "どの", "わが")
+    _APPROX = ("約", "およそ", "最大", "最小", "上限", "下限")
+    # 送り仮名で終わる語のあとに自立語が続くのは、複合語の途中(「積み/上げ」「問い/合わせ」)。
+    # 助詞で終わっているときだけ、そこが語の切れ目になる
+    merged: list[str] = []
+    for w in out:
+        if merged and _char_class(merged[-1][-1]) == "kana_hira" and _char_class(w[0]) in ("kanji", "kana_kata"):
+            tail_closes = any(merged[-1].endswith(p) for p in _PARTICLES + _SUFFIX_TAILS)
+            if not tail_closes:
+                merged[-1] += w
+                continue
+        merged.append(w)
+    bound: list[str] = []
+    for w in merged:
+        prev = bound[-1] if bound else ""
+        binds = prev.endswith(_DEMONSTRATIVE) or (
+            prev.endswith(_APPROX) and w[:1].isdigit())
+        if binds:
+            bound[-1] += w
+        else:
+            bound.append(w)
+    return bound
+
+
+def _natural_lines(text: str, cap: float, size_pt: float, weight: int) -> list[str]:
+    """レンダラがそのまま折り返したときの行(1文字ずつ詰める。行頭禁則だけ守る)。"""
+    lines, cur = [], ""
+    for ch in text:
+        trial = cur + ch
+        if cur and text_width_in(trial, size_pt, weight) > cap and ch not in _NO_LINE_START:
+            lines.append(cur)
+            cur = ch
+        else:
+            cur = trial
+    if cur:
+        lines.append(cur)
+    return lines
+
+
+def _wrap_words(text: str) -> list[str]:
+    """折り返しの単位。行頭に立てない字は前の語に付けたまま扱う(あとから戻すと行が溢れる)。"""
+    words: list[str] = []
+    for wd in _words(text):
+        if words and wd and wd[0] in _NO_LINE_START:
+            words[-1] += wd
+        else:
+            words.append(wd)
+    return words
+
+
+def wrap_prose(text: str, width_in: float, size_pt: float, weight: int = 400) -> str:
+    """文章は行を埋めて流し、語の切れ目でだけ改行する。
+
+    1行に収まる文には手を出さない。はみ出す文は、こちらが行を組む — 語を割らないまま、
+    入るところまで詰めた行にする。折返しをレンダラに任せると、字送りのわずかな差で語の
+    途中に切れ目が落ちる(「結果まで続/く運用は」)。行が埋まっていることと、語が割れない
+    ことは両立する。最終行に語が1つだけ残るとき(ウィドウ)は、前の行から1語下ろす。
+    行数が増えるのは、その列にコピーが多すぎるということ — verify_deck が名指しする。
+    """
+    if not text or "\n" in text:
+        return text
+    cap = max(0.05, width_in - 0.3 * size_pt / 72.0)
+    if text_width_in(text, size_pt, weight) <= cap:
+        return text
+
+    words = _wrap_words(text)
+
+    def w_of(ln):
+        return text_width_in(ln, size_pt, weight)
+
+    lines, cur, cur_w = [], "", 0.0
+    for word in words:
+        w = w_of(word)
+        if cur and cur_w + w > cap:
+            lines.append(cur)
+            cur, cur_w = word, w
+        else:
+            cur, cur_w = cur + word, cur_w + w
+    if cur:
+        lines.append(cur)
+    lines = [ln for ln in lines if ln]
+    if len(lines) < 2:
+        return text
+
+
+    if w_of(lines[-1]) < cap * 0.35 and len(lines) >= 2:
+        prev = _wrap_words(lines[-2])
+        if len(prev) >= 2:
+            cand_prev, cand_last = "".join(prev[:-1]), prev[-1] + lines[-1]
+            if cand_prev and w_of(cand_last) <= cap and w_of(cand_prev) <= cap:
+                lines[-2], lines[-1] = cand_prev, cand_last
+    if any(w_of(ln) > cap for ln in lines):
+        return text                                   # 1語で溢れる行がある = レンダラに委ねる
+    return "\n".join(lines)
+
+
 def wrap_display(text: str, width_in: float, size_pt: float, max_lines: int = 3,
                  weight: int = 400) -> str:
     """表示テキストを文節の切れ目で折り返した文字列("\n" 入り)にして返す。
@@ -306,7 +536,7 @@ def wrap_display(text: str, width_in: float, size_pt: float, max_lines: int = 3,
     1行に収まるならそのまま返す。max_lines に収まらない長文にも手を出さない(本文は無理に
     改行を打つより自然折返しに任せたほうが崩れない)。幅はすべて実測(in)で扱う。
     """
-    if not text or "\n" in text:
+    if not text or "\n" in text or is_prose(text):
         return text
     # 行はレンダラの折返し閾値の手前で切る。閾値ぎりぎりの行を作ると、レンダラ側が先に
     # 折り返し、こちらのソフト改行がそこへ重なって「空行」が1本入る(実測とレンダラの
@@ -362,3 +592,72 @@ def wrap_display(text: str, width_in: float, size_pt: float, max_lines: int = 3,
         lines.append("".join(chunks[i:j]))
         i, k = j, k - 1
     return "\n".join(lines) if i >= n else text
+
+
+# ---------------------------------------------------------------------------
+# トークスクリプトの読み上げ(TTS)
+# ---------------------------------------------------------------------------
+# スライドは目で読むので記号のままでよい。speaker_notes は声で読むので、記号のままだと
+# 読み飛ばされるか英語で綴られる。開くのは「声が詰まるところ」だけ — すべてをカタカナに
+# すると、こんどは人(発表者)が自分のメモを読めなくなる。読み方の表は
+# references/tts_readings.json、選び方の理屈は talk-script-and-tts.md。
+
+TTS_PATH = Path(__file__).resolve().parent.parent / "references" / "tts_readings.json"
+
+
+@lru_cache(maxsize=1)
+def load_tts_readings() -> dict:
+    return json.loads(TTS_PATH.read_text())
+
+
+def tts_risks(text: str) -> list[tuple[str, str]]:
+    """読み上げに耐えない断片と、その読み方の提案を返す [(断片, 提案), ...]。
+
+    提案であって置換ではない — 「×」は式では「かける」、倍率では「倍」であり、
+    正しい読みは文が決める。判断は書き手に残す(検証は警告どまり)。"""
+    if not text:
+        return []
+    table = load_tts_readings()
+    found: list[tuple[str, str]] = []
+    for sym in table["symbols"]:
+        if sym["pattern"] in text:
+            readings = [r for r in sym["readings"] if r]
+            hint = "／".join(readings) if readings else "文を切るか接続詞に置き換える"
+            found.append((sym["pattern"], hint))
+    for pat in table["patterns"]:
+        for m in re.finditer(pat["regex"], text):
+            guard = pat.get("guard")
+            if guard == "fraction" and not _looks_like_fraction(m):
+                continue                             # 「9/1」は日付、「2025/26」は年度 — 分数ではない
+            if guard == "date" and not _looks_like_date(m):
+                continue
+            hint, label = pat["hint"], pat.get("label", "{0}")
+            for i, g in enumerate((m.group(0),) + m.groups()):
+                hint = hint.replace("{%d}" % i, g or "")
+                label = label.replace("{%d}" % i, g or "")
+            found.append((label, hint))
+            break
+    seen, out = set(), []
+    for frag, hint in found:
+        if frag not in seen:
+            seen.add(frag)
+            out.append((frag, hint))
+    return out
+
+
+def _looks_like_fraction(m) -> bool:
+    """「1/3」は分数、「9/1」は日付、「2025/26」は年度。分子<分母、分母12以下のときだけ分数。"""
+    try:
+        num, den = int(m.group(1)), int(m.group(2))
+    except (TypeError, ValueError):
+        return False
+    return num < den <= 12
+
+
+def _looks_like_date(m) -> bool:
+    """月/日として読める組(1-12 / 1-31)で、分数として読めないもの。"""
+    try:
+        month, day = int(m.group(1)), int(m.group(2))
+    except (TypeError, ValueError):
+        return False
+    return 1 <= month <= 12 and 1 <= day <= 31 and not _looks_like_fraction(m)

@@ -1,0 +1,50 @@
+{
+  "$comment": "言い切りの強さを機械で見るための語彙表。audit_argument.py が唯一の真実として読む — 語を足すのはここで、散文ではない。negatives はその語を含んでいても該当しない語(誤検出の除去)。",
+  "classes": {
+    "promise": {
+      "severity": "error",
+      "fix": "レンジと前提に置き換える(数値は直説法のままスライドに、不確かさは assumption へ)",
+      "terms": ["必ず", "確実に", "間違いなく", "絶対に", "保証します", "確約", "揺るぎない", "guaranteed", "ensures", "will definitely"],
+      "negatives": ["品質保証", "保証金", "確実性", "身元保証"]
+    },
+    "rank": {
+      "severity": "error",
+      "fix": "母集団(universe)と時点(as_of)と出所を添える(qualifier と source)",
+      "terms": ["No.1", "ナンバーワン", "第1位", "首位", "業界最大", "国内初", "世界初", "唯一", "圧倒的", "断トツ", "market leader", "best-in-class"],
+      "negatives": ["最初", "初動", "初月", "初期", "当初", "最大限", "最小限", "最新", "第1四半期"]
+    },
+    "hedge": {
+      "severity": "error",
+      "scope": "visible",
+      "fix": "数値は直説法で言い切り、不確かさは assumption にレンジと前提として書く",
+      "terms": ["可能性があります", "見込まれます", "と考えられます", "が期待されます", "かもしれません", "と思われます", "だろう", "may be able to", "could potentially"],
+      "negatives": []
+    },
+    "motion": {
+      "severity": "warning",
+      "fix": "変化は量で書く(月次1.8%→1.2%へ改善)",
+      "terms": ["大幅に", "着実に", "飛躍的に", "劇的に", "industry-leading", "best-in-class", "seamless", "cutting-edge", "state-of-the-art", "world-class", "game-chang", "next-generation", "revolutionary", "innovative", "robust", "synerg"],
+      "negatives": []
+    },
+    "euphemism": {
+      "severity": "warning",
+      "fix": "減少は減少として書く(悪い知らせは良い知らせと同じ文法で)",
+      "terms": ["微減", "軽微", "限定的", "一時的", "ほぼ横ばい"],
+      "negatives": []
+    },
+    "self_source": {
+      "severity": "error",
+      "fix": "自社の推計は source ではなく assumption に置く(または版のある社内資料名を書く)",
+      "terms": ["自社調べ", "当社調べ", "弊社調べ", "社内資料", "社内管理数値", "独自調査", "各種調査", "一般的に", "公知の情報"],
+      "negatives": []
+    }
+  },
+  "relation_markers": {
+    "$comment": "この語が数値の近くにあるとき、その数値は「関係の主張」— 図表から計算し直せなければならない。",
+    "cagr": ["CAGR", "年平均成長率", "年率"],
+    "growth": ["前年比", "前期比", "対前年", "対前期", "YoY", "QoQ", "成長率"],
+    "multiple": ["倍"],
+    "share": ["シェア", "構成比", "占める", "進捗率"],
+    "negatives": ["NRR", "ARPU", "解約率", "チャーン", "粗利率", "利益率", "浸透率", "回収期間"]
+  }
+}

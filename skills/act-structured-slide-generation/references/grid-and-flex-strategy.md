@@ -105,28 +105,70 @@ an edge while another edge floats.
   from the normal row hairline. This is a judgment call, not a default: a short table whose
   groups read at a glance needs no extra line. Decide per table and opt in explicitly.
 
-## Optical Stack Contract (ink, not boxes)
+## One Box, One Group (the stack contract)
 
-A vertical stack inside a container — label -> value -> delta -> note, heading -> body,
-metric -> subline — is spaced by the **ink** (the glyph faces the reader sees), not by the
-text boxes that hold it. A line box is taller than its ink and the ink does not sit in the
-middle of it: Japanese text leaves descender room below, and Latin numerals sit high.
-Stacking boxes with equal box gaps therefore renders with unequal *visible* gaps — a value
-appears to hang closer to the label above it than to the note below it, which is the defect
-that keeps getting reported as "the spacing under the number is wrong".
+A group that reads as one thing is built as one text box. Label -> value -> note, heading ->
+body, an interpretation rail's whole column: all of it lives in a single frame, as
+paragraphs. The frame is then the only thing anyone positions, and the rhythm inside it
+comes from the type itself:
 
-- **Space the ink.** Compute each block's ink height (`deck_text.ink_height_in`) and place
-  boxes so the ink centers land on the intended rhythm (`build_deck.stack_optical`). The two
-  gaps around a value must be authored as one token, not two independent numbers.
-- **Numerals and text are different inks.** They have their own ink ratio and center offset;
-  the block declares which it is (`kind: "numeral" | "text"`). Never hand-tune a single
-  card's `y` to fix an optical gap — fix the model or the token.
-- **Calibration lives in tokens.** `layout.optical_stack` (`ink_ratio`,
-  `ink_center_offset_em`, `gap_in`) is the single source, measured from 300dpi renders. The
-  builder and `verify_deck` both read it, so the verifier measures the same ink the renderer
-  draws; if only one side knows the model, correct slides get flagged as overlapping.
-- **Insets stay symmetric.** Leftover height is split evenly above and below the stack. A
-  stack that grows must eat slack, never the bottom inset.
+- **Leading follows the type size.** `tokens.leading` maps a size to its line spacing, and
+  every paragraph draws with the spacing its size declares. Text of the same size reads at
+  the same density on every slide and in every card, because there is one place that decides
+  it. The height a line actually occupies is `max(natural_em, spacing x cjk_line_box)` — a
+  renderer never draws a line box shorter than the font's own line height — so every height
+  and every gap is computed from that drawn height (`deck_text.drawn_line_h`), calibrated at
+  300dpi.
+- **Space between paragraphs is authored as ink distance.** The visible gap is between the
+  glyph faces, not the line boxes: Japanese text carries room below its ink, and a large
+  numeral sits high in a tall line box. `stack_block` measures the slack each neighbouring
+  line already contributes (`deck_text.ink_slacks`) — that sum is the smallest gap that can
+  exist — and sets the paragraph spacing to whatever is still needed to reach the gap you
+  asked for (`tokens.layout.optical_stack.gap_in`). Junctions that share a `gap_name` are
+  equalised to the largest of their floors, so the gap above a value equals the gap below it
+  even though its line box is not symmetric.
+- **Proximity is expressed in the gaps.** The gap inside a heading/body pair
+  (`gap_in.heading_body`) is smaller than the gap between items (`gap_in.item`), so the pair
+  reads as one thing and the items read as several.
+- **A card is the size of its tallest content.** A row of cards takes its height from the
+  fullest card, computed from what will actually be drawn — a note that wraps to two lines
+  makes every card taller, rather than overflowing the one card that holds it. Inside the
+  card the stack starts at the top, so the values in a row read at the same height whatever
+  their notes do underneath.
+- **A frame is the size of its text.** Height comes from the lines that will actually be
+  drawn; a no-wrap label's width comes from the measured width of its string
+  (`build_deck._label_w`). Frames sized this way sit beside each other cleanly, and
+  `verify_deck` reports any pair that overlaps.
+- **A chart's unit sits inside the plot.** The vertical-axis unit is a caption on the plot,
+  not a line of its own: it is placed inside the chart region at the axis side, aligned to
+  the top of the plot, with the insets declared once in `tokens.layout.chart.unit_note`.
+- **Count lines in exactly one place.** Every height that depends on wrapping comes from
+  `build_deck._text_lines`, which measures with the real font and the weight the text is
+  drawn at.
+
+Separate boxes are for things that are genuinely separate objects: a chart, a card's
+background, a label pinned to a data point. Everything a reader takes in as one block is
+one block.
+
+## Message Slides (form and footprint)
+
+A symbolic slide says its point in one line and supports it with one sentence. `lead` carries
+the payoff at statement size; the sentence below it, set smaller and lighter, gives the
+reason. Authors write both (`statement.lead` + `statement`), and a statement written as one
+long clause joined by a dash is opened into the same two tiers automatically
+(`build_deck.split_message`). The lead is composed as a form; the supporting sentence fills
+its lines like any other prose and keeps a margin of whitespace on the right.
+
+`build_deck.shape_message` chooses the measure and the line breaks of the lead together:
+
+- Lines change where the sentence changes — at a comma or a dash, so the phrasing is visible
+  in the silhouette. A clause too long for one line is broken at a phrase boundary, and a
+  word is never broken.
+- Line lengths are balanced (a DP over clause/phrase units minimises the spread), and the
+  last line stays long enough to hold the sentence's weight.
+- The measure is chosen shorter than the available width, so the block keeps a margin of
+  whitespace on the right and reads as placed rather than packed. The block is then centred
+  in the free region above the supporting strip.
 
 ## Flexbox Mental Model
 

@@ -13,7 +13,9 @@ import json
 import sys
 from pathlib import Path
 
-from deck_text import footer_text, header_slots, ja_len
+from deck_text import footer_text, header_slots, ja_len, tts_risks
+
+REF = Path(__file__).resolve().parent.parent / "references"
 
 TOKENS = json.loads((Path(__file__).resolve().parent.parent / "references" / "tokens.json").read_text())
 BUDGET = TOKENS["text_budget"]
@@ -83,10 +85,11 @@ IMAGE_ASSET_KINDS = {
 TALK_CHARS_PER_MIN = 300
 
 
+# AI 常套句。語幹で持つ(「game-changer」だけを持つと「game-changing」を取り逃がす)。
+# 言い切りの強さ(約束・順位・ぼかし)は commitment-lexicon.json 側 — audit_argument が見る
 BANNED_PHRASES = [
-    "と言えるでしょう", "と考えられます", "が期待されます", "一概には言えませんが",
-    "することが重要です", "まとめると", "いかがでしたか",
-    "delve", "leverage", "seamless", "game-changer", "it's important to note",
+    "と言えるでしょう", "一概には言えませんが", "することが重要です", "まとめると", "いかがでしたか",
+    "delve", "leverage", "seamless", "game-chang", "it's important to note",
 ]
 META_DECLARATIONS = ["以下の3点", "本資料では", "について説明します", "ご紹介します"]
 
@@ -246,6 +249,13 @@ def main() -> int:
             if pat in EVIDENCE_PATTERNS and pat not in ("competitive_landscape", "diagram") and not any(ch.isdigit() for ch in title):
                 warns.append(f"{loc}: エビデンススライドのタイトルに数字がない — 図表が証明する結論の数値を1つ入れる")
 
+        dg = s.get("diagram") or {}
+        if dg.get("kind") == "ring" and "cycle" not in dg:
+            vals = [seg.get("value") for seg in dg.get("segments", [])]
+            if len(vals) >= 3 and len(set(vals)) == 1:
+                warns.append(f"{loc}: 均等な ring は循環として描かれる(時計回り・番号・矢) — "
+                             "比率を見せたいなら diagram.cycle: false、循環なら true と明示する")
+
         if pat == "financial_highlights" and len(s.get("groups", [])) > 3:
             warns.append(f"{loc}: financial_highlights の groups が {len(s['groups'])} 件 — ヒーローカードは3枚まで。"
                          "4件目以降の主指標は補助ストリップへ回るため、グループを3つに絞るかスライドを分割する")
@@ -268,6 +278,14 @@ def main() -> int:
             if len(notes) >= 80 and "です" not in notes and "ます" not in notes:
                 warns.append(f"{loc}: speaker_notes が話し言葉でない(です/ます不在) — "
                              "読み上げられる敬体のナラティブに書き直す")
+            # 読み上げ(TTS): スライドは目で読むので記号のままでよいが、スクリプトは声で読む。
+            # 記号や語形のままでは読み飛ばされる/英語で綴られる断片だけを、話し言葉へ開く
+            risks = tts_risks(notes)
+            if risks:
+                shown = "、".join(f"「{frag}」→ {hint}" for frag, hint in risks[:3])
+                more = f" ほか{len(risks) - 3}件" if len(risks) > 3 else ""
+                warns.append(f"{loc}: speaker_notes に読み上げできない表記 — {shown}{more}"
+                             "(スライド側は記号のままでよい。開くのはスクリプトだけ)")
             # タイトル逐語読みの冒頭は禁止(主張は話し言葉で言い換えて開く)
             if title and len(title) >= 8 and title in notes[: len(title) + 15]:
                 warns.append(f"{loc}: speaker_notes の冒頭がタイトルの逐語読み — 主張を話し言葉で言い換えて開く")
@@ -373,6 +391,9 @@ def main() -> int:
                     _corpus_parts.append(o)
                 elif isinstance(o, (int, float)) and not isinstance(o, bool):
                     _corpus_parts.append(_numstr(o))
+            # ここはスクリプトと本体の一致(script drift)を見る検査なので、本体の可視文字列も
+            # 突き合わせの相手にする。「その主張の数値が図表で裏づけられているか」は
+            # audit_argument.py が別に見る(証拠と主張を混ぜないのはあちら側の責務)
             _walk_nums({k: v for k, v in s.items() if k not in ("speaker_notes", "pattern")})
             # 区切りなし連結は JSON のキー順次第で「1」+「億円」が隣接し偽陰性を生む。
             # 連続性は単一文字列内でのみ意味を持つため、パーツ間に区切り子を挟む
@@ -768,6 +789,53 @@ def main() -> int:
                 yield from _visible_strings(v)
         elif isinstance(obj, str):
             yield obj
+    # 具体性: 抽象名詞は動作と結果へ開き、規模の数字には体感できる単位を添え、台本は場面から
+    # 始める。語彙表は references/concreteness-lexicon.json(判断は書き手に残すので警告どまり)
+    conc = json.loads((REF / "concreteness-lexicon.json").read_text())
+    ABSTRACT = conc["abstract"]["terms"]
+    ABS_NEG = conc["abstract"].get("negatives", [])
+    ANCHORS = sum((conc["anchor"][k] for k in ("moment", "actor", "action")), [])
+    FELT = conc["anchor"]["felt_scale"]
+    LARGE = conc["large_units"]["terms"]
+    import re as _re_c
+    scene_ok = content_n = 0
+    big_any, felt_any = "", False
+    for i, s_ in enumerate(slides, start=1):
+        if s_.get("pattern") in STRUCTURAL:
+            continue
+        loc = f"slide {i} ({s_.get('pattern')})"
+        visible = " ".join(t for t in _visible_strings(s_))
+        notes = s_.get("speaker_notes", "") or ""
+        hits = [t for t in ABSTRACT if t in visible and not any(n in visible for n in ABS_NEG)]
+        if hits and not any(a in visible for a in ANCHORS):
+            warns.append(f"{loc}: 抽象名詞「{hits[0]}」だけで、誰が何をするかが無い — "
+                         "動作(誰が何をする)と結果(何がどう変わる)へ言い換える")
+        big = _re_c.search(r"\d[\d,]*(?:\.\d+)?\s*(?:" + "|".join(LARGE) + ")", visible)
+        if big:
+            big_any = big_any or big.group(0)
+        if any(f in visible for f in FELT):
+            felt_any = True
+        content_n += 1
+        if any(a in notes for a in ANCHORS):
+            scene_ok += 1
+        elif notes:
+            warns.append(f"{loc}: speaker_notes に場面がない — 誰が、いつ、何をしている場面かから"
+                         "話し始める(references/concreteness.md)")
+    if big_any and not felt_any:
+        warns.append(f"規模の数字「{big_any}」が、体感できる単位に落ちていない — "
+                     "1日あたり・1人あたり・1現場あたりの数を derivation で導いて、どこか1枚に置く")
+    if content_n and scene_ok < content_n * 0.5:
+        warns.append(f"場面のある台本が {scene_ok}/{content_n} 枚 — "
+                     "半分以上のスライドは、聞き手が絵を描ける場面から始める")
+
+    # ダッシュ(——)はスライド上では読みの間を作れない。意味の切れ目は読点と改行で表す —
+    # 言い切りを前に出したいなら statement.lead のように「行」で分ける(構成で表す)
+    dash_slides = [i for i, s in enumerate(slides, start=1)
+                   if any(any(d in t for d in "—―─－") for t in _visible_strings(s))]
+    for i in dash_slides:
+        warns.append(f"slide {i}: 表示テキストのダッシュ(——) — 意味の切れ目は読点と改行で表す。"
+                     "言い切りを立てたいときは行を分ける(statement は lead + 支え文)")
+
     period_slides = [i for i, s in enumerate(slides, start=1)
                      if any(("。" in t or "．" in t) for t in _visible_strings(s))]
     if period_slides:
