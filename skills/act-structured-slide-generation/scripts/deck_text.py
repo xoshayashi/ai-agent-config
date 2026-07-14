@@ -143,9 +143,9 @@ def token_rgb(key: str, fallback: tuple) -> tuple:
 _FONT_DIRS = [Path.home() / "Library/Fonts", Path("/Library/Fonts"), Path(__file__).resolve().parent]
 
 
-def _font_file(weight: int) -> Path | None:
-    for d in _FONT_DIRS:
-        f = d / f"NotoSansJP-{weight}.ttf"
+def _font_file(family: str, weight: int) -> Path | None:
+    for base in _FONT_DIRS:
+        f = base / f"{family}-{weight}.ttf"
         if f.exists():
             return f
     return None
@@ -153,25 +153,46 @@ def _font_file(weight: int) -> Path | None:
 
 try:
     from PIL import ImageFont
-    _FONT_FILES = {w: (str(f) if (f := _font_file(w)) else None) for w in (400, 600, 700)}
-    MEASURE_OK = all(_FONT_FILES.values())
+    _FONT_FILES = {(fam, w): (str(f) if (f := _font_file(fam, w)) else None)
+                   for fam in ("NotoSansJP", "Geist") for w in (400, 600, 700)}
+    MEASURE_OK = all(_FONT_FILES[("NotoSansJP", w)] for w in (400, 600, 700))
+    GEIST_OK = all(_FONT_FILES[("Geist", w)] for w in (400, 600, 700))
 except ImportError:
-    MEASURE_OK = False
+    MEASURE_OK = GEIST_OK = False
 
 
 @lru_cache(maxsize=None)
-def _pil_font(weight: int, size_px: int):
-    return ImageFont.truetype(_FONT_FILES[weight], size=size_px)
+def _pil_font(family: str, weight: int, size_px: int):
+    return ImageFont.truetype(_FONT_FILES[(family, weight)], size=size_px)
+
+
+_ASCII_RUN = re.compile(r"[!-~]+(?: [!-~]+)*")
+_DIGITS_ONLY = re.compile(r"^[0-9.,%\-+/]+$")
 
 
 def text_width_in(text: str, size_pt: float, weight: int = 400) -> float:
-    """描画される文字列の幅(in)。フォントが無い環境では ja_len 近似へ落ちる。"""
+    """描画される文字列の幅(in)。描くときと同じフォントで測る — 欧文は Geist、和文は Noto、
+    和文中の数字だけの区間は Noto の半角数字(build_deck の _add_script_runs と同じ割り当て)。
+    片方のフォントだけで測ると、欧文の多い行で実幅を読み違え、レンダラが先に折り返す。"""
     if not text:
         return 0.0
     if not MEASURE_OK:
         return ja_len(text) * size_pt / 72.0
     w = weight if weight in (400, 600, 700) else 400
-    return _pil_font(w, int(size_pt * 4)).getlength(text) / 4 / 72.0
+    px = int(size_pt * 4)
+    has_cjk = any(ord(ch) > 0x2E7F for ch in text)
+    total, pos = 0.0, 0
+    for m in _ASCII_RUN.finditer(text):
+        if m.start() > pos:
+            total += _pil_font("NotoSansJP", w, px).getlength(text[pos:m.start()])
+        seg = m.group()
+        latin_is_ea = has_cjk and _DIGITS_ONLY.match(seg) is not None
+        fam = "NotoSansJP" if (latin_is_ea or not GEIST_OK) else "Geist"
+        total += _pil_font(fam, w, px).getlength(seg)
+        pos = m.end()
+    if pos < len(text):
+        total += _pil_font("NotoSansJP", w, px).getlength(text[pos:])
+    return total / 4 / 72.0
 
 
 # ---------------------------------------------------------------------------
@@ -179,6 +200,20 @@ def text_width_in(text: str, size_pt: float, weight: int = 400) -> float:
 # ---------------------------------------------------------------------------
 # 行間は級数が決める。同じ級数の文字は、どのスライドのどのカードでも同じ行間で組む
 # (tokens.leading が単一ソース)。役割で例外を置きたいときだけ role で上書きする。
+
+
+def drawn_line_h(size_pt: float, role: str | None = None,
+                 line_spacing: float | None = None) -> float:
+    """実際に描かれる1行の高さ(in)。
+
+    レンダラはフォント本来の行高(natural_em)より低い行ボックスを作らない。指定した行間が
+    それを上回るときだけ行が伸びる(和文の行ボックス補正 cjk_line_box 込み)。塊の高さも、
+    段落間の余白も、この「描かれる高さ」から計算する — 公称値で計算すると、行の高い側
+    (大きな数字)で余白が食い違う。"""
+    tok = load_tokens()["leading"]
+    ls = line_spacing if line_spacing else leading(size_pt, role)
+    em = max(float(tok.get("natural_em", 1.28)), ls * float(tok.get("cjk_line_box", 1.15)))
+    return size_pt / 72.0 * em
 
 
 def leading(size_pt: float, role: str | None = None) -> float:
@@ -222,8 +257,7 @@ def ink_slacks(size_pt: float, kind: str = "text", line_spacing: float | None = 
     インクの隙間が目に見える間隔だから。和文は下にディセンダ余白を持ち、欧文数字は字面が
     上寄りに座る(較正値は tokens.optical_stack)。"""
     opt = load_tokens()["layout"]["optical_stack"]
-    ls = line_spacing if line_spacing else leading(size_pt)
-    line_h = size_pt / 72.0 * ls
+    line_h = drawn_line_h(size_pt, None, line_spacing)
     ink_h = size_pt / 72.0 * opt["ink_ratio"][kind]
     offset = size_pt / 72.0 * opt["ink_center_offset_em"][kind]
     above = line_h / 2 + offset - ink_h / 2
@@ -342,6 +376,8 @@ def _segments(text: str) -> tuple[list[str], list[float]]:
 #   文章(読点を持つ文)           : 行はできるだけ埋めたい。文節ごとに割ると短い行が階段状に
 #                                並び、読み進めるリズムが崩れる — 折返しはレンダラに委ねる
 _SENTENCE_MARKS = "、。，．"
+# 数値に続く助数詞・単位(語の一部として扱い、数字から引き離さない)
+_COUNTERS = "万億兆円年月日時分秒人件社名倍割点回個台歳週期版号"
 
 
 def is_prose(text: str) -> bool:
@@ -359,20 +395,26 @@ def is_prose(text: str) -> bool:
 def _words(text: str) -> list[str]:
     """行の途中で割ってはいけない最小単位に割る。
 
-    和文は漢字と漢字のあいだで行が変わっても読める。読みが壊れるのは、カタカナ語や欧文語、
-    数値と単位のような「1つの語」が途中で割れたとき(「ワークフ/ロー」「社内ナ/レッジ」)。
-    守るのはそこだけで、それ以外は1文字単位で詰めてよい — 行が埋まることが文章の読みやすさ。
+    同じ表記の連なりは1つの語として扱う — 漢字の連なり(予約・接続・承認)、カタカナ語
+    (ワークフロー)、欧文語、数値。読みが壊れるのは、この連なりが途中で割れたときで、
+    表記の変わり目(漢字→かな、かな→漢字)で行が変わるぶんには読める。
     """
     out: list[str] = []
     i = 0
     while i < len(text):
         cls = _char_class(text[i])
         j = i + 1
-        if cls in ("ascii", "kana_kata"):             # 欧文語・カタカナ語はひとかたまり
+        if cls in ("ascii", "kana_kata", "kanji", "kana_hira"):
             while j < len(text) and _char_class(text[j]) == cls:
                 j += 1
-            if cls == "ascii":                        # 数値に続く単位(円・%・年)まで含める
+            if cls == "ascii":                        # 数値に続く単位・助数詞まで含める
                 while j < len(text) and text[j] in "%％":
+                    j += 1
+                while j < len(text) and text[j] in _COUNTERS:
+                    j += 1                            # 「1,100万人」「2025年」を割らない
+            if cls in ("ascii", "kana_kata", "kanji"):
+                # 続くひらがなは送り仮名・助詞。語から引き離さない(「跨/いで」「文脈/を」)
+                while j < len(text) and _char_class(text[j]) == "kana_hira":
                     j += 1
         out.append(text[i:j])
         i = j
@@ -416,7 +458,12 @@ def wrap_prose(text: str, width_in: float, size_pt: float, weight: int = 400) ->
         while lines[i] and lines[i][0] in _NO_LINE_START:
             lines[i - 1] += lines[i][0]
             lines[i] = lines[i][1:]
-    return "\n".join(ln for ln in lines if ln)
+    lines = [ln for ln in lines if ln]
+    if any(text_width_in(ln, size_pt, weight) > cap for ln in lines):
+        # 禁則で戻した1字が行を溢れさせた。溢れた行の後ろにソフト改行を置くと、レンダラが
+        # 先に折り返して空行が入る — その場合は一切手を出さない
+        return text
+    return "\n".join(lines)
 
 
 def wrap_display(text: str, width_in: float, size_pt: float, max_lines: int = 3,

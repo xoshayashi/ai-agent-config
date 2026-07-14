@@ -145,6 +145,10 @@ claim hinges on a mid-flow step, so the visual focus matches the argument.
 
 ### 15. `statement`
 
+`lead` (optional) is the one line that says the point, set at statement size; `statement` is
+the sentence that supports it, set smaller below. A statement written as one clause joined by
+a dash is opened into the same two tiers automatically.
+
 Flexible closing, thesis, quote, decision request, legal close, or proof recap. Use variants
 such as `thesis`, `evidence_strip`, `decision_request`, `next_actions`, `legal`, or `quote`
 when available. Avoid fixed left-heavy endings and redundant company/date metadata.

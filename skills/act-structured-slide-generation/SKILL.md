@@ -147,6 +147,11 @@ exact line count (the cover subtitle's two lines). When a word is wider than its
 `verify_deck` names it: shorten the word or widen the column. See
 `references/copy-and-title-rules.md`.
 
+**Emphasis without dashes.** On a slide, a clause break is a comma and an emphasis break is a
+line. A point that deserves to stand alone gets its own line — on a statement slide it becomes
+the `lead`, with the sentence that supports it set below in smaller type. `validate_spec`
+flags dashes in slide-visible text.
+
 **Text frames.** A group that reads as one thing is one text box, built from paragraphs
 (label -> value -> note; heading -> body; a whole interpretation rail). Leading follows the
 type size (`tokens.leading`), paragraph spacing is authored as the ink gap you want to see,

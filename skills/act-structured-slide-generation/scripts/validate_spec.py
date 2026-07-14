@@ -776,6 +776,14 @@ def main() -> int:
                 yield from _visible_strings(v)
         elif isinstance(obj, str):
             yield obj
+    # ダッシュ(——)はスライド上では読みの間を作れない。意味の切れ目は読点と改行で表す —
+    # 言い切りを前に出したいなら statement.lead のように「行」で分ける(構成で表す)
+    dash_slides = [i for i, s in enumerate(slides, start=1)
+                   if any(any(d in t for d in "—―─－") for t in _visible_strings(s))]
+    for i in dash_slides:
+        warns.append(f"slide {i}: 表示テキストのダッシュ(——) — 意味の切れ目は読点と改行で表す。"
+                     "言い切りを立てたいときは行を分ける(statement は lead + 支え文)")
+
     period_slides = [i for i, s in enumerate(slides, start=1)
                      if any(("。" in t or "．" in t) for t in _visible_strings(s))]
     if period_slides:

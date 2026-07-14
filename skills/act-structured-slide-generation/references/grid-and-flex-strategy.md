@@ -115,13 +115,18 @@ comes from the type itself:
 - **Leading follows the type size.** `tokens.leading` maps a size to its line spacing, and
   every paragraph draws with the spacing its size declares. Text of the same size reads at
   the same density on every slide and in every card, because there is one place that decides
-  it.
+  it. The height a line actually occupies is `max(natural_em, spacing x cjk_line_box)` — a
+  renderer never draws a line box shorter than the font's own line height — so every height
+  and every gap is computed from that drawn height (`deck_text.drawn_line_h`), calibrated at
+  300dpi.
 - **Space between paragraphs is authored as ink distance.** The visible gap is between the
-  glyph faces, not the line boxes: Japanese text carries descender room below its ink and
-  Latin numerals sit high in their line box. `stack_block` takes the ink gap you want
-  (`tokens.layout.optical_stack.gap_in`), subtracts the slack each neighbouring line already
-  contributes (`deck_text.ink_slacks`), and sets the paragraph spacing to the remainder. A
-  value then shows the same gap above it as below it.
+  glyph faces, not the line boxes: Japanese text carries room below its ink, and a large
+  numeral sits high in a tall line box. `stack_block` measures the slack each neighbouring
+  line already contributes (`deck_text.ink_slacks`) — that sum is the smallest gap that can
+  exist — and sets the paragraph spacing to whatever is still needed to reach the gap you
+  asked for (`tokens.layout.optical_stack.gap_in`). Junctions that share a `gap_name` are
+  equalised to the largest of their floors, so the gap above a value equals the gap below it
+  even though its line box is not symmetric.
 - **Proximity is expressed in the gaps.** The gap inside a heading/body pair
   (`gap_in.heading_body`) is smaller than the gap between items (`gap_in.item`), so the pair
   reads as one thing and the items read as several.
@@ -129,6 +134,9 @@ comes from the type itself:
   drawn; a no-wrap label's width comes from the measured width of its string
   (`build_deck._label_w`). Frames sized this way sit beside each other cleanly, and
   `verify_deck` reports any pair that overlaps.
+- **A chart's unit sits inside the plot.** The vertical-axis unit is a caption on the plot,
+  not a line of its own: it is placed inside the chart region at the axis side, aligned to
+  the top of the plot, with the insets declared once in `tokens.layout.chart.unit_note`.
 - **Count lines in exactly one place.** Every height that depends on wrapping comes from
   `build_deck._text_lines`, which measures with the real font and the weight the text is
   drawn at.
@@ -139,8 +147,14 @@ one block.
 
 ## Message Slides (form and footprint)
 
-A closing statement is a shape on the page, not a paragraph poured into the content width.
-`build_deck.shape_message` chooses the measure and the line breaks together:
+A symbolic slide says its point in one line and supports it with one sentence. `lead` carries
+the payoff at statement size; the sentence below it, set smaller and lighter, gives the
+reason. Authors write both (`statement.lead` + `statement`), and a statement written as one
+long clause joined by a dash is opened into the same two tiers automatically
+(`build_deck.split_message`). The lead is composed as a form; the supporting sentence fills
+its lines like any other prose and keeps a margin of whitespace on the right.
+
+`build_deck.shape_message` chooses the measure and the line breaks of the lead together:
 
 - Lines change where the sentence changes — at a comma or a dash, so the phrasing is visible
   in the silhouette. A clause too long for one line is broken at a phrase boundary, and a

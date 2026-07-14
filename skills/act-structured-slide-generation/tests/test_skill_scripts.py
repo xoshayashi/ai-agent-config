@@ -2495,3 +2495,73 @@ def test_no_two_text_frames_overlap(tmp_path, spec_path):
                 if ov_w > 0.01 and ov_h > 0.01:
                     overlaps.append(f"slide {idx}: '{boxes[i][1]}' × '{boxes[j][1]}' {ov_h * 72:.1f}pt")
     assert not overlaps, "枠が重なっている: " + "; ".join(overlaps[:5])
+
+
+def test_kpi_ink_gaps_equal_in_the_rendered_line_boxes(tmp_path):
+    """行ボックスは、指定した行間より低くはならない(フォント本来の行高が下限)。大きな数字は
+    その高い行ボックスの中で上に寄って座るので、段落後スペースだけでは上の隙間を詰められない。
+    同じ役割の継ぎ目(gap_name)は下限の大きい側へ揃える — こうして値の上下が同じ隙間になる。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import build_deck as B
+
+    blocks = [
+        {"parts": [("導入社数", 15.5, 600, B.C["ink_subtle"])], "size": 15.5, "kind": "text"},
+        {"parts": [("120", 52, 700, B.C["ink"])], "size": 52, "kind": "numeral",
+         "gap_before": 0.22, "gap_name": "value_meta"},
+        {"parts": [("経理SaaS単体", 14.5, 400, B.C["ink_faint"])], "size": 14.5, "kind": "text",
+         "gap_before": 0.22, "gap_name": "value_meta"},
+    ]
+    gaps, spc = B._stack_gaps(blocks)
+    assert abs(gaps[0] - gaps[1]) < 0.01, f"値の上下でインクの隙間が違う: {gaps}"
+    assert all(g >= -1e-9 for g in spc), "段落後スペースが負(実現できない隙間を要求している)"
+
+
+def test_statement_is_a_lead_plus_a_supporting_sentence(tmp_path):
+    """象徴的なスライドは、一行で言い切り、一文で支える。ダッシュでつないだ一文は同じ形へ開く。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import build_deck as B
+
+    lead, support = B.split_message({"statement": "AをBする——Cを世界へ"})
+    assert lead == "Cを世界へ" and support == "AをBする"
+    lead, support = B.split_message({"lead": "Cを世界へ", "statement": "AをBする"})
+    assert lead == "Cを世界へ" and support == "AをBする"
+    lead, support = B.split_message({"statement": "AをBする"})
+    assert lead == "AをBする" and support is None
+
+
+def test_visible_dashes_are_flagged(tmp_path):
+    """スライド上のダッシュは読みの間を作れない。切れ目は読点、強調は改行(lead)で表す。"""
+    deck = {"slides": [{"pattern": "kpi_dashboard", "title": "ダッシュは表示テキストに置かない",
+                        "subtitle": "切れ目は読点、強調は行",
+                        "kpis": [{"label": "ARR", "value": "38", "unit": "億円",
+                                  "note": "経理SaaS単体——初期参入領域"}],
+                        "source": "社内分析",
+                        "speaker_notes": "ARRは38億円です。次のスライドで単価設計をご説明します。"}]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    assert any("ダッシュ" in ln for ln in r.stdout.splitlines()), r.stdout
+
+
+def test_chart_unit_note_sits_inside_the_plot(tmp_path):
+    """縦軸の単位はプロットへの添え物 — グラフの内側・軸側の上端に置く(位置はトークンが決める)。"""
+    from pptx.util import Emu
+
+    deck = {"slides": [{"pattern": "chart_insight", "title": "単位はグラフの内側・軸側の上に置く",
+                        "subtitle": "位置はトークンが決める",
+                        "chart": {"type": "bar", "categories": ["A", "B"],
+                                  "series": [{"name": "x", "values": [1, 2]}], "unit": "万時間/日"},
+                        "source": "社内分析"}]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    slide = pptx.Presentation(out).slides[0]
+    note = next(sh for sh in slide.shapes if sh.has_text_frame and "万時間" in sh.text_frame.text)
+    chart = next(sh for sh in slide.shapes if getattr(sh, "has_chart", False))
+    cx, cy = Emu(chart.left).inches, Emu(chart.top).inches
+    nx, ny = Emu(note.left).inches, Emu(note.top).inches
+    cfg = TOKENS["layout"]["chart"]["unit_note"]
+    assert abs(nx - (cx + cfg["inset_x_in"])) < 0.01, "単位が軸側に付いていない"
+    assert abs(ny - (cy + cfg["inset_y_in"])) < 0.01, "単位がグラフ上端に揃っていない"

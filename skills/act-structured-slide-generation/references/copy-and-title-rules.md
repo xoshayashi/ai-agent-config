@@ -68,6 +68,10 @@ and the builder gives each what it wants — the author writes copy, not line br
 - **Copy that fits its column is copy that survives layout.** When a single word is wider than
   its column, `verify_deck` names it: shorten the word or widen the column. Type size stays
   as designed.
+- **Meaning is carried by commas and by line breaks.** A slide reads at a glance, so a clause
+  break is a comma and an emphasis break is a new line. When a point deserves to stand alone,
+  give it its own line — a statement slide gives it the `lead`. (`validate_spec` flags a dash
+  in slide-visible text and points to those two moves.)
 - A hand-typed `\n` is honoured as a forced break, which is what makes it right for the few
   slots that require an exact line count (the cover subtitle's two lines).
 

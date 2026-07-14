@@ -11,14 +11,12 @@ import re
 import sys
 from pathlib import Path
 
-from deck_text import (MEASURE_OK, _words as words, ink_center_offset_in, ink_height_in,
-                       text_width_in as _measure)
+from deck_text import MEASURE_OK, _words as words, text_width_in as _measure
 from pptx import Presentation
 from pptx.util import Emu
 
 TOKENS = json.loads((Path(__file__).resolve().parent.parent / "references" / "tokens.json").read_text())
 LINE_BREAK = TOKENS["line_break"]
-INK_KIND_PREFIX = "ink:"   # build_deck が図形名に刻む宣言タグ
 ALLOWED = {v.upper() for v in TOKENS["colors"].values()}
 FORBIDDEN = {v.upper() for v in TOKENS["color_policy"]["forbidden_colors"]}
 OK_FONTS = {TOKENS["fonts"]["latin"], TOKENS["fonts"]["latin_semibold"],
@@ -128,10 +126,6 @@ def check_overflow(shape, issues, where):
     h_in = Emu(shape.height).inches
     if w_in <= 0.05:
         return
-    if _ink_kind_of(shape) is not None:
-        # インク積みの箱は「文字の器」ではなく「位置決めの枠」で、行ボックスより意図的に低い。
-        # はみ出しの尺度は箱ではなくインクどうしの重なり(check_collisions)で見る
-        return
     used_h = sum(h + sa for h, sa, _, _ in _para_metrics(shape.text_frame, w_in))
     # textboxes are allowed to visually overrun their nominal box a bit (top-anchored,
     # autosize off) as long as they don't collide; flag only meaningful overruns
@@ -156,54 +150,22 @@ def _overlap_frac(a, b) -> float:
     return inter / area if area > 0 else 0.0
 
 
-def _ink_kind_of(shape) -> str | None:
-    """描く側が図形名に刻んだインク種別(build_deck.stack_optical)。無ければ None。"""
-    name = shape.name or ""
-    if name.startswith(INK_KIND_PREFIX):
-        kind = name[len(INK_KIND_PREFIX):]
-        if kind in ("text", "numeral"):
-            return kind
-    return None
-
-
 def _ink_bbox(shape):
-    """Approximate the rendered text extent (ink box), not the nominal textbox:
-    width = measured widest line (capped at box width), height = computed line stack."""
+    """描かれる文字の範囲(インク箱)。段落を積んだ箱では、段落後スペースも文字を押し下げる —
+    行の高さだけで測ると、下の段落のぶんが見えず、重なりを見逃す。"""
     box = _bbox(shape)
     if not _measure_ok:
         return box
     w_in = box[2] - box[0]
-    max_w, used_h, n_lines = 0.0, 0.0, 0
-    # space_after はボックス内の余白であってインクではないため ink 高には含めない
-    for line_h, _space_after, width, lines in _para_metrics(shape.text_frame, w_in):
-        used_h += line_h
-        n_lines += lines
+    max_w, used_h = 0.0, 0.0
+    for line_h, space_after, width, _lines in _para_metrics(shape.text_frame, w_in):
+        used_h += line_h + space_after
         max_w = max(max_w, min(width, w_in))
     if max_w <= 0:
         return box
-    anchor = shape.text_frame.vertical_anchor
     from pptx.enum.text import MSO_ANCHOR as _MA
-    kind = _ink_kind_of(shape)
-    if anchor == _MA.MIDDLE and kind is not None:
-        # 縦中央寄せの箱では、インクは箱の中心にちょうど座らない(和文は行ボックスの下に
-        # ディセンダ余白、欧文数字は字面が上寄り)。build_deck の stack_optical はこの
-        # ズレを見込んで箱を置くので、検証も同じモデルで測らないと「実際は重なっていない
-        # のに重なりと判定する」ことになる — 較正値は tokens.optical_stack が単一ソース。
-        # 種別は図形名に刻まれた宣言を読む(文字列から推測すると「黒字化」のような数値
-        # ブロックを text として測り、ビルダーと違うインクを見ることになる)
-        sizes = [r.font.size.pt if r.font.size else 11
-                 for p_ in shape.text_frame.paragraphs for r in p_.runs]
-        size = max(sizes) if sizes else 11
-        spacing = next((p_.line_spacing for p_ in shape.text_frame.paragraphs
-                        if isinstance(p_.line_spacing, float)), 1.2)
-        used_h = ink_height_in(size, kind, lines=n_lines, line_spacing=spacing)
-        y0 = (box[1] + box[3]) / 2 + ink_center_offset_in(size, kind) - used_h / 2
-    elif anchor == _MA.MIDDLE:
-        # インク宣言の無い縦中央寄せ(見出し+本文のような複数段落・複数級数の箱)は、
-        # 単一級数のインクモデルでは測れない。行スタックの高さで中央に置く
-        y0 = (box[1] + box[3]) / 2 - used_h / 2
-    else:
-        y0 = box[1]
+    y0 = ((box[1] + box[3]) / 2 - used_h / 2
+          if shape.text_frame.vertical_anchor == _MA.MIDDLE else box[1])
     x0 = box[0]
     try:
         from pptx.enum.text import PP_ALIGN as _PA
@@ -218,9 +180,8 @@ def _ink_bbox(shape):
 
 
 def check_frame_overlaps(slide, idx, warns) -> None:
-    """テキストボックスの「枠」どうしの重なり。描かれるインクが正しくても、枠が重なった
-    pptx は編集で掴み違える(下の枠を選べない)。枠は文字を囲むだけの大きさに保つこと —
-    行ボックスの余白や固定高をそのまま枠にすると、余白が隣の枠へ食い込む。"""
+    """テキストボックスの「枠」どうしの重なり。描かれる文字が正しくても、枠が重なった pptx は
+    編集で掴み違える(下の枠を選べない)。枠は文字を囲むだけの大きさに保つこと。"""
     boxes = [(_bbox(sh), sh.text_frame.text[:16]) for sh in slide.shapes
              if sh.shape_type == 17 and sh.has_text_frame and sh.text_frame.text.strip()
              and sh.left is not None]
@@ -231,7 +192,7 @@ def check_frame_overlaps(slide, idx, warns) -> None:
             ov_h = min(a[3], b[3]) - max(a[1], b[1])
             if ov_w > 0.01 and ov_h > 0.01:
                 warns.append(f"slide {idx}: テキストボックスの枠が重なる {ov_h * 72:.1f}pt — "
-                             f"'{boxes[i][1]}' × '{boxes[j][1]}'(枠は文字ぶんの高さに)")
+                             f"'{boxes[i][1]}' × '{boxes[j][1]}'(枠は文字ぶんの大きさに)")
 
 
 def check_collisions(slide, idx, issues) -> None:
