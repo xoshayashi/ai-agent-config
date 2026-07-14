@@ -137,14 +137,21 @@ Per-line character limits are never written down: they are derived from the rend
 renderer read. Changing a type scale or a layout width moves the limit automatically — do not
 reintroduce hard-coded character budgets for headers.
 
-**Line breaks (hard rule).** Do not hand-break display text. Labels, headings, bullets, cell
-text, callouts and conclusion lines are wrapped by the builder at 文節 boundaries for the
-width they are actually drawn at (`deck_text.wrap_display`), so a line never splits a word,
-an okurigana stem, or a number from its unit, and never strands a particle at the head of a
-line. A `\n` you type is a FORCED break the builder keeps — use it only where an exact line
-count is part of the contract (the cover subtitle's two lines). If a chunk cannot fit the box
-on one line, the engine refuses to mangle it and lets the wrap stay visible: that is a copy
-defect, so shorten the copy — never shrink the type. See `references/copy-and-title-rules.md`.
+**Line breaks.** Write copy; the builder writes the line breaks. Short display text (labels,
+headings, cell text, conclusion lines) breaks at phrase boundaries so the phrasing shows in
+the shape; sentences and body copy keep the renderer's natural, filled lines, with only a
+word that would be split carried to the next line. A symbolic closing message is composed as
+a form — its measure, its line balance and its surrounding whitespace are chosen together. A
+`\n` you type is honoured as a forced break, which is what makes it right for a slot with an
+exact line count (the cover subtitle's two lines). When a word is wider than its column,
+`verify_deck` names it: shorten the word or widen the column. See
+`references/copy-and-title-rules.md`.
+
+**Text frames.** A group that reads as one thing is one text box, built from paragraphs
+(label -> value -> note; heading -> body; a whole interpretation rail). Leading follows the
+type size (`tokens.leading`), paragraph spacing is authored as the ink gap you want to see,
+and every frame is the size of its text. `verify_deck` reports overlapping frames. See
+`references/grid-and-flex-strategy.md`.
 
 Source, assumption, and note fields stay small in the footer area; page numbers are never
 rendered.

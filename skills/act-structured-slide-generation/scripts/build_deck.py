@@ -45,8 +45,8 @@ A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 
 # 表示長(_ja_len)と全角→半角(hw)は deck_text.py の単一実装を使う — validate_spec の
 # 字数バジェット・lint_render の readback 照合と同一実装であることが契約
-from deck_text import (MEASURE_OK, footer_text, header_slots, hw, ja_len as _ja_len,
-                       text_width_in, wrap_display)
+from deck_text import (MEASURE_OK, footer_text, header_slots, hw, ink_slacks, is_prose,
+                       ja_len as _ja_len, leading, text_width_in, wrap_display, wrap_prose)
 
 
 def _label_w(text: str, size_pt: float, weight: int = 400) -> float:
@@ -101,6 +101,124 @@ def _statement_lines(stmt: str, width_in: float, size_pt: float) -> list[str]:
     if cur:
         lines.append(cur)
     return lines
+
+
+# 象徴的なメッセージ(結び・ステートメント)は、文字を流し込むのではなく「形」を作る。
+# 行長(measure)を選び、節の切れ目で割り、行の長さを揃え、周りの余白との占有バランスを見る。
+# 端から端まで文字で埋めた行は、読み手に「詰め込まれた」と感じさせる。
+def _units_of(text: str, avail_w: float, size_pt: float, weight: int) -> list[str]:
+    """長い節を、行の切れ目になれる単位へ割る。まず文節、収まらないものだけ語へ。
+    文節で割れば、行頭に助詞が立たない(「…存在感 / をプログラム…」にならない)。"""
+    from deck_text import _segments, _words
+    out: list[str] = []
+    for chunk in _segments(text)[0]:
+        if text_width_in(chunk, size_pt, weight) > avail_w * 0.9:
+            out.extend(_words(chunk))
+        else:
+            out.append(chunk)
+    return out
+
+
+def _clauses(stmt: str) -> list[str]:
+    """節に割る。読点とダッシュは節の切れ目 — 意味の変わり目で行が変わると、文体が形に出る。
+    ダッシュは連なって1つの記号(——)なので、途中では割らない。"""
+    DASHES = "—―─－"
+    out, cur = [], ""
+    i = 0
+    while i < len(stmt):
+        ch = stmt[i]
+        if ch in DASHES:
+            j = i
+            while j < len(stmt) and stmt[j] in DASHES:
+                j += 1
+            out.append(cur + stmt[i:j])
+            cur = ""
+            i = j
+            continue
+        cur += ch
+        if ch in "、，":
+            out.append(cur)
+            cur = ""
+        i += 1
+    if cur:
+        out.append(cur)
+    return [c for c in out if c]
+
+
+def shape_message(stmt: str, avail_w: float, size_pt: float, weight: int = 700,
+                  max_lines: int = 4) -> tuple[list[str], float]:
+    """メッセージの行(lines)と、その行を組む幅(measure)を返す。
+
+    象徴的な一文は、流し込みではなく形として組む:
+      - 行は節(読点・ダッシュ)の切れ目で変わる。意味の変わり目が行の変わり目になる
+      - 行の長さを揃える(行長の分散を最小化する分割を選ぶ)
+      - 行長は使える幅より短く取り、右に余白を残す。端まで埋めた行は詰め込んで見える
+      - 語は割らない(節が長すぎる行は語の単位で詰める)
+    """
+    clauses = _clauses(stmt)
+    units: list[tuple[str, bool]] = []           # (文字列, 節の終わりか)
+    for c in clauses:
+        if text_width_in(c, size_pt, weight) > avail_w * 0.9:
+            parts = _units_of(c, avail_w, size_pt, weight)
+            for i, part in enumerate(parts):
+                units.append((part, i == len(parts) - 1))
+        else:
+            units.append((c, True))
+    widths = [text_width_in(u, size_pt, weight) for u, _ in units]
+    total = sum(widths)
+    n = len(units)
+    if n < 2:
+        return [stmt], min(avail_w, total + 0.06)
+
+    best, best_score = None, float("inf")
+    for k in range(1, max_lines + 1):
+        if k > n:
+            break
+        target = total / k
+        INF = float("inf")
+        dp = [[INF] * (k + 1) for _ in range(n + 1)]
+        cut = [[0] * (k + 1) for _ in range(n + 1)]
+        dp[0][0] = 0.0
+        for i in range(1, n + 1):
+            for j in range(1, k + 1):
+                w = 0.0
+                for start_i in range(i - 1, -1, -1):
+                    w += widths[start_i]
+                    if w > avail_w * 0.94 and i - start_i > 1:
+                        break
+                    if dp[start_i][j - 1] == INF:
+                        continue
+                    # 行長のばらつき + 節の途中で行が変わることの罰
+                    cost = (target - w) ** 2
+                    if i < n and not units[i - 1][1]:
+                        cost += 0.35
+                    if dp[start_i][j - 1] + cost < dp[i][j]:
+                        dp[i][j] = dp[start_i][j - 1] + cost
+                        cut[i][j] = start_i
+        if dp[n][k] == INF:
+            continue
+        lines, i, j = [], n, k
+        while j > 0:
+            st = cut[i][j]
+            lines.append("".join(u for u, _ in units[st:i]))
+            i, j = st, j - 1
+        lines.reverse()
+        line_w = [text_width_in(ln, size_pt, weight) for ln in lines]
+        measure = max(line_w)
+        if measure > avail_w:
+            continue
+        even = sum((measure - lw) ** 2 for lw in line_w)
+        fill = measure / avail_w
+        score = even + max(0.0, fill - 0.88) * 12 + max(0, k - 3) * 0.6
+        if score < best_score:
+            best, best_score = (lines, measure), score
+    if not best:
+        lines = wrap_prose(stmt, avail_w, size_pt, weight).split("\n")
+        return lines, avail_w
+    lines, measure = best
+    # 箱は行の実測幅より少し広く取る(折返しの安全マージン 0.3em ぶん)。ぴったりの幅で渡すと
+    # レンダラが先に折り返し、行末のダッシュや約物だけが次の行へこぼれる
+    return lines, min(avail_w, measure + 0.3 * size_pt / 72.0 + 0.06)
 
 
 def grid(col_start: int, col_span: int) -> tuple[float, float]:
@@ -196,8 +314,9 @@ def _add_line_runs(p, text, size_pt, weight, color):
         _set_run_fonts(r, size_pt, weight, color, lang="ja-JP")
 
 
-DISPLAY_WRAP_MAX_CHARS = LINE_BREAK["max_display_chars_ja"]   # これを超えたら本文 — 自然折返しに任せる
-DISPLAY_WRAP_MAX_LINES = LINE_BREAK["max_lines"]              # 表示テキストとして許す行数の上限
+DISPLAY_WRAP_MAX_CHARS = LINE_BREAK["max_display_chars_ja"]   # これを超えたら本文 — 自然に行を埋める
+DISPLAY_WRAP_MAX_LINES = LINE_BREAK["max_lines"]              # 文節で割るときに許す行数の上限
+LABEL_MAX_CHARS = LINE_BREAK["label_max_chars_ja"]            # ここまでが「ラベル」 — 文節で割る
 
 
 def display_wrap_text(text: str, w_in: float, size_pt: float, weight: int = 400) -> str:
@@ -208,15 +327,23 @@ def display_wrap_text(text: str, w_in: float, size_pt: float, weight: int = 400)
     行数は「自然折返しの行数 + 1」までを許す。語の途中で割るくらいなら1行増やす、という
     優先順位 — 増えた1行が箱に入らないなら、それは組版ではなくコピーが長すぎるという意味で、
     verify_deck の overflow/重なり検査が拾う(直すのはコピーの側)。"""
-    if not isinstance(text, str) or "\n" in text or _ja_len(text) > DISPLAY_WRAP_MAX_CHARS:
+    if not isinstance(text, str) or "\n" in text:
         return text
-    natural = math.ceil(text_width_in(text, size_pt, weight) / max(0.05, w_in))
-    return wrap_display(text, w_in, size_pt, min(DISPLAY_WRAP_MAX_LINES, natural + 1), weight)
+    if not is_prose(text) and _ja_len(text) <= LABEL_MAX_CHARS:
+        # 短いラベル・見出し・結論句は、意味の切れ目(文節)で割る — 行の切れ目が文体に表れる
+        natural = math.ceil(text_width_in(text, size_pt, weight) / max(0.05, w_in))
+        broken = wrap_display(text, w_in, size_pt,
+                              min(DISPLAY_WRAP_MAX_LINES, natural + 1), weight)
+        if "\n" in broken:
+            return broken
+    # 文章・長い表示テキスト、および文節で割れなかったもの: 自然に行を埋め、語が割れる行だけ
+    # その語を次行へ送る(行の埋まりを保ったまま、語は割らない)
+    return wrap_prose(text, w_in, size_pt, weight)
 
 
 def add_text(slide, x, y, w, h, runs, *, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP,
-             line_spacing: float = 1.15, space_after_pt: float = 0.0, wrap=True,
-             autosize_off=True, display_wrap=True):
+             line_spacing: float | None = None, space_after_pt: float = 0.0, wrap=True,
+             autosize_off=True, display_wrap=True, role: str | None = None):
     """Add a textbox. `runs` is a list of paragraphs; each paragraph is a list of
     (text, size_pt, weight, color) tuples.
 
@@ -241,7 +368,10 @@ def add_text(slide, x, y, w, h, runs, *, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.
     for i, para in enumerate(runs):
         p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
         p.alignment = align
-        p.line_spacing = line_spacing
+        # 行間は級数が決める(tokens.leading)。段落ごとに、その段落の級数で引く —
+        # 箱ごとに行間を決めると、同じ役割の文章が箱によって違う密度で見える
+        size = max((r[1] for r in para), default=TS["body"])
+        p.line_spacing = line_spacing if line_spacing else leading(size, role)
         if space_after_pt:
             p.space_after = Pt(space_after_pt)
         for text, size_pt, weight, color in para:
@@ -303,7 +433,7 @@ def _parts_lines(parts, width_in: float) -> int:
 def _ink_h(b, width_in: float) -> float:
     """1ブロックのインク高(in)。折返し行は行送りぶん積み、最後の行だけ字面高で数える。"""
     n = max(1, _parts_lines(b["parts"], width_in))
-    line_h = b["size"] / 72.0 * b.get("line_spacing", 1.2)
+    line_h = b["size"] / 72.0 * leading(b["size"], b.get("role"))
     return (n - 1) * line_h + b["size"] / 72.0 * OPT["ink_ratio"][b.get("kind", "text")]
 
 
@@ -311,6 +441,67 @@ def stack_optical_height(blocks, width_in: float) -> float:
     """縦積みが必要とするインク総高(in)。器の高さを決める側と描く側が同じ式を見る。"""
     return (sum(_ink_h(b, width_in) for b in blocks)
             + sum(b.get("gap_before", 0.0) for b in blocks[1:]))
+
+
+def stack_block(slide, x, y, w, h, blocks, *, align=PP_ALIGN.LEFT):
+    """1つのテキストボックスに、blocks を段落として積む。
+
+    分ける必要のないもの(ラベル→数値→注記、見出し→本文)は同じ箱の中で仕上げる。箱を分けると
+    位置を人手で合わせることになり、行間・余白・枠の重なりのズレがそこから生まれる。1つの箱なら、
+    段落の行間(級数が決める)と段落間の余白だけで組み上がる。
+
+    blocks: [{parts, size, kind, gap_before, align, role}]
+      gap_before : 直前のブロックとの「インク(字面)の隙間」(in)。段落間の余白は、行ボックスの
+                   余白(和文のディセンダ、数字の上寄り)を差し引いてここから逆算する
+    返り値: (shape, インク総高(in))
+    """
+    ink_total = stack_optical_height(blocks, w)
+    first = blocks[0]
+    above0, _ = ink_slacks(first["size"], first.get("kind", "text"),
+                           leading(first["size"], first.get("role")))
+    top = y + max(0.0, (h - ink_total) / 2) - above0     # インクが領域の中央に来るよう箱を置く
+
+    runs = [b["parts"] for b in blocks]
+    tb = slide.shapes.add_textbox(Inches(x), Inches(top), Inches(w), Inches(h))
+    tf = tb.text_frame
+    tf.word_wrap = True
+    tf.vertical_anchor = MSO_ANCHOR.TOP
+    tf.margin_left = tf.margin_right = tf.margin_top = tf.margin_bottom = 0
+    for i, b in enumerate(blocks):
+        p = tf.paragraphs[0] if i == 0 else tf.add_paragraph()
+        p.alignment = b.get("align", align)
+        ls = leading(b["size"], b.get("role"))
+        p.line_spacing = ls
+        if i + 1 < len(blocks):
+            nxt = blocks[i + 1]
+            _, below = ink_slacks(b["size"], b.get("kind", "text"), ls)
+            above, _ = ink_slacks(nxt["size"], nxt.get("kind", "text"),
+                                  leading(nxt["size"], nxt.get("role")))
+            gap = max(0.0, nxt.get("gap_before", 0.0) - below - above)
+            if gap > 0:
+                p.space_after = Pt(gap * 72)
+        text_w = w
+        for part in (b["parts"] if len(b["parts"]) > 1 else
+                     [(display_wrap_text(b["parts"][0][0], text_w, b["parts"][0][1],
+                                         b["parts"][0][2]), *b["parts"][0][1:])]):
+            _add_script_runs(p, part[0], part[1], part[2], part[3])
+    tb.height = Inches(_stack_drawn_h(blocks, w))
+    return tb, ink_total
+
+
+def _stack_drawn_h(blocks, w) -> float:
+    """箱が実際に必要とする高さ(行ボックス + 段落間の余白)。"""
+    total = 0.0
+    for i, b in enumerate(blocks):
+        ls = leading(b["size"], b.get("role"))
+        total += max(1, _parts_lines(b["parts"], w)) * b["size"] / 72.0 * ls
+        if i + 1 < len(blocks):
+            nxt = blocks[i + 1]
+            _, below = ink_slacks(b["size"], b.get("kind", "text"), ls)
+            above, _ = ink_slacks(nxt["size"], nxt.get("kind", "text"),
+                                  leading(nxt["size"], nxt.get("role")))
+            total += max(0.0, nxt.get("gap_before", 0.0) - below - above)
+    return total + 0.02
 
 
 def stack_optical(slide, x, y, w, h, blocks, *, align=PP_ALIGN.LEFT):
@@ -936,8 +1127,7 @@ def p_kpi_dashboard(slide, spec, deck):
         if k.get("note"):
             blocks.append({
                 "parts": [(k["note"], TS["kpi_sub"], 400, C["ink_faint"])],
-                "size": TS["kpi_sub"], "kind": "text", "gap_before": gap["value_meta"],
-                "line_spacing": 1.18})
+                "size": TS["kpi_sub"], "kind": "text", "gap_before": gap["value_meta"]})
         return blocks
 
     stacks = [card_blocks(k) for k in kpis]
@@ -962,7 +1152,7 @@ def p_kpi_dashboard(slide, spec, deck):
                  C["primary_pale"] if k.get("focal") else C["surface_tint"],
                  radius_pt=LAY["card"]["radius_pt"])
         # インクの隙間で組む: 値の上下(ラベル・注記)が同じ余白で座り、上下インセットも対称
-        stack_optical(slide, x + pad, y + pad, text_w, rh - 2 * pad, stacks[i])
+        stack_block(slide, x + pad, y + pad, text_w, rh - 2 * pad, stacks[i])
 
 
 def _focal_bar_anchor(cx, cw, cspec):
@@ -1071,7 +1261,6 @@ def p_chart_insight(slide, spec, deck):
 # 見える(字数近似なら尚更ずれる)。行数は _text_lines、位置は stack_optical — 数える実装も
 # 積む実装も1つずつしか持たない。
 RAIL_HEAD_PT = 15
-RAIL_LINE_SPACING = 1.28
 
 
 def _rail_blocks(items):
@@ -1084,11 +1273,10 @@ def _rail_blocks(items):
         body = t.get("body") if isinstance(t, dict) else str(t)
         if head:
             blocks.append({"parts": [(head, RAIL_HEAD_PT, 600, C["ink"])], "size": RAIL_HEAD_PT,
-                           "kind": "text", "line_spacing": RAIL_LINE_SPACING,
-                           "gap_before": gap["item"] if i else 0.0})
+                           "kind": "text", "gap_before": gap["item"] if i else 0.0})
         if body:
             blocks.append({"parts": [(body, TS["body"], 400, C["ink_subtle"])], "size": TS["body"],
-                           "kind": "text", "line_spacing": RAIL_LINE_SPACING,
+                           "kind": "text",
                            "gap_before": gap["heading_body"] if head else (gap["item"] if i else 0.0)})
     return blocks
 
@@ -1103,7 +1291,7 @@ def _takeaways_rail(slide, spec, takeaways, tx, tw, y0, region_y, region_h):
     ty = max(y0 + 0.05, region_y + (region_h - group_h) / 2)
     add_text(slide, tx, ty, tw, 0.3, [[(spec.get("takeaways_heading", "要点"), 16, 600, C["primary_deep"])]])
     add_line(slide, tx, ty + 0.34, tx + tw, ty + 0.34, C["rule"], 0.75)
-    stack_optical(slide, tx, ty + 0.5, text_w, stack_h, blocks)
+    stack_block(slide, tx, ty + 0.5, text_w, stack_h, blocks)
 
 
 def p_diagram(slide, spec, deck):
@@ -1394,6 +1582,20 @@ def p_comparison_table(slide, spec, deck):
     add_act_table(slide, x, y0 + 0.08, w, h - 0.16, spec["table"])
 
 
+def _free_below(placed, x, y, w, h, gap=0.04):
+    """すでに置いたラベルと重なるなら、重ならない高さまで下げた y を返す。
+
+    プロットの位置はデータが決めるので、近い2点のラベルは自然に重なる。重なったまま置くと
+    文字が読めず、枠も掴み違える — 下へ逃がして両方を読めるようにする。"""
+    for _ in range(8):
+        hit = next((b for b in placed
+                    if x < b[2] and b[0] < x + w and y < b[3] and b[1] < y + h), None)
+        if not hit:
+            break
+        y = hit[3] + gap
+    return y
+
+
 def p_competitive_landscape(slide, spec, deck):
     """2x2 positioning map. spec: {x_axis:{low,high}, y_axis:{low,high},
     players:[{name, x, y, focal}]} coords in 0..1."""
@@ -1411,6 +1613,7 @@ def p_competitive_landscape(slide, spec, deck):
     add_text(slide, cx + cw_ + 0.08, cy + size / 2 - 0.10, 0.92, 0.34, [[(ax.get("high", ""), TS["chart_axis"], 400, C["ink_faint"])]])
     add_text(slide, cx + cw_ / 2 - 1.0, cy - 0.30, 2.0, 0.30, [[(ay.get("high", ""), TS["chart_axis"], 400, C["ink_faint"])]], align=PP_ALIGN.CENTER)
     add_text(slide, cx + cw_ / 2 - 1.0, cy + size + 0.05, 2.0, 0.30, [[(ay.get("low", ""), TS["chart_axis"], 400, C["ink_faint"])]], align=PP_ALIGN.CENTER)
+    placed: list[tuple[float, float, float, float]] = []
     for pl in spec.get("players", []):
         dot = 0.5 if pl.get("focal") else 0.3
         dx = cx + pl["x"] * cw_ - dot / 2
@@ -1421,8 +1624,17 @@ def p_competitive_landscape(slide, spec, deck):
         sh.line.fill.background()
         sh.shadow.inherit = False
         _strip_style(sh)
-        add_text(slide, dx - 0.55, dy + dot + 0.02, dot + 1.1, 0.22,
-                 [[(pl["name"], TS["body_small"], 600 if pl.get("focal") else 400,
+        # 枠は文字ぶんの大きさを持つ — 幅は実測、高さは折返し行数から。余った幅を枠に含めると、
+        # 近くのプロットのラベルと枠だけが重なる(文字は離れていても、編集で掴み違える)
+        lab_pt = TS["body_small"]
+        weight = 600 if pl.get("focal") else 400
+        lab_w = _label_w(pl["name"], lab_pt, weight)          # 実測幅 = 1行に収まり、余分な枠を持たない
+        lab_h = lab_pt / 72.0 * leading(lab_pt) + 0.02
+        lx, ly = dx + dot / 2 - lab_w / 2, dy + dot + 0.02
+        ly = _free_below(placed, lx, ly, lab_w, lab_h)        # 近いプロットどうしはラベルを下へ逃がす
+        placed.append((lx, ly, lx + lab_w, ly + lab_h))
+        add_text(slide, lx, ly, lab_w, lab_h,
+                 [[(pl["name"], lab_pt, weight,
                     C["ink"] if pl.get("focal") else C["ink_subtle"])]], align=PP_ALIGN.CENTER)
     notes = spec.get("notes", [])
     if notes:
@@ -1433,7 +1645,7 @@ def p_competitive_landscape(slide, spec, deck):
         ny = max(cy, cy + (size - (0.5 + stack_h)) / 2)
         add_text(slide, nx, ny, nw, 0.3, [[(spec.get("notes_heading", "Positioning"), 16, 600, C["primary_deep"])]])
         add_line(slide, nx, ny + 0.34, nx + nw, ny + 0.34, C["rule"], 0.75)
-        stack_optical(slide, nx, ny + 0.5, nw, stack_h, blocks)
+        stack_block(slide, nx, ny + 0.5, nw, stack_h, blocks)
 
 
 def p_financial_summary(slide, spec, deck):
@@ -1838,9 +2050,9 @@ def p_quote_or_statement(slide, spec, deck):
     if variant in ("evidence_strip", "thesis_strip", "closing_grid") and recap:
         x, w = grid(0, 12)
         s_pt = 31 if _ja_len(stmt) <= 70 else 28
-        lines = _text_lines(stmt, w * 0.86, s_pt, 700)
-        text_w = min(w, max(w * 0.72, lines and _ja_len(stmt) * (s_pt / 72.0) * 0.72))
-        text_h = lines * (s_pt / 72.0) * 1.38 * 1.15 + 0.12
+        msg_lines, text_w = shape_message(stmt, w, s_pt, 700)
+        stmt = "\n".join(msg_lines)
+        text_h = len(msg_lines) * (s_pt / 72.0) * leading(s_pt, "statement") * 1.15 + 0.12
         n = min(4, len(recap))
         gap = LAY["gutter_in"]
         heading_h = 0.34
@@ -1849,7 +2061,7 @@ def p_quote_or_statement(slide, spec, deck):
         gy = y0 + max(0.0, (h - group_h) * 0.44)
         add_rect(slide, x, gy, 0.72, 0.055, C["primary"])
         add_text(slide, x, gy + 0.34, text_w, text_h,
-                 [[(stmt, s_pt, 700, C["ink"])]], line_spacing=1.34)
+                 [[(stmt, s_pt, 700, C["ink"])]], role="statement")
         hy = gy + 0.34 + text_h + 0.40
         add_text(slide, x, hy, w, heading_h,
                  [[(spec.get("recap_heading", "確認指標"), TS["section_heading"], 700, C["primary_deep"])]])

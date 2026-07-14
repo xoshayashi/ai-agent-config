@@ -175,6 +175,24 @@ def text_width_in(text: str, size_pt: float, weight: int = 400) -> float:
 
 
 # ---------------------------------------------------------------------------
+# 行間(leading)
+# ---------------------------------------------------------------------------
+# 行間は級数が決める。同じ級数の文字は、どのスライドのどのカードでも同じ行間で組む
+# (tokens.leading が単一ソース)。役割で例外を置きたいときだけ role で上書きする。
+
+
+def leading(size_pt: float, role: str | None = None) -> float:
+    """その級数で組むときの行間(倍率)。"""
+    tok = load_tokens()["leading"]
+    if role and role in tok["roles"]:
+        return float(tok["roles"][role])
+    for min_pt, value in tok["by_size"]:
+        if size_pt >= min_pt:
+            return float(value)
+    return 1.28
+
+
+# ---------------------------------------------------------------------------
 # 光学的な積み(インク基準の縦組み)
 # ---------------------------------------------------------------------------
 # 箱(行ボックス)の間隔で組むと、和文は下のディセンダ余白ぶん、欧文数字は字面が上寄りな
@@ -195,6 +213,22 @@ def ink_center_offset_in(size_pt: float, kind: str = "text") -> float:
     """縦中央寄せした箱の中心から、実際のインク中心までのズレ(in)。"""
     opt = load_tokens()["layout"]["optical_stack"]
     return size_pt / 72.0 * opt["ink_center_offset_em"][kind]
+
+
+def ink_slacks(size_pt: float, kind: str = "text", line_spacing: float | None = None) -> tuple[float, float]:
+    """1行の「行ボックスの上端からインク上端まで」と「インク下端から行ボックス下端まで」(in)。
+
+    段落を積むときの余白(spcAft)は、この2つを差し引いて決める — 行ボックスの隙間ではなく
+    インクの隙間が目に見える間隔だから。和文は下にディセンダ余白を持ち、欧文数字は字面が
+    上寄りに座る(較正値は tokens.optical_stack)。"""
+    opt = load_tokens()["layout"]["optical_stack"]
+    ls = line_spacing if line_spacing else leading(size_pt)
+    line_h = size_pt / 72.0 * ls
+    ink_h = size_pt / 72.0 * opt["ink_ratio"][kind]
+    offset = size_pt / 72.0 * opt["ink_center_offset_em"][kind]
+    above = line_h / 2 + offset - ink_h / 2
+    below = line_h / 2 - offset - ink_h / 2
+    return max(0.0, above), max(0.0, below)
 
 
 def ink_height_in(size_pt: float, kind: str = "text", lines: int = 1,
@@ -320,6 +354,69 @@ def is_prose(text: str) -> bool:
     if not text:
         return False
     return any(ch in text for ch in _SENTENCE_MARKS)
+
+
+def _words(text: str) -> list[str]:
+    """行の途中で割ってはいけない最小単位に割る。
+
+    和文は漢字と漢字のあいだで行が変わっても読める。読みが壊れるのは、カタカナ語や欧文語、
+    数値と単位のような「1つの語」が途中で割れたとき(「ワークフ/ロー」「社内ナ/レッジ」)。
+    守るのはそこだけで、それ以外は1文字単位で詰めてよい — 行が埋まることが文章の読みやすさ。
+    """
+    out: list[str] = []
+    i = 0
+    while i < len(text):
+        cls = _char_class(text[i])
+        j = i + 1
+        if cls in ("ascii", "kana_kata"):             # 欧文語・カタカナ語はひとかたまり
+            while j < len(text) and _char_class(text[j]) == cls:
+                j += 1
+            if cls == "ascii":                        # 数値に続く単位(円・%・年)まで含める
+                while j < len(text) and text[j] in "%％":
+                    j += 1
+        out.append(text[i:j])
+        i = j
+    return out
+
+
+def wrap_prose(text: str, width_in: float, size_pt: float, weight: int = 400) -> str:
+    """文章は自然に流し、語が割れる行だけ、その語を次の行へ送る。
+
+    文章に求めるのは「行が埋まっていること」で、文節ごとに割ると短い行が階段状に並ぶ。
+    一方でレンダラは箱の幅しか見ないので、行の切れ目が語の途中に落ちる(「ワークフ/ロー」)。
+    そこで、レンダラと同じように行を詰めながら、切れ目が語をまたぐときだけ、その語の頭で折る
+    — 見た目は自然な折返しのまま、割れていた1語だけが下の行へ降りる。語割れが起きないなら
+    改行は1つも足さない(レンダラに委ねる)。
+    """
+    if not text or "\n" in text:
+        return text
+    cap = max(0.05, width_in - 0.3 * size_pt / 72.0)
+    if text_width_in(text, size_pt, weight) <= cap:
+        return text
+    lines, cur, cur_w, moved = [], "", 0.0, False
+    for word in _words(text):
+        w = text_width_in(word, size_pt, weight)
+        if cur and cur_w + w > cap:
+            if len(word) > 1 and w <= cap:
+                moved = True                          # レンダラならこの語の途中で切れていた
+            lines.append(cur)
+            cur, cur_w = word, w
+        else:
+            cur, cur_w = cur + word, cur_w + w
+    if cur:
+        lines.append(cur)
+    if not moved or len(lines) < 2:
+        return text                                   # 語は割れない — レンダラに任せる
+    if any(text_width_in(ln, size_pt, weight) > cap for ln in lines):
+        # 箱に入らない語がある行を作ってしまった。はみ出した行の後ろにソフト改行を置くと、
+        # レンダラが先に折り返して空行が1本入る — その場合は一切手を出さない
+        return text
+    # 行頭禁則: 句読点や閉じ括弧で行を始めない(前の行の末尾へ戻す)
+    for i in range(1, len(lines)):
+        while lines[i] and lines[i][0] in _NO_LINE_START:
+            lines[i - 1] += lines[i][0]
+            lines[i] = lines[i][1:]
+    return "\n".join(ln for ln in lines if ln)
 
 
 def wrap_display(text: str, width_in: float, size_pt: float, max_lines: int = 3,

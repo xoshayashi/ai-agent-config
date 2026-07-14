@@ -11,8 +11,8 @@ import re
 import sys
 from pathlib import Path
 
-from deck_text import (MEASURE_OK, _segments as segments, ink_center_offset_in, ink_height_in,
-                       is_prose, ja_len, text_width_in as _measure)
+from deck_text import (MEASURE_OK, _words as words, ink_center_offset_in, ink_height_in,
+                       text_width_in as _measure)
 from pptx import Presentation
 from pptx.util import Emu
 
@@ -100,34 +100,27 @@ def _para_metrics(tf, w_in):
 
 
 def check_natural_wrap(shape, warns, where):
-    """文節で割れずに自然折返しへ落ちた表示テキストを拾う。
+    """その列に収まらない語を拾う。
 
-    ビルダーは表示テキスト(ラベル・箇条書き・セル)を文節の切れ目で折り返すが、その列幅に
-    対してコピーが長すぎると、どこで切っても行が足りず自然折返しに委ねる。そのときレンダラは
-    語の途中(初/回相談)で割る — 静かに崩れるので、ここで見えるようにする。直すのはコピーか
-    列幅であって、字を小さくすることではない。"""
+    行の切れ目は、短いラベルなら文節へ寄せ、それ以外は自然に詰めながら語をまたぐときだけ
+    その語を次行へ送る — どちらの経路でも語は割れない。割れるのは「1語が列幅より広い」ときで、
+    それは組版ではなくコピーの問題(語を短くするか、列を広げる)。ここで見えるようにする。"""
     tf = shape.text_frame
     w_in = Emu(shape.width).inches - 0.02
     if w_in <= 0.05:
         return
     for para in tf.paragraphs:
         text = "".join(r.text for r in para.runs)
-        if not text.strip() or ja_len(text) > LINE_BREAK["max_display_chars_ja"]:
-            continue                                  # 長文は本文 — 自然折返しでよい
-        if is_prose(text):
-            continue                                  # 文章の折返しはレンダラに委ねる(仕様)
-        if para._p.find(f"{A}br") is not None:
-            continue                                  # 文節で折り返し済み
-        if len(segments(text)[0]) < 2:
-            continue                                  # 切れ目が無い語(社名など) — 折返しでは直せない
-        # 幅はランごとの実サイズで測る(値40pt+単位16pt のような混在段落を最大サイズで
-        # 測ると、収まっている行を「はみ出す」と誤って数える)
-        default = max((r.font.size.pt if r.font.size else 11) for r in para.runs)
-        width = sum(text_width_in(r.text, r.font.size.pt if r.font.size else default, _run_weight(r))
-                    for r in para.runs if r.text)
-        if width > max(0.05, w_in - _text_indent_in(para)):
-            warns.append(f"{where}: 文節で折り返せず自然折返し(語の途中で割れる) — "
-                         f"'{text[:24]}' … コピーを短くするか列幅を広げる")
+        if not text.strip():
+            continue
+        size = max((r.font.size.pt if r.font.size else 11) for r in para.runs)
+        avail = max(0.05, w_in - _text_indent_in(para))
+        weight = _para_weight(para)
+        too_wide = [w for w in words(text)
+                    if len(w) > 1 and text_width_in(w, size, weight) > avail]
+        if too_wide:
+            warns.append(f"{where}: 列幅に収まらない語 — '{too_wide[0]}'"
+                         f"(語を短くするか列を広げる。語の途中で割れて描かれる)")
 
 
 def check_overflow(shape, issues, where):
