@@ -36,7 +36,10 @@ CONTROL_KEYS = {
     "derivation", "qualifier", "unit_label", "delta_dir", "positive_is_good", "kind",
 }
 
-UNIT = r"(?:億円|兆円|万円|百万円|億|兆|万|円|%|％|件|社|名|人|カ月|ヶ月|か月|週間|時間|倍|pt|日|時間/日)"
+# 単位は「長いものから」並べる。万 を先に置くと「2,404万人」が「2,404万」として切れ、
+# 主張と図表のトークンが一致しなくなる(人・件・社は万の後ろに付く)
+UNIT = (r"(?:億円|兆円|万円|百万円|万人|億人|万件|万社|万時間|万台|億円超|"
+        r"億|兆|万|円|%|％|件|社|名|人|カ月|ヶ月|か月|週間|時間|倍|pt|日|時間/日)")
 NUM = r"(?:△|▲|-|−|\+)?\d[\d,]*(?:\.\d+)?"
 MATERIAL = re.compile(rf"({NUM})\s*({UNIT})")
 YEARLIKE = re.compile(r"20\d{2}\s*年|FY\s?\d{2,4}|第[1-4]四半期|Q[1-4]")
@@ -181,7 +184,7 @@ def visible_strings(slide: dict) -> list[str]:
 # ---------------------------------------------------------------------------
 # derivation: 計算された数値は、計算し直せる形で宣言する
 # ---------------------------------------------------------------------------
-KINDS = {"cagr", "growth", "multiple", "share", "ratio", "delta", "sum"}
+KINDS = {"cagr", "growth", "multiple", "share", "ratio", "delta", "sum", "product"}
 
 
 def resolve_path(slide: dict, path):
@@ -252,6 +255,8 @@ def compute(slide: dict, deriv: dict) -> float:
         return a / b
     if kind == "delta":
         return b - a
+    if kind == "product":                             # 母数 × 比率(SAM の積み上げ等)
+        return a * b
     raise ValueError(f"計算できない kind: {kind}")
 
 

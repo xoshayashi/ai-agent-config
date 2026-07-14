@@ -410,8 +410,12 @@ def _words(text: str) -> list[str]:
             if cls == "ascii":                        # 数値に続く単位・助数詞まで含める
                 while j < len(text) and text[j] in "%％":
                     j += 1
-                while j < len(text) and text[j] in _COUNTERS:
-                    j += 1                            # 「1,100万人」「2025年」を割らない
+                # 「13万5,718人」のように、助数詞のあとに数が続くこともある。数と助数詞が
+                # 交互に続くかぎり1語として扱う(数を途中で割らない)
+                while j < len(text) and (text[j] in _COUNTERS or text[j].isdigit()
+                                         or (text[j] == "," and j + 1 < len(text)
+                                             and text[j + 1].isdigit())):
+                    j += 1
             if cls in ("ascii", "kana_kata", "kanji"):
                 # 続くひらがなは送り仮名・助詞。語から引き離さない(「跨/いで」「文脈/を」)
                 while j < len(text) and _char_class(text[j]) == "kana_hira":

@@ -1310,7 +1310,12 @@ def _takeaways_rail(slide, spec, takeaways, tx, tw, y0, region_y, region_h):
     blocks = _rail_blocks(takeaways)
     stack_h = stack_optical_height(blocks, text_w)
     group_h = 0.5 + _stack_drawn_h(blocks, text_w)      # 塊の高さは「描かれる高さ」で測る
+    if group_h > region_h + 0.02:
+        # 領域に入りきらない = その列にはコピーが多すぎる。黙って帯や脚注へ食い込ませない
+        print(f"WARN: 要点レールが領域に収まらない({group_h:.2f}in > {region_h:.2f}in) — "
+              "要点を減らすか本文を短くする")
     ty = max(y0 + 0.05, region_y + (region_h - group_h) / 2)
+    ty = min(ty, region_y + max(0.0, region_h - group_h))
     add_text(slide, tx, ty, tw, 0.3, [[(spec.get("takeaways_heading", "要点"), 16, 600, C["primary_deep"])]])
     add_line(slide, tx, ty + 0.34, tx + tw, ty + 0.34, C["rule"], 0.75)
     stack_block(slide, tx, ty + 0.5, text_w, stack_h, blocks)
@@ -2139,17 +2144,23 @@ def p_quote_or_statement(slide, spec, deck):
             add_rect(slide, cx, card_y, cw, card_h,
                      C["primary_pale"] if focal else C["surface_tint"],
                      radius_pt=LAY["card"]["radius_pt"])
-            add_text(slide, cx + 0.22, card_y + 0.18, cw - 0.44, 0.28,
-                     [[(m.get("label", ""), TS["body"], 600, C["ink_subtle"])]])
+            # カードの中身(ラベル→値→注記)は1つの箱に段落で積む。注記は折返すので、枠は
+            # 文字ぶんの高さを取る — 固定高だと注記が枠からあふれ、値の枠と重なる
             vcolor = C["primary_deep"] if focal else C["ink"]
             vparts = [(str(m.get("value", "")), 34, 700, vcolor)]
             if m.get("unit"):
                 vparts.append(_unit_part(m["unit"], 16))
-            add_text(slide, cx + 0.22, card_y + 0.52, cw - 0.44, 0.58, [vparts],
-                     anchor=MSO_ANCHOR.MIDDLE)
+            ink_gap = OPT["gap_in"]
+            blocks = [{"parts": [(m.get("label", ""), TS["body"], 600, C["ink_subtle"])],
+                       "size": TS["body"], "kind": "text"},
+                      {"parts": vparts, "size": 34, "kind": "numeral",
+                       "gap_before": ink_gap["value_meta"], "gap_name": "value_meta"}]
             if m.get("note"):
-                add_text(slide, cx + 0.22, card_y + 1.08, cw - 0.44, 0.24,
-                         [[(m["note"], TS["kpi_sub"], 400, C["ink_faint"])]])
+                blocks.append({"parts": [(m["note"], TS["kpi_sub"], 400, C["ink_faint"])],
+                               "size": TS["kpi_sub"], "kind": "text",
+                               "gap_before": ink_gap["value_meta"], "gap_name": "value_meta"})
+            pad = OPT["inset_in"]
+            stack_block(slide, cx + 0.22, card_y + pad, cw - 0.44, card_h - 2 * pad, blocks)
         return
     if variant in ("split_evidence", "editorial_split") and recap:
         lx, lw = grid(0, 7)
