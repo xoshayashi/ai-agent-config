@@ -65,6 +65,12 @@ and the builder gives each what it wants — the author writes copy, not line br
   is touched, so the text keeps its natural rhythm.
 - **A symbolic message is composed as a form.** See the message-slide contract in
   `grid-and-flex-strategy.md`: measure, balance and breathing are chosen together.
+- **Copy that fits its column is copy that survives layout.** Keeping a word whole must not
+  cost a line: when it does, the column is carrying more copy than it can hold, and the lines
+  come out short and stepped. `verify_deck` names the paragraph; say it in fewer words.
+- **A last line carries weight.** A line holding a single word is a widow; the builder pulls a
+  word down from the line above to balance the pair. Copy that ends on a two-character
+  fragment is copy to tighten.
 - **Copy that fits its column is copy that survives layout.** When a single word is wider than
   its column, `verify_deck` names it: shorten the word or widen the column. Type size stays
   as designed.

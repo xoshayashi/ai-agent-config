@@ -2094,6 +2094,24 @@ def p_process_flow(slide, spec, deck):
                         line_spacing=1.30, space_after_pt=8)
 
 
+def _recap_blocks(m, focal=True):
+    """締めカードの中身(ラベル→値→注記)。カードの高さもここから測る。"""
+    ink_gap = OPT["gap_in"]
+    vcolor = C["primary_deep"] if focal else C["ink"]
+    vparts = [(str(m.get("value", "")), 34, 700, vcolor)]
+    if m.get("unit"):
+        vparts.append(_unit_part(m["unit"], 16))
+    blocks = [{"parts": [(m.get("label", ""), TS["body"], 600, C["ink_subtle"])],
+               "size": TS["body"], "kind": "text"},
+              {"parts": vparts, "size": 34, "kind": "numeral",
+               "gap_before": ink_gap["value_meta"], "gap_name": "value_meta"}]
+    if m.get("note"):
+        blocks.append({"parts": [(m["note"], TS["kpi_sub"], 400, C["ink_faint"])],
+                       "size": TS["kpi_sub"], "kind": "text",
+                       "gap_before": ink_gap["value_meta"], "gap_name": "value_meta"})
+    return blocks
+
+
 def p_quote_or_statement(slide, spec, deck):
     """Flexible closing statement. center_hero is ceremonial; split_evidence is an
     editorial close with proof metrics attached."""
@@ -2111,8 +2129,9 @@ def p_quote_or_statement(slide, spec, deck):
         # 右に余白を残す(占有バランス)
         sup_w = min(w, max(lead_w, w * MESSAGE_SUPPORT_MEASURE))
         sup_lines = (wrap_prose(support, sup_w, sup_pt, 400).split("\n") if support else [])
-        lead_h = len(lead_lines) * (s_pt / 72.0) * leading(s_pt, "statement") * 1.15 + 0.10
-        sup_h = (len(sup_lines) * (sup_pt / 72.0) * leading(sup_pt) * 1.22 + 0.08) if sup_lines else 0.0
+        # 高さは「実際に描かれる行の高さ」で取る。公称値で取ると、下に置く見出しが支え文へ寄る
+        lead_h = len(lead_lines) * drawn_line_h(s_pt, "statement") + 0.10
+        sup_h = (len(sup_lines) * drawn_line_h(sup_pt) + 0.10) if sup_lines else 0.0
         SUP_GAP = 0.18 if sup_lines else 0.0
         stmt = "\n".join(lead_lines)
         text_h = lead_h + SUP_GAP + sup_h
@@ -2120,8 +2139,14 @@ def p_quote_or_statement(slide, spec, deck):
         n = min(4, len(recap))
         gap = LAY["gutter_in"]
         heading_h = 0.34
-        card_h = 1.42 if n <= 3 else 1.30
-        group_h = 0.06 + 0.36 + text_h + 0.40 + heading_h + 0.16 + card_h
+        # カードの高さは「いちばん高い中身」から決める。固定高だと、注記が2行になったカードだけ
+        # 中身が枠から溢れる(カードは中身の器であって、中身をカードに合わせない)
+        cw_probe = (w - gap * (n - 1)) / n - 0.44
+        pad = OPT["inset_in"]
+        card_h = max(1.30, max(_stack_drawn_h(_recap_blocks(m), cw_probe)
+                               for m in recap[:n]) + 2 * pad)
+        RECAP_GAP = 0.55        # 支え文と、論点の見出しの間(章が変わる呼吸)
+        group_h = 0.06 + 0.36 + text_h + RECAP_GAP + heading_h + 0.16 + card_h
         gy = y0 + max(0.0, (h - group_h) * 0.44)
         add_rect(slide, x, gy, 0.72, 0.055, C["primary"])
         # 整形済み(行が決まっている)テキストは、もう一度折り返さない
@@ -2131,7 +2156,7 @@ def p_quote_or_statement(slide, spec, deck):
             add_text(slide, x, gy + 0.34 + lead_h + SUP_GAP, sup_w, sup_h,
                      [[("\n".join(sup_lines), sup_pt, 400, C["ink_subtle"])]],
                      display_wrap=False)
-        hy = gy + 0.34 + text_h + 0.40
+        hy = gy + 0.34 + text_h + RECAP_GAP
         add_text(slide, x, hy, w, heading_h,
                  [[(spec.get("recap_heading", "確認指標"), TS["section_heading"], 700, C["primary_deep"])]])
         add_line(slide, x, hy + heading_h + 0.05, x + w, hy + heading_h + 0.05, C["rule"], 0.75)
@@ -2144,23 +2169,12 @@ def p_quote_or_statement(slide, spec, deck):
             add_rect(slide, cx, card_y, cw, card_h,
                      C["primary_pale"] if focal else C["surface_tint"],
                      radius_pt=LAY["card"]["radius_pt"])
-            # カードの中身(ラベル→値→注記)は1つの箱に段落で積む。注記は折返すので、枠は
-            # 文字ぶんの高さを取る — 固定高だと注記が枠からあふれ、値の枠と重なる
-            vcolor = C["primary_deep"] if focal else C["ink"]
-            vparts = [(str(m.get("value", "")), 34, 700, vcolor)]
-            if m.get("unit"):
-                vparts.append(_unit_part(m["unit"], 16))
-            ink_gap = OPT["gap_in"]
-            blocks = [{"parts": [(m.get("label", ""), TS["body"], 600, C["ink_subtle"])],
-                       "size": TS["body"], "kind": "text"},
-                      {"parts": vparts, "size": 34, "kind": "numeral",
-                       "gap_before": ink_gap["value_meta"], "gap_name": "value_meta"}]
-            if m.get("note"):
-                blocks.append({"parts": [(m["note"], TS["kpi_sub"], 400, C["ink_faint"])],
-                               "size": TS["kpi_sub"], "kind": "text",
-                               "gap_before": ink_gap["value_meta"], "gap_name": "value_meta"})
-            pad = OPT["inset_in"]
-            stack_block(slide, cx + 0.22, card_y + pad, cw - 0.44, card_h - 2 * pad, blocks)
+            # カードの中身(ラベル→値→注記)は1つの箱に段落で積み、カードの上から積む。
+            # 中央寄せにすると、注記の行数が違うカードで値の高さが揃わない(横に並ぶ数値は
+            # 同じ高さで読めることが先)
+            blocks = _recap_blocks(m, focal)
+            inner = stack_optical_height(blocks, cw - 0.44)
+            stack_block(slide, cx + 0.22, card_y + pad, cw - 0.44, inner, blocks)
         return
     if variant in ("split_evidence", "editorial_split") and recap:
         lx, lw = grid(0, 7)

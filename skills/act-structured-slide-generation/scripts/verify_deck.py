@@ -7,6 +7,7 @@ Exit 0 = all checks green, exit 1 = violations found (fix deck.json / builder, r
 from __future__ import annotations
 
 import json
+import math
 import re
 import sys
 from pathlib import Path
@@ -120,6 +121,14 @@ def check_natural_wrap(shape, warns, where):
         if too_wide:
             warns.append(f"{where}: 列幅に収まらない語 — '{too_wide[0]}'"
                          f"(語を短くするか列を広げる。語の途中で割れて描かれる)")
+            continue
+        # 語を割らずに組むと行が増える = その列にはコピーが密すぎる。行が短く階段状に並ぶ
+        drawn = len(para._p.findall(f"{A}br")) + 1
+        cap = max(0.05, avail - 0.3 * size / 72.0)
+        natural = math.ceil(text_width_in(text, size, weight) / cap - 1e-9)
+        if drawn > natural >= 2:      # 1行→2行は、契約で行数を決めた見出し(表紙の副題)もある
+            warns.append(f"{where}: 語を割らずに組むと行が増える — '{text[:20]}'"
+                         f"({natural}行ぶんのコピーが{drawn}行になる。短く言い切る)")
 
 
 def check_overflow(shape, issues, where):

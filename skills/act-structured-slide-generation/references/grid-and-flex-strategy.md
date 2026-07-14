@@ -130,6 +130,11 @@ comes from the type itself:
 - **Proximity is expressed in the gaps.** The gap inside a heading/body pair
   (`gap_in.heading_body`) is smaller than the gap between items (`gap_in.item`), so the pair
   reads as one thing and the items read as several.
+- **A card is the size of its tallest content.** A row of cards takes its height from the
+  fullest card, computed from what will actually be drawn — a note that wraps to two lines
+  makes every card taller, rather than overflowing the one card that holds it. Inside the
+  card the stack starts at the top, so the values in a row read at the same height whatever
+  their notes do underneath.
 - **A frame is the size of its text.** Height comes from the lines that will actually be
   drawn; a no-wrap label's width comes from the measured width of its string
   (`build_deck._label_w`). Frames sized this way sit beside each other cleanly, and

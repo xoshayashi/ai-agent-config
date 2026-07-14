@@ -422,51 +422,92 @@ def _words(text: str) -> list[str]:
                     j += 1
         out.append(text[i:j])
         i = j
-    return out
+    # 送り仮名で終わる語のあとに自立語が続くのは、複合語の途中(「積み/上げ」「問い/合わせ」)。
+    # 助詞で終わっているときだけ、そこが語の切れ目になる
+    merged: list[str] = []
+    for w in out:
+        if merged and _char_class(merged[-1][-1]) == "kana_hira" and _char_class(w[0]) in ("kanji", "kana_kata"):
+            tail_is_particle = any(merged[-1].endswith(p) for p in _PARTICLES)
+            if not tail_is_particle:
+                merged[-1] += w
+                continue
+        merged.append(w)
+    return merged
+
+
+def _natural_lines(text: str, cap: float, size_pt: float, weight: int) -> list[str]:
+    """レンダラがそのまま折り返したときの行(1文字ずつ詰める。行頭禁則だけ守る)。"""
+    lines, cur = [], ""
+    for ch in text:
+        trial = cur + ch
+        if cur and text_width_in(trial, size_pt, weight) > cap and ch not in _NO_LINE_START:
+            lines.append(cur)
+            cur = ch
+        else:
+            cur = trial
+    if cur:
+        lines.append(cur)
+    return lines
 
 
 def wrap_prose(text: str, width_in: float, size_pt: float, weight: int = 400) -> str:
-    """文章は自然に流し、語が割れる行だけ、その語を次の行へ送る。
+    """文章は自然に流し、読みが欠ける行だけ直す。
 
-    文章に求めるのは「行が埋まっていること」で、文節ごとに割ると短い行が階段状に並ぶ。
-    一方でレンダラは箱の幅しか見ないので、行の切れ目が語の途中に落ちる(「ワークフ/ロー」)。
-    そこで、レンダラと同じように行を詰めながら、切れ目が語をまたぐときだけ、その語の頭で折る
-    — 見た目は自然な折返しのまま、割れていた1語だけが下の行へ降りる。語割れが起きないなら
-    改行は1つも足さない(レンダラに委ねる)。
+    直すのは2つだけ。(1) 行の切れ目が語をまたぐとき、その語を次の行へ送る。(2) 最終行に
+    語が1つだけ残るとき(ウィドウ)、前の行から語を1つ下ろして釣り合わせる。それ以外は
+    レンダラの折返しのまま — 行が埋まっていることが、文章の読みやすさだから。
+    語を守るために行数が増えるのは許すが、増えるのは1行まで(それ以上は階段状になる)。
     """
     if not text or "\n" in text:
         return text
     cap = max(0.05, width_in - 0.3 * size_pt / 72.0)
     if text_width_in(text, size_pt, weight) <= cap:
         return text
-    # 行頭に立てない字(、。・など)は、前の語にくっつけたまま詰める — あとから戻すと、
-    # 戻した1字ぶんで行が溢れ、レンダラが先に折り返してしまう
+
+    natural = _natural_lines(text, cap, size_pt, weight)
+    # 行頭に立てない字は前の語に付けたまま詰める(あとから戻すと行が溢れる)
     words: list[str] = []
     for wd in _words(text):
         if words and wd and wd[0] in _NO_LINE_START:
             words[-1] += wd
         else:
             words.append(wd)
-    lines, cur, cur_w, moved = [], "", 0.0, False
+
+    def w_of(ln):
+        return text_width_in(ln, size_pt, weight)
+
+    lines, cur, cur_w = [], "", 0.0
     for word in words:
-        w = text_width_in(word, size_pt, weight)
+        w = w_of(word)
         if cur and cur_w + w > cap:
-            if len(word) > 1 and w <= cap:
-                moved = True                          # レンダラならこの語の途中で切れていた
             lines.append(cur)
             cur, cur_w = word, w
         else:
             cur, cur_w = cur + word, cur_w + w
     if cur:
         lines.append(cur)
-    if not moved or len(lines) < 2:
-        return text                                   # 語は割れない — レンダラに任せる
-    if any(text_width_in(ln, size_pt, weight) > cap for ln in lines):
-        # 箱に入らない語がある行を作ってしまった。はみ出した行の後ろにソフト改行を置くと、
-        # レンダラが先に折り返して空行が1本入る — その場合は一切手を出さない
-        return text
     lines = [ln for ln in lines if ln]
-    if any(text_width_in(ln, size_pt, weight) > cap for ln in lines):
+    if len(lines) < 2:
+        return text
+
+    # 自然折返しが語をまたいで切っているか
+    splits_a_word = "".join(natural) != "".join(natural) or any(
+        len(w) > 1 and all(w not in ln for ln in natural) for w in words if len(w) > 1)
+    # 自然折返しの最終行が1語だけ残っているか(ウィドウ)
+    widow = len(natural) >= 2 and w_of(natural[-1]) < cap * 0.35
+    if not splits_a_word and not widow:
+        return text                                   # 読みは欠けていない。手を出さない
+    if len(lines) > len(natural) + 1:
+        return text                                   # 語を守ると行が増えすぎる(階段状になる)
+
+
+    if w_of(lines[-1]) < cap * 0.35 and len(lines) >= 2:
+        prev = _words(lines[-2])
+        if len(prev) >= 2:
+            cand_prev, cand_last = "".join(prev[:-1]), prev[-1] + lines[-1]
+            if cand_prev and w_of(cand_last) <= cap and w_of(cand_prev) <= cap:
+                lines[-2], lines[-1] = cand_prev, cand_last
+    if any(w_of(ln) > cap for ln in lines):
         return text                                   # 1語で溢れる行がある = レンダラに委ねる
     return "\n".join(lines)
 
