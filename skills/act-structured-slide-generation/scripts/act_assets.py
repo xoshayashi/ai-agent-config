@@ -264,11 +264,29 @@ def _chart_radar(ax, spec, palette, C):
 
 
 def _diag_ring(ax, spec, palette, C):
+    import math
+    from matplotlib.patches import FancyArrowPatch
     segs = spec["segments"]  # [{"label","value"}]
     vals = [s["value"] for s in segs]; labels = [s["label"] for s in segs]
+    # 値がすべて同じ ring は比率を語っていない — それは循環である。循環は順序が読めなければ
+    # 図として成立しないので、時計回りに回し、段を数え、境目に矢を置く。
+    # ちょうど均等な比率(5区分が各20%など)を描きたいときは cycle: false で明示する
+    cycle = spec.get("cycle", len(set(vals)) == 1 and len(segs) >= 3)
+    if cycle:
+        labels = [f"{i + 1}. {t}" for i, t in enumerate(labels)]
     ax.pie(vals, labels=labels, colors=palette[:len(segs)], startangle=90,
+           counterclock=not cycle,
            wedgeprops=dict(width=0.38, edgecolor=C["canvas"], linewidth=2),
            textprops=dict(color=C["ink"], fontsize=12))
+    if cycle:
+        r, step = 0.81, 360.0 / len(segs)
+        for i in range(len(segs)):
+            b = 90 - step * (i + 1)                   # 段と段の境目(時計回り)
+            p0, p1 = [(r * math.cos(math.radians(a)), r * math.sin(math.radians(a)))
+                      for a in (b + 6, b - 6)]
+            ax.add_patch(FancyArrowPatch(p0, p1, connectionstyle="arc3,rad=-0.2",
+                                         arrowstyle="-|>", mutation_scale=13, lw=1.4,
+                                         color=C["canvas"], zorder=5))
     if spec.get("center"):
         ax.text(0, 0, spec["center"], ha="center", va="center", fontsize=15,
                 fontweight="bold", color=C["primary_deep"])

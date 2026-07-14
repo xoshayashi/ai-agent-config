@@ -78,7 +78,10 @@ native-only deck runs without them, and they are only needed when a deck uses an
    forbidden topics, brand constraints, and whether the deliverable must be editable .pptx.
 2. Read all provided source material before drafting. Record provenance in `outline.md`.
 3. Write `outline.md` with audience/action, governing thought, chapter spine, action-title
-   sequence, evidence status, open questions, and talk-time budget.
+   sequence, evidence status, open questions, and talk-time budget. For every chapter, name
+   the one concrete scene it must put in the reader's head (who is standing where, what they
+   do next, what changes) — the chapter's slides are then judged by whether that scene comes
+   through (`references/concreteness.md`).
 4. Stop and ask for missing high-risk inputs when a claim would otherwise require invented
    numbers, fake sources, or unsupported company facts.
 5. Run the outline read-through before building:
@@ -89,6 +92,12 @@ python3 scripts/validate_spec.py deck.json --outline
 
 ### 2. Author `deck.json`
 
+Declare `meta.thesis` first — the sentence the deck proves and the figure that settles it —
+and declare a `derivation` for every rate, multiple or share the moment you write it. A
+derivation forces its inputs onto the deck: an author who wants to title a slide 「前年比42%増」
+must first have a prior-year figure to derive it from, so the evidence is planned with the
+claim rather than reverse-engineered under it (`references/argument-integrity.md`).
+
 Read these references before writing or substantially repairing `deck.json`:
 
 - `references/slide-decision-engine.md`
@@ -97,6 +106,7 @@ Read these references before writing or substantially repairing `deck.json`:
 - `references/design-principles.md`
 - `references/grid-and-flex-strategy.md`
 - `references/copy-and-title-rules.md`
+- `references/talk-script-and-tts.md` (when writing `speaker_notes`)
 - `references/evidence-and-claim-rules.md`
 
 For IR / earnings / evidence-heavy decks, also read
@@ -115,6 +125,13 @@ list here — when in doubt, follow slide-judgment-system.md.
 
 Write Japanese slide text in noun-ending / headline style with no sentence-final full stop.
 The title must state the conclusion, not the topic.
+
+**Concreteness.** A claim names a who, a when and a what-happens: 「点検の記録を、作業を止めずに
+会話で終える」, not 「現場の効率化」. Name the mechanism (which system, which step, which handoff)
+rather than the direction. Give a national number a companion at the scale a person feels
+(1日あたり / 1人あたり / 1現場あたり), derived with a `derivation` so the arithmetic is checked.
+`validate_spec.py` warns on an abstract noun with no actor, and on a deck whose social-scale
+figures never land in a human unit. See `references/concreteness.md`.
 
 **Header contract (hard rule).** Every slide carries BOTH a main title and a subtitle, and
 each fits on exactly ONE rendered line — no `\n`, no wrapping. Overflow is a spec defect:
@@ -136,14 +153,27 @@ Per-line character limits are never written down: they are derived from the rend
 renderer read. Changing a type scale or a layout width moves the limit automatically — do not
 reintroduce hard-coded character budgets for headers.
 
-**Line breaks (hard rule).** Do not hand-break display text. Labels, headings, bullets, cell
-text, callouts and conclusion lines are wrapped by the builder at 文節 boundaries for the
-width they are actually drawn at (`deck_text.wrap_display`), so a line never splits a word,
-an okurigana stem, or a number from its unit, and never strands a particle at the head of a
-line. A `\n` you type is a FORCED break the builder keeps — use it only where an exact line
-count is part of the contract (the cover subtitle's two lines). If a chunk cannot fit the box
-on one line, the engine refuses to mangle it and lets the wrap stay visible: that is a copy
-defect, so shorten the copy — never shrink the type. See `references/copy-and-title-rules.md`.
+**Line breaks.** Write copy; the builder writes the line breaks. Short display text (labels,
+headings, cell text, conclusion lines) breaks at phrase boundaries so the phrasing shows in
+the shape; sentences and body copy fill their lines, each line ending on a whole word. The
+renderer is never left to wrap an overflowing sentence — its letter spacing differs from the
+builder's by a fraction, and that fraction is what drops a break inside a word. A symbolic closing message is composed as
+a form — its measure, its line balance and its surrounding whitespace are chosen together. A
+`\n` you type is honoured as a forced break, which is what makes it right for a slot with an
+exact line count (the cover subtitle's two lines). When a word is wider than its column,
+`verify_deck` names it: shorten the word or widen the column. See
+`references/copy-and-title-rules.md`.
+
+**Emphasis without dashes.** On a slide, a clause break is a comma and an emphasis break is a
+line. A point that deserves to stand alone gets its own line — on a statement slide it becomes
+the `lead`, with the sentence that supports it set below in smaller type. `validate_spec`
+flags dashes in slide-visible text.
+
+**Text frames.** A group that reads as one thing is one text box, built from paragraphs
+(label -> value -> note; heading -> body; a whole interpretation rail). Leading follows the
+type size (`tokens.leading`), paragraph spacing is authored as the ink gap you want to see,
+and every frame is the size of its text. `verify_deck` reports overlapping frames. See
+`references/grid-and-flex-strategy.md`.
 
 Source, assumption, and note fields stay small in the footer area; page numbers are never
 rendered.
@@ -167,6 +197,12 @@ Concretely:
   caveat in natural language ("この期間は会議時点の見込みです" 等).
 - Do not read the title string verbatim as the opening; restate the claim in spoken form.
 
+**Open on the scene, then the claim.** The presenter's first sentence puts the audience
+somewhere: a person, a place, an action. 「朝、倉庫の点呼です。ドライバーの声が少し低い。」— then
+the claim, then the evidence in the slide's reading order. A script that could be read over any
+slide in the deck is not yet doing its job; `validate_spec.py` warns when a slide's notes carry
+no scene.
+
 **Narrative — the deck reads as ONE story, not per-slide captions.** Each script:
 
 1. picks up from the previous slide's bridge (no reset openings like 「このスライドでは」;
@@ -181,17 +217,36 @@ bullet dumps. Read the finished set aloud start-to-finish once — if any transi
 jars or a slide's script could be shuffled elsewhere without anyone noticing, the
 narrative is not yet doing its job.
 
+**Readable by a voice, and by the presenter.** The script is read aloud — by a person or by
+a speech engine — so a fragment a voice cannot say is a defect there, even though the same
+character is right on the slide (which is read with the eyes). Open the fragments that a TTS
+engine skips, spells out, or reads in English: arrows, range tildes, math and relation signs,
+the accounting triangle, `&`, inline fractions, `2.4x`, `vs`, `CAGR`, `YoY`, `SaaS`, an
+em-dash used as a pause. Open them into the words a presenter would actually say — the form
+follows the kind of fragment (operators and relations into kana/kanji, units into
+katakana/kanji, fractions reordered denominator-first, letter-wise acronyms like KPI/ARR left
+as Latin, word-like ones like SaaS into katakana). Stop there: rewriting every Latin string
+into katakana makes the notes unreadable for the human holding them.
+`validate_spec.py` warns on each un-speakable fragment and names the reading; the table is
+`references/tts_readings.json`, the reasoning `references/talk-script-and-tts.md`. Never
+apply these conversions to slide-visible text.
+
 Depth target: ~150-300 Japanese characters per content slide (≈30-60 seconds of speech);
 calibrate the deck total against `meta.talk_minutes` (~300字/分). A one-line note is a
 defect on any slide except the cover. `validate_spec.py` warns on metadata leakage,
 thin scripts, non-spoken register, title-verbatim openings, and slide-absent numbers.
 
-### 3. Validate, Build, Verify, Render
+### 3. Validate, Audit The Argument, Build, Verify, Render
 
-All commands must pass before final delivery:
+All commands must pass before final delivery. `audit_argument.py` runs before the build,
+because an argument defect is a defect in the spec: a rate that does not recompute, a
+comparison with nothing to compare against, a source no one could request, or a closing line
+that proves itself is fixed in `deck.json`, never in the render. It has no waiver flag — see
+`references/argument-integrity.md`.
 
 ```bash
 python3 scripts/validate_spec.py deck.json
+python3 scripts/audit_argument.py deck.json
 python3 scripts/build_deck.py deck.json -o deck.pptx
 python3 scripts/verify_deck.py deck.pptx
 sh scripts/render_deck.sh deck.pptx render/
@@ -305,7 +360,11 @@ Read only what the task needs, but do not skip the required workflow references.
 | `references/evidence-and-claim-rules.md` | Claim/evidence/status/source discipline |
 | `references/data-and-diagram-rules.md` | Chart and diagram selection rules |
 | `references/visual-hierarchy-rules.md` | Reading path, emphasis, alignment, accessibility |
-| `references/copy-and-title-rules.md` | Action titles and Japanese slide copy discipline |
+| `references/copy-and-title-rules.md` | Action titles, Japanese slide copy, line-break discipline |
+| `references/argument-integrity.md` | The argument contract enforced by `audit_argument.py` |
+| `references/concreteness.md` | Scenes, named mechanisms, felt scale (lexicon: `concreteness-lexicon.json`) |
+| `references/commitment-lexicon.json` | Terms that decide promise / rank / hedge / motion |
+| `references/talk-script-and-tts.md` | Speaker-notes readings a voice can say (table: `tts_readings.json`) |
 | `references/design-richness-rules.md` | Freshness and impact without decoration |
 | `references/humanize.md` | Remove AI-like generic output |
 | `references/anti-patterns.md` | Failure modes to hunt before delivery |
