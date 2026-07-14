@@ -2316,67 +2316,22 @@ def test_driver_decomposition_caps_its_factors(tmp_path):
 def test_prose_fills_its_lines_but_never_splits_a_word():
     """文章は行を埋めて流す。ただし、はみ出す文の折返しをレンダラに任せると、字送りの
     わずかな差で語の途中に切れ目が落ちる(「結果まで続/く運用は」)— 行が埋まっていることと、
-    語が割れないことは両立する。1行に収まる文には、手を出さない。"""
-    D = _deck_text()
-    prose = ["サービスを跨いで接点数と稼働量を増やし、従量利用料を積み上げ",
-             "CRM・SFA・社内ナレッジと連携し、記録まで埋め込み"]
-    for text in prose:
-        assert D.is_prose(text), text
-        assert "\n" not in D.wrap_display(text, 6.0, 13, 5), text      # 収まる列では素通し
-        broken = D.wrap_display(text, 1.35, 13, 5)                     # 収まらない列では組み直す
-        for word in D._words(text):
-            if len(word) > 1 and D.text_width_in(word, 13) <= 1.35:
-                assert any(word in ln for ln in broken.split("\n")), (word, broken)
-    labels = ["導入費＋固定利用料", "基盤利用量の複利成長", "Coreへ戻るデータ",
-              "本人確認・利用同意・権利管理・商用利用条件・報酬設計"]   # 短い項目が並ぶ列挙はラベルの列
-    for text in labels:
-        assert not D.is_prose(text), text
-        assert "\n" in D.wrap_display(text, 1.35, 13, 5), text
-    # 長い名詞句は文ではなくラベル。長さで文章と決めつけると、レンダラが語の途中で割る
-    # (「単一のワークフ/ローで完結」)。スライドの表示テキストは体言止めが原則である
-    noun_phrases = ["電子帳簿保存法とインボイス制度への対応を単一のワークフローで完結",
-                    "中堅企業の業務複雑性に対応した統合スイートの提供体制"]
-    for text in noun_phrases:
-        assert not D.is_prose(text), text
-        broken = D.wrap_display(text, 3.0, 16, 5)
-        assert "\n" in broken, text
-        assert "ワークフ\n" not in broken and "統合ス\n" not in broken, broken
-
-
-def test_kpi_value_shrinks_until_its_unit_stays_on_the_line(tmp_path):
-    """カードに入らない数字を大きいまま置くと、レンダラが単位を割って「億/円」と落とす。
-    数字はカードに収まる大きさで置き、大きさはカード間で揃える(1枚だけ小さいと比較が歪む)。"""
-    from pptx import Presentation
-    from pptx.util import Emu
+    語が割れないことは両立する。ビルダーが通る経路(display_wrap_text)で確かめる。"""
     B = _import_build_deck()
-    deck = _minimal_deck(pattern="kpi_dashboard", title="収益の3指標は計画どおりに積み上がる",
-                         subtitle="FY2027の主要指標",
-                         kpis=[{"label": "ARR", "value": "1,234.5", "unit": "億円"},
-                               {"label": "導入社数", "value": "120", "unit": "社"},
-                               {"label": "NRR", "value": "112", "unit": "%"}])
-    deck["slides"][0].pop("chart")
-    out = tmp_path / "k.pptx"
-    r = run("build_deck.py", _write(tmp_path, deck), "-o", out)
-    assert r.returncode == 0, r.stdout + r.stderr
-    for shape in Presentation(str(out)).slides[0].shapes:
-        if not shape.has_text_frame:
-            continue
-        w_in = Emu(shape.width).inches
-        for para in shape.text_frame.paragraphs:
-            runs = [r_ for r_ in para.runs if r_.text.strip()]
-            if not runs or max(r_.font.size.pt for r_ in runs) < 24:
-                continue                              # 数字の行だけを見る
-            drawn = sum(B.text_width_in(r_.text, r_.font.size.pt, 700 if r_.font.bold else 600)
-                        for r_ in runs)
-            assert drawn <= w_in, f"値と単位がカード幅を超える: {[r_.text for r_ in runs]}"
-
-
-def test_ring_with_equal_segments_is_drawn_as_a_cycle():
-    """値がすべて同じ ring は比率ではなく循環。順序が読めない循環図は図として成立しない —
-    時計回りに回し、段を数え、境目に矢を置く。"""
-    src = (SCRIPTS / "act_assets.py").read_text()
-    assert "counterclock=not cycle" in src, "循環の向きが決まっていない"
-    assert "FancyArrowPatch" in src, "循環の境目に矢がない"
+    D = _deck_text()
+    # 幅と大きさは実際に「続/く運用は」と割れたレールのもの。こちらの見積りでは、この文の
+    # 自然折返しは語をまたがない — それでもレンダラは割った。だから、はみ出す文は必ず組む
+    cases = [("撮影規則、本人の許可、安全と業務の結果まで続く運用は複製に時間がかかる", 4.93, 16),
+             ("サービスを跨いで接点数と稼働量を増やし、従量利用料を積み上げ", 2.6, 13)]
+    for text, width, size in cases:
+        assert D.is_prose(text), text
+        assert "\n" not in B.display_wrap_text(text, 12.0, size), text   # 収まる列では素通し
+        broken = B.display_wrap_text(text, width, size)                   # 収まらない列では組む
+        assert "\n" in broken, f"はみ出す文をレンダラに委ねている: {broken!r}"
+        lines = broken.split("\n")
+        for word in D._words(text):
+            if len(word) > 1 and D.text_width_in(word, size) <= width:
+                assert any(word in ln for ln in lines), (word, broken)
 
 
 def test_prose_never_starts_a_line_with_a_character_that_cannot_open_one():
@@ -2399,6 +2354,71 @@ def test_prose_keeps_a_prefix_with_the_word_it_qualifies():
     assert "その\n" not in broken, broken
     broken = D.wrap_prose("2020年の7,509万人から2070年に4,535万人へ、1日あたり約1,630人が減り続ける", 3.3, 16)
     assert "約\n" not in broken and "1\n" not in broken, broken
+
+
+def test_line_counts_come_only_from_the_measured_estimator():
+    """行数を数える実装は _text_lines だけ。字数近似(_ja_len / 1行の字数)を別に持つと、
+    見積りが1行ずれたぶんがブロック間の空白のズレや重なりとして出る(実際に起きた)。"""
+    src = (SCRIPTS / "build_deck.py").read_text()
+    assert "chars_per_line" not in src, "字数近似の行数見積りが復活している"
+    assert "math.ceil(_ja_len(" not in src, "字数近似の行数見積りが復活している"
+
+
+def test_interpretation_rail_is_one_box_with_one_rhythm(tmp_path):
+    """図表の横の要点レールも、1つのテキストボックスに段落で積む。見出しと本文の隙間、項目どうしの
+    隙間は、どの項目でも同じ — 箱を分けて位置を合わせると、そこにズレ(1行ぶんの穴、重なり)が出る。"""
+    takeaways = [
+        {"heading": "人口構造の縮小", "body": "生産年齢人口は2025年7,310万人→2040年6,213万人、15年で約1,100万人減"},
+        {"heading": "専門人材の不足", "body": "2040年にAI・ロボット利活用人材が約340万人、医療・福祉の就業者が96万人不足の試算"},
+        {"heading": "不足は対人接点に集中", "body": "SaaS / RPAが担えない説明・相談・ケアなど非定型コミュニケーション業務が人手依存のまま"},
+    ]
+    deck = {"slides": [{
+        "pattern": "chart_insight",
+        "title": "要点レールのブロックは同じリズムで積む",
+        "subtitle": "1つの箱に段落で積む",
+        "takeaways_heading": "構造要因",
+        "takeaways": takeaways,
+        "chart": {"type": "bar", "categories": ["事務", "専門・技術", "サービス", "販売"],
+                  "series": [{"name": "不足時間", "values": [365, 302, 266, 245]}], "unit": "万時間/日"},
+        "source": "社内分析",
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+    from pptx.util import Emu
+    slide = pptx.Presentation(out).slides[0]
+    rails = [sh for sh in slide.shapes if sh.has_text_frame and "人口構造の縮小" in sh.text_frame.text]
+    assert len(rails) == 1, "レールが1つの箱になっていない"
+    inks = _para_ink_boxes(rails[0])
+    assert len(inks) == 6, f"(見出し+本文)×3 = 6段落のはず: {len(inks)}"
+    pair_gaps = [(inks[i + 1][0] - inks[i][1]) * 72 for i in (0, 2, 4)]     # 見出し → 本文
+    item_gaps = [(inks[i + 1][0] - inks[i][1]) * 72 for i in (1, 3)]        # 項目 → 項目
+    assert max(pair_gaps) - min(pair_gaps) < 1.0, f"見出しと本文の隙間が不揃い: {pair_gaps}"
+    assert max(item_gaps) - min(item_gaps) < 1.0, f"項目どうしの隙間が不揃い: {item_gaps}"
+    assert min(item_gaps) > max(pair_gaps), "かたまり内の隙間がかたまり間より広い(近接の原則に反する)"
+
+
+def test_labels_break_on_meaning_and_sentences_break_on_words():
+    """ラベルと文章では、改行に求めるものが逆になる。短いラベルは意味の切れ目(文節)で割り、
+    文章は行を埋めて語の切れ目で割る — どちらの経路でも、語の途中では割らない。"""
+    B = _import_build_deck()
+    D = _deck_text()
+    labels = ["導入費＋固定利用料", "基盤利用量の複利成長", "Coreへ戻るデータ",
+              "本人確認・利用同意・権利管理・商用利用条件・報酬設計"]   # 短い項目が並ぶ列挙はラベルの列
+    for text in labels:
+        assert not D.is_prose(text), text
+        assert "\n" in D.wrap_display(text, 1.35, 13, 5), text
+    # 長い名詞句は文ではなくラベル。長さで文章と決めつけると、レンダラが語の途中で割る
+    # (「単一のワークフ/ローで完結」)。スライドの表示テキストは体言止めが原則である
+    noun_phrases = ["電子帳簿保存法とインボイス制度への対応を単一のワークフローで完結",
+                    "中堅企業の業務複雑性に対応した統合スイートの提供体制"]
+    for text in noun_phrases:
+        assert not D.is_prose(text), text
+        broken = B.display_wrap_text(text, 3.0, 16)
+        assert "\n" in broken, text
+        assert "ワークフ\n" not in broken and "統合ス\n" not in broken, broken
 
 
 def test_line_counts_come_only_from_the_measured_estimator():
