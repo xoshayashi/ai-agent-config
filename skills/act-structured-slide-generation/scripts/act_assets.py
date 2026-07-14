@@ -269,8 +269,9 @@ def _diag_ring(ax, spec, palette, C):
     segs = spec["segments"]  # [{"label","value"}]
     vals = [s["value"] for s in segs]; labels = [s["label"] for s in segs]
     # 値がすべて同じ ring は比率を語っていない — それは循環である。循環は順序が読めなければ
-    # 図として成立しないので、時計回りに回し、段を数え、境目に矢を置く
-    cycle = len(set(vals)) == 1 and len(segs) >= 3
+    # 図として成立しないので、時計回りに回し、段を数え、境目に矢を置く。
+    # ちょうど均等な比率(5区分が各20%など)を描きたいときは cycle: false で明示する
+    cycle = spec.get("cycle", len(set(vals)) == 1 and len(segs) >= 3)
     if cycle:
         labels = [f"{i + 1}. {t}" for i, t in enumerate(labels)]
     ax.pie(vals, labels=labels, colors=palette[:len(segs)], startangle=90,
