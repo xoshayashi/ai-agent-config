@@ -2565,3 +2565,84 @@ def test_chart_unit_note_sits_inside_the_plot(tmp_path):
     cfg = TOKENS["layout"]["chart"]["unit_note"]
     assert abs(nx - (cx + cfg["inset_x_in"])) < 0.01, "単位が軸側に付いていない"
     assert abs(ny - (cy + cfg["inset_y_in"])) < 0.01, "単位がグラフ上端に揃っていない"
+
+
+# ---------------------------------------------------------------------------
+# 論証のゲート(audit_argument)
+# ---------------------------------------------------------------------------
+
+RED_TEAM_DECK = {
+    "meta": {"title": "逃げ道だらけのデッキ", "basis": "自社調べ"},
+    "slides": [
+        {"pattern": "chart_insight",
+         "title": "売上は前年比42%増で市場を席巻",       # 比較の相手が図表に無い
+         "subtitle": "国内シェアNo.1の当社は必ず市場を制覇します",  # 順位 + 約束
+         "chart": {"type": "column", "unit": "億円", "categories": ["FY26"],
+                   "series": [{"name": "売上", "values": [120]}]},
+         "source": "自社調べ",                        # 請求できない出所
+         "speaker_notes": "売上は前年比42%増です。市場を必ず制覇します。次に単価をご説明します。"},
+        {"pattern": "statement",
+         "title": "結論",
+         "statement": "ARR 68億円は確実に達成できる見込みです",   # 前のページに無い数値 + 約束 + ぼかし
+         "attribution": "Act"},
+    ],
+}
+
+
+def test_red_team_deck_is_blocked_by_the_argument_gate(tmp_path):
+    """今のゲート(validate/verify/lint)をすべて通り抜ける「逃げ道だらけのデッキ」が、
+    論証のゲートでは止まること — 順位の自己認証、比較の相手不在、請求できない出所、
+    締めの自己証明、約束とぼかしの言葉。"""
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(RED_TEAM_DECK, ensure_ascii=False))
+    r = run("audit_argument.py", spec)
+    assert r.returncode == 1, "逃げ道だらけのデッキが通ってしまった:\n" + r.stdout
+    out = r.stdout
+    for expected in ("比べる相手がない", "順位", "約束の言葉", "出所が請求できない",
+                     "meta.thesis", "締め"):
+        assert expected in out, f"検出できていない: {expected}\n{out}"
+
+
+def test_canonical_decks_pass_the_argument_gate():
+    """スキルの手本は、自分のゲートを通ること(手本が通らない検査は、誰にも読まれなくなる)。"""
+    for path in (SAMPLE, SAMPLE_EARNINGS):
+        r = run("audit_argument.py", path)
+        assert r.returncode == 0, f"{path.name}:\n{r.stdout}"
+        assert "0 errors / 0 warnings" in r.stdout, f"{path.name}:\n{r.stdout}"
+
+
+def test_a_declared_derivation_must_recompute(tmp_path):
+    """宣言された導出は、計算し直して一致すること — 宣言は計算で贖われる(嘘をつけない)。"""
+    base = {
+        "meta": {"thesis": {"statement": "市場は年率15%で伸びる", "value": "3.2", "unit": "兆円"}},
+        "slides": [{
+            "pattern": "chart_insight",
+            "title": "国内市場は年率15%成長で3.2兆円へ",
+            "subtitle": "市場規模の推移",
+            "chart": {"type": "column", "unit": "兆円",
+                      "categories": ["2024", "2025", "2026", "2027", "2028", "2029", "2030"],
+                      "series": [{"name": "市場規模", "values": [1.4, 1.6, 1.8, 2.1, 2.4, 2.8, 3.2]}]},
+            "derivation": {"kind": "cagr", "value": 15, "unit": "%",
+                           "of": "chart.series[0].values", "from": 0, "to": 6},
+            "source": "調査会社レポート 2026年版",
+            "assumption": "2027年以降は年率15%成長を前提",
+        }],
+    }
+    spec = tmp_path / "ok.json"
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert run("audit_argument.py", spec).returncode == 0, "正しい導出が落ちている"
+
+    bad = json.loads(json.dumps(base, ensure_ascii=False))
+    bad["slides"][0]["title"] = "国内市場は年率13%成長で3.2兆円へ"
+    bad["slides"][0]["derivation"]["value"] = 13
+    spec2 = tmp_path / "bad.json"
+    spec2.write_text(json.dumps(bad, ensure_ascii=False))
+    r = run("audit_argument.py", spec2)
+    assert r.returncode == 1 and "derivation が合わない" in r.stdout, r.stdout
+
+
+def test_the_gate_has_no_waiver_flag():
+    """免除のフラグは、それ自体が逃げ道 — 用意しない。"""
+    src = (SCRIPTS / "audit_argument.py").read_text()
+    for escape in ("--ignore", "--skip", "--waiver", "--only", "noqa: audit"):
+        assert escape not in src, f"免除の口が空いている: {escape}"

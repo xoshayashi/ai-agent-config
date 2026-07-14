@@ -89,6 +89,12 @@ python3 scripts/validate_spec.py deck.json --outline
 
 ### 2. Author `deck.json`
 
+Declare `meta.thesis` first — the sentence the deck proves and the figure that settles it —
+and declare a `derivation` for every rate, multiple or share the moment you write it. A
+derivation forces its inputs onto the deck: an author who wants to title a slide 「前年比42%増」
+must first have a prior-year figure to derive it from, so the evidence is planned with the
+claim rather than reverse-engineered under it (`references/argument-integrity.md`).
+
 Read these references before writing or substantially repairing `deck.json`:
 
 - `references/slide-decision-engine.md`
@@ -213,12 +219,17 @@ calibrate the deck total against `meta.talk_minutes` (~300字/分). A one-line n
 defect on any slide except the cover. `validate_spec.py` warns on metadata leakage,
 thin scripts, non-spoken register, title-verbatim openings, and slide-absent numbers.
 
-### 3. Validate, Build, Verify, Render
+### 3. Validate, Audit The Argument, Build, Verify, Render
 
-All commands must pass before final delivery:
+All commands must pass before final delivery. `audit_argument.py` runs before the build,
+because an argument defect is a defect in the spec: a rate that does not recompute, a
+comparison with nothing to compare against, a source no one could request, or a closing line
+that proves itself is fixed in `deck.json`, never in the render. It has no waiver flag — see
+`references/argument-integrity.md`.
 
 ```bash
 python3 scripts/validate_spec.py deck.json
+python3 scripts/audit_argument.py deck.json
 python3 scripts/build_deck.py deck.json -o deck.pptx
 python3 scripts/verify_deck.py deck.pptx
 sh scripts/render_deck.sh deck.pptx render/
@@ -333,6 +344,8 @@ Read only what the task needs, but do not skip the required workflow references.
 | `references/data-and-diagram-rules.md` | Chart and diagram selection rules |
 | `references/visual-hierarchy-rules.md` | Reading path, emphasis, alignment, accessibility |
 | `references/copy-and-title-rules.md` | Action titles, Japanese slide copy, line-break discipline |
+| `references/argument-integrity.md` | The argument contract enforced by `audit_argument.py` |
+| `references/commitment-lexicon.json` | Terms that decide promise / rank / hedge / motion |
 | `references/talk-script-and-tts.md` | Speaker-notes readings a voice can say (table: `tts_readings.json`) |
 | `references/design-richness-rules.md` | Freshness and impact without decoration |
 | `references/humanize.md` | Remove AI-like generic output |

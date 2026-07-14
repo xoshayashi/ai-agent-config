@@ -83,10 +83,11 @@ IMAGE_ASSET_KINDS = {
 TALK_CHARS_PER_MIN = 300
 
 
+# AI 常套句。語幹で持つ(「game-changer」だけを持つと「game-changing」を取り逃がす)。
+# 言い切りの強さ(約束・順位・ぼかし)は commitment-lexicon.json 側 — audit_argument が見る
 BANNED_PHRASES = [
-    "と言えるでしょう", "と考えられます", "が期待されます", "一概には言えませんが",
-    "することが重要です", "まとめると", "いかがでしたか",
-    "delve", "leverage", "seamless", "game-changer", "it's important to note",
+    "と言えるでしょう", "一概には言えませんが", "することが重要です", "まとめると", "いかがでしたか",
+    "delve", "leverage", "seamless", "game-chang", "it's important to note",
 ]
 META_DECLARATIONS = ["以下の3点", "本資料では", "について説明します", "ご紹介します"]
 
@@ -381,6 +382,9 @@ def main() -> int:
                     _corpus_parts.append(o)
                 elif isinstance(o, (int, float)) and not isinstance(o, bool):
                     _corpus_parts.append(_numstr(o))
+            # ここはスクリプトと本体の一致(script drift)を見る検査なので、本体の可視文字列も
+            # 突き合わせの相手にする。「その主張の数値が図表で裏づけられているか」は
+            # audit_argument.py が別に見る(証拠と主張を混ぜないのはあちら側の責務)
             _walk_nums({k: v for k, v in s.items() if k not in ("speaker_notes", "pattern")})
             # 区切りなし連結は JSON のキー順次第で「1」+「億円」が隣接し偽陰性を生む。
             # 連続性は単一文字列内でのみ意味を持つため、パーツ間に区切り子を挟む

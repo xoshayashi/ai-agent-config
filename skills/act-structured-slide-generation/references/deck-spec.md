@@ -143,6 +143,17 @@ should be large and centered when they are the key design objects. `focal_step` 
 default last) picks which step gets the solid emphasis chevron — set it when the title's
 claim hinges on a mid-flow step, so the visual focus matches the argument.
 
+## Argument fields (enforced by `audit_argument.py`)
+
+- `meta.thesis` — `{statement, value, unit}`: the deck's one claim and the figure that settles
+  it. Required; the figure must appear in some slide's exhibit.
+- `derivation` (per slide) — `{kind, value, unit, ...operands}`: how a computed figure was
+  computed. Kinds: `cagr`, `growth`, `multiple`, `share`, `ratio`, `delta`, `sum`. Operands are
+  numbers, lists, or paths into the slide (`"chart.series[0].values"`, `"current.actual"`).
+  The gate recomputes and compares at the precision printed.
+- `qualifier` (per slide) — `{universe, as_of}`: required on a slide that claims a rank or a
+  uniqueness, alongside a `source`.
+
 ### 15. `statement`
 
 `lead` (optional) is the one line that says the point, set at statement size; `statement` is
