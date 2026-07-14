@@ -12,7 +12,8 @@ import re
 import sys
 from pathlib import Path
 
-from deck_text import MEASURE_OK, _words as words, drawn_line_h, text_width_in as _measure
+from deck_text import (MEASURE_OK, _natural_lines, _words as words, drawn_line_h,
+                       text_width_in as _measure)
 from pptx import Presentation
 from pptx.util import Emu
 
@@ -106,7 +107,9 @@ def check_natural_wrap(shape, warns, where):
     その語を次行へ送る — どちらの経路でも語は割れない。割れるのは「1語が列幅より広い」ときで、
     それは組版ではなくコピーの問題(語を短くするか、列を広げる)。ここで見えるようにする。"""
     tf = shape.text_frame
-    w_in = Emu(shape.width).inches - 0.02
+    # 折返しの判定は、ビルダーが行を決めたときと同じ幅で行う — ここで数 mm でも差をつけると、
+    # ぎりぎり1行に収まった文を「2行になる」と読み違え、直すところのない警告が出る
+    w_in = Emu(shape.width).inches
     if w_in <= 0.05:
         return
     for para in tf.paragraphs:
@@ -116,6 +119,15 @@ def check_natural_wrap(shape, warns, where):
         size = max((r.font.size.pt if r.font.size else 11) for r in para.runs)
         avail = max(0.05, w_in - _text_indent_in(para))
         weight = _para_weight(para)
+        if len({r.font.size.pt if r.font.size else 11 for r in para.runs}) > 1:
+            # 値と単位のように大きさの違う走りが並ぶ行。1つの大きさで行を組み直しても
+            # 実際の描かれ方にならない — この行は「収まるか」だけを、走りごとに測って見る
+            drawn_w = sum(text_width_in(r.text, r.font.size.pt if r.font.size else size,
+                                        _run_weight(r)) for r in para.runs)
+            if drawn_w > avail:
+                warns.append(f"{where}: 値と単位が列に収まらない — '{text[:20]}'"
+                             f"(数字の大きさを下げるか、列を広げる。単位が割れて描かれる)")
+            continue
         too_wide = [w for w in words(text)
                     if len(w) > 1 and text_width_in(w, size, weight) > avail]
         if too_wide:
@@ -129,6 +141,15 @@ def check_natural_wrap(shape, warns, where):
         if drawn > natural >= 2:      # 1行→2行は、契約で行数を決めた見出し(表紙の副題)もある
             warns.append(f"{where}: 語を割らずに組むと行が増える — '{text[:20]}'"
                          f"({natural}行ぶんのコピーが{drawn}行になる。短く言い切る)")
+            continue
+        # 折返しを任せた段落。レンダラの行が語をまたぐなら、その列にはこの文が長すぎる
+        if drawn == 1 and text_width_in(text, size, weight) > cap:
+            lines = _natural_lines(text, cap, size, weight)
+            broken = [w for w in words(text)
+                      if len(w) > 1 and all(w not in ln for ln in lines)]
+            if broken:
+                warns.append(f"{where}: 語を割らずには組めない文 — '{broken[0]}' が行をまたぐ"
+                             f"(コピーを短くするか列を広げる)")
 
 
 def check_overflow(shape, issues, where):

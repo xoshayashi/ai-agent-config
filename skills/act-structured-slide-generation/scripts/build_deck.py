@@ -1106,6 +1106,26 @@ def p_executive_summary(slide, spec, deck):
         y += card_h + GAP
 
 
+def _value_line_w(k, vsize: float) -> float:
+    """値+単位の1行の幅。単位は値の従属で、同じ行に並ぶ — 幅は2つ合わせて測る。"""
+    w = text_width_in(str(k.get("value", "")), vsize, 700)
+    if k.get("unit"):
+        txt, usize, uw, _ = _unit_part(k["unit"], vsize * 0.45)
+        w += text_width_in(txt, usize, uw)
+    return w
+
+
+def _fit_value_size(kpis, text_w: float, vsize: float) -> float:
+    """数字はカードに収まる大きさで置く。収まらない値を大きいまま置くと、レンダラが単位を
+    割って「億/円」と落とす — 見出しの数字が割れるのは、どんな強調よりも先に直すべき欠陥。
+    大きさはカード間で揃える(1枚だけ小さい数字は、比較を歪める)。"""
+    while vsize > TS["kpi_sub"] * 1.5:
+        if all(_value_line_w(k, vsize) <= text_w for k in kpis):
+            break
+        vsize -= 2
+    return vsize
+
+
 def p_kpi_dashboard(slide, spec, deck):
     kpis = spec.get("kpis", [])
     if not kpis:
@@ -1121,6 +1141,7 @@ def p_kpi_dashboard(slide, spec, deck):
     pad = OPT["inset_in"]
     gap = OPT["gap_in"]
     text_w = cw - 2 * pad
+    vsize = _fit_value_size(kpis, text_w, vsize)
     any_focal_kpi = any(kk.get("focal") for kk in kpis)
 
     def card_blocks(k):
@@ -1377,7 +1398,7 @@ def p_market_sizing(slide, spec, deck):
     x, w = grid(0, 12)
     n = max(1, len(stages))
     row_h = min(1.7, (h - 0.2) / n)
-    y0 += max(0.0, (h - n * row_h) * 0.4)
+    y0 += max(0.0, (h - n * row_h) * 0.5)      # 段の塊は1つのオブジェクト。領域の縦中央に置く
     bar_max_w = w * 0.52
     vals = [float(s.get("numeric", 0) or 0) for s in stages]
     vmax = max(vals) if any(vals) else 1.0

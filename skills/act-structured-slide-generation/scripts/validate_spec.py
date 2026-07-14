@@ -15,6 +15,8 @@ from pathlib import Path
 
 from deck_text import footer_text, header_slots, ja_len, tts_risks
 
+REF = Path(__file__).resolve().parent.parent / "references"
+
 TOKENS = json.loads((Path(__file__).resolve().parent.parent / "references" / "tokens.json").read_text())
 BUDGET = TOKENS["text_budget"]
 ALLOWED_COLORS = set(TOKENS["colors"].values())
@@ -780,6 +782,45 @@ def main() -> int:
                 yield from _visible_strings(v)
         elif isinstance(obj, str):
             yield obj
+    # 具体性: 抽象名詞は動作と結果へ開き、規模の数字には体感できる単位を添え、台本は場面から
+    # 始める。語彙表は references/concreteness-lexicon.json(判断は書き手に残すので警告どまり)
+    conc = json.loads((REF / "concreteness-lexicon.json").read_text())
+    ABSTRACT = conc["abstract"]["terms"]
+    ABS_NEG = conc["abstract"].get("negatives", [])
+    ANCHORS = sum((conc["anchor"][k] for k in ("moment", "actor", "action")), [])
+    FELT = conc["anchor"]["felt_scale"]
+    LARGE = conc["large_units"]["terms"]
+    import re as _re_c
+    scene_ok = content_n = 0
+    big_any, felt_any = "", False
+    for i, s_ in enumerate(slides, start=1):
+        if s_.get("pattern") in STRUCTURAL:
+            continue
+        loc = f"slide {i} ({s_.get('pattern')})"
+        visible = " ".join(t for t in _visible_strings(s_))
+        notes = s_.get("speaker_notes", "") or ""
+        hits = [t for t in ABSTRACT if t in visible and not any(n in visible for n in ABS_NEG)]
+        if hits and not any(a in visible for a in ANCHORS):
+            warns.append(f"{loc}: 抽象名詞「{hits[0]}」だけで、誰が何をするかが無い — "
+                         "動作(誰が何をする)と結果(何がどう変わる)へ言い換える")
+        big = _re_c.search(r"\d[\d,]*(?:\.\d+)?\s*(?:" + "|".join(LARGE) + ")", visible)
+        if big:
+            big_any = big_any or big.group(0)
+        if any(f in visible for f in FELT):
+            felt_any = True
+        content_n += 1
+        if any(a in notes for a in ANCHORS):
+            scene_ok += 1
+        elif notes:
+            warns.append(f"{loc}: speaker_notes に場面がない — 誰が、いつ、何をしている場面かから"
+                         "話し始める(references/concreteness.md)")
+    if big_any and not felt_any:
+        warns.append(f"規模の数字「{big_any}」が、体感できる単位に落ちていない — "
+                     "1日あたり・1人あたり・1現場あたりの数を derivation で導いて、どこか1枚に置く")
+    if content_n and scene_ok < content_n * 0.5:
+        warns.append(f"場面のある台本が {scene_ok}/{content_n} 枚 — "
+                     "半分以上のスライドは、聞き手が絵を描ける場面から始める")
+
     # ダッシュ(——)はスライド上では読みの間を作れない。意味の切れ目は読点と改行で表す —
     # 言い切りを前に出したいなら statement.lead のように「行」で分ける(構成で表す)
     dash_slides = [i for i, s in enumerate(slides, start=1)

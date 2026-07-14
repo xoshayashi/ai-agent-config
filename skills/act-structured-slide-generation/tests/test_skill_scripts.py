@@ -2313,15 +2313,20 @@ def test_driver_decomposition_caps_its_factors(tmp_path):
     assert run("build_deck.py", spec, "-o", out).returncode == 0
 
 
-def test_prose_keeps_its_line_breaks_from_the_renderer():
-    """文章(読点を持つ文、列挙でない長文)の改行には手を出さない。狭い箱で文節ごとに割ると
-    短い行が階段状に並び、文としてはかえって読みにくい — ラベルと文章では要求が逆になる。"""
+def test_prose_fills_its_lines_but_never_splits_a_word():
+    """文章は行を埋めて流す。ただし、はみ出す文の折返しをレンダラに任せると、字送りの
+    わずかな差で語の途中に切れ目が落ちる(「結果まで続/く運用は」)— 行が埋まっていることと、
+    語が割れないことは両立する。1行に収まる文には、手を出さない。"""
     D = _deck_text()
     prose = ["サービスを跨いで接点数と稼働量を増やし、従量利用料を積み上げ",
              "CRM・SFA・社内ナレッジと連携し、記録まで埋め込み"]
     for text in prose:
         assert D.is_prose(text), text
-        assert "\n" not in D.wrap_display(text, 1.35, 13, 5), text
+        assert "\n" not in D.wrap_display(text, 6.0, 13, 5), text      # 収まる列では素通し
+        broken = D.wrap_display(text, 1.35, 13, 5)                     # 収まらない列では組み直す
+        for word in D._words(text):
+            if len(word) > 1 and D.text_width_in(word, 13) <= 1.35:
+                assert any(word in ln for ln in broken.split("\n")), (word, broken)
     labels = ["導入費＋固定利用料", "基盤利用量の複利成長", "Coreへ戻るデータ",
               "本人確認・利用同意・権利管理・商用利用条件・報酬設計"]   # 短い項目が並ぶ列挙はラベルの列
     for text in labels:
@@ -2336,6 +2341,64 @@ def test_prose_keeps_its_line_breaks_from_the_renderer():
         broken = D.wrap_display(text, 3.0, 16, 5)
         assert "\n" in broken, text
         assert "ワークフ\n" not in broken and "統合ス\n" not in broken, broken
+
+
+def test_kpi_value_shrinks_until_its_unit_stays_on_the_line(tmp_path):
+    """カードに入らない数字を大きいまま置くと、レンダラが単位を割って「億/円」と落とす。
+    数字はカードに収まる大きさで置き、大きさはカード間で揃える(1枚だけ小さいと比較が歪む)。"""
+    from pptx import Presentation
+    from pptx.util import Emu
+    B = _import_build_deck()
+    deck = _minimal_deck(pattern="kpi_dashboard", title="収益の3指標は計画どおりに積み上がる",
+                         subtitle="FY2027の主要指標",
+                         kpis=[{"label": "ARR", "value": "1,234.5", "unit": "億円"},
+                               {"label": "導入社数", "value": "120", "unit": "社"},
+                               {"label": "NRR", "value": "112", "unit": "%"}])
+    deck["slides"][0].pop("chart")
+    out = tmp_path / "k.pptx"
+    r = run("build_deck.py", _write(tmp_path, deck), "-o", out)
+    assert r.returncode == 0, r.stdout + r.stderr
+    for shape in Presentation(str(out)).slides[0].shapes:
+        if not shape.has_text_frame:
+            continue
+        w_in = Emu(shape.width).inches
+        for para in shape.text_frame.paragraphs:
+            runs = [r_ for r_ in para.runs if r_.text.strip()]
+            if not runs or max(r_.font.size.pt for r_ in runs) < 24:
+                continue                              # 数字の行だけを見る
+            drawn = sum(B.text_width_in(r_.text, r_.font.size.pt, 700 if r_.font.bold else 600)
+                        for r_ in runs)
+            assert drawn <= w_in, f"値と単位がカード幅を超える: {[r_.text for r_ in runs]}"
+
+
+def test_ring_with_equal_segments_is_drawn_as_a_cycle():
+    """値がすべて同じ ring は比率ではなく循環。順序が読めない循環図は図として成立しない —
+    時計回りに回し、段を数え、境目に矢を置く。"""
+    src = (SCRIPTS / "act_assets.py").read_text()
+    assert "counterclock=not cycle" in src, "循環の向きが決まっていない"
+    assert "FancyArrowPatch" in src, "循環の境目に矢がない"
+
+
+def test_prose_never_starts_a_line_with_a_character_that_cannot_open_one():
+    """レンダラは禁則を守るとはかぎらない(実際、読点や中黒が行頭に落ちた)。文章を流したままに
+    するのは読みが欠けないときだけで、行頭に立てない字が落ちたら、こちらで行を組み直す。"""
+    D = _deck_text()
+    cases = [("実証期間、改善目標、停止条件", 2.2, 13),
+             ("災害時に現在地と身体状態に合わせ、次の行動を音声で伝え、支援者へつなぐ", 2.4, 13),
+             ("映像と音声を端末で処理し、必要な特徴だけを選別・匿名化する", 2.4, 13)]
+    for text, width, size in cases:
+        for line in D.wrap_prose(text, width, size).split("\n")[1:]:
+            assert line[0] not in D._NO_LINE_START, (text, line)
+
+
+def test_prose_keeps_a_prefix_with_the_word_it_qualifies():
+    """「その場」「約1,630人」は前置きと語で1つ。助詞で終わるからと「その」で切ると、
+    行末に掛かり先のない語が残る。"""
+    D = _deck_text()
+    broken = D.wrap_prose("映像、音声、生体情報、環境をその場で処理し、即時応答、匿名化、必要情報の選別を担う", 3.0, 13)
+    assert "その\n" not in broken, broken
+    broken = D.wrap_prose("2020年の7,509万人から2070年に4,535万人へ、1日あたり約1,630人が減り続ける", 3.3, 16)
+    assert "約\n" not in broken and "1\n" not in broken, broken
 
 
 def test_line_counts_come_only_from_the_measured_estimator():

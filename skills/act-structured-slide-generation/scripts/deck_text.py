@@ -294,6 +294,8 @@ def ink_height_in(size_pt: float, kind: str = "text", lines: int = 1,
 _NO_LINE_START = "、。，．・：；！？）］｝」』〉》】〕”’ー々ぁぃぅぇぉっゃゅょゎヵヶ%％℃ "
 # 行末禁則: これらで行が終わらない
 _NO_LINE_END = "（［｛「『〈《【〔“‘￥＄＃"
+# 語を閉じる接尾(「1日あたり」「1件ごと」)。ここまでで1語 — 次の語とはくっつけない
+_SUFFIX_TAILS = ("あたり", "ごと", "ずつ", "など", "ほど", "くらい", "ぐらい")
 # 付属語(助詞)。文節はここで終わる — 直後は切ってよい
 _PARTICLES = ("の", "を", "に", "が", "は", "で", "と", "へ", "や", "も", "から", "まで",
               "より", "など", "への", "での", "とは", "には", "では", "からの", "による",
@@ -416,23 +418,41 @@ def _words(text: str) -> list[str]:
                                          or (text[j] == "," and j + 1 < len(text)
                                              and text[j + 1].isdigit())):
                     j += 1
+                # 「Operation-centric」「GPT-4」— つなぎ字で結ばれた欧文は1語
+                while (j + 1 < len(text) and text[j] in "-‐–/"
+                       and _char_class(text[j + 1]) == "ascii"):
+                    j += 1
+                    while j < len(text) and _char_class(text[j]) == "ascii":
+                        j += 1
             if cls in ("ascii", "kana_kata", "kanji"):
                 # 続くひらがなは送り仮名・助詞。語から引き離さない(「跨/いで」「文脈/を」)
                 while j < len(text) and _char_class(text[j]) == "kana_hira":
                     j += 1
         out.append(text[i:j])
         i = j
+    # 次の語に掛かる前置き(「その場」「約1,630人」)は、そこで切ると意味が宙に浮く
+    _DEMONSTRATIVE = ("その", "この", "あの", "どの", "わが")
+    _APPROX = ("約", "およそ", "最大", "最小", "上限", "下限")
     # 送り仮名で終わる語のあとに自立語が続くのは、複合語の途中(「積み/上げ」「問い/合わせ」)。
     # 助詞で終わっているときだけ、そこが語の切れ目になる
     merged: list[str] = []
     for w in out:
         if merged and _char_class(merged[-1][-1]) == "kana_hira" and _char_class(w[0]) in ("kanji", "kana_kata"):
-            tail_is_particle = any(merged[-1].endswith(p) for p in _PARTICLES)
-            if not tail_is_particle:
+            tail_closes = any(merged[-1].endswith(p) for p in _PARTICLES + _SUFFIX_TAILS)
+            if not tail_closes:
                 merged[-1] += w
                 continue
         merged.append(w)
-    return merged
+    bound: list[str] = []
+    for w in merged:
+        prev = bound[-1] if bound else ""
+        binds = prev.endswith(_DEMONSTRATIVE) or (
+            prev.endswith(_APPROX) and w[:1].isdigit())
+        if binds:
+            bound[-1] += w
+        else:
+            bound.append(w)
+    return bound
 
 
 def _natural_lines(text: str, cap: float, size_pt: float, weight: int) -> list[str]:
@@ -450,13 +470,25 @@ def _natural_lines(text: str, cap: float, size_pt: float, weight: int) -> list[s
     return lines
 
 
-def wrap_prose(text: str, width_in: float, size_pt: float, weight: int = 400) -> str:
-    """文章は自然に流し、読みが欠ける行だけ直す。
+def _wrap_words(text: str) -> list[str]:
+    """折り返しの単位。行頭に立てない字は前の語に付けたまま扱う(あとから戻すと行が溢れる)。"""
+    words: list[str] = []
+    for wd in _words(text):
+        if words and wd and wd[0] in _NO_LINE_START:
+            words[-1] += wd
+        else:
+            words.append(wd)
+    return words
 
-    直すのは2つだけ。(1) 行の切れ目が語をまたぐとき、その語を次の行へ送る。(2) 最終行に
-    語が1つだけ残るとき(ウィドウ)、前の行から語を1つ下ろして釣り合わせる。それ以外は
-    レンダラの折返しのまま — 行が埋まっていることが、文章の読みやすさだから。
-    語を守るために行数が増えるのは許すが、増えるのは1行まで(それ以上は階段状になる)。
+
+def wrap_prose(text: str, width_in: float, size_pt: float, weight: int = 400) -> str:
+    """文章は行を埋めて流し、語の切れ目でだけ改行する。
+
+    1行に収まる文には手を出さない。はみ出す文は、こちらが行を組む — 語を割らないまま、
+    入るところまで詰めた行にする。折返しをレンダラに任せると、字送りのわずかな差で語の
+    途中に切れ目が落ちる(「結果まで続/く運用は」)。行が埋まっていることと、語が割れない
+    ことは両立する。最終行に語が1つだけ残るとき(ウィドウ)は、前の行から1語下ろす。
+    行数が増えるのは、その列にコピーが多すぎるということ — verify_deck が名指しする。
     """
     if not text or "\n" in text:
         return text
@@ -465,13 +497,7 @@ def wrap_prose(text: str, width_in: float, size_pt: float, weight: int = 400) ->
         return text
 
     natural = _natural_lines(text, cap, size_pt, weight)
-    # 行頭に立てない字は前の語に付けたまま詰める(あとから戻すと行が溢れる)
-    words: list[str] = []
-    for wd in _words(text):
-        if words and wd and wd[0] in _NO_LINE_START:
-            words[-1] += wd
-        else:
-            words.append(wd)
+    words = _wrap_words(text)
 
     def w_of(ln):
         return text_width_in(ln, size_pt, weight)
@@ -490,19 +516,9 @@ def wrap_prose(text: str, width_in: float, size_pt: float, weight: int = 400) ->
     if len(lines) < 2:
         return text
 
-    # 自然折返しが語をまたいで切っているか
-    splits_a_word = "".join(natural) != "".join(natural) or any(
-        len(w) > 1 and all(w not in ln for ln in natural) for w in words if len(w) > 1)
-    # 自然折返しの最終行が1語だけ残っているか(ウィドウ)
-    widow = len(natural) >= 2 and w_of(natural[-1]) < cap * 0.35
-    if not splits_a_word and not widow:
-        return text                                   # 読みは欠けていない。手を出さない
-    if len(lines) > len(natural) + 1:
-        return text                                   # 語を守ると行が増えすぎる(階段状になる)
-
 
     if w_of(lines[-1]) < cap * 0.35 and len(lines) >= 2:
-        prev = _words(lines[-2])
+        prev = _wrap_words(lines[-2])
         if len(prev) >= 2:
             cand_prev, cand_last = "".join(prev[:-1]), prev[-1] + lines[-1]
             if cand_prev and w_of(cand_last) <= cap and w_of(cand_prev) <= cap:

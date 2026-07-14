@@ -78,7 +78,10 @@ native-only deck runs without them, and they are only needed when a deck uses an
    forbidden topics, brand constraints, and whether the deliverable must be editable .pptx.
 2. Read all provided source material before drafting. Record provenance in `outline.md`.
 3. Write `outline.md` with audience/action, governing thought, chapter spine, action-title
-   sequence, evidence status, open questions, and talk-time budget.
+   sequence, evidence status, open questions, and talk-time budget. For every chapter, name
+   the one concrete scene it must put in the reader's head (who is standing where, what they
+   do next, what changes) — the chapter's slides are then judged by whether that scene comes
+   through (`references/concreteness.md`).
 4. Stop and ask for missing high-risk inputs when a claim would otherwise require invented
    numbers, fake sources, or unsupported company facts.
 5. Run the outline read-through before building:
@@ -123,6 +126,13 @@ list here — when in doubt, follow slide-judgment-system.md.
 Write Japanese slide text in noun-ending / headline style with no sentence-final full stop.
 The title must state the conclusion, not the topic.
 
+**Concreteness.** A claim names a who, a when and a what-happens: 「点検の記録を、作業を止めずに
+会話で終える」, not 「現場の効率化」. Name the mechanism (which system, which step, which handoff)
+rather than the direction. Give a national number a companion at the scale a person feels
+(1日あたり / 1人あたり / 1現場あたり), derived with a `derivation` so the arithmetic is checked.
+`validate_spec.py` warns on an abstract noun with no actor, and on a deck whose social-scale
+figures never land in a human unit. See `references/concreteness.md`.
+
 **Header contract (hard rule).** Every slide carries BOTH a main title and a subtitle, and
 each fits on exactly ONE rendered line — no `\n`, no wrapping. Overflow is a spec defect:
 shorten the copy, never the type size (`validate_spec.py` errors on violations).
@@ -145,8 +155,9 @@ reintroduce hard-coded character budgets for headers.
 
 **Line breaks.** Write copy; the builder writes the line breaks. Short display text (labels,
 headings, cell text, conclusion lines) breaks at phrase boundaries so the phrasing shows in
-the shape; sentences and body copy keep the renderer's natural, filled lines, with only a
-word that would be split carried to the next line. A symbolic closing message is composed as
+the shape; sentences and body copy fill their lines, each line ending on a whole word. The
+renderer is never left to wrap an overflowing sentence — its letter spacing differs from the
+builder's by a fraction, and that fraction is what drops a break inside a word. A symbolic closing message is composed as
 a form — its measure, its line balance and its surrounding whitespace are chosen together. A
 `\n` you type is honoured as a forced break, which is what makes it right for a slot with an
 exact line count (the cover subtitle's two lines). When a word is wider than its column,
@@ -185,6 +196,12 @@ Concretely:
   object, the key rows/steps/columns, the insight band, and any caveat note — speak the
   caveat in natural language ("この期間は会議時点の見込みです" 等).
 - Do not read the title string verbatim as the opening; restate the claim in spoken form.
+
+**Open on the scene, then the claim.** The presenter's first sentence puts the audience
+somewhere: a person, a place, an action. 「朝、倉庫の点呼です。ドライバーの声が少し低い。」— then
+the claim, then the evidence in the slide's reading order. A script that could be read over any
+slide in the deck is not yet doing its job; `validate_spec.py` warns when a slide's notes carry
+no scene.
 
 **Narrative — the deck reads as ONE story, not per-slide captions.** Each script:
 
@@ -345,6 +362,7 @@ Read only what the task needs, but do not skip the required workflow references.
 | `references/visual-hierarchy-rules.md` | Reading path, emphasis, alignment, accessibility |
 | `references/copy-and-title-rules.md` | Action titles, Japanese slide copy, line-break discipline |
 | `references/argument-integrity.md` | The argument contract enforced by `audit_argument.py` |
+| `references/concreteness.md` | Scenes, named mechanisms, felt scale (lexicon: `concreteness-lexicon.json`) |
 | `references/commitment-lexicon.json` | Terms that decide promise / rank / hedge / motion |
 | `references/talk-script-and-tts.md` | Speaker-notes readings a voice can say (table: `tts_readings.json`) |
 | `references/design-richness-rules.md` | Freshness and impact without decoration |

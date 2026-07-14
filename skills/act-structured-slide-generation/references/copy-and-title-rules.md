@@ -58,11 +58,21 @@ and the builder gives each what it wants — the author writes copy, not line br
   (bunsetsu), so the phrasing shows in the shape of the block — a fee label breaks after the
   connective, a growth phrase breaks after its particle. Particles and symbols stay with the
   word they belong to, a number stays with its counter, and okurigana stays with its stem.
-- **Everything longer — sentences and body copy — fills its lines, and only a word that would
-  be split moves down.** The renderer's natural wrap is kept, because a filled line is what
-  makes prose readable; where that wrap would land inside a katakana word, a Latin word or a
-  number, the word is carried to the next line instead (`deck_text.wrap_prose`). Nothing else
-  is touched, so the text keeps its natural rhythm.
+- **Everything longer — sentences and body copy — fills its lines, and the builder writes the
+  breaks.** A sentence that fits its column is left alone. One that does not is set by
+  `deck_text.wrap_prose`: each line is filled to the last whole word, and the word that would
+  straddle the break starts the next line. Leaving that wrap to the renderer is what puts a
+  break inside a word — its letter spacing differs from ours by a fraction, and a fraction is
+  all it takes to land between a stem and its okurigana. A filled line and an unbroken word
+  are not in tension; you get both by deciding the break yourself.
+- **A line never opens on a character that cannot open one.** A comma, a full stop, a middle
+  dot or a closing bracket belongs to the line above, and a qualifier stays with what it
+  qualifies: a demonstrative and its noun, an approximator and its figure, a number and its
+  counter are one word each, however the particle before them reads.
+- **A number keeps the size that fits its card.** A value and its unit are one line; when that
+  line is wider than the card, the renderer drops the unit onto a second line and splits it.
+  The builder steps the numeral down until the line fits, and uses one size across the cards
+  so the comparison is not distorted.
 - **A symbolic message is composed as a form.** See the message-slide contract in
   `grid-and-flex-strategy.md`: measure, balance and breathing are chosen together.
 - **Copy that fits its column is copy that survives layout.** Keeping a word whole must not
