@@ -990,6 +990,49 @@ def check_footer_present_layout_plan() -> Result:
     return Result("footer_present_layout_plan", proc.returncode == 0 and all(item in output for item in required), proc.stdout + proc.stderr if proc.returncode else "missing render-basis footer geometry")
 
 
+def check_nested_flex_layout_plan() -> Result:
+    script = ROOT / "build" / "scripts" / "build_act_slide_prompt.py"
+    plan = json.loads((ROOT / "build" / "evals" / "sample-layout-plan.json").read_text(encoding="utf-8"))
+    plan["layout_tree"]["nodes"].append({"id": "nested_flex", "parent_id": "main", "layout": "flex"})
+    next(node for node in plan["layout_tree"]["nodes"] if node["id"] == "item_b")["parent_id"] = "nested_flex"
+    main = plan["flex_plan"]["containers"][0]
+    main["children"][1]["id"] = "nested_flex"
+    nested_bounds = dict(main["children"][1]["allocation_bounds"])
+    plan["flex_plan"]["containers"].append({
+        "id": "nested_flex",
+        "bounds": nested_bounds,
+        "main_axis": "row",
+        "wrap": "nowrap",
+        "line_plan": [1],
+        "gap_px": 16,
+        "justify": "start",
+        "align": "stretch",
+        "children": [{
+            "id": "item_b",
+            "basis_px": nested_bounds["w"],
+            "grow": 1,
+            "shrink": 1,
+            "min_main_px": 480,
+            "min_cross_px": 400,
+            "allocation_bounds": dict(nested_bounds),
+        }],
+    })
+    item_b = next(component for component in plan["component_geometry_plan"]["components"] if component["id"] == "item_b")
+    item_b["parent_id"] = "nested_flex"
+    with tempfile.TemporaryDirectory() as tmp:
+        path = Path(tmp) / "nested-flex.json"
+        path.write_text(json.dumps(plan), encoding="utf-8")
+        proc = subprocess.run(
+            [sys.executable, str(script), "--mode", "single-slide-image", "--archetype", "content-led composition", "--grid-mode", "nested Grid/Flex", "--layout-plan", str(path)],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+    return Result("nested_flex_layout_plan", proc.returncode == 0, proc.stdout + proc.stderr if proc.returncode else "")
+
+
 def check_one_line_footer_layout_plan() -> Result:
     script = ROOT / "build" / "scripts" / "build_act_slide_prompt.py"
     plan = json.loads((ROOT / "build" / "evals" / "sample-layout-plan.json").read_text(encoding="utf-8"))
@@ -1107,6 +1150,7 @@ def main() -> int:
     results.append(Result("header_geometry_visual_regression_case", any(case.get("id") == "adversarial_self_generated_header_geometry" for case in visual_cases), "required header-geometry regression case is missing"))
     results.extend(check_layout_plan_geometry_rejections())
     results.append(check_footer_present_layout_plan())
+    results.append(check_nested_flex_layout_plan())
     results.append(check_one_line_footer_layout_plan())
     results.extend(check_design_token_swap())
     results.append(check_compiled_prompt_budget_rejection())

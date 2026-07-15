@@ -528,6 +528,7 @@ def read_layout_plan(path: str | None, mode: str, design_tokens: dict) -> dict |
     containers = plan["flex_plan"].get("containers", [])
     if not containers:
         raise SystemExit("Invalid --layout-plan; declare at least one Flex container.")
+    containers_by_id = {container.get("id"): container.get("bounds") for container in containers if container.get("id") and container.get("bounds")}
     required_container = {"id", "bounds", "main_axis", "wrap", "line_plan", "gap_px", "justify", "align", "children"}
     required_child = {"id", "basis_px", "grow", "shrink", "min_main_px", "min_cross_px", "allocation_bounds"}
     allowed_justify = {"start", "center", "end", "space-between", "space-around", "space-evenly"}
@@ -572,9 +573,9 @@ def read_layout_plan(path: str | None, mode: str, design_tokens: dict) -> dict |
             cross_lo, cross_hi = GEOMETRY["flex"]["cross_axis_fill_range"]
             if not cross_lo <= allocation_cross / cross_size <= cross_hi:
                 raise SystemExit("Invalid --layout-plan; every Flex child fills 82-100% of its parent cross axis.")
-            registered_bounds = component_by_id.get(child["id"], {}).get("bounds") or region_boxes.get(child["id"])
+            registered_bounds = component_by_id.get(child["id"], {}).get("bounds") or region_boxes.get(child["id"]) or containers_by_id.get(child["id"])
             if registered_bounds is None:
-                raise SystemExit("Invalid --layout-plan; every Flex child allocation binds to registered component or grid-region geometry.")
+                raise SystemExit("Invalid --layout-plan; every Flex child allocation binds to registered component, grid-region, or nested Flex geometry.")
             if any(abs(allocation[key] - registered_bounds[key]) > tolerance for key in ("x", "y", "w", "h")):
                 raise SystemExit("Invalid --layout-plan; every Flex child allocation matches its registered geometry within 4px.")
             allocation_rectangles.append(allocation)
