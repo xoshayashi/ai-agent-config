@@ -1,0 +1,17 @@
+{
+  "$comment": "Navy (Formal) — the lead hue moves from teal to navy for a formal, corporate register (board, IR, regulated). Only role→sanctioned-palette remaps and the chart lead colour change; every hex is already in tokens.colors, so the colour allowlist is unchanged and validate/verify stay template-agnostic.",
+  "$template": {
+    "label": "ネイビー / Formal",
+    "use": "取締役会・IR・金融など、硬めの場。ティールをネイビーへ。",
+    "lead_hue": "navy",
+    "feel": "formal"
+  },
+  "colors": {
+    "primary": "1F3A66",
+    "primary_deep": "1F3A66",
+    "primary_pale": "E4E9F2"
+  },
+  "chart_style": {
+    "comparison_series_colors": ["1F3A66", "008A80", "B9B5AA", "D6913D"]
+  }
+}
