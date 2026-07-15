@@ -572,9 +572,11 @@ def read_layout_plan(path: str | None, mode: str, design_tokens: dict) -> dict |
             cross_lo, cross_hi = GEOMETRY["flex"]["cross_axis_fill_range"]
             if not cross_lo <= allocation_cross / cross_size <= cross_hi:
                 raise SystemExit("Invalid --layout-plan; every Flex child fills 82-100% of its parent cross axis.")
-            component_bounds = component_by_id[child["id"]]["bounds"]
-            if any(abs(allocation[key] - component_bounds[key]) > tolerance for key in ("x", "y", "w", "h")):
-                raise SystemExit("Invalid --layout-plan; every Flex child allocation matches its registered component bounds within 4px.")
+            registered_bounds = component_by_id.get(child["id"], {}).get("bounds") or region_boxes.get(child["id"])
+            if registered_bounds is None:
+                raise SystemExit("Invalid --layout-plan; every Flex child allocation binds to registered component or grid-region geometry.")
+            if any(abs(allocation[key] - registered_bounds[key]) > tolerance for key in ("x", "y", "w", "h")):
+                raise SystemExit("Invalid --layout-plan; every Flex child allocation matches its registered geometry within 4px.")
             allocation_rectangles.append(allocation)
         ordered_children = sorted(container["children"], key=lambda child: child["allocation_bounds"]["x" if container["main_axis"] == "row" else "y"])
         for previous, current in zip(ordered_children, ordered_children[1:]):

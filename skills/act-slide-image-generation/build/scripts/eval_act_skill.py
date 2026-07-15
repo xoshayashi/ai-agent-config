@@ -801,6 +801,10 @@ def check_layout_plan_geometry_rejections() -> list[Result]:
     def overlap_quiet_region_with_direct_grid_content(plan: dict) -> None:
         plan["quiet_region"]["bounds"] = {"x": 169, "y": 272, "w": 96, "h": 96}
 
+    def add_unregistered_flex_child_node(plan: dict) -> None:
+        plan["layout_tree"]["nodes"].append({"id": "nested_grid", "parent_id": "main", "layout": "grid"})
+        plan["flex_plan"]["containers"][0]["children"][0]["id"] = "nested_grid"
+
     cases: list[tuple[str, callable]] = [
         ("argument_plan_missing", lambda plan: plan.pop("slide_argument_plan")),
         ("argument_evidence_unbound", lambda plan: plan["slide_argument_plan"].update(evidence_atom_ids=["missing_atom"])),
@@ -827,6 +831,7 @@ def check_layout_plan_geometry_rejections() -> list[Result]:
         ("flex_gap_mismatch", lambda plan: plan["flex_plan"]["containers"][0]["children"][1]["allocation_bounds"].update(x=860, w=643)),
         ("flex_cross_axis_underfill", lambda plan: [plan["flex_plan"]["containers"][0]["children"][0].update(min_cross_px=80), plan["flex_plan"]["containers"][0]["children"][0]["allocation_bounds"].update(h=80)]),
         ("flex_invalid_wrap", lambda plan: plan["flex_plan"]["containers"][0].update(wrap="wrpa")),
+        ("flex_child_without_registered_geometry", add_unregistered_flex_child_node),
         ("freeform_connector_route", lambda plan: plan["connector_plan"]["connectors"][0].update(route="freeform")),
         ("connector_crossing", lambda plan: plan["connector_plan"]["connectors"][0].update(crossing_count=1)),
         ("connector_endpoint_drift", lambda plan: plan["connector_plan"]["connectors"][0]["waypoints"][0].update(x=800)),
