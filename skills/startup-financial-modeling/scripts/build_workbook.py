@@ -652,6 +652,14 @@ class Compiler:
 SHEET_NAMES = {"revenue": "売上計画", "headcount": "人員計画", "costs": "費用計画"}
 BASIS_OK = {"実績", "契約", "記載", "仮置き", "ベンチマーク", "逆算"}
 
+# story_checks のうち、実際に「記載値の照合行」を生むキー（build_story_inputs の
+# mapping と一致させること）。tol_amount/tol_share は許容誤差であって照合ではない。
+RECON_STORY_KEYS = {
+    "y5_recurring_revenue", "y5_implementation_revenue", "y5_total_som",
+    "y5_b2b_units", "y5_toc_paid_users", "tam", "net_sam",
+    "som_sam_share", "som_tam_share",
+}
+
 
 def validate_tree(cfg):
     ids, calc_deps = {}, {}
@@ -702,17 +710,28 @@ def validate_tree(cfg):
     # セットにする。照合がないと「目標に合うよう解いた数字」が独立の根拠を持つ
     # かのように出荷される（＝逃げ道）。
     # 照合は**集約でもよい**（例: 3セグメントの期末稼働数を y5_b2b_units 合計で
-    # 突き合わせる）。ドライバーIDの直接記載を要求すると、正しい集約照合を誤って
-    # 弾く。よって「逆算があるのに照合機構が一切ない」ときだけ落とす。
+    # 突き合わせる）が、**実際に照合行になるもの**でなければならない。
+    #   - source_bounds は driver が実在しないと build_story_inputs が黙って
+    #     読み飛ばす（誤記で照合ゼロ）。→ driver が ids にある行だけ数える。
+    #   - story_checks の tol_amount/tol_share は許容誤差であって照合ではない。
+    #     → 実際に記載値の行を生む RECON_STORY_KEYS（build_story_inputs の
+    #       mapping と一致）か scenario_reference があるときだけ照合とみなす。
     back_solved = [did for did, d in ids.items() if d.get("basis") == "逆算"]
     if back_solved:
-        has_recon = bool(cfg.get("source_bounds")) or \
-            bool(cfg.get("story_checks"))
-        if not has_recon:
+        # scenario_reference は「（記載）各ケースの到達点」の表示行であって、
+        # モデル値と突き合わせる照合チェックそのものではない（照合の実体は
+        # RECON_STORY_KEYS が生む記載値行をサマリーが比較して作る）。照合と
+        # 数えない。
+        real_bounds = any(b.get("driver") in ids
+                          for b in (cfg.get("source_bounds") or []))
+        real_story = bool(RECON_STORY_KEYS & set(cfg.get("story_checks") or {}))
+        if not (real_bounds or real_story):
             raise ModelError(
-                f"逆算ドライバー {back_solved} があるのに照合チェックが一つもない"
-                "（分解ガイド停止条件S2）。source_bounds か story_checks で"
-                "記載値・実測値と突き合わせること。逆算は独立の根拠にならない")
+                f"逆算ドライバー {back_solved} に実際の照合チェックがない"
+                "（分解ガイド停止条件S2）。source_bounds（driverは実在ID）か"
+                f"story_checks（{sorted(RECON_STORY_KEYS)} のいずれか）で"
+                "記載値・実測値と突き合わせること。許容誤差キーや誤記IDは照合に"
+                "ならない。逆算は独立の根拠にならない")
     return ids
 
 
@@ -790,11 +809,15 @@ def _case_block(s, reg, d, case_names):
     # 分解ガイド 停止条件S3の機械化: 3ケースが全期間で同値なら、それは
     # シナリオ変数ではなく定数。ケースブロックは行を増やすだけで何も語らない
     # （重複＝「重複のない見せ方」に反する）。ケースを外して定数入力にする。
-    _base = d["values"] if isinstance(d["values"], list) else [d["values"]]
+    # 比較は**期間数に展開してから**行う。row() はスカラー・短いリストを
+    # 「最後の値を繰り返して」埋めるので、values: 1 と cases: [1,1,1] は
+    # 全期間で同一に描画される。生の [1] と [1,1,1] を比べると見逃す（レビュー指摘）。
+    def _expand(v):
+        vals = v if isinstance(v, list) else [v]
+        return [vals[t] if t < len(vals) else vals[-1] for t in range(s.p)]
+    _base_e = _expand(d["values"])
     _cases = d.get("cases", {})
-    if _cases and all(
-            (v if isinstance(v, list) else [v]) == _base
-            for v in _cases.values()):
+    if _cases and all(_expand(v) == _base_e for v in _cases.values()):
         raise ModelError(
             f"ドライバー『{d['id']}』は3ケースが全期間で同値。"
             "シナリオ変数でないのでケースを外す（分解ガイド停止条件S3）。"
@@ -2434,6 +2457,8 @@ def build_story_inputs(s, cfg):
                   note="サマリーの照合ブロックが参照（超過で赤字）")
         const_row(s, "照合許容誤差：市場シェア", sc.get("tol_share", 0.05),
                   "pct", "a_ck_tol_share", "%", italic=True, basis="仮置き")
+        # キーは RECON_STORY_KEYS と一致させる（validate_tree のS2ゲートと
+        # 同じ集合。片方だけ増減するとゲートが照合を見落とす）。
         mapping = [
             ("y5_recurring_revenue", "最終年Recurring収益", "m", "百万円"),
             ("y5_implementation_revenue", "最終年一時収益", "m", "百万円"),
@@ -2445,6 +2470,8 @@ def build_story_inputs(s, cfg):
             ("som_sam_share", "SOM/Net SAM（記載値）", "pct", "%"),
             ("som_tam_share", "SOM/TAM（記載値）", "pct", "%"),
         ]
+        assert {k for k, *_ in mapping} == RECON_STORY_KEYS, \
+            "mapping と RECON_STORY_KEYS が不一致（S2ゲートが照合を見落とす）"
         for key, label, fk, unit in mapping:
             if key in sc:
                 const_row(s, label, sc[key], fk, f"a_ck_{key}", unit,
