@@ -1,11 +1,11 @@
 #!/usr/bin/env python3
-"""生成器の汎用性スモークテスト。
+"""v3エンジンの汎用性スモークテスト。
 
-ACT固有形状（4セグメント・年0調達・全任意ブロックあり）以外の入力でも
-生成と機械検査が通ることを確認する。
+ドライバーツリーが異なる収益アーキタイプ（ハードウェア単品販売＋SaaSアタッチ、
+プロフェッショナルサービス）を表現でき、生成・機械検査・再計算ゲートが
+通ることを確認する。
 
-使い方: python3 smoke_test.py
-終了コード 0=全パス / 1=失敗
+使い方: python3 smoke_test.py   （終了コード 0=全パス）
 """
 from __future__ import annotations
 
@@ -18,105 +18,230 @@ import yaml
 
 HERE = Path(__file__).parent
 
-CASES = {
-    # 最小構成: B2B 2セグメントのみ・ToCなし・任意ブロックなし・
-    # 調達は2年目（year_index=1）・6期・同一allocationの重複職能
-    "minimal_b2b_only_6y": {
-        "company": "SmokeCo",
-        "model_title": "スモークテスト最小構成",
-        "start_year": 2027,
-        "periods": 6,
-        "segments": [
-            {"name": "Core", "unit_label": "社",
-             "ending_customers": [10, 30, 80, 150, 240, 320],
-             "churn_rate": 0.08, "fixed_fee_monthly": 200000,
-             "usage_fee_monthly": 300000, "usage_rate_per_min": 10,
-             "implementation_fee": 1000000,
-             "cost_per_min": [8, 6, 5, 4, 3, 3]},
-            {"name": "Enterprise", "unit_label": "社",
-             "ending_customers": [1, 4, 10, 20, 32, 45],
-             "churn_rate": 0.03, "fixed_fee_monthly": 1500000,
-             "usage_fee_monthly": 2000000, "usage_rate_per_min": 25,
-             "implementation_fee": 10000000,
-             "cost_per_min": [18, 14, 10, 8, 6, 5]},
+
+def base_common(periods, extra_tree, roles, company, title):
+    return {
+        "company": company, "model_title": title,
+        "start_year": 2027, "periods": periods,
+        "source_note": "スモークテスト（合成データ）",
+        "tree": extra_tree + [
+            {"section": "9. 人員", "sheet": "headcount", "drivers": [
+                {"id": "fte_all", "label": "総人員（期末）", "unit": "人",
+                 "fmt": "cnt", "kind": "input", "basis": "仮置き",
+                 "source": "採用計画", "values": [8, 16, 28, 40, 52][:periods]},
+                {"id": "hires", "label": "新規採用数（純増）", "unit": "人",
+                 "fmt": "cnt", "formula": "fte_all - prev(fte_all)"},
+                {"id": "sal", "label": "平均年収", "unit": "円/年",
+                 "fmt": "yen", "kind": "input", "basis": "仮置き",
+                 "source": "市場相場", "values": 9000000},
+                {"id": "burden", "label": "法定福利率", "unit": "%",
+                 "fmt": "pct", "kind": "input", "basis": "ベンチマーク",
+                 "source": "法定福利約16%", "values": 0.16},
+                {"id": "payroll", "label": "人件費合計", "unit": "百万円",
+                 "fmt": "m", "formula": "fte_all * sal * (1 + burden)",
+                 "bold": True, "total": True},
+            ]},
+            {"section": "10. 営業費用・投資・税", "sheet": "costs",
+             "drivers": [
+                {"id": "mkt_rate", "label": "マーケ費率（対売上）", "unit": "%",
+                 "fmt": "pct", "kind": "input", "basis": "仮置き",
+                 "source": "初期GTM投資", "values": 0.12},
+                {"id": "mkt", "label": "マーケティング費", "unit": "百万円",
+                 "fmt": "m", "formula": "rev_all * mkt_rate"},
+                {"id": "office_unit", "label": "オフィス単価", "unit": "円/人/年",
+                 "fmt": "yen", "kind": "input", "basis": "仮置き",
+                 "source": "都内相場", "values": 800000},
+                {"id": "office", "label": "オフィス・ツール費", "unit": "百万円",
+                 "fmt": "m", "formula": "fte_all * office_unit"},
+                {"id": "capex", "label": "設備投資", "unit": "百万円",
+                 "fmt": "m", "kind": "input", "basis": "仮置き",
+                 "source": "開発設備", "values": 30000000},
+                {"id": "dep_years", "label": "償却年数", "unit": "年",
+                 "fmt": "cnt", "kind": "input", "basis": "仮置き",
+                 "source": "税法耐用年数目安", "values": 5},
+                {"id": "tax_rate", "label": "実効税率", "unit": "%",
+                 "fmt": "pct", "kind": "input", "basis": "ベンチマーク",
+                 "source": "日本実効税率30-34%", "values": 0.30},
+                {"id": "nol0", "label": "期初繰越欠損金", "unit": "百万円",
+                 "fmt": "m", "kind": "input", "basis": "仮置き",
+                 "source": "設立時", "values": 0},
+                {"id": "ar_days", "label": "売掛回収サイト", "unit": "日",
+                 "fmt": "cnt", "kind": "input", "basis": "ベンチマーク",
+                 "source": "末締め翌月末", "values": 45},
+                {"id": "ap_days", "label": "買掛支払サイト", "unit": "日",
+                 "fmt": "cnt", "kind": "input", "basis": "仮置き",
+                 "source": "同上", "values": 30},
+                {"id": "cash0", "label": "期初現金", "unit": "百万円",
+                 "fmt": "m", "kind": "input", "basis": "仮置き",
+                 "source": "手元資金", "values": 400000000},
+            ]},
         ],
-        "implementation_cost_pct": [0.6, 0.55, 0.5, 0.5, 0.45, 0.45],
-        "headcount": [
-            {"function": "R&D（基盤）", "fte": [5, 10, 18, 26, 34, 40],
-             "avg_salary": 12000000, "allocation": "R&D"},
-            {"function": "R&D（アプリ）", "fte": [3, 6, 12, 18, 24, 30],
-             "avg_salary": 11000000, "allocation": "R&D"},
-            {"function": "セールス", "fte": [2, 6, 14, 24, 34, 44],
-             "avg_salary": 10000000, "allocation": "S&M"},
-            {"function": "CS", "fte": [1, 3, 7, 12, 18, 24],
-             "avg_salary": 8000000, "allocation": "COGS"},
-            {"function": "コーポレート", "fte": [1, 2, 4, 7, 10, 13],
-             "avg_salary": 10000000, "allocation": "G&A"},
-        ],
-        "payroll_burden_rate": 0.16,
-        "recruiting_cost_per_hire": 1000000,
-        "opex": {
-            "sm_pct_of_revenue": [0.2, 0.18, 0.16, 0.14, 0.12, 0.12],
-            "rd_program_yen": [50000000, 100000000, 200000000,
-                               300000000, 400000000, 450000000],
-            "office_cost_per_fte": 1000000,
-            "ga_pct_of_revenue": 0.02,
-        },
-        "capex_yen": [50000000, 80000000, 120000000,
-                      150000000, 180000000, 200000000],
-        "depreciation_years": 5,
-        "tax_rate": 0.30,
-        "ar_days": 60,
-        "ap_days": 30,
-        "financing": {
-            "beginning_cash": 500000000,
-            "rounds": [{"year_index": 1, "label": "シリーズA",
-                        "amount": 4000000000}],
-        },
-    },
-}
+        "roles": roles,
+        "statements": {"dep_years_driver": "dep_years",
+                       "tax_rate_driver": "tax_rate",
+                       "nol_opening_driver": "nol0"},
+        "financing": {"rounds": [
+            {"year_index": 1, "label": "シリーズA", "amount": 2500000000}]},
+    }
 
 
-def run_case(name, cfg, with_captable=False):
-    if with_captable:
-        cfg = dict(cfg)
-        cfg["cap_table"] = {
-            "founder_shares": 1000000,
-            "pool_expansion_shares": 150000,
-            "post_money": 6000000000,
-        }
-        cfg["valuation"] = {
-            "discount_rate": [0.35, 0.28, 0.22],
-            "gordon_g": 0.02,
-            "ebitda_exit_multiple": [6, 10, 14],
-            "rev_exit_multiple": [2.5, 4.0, 6.0],
-            "txn_multiple": [3.0, 4.5, 6.5],
-            "dlom": 0.25,
-            "moic_target": 10,
-            "adopted_range": [3000000000, 8000000000],
-            "comps": [{"name": f"Comp{i}", "ev_rev": 2.0 + i * 0.7,
-                       "growth": 0.2 + i * 0.02} for i in range(5)],
-            "transactions": [{"name": f"Deal{i}", "ev_rev": 3.0 + i}
-                             for i in range(3)],
-        }
-        # scenario_referenceは意図的に置かない（任意ブロック欠落の回帰確認）
-        name += "_captable_valuation_no_scenarioref"
+def hardware_attach(periods=4):
+    """アーキタイプ5+8: 単品販売（コストダウンカーブ）＋SaaSアタッチ。"""
+    tree = [
+        {"section": "1. 需要｜出荷とインストールベース", "sheet": "revenue",
+         "drivers": [
+            {"id": "units", "label": "出荷台数", "unit": "台", "fmt": "cnt",
+             "kind": "input", "basis": "逆算",
+             "source": "販売計画（最終年目標からの逆算）",
+             "values": [200, 800, 2000, 4000][:periods],
+             "cases": {"Upside": [300, 1200, 3000, 6000][:periods],
+                       "Downside": [120, 480, 1200, 2400][:periods]}},
+            {"id": "base_units", "label": "累計インストールベース", "unit": "台",
+             "fmt": "cnt", "formula": "prev(base_units) + units",
+             "note": "リタイアメントなしの簡便法"},
+        ]},
+        {"section": "2. 単価と原価カーブ", "sheet": "revenue", "drivers": [
+            {"id": "asp", "label": "平均販売単価（ASP）", "unit": "円/台",
+             "fmt": "yen", "kind": "input", "basis": "記載",
+             "source": "価格表", "values": 1200000},
+            {"id": "bom", "label": "BOM＋製造原価/台", "unit": "円/台",
+             "fmt": "yen", "kind": "input", "basis": "仮置き",
+             "source": "コストダウンカーブ（量産効果）",
+             "values": [800000, 680000, 580000, 500000][:periods]},
+            {"id": "attach", "label": "SaaSアタッチ率", "unit": "%",
+             "fmt": "pct", "kind": "input", "basis": "仮置き",
+             "source": "同種HW+SaaSの実務水準", "values": 0.6},
+            {"id": "saas_fee", "label": "SaaS月額/台", "unit": "円/月",
+             "fmt": "yen", "kind": "input", "basis": "記載",
+             "source": "価格表", "values": 20000},
+        ]},
+        {"section": "3. 収益（HW＋アタッチSaaS）", "sheet": "revenue",
+         "drivers": [
+            {"id": "hw_rev", "label": "ハードウェア売上", "unit": "百万円",
+             "fmt": "m", "formula": "units * asp"},
+            {"id": "saas_subs", "label": "SaaS課金台数（期末）", "unit": "台",
+             "fmt": "cnt", "formula": "base_units * attach",
+             "note": "リカーリングはインストールベース×アタッチに整合"},
+            {"id": "saas_rev", "label": "SaaS売上", "unit": "百万円",
+             "fmt": "m", "formula": "saas_subs * saas_fee * 12"},
+            {"id": "rev_all", "label": "売上高合計（参照用）", "unit": "百万円",
+             "fmt": "m", "formula": "hw_rev + saas_rev"},
+        ]},
+        {"section": "4. 原価", "sheet": "costs", "drivers": [
+            {"id": "hw_cogs", "label": "ハードウェア原価", "unit": "百万円",
+             "fmt": "m", "formula": "units * bom"},
+            {"id": "saas_cogs_rate", "label": "SaaS原価率", "unit": "%",
+             "fmt": "pct", "kind": "input", "basis": "仮置き",
+             "source": "ホスティング等", "values": 0.2},
+            {"id": "saas_cogs", "label": "SaaS原価", "unit": "百万円",
+             "fmt": "m", "formula": "saas_rev * saas_cogs_rate"},
+        ]},
+    ]
+    roles = {
+        "revenue_lines": [
+            {"driver": "hw_rev", "label": "ハードウェア売上",
+             "onetime": True, "scales": "vol"},
+            {"driver": "saas_rev", "label": "SaaS売上", "scales": "both"}],
+        "cogs_lines": [
+            {"driver": "hw_cogs", "label": "ハードウェア原価", "scales": "vol"},
+            {"driver": "saas_cogs", "label": "SaaS原価", "scales": "both"}],
+        "opex_sm_lines": [{"driver": "mkt", "label": "マーケティング費",
+                           "scales": "both"}],
+        "opex_rd_lines": [{"driver": "payroll", "label": "人件費（全社）",
+                           "scales": "fixed"}],
+        "opex_ga_lines": [{"driver": "office", "label": "オフィス・ツール",
+                           "scales": "fixed"}],
+        "variable_cost_lines": [{"driver": "hw_cogs"}, {"driver": "saas_cogs"},
+                                {"driver": "mkt"}],
+        "arr": "saas_rev", "onetime_revenue": "hw_rev",
+        "new_units": ["units"], "fte_total": "fte_all",
+        "payroll_total": "payroll", "hires": "hires", "capex": "capex",
+        "ar_days": "ar_days", "ap_days": "ap_days",
+        "beginning_cash": "cash0",
+    }
+    cfg = base_common(periods, tree, roles, "SmokeHW",
+                      "HW＋SaaSアタッチ スモーク")
+    cfg["scenario"] = {"cases": ["Base", "Upside", "Downside"],
+                       "active": "Base"}
+    cfg["scenario_scales"] = {"volume": [0.8, 1.0, 1.2],
+                              "price": [0.95, 1.0, 1.05]}
+    return cfg
+
+
+def services(periods=5):
+    """アーキタイプ6: 稼働人員×稼働率×単価のサービス業（供給キャップ）。"""
+    tree = [
+        {"section": "1. 供給能力（ビラブル人員）", "sheet": "revenue",
+         "drivers": [
+            {"id": "billable", "label": "ビラブル人員（期末）", "unit": "人",
+             "fmt": "cnt", "kind": "input", "basis": "仮置き",
+             "source": "採用計画", "values": [10, 20, 35, 50, 70][:periods]},
+            {"id": "hours_pm", "label": "月間稼働可能時間/人", "unit": "時間",
+             "fmt": "cnt", "kind": "input", "basis": "ベンチマーク",
+             "source": "160h/月", "values": 160},
+            {"id": "util", "label": "稼働率", "unit": "%", "fmt": "pct",
+             "kind": "input", "basis": "ベンチマーク",
+             "source": "PS業界70-80%帯（Kantata）", "values": 0.75},
+            {"id": "bill_rate", "label": "請求単価", "unit": "円/時間",
+             "fmt": "yen", "kind": "input", "basis": "記載",
+             "source": "料金表", "values": 15000},
+        ]},
+        {"section": "2. 収益（供給キャップ）", "sheet": "revenue", "drivers": [
+            {"id": "bill_hours", "label": "請求可能時間", "unit": "時間",
+             "fmt": "cnt", "formula": "billable * hours_pm * util * 12"},
+            {"id": "svc_rev", "label": "サービス売上", "unit": "百万円",
+             "fmt": "m", "formula": "bill_hours * bill_rate",
+             "note": "供給キャップ型: 需要が供給を超える計画は不可"},
+            {"id": "rev_all", "label": "売上高合計（参照用）", "unit": "百万円",
+             "fmt": "m", "formula": "svc_rev"},
+        ]},
+        {"section": "3. 原価（デリバリー）", "sheet": "costs", "drivers": [
+            {"id": "delivery_rate", "label": "外注・ツール原価率", "unit": "%",
+             "fmt": "pct", "kind": "input", "basis": "仮置き",
+             "source": "外注比率", "values": 0.15},
+            {"id": "delivery_cogs", "label": "外注・ツール原価", "unit": "百万円",
+             "fmt": "m", "formula": "svc_rev * delivery_rate"},
+        ]},
+    ]
+    roles = {
+        "revenue_lines": [{"driver": "svc_rev", "label": "サービス売上",
+                           "scales": "both"}],
+        "cogs_lines": [
+            {"driver": "delivery_cogs", "label": "外注・ツール原価",
+             "scales": "both"},
+            {"driver": "payroll", "label": "デリバリー人件費",
+             "scales": "fixed"}],
+        "opex_sm_lines": [{"driver": "mkt", "label": "マーケティング費",
+                           "scales": "both"}],
+        "opex_ga_lines": [{"driver": "office", "label": "オフィス・ツール",
+                           "scales": "fixed"}],
+        "variable_cost_lines": [{"driver": "delivery_cogs"},
+                                {"driver": "mkt"}],
+        "new_units": ["billable"], "fte_total": "fte_all",
+        "payroll_total": "payroll", "hires": "hires", "capex": "capex",
+        "ar_days": "ar_days", "ap_days": "ap_days",
+        "beginning_cash": "cash0",
+    }
+    return base_common(periods, tree, roles, "SmokePS",
+                       "プロフェッショナルサービス スモーク")
+
+
+def run(name, cfg):
     with tempfile.TemporaryDirectory() as td:
         y = Path(td) / "plan.yaml"
         y.write_text(yaml.safe_dump(cfg, allow_unicode=True),
                      encoding="utf-8")
         out = Path(td) / "out"
-        r = subprocess.run(
-            [sys.executable, str(HERE / "build_workbook.py"),
-             "--input", str(y), "--outdir", str(out), "--name", "smoke"],
-            capture_output=True, text=True)
+        r = subprocess.run([sys.executable, str(HERE / "build_workbook.py"),
+                            "--input", str(y), "--outdir", str(out),
+                            "--name", "smoke"],
+                           capture_output=True, text=True)
         if r.returncode != 0:
             print(f"FAIL {name}: build\n{r.stderr[-1500:]}")
             return False
-        r = subprocess.run(
-            [sys.executable, str(HERE / "inspect_workbook.py"),
-             str(out / "smoke.xlsx"), "--recalc"],
-            capture_output=True, text=True)
+        r = subprocess.run([sys.executable, str(HERE / "inspect_workbook.py"),
+                            str(out / "smoke.xlsx"), "--recalc"],
+                           capture_output=True, text=True)
         if r.returncode != 0:
             print(f"FAIL {name}: inspect\n{r.stdout[-1500:]}")
             return False
@@ -126,22 +251,8 @@ def run_case(name, cfg, with_captable=False):
 
 def main():
     ok = True
-    for name, cfg in CASES.items():
-        ok &= run_case(name, cfg, with_captable=False)
-        ok &= run_case(name, cfg, with_captable=True)
-    # 短期間（4期）でのcap_table/valuation: 感応度3点フォールバックの回帰確認
-    short = dict(CASES["minimal_b2b_only_6y"])
-    short["periods"] = 4
-    short["segments"] = [dict(s, ending_customers=s["ending_customers"][:4],
-                              cost_per_min=s["cost_per_min"][:4])
-                         for s in short["segments"]]
-    short["implementation_cost_pct"] = short["implementation_cost_pct"][:4]
-    short["headcount"] = [dict(h, fte=h["fte"][:4]) for h in short["headcount"]]
-    short["opex"] = dict(short["opex"],
-                         sm_pct_of_revenue=short["opex"]["sm_pct_of_revenue"][:4],
-                         rd_program_yen=short["opex"]["rd_program_yen"][:4])
-    short["capex_yen"] = short["capex_yen"][:4]
-    ok &= run_case("short_4y", short, with_captable=True)
+    ok &= run("hardware_attach_4y_scenario", hardware_attach(4))
+    ok &= run("services_5y_minimal", services(5))
     return 0 if ok else 1
 
 
