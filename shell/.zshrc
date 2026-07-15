@@ -2,14 +2,20 @@
 #  _   _   _   _   _   _   _  
 # | \_/ | / \ / \_/ | / \_/ | 
 # |  _  | | | |  _  | |  _  |   Zsh Configuration File
-# |_| |_| \_/ |_| |_| |_| |_|   User: sh
+# |_| |_| \_/ |_| |_| |_| |_|   Portable · installed per-user via ai-agent-config
 # ==============================================================================
 
 # ------------------------------------------------------------------------------
 # 1. 環境変数 & PATH 設定 (Environment Variables & PATH)
 # ------------------------------------------------------------------------------
-# パス関係を一括して整理（優先度の高い順）
-export PATH="/Users/sh/.antigravity-ide/antigravity-ide/bin:$HOME/.antigravity/antigravity/bin:$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+# パス関係を一括して整理（優先度の高い順）。
+# 共有dotfileなので個人パスは直書きしない: 汎用パスを先に置き、Antigravity IDE の bin は
+# そのディレクトリが実在するときだけ最優先で前置する（未導入のマシンでは何も足さない）。
+export PATH="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:$PATH"
+for _agbin in "$HOME/.antigravity/antigravity/bin" "$HOME/.antigravity-ide/antigravity-ide/bin"; do
+  [[ -d "$_agbin" ]] && export PATH="$_agbin:$PATH"
+done
+unset _agbin
 
 # 基本文字コード
 export LANG=ja_JP.UTF-8
