@@ -207,9 +207,23 @@ install_command_line_tools() {
     return 0
   fi
   say "install: Command Line Tools"
-  run xcode-select --install
-  say "Complete the Command Line Tools installer dialog, then rerun setup.sh."
-  exit 0
+  run xcode-select --install >/dev/null 2>&1 || true
+  if [ "$dry_run" = "1" ]; then
+    say "would wait for Command Line Tools dialog to complete, then continue"
+    return 0
+  fi
+  # GUI ダイアログのクリックだけは人が要る(不可避)。だが exit して手動再実行を強いる代わりに、
+  # インストール完了をポーリングして、終わり次第このまま先へ進む(=一発で走り切る)。
+  say "Complete the Command Line Tools installer dialog when it appears; setup will continue automatically."
+  waited=0
+  while ! xcode-select -p >/dev/null 2>&1; do
+    if [ "$waited" -ge 1800 ]; then
+      fail "Command Line Tools still not installed after 30 min — complete the dialog, then rerun setup.sh"
+    fi
+    sleep 15
+    waited=$((waited + 15))
+  done
+  say "ok: Command Line Tools installed"
 }
 
 install_homebrew() {
@@ -223,7 +237,14 @@ install_homebrew() {
     say "would install: Homebrew"
   else
     say "install: Homebrew"
-    NONINTERACTIVE=1 /bin/bash -c "$(/usr/bin/curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    brew_install_cmd='NONINTERACTIVE=1 /bin/bash -c "$(/usr/bin/curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"'
+    if [ ! -t 0 ] && ! sudo -n true >/dev/null 2>&1; then
+      # 非対話(Claude 経由など)で sudo にパスワードが要る。cask と同じく Terminal.app へ
+      # 受け渡し、そこでパスワードを入力できるようにする(ここが無いと sudo が prompt できず中断)。
+      run_in_terminal "Homebrew install" "$brew_install_cmd"
+    else
+      NONINTERACTIVE=1 /bin/bash -c "$(/usr/bin/curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+    fi
   fi
   if brew_path=$(brew_command); then
     brew_prefix=$("$brew_path" --prefix)
@@ -251,7 +272,9 @@ brew_install_formulae() {
     zoxide \
     starship \
     zsh-syntax-highlighting \
-    displayplacer
+    displayplacer \
+    graphviz \
+    poppler
   do
     if ! "$brew_path" list --formula "$formula" >/dev/null 2>&1; then
       say "install: brew formula $formula"
@@ -556,18 +579,22 @@ install_mas_apps() {
     warn "mas unavailable; skip Mac App Store app install"
     return 0
   fi
-  if ! mas account >/dev/null 2>&1; then
-    warn "Mac App Store is not signed in; skip Perplexity install"
-    say "manual auth step: sign in to App Store, then rerun setup"
-    return 0
-  fi
-
+  # `mas account` は mas 7 で廃止された(常に失敗し、以前はここで Perplexity を握り潰していた)。
+  # サインイン判定は行わず直接インストールを試み、未サインインで失敗したときだけ手順を示す。
   if mas_app_installed 1668000334; then
     say "upgrade: Mac App Store app Perplexity"
-    run mas upgrade 1668000334
+    if [ "$dry_run" = "1" ]; then
+      run mas upgrade 1668000334
+    elif ! mas upgrade 1668000334; then
+      warn "Perplexity upgrade failed — sign in to the App Store, then rerun setup"
+    fi
   else
     say "install: Mac App Store app Perplexity"
-    run mas install 1668000334
+    if [ "$dry_run" = "1" ]; then
+      run mas install 1668000334
+    elif ! mas install 1668000334; then
+      warn "Perplexity install failed — sign in to the App Store (App Store app → Sign In), then rerun setup"
+    fi
   fi
 }
 
@@ -847,8 +874,30 @@ install_skill_runtime_support() {
     else
       say "ok: python packages for act-structured-slide-generation"
     fi
+
+    # スライド skill は Geist / Noto Sans JP を採寸に使う。同梱の setup_fonts.py が
+    # ~/Library/Fonts へ 400/600/700 を導入する(冪等)。フォントが無いと採寸が近似に落ち、
+    # 描画が警告なく崩れる — fonttools は上のブロックで入るので、ここで揃える。
+    fonts_script="$skill_source_root/act-structured-slide-generation/scripts/setup_fonts.py"
+    if [ -f "$fonts_script" ]; then
+      if python3 "$fonts_script" --check >/dev/null 2>&1; then
+        say "ok: slide fonts (Geist / Noto Sans JP)"
+      elif [ "$dry_run" = "1" ]; then
+        run python3 "$fonts_script"
+      else
+        say "install: slide fonts (Geist / Noto Sans JP)"
+        if python3 "$fonts_script" >/dev/null 2>&1 \
+          && python3 "$fonts_script" --check >/dev/null 2>&1; then
+          say "ok: slide fonts (Geist / Noto Sans JP)"
+        else
+          warn "slide fonts install failed; run: python3 $fonts_script"
+        fi
+      fi
+    fi
+
     # graphviz の python パッケージは CLI(dot)が無いと動かない(org_tree/node_graph が
-    # ビルド時に失敗する)。import プローブでは検出できないため実行ファイルを確認する
+    # ビルド時に失敗する)。import プローブでは検出できないため実行ファイルを確認する。
+    # dot は brew_install_formulae で導入するが、念のため実行ファイルを確認する。
     if ! command -v dot >/dev/null 2>&1; then
       warn "graphviz CLI (dot) not found — org_tree/node_graph diagrams will fail; install with: brew install graphviz"
     fi
@@ -1015,6 +1064,9 @@ check_manual_auth_steps() {
     say "  gh auth login"
     say "  gcloud auth login"
     say "  hf auth login"
+    say "  claude   # /login"
+    say "  codex login"
+    say "  git config --global user.name / user.email (if unset)"
     return 0
   fi
 
@@ -1051,9 +1103,53 @@ check_manual_auth_steps() {
     warn "hf unavailable; run setup again after Hugging Face CLI is installed"
   fi
 
+  # このリポジトリが設定する主役 CLI — Claude Code と Codex — のログインも見る(以前は漏れていた)。
+  # 認証は資格情報ファイルの有無で推定する(資格情報はリポジトリに置けないため、手順だけ示す)。
+  if command -v claude >/dev/null 2>&1; then
+    # macOS では Claude Code の資格情報は Keychain に入る(ファイルではない)。まず Keychain を
+    # 見て、無ければ Linux/Windows のファイルを見る — 逆にするとサインイン済みでも毎回 nag する。
+    if security find-generic-password -s "Claude Code-credentials" >/dev/null 2>&1 \
+      || [ -f "$HOME/.claude/.credentials.json" ] || [ -f "$HOME/.claude/.credentials" ]; then
+      say "ok: claude code credentials present"
+    else
+      manual_auth_command "claude   # 起動して /login で Claude Code にサインイン"
+    fi
+  fi
+  if command -v codex >/dev/null 2>&1; then
+    if [ -f "$HOME/.codex/auth.json" ]; then
+      say "ok: codex credentials present"
+    else
+      manual_auth_command "codex login"
+    fi
+  fi
+
+  # git のコミット著者情報(user.name / user.email)。未設定だと @hostname.local で記録される。
+  if command -v git >/dev/null 2>&1; then
+    if [ -z "$(git config --global user.name 2>/dev/null)" ] \
+      || [ -z "$(git config --global user.email 2>/dev/null)" ]; then
+      manual_auth_command "git config --global user.name 'Your Name'"
+      manual_auth_command "git config --global user.email 'you@example.com'"
+    else
+      say "ok: git commit identity set"
+    fi
+  fi
+
   if [ "$manual_auth_header_printed" = "0" ]; then
     say "ok: all checked auth sessions are active"
   fi
+}
+
+post_setup_manual_steps() {
+  # リポジトリが原理的に自動化できない一回きりの手動ステップを、最小の一覧として明示する。
+  # ここを黙っていると「setup 完了」が過大表示になる — 何が残るかを利用者に必ず見せる。
+  say ""
+  say "remaining one-time steps (a repo cannot hold these):"
+  say "  - sign in to the apps you use: ChatGPT / Claude / Slack / Zoom / Docker /"
+  say "    Google Drive / Tailscale / Dia / Chrome / VS Code (Settings Sync)"
+  say "  - grant macOS privacy permissions when prompted (System Settings > Privacy & Security):"
+  say "    Accessibility / Screen Recording / Automation — e.g. Maccy, DisplayLink, screen tools"
+  say "  - Apple ID / iCloud / App Store sign-in, Wi-Fi, and Keychain are set in System Settings"
+  say "  - verify VS Code extensions/settings if you rely on them (not reproduced by this repo)"
 }
 
 move_existing_skill_backups
@@ -1065,5 +1161,8 @@ install_notification_hooks
 install_skill_runtime_support
 apply_macos_settings
 check_manual_auth_steps
+post_setup_manual_steps
 
-say "setup complete"
+say ""
+say "setup finished — review any 'warning:' lines above and the manual steps listed."
+say "run 'sh scripts/health-check.sh' to verify what is and isn't in place."
