@@ -43,6 +43,7 @@ def _recalc(path: Path, outdir: Path) -> Path:
     if not Path(soffice).exists():
         print("SKIP: sofficeが見つかりません")
         sys.exit(2)
+    outdir.mkdir(parents=True, exist_ok=True)   # soffice --outdir は存在しない出力先を作らない
     prof = Path(tempfile.mkdtemp(prefix="lo_")).as_uri()
     subprocess.run([soffice, f"-env:UserInstallation={prof}",
                     "--headless", "--calc", "--convert-to", "xlsx",
@@ -150,6 +151,10 @@ def main(path: str) -> int:
             if v2 != "要確認":
                 fails.append("定義域外スイッチを検知できていない"
                              f"（総合判定={v2}）")
+        else:
+            # スイッチ行が見つからない = 定義域外テストが素通りしている。黙って合格にしない
+            print("SKIP スイッチ定義域外: 「アクティブケース」行が見つからない"
+                  "（生成側のラベルとハーネスがずれていないか）")
     if fails:
         print("FAIL 境界値テスト:")
         for f in fails:

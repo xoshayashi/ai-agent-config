@@ -349,6 +349,13 @@ def main(path):
     CLAIMS = ("閉合", "検算", "整合確認", "一致確認", "検証済")
     borrowed = []
     for ws in wb.worksheets:
+        # 備考列はシートごとに位置が違う（KPI や資本政策は列数が異なる）。
+        # 前ループの ncol を使い回すと、シートごとに別の列を読み、違反を取り逃がす。
+        note_col = next((c for c in range(6, ws.max_column + 1)
+                         if ws.cell(row=5, column=c).value
+                         == "根拠・出典・備考（印刷範囲外）"), None)
+        if not note_col:
+            continue
         for r in range(6, ws.max_row + 1):
             lab = next((ws.cell(row=r, column=c).value for c in (2, 3, 4)
                         if isinstance(ws.cell(row=r, column=c).value, str)
@@ -358,7 +365,7 @@ def main(path):
             f = ws.cell(row=r, column=6).value
             if not (isinstance(f, str) and f.startswith("=")):
                 continue
-            note = ws.cell(row=r, column=ncol).value
+            note = ws.cell(row=r, column=note_col).value
             if isinstance(note, str) and any(k in note for k in CLAIMS):
                 borrowed.append(f"{ws.title}!{r} {lab[:16]}")
     gate(not borrowed,

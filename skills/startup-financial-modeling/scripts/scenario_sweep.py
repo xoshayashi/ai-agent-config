@@ -27,6 +27,7 @@ def _recalc(path: Path, outdir: Path) -> Path:
     if not Path(soffice).exists():
         print("FAIL: sofficeが見つかりません")
         sys.exit(2)
+    outdir.mkdir(parents=True, exist_ok=True)   # soffice --outdir は存在しない出力先を作らない
     prof = Path(tempfile.mkdtemp(prefix="lo_")).as_uri()
     subprocess.run([soffice, f"-env:UserInstallation={prof}",
                     "--headless", "--calc", "--convert-to", "xlsx",

@@ -26,7 +26,6 @@ from openpyxl.utils import (column_index_from_string,
 from openpyxl.worksheet.pagebreak import Break
 from openpyxl.worksheet.properties import PageSetupProperties
 
-from model_surface import _always_text as always_text
 
 FONT = "Arial"
 SIZE = 10
@@ -711,8 +710,14 @@ def build_assumptions_v3(wb, reg, cfg):
         s.section("0. ケースの選択",
                   note="ケース別の数値は各ブロックの中に置く（モデルの分岐は禁止）",
                   explain="どの想定で計算するかを、この1セルだけで切り替える")
-        active = case_names.index((scen or {}).get("active", case_names[0])) + 1
-        r = s.row("採用するケース", FMT["cnt"],
+        active_name = (scen or {}).get("active", case_names[0])
+        if active_name not in case_names:
+            raise ModelError(f"scenario.active='{active_name}' はケース一覧にない"
+                             f"（{' / '.join(case_names)}）")
+        active = case_names.index(active_name) + 1
+        # ラベルは検証ハーネス(scenario_sweep / boundary_test)と参照仕様のスイッチ名に一致させる。
+        # ずれると両ゲートがスイッチ行を見つけられず、テストせずに素通りする(偽の合格)。
+        r = s.row("アクティブケース", FMT["cnt"],
                   values=[active] + [None] * (s.p - 1), unit="番号",
                   note="【選択】" + " / ".join(f"{i+1}={n}"
                                             for i, n in enumerate(case_names)))
@@ -1869,8 +1874,9 @@ def build_kpi_v3(wb, reg, cfg):
     if ot:
         s.row("一時（サービス）売上比率", FMT["pct"],
               formula=lambda col, t:
-              "=(" + "+".join(s.ref(x["driver"], col) for x in ot)
-              + f")/{s.ref('_rev_total', col)}",
+              f"=IF({s.ref('_rev_total', col)}=0,0,("
+              + "+".join(s.ref(x["driver"], col) for x in ot)
+              + f")/{s.ref('_rev_total', col)})",
               unit="%", italic=True, name="k_svc",
               bench="しきい値は前提条件を参照",
               evaluation=(f"=IF(AND({last}{s.r}<={s.ref('a_th_svc_good', last)},"
@@ -1955,7 +1961,8 @@ def build_kpi_v3(wb, reg, cfg):
     if arr_d:
         burn = s.row("資金燃焼倍率（Burn Multiple）", FMT["x"],
                      formula=lambda col, t:
-                     f"=IF({s.ref('c_fcf', col)}>=0,0,"
+                     f"=IF(OR({s.ref('c_fcf', col)}>=0,"
+                     f"{col}{reg.rows['k_netnew'][1]}=0),0,"
                      f"-{s.ref('c_fcf', col)}/{col}{reg.rows['k_netnew'][1]})",
                      unit="倍", name="k_burn",
                      bench=bench_ref("a_th_burn_good", "a_th_burn_ok", "x"),
