@@ -220,13 +220,23 @@ if command -v python3 >/dev/null 2>&1 && python3 -c 'import pptx, PIL, lxml, fon
 fi
 libreoffice_status=$(command_status libreoffice)
 pdftoppm_status=$(command_status pdftoppm)
+# スライド skill が採寸に使う Geist / Noto Sans JP。無いと描画が警告なく崩れるので必ず見る。
+fonts_status=missing
+fonts_script="$skill_source_root/act-structured-slide-generation/scripts/setup_fonts.py"
+if command -v python3 >/dev/null 2>&1 && [ -f "$fonts_script" ] \
+  && python3 "$fonts_script" --check >/dev/null 2>&1; then
+  fonts_status=ok
+fi
 
+# 総合判定には、このリポジトリが設定する主役 CLI(claude / codex / agy)の存在と、
+# スライド用フォントも入れる — これらが欠けていても ok と出す嘘の合格を防ぐ。
 for status in \
   "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status" \
   "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status" \
   "$shell_zshrc_status" \
   "$codex_notify_status" "$claude_notify_status" \
-  "$python3_status" "$openpyxl_status" "$pptx_deps_status"; do
+  "$claude_status" "$codex_status" "$agy_status" \
+  "$python3_status" "$openpyxl_status" "$pptx_deps_status" "$fonts_status"; do
   [ "$status" = "ok" ] || mark_status warn
 done
 
@@ -245,7 +255,7 @@ if [ "$format" = "json" ]; then
   printf '    "shell_.zshrc": "%s"\n' "$shell_zshrc_status"
   printf '  },\n'
   printf '  "notifications": {"codex": "%s", "claude": "%s"},\n' "$codex_notify_status" "$claude_notify_status"
-  printf '  "skill_dependencies": {"python3": "%s", "pip": "%s", "pip3": "%s", "openpyxl": "%s", "pptx_deps": "%s", "libreoffice": "%s", "pdftoppm": "%s"}\n' "$python3_status" "$pip_status" "$pip3_status" "$openpyxl_status" "$pptx_deps_status" "$libreoffice_status" "$pdftoppm_status"
+  printf '  "skill_dependencies": {"python3": "%s", "pip": "%s", "pip3": "%s", "openpyxl": "%s", "pptx_deps": "%s", "fonts": "%s", "libreoffice": "%s", "pdftoppm": "%s"}\n' "$python3_status" "$pip_status" "$pip3_status" "$openpyxl_status" "$pptx_deps_status" "$fonts_status" "$libreoffice_status" "$pdftoppm_status"
   printf '}\n'
 else
   printf 'AI Agent Config health: %s\n' "$(overall_status)"
@@ -259,8 +269,8 @@ else
   printf 'shell: zshrc=%s\n' "$shell_zshrc_status"
   printf 'notifications: codex=%s claude=%s\n' \
     "$codex_notify_status" "$claude_notify_status"
-  printf 'skill dependencies: python3=%s pip=%s pip3=%s openpyxl=%s pptx_deps=%s libreoffice=%s pdftoppm=%s\n' \
-    "$python3_status" "$pip_status" "$pip3_status" "$openpyxl_status" "$pptx_deps_status" "$libreoffice_status" "$pdftoppm_status"
+  printf 'skill dependencies: python3=%s pip=%s pip3=%s openpyxl=%s pptx_deps=%s fonts=%s libreoffice=%s pdftoppm=%s\n' \
+    "$python3_status" "$pip_status" "$pip3_status" "$openpyxl_status" "$pptx_deps_status" "$fonts_status" "$libreoffice_status" "$pdftoppm_status"
 fi
 
 if [ "$strict" = "1" ] && [ "$(overall_status)" != "ok" ]; then
