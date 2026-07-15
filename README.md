@@ -14,7 +14,7 @@ Claude Code / Codex / Gemini CLI に共通の Instructions を配布するため
 
 加えて、各 CLI の設定フォルダーに次の共有ファイルをリンクします。
 
-- `AI_AGENT_INSTRUCTIONS.md`
+- `INSTRUCTIONS.md`
 - `DESIGN.md`
 
 さらに、`skills/` 配下の共有 skill も各 CLI のグローバル `skills/`
@@ -113,5 +113,5 @@ sh /path/to/ai-agent-config/scripts/uninstall.sh
 ## 保守方針
 
 - 構成は `instructions/`、`scripts/`、`notifications/`、`shell/`、必要に応じた `skills/`、最小 docs、CI validation、on-demand PR review workflow に絞ります。
-- 初心者向けの coding support は `instructions/AI_AGENT_INSTRUCTIONS.md` の `Coding Collaboration Defaults` に集約し、長い個別プロンプト例を常時ロードしないようにします。
+- 初心者向けの coding support は `instructions/INSTRUCTIONS.md` の `Coding Collaboration Defaults` に集約し、長い個別プロンプト例を常時ロードしないようにします。
 - Instruction の構造を変えたら、`README.md`、`setup.md`、`scripts/validate-repo.sh` も同じ変更で合わせます。
