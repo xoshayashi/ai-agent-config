@@ -27,6 +27,7 @@ gha-creds-*.json
 .codex/
 .gemini/
 .serena/
+.memories/
 # Keep only the repository-owned GitHub workflows; local templates/config stay untracked.
 .github/*
 !.github/

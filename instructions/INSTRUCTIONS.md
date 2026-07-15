@@ -33,11 +33,28 @@ Entrypoints (`AGENTS.md` and `CLAUDE.md`) route here. `DESIGN.md` is the compani
 - When a dirty worktree or parallel agent/user activity changes files during
   your task, re-read affected files and diffs before final judgment, commit, or
   review findings.
-- Before committing, pushing, opening a PR, or merging, verify that the current
-  branch, base, staged files, and diff match the requested task. If the branch
-  or existing commits belong to another task, switch to an appropriate branch or
-  worktree before adding new commits.
+- Before committing, pushing, opening a PR, or merging, verify that the base,
+  staged files, and diff match the requested task, and that you are on the
+  intended target line (see Version Control Workflow) rather than carrying
+  unrelated work.
 - When changing shared instructions or entrypoints in this repository, update matching docs and validation checks in the same pass.
+
+## Version Control Workflow
+
+Keep a single working line on `main`; don't let work sprawl across parallel
+branches or worktrees. Pick the model by whether the target needs a PR:
+
+- **Routine work:** commit to `main` as you go. Run a review with the review skill
+  before the final commit/push. No PR branch is created when you can commit to
+  `main` directly.
+- **When a PR is required** (branch protection or a review gate): a short-lived
+  branch is only the PR's transport. Run the review skill before opening it, keep
+  the branch through review — resolve every review comment and thread — and merge
+  only after the merge-ready signal is green. Delete the branch the moment it
+  merges. Do not port-and-delete it *before* it merges; that bypasses the review.
+- **A stray branch or worktree** (left by a tool, a parallel agent, or an abandoned
+  attempt — not an active PR branch): promptly diff it against `main`, port any
+  change that is actually needed into `main`, and delete it. Never leave one behind.
 
 ## Autonomous Execution
 

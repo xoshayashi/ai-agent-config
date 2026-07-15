@@ -7,11 +7,11 @@
 | Destination | Source |
 |---|---|
 | `~/.codex/AGENTS.md` | `instructions/AGENTS.md` |
-| `~/.codex/AI_AGENT_INSTRUCTIONS.md` | `instructions/AI_AGENT_INSTRUCTIONS.md` |
+| `~/.codex/INSTRUCTIONS.md` | `instructions/INSTRUCTIONS.md` |
 | `~/.codex/DESIGN.md` | `instructions/DESIGN.md` |
 | `~/.codex/skills/<name>` | `skills/<name>` |
 | `~/.claude/CLAUDE.md` | `instructions/CLAUDE.md` |
-| `~/.claude/AI_AGENT_INSTRUCTIONS.md` | `instructions/AI_AGENT_INSTRUCTIONS.md` |
+| `~/.claude/INSTRUCTIONS.md` | `instructions/INSTRUCTIONS.md` |
 | `~/.claude/DESIGN.md` | `instructions/DESIGN.md` |
 | `~/.claude/skills/<name>` | `skills/<name>` |
 | `~/.zshrc` | `shell/.zshrc` |
