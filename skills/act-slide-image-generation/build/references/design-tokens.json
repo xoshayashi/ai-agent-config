@@ -1,0 +1,47 @@
+{
+  "schema_version": 1,
+  "name": "act-equity-story",
+  "source_reference": "ACT equity-story deck visual system",
+  "colors": {
+    "canvas": "#FCFCFB",
+    "ink": "#2D332E",
+    "secondary_text": "#4D544E",
+    "footer_text": "#6E756E",
+    "rule": "#DEDEDA",
+    "surface": "#F2F2F0",
+    "structural_surface": "#E2EFED",
+    "petrol": "#008A80",
+    "petrol_deep": "#004F49",
+    "success": "#3F8F5E",
+    "muted": "#B9B5AA",
+    "focal_surface": "#FBF3D7",
+    "focal_stroke": "#C49A2C",
+    "navy": "#1F3A66",
+    "on_dark": "#FCFCFB"
+  },
+  "role_mapping": {
+    "slide_background": "canvas",
+    "main_message": "ink",
+    "sub_message": "secondary_text",
+    "body_primary": "ink",
+    "body_secondary": "secondary_text",
+    "footer": "footer_text",
+    "separator": "rule",
+    "neutral_panel": "surface",
+    "structural_panel": "structural_surface",
+    "primary_accent": "petrol",
+    "primary_accent_deep": "petrol_deep",
+    "positive_state": "success",
+    "deemphasized_state": "muted",
+    "single_focus_fill": "focal_surface",
+    "single_focus_stroke": "focal_stroke",
+    "secondary_accent": "navy",
+    "text_on_dark": "on_dark"
+  },
+  "usage": {
+    "single_focus_per_slide": true,
+    "flat_fills": true,
+    "gradient": "none",
+    "shadow": "none"
+  }
+}
