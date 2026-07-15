@@ -422,7 +422,10 @@ class Sheet:
         # (2) ラベルは■必達なのに実体はalert、という食い違い
         # が起きる。実際に非負チェック5本がマーカー無しで出荷されていた。
         mark = {"error": "■必達 ", "alert": "□要説明 "}[cls]
-        label = mark + re.sub(r"^[■□](必達|要説明)\s*", "", label)
+        # マーカーを剥いだ本体（core）はここで一度だけ作る。備考合成でも使うので、
+        # 同じ正規表現を後段で再適用しない（パターンの二重管理を避ける）。
+        bare = re.sub(r"^[■□](必達|要説明)\s*", "", label)
+        label = mark + bare
         # 単位とスケールの整合。%・倍・係数のチェックを円スケールの許容差
         # （既定0.5）で判定すると、5ptの誤差すら素通りする（実際に起きた）。
         if cls == "error" and fmt in (FMT["pct"], FMT["x"]) \
@@ -434,8 +437,7 @@ class Sheet:
         # 初心者にとって最も意味の取りづらい行なので、**全チェックに意味解説を
         # 保証する**。呼び出し側が守る/破れたらを書いていなければ、ラベルの型から
         # 既定の解説を合成する（手書きが無くても説明ゼロのチェックを出さない）。
-        core = re.sub(r"^[■□](必達|要説明)\s*", "", label).replace(
-            "（0=OK）", "").strip()
+        core = bare.replace("（0=OK）", "").strip()
         if not (note and "守る" in note and "破れたら" in note):
             if "一致確認" in core:
                 subj = core.replace("の一致確認", "")
@@ -2402,14 +2404,19 @@ def build_capval_inputs(s, cfg):
                 # 今払う価格は今決まっており、後から下振れしたら安く入れた、
                 # ということにはならない。動かすとDownsideのMOICが上振れする。
                 # ケース連動は後続ラウンド（i>=1）だけ。
-                if scale and i >= 1 and "a_switch" in s.reg.cells:
+                # かつ**ケースが実際に差を持つときだけ**ケースブロックにする。
+                # scale が非Baseで1.0に解決される（キー欠落・全て1.0）と合成ケースが
+                # base と同値になり、S3ゲートが自分の合成行で発火してしまう。
+                # 差が無いラウンドは定数行にする（S3の意図と一致）。
+                case_vals = {cn: pv * scale.get(cn, 1.0) for cn in cnames[1:]}
+                differentiated = any(v != pv for v in case_vals.values())
+                if scale and i >= 1 and differentiated \
+                        and "a_switch" in s.reg.cells:
                     _case_block(s, s.reg, {
                         "id": f"a_ct_post{i}",
                         "label": f"ポストマネー：{rd['label']}",
                         "unit": "百万円", "fmt": "m", "basis": "仮置き",
-                        "values": pv,
-                        "cases": {cn: pv * scale.get(cn, 1.0)
-                                  for cn in cnames[1:]},
+                        "values": pv, "cases": case_vals,
                         "case_sources": {
                             cn: f"ケースの到達点に比例（×{scale.get(cn, 1.0)}）"
                             for cn in cnames[1:]},

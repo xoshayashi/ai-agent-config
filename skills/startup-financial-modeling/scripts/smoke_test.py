@@ -257,10 +257,65 @@ def run(name, cfg):
         return True
 
 
+def expect_build_fail(name, cfg, needle):
+    """変異入力でビルドが**失敗し、狙ったエラーが出る**ことを確認する負テスト。
+
+    ゲートは「鳴らないなら偽の保証」。正常系がPASSするだけでは、誰かがゲートの
+    述語を弱めても気づけない。ここで実際に変異を注入し、ModelErrorが出ることを
+    アサートして、ゲートの実効性そのものを回帰させる。
+    """
+    with tempfile.TemporaryDirectory() as td:
+        y = Path(td) / "plan.yaml"
+        y.write_text(yaml.safe_dump(cfg, allow_unicode=True), encoding="utf-8")
+        r = subprocess.run([sys.executable, str(HERE / "build_workbook.py"),
+                            "--input", str(y), "--outdir", str(Path(td) / "o"),
+                            "--name", "smoke"], capture_output=True, text=True)
+        blob = r.stdout + r.stderr
+        if r.returncode == 0:
+            print(f"FAIL {name}: ゲートが発火せずビルド成功（偽の保証）")
+            return False
+        if needle not in blob:
+            print(f"FAIL {name}: 別の理由で失敗\n{blob[-800:]}")
+            return False
+        print(f"PASS {name}（ゲート発火を確認）")
+        return True
+
+
+def _mutate(cfg_fn, mutate):
+    cfg = cfg_fn
+    import copy
+    c = copy.deepcopy(cfg)
+    mutate(c)
+    return c
+
+
+def _drop_reconciliation(c):
+    c["source_bounds"] = []
+    c["story_checks"] = {}
+    c.pop("scenario_reference", None)
+
+
+def _identical_cases(c):
+    for sec in c["tree"]:
+        for d in sec["drivers"]:
+            if "cases" in d:
+                base = d["values"]
+                for cn in d["cases"]:
+                    d["cases"][cn] = base   # 全ケースを base と同値に
+                return
+
+
 def main():
     ok = True
     ok &= run("hardware_attach_4y_scenario", hardware_attach(4))
     ok &= run("services_5y_minimal", services(5))
+    # --- ゲートの実効性回帰（負テスト）: 変異を注入して発火を確認 ---
+    ok &= expect_build_fail(
+        "neg_S2_no_reconciliation",
+        _mutate(hardware_attach(4), _drop_reconciliation), "停止条件S2")
+    ok &= expect_build_fail(
+        "neg_S3_identical_cases",
+        _mutate(hardware_attach(4), _identical_cases), "停止条件S3")
     return 0 if ok else 1
 
 

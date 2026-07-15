@@ -550,8 +550,14 @@ def main(path):
             lab = next((ws.cell(row=r, column=c).value for c in (2, 3, 4)
                         if isinstance(ws.cell(row=r, column=c).value, str)
                         and ws.cell(row=r, column=c).value.strip()), "")
-            if not lab.startswith(("■必達", "□要説明")) or "：" in lab:
-                continue                # 集約行（シート名：…）は転記なので除外
+            if not lab.startswith(("■必達", "□要説明")):
+                continue                # チェック行以外
+            # 集約行（サマリーの「シート名：■必達…」転記）だけを外す。
+            # 単に「：を含む」で外すと、将来 ■必達 売上高：一致確認 のような
+            # 正当なチェックラベルまで盲点になる（レビュー指摘）。集約行は
+            # マーカーの直前にコロンが来る（：■／：□）ので、それだけを狙う。
+            if "：■" in lab or "：□" in lab:
+                continue
             note = str(ws.cell(row=r, column=ncol).value or "")
             if "守る" not in note or "破れたら" not in note:
                 unexplained.append(f"{ws.title}!{r} {lab[:20]}")
