@@ -831,6 +831,7 @@ def check_layout_plan_geometry_rejections() -> list[Result]:
         ("flex_gap_mismatch", lambda plan: plan["flex_plan"]["containers"][0]["children"][1]["allocation_bounds"].update(x=860, w=643)),
         ("flex_cross_axis_underfill", lambda plan: [plan["flex_plan"]["containers"][0]["children"][0].update(min_cross_px=80), plan["flex_plan"]["containers"][0]["children"][0]["allocation_bounds"].update(h=80)]),
         ("flex_invalid_wrap", lambda plan: plan["flex_plan"]["containers"][0].update(wrap="wrpa")),
+        ("flex_grow_line_underfill", lambda plan: plan["flex_plan"]["containers"][0].update(wrap="wrap", line_plan=[1, 1])),
         ("flex_child_without_registered_geometry", add_unregistered_flex_child_node),
         ("freeform_connector_route", lambda plan: plan["connector_plan"]["connectors"][0].update(route="freeform")),
         ("connector_crossing", lambda plan: plan["connector_plan"]["connectors"][0].update(crossing_count=1)),

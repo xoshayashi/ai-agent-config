@@ -570,36 +570,44 @@ def read_layout_plan(path: str | None, mode: str, design_tokens: dict) -> dict |
             allocation_cross = allocation["h"] if container["main_axis"] == "row" else allocation["w"]
             if child["min_main_px"] > allocation_main or child["min_cross_px"] > allocation_cross or child["min_cross_px"] > cross_size:
                 raise SystemExit("Invalid --layout-plan; every Flex child allocation satisfies its minimum sizes.")
-            cross_lo, cross_hi = GEOMETRY["flex"]["cross_axis_fill_range"]
-            if not cross_lo <= allocation_cross / cross_size <= cross_hi:
-                raise SystemExit("Invalid --layout-plan; every Flex child fills 82-100% of its parent cross axis.")
             registered_bounds = component_by_id.get(child["id"], {}).get("bounds") or region_boxes.get(child["id"]) or containers_by_id.get(child["id"])
             if registered_bounds is None:
                 raise SystemExit("Invalid --layout-plan; every Flex child allocation binds to registered component, grid-region, or nested Flex geometry.")
             if any(abs(allocation[key] - registered_bounds[key]) > tolerance for key in ("x", "y", "w", "h")):
                 raise SystemExit("Invalid --layout-plan; every Flex child allocation matches its registered geometry within 4px.")
             allocation_rectangles.append(allocation)
-        ordered_children = sorted(container["children"], key=lambda child: child["allocation_bounds"]["x" if container["main_axis"] == "row" else "y"])
-        for previous, current in zip(ordered_children, ordered_children[1:]):
-            if rectangles_overlap(previous["allocation_bounds"], current["allocation_bounds"]):
-                raise SystemExit("Invalid --layout-plan; Flex sibling allocations remain non-overlapping.")
-            axis = "x" if container["main_axis"] == "row" else "y"
-            size_key = "w" if container["main_axis"] == "row" else "h"
-            actual_gap = current["allocation_bounds"][axis] - (previous["allocation_bounds"][axis] + previous["allocation_bounds"][size_key])
-            if abs(actual_gap - container["gap_px"]) > tolerance:
-                raise SystemExit("Invalid --layout-plan; Flex sibling allocations preserve the declared gap within 4px.")
         for child in container["children"]:
             allocation_main = child["allocation_bounds"]["w" if container["main_axis"] == "row" else "h"]
             if child["basis_px"] and abs(allocation_main - child["basis_px"]) / child["basis_px"] > GEOMETRY["flex"]["basis_deviation_limit"]:
                 raise SystemExit("Invalid --layout-plan; Flex allocation remains within 20% of the declared basis.")
         child_offset = 0
-        for line_count in container["line_plan"]:
+        for line_index, line_count in enumerate(container["line_plan"]):
             line_children = container["children"][child_offset:child_offset + line_count]
+            axis = "x" if container["main_axis"] == "row" else "y"
+            size_key = "w" if container["main_axis"] == "row" else "h"
+            cross_key = "h" if container["main_axis"] == "row" else "w"
+            line_cross_size = cross_size if container["wrap"] == "nowrap" else max(child["allocation_bounds"][cross_key] for child in line_children)
+            cross_lo, cross_hi = GEOMETRY["flex"]["cross_axis_fill_range"]
+            if any(not cross_lo <= child["allocation_bounds"][cross_key] / line_cross_size <= cross_hi for child in line_children):
+                raise SystemExit("Invalid --layout-plan; every Flex child fills 82-100% of its line cross axis.")
+            ordered_line_children = sorted(line_children, key=lambda child: child["allocation_bounds"][axis])
+            for previous, current in zip(ordered_line_children, ordered_line_children[1:]):
+                if rectangles_overlap(previous["allocation_bounds"], current["allocation_bounds"]):
+                    raise SystemExit("Invalid --layout-plan; same-line Flex sibling allocations remain non-overlapping.")
+                actual_gap = current["allocation_bounds"][axis] - (previous["allocation_bounds"][axis] + previous["allocation_bounds"][size_key])
+                if abs(actual_gap - container["gap_px"]) > tolerance:
+                    raise SystemExit("Invalid --layout-plan; same-line Flex siblings preserve the declared gap within 4px.")
             basis_total = sum(child["basis_px"] for child in line_children) + max(0, line_count - 1) * container["gap_px"]
             if basis_total > main_size:
                 raise SystemExit("Invalid --layout-plan; Flex basis and gaps fit within every planned line.")
-            if all(child["grow"] == 0 for child in line_children) and basis_total / main_size < GEOMETRY["flex"]["main_axis_fill_range"][0]:
-                raise SystemExit("Invalid --layout-plan; fixed Flex items fill at least 92% of each planned line.")
+            actual_total = sum(child["allocation_bounds"][size_key] for child in line_children) + max(0, line_count - 1) * container["gap_px"]
+            fill_floor = (
+                GEOMETRY["flex"]["last_line_fill_min"]
+                if container["wrap"] == "wrap" and line_index == len(container["line_plan"]) - 1
+                else GEOMETRY["flex"]["main_axis_fill_range"][0]
+            )
+            if not fill_floor <= actual_total / main_size <= GEOMETRY["flex"]["main_axis_fill_range"][1]:
+                raise SystemExit("Invalid --layout-plan; each Flex line meets its actual main-axis fill range after grow/shrink allocation.")
             child_offset += line_count
     occupancy = plan["occupancy_plan"]
     required_occupancy = {"body_width_target", "body_height_target", "container_width_target", "container_height_target", "allocated_area_target", "foreground_area_target", "text_ink_area_share_target", "object_ink_area_share_target"}
