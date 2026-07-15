@@ -201,7 +201,11 @@ def main() -> int:
     if template not in list_templates():
         print(f"ERROR: unknown meta.template '{template}' — valid: {', '.join(list_templates())}")
         return 1
-    tokens = resolve_tokens(template)
+    try:
+        tokens = resolve_tokens(template)
+    except ValueError as e:
+        print(f"ERROR: {e}")
+        return 1
 
     for i, s in enumerate(slides, start=1):
         loc = f"slide {i}"

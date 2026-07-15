@@ -76,7 +76,10 @@ def resolve_tokens(template: str | None = None) -> dict:
     patch_path = TEMPLATES_DIR / f"{template}.json"
     if not patch_path.exists():
         raise ValueError(f"unknown template '{template}'. valid: {list_templates()}")
-    patch = json.loads(patch_path.read_text())
+    try:
+        patch = json.loads(patch_path.read_text())
+    except json.JSONDecodeError as e:
+        raise ValueError(f"template '{template}' is not valid JSON ({patch_path.name}): {e}")
     _assert_template_stays_in_bounds(template, patch)
     return _deep_merge(load_tokens(), patch)
 

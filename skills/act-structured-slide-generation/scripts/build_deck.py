@@ -2803,8 +2803,12 @@ def main() -> None:
         tdir = Path(__file__).resolve().parent.parent / "references" / "templates"
         for name in list_templates():
             patch = tdir / f"{name}.json"
-            meta = (json.loads(patch.read_text()).get("$template") or {}) if patch.exists() else {}
-            print(f"  {name:12} {meta.get('label', name):18} {meta.get('use', '')}")
+            try:
+                meta = (json.loads(patch.read_text()).get("$template") or {}) if patch.exists() else {}
+                label, use = meta.get("label", name), meta.get("use", "")
+            except json.JSONDecodeError:
+                label, use = name, "(壊れた JSON — 読めない)"
+            print(f"  {name:12} {label:18} {use}")
         return
     if not args.spec:
         ap.error("spec is required (or use --templates)")
