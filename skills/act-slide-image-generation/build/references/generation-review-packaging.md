@@ -4,7 +4,7 @@ Use this file for production and delivery.
 
 ## Pilot And Same-Deck Reference
 
-Generate and approve one representative pilot content slide first. Derive a temporary style board that contains only its header crop, canvas tone, palette swatches, rule weight, corner treatment, and type-role examples. Use the style board, not the complete pilot slide, as the visual reference for new pages. The pilot freezes material and header tokens while later prompts vary body composition from the message without importing another page's exhibit.
+Generate one representative pilot content slide and complete its header pixel-inventory review first. Derive a temporary style board from the audited H1/subtitle crop on uninterrupted canvas, canvas tone, palette swatches, body-rule weight, corner treatment, and type-role examples. Use this style board as the visual reference for new pages. The pilot freezes material and header tokens while later prompts vary body composition from the message.
 
 ## Reference-role isolation
 
@@ -14,7 +14,7 @@ After every generation or repair, compare the actual PNG with frozen exact text 
 
 ## Contact-Sheet Consistency Gate
 
-Review all actual PNGs together before packaging. Reject and regenerate any page that introduces serif type, centered content headers, dark top bands, sidebars, logos, ACT wordmarks, page numbers, chapter labels, decorative rails, gradients, shadows, unrequested navigation furniture, or a different card/rule material system. Record failing pages in `weak_slide_regeneration_queue` and keep packaging blocked until the queue is empty.
+Review all actual PNGs together before packaging. Confirm that each header is an uninterrupted canvas containing its registered H1 and subtitle, that outer bands follow their declared furniture inventory, and that typography, alignment, canvas, card/rule material, and navigation treatment match the approved pilot. Record pages that need restoration in `weak_slide_regeneration_queue` and keep packaging blocked until the queue is empty.
 
 ## Approved Production Route
 
@@ -39,24 +39,34 @@ Keep the generation prompt concise and spatially explicit: purpose, exact visibl
 
 ## Review Loop
 
-### Geometry-only final correction
+### Focused image correction
 
-Use image generation for meaning, copy, typography, component, and composition changes. After a slide is otherwise approved, deterministic geometry repair may translate a complete body or bottom-evidence group while preserving every content pixel and keeping the header fixed. Fill the revealed strip from the existing canvas surface, exclude the displaced border from the pasted region, and restore the quiet canvas edge. Record the operation as `geometry_only_repair`, then re-measure safe-shell bounds, header/body clearance, footer clearance, and body centroid. Return to image-generation repair whenever the correction would alter text, color, scale, components, internal spacing, composition, or reading path.
+Use the built-in image editing route for one isolated text, color, icon, or local-spacing variance after the composition passes. Name one region and one change category, then restate the approved header, exact-copy ledger, grid skeleton, outer-band furniture, and reference roles. Route any topology, silhouette, occupancy, multi-region alignment, or reading-path variance to zero-base regeneration from the frozen specification. After two focused edits, regenerate from the frozen specification.
 
 Open every generated PNG and review:
 
 - exact text and title uniformity
-- rendered H1/subtitle size and stack gap
+- rendered H1/subtitle visible heights against the absolute bands and the approved pilot within 2px
 - header/body quiet band
-- outer padding
+- deck-wide `equity_story_master` outer-shell profile with consistent `50/72/17/72px` top/right/bottom/left containment
 - body width/height footprint
+- top-level container footprint, allocated-region area fill, and meaningful foreground fill
+- text-bbox union and meaningful-object union
+- 16-column grid-line alignment and 8px baseline alignment
+- recursive Flex basis, gap, wrap, fill, minimum-size, and overflow measurements
+- component edge and text-anchor registration, repeated-module dimensions, shared vertical/horizontal axes, and orphan regions
+- structural-rule endpoints, stroke tokens, connector ports, orthogonal routes, bends, and crossings
+- grid-rigidity score and structured-cell fill
 - horizontal and vertical optical center
-- footer mode
+- footer consistency, exact `Source: ` / `Assumption: ` / `Note: ` prefixes, external-reference provenance, and canonical one- or two-line footer geometry
+- text-only message-box construction, zero icon children/atoms, and copy-derived box height
 - evidence-state encoding
 - font and palette unity
 - illustration and icon consistency
 
 Record each item as `approved` or `repair_required`. For repair, name one observed delta, the target state, the region that changes, and the elements that remain preserved. Continue until every slide and deck-level status is approved and the regeneration queue is empty.
+
+Require the render audit to mirror the generation plan field-for-field. A complete review contains `layout_tree`, `grid_plan`, `flex_plan`, `occupancy_plan`, and their measured audit counterparts. Register every rendered body element, keep grid and baseline error within 4px, and record zero overflow pixels, clipped items, and text overlaps.
 
 ## Packaging
 

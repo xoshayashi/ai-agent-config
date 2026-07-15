@@ -5,42 +5,118 @@
     "height": 941
   },
   "outer_shell": {
+    "profile": "equity_story_master",
     "x": 72,
-    "y": 72,
+    "y": 50,
     "width": 1528,
-    "height": 797,
+    "height": 874,
     "right": 1600,
-    "bottom": 869,
-    "padding_px": 72
+    "bottom": 924,
+    "insets_px": {"top": 50, "right": 72, "bottom": 17, "left": 72}
   },
   "header": {
     "h1": {
       "x": 72,
-      "y": 72,
-      "width": 1528
+      "y": 50,
+      "width": 1492,
+      "point_size": 28,
+      "weight": 700,
+      "visible_height_px_range": [47, 50],
+      "calibrated_visible_height_px": 48
+      ,"visible_top_y": 66,
+      "baseline_y": 104
     },
     "subtitle": {
       "x": 72,
-      "y": 136,
-      "width": 1528
+      "y": 123,
+      "width": 1492,
+      "point_size": 20,
+      "weight": 400,
+      "visible_height_px_range": [33, 35],
+      "calibrated_visible_height_px": 34,
+      "baseline_y": 152
     },
-    "max_visible_bottom": 172
+    "pilot_visible_height_tolerance_px": 2,
+    "clearance_datum_y": 170,
+    "wrap": "square",
+    "text_insets_px": {"left": 0, "right": 0, "top": 0, "bottom": 0},
+    "vertical_anchor": "top",
+    "max_lines": 1
   },
   "body": {
-    "start_y": 238,
-    "bottom_without_footer": 869,
-    "bottom_with_footer": 806,
-    "target_envelope_without_footer": {"top": 248, "bottom": 815},
-    "target_envelope_with_footer": {"top": 248, "bottom": 759},
-    "width_utilization_range": [0.72, 0.92],
-    "height_utilization_range": [0.70, 0.90],
-    "centroid_y_range_without_footer": [0.54, 0.58]
+    "target_envelope_without_footer": {"top": 190, "bottom": 869},
+    "target_envelope_with_footer": {"top": 190, "bottom": 869},
+    "width_utilization_range": [0.78, 0.92],
+    "single_aspect_locked_object_width_utilization_range": [0.55, 0.88],
+    "height_utilization_range_without_footer": [0.82, 0.94],
+    "height_utilization_range_with_footer": [0.78, 0.90],
+    "top_level_container_width_utilization_range": [0.82, 0.94],
+    "top_level_container_height_utilization_range_without_footer": [0.86, 0.96],
+    "top_level_container_height_utilization_range_with_footer": [0.84, 0.94],
+    "allocated_region_area_fill_range": [0.58, 0.80],
+    "meaningful_foreground_area_fill_range": [0.18, 0.38],
+    "text_ink_area_share_range": [0.06, 0.20],
+    "object_ink_area_share_range": [0.10, 0.30],
+    "available_width": 1528,
+    "available_height_without_footer": 679,
+    "available_height_with_footer": 679,
+    "centroid_y_range_without_footer": [0.58, 0.62],
+    "centroid_y_range_with_footer": [0.58, 0.62],
+    "quiet_clearance_range_without_footer": [48, 112],
+    "quiet_clearance_range_with_footer": [48, 112],
+    "bottom_closure_range_without_footer": [857, 869],
+    "outer_visible_margin_difference_max_px": 12
   },
   "footer": {
-    "baseline_y": 858
+    "x": 72,
+    "y": 866,
+    "width": 1528,
+    "height": 48,
+    "baseline_y": 895,
+    "baseline_y_by_max_lines": {"1": [895], "2": [888, 902]},
+    "line_height_px": 14,
+    "point_size": 9,
+    "max_lines": 2,
+    "wrap": "square",
+    "text_insets_px": {"left": 0, "right": 0, "top": 0, "bottom": 0},
+    "vertical_anchor": "center"
+  },
+  "message_box": {
+    "x": 72,
+    "y": 796,
+    "width": 1528,
+    "line_height_px": 25,
+    "allowed_line_counts": [1],
+    "vertical_padding_tokens_px": [24],
+    "horizontal_padding_tokens_px": [24],
+    "height_by_line_count_px": {
+      "1": [73]
+    },
+    "point_size": 17,
+    "visible_text_height_px_range": [24, 27],
+    "allowed_surface_roles": ["focal"],
+    "wrap": "square",
+    "vertical_anchor": "center",
+    "text_alignment": "center",
+    "icon_count": 0
   },
   "grid": {
     "unit_px": 8,
-    "columns": 12
+    "columns": 16,
+    "track_px": 73,
+    "gutter_px": 24,
+    "line_snap_tolerance_px": 4,
+    "baseline_snap_tolerance_px": 4,
+    "spacing_tokens_px": [8, 16, 24, 32, 48, 64]
+  },
+  "flex": {
+    "gap_tokens_px": [16, 24, 32, 48],
+    "main_axis_fill_range": [0.92, 1.0],
+    "cross_axis_fill_range": [0.82, 1.0],
+    "basis_deviation_limit": 0.20,
+    "last_line_fill_min": 0.75,
+    "overflow_pixels": 0,
+    "clipped_items": 0,
+    "text_overlap": 0
   }
 }
