@@ -384,7 +384,7 @@ def check_source_none_contract() -> Result:
             check=False,
         )
     required = [
-        "source_line: none",
+        '"source_line":"none"',
         '"visibility":"none"',
         '"reference_class":"none"',
         "empty provenance keeps the footer quiet",
@@ -1094,7 +1094,7 @@ def check_design_token_swap() -> list[Result]:
     ]
 
 
-def check_compiled_prompt_budget_rejection() -> Result:
+def check_compiled_prompt_budget_independence() -> Result:
     script = ROOT / "build" / "scripts" / "build_act_slide_prompt.py"
     with tempfile.TemporaryDirectory() as tmp:
         brief_path = Path(tmp) / "oversized-brief.txt"
@@ -1121,8 +1121,8 @@ def check_compiled_prompt_budget_rejection() -> Result:
         )
     output = proc.stdout + proc.stderr
     return Result(
-        "compiled_prompt_budget_rejection",
-        proc.returncode == 1 and "6144-byte budget" in output,
+        "compiled_prompt_budget_independence",
+        proc.returncode == 0 and len(proc.stdout.encode("utf-8")) <= GENERATION_CONTRACT_MAX_BYTES and ("検証" * 20) not in proc.stdout,
         output[:1200],
     )
 
@@ -1154,7 +1154,7 @@ def main() -> int:
     results.append(check_nested_flex_layout_plan())
     results.append(check_one_line_footer_layout_plan())
     results.extend(check_design_token_swap())
-    results.append(check_compiled_prompt_budget_rejection())
+    results.append(check_compiled_prompt_budget_independence())
     for check in config["helper_checks"]:
         results.append(run_helper_check(check))
     results.append(check_final_generation_prompt_hygiene())

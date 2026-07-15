@@ -586,7 +586,7 @@ def read_layout_plan(path: str | None, mode: str, design_tokens: dict) -> dict |
             axis = "x" if container["main_axis"] == "row" else "y"
             size_key = "w" if container["main_axis"] == "row" else "h"
             cross_key = "h" if container["main_axis"] == "row" else "w"
-            line_cross_size = cross_size if container["wrap"] == "nowrap" else max(child["allocation_bounds"][cross_key] for child in line_children)
+            line_cross_size = cross_size if container["wrap"] == "nowrap" else cross_size / len(container["line_plan"])
             cross_lo, cross_hi = GEOMETRY["flex"]["cross_axis_fill_range"]
             if any(not cross_lo <= child["allocation_bounds"][cross_key] / line_cross_size <= cross_hi for child in line_children):
                 raise SystemExit("Invalid --layout-plan; every Flex child fills 82-100% of its line cross axis.")
@@ -603,7 +603,7 @@ def read_layout_plan(path: str | None, mode: str, design_tokens: dict) -> dict |
             actual_total = sum(child["allocation_bounds"][size_key] for child in line_children) + max(0, line_count - 1) * container["gap_px"]
             fill_floor = (
                 GEOMETRY["flex"]["last_line_fill_min"]
-                if container["wrap"] == "wrap" and line_index == len(container["line_plan"]) - 1
+                if container["wrap"] == "wrap" and len(container["line_plan"]) > 1 and line_index == len(container["line_plan"]) - 1
                 else GEOMETRY["flex"]["main_axis_fill_range"][0]
             )
             if not fill_floor <= actual_total / main_size <= GEOMETRY["flex"]["main_axis_fill_range"][1]:
@@ -903,6 +903,7 @@ def lean_contract(brief: str, mode: str, composition: str, alignment: str, layou
     if len(brief) > 4000:
         raise SystemExit("Brief exceeds 4000 characters; split or condense it while preserving exact_text before generation.")
     compiled = compile_render_plan(layout_plan, design_tokens)
+    validated_claim = layout_plan["slide_argument_plan"]["claim"]
     sx = 2048 / GEOMETRY["basis"]["width"]
     sy = 1152 / GEOMETRY["basis"]["height"]
     shell = GEOMETRY["outer_shell"]
@@ -933,7 +934,7 @@ DELIVERABLE
 {action}; model={IMAGE_MODEL}; size={size}; quality={quality}; opaque PNG; language={language}.
 
 MESSAGE
-{brief}
+{validated_claim}
 
 CANVAS
 output_basis=2048x1152; canvas {resolved['slide_background']}; shell profile {shell['profile']} x={round(shell['x'] * sx)}..{round(shell['right'] * sx)} y={round(shell['y'] * sy)}..{round(shell['bottom'] * sy)}. H1 x={round(header['h1']['x'] * sx)} y={round(header['h1']['y'] * sy)}, one {header['h1']['point_size']}pt/{header['h1']['weight']} line with visible glyph height {h1_rendered[0]}-{h1_rendered[1]}px; subtitle x={round(header['subtitle']['x'] * sx)} y={round(header['subtitle']['y'] * sy)}, one {header['subtitle']['point_size']}pt/{header['subtitle']['weight']} line with visible glyph height {subtitle_rendered[0]}-{subtitle_rendered[1]}px. footer_mode={layout_plan['footer_mode']}; body envelope y={round(envelope['top'] * sy)}..{round(envelope['bottom'] * sy)}.
