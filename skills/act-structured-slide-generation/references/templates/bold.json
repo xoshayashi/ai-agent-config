@@ -1,0 +1,19 @@
+{
+  "$comment": "Bold (Keynote) — the punch comes from scale, not from more colour (accent still ≤1/slide, lead stays teal). Cover, statement and hero numerals are enlarged so a pitch reads from the back of the room. Only type_scale_pt sizes change; because header capacity is derived from type size, larger titles simply demand shorter copy — validate flags any that overflow.",
+  "$template": {
+    "label": "キーノート / Bold",
+    "use": "登壇・ピッチ。結論とヒーロー数値を大きく。強調はサイズで作る(色は増やさない)。",
+    "lead_hue": "teal",
+    "feel": "keynote"
+  },
+  "type_scale_pt": {
+    "cover_title": 52,
+    "cover_subtitle": 24,
+    "action_title": 30,
+    "section_heading": 20,
+    "statement": 44,
+    "kpi_value": 44,
+    "kpi_value_hero": 58,
+    "divider_title": 36
+  }
+}

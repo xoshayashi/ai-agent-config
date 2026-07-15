@@ -1,0 +1,9 @@
+{
+  "$comment": "Standard (Teal) — the default Act look. This patch is intentionally empty: meta.template unset or 'standard' resolves to tokens.json unchanged, so every existing deck is byte-for-byte identical. Ship this file so the template registry (list_templates) and the picker can name the default alongside the others.",
+  "$template": {
+    "label": "標準 / Teal",
+    "use": "既定。落ち着いたティール基調。汎用のIR・提案・社内資料。",
+    "lead_hue": "teal",
+    "feel": "calm"
+  }
+}

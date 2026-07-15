@@ -21,6 +21,7 @@ primitives, not design templates. Choose and combine them after the judgment pro
 {
   "meta": {
     "title": "Deck title",
+    "template": "standard | navy | monochrome | bold",
     "date": "Optional display date",
     "company": "Optional company name"
   },
@@ -32,6 +33,11 @@ primitives, not design templates. Choose and combine them after the judgment pro
 the selected primitive displays it appropriately. `meta.basis` (optional) records the single
 internal artifact a deck derives from (e.g. one meeting's minutes); it satisfies the
 evidence-source check without printing an internal-provenance footer on every slide.
+
+`meta.template` (optional, default `standard`) selects the deck-level design template — the
+look every slide wears. The valid set is the files in `references/templates/`; list them with
+`build_deck.py --templates` and see `templates.md`. `validate_spec.py` errors on an unknown
+name. An absent template resolves to `standard`, which is byte-for-byte the pre-template output.
 
 ## Fields Common To Slides
 
