@@ -1,0 +1,17 @@
+{
+  "$comment": "Monochrome (Ink) — austere. The lead role maps to ink/grey so the deck carries no brand hue; the single accent (mustard) is the one highlight, exactly as DESIGN.md prescribes. Charts go greyscale with the focal series in ink. All hexes are already in tokens.colors.",
+  "$template": {
+    "label": "モノクローム / Ink",
+    "use": "主張を数字と構造だけで通す硬派な資料。色相を持たず、強調はアクセント1点のみ。",
+    "lead_hue": "ink",
+    "feel": "austere"
+  },
+  "colors": {
+    "primary": "4D544E",
+    "primary_deep": "2D332E",
+    "primary_pale": "F2F2F0"
+  },
+  "chart_style": {
+    "comparison_series_colors": ["2D332E", "6E756E", "B9B5AA", "D8D4C9"]
+  }
+}

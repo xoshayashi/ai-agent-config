@@ -2776,3 +2776,111 @@ def test_the_gate_has_no_waiver_flag():
     src = (SCRIPTS / "audit_argument.py").read_text()
     for escape in ("--ignore", "--skip", "--waiver", "--only", "noqa: audit"):
         assert escape not in src, f"免除の口が空いている: {escape}"
+
+
+# --- 基本デザイン(テンプレート) ---------------------------------------------------
+# テンプレートはデッキ全体の見た目を1つ選ぶ機能。要は「測る物差しと描く物差しが
+# テンプレート間でずれないこと」— standard は完全な無改変で、既存デックを1バイトも動かさない。
+
+def _templates_dir():
+    return SKILL / "references" / "templates"
+
+
+def test_standard_template_is_a_true_identity():
+    """meta.template 未指定 / 'standard' は base をそのまま返す — 既存デックは不変。"""
+    D = _deck_text()
+    base = D.load_tokens()
+    assert D.resolve_tokens(None) is base
+    assert D.resolve_tokens("standard") is base
+    assert D.template_of({}) == "standard"
+    assert D.template_of({"meta": {"template": "navy"}}) == "navy"
+
+
+def test_template_registry_comes_from_the_directory():
+    """有効なテンプレートの集合は references/templates/*.json の存在から導く(名前を二重管理しない)。"""
+    D = _deck_text()
+    names = set(D.list_templates())
+    on_disk = {p.stem for p in _templates_dir().glob("*.json")}
+    assert on_disk <= names and "standard" in names
+    assert {"navy", "monochrome", "bold"} <= names
+
+
+def test_a_template_may_not_touch_the_invisible_geometry():
+    """行間・光学較正・フォント・行分割は不変。ここを触る差分は、build と verify の物差しを
+    黙って食い違わせる — 設計上の欠陥として resolve_tokens が弾く。"""
+    D = _deck_text()
+    for locked in ({"leading": {"cjk_line_box": 1.30}},
+                   {"fonts": {"latin": "Comic Sans"}},
+                   {"line_break": {"label_max_chars_ja": 40}},
+                   {"layout": {"optical_stack": {"inset_in": 0.30}}}):
+        (_templates_dir() / "_probe.json").write_text(json.dumps(locked))
+        try:
+            with pytest.raises(ValueError):
+                D.resolve_tokens.cache_clear()
+                D.resolve_tokens("_probe")
+        finally:
+            (_templates_dir() / "_probe.json").unlink()
+            D.resolve_tokens.cache_clear()
+
+
+def test_every_shipped_template_stays_inside_the_sanctioned_palette():
+    """テンプレートは新しい色を持ち込まない — 役割を公認パレット内の既存の色へ振り直すだけ。
+    これで色の許可集合が不変になり、validate / verify はテンプレート非依存でいられる。"""
+    D = _deck_text()
+    palette = set(D.load_tokens()["colors"].values())
+    for name in D.list_templates():
+        colors = D.resolve_tokens(name)["colors"]
+        assert set(colors.values()) <= palette, f"{name} が公認パレット外の色を導入している"
+
+
+def test_unknown_template_is_rejected_by_validate_and_build(tmp_path):
+    """未知の meta.template は、描く前に弾く。"""
+    deck = _minimal_deck()
+    deck["meta"] = {"title": "t", "template": "does-not-exist"}
+    spec = _write(tmp_path, deck)
+    r = run("validate_spec.py", spec)
+    assert r.returncode == 1 and "unknown meta.template" in r.stdout, r.stdout
+    rb = run("build_deck.py", spec, "-o", tmp_path / "x.pptx")
+    assert rb.returncode != 0
+
+
+def test_a_bigger_type_scale_tightens_the_one_line_header():
+    """型スケールを上げると1行の見出し容量は減る(幾何から導出)。build と validate は
+    どちらも解決済みトークンでこれを見るので、判定がずれない。"""
+    D = _deck_text()
+    std = D.header_slots("chart_insight", D.resolve_tokens("standard"))
+    bold = D.header_slots("chart_insight", D.resolve_tokens("bold"))
+    std_title = next(s for s in std if s["slot"] == "title")
+    bold_title = next(s for s in bold if s["slot"] == "title")
+    assert bold_title["size_pt"] > std_title["size_pt"]
+    assert bold_title["max_chars"] < std_title["max_chars"]
+
+
+def test_image_asset_cache_is_keyed_by_template():
+    """色だけ違うテンプレートのグラフが、同じ数字から同じキャッシュキーになってはいけない
+    (ネイビーのグラフとティールのグラフが取り違わる)。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import importlib
+    theme = importlib.import_module("act_theme")
+    theme.use_template("standard")
+    h_std = theme.tokens_hash()
+    theme.use_template("navy")
+    h_navy = theme.tokens_hash()
+    theme.use_template("standard")            # 後片付け(他テストへ漏らさない)
+    assert h_std != h_navy
+
+
+@pytest.mark.parametrize("template", ["standard", "navy", "monochrome", "bold"])
+def test_each_template_builds_and_verifies_clean(tmp_path, template):
+    """全テンプレートが同じデッキを、パイプラインを通して破綻なく組める。"""
+    deck = _minimal_deck(title="市場は年率10%で拡大し2030年に1兆円へ", subtitle="市場規模の推移")
+    deck["meta"] = {"title": "t", "template": template}
+    spec = _write(tmp_path, deck)
+    assert run("validate_spec.py", spec).returncode == 0
+    out = tmp_path / f"{template}.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0, v.stdout
+    # 由来が .pptx に残る
+    from pptx import Presentation
+    assert Presentation(str(out)).core_properties.category == f"act-template:{template}"

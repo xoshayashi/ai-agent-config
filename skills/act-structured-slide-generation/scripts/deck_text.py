@@ -21,6 +21,71 @@ def load_tokens() -> dict:
     return json.loads(TOKENS_PATH.read_text())
 
 
+# --------------------------------------------------------------------------- テンプレート
+# テンプレート(基本デザイン)は tokens.json への「差分」。全スクリプトがこの1か所で実効
+# トークンを解決するので、測る物差しと描く物差しがテンプレート間でずれない。
+# テンプレートが触れてよいのは design 層(色の役割割り当て・型スケール・余白・カード・グラフ
+# 配色)だけで、行ボックス/行間モデル(leading)、光学スタックの較正(optical_stack)、フォント、
+# スライド寸法、字数予算、行分割規則(line_break)は不変 — これらは「見えない幾何」であり、
+# ここが動くと build と verify が黙って食い違う。standard は完全な無改変(既存デックと同一)。
+TEMPLATES_DIR = TOKENS_PATH.parent / "templates"
+LOCKED_TOKEN_KEYS = ("leading", "line_break", "fonts", "slide", "text_budget",
+                     "header_contract", "color_policy")
+LOCKED_LAYOUT_KEYS = ("optical_stack",)
+DEFAULT_TEMPLATE = "standard"
+
+
+def list_templates() -> list[str]:
+    """使えるテンプレート名(references/templates/*.json)。パターン登録簿と同じく、
+    有効な集合はファイルの存在から導く — 名前を二重管理しない。standard は常に含む。"""
+    names = {DEFAULT_TEMPLATE}
+    if TEMPLATES_DIR.is_dir():
+        names |= {p.stem for p in TEMPLATES_DIR.glob("*.json")}
+    return sorted(names)
+
+
+def _deep_merge(base: dict, patch: dict) -> dict:
+    out = dict(base)
+    for k, v in patch.items():
+        if k.startswith("$"):
+            continue                                    # $comment はマージしない
+        if isinstance(v, dict) and isinstance(out.get(k), dict):
+            out[k] = _deep_merge(out[k], v)
+        else:
+            out[k] = v
+    return out
+
+
+def _assert_template_stays_in_bounds(name: str, patch: dict) -> None:
+    """テンプレートが「見えない幾何」を触っていないか。ここを許すと build と verify の
+    物差しが食い違う — だから design 層以外への差分は、テンプレート定義の欠陥として弾く。"""
+    bad = [k for k in patch if k in LOCKED_TOKEN_KEYS]
+    if "layout" in patch:
+        bad += [f"layout.{k}" for k in patch["layout"] if k in LOCKED_LAYOUT_KEYS]
+    if bad:
+        raise ValueError(f"template '{name}' overrides locked keys {bad} — テンプレートは"
+                         "色・型スケール・余白・グラフ配色のみを変えられる(行間・光学較正・"
+                         "フォント・行分割は不変)")
+
+
+@lru_cache(maxsize=None)
+def resolve_tokens(template: str | None = None) -> dict:
+    """テンプレート名 → 実効トークン。standard(既定)は base をそのまま返す(完全な無改変)。"""
+    if template in (None, "", DEFAULT_TEMPLATE):
+        return load_tokens()
+    patch_path = TEMPLATES_DIR / f"{template}.json"
+    if not patch_path.exists():
+        raise ValueError(f"unknown template '{template}'. valid: {list_templates()}")
+    patch = json.loads(patch_path.read_text())
+    _assert_template_stays_in_bounds(template, patch)
+    return _deep_merge(load_tokens(), patch)
+
+
+def template_of(deck: dict) -> str:
+    """デッキが選んだテンプレート。meta.template 未指定なら standard。"""
+    return ((deck.get("meta") or {}).get("template") or DEFAULT_TEMPLATE)
+
+
 def ja_len(s: str) -> float:
     """Approximate display length: full-width chars count 1, half-width 0.55."""
     return sum(1.0 if ord(ch) > 0x2E7F else 0.55 for ch in s or "")

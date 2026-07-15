@@ -13,6 +13,11 @@ import json
 from pathlib import Path
 
 _TOKENS_PATH = Path(__file__).resolve().parent.parent / "references" / "tokens.json"
+
+# The active template. build_deck calls use_template() so image assets (matplotlib charts,
+# Graphviz diagrams) carry the SAME palette as the native slides, and the content-addressed
+# asset cache is keyed by template — two templates that differ only in colour must not collide.
+_TEMPLATE = "standard"
 TOKENS = json.loads(_TOKENS_PATH.read_text())
 
 # hex strings WITH leading '#', ready for matplotlib / Graphviz (native builder uses RGBColor)
@@ -28,11 +33,30 @@ SERIES_PALETTE = ["#" + c for c in CHART["comparison_series_colors"]]
 NONFOCAL = COLORS["chart_gray"]
 
 
+def use_template(name: str | None) -> None:
+    """Switch the active design template so every image-asset backend recolours with it.
+
+    Reassigns the module constants the chart/diagram functions read at call time (COLORS,
+    CHART, SERIES_PALETTE, NONFOCAL, FONT_STACK). resolve_tokens keeps the leading/optical/font
+    model fixed, so only colour and chart palette move — exactly what an image chart shows."""
+    global _TEMPLATE, TOKENS, COLORS, FONTS, CHART, FONT_STACK, SERIES_PALETTE, NONFOCAL
+    from deck_text import resolve_tokens
+    _TEMPLATE = name or "standard"
+    TOKENS = resolve_tokens(_TEMPLATE)
+    COLORS = {k: "#" + v for k, v in TOKENS["colors"].items()}
+    FONTS = TOKENS["fonts"]
+    CHART = TOKENS["chart_style"]
+    FONT_STACK = [FONTS["latin"], FONTS["ea"]]
+    SERIES_PALETTE = ["#" + c for c in CHART["comparison_series_colors"]]
+    NONFOCAL = COLORS["chart_gray"]
+
+
 def tokens_hash() -> str:
-    """Stable short hash of the theme, for content-addressed asset caching."""
+    """Stable short hash of the ACTIVE theme, for content-addressed asset caching. Includes the
+    template name so a navy chart and a teal chart from the same numbers get different cache keys."""
     import hashlib
 
-    return hashlib.sha1(_TOKENS_PATH.read_bytes()).hexdigest()[:12]
+    return hashlib.sha1(_TOKENS_PATH.read_bytes() + _TEMPLATE.encode()).hexdigest()[:12]
 
 
 def fonts_present() -> list[str]:

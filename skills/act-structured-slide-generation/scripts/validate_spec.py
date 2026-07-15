@@ -13,7 +13,8 @@ import json
 import sys
 from pathlib import Path
 
-from deck_text import footer_text, header_slots, ja_len, tts_risks
+from deck_text import (footer_text, header_slots, ja_len, list_templates, resolve_tokens,
+                       template_of, tts_risks)
 
 REF = Path(__file__).resolve().parent.parent / "references"
 
@@ -120,7 +121,8 @@ def iter_colors(obj):
 STRUCTURAL = ("cover", "section_divider", "statement", "agenda")
 
 
-def _check_header_contract(errors: list, loc: str, pattern: str, slide: dict) -> None:
+def _check_header_contract(errors: list, loc: str, pattern: str, slide: dict,
+                           tokens: dict | None = None) -> None:
     """ヘッダー契約(tokens.json の header_contract)をパターン非依存に検査する。
 
     契約はデータで宣言され、ここはそれを機械的に適用するだけ — パターンごとの分岐や
@@ -131,7 +133,7 @@ def _check_header_contract(errors: list, loc: str, pattern: str, slide: dict) ->
     描画されないフィールドを書いた場合(章扉の subtitle 等)は、黙って捨てられるより
     誤りとして返すほうが安全なので弾く。
     """
-    slots = header_slots(pattern)
+    slots = header_slots(pattern, tokens)
     for cfg in slots:
         field, text = cfg["field"], slide.get(cfg["field"], "") or ""
         want = cfg["lines"]
@@ -193,6 +195,14 @@ def main() -> int:
         print_outline(slides)
         return 0
 
+    # 基本デザイン(テンプレート)。未知なら弾き、以降のヘッダー幾何はこのテンプレートの
+    # 型スケール・レイアウト幅で見る — build が使う物差しと validate の物差しを一致させる。
+    template = template_of(deck)
+    if template not in list_templates():
+        print(f"ERROR: unknown meta.template '{template}' — valid: {', '.join(list_templates())}")
+        return 1
+    tokens = resolve_tokens(template)
+
     for i, s in enumerate(slides, start=1):
         loc = f"slide {i}"
         pat = s.get("pattern")
@@ -204,7 +214,7 @@ def main() -> int:
             if not s.get(req):
                 errors.append(f"{loc}: missing required field '{req}'")
 
-        _check_header_contract(errors, loc, pat, s)
+        _check_header_contract(errors, loc, pat, s, tokens)
         title = s.get("title", "")
         if s.get("insight") and ja_len(s["insight"]) > BUDGET["insight_max_chars_ja"]:
             errors.append(f"{loc}: insight too long ({ja_len(s['insight']):.0f} > {BUDGET['insight_max_chars_ja']}) — one short judgment sentence only")

@@ -36,6 +36,15 @@ pyramid/Venn/matrix — it escalates to the image-asset track (matplotlib / Grap
 `act_assets.py`, one shared token core via `act_theme.py`), embedded as an Act-styled picture
 with an audit sidecar. Escalate only the single hard object; keep the rest of the slide native.
 
+**Design template ≠ layout template.** The rule above forbids picking a *per-slide layout* from
+a type label. It does not forbid a *deck-level design template* — the calm-teal, formal-navy,
+austere-ink, or bold-keynote look the whole deck wears, chosen once and applied to every slide.
+That is the Google-Slides "theme", and it is a real, selectable choice (`meta.template`). A
+template only re-parametrises the design tokens (colour role assignment, type scale, margins,
+chart palette); it never touches the line-box model, fonts, or per-slide judgment. Choose the
+template with the reader in mind (§1), then compose each slide by judgment (the chain above)
+inside it. See `references/templates.md`.
+
 ## Required Workflow
 
 ### 0. Environment
@@ -76,6 +85,13 @@ native-only deck runs without them, and they are only needed when a deck uses an
 
 1. Confirm audience, desired action, talk time, page count, source files, mandatory topics,
    forbidden topics, brand constraints, and whether the deliverable must be editable .pptx.
+1b. **Choose the design template.** Offer the basic looks and let the reader's context decide:
+   `standard` (calm teal, general), `navy` (formal, board/IR), `monochrome` (austere ink, one
+   accent), `bold` (keynote scale, pitch). List them from the registry, don't hard-code:
+   `python3 scripts/build_deck.py --templates`. When unsure which fits, render the outline's
+   cover + one evidence slide under two candidates and let the user pick. Record the choice in
+   `outline.md` and set it as `meta.template` (§2); every slide then wears it. See
+   `references/templates.md`.
 2. Read all provided source material before drafting. Record provenance in `outline.md`.
 3. Write `outline.md` with audience/action, governing thought, chapter spine, action-title
    sequence, evidence status, open questions, and talk-time budget. For every chapter, name
@@ -92,11 +108,16 @@ python3 scripts/validate_spec.py deck.json --outline
 
 ### 2. Author `deck.json`
 
-Declare `meta.thesis` first — the sentence the deck proves and the figure that settles it —
-and declare a `derivation` for every rate, multiple or share the moment you write it. A
-derivation forces its inputs onto the deck: an author who wants to title a slide 「前年比42%増」
-must first have a prior-year figure to derive it from, so the evidence is planned with the
-claim rather than reverse-engineered under it (`references/argument-integrity.md`).
+Set `meta.template` to the look chosen in §1b (omit it for `standard`). Then declare
+`meta.thesis` — the sentence the deck proves and the figure that settles it — and declare a
+`derivation` for every rate, multiple or share the moment you write it. A derivation forces its
+inputs onto the deck: an author who wants to title a slide 「前年比42%増」 must first have a
+prior-year figure to derive it from, so the evidence is planned with the claim rather than
+reverse-engineered under it (`references/argument-integrity.md`).
+
+The template is a deck-level choice, not a per-slide one: one `meta.template` wears the whole
+deck. A larger type scale (`bold`) leaves less room in the one-line header, so `validate_spec`
+may ask for a shorter title under it — shorten the copy, never switch the type size by hand.
 
 Read these references before writing or substantially repairing `deck.json`:
 
@@ -352,6 +373,8 @@ Read only what the task needs, but do not skip the required workflow references.
 | `references/slide-decision-engine.md` | End-to-end decision flow from sources to repair |
 | `references/slide-judgment-system.md` | Per-slide judgment fields and anti-template audit |
 | `references/deck-spec.md` | `deck.json` schema, pattern fields, chart spec, copy rules |
+| `references/templates.md` | Deck-level design templates (`meta.template`): the selectable looks and their bounds |
+| `references/templates/*.json` | The template patches themselves (`standard`, `navy`, `monochrome`, `bold`) |
 | `references/design-principles.md` | Act visual grammar and slide-level design decisions |
 | `references/grid-and-flex-strategy.md` | Granular grid/flex contract for layout consistency |
 | `references/composition-vocabulary.md` | Composition moves, not templates |
