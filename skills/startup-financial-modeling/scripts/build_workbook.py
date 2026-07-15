@@ -430,9 +430,32 @@ class Sheet:
             raise ModelError(
                 f"チェック『{label}』は%・倍単位なのに許容差{tolerance}"
                 "（円スケール）。0.005以下を明示すること")
-        # 備考は「何を守るか／破れたら何が起きるか」が主。許容差は末尾に短く。
+        # 備考は「何を守るか／破れたら何が起きるか」が主。整合性チェックは
+        # 初心者にとって最も意味の取りづらい行なので、**全チェックに意味解説を
+        # 保証する**。呼び出し側が守る/破れたらを書いていなければ、ラベルの型から
+        # 既定の解説を合成する（手書きが無くても説明ゼロのチェックを出さない）。
+        core = re.sub(r"^[■□](必達|要説明)\s*", "", label).replace(
+            "（0=OK）", "").strip()
+        if not (note and "守る" in note and "破れたら" in note):
+            if "一致確認" in core:
+                subj = core.replace("の一致確認", "")
+                g = (f"守る: {subj}が独立経路で再計算した値と一致すること"
+                     f"／破れたら: 配線が壊れ、壊れた数字が黙って印刷される")
+            elif "非負" in core:
+                subj = core.replace("非負", "")
+                g = (f"守る: {subj}が負にならないこと"
+                     f"／破れたら: 増減の向きが逆か、期首残高が過大")
+            elif "照合" in core:
+                g = ("守る: モデル値がソース記載レンジ内であること"
+                     "／破れたら: 計画がソースの主張から外れている")
+            elif "範囲" in core:
+                g = ("守る: 選択値が定義域内であること"
+                     "／破れたら: 全シートが計算不能になる")
+            else:
+                g = f"守る: {core}が保たれること／破れたら: この前提が崩れる"
+            note = f"{g}。{note}" if note else g
         tol_note = f"（±{tolerance}）"
-        note = f"{note}{tol_note}" if note else f"配線の検算{tol_note}"
+        note = f"{note}{tol_note}"
         self._pending.append(
             dict(label=label, formula=formula, fmt=fmt, note=note,
                  tolerance=tolerance, cls=cls, unit=unit, scope=scope))
@@ -674,6 +697,22 @@ def validate_tree(cfg):
                             f"{d['id']} が後方定義の {dep} を前方参照"
                             "（prev()以外の前方参照は禁止。宣言順を計算順に）")
             seen.add(d["id"])
+
+    # 分解ガイド 停止条件S2の機械化: 逆算（目標から解いた値）は、必ず照合チェックと
+    # セットにする。照合がないと「目標に合うよう解いた数字」が独立の根拠を持つ
+    # かのように出荷される（＝逃げ道）。
+    # 照合は**集約でもよい**（例: 3セグメントの期末稼働数を y5_b2b_units 合計で
+    # 突き合わせる）。ドライバーIDの直接記載を要求すると、正しい集約照合を誤って
+    # 弾く。よって「逆算があるのに照合機構が一切ない」ときだけ落とす。
+    back_solved = [did for did, d in ids.items() if d.get("basis") == "逆算"]
+    if back_solved:
+        has_recon = bool(cfg.get("source_bounds")) or \
+            bool(cfg.get("story_checks"))
+        if not has_recon:
+            raise ModelError(
+                f"逆算ドライバー {back_solved} があるのに照合チェックが一つもない"
+                "（分解ガイド停止条件S2）。source_bounds か story_checks で"
+                "記載値・実測値と突き合わせること。逆算は独立の根拠にならない")
     return ids
 
 
@@ -748,6 +787,18 @@ def _case_block(s, reg, d, case_names):
     # 「ラベルと単位はあるが値が1つもない」空行として印刷面に12本残り、
     # 前提条件を8ページに膨らませていた（修正が別の逃げ道を作った実例）。
     # ラベルは採用値行が持つ。
+    # 分解ガイド 停止条件S3の機械化: 3ケースが全期間で同値なら、それは
+    # シナリオ変数ではなく定数。ケースブロックは行を増やすだけで何も語らない
+    # （重複＝「重複のない見せ方」に反する）。ケースを外して定数入力にする。
+    _base = d["values"] if isinstance(d["values"], list) else [d["values"]]
+    _cases = d.get("cases", {})
+    if _cases and all(
+            (v if isinstance(v, list) else [v]) == _base
+            for v in _cases.values()):
+        raise ModelError(
+            f"ドライバー『{d['id']}』は3ケースが全期間で同値。"
+            "シナリオ変数でないのでケースを外す（分解ガイド停止条件S3）。"
+            "差をつけるか、cases を削除して定数入力にすること")
     s.blank()
     case_rows = {}
     base_vals = d["values"]

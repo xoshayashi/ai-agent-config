@@ -165,6 +165,14 @@ def hardware_attach(periods=4):
                        "active": "Base"}
     cfg["scenario_scales"] = {"volume": [0.8, 1.0, 1.2],
                               "price": [0.95, 1.0, 1.05]}
+    # units は最終年目標からの逆算なので、照合とセットにする（分解ガイドS2）。
+    # 逆算値が販売計画の最終年目標と整合していることを突き合わせる。
+    cfg["source_bounds"] = [{
+        "driver": "units", "label": "販売計画の最終年目標（台）",
+        "value": [200, 800, 2000, 4000][:periods][-1],
+        "fmt": "cnt", "unit": "台",
+        "note": "逆算した出荷台数が販売計画の最終年目標と整合（記載）",
+    }]
     return cfg
 
 

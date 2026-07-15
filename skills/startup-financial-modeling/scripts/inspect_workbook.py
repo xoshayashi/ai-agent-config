@@ -535,6 +535,30 @@ def main(path):
          f"印刷面の文字列が切り詰められない（超過{len(truncated)}件）",
          str(truncated[:4]))
 
+    # --- 整合性チェックは全て「守る/破れたら」の意味解説を持つ ---
+    # 整合性チェックは初心者に最も意味の取りづらい行。全チェックに「何を守り、
+    # 破れたら何が起きるか」を保証する（ユーザーが明示した観点。check()が
+    # 自動合成するので、ここは後退の検知）。集約行（サマリー）は転記なので除外。
+    unexplained = []
+    for ws in wb.worksheets:
+        ncol = next((c for c in range(6, ws.max_column + 2)
+                     if isinstance(ws.cell(row=5, column=c).value, str)
+                     and "備考" in ws.cell(row=5, column=c).value), None)
+        if not ncol:
+            continue
+        for r in range(6, ws.max_row + 1):
+            lab = next((ws.cell(row=r, column=c).value for c in (2, 3, 4)
+                        if isinstance(ws.cell(row=r, column=c).value, str)
+                        and ws.cell(row=r, column=c).value.strip()), "")
+            if not lab.startswith(("■必達", "□要説明")) or "：" in lab:
+                continue                # 集約行（シート名：…）は転記なので除外
+            note = str(ws.cell(row=r, column=ncol).value or "")
+            if "守る" not in note or "破れたら" not in note:
+                unexplained.append(f"{ws.title}!{r} {lab[:20]}")
+    gate(not unexplained,
+         f"整合性チェックに意味解説（守る/破れたら）がある（欠落{len(unexplained)}件）",
+         str(unexplained[:4]))
+
     # --- 軸の語彙を混ぜない（原則17）: 列軸の値にシナリオ名を付けない ---
     # 「（参考）Downsideケースの回収倍率 1.9倍」は、実体がバリュエーションの
     # **低位列**（保守的倍率）のMOICだった。実際にDownsideシナリオを回すと3.59倍。
