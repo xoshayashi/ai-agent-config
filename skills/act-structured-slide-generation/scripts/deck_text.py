@@ -32,6 +32,9 @@ TEMPLATES_DIR = TOKENS_PATH.parent / "templates"
 LOCKED_TOKEN_KEYS = ("leading", "line_break", "fonts", "slide", "text_budget",
                      "header_contract", "color_policy")
 LOCKED_LAYOUT_KEYS = ("optical_stack",)
+# アクセント系の色は不変。validate は base の accent を「1画面1か所」で数えるので、
+# テンプレートが付け替えると検査と描画がずれる(強調はサイズと濃淡で作るのが規律)。
+LOCKED_COLOR_ROLES = {"accent", "accent_pale", "accent_line"}
 DEFAULT_TEMPLATE = "standard"
 
 
@@ -57,8 +60,11 @@ def _deep_merge(base: dict, patch: dict) -> dict:
 
 
 def _assert_template_stays_in_bounds(name: str, patch: dict) -> None:
-    """テンプレートが「見えない幾何」を触っていないか。ここを許すと build と verify の
-    物差しが食い違う — だから design 層以外への差分は、テンプレート定義の欠陥として弾く。"""
+    """テンプレートが契約の内側にとどまっているか。破れば build と verify の物差しが食い違う。
+
+    2つを弾く: (1)「見えない幾何」(行間・光学較正・フォント・行分割)への差分、(2) 公認
+    パレットにない新しい色。色を新設したいときは tokens.colors に一度だけ足す — そうすれば
+    色の許可集合が1か所で広がり、validate / verify がテンプレート非依存でいられる。"""
     bad = [k for k in patch if k in LOCKED_TOKEN_KEYS]
     if "layout" in patch:
         bad += [f"layout.{k}" for k in patch["layout"] if k in LOCKED_LAYOUT_KEYS]
@@ -66,6 +72,18 @@ def _assert_template_stays_in_bounds(name: str, patch: dict) -> None:
         raise ValueError(f"template '{name}' overrides locked keys {bad} — テンプレートは"
                          "色・型スケール・余白・グラフ配色のみを変えられる(行間・光学較正・"
                          "フォント・行分割は不変)")
+    palette = set(load_tokens()["colors"].values())
+    new_hex = sorted(set(patch.get("colors", {}).values()) - palette)
+    if new_hex:
+        raise ValueError(f"template '{name}' introduces colors outside the sanctioned palette "
+                         f"{new_hex} — 新しい色は references/tokens.json の colors に一度だけ足す"
+                         "(そこで許可集合が広がる)")
+    # アクセントは1画面1か所の固定アイデンティティ。validate は base の accent を数えるので、
+    # テンプレートがここを付け替えると数え間違える — アクセント系の役割は動かさせない。
+    protected = LOCKED_COLOR_ROLES & set(patch.get("colors", {}))
+    if protected:
+        raise ValueError(f"template '{name}' remaps protected colour roles {sorted(protected)} — "
+                         "アクセント系は不変(強調はサイズと濃淡で作る)")
 
 
 @lru_cache(maxsize=None)

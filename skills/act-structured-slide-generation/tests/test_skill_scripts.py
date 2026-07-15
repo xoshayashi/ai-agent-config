@@ -2809,11 +2809,16 @@ def test_a_template_may_not_touch_the_invisible_geometry():
     """行間・光学較正・フォント・行分割は不変。ここを触る差分は、build と verify の物差しを
     黙って食い違わせる — 設計上の欠陥として resolve_tokens が弾く。"""
     D = _deck_text()
-    for locked in ({"leading": {"cjk_line_box": 1.30}},
-                   {"fonts": {"latin": "Comic Sans"}},
-                   {"line_break": {"label_max_chars_ja": 40}},
-                   {"layout": {"optical_stack": {"inset_in": 0.30}}}):
-        (_templates_dir() / "_probe.json").write_text(json.dumps(locked))
+    bad_patches = (
+        {"leading": {"cjk_line_box": 1.30}},                 # 行ボックスモデル
+        {"fonts": {"latin": "Comic Sans"}},                  # フォント
+        {"line_break": {"label_max_chars_ja": 40}},          # 行分割規則
+        {"layout": {"optical_stack": {"inset_in": 0.30}}},   # 光学較正
+        {"colors": {"primary": "FF00FF"}},                   # 公認パレット外の新色
+        {"colors": {"accent": "1F3A66"}},                    # アクセント役割の付け替え
+    )
+    for patch in bad_patches:
+        (_templates_dir() / "_probe.json").write_text(json.dumps(patch))
         try:
             with pytest.raises(ValueError):
                 D.resolve_tokens.cache_clear()

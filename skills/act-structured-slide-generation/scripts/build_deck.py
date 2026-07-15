@@ -2757,9 +2757,13 @@ def build(spec_path: Path, out_path: Path) -> Path:
     _ASSET_ROOT = out_path.resolve().parent  # image assets + manifest cache beside the .pptx
     deck = _strip_visible_periods(json.loads(spec_path.read_text()))
     # デッキが選んだ基本デザインを、描画のすべて(ネイティブ図形・画像アセット)へ一度で効かせる。
-    # resolve_tokens が未知テンプレートを弾き、_apply_tokens が派生定数を組み直す。
+    # resolve_tokens が未知/壊れた/契約違反のテンプレートを弾く。通常は validate が先に止めるが、
+    # 直接ビルドした場合もトレースバックではなく1行で伝える。
     template = template_of(deck)
-    _apply_tokens(resolve_tokens(template))
+    try:
+        _apply_tokens(resolve_tokens(template))
+    except ValueError as e:
+        raise SystemExit(f"ERROR: {e}")
     act_theme.use_template(template)          # matplotlib / Graphviz のアセットも同じ配色で描く
     prs = Presentation()
     prs.slide_width, prs.slide_height = SLIDE_W, SLIDE_H

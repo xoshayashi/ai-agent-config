@@ -32,10 +32,13 @@ with is the ruler the validator measures with.
 
 **May override** — the visible design layer:
 
-- `colors` — remap the role of the lead hue and its tints. Only to values already in
-  `tokens.colors`; a template introduces no new hex, so the colour allowlist is unchanged and
-  `validate_spec` / `verify_deck` need no template awareness. `accent` stays the single
-  highlight (DESIGN.md: ≤1 use per slide) — a "bold" template gets its punch from scale.
+- `colors` — remap the role of the lead hue and its tints (`primary`, `primary_deep`,
+  `primary_pale`, chart greys). `resolve_tokens` **enforces** two bounds: every value must
+  already be in `tokens.colors` (a template introduces no new hex, so the colour allowlist is
+  unchanged and `validate_spec` / `verify_deck` need no template awareness), and the accent
+  roles (`accent`, `accent_pale`, `accent_line`) may not be remapped — the accent stays the
+  single highlight (DESIGN.md: ≤1 use per slide), and `validate_spec` counts it from the base
+  palette. A "bold" template gets its punch from scale, not more accent.
 - `type_scale_pt` — the type sizes. Header capacity is derived from type size, so a larger
   scale simply asks for shorter titles; `validate_spec` flags any that overflow.
 - `layout` (except `optical_stack`) — margins, gutter, header/divider geometry, card radius
