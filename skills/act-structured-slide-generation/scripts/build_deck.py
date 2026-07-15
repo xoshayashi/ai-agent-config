@@ -2763,7 +2763,9 @@ def build(spec_path: Path, out_path: Path) -> Path:
     act_theme.use_template(template)          # matplotlib / Graphviz のアセットも同じ配色で描く
     prs = Presentation()
     prs.slide_width, prs.slide_height = SLIDE_W, SLIDE_H
-    prs.core_properties.category = f"act-template:{template}"   # 由来を .pptx に残す
+    if template != "standard":
+        # 由来を .pptx に残す。標準は無改変を貫く(既定デックは core.xml も含め従来と同一)ため印を付けない
+        prs.core_properties.category = f"act-template:{template}"
     set_template_background(prs, C["canvas"])
     blank = prs.slide_layouts[6]
     slides = deck["slides"]

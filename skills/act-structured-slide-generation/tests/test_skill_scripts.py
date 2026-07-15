@@ -2881,6 +2881,19 @@ def test_each_template_builds_and_verifies_clean(tmp_path, template):
     assert run("build_deck.py", spec, "-o", out).returncode == 0
     v = run("verify_deck.py", out)
     assert v.returncode == 0, v.stdout
-    # 由来が .pptx に残る
+    # 由来が .pptx に残る(標準は無改変を貫くので印を付けない)
     from pptx import Presentation
-    assert Presentation(str(out)).core_properties.category == f"act-template:{template}"
+    cat = Presentation(str(out)).core_properties.category
+    assert cat == ("" if template == "standard" else f"act-template:{template}")
+
+
+def test_no_template_erases_the_focal_emphasis():
+    """テンプレートは focal を殺してはならない。強調は2つの経路で描かれる — 値の色
+    (focal→primary_deep / 非focal→ink)と、カードの地(focal→primary_pale / 非focal→surface_tint)。
+    色相を捨てるモノクロームでも、この2色が非focalの相方と一致してはいけない(実際、一致して
+    いて focal が見えなくなっていた)。verify は禁則色しか見ないので、この不変条件はここで守る。"""
+    D = _deck_text()
+    for name in D.list_templates():
+        c = D.resolve_tokens(name)["colors"]
+        assert c["primary_deep"] != c["ink"], f"{name}: focal値の色が本文インクと同じ(強調が消える)"
+        assert c["primary_pale"] != c["surface_tint"], f"{name}: focalカードの地が非focalと同じ"
