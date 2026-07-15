@@ -264,6 +264,19 @@ brew_install_formulae() {
     fi
   done
 
+  # Tap and install HashiCorp Vault
+  if ! "$brew_path" tap | grep -q "^hashicorp/tap$"; then
+    say "tap: hashicorp/tap"
+    run "$brew_path" tap hashicorp/tap
+  fi
+
+  if ! "$brew_path" list --formula hashicorp/tap/vault >/dev/null 2>&1 && ! command -v vault >/dev/null 2>&1; then
+    say "install: hashicorp/tap/vault"
+    run "$brew_path" install hashicorp/tap/vault
+  else
+    say "ok: hashicorp/tap/vault"
+  fi
+
   python_prefix=$("$brew_path" --prefix python 2>/dev/null || true)
   if [ -n "$python_prefix" ]; then
     export PATH="$python_prefix/libexec/bin:$PATH"
@@ -839,7 +852,24 @@ install_skill_runtime_support() {
     if ! command -v dot >/dev/null 2>&1; then
       warn "graphviz CLI (dot) not found — org_tree/node_graph diagrams will fail; install with: brew install graphviz"
     fi
+
+    # HashiCorp Vault Python Client (hvac)
+    if ! python3 -c 'import hvac' >/dev/null 2>&1; then
+      say "install: python package hvac (for HashiCorp Vault)"
+      if [ "$dry_run" = "1" ]; then
+        run python3 -m pip install --user --break-system-packages hvac
+      else
+        if python3 -m pip install --user --break-system-packages hvac; then
+          say "ok: python package hvac"
+        else
+          warn "python package hvac install failed"
+        fi
+      fi
+    else
+      say "ok: python package hvac"
+    fi
   fi
+
 
   # pdftoppm (poppler) renders the PDF to per-slide PNGs for the deck QA loop.
   if command -v pdftoppm >/dev/null 2>&1; then

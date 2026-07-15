@@ -1,84 +1,212 @@
 ---
 name: startup-financial-modeling
-description: Use when the user needs a startup 収支計画 / financial plan xlsx from an equity story, business plan, or driver assumptions — a tight, IB-formatted 10-sheet annual model (Summary / Assumptions / Revenue / Headcount / Opex / PL / Cash / KPI / Cap Table / Valuation) with live formulas, story tie-out checks, and a 95-point rubric gate. Also for auditing or restyling an existing plan against IB conventions.
+description: Use when the user needs a startup 収支計画 / financial plan xlsx from an equity story, business plan, or driver assumptions — a declarative driver-tree engine compiles any business model (subscription, usage, marketplace, unit sales, services…) into an IB-formatted 10-sheet annual model with evidence-tagged assumptions, scenario switch, statements, KPI benchmarks, cap table and valuation, gated by a 95-point rubric. Also for auditing or restyling an existing plan against IB conventions.
 ---
 
-# Startup Financial Modeling（IB流収支計画）
+# Startup Financial Modeling（宣言的ドライバーツリー・エンジン）
 
-エクイティストーリーや事業計画から、投資銀行流の作法で締まった収支計画xlsxを
-生成する。シートは必要十分の10枚（サマリー/前提条件/売上計画/人員計画/費用計画/
-損益計画/資金繰り/KPI/資本政策/バリュエーション）に固定し、各シートに1つの
-役割と十分なモデリング密度を持たせる。メタシート（Guide等）、フル3表BSは
-作らない（根拠は `references/sheet_architecture.md`）。
+エクイティストーリーや事業計画から、投資銀行流の収支計画xlsxを生成する。
+**事業の経済構造はYAMLの `tree`（根拠タグ付きドライバーDAG）で記述し、
+エンジンがIB作法のシート群にコンパイルする** — スキーマに事業形状を
+焼き込まない。シートは10枚固定（サマリー/前提条件/売上計画/人員計画/
+費用計画/損益計画/資金繰り/KPI/資本政策/バリュエーション）。
 
 ## ワークフロー
 
-1. **ソースを読む** — エクイティストーリー・事業計画から記載値（顧客数、単価、
-   原価、フェーズ別粗利率、ケース）をすべて拾う。記載のない値（調達額、解約率、
-   人員、費用率）は仮置きし、必ず「仮置き」と注記する。
-   仮置き値の水準とシート中身の設計は、シート別プレイブックの必須ブロック・
-   ベンチマーク・チェックリストに従う:
-   - `references/playbook_assumptions_revenue.md` — 前提条件・売上計画
-     （解約率/NRRベンチマーク、ロールフォワード、ARR vs 認識売上、従量分解）
-   - `references/playbook_headcount_costs.md` — 人員計画・費用計画
-     （バーデン率、Revenue/FTE、AI推論原価の段階逓減、COGS線引き、費用率水準）
-   - `references/playbook_pl_cash_summary.md` — 損益計画・資金繰り・サマリー
-     （繰越欠損金の日本ルール、ランウェイ/バーン規律、KPIのステージ適合）
-   - `references/playbook_kpi.md` — KPIシート
-     （ベンチマーク帯と出典、3段階評価ロジック、除外すべきKPI）
-   - `references/playbook_captable.md` — 資本政策シート
-     （ラウンドイベント列方式、循環回避の数式チェーン、希薄化・プール帯）
-   - `references/playbook_valuation.md` — バリュエーションシート
-     （三大手法のレンジ、Exit Value・投資家リターン、フットボールフィールド、感応度）
-2. **YAMLに構造化** — `scripts/build_workbook.py` の入力スキーマ（下記は必須。
-   依存: `pip install -r scripts/requirements.txt`＝openpyxl・PyYAML）:
-   - トップレベル必須: `company` / `model_title` / `start_year` / `periods` /
-     `segments` / `implementation_cost_pct` / `headcount`（各行に function・
-     fte・avg_salary・allocation ∈ {COGS,S&M,R&D,G&A}。同一allocationの複数
-     職能は合算される） / `payroll_burden_rate` / `recruiting_cost_per_hire` /
-     `opex`（sm_pct_of_revenue・rd_program_yen・office_cost_per_fte・
-     ga_pct_of_revenue） / `capex_yen` / `depreciation_years` / `tax_rate` /
-     `ar_days` / `ap_days` / `financing`（beginning_cash・rounds[year_index/
-     label/amount]）
-   - セグメント（B2B型）: `ending_customers` / `churn_rate` /
-     `fixed_fee_monthly` / `usage_fee_monthly` / `usage_rate_per_min` /
-     `implementation_fee` / `cost_per_min`。コンシューマ型は
-     `cogs_pct_of_revenue` を持たせる（従量・導入キーは不要）。B2B型・
-     コンシューマ型の数と順序は任意
-   - 任意: `prepay_share`・`prepay_residual_months` / `story_checks`
-     （y5_recurring_revenue 等。あるキーだけ照合行が生成される） /
-     `scenario_reference` / `scenario_scales` / `kpi_thresholds` /
-     `cap_table`（資本政策シート） / `valuation`（バリュエーションシート。
-     cap_table必須） / `gm_phase_note`・`sm_ratio_note` 等の注記オーバーライド
-   年次ランプがソースに無ければ最終年目標から逆算設計し、備考に明記する。
-3. **生成** — `python3 scripts/build_workbook.py --input plan.yaml --outdir 出力先/`
-   （xlsxと入力YAMLコピーを同一フォルダーへ出力。PDFも後続手順で同じフォルダーに置き、
-   納品物は必ず1フォルダーに集約する）
-4. **機械検査＋再計算ゲート** — `python3 scripts/inspect_workbook.py plan.xlsx --recalc`
-   （B列起点、行高デフォルト、青字入力・黒字数式・緑字リンク、書式ホワイト
-   リスト、フィル制限、結合セル・揮発関数禁止。--recalcはLibreOfficeで再計算し
-   数式エラーゼロ・総合判定OKを強制する。契約は `references/ib_format_spec.md`）
-5. **再計算の内訳確認** — 再計算済みコピーの`data_only=True`で、サマリーの
-   照合ブロック（モデル値 vs 記載値）が宣言許容誤差内、現金非負チェック0を確認する。
-6. **レンダリング目視** — `soffice --headless --convert-to pdf` でPDF化し、
-   切れ・重なり・階層崩れを目視する。
-7. **プレイブック照合** — 各シートをプレイブックの品質チェックリストで自己検査
-   する（ロールフォワード閉合、ARPU検算、Revenue/FTEバンド、粗利軌道とフェーズ
-   整合、NOL枯渇年まで税ゼロ、ランウェイ18〜24ヶ月、Burn Multiple等）。
-8. **ルーブリック採点** — `references/rubric.md`（100点満点・多面的）で採点し、
-   **95点未満なら修正して1に戻る**。独立した複数エージェント（IB / VC / 監査の
-   異なるスタンス）に採点させ平均を取ることを推奨。
+0. **読み手を先に決める** — 投資家（3分でp.1）／現場の前提オーナー（10分）／
+   監査者（60分）が同じ1冊を読む。提示レイヤーの契約は
+   `references/presentation_layer_spec.md`、前提の分解方法論は
+   `references/assumption_decomposition_guide.md`。
+   **数字が正しいだけでは読まれない。読み順・用語・視線誘導まで含めて成果物**。
+1. **ソースを読み、事業をドライバーに分解する** — 収益アーキタイプを
+   `references/patterns_revenue_builds.md`（サブスク/従量/マーケットプレイス/
+   決済/単品販売/サービス/広告/ハイブリッドの標準分解）から選び、
+   `references/assumption_layer_spec.md` の分解規律（価格×数量、ファネル、
+   ストック・フロー、人員連動、率×ベース。**率の上に率を重ねない**、
+   集約成長率を入力にしない）に従って原始ドライバーまで分解する。
+   全入力に basis（実績/契約/記載/仮置き/ベンチマーク/逆算）と source を必須で付ける。
+   逆算（目標からのback-solve）は許容されるが、必ずbasis=逆算＋照合チェック行とセット。
+2. **YAMLに構造化** — スキーマ（依存: `pip install -r scripts/requirements.txt`）:
+   - `meta系`: company / model_title / start_year / periods / source_note
+   - `tree`: セクション（section/sheet∈{revenue,headcount,costs}/note）の配列。
+     各ドライバー: id / label / unit（必須） / fmt∈{m,yen,pct,cnt,x,d1} /
+     kind∈{input,calc} / input→ basis・source・values（スカラーは全期複製。
+     `scope: single` でスイッチ型＝F列単一セル・絶対参照）・
+     cases（ケース別値→シナリオスイッチ自動生成） / calc→ formula（DSL:
+     四則・数値・ID・prev(id[,初期値])・cum(id)・min/max/if。初期値には
+     期初境界の入力ドライバーIDを渡し `=0` 埋め込みを避ける）・note・
+     check_nonneg。**宣言順＝計算順**（prev以外の前方参照は禁止）
+   - `roles`: revenue_lines / cogs_lines / opex_{sm,rd,ga}_lines（各行に
+     driver・label・任意でscales∈{vol,price,both,fixed}＝感応度の線形分解、
+     onetime） / variable_cost_lines（限界利益） / arr / onetime_revenue /
+     b2b_units / consumer_users / new_units / fte_total / payroll_total /
+     hires / capex / ar_days / ap_days / prepay_balance / beginning_cash /
+     任意で ar_open・ap_open・prepay_open（期首残高の入力ドライバー。
+     未指定なら期首ゼロ）・b2b_unit_name（稼働単位の呼称）
+   - `statements`: dep_years_driver / tax_rate_driver / nol_opening_driver /
+     任意で nol_limit_driver（大法人50%等の控除限度率）・depreciation_driver
+     （資産コークスクリューで自前計算した償却。半期償却慣行・除却資産の
+     基礎控除など）・disposal_loss_driver（固定資産除却損。PLで控除・CFで足戻し）
+   - `derive_drivers`（任意。印刷面に出る主要KPI＝回収期間・ユニットエコノミクス等の
+     ドライバーID配列。エンジンが入力まで展開した独立再計算チェックを自動生成する。
+     **ソースの看板主張になっている数値は必ずここに登録する**）
+   - `financing.rounds`（year_index/label/amount。任意で cases＝ケース別調達額）、
+     `financing.note`／`case_sources`、`scenario`（cases/active）、
+     `scenario_scales`、`tie_gate_drivers`（照合判定のゲート条件となる
+     スイッチ型ドライバー群。=1以外の選択で照合を対象外化＋警告点灯。
+     収益認識基準スイッチ等に使用）、任意で story_checks /
+     scenario_reference / kpi_thresholds / cap_table / valuation /
+     gm_phase_note / kpi.gm_basis（`after_dep`＝資本集約型は償却後粗利率で
+     ベンチマーク評価）等の注記。`cap_table.post_money_by_round` を与えると
+     資本政策が全ラウンド展開（累積希薄化・ラウンド別持分・希薄化後MOIC）になる
+3. **検証パイプラインを一括実行** — `bash scripts/verify.sh plan.yaml 出力先/ 名前 [納品先/]`
+   ビルド→機械検査＋再計算→**恒等式リンター**→**変異テスト（全数）**→**境界値**→
+   シナリオスイープ→スモーク→PDF生成（xlsxとの整合を機械保証）→納品を1コマンドで
+   通す。**採点に出す前に必ず全ゲート通過させる。**
+   個別に回すなら:
+   - `inspect_workbook.py plan.xlsx --recalc`（IB作法1,400超ゲート＋数式エラーゼロ＋
+     総合判定OK。契約は `references/ib_format_spec.md`）
+   - `tautology_lint.py plan.xlsx`（**静的・数秒**。各エラー級チェックを
+     `対象−再導出` に二分し依存錐を比較。財務に効く導出セルが両側の錐に入って
+     いれば「偽の保証」＝FAIL。設計段階の欠陥をここで潰す）
+   - `mutation_test.py plan.xlsx`（**動的・全行×全列ゼロ化・並列**。セルを落として
+     投資家に見える数字が動いたのに総合判定OKならFAIL。中央列だけだとMIN/MAXの
+     飽和で見逃す。契約は `references/check_design_spec.md`）
+   - `boundary_test.py plan.xlsx`（期首残高に非ゼロを投入しても自壊しないか、
+     スイッチ定義域外で判定が壊れないか）
+   - `smoke_test.py`（別アーキタイプ2件でエンジンの汎用性を回帰）
+4. **シナリオスイッチ検証** — アクティブケースを1→2→3、認識基準を1→2に切替えて
+   再計算し、全シート連動・非Baseで警告点灯・ソース照合の自動ゲートを確認する。
+5. **レンダリング目視** — PDFで切れ・重なり・ラベル破損を確認（機械ゲートは
+   ラベル幅・ヘッダー幅・括弧整合まで見るが、最後は目視）。
+6. **プレイブック照合** — シート別に自己検査する:
+   `playbook_assumptions_revenue.md`（前提条件・売上）／`playbook_headcount_costs.md`
+   （人員・費用）／`playbook_pl_cash_summary.md`（損益・資金繰り・サマリー）／
+   `playbook_kpi.md`／`playbook_captable.md`／`playbook_valuation.md`。
+   横断仕様は `statement_sheets_spec.md`・`analysis_layer_spec.md`、
+   シート構成の根拠は `sheet_architecture.md`。
+   **資本集約型（フリート保有・設備型）なら `playbook_capital_intensive.md` を必読**
+   （収益認識・資産/負債コークスクリュー・エクイティブリッジ・償却後開示の
+   必須要素を初回ビルドで入れる。後から足すと採点が何ラウンドも伸びる）。
+7. **ルーブリック採点** — `references/rubric.md` で IB/VC/監査の独立エージェント採点。
+   **採点中はビルドを凍結する**（実査の途中でファイルを再生成すると手続き上の
+   不信を招く）。**95点未満なら修正して3に戻る**。採点後に修正した場合は、
+   納品ビルドそのものを再認証する（採点したものと違うものを納品しない）。
+
+## 提示レイヤー（読み手のための構造。機械ゲートで強制）
+
+- **各シートは「STEP n｜このシートが決めること」を3行目で名乗る**（`Sheet.intro()`）。
+  4行目に「使う入力 → 出す結論」。読み手が常に「今どの手順か」を知っている状態を作る
+  （どこから来た数字か分からない行＝モデリングの逃げ道を構造的に無くす）
+- **各ブロックは見出し直下に、専門用語ゼロの1行説明**を持つ（`section(explain=)`）
+- **印刷面に隠語を出さない**（コークスクリュー／ロールフォワード／タイ／FCFF／
+  アセットF等は禁止。投資家の共通語は「日本語（英字略号）」の形でのみ可）。
+  `inspect_workbook.py` がゲート化する
+- **前提条件は事業の因果順**（数量→単価→収益→原価→人員→費用→投資→資金）。
+  **ケース別の値は、そのドライバーの居場所に置く**（親→└Base→└Upside→└Downside→
+  **採用値＝太字・モデルが読む唯一の行**）。採点基準（しきい値・記載値・許容誤差）は
+  事業の前提ではないので**付録に隔離**する
+- **印刷面は「根拠」列で終端し、備考全文（幅120）は印刷範囲外**。これを守らないと
+  紙面の半分を注記が占め、本文が実効6ptまで潰れて何も読めなくなる（印刷可視幅は
+  約140に収める）。隠語も、この1手で印刷面から構造的に消える
+- **検算行は本文に挟まず、各シート末尾＝印刷範囲外の監査証跡へ**（`Sheet.check()` は
+  予約、`flush_checks()` が末尾に書く）。印刷面に出すのはサマリーの結論
+  （総合判定・警告件数）と、**点灯している注意点を「件数ではなく名前で」**だけ
+- **視線誘導は塗りではなく罫線と太字**（IB作法：塗りはタイトル帯のみ）。
+  **結論行は1シート1本**（`Sheet.headline()`、Act Accentの下罫線。2本目はビルド失敗）
+- **意味の切れ目＝視覚の切れ目**（セクション間1行＋見出しの下罫線・ブロック間1行・ブロック内0行）
+- **同じ数字の原本は1か所**。他シートは純リンク（緑字）のみで、作り直さない。
+  サマリーの「投資判断の変数」（回収期間・採用レンジ・MOIC・IRR・希薄化後持分）は
+  すべて原本への純リンク
+- **チェック行は「■必達／□要説明」で始め、備考に「守る/破れたら」を書く**。
+  0=OK の羅列ではなく、何が保証されたのかを読み手に渡す。
+  **この前置きは `cls` から自動付与する**（手打ちに任せると付け忘れ・実体との
+  食い違いが起きる。実際に非負チェック5本がマーカー無しで出荷された）
+- **点灯した警告は「ラベルごと赤字」＋「どの年・どのケースで鳴っているか」**。
+  0と1が同じ黒字で20行並ぶと、読み手が不都合な事実を目で探すことになる。
+  件数（「1件」）では何も判断できない。「FY2030」なら見に行ける
+- **導出行の備考が検証を名乗ることを禁じる**（`閉合`・`検算`・`一致確認` 等。
+  機械ゲート）。逆算行（プラグ）が検算の権威を借りるのが**最も危険な逃げ道**。
+  逆算は逆算だと名乗り、「等式は定義上必ず成り立つので正しさの根拠にならない。
+  ○○の裏付けはモデル外」と書く
+- **数値列は標準幅（11.5）固定。見出しが長くても列を広げず折り返す**。
+  印刷は `fitToWidth` なので、1列でも広いとシート全体が縮小され、数字が読めない
+  大きさで刷られる（実測: 幅227の資本政策が縮尺42%＝標準68%の6割）
 
 ## 設計原則（要約）
 
-- 収益はセグメント×経済プリミティブ（稼働数ロールフォワード×固定＋従量ARPU、
-  新規×導入費）から構築。COGSは稼働分数×原価/分などのドライバーで導出し、
-  粗利率は結果として出す（率の直打ちで済ませない）。
-- 収益認識の慣行（期末稼働×年額 vs 期中平均）はソースの算式に合わせ、
-  備考で明示する。
-- 全入力はAssumptionsに青字で集約。導出はすべて生きた数式。定数の数式内
-  埋め込み禁止（12か月・365日などの構造定数は除く）。
-- 記載値とモデル値のタイアウトはサマリーの照合ブロックで数式化し、
-  条件付き書式で±1%超を赤字にする。
-- 税は繰越欠損金スケジュール付き。資金繰りは簡易FCFブリッジ＋運転資本＋
-  調達＋ランウェイ。
+- 入力→計算→出力の一方向。青字入力は前提条件（＋バリュエーションのコンプ表）のみ。
+  計算行はすべて生きた数式で、定数の埋め込みは構造定数（12・365等）以外禁止
+- ドライバーは「誰かが根拠を持てる/所有できる数値」まで分解して止める
+  （10-15個の主要ドライバーが成果の8割を説明する）。%-of-revenueは
+  非本質な残余費目のみ
+- シナリオは単一モデル＋中央スイッチ（CHOOSE）。モデルの複製・分岐は禁止。
+  ケースは需要側だけでなくコスト側（人員・R&D・Capex）と調達額にも付け、
+  Upsideには体制増強コストと追加調達が付き、Downsideは投資抑制が効く整合をとる
+- 収益認識は**発生主義（期中平均稼働）を既定**とし、期末稼働×年額（ARR
+  ランレート＝ソースのSOM算式）は別行・スイッチで併記する。原価・人員の
+  稼働ベースは収益と同一にする（対応原則）。ARRランレート行はKPIと
+  ソース照合に使い、PL売上と混同させない
+- 資本集約型（ハードRaaS・設備型）は、償却前EBITDAだけで語らない。
+  償却後粗利率・営業利益率・台あたり回収期間（売上ベース／貢献利益ベース）を
+  必ず並べ、KPIのベンチマーク評価も償却後基準に切り替える
+- チェックはエラー級（配線整合。全行0で総合判定OK）とアラート級（事業
+  アウトカム・非Base選択。出荷可・要レビュー）を区別する。**サマリーの印刷面には
+  結論（総合判定・警告件数）だけを載せ、チェック明細は印刷範囲外の監査証跡に置く**
+  （意思決定面を統制ログで埋めない）。独立再計算チェックは**対象行と同じシート**に
+  置く（売上のチェックが費用計画に住まない）。全シートヘッダーにマスターフラグを表示
+- **保護を与えないチェックはエラー級にしない**（スケール不変な「持分合計100%」、
+  比率形の「調達額タイ」等はアラート級に降格し、水準は金額ベースの再計算チェックで守る）
+- **エラー級チェックは「独立経路」で再導出する。恒等式は禁止**（両辺が同じセルを
+  読む式は代数的に必ずゼロで、何も検証していない）。これがこのスキルで最も高く
+  ついた失敗で、株主クラスを丸ごと消しても・償却リンクを落として現金が2.5倍に
+  なっても総合判定OKで通っていた。合格基準は機械化してある:
+  **NI・期末現金の先祖である全導出セルが、いずれかのエラー級チェックの
+  「対象側の依存錐 △ 再導出側の依存錐」に入っていること**。
+  契約は `references/check_design_spec.md`、静的検証は `scripts/tautology_lint.py`、
+  動的検証は `scripts/mutation_test.py`（全行ゼロ化）。両方をゲートに置く
+- **機械ゲートの契約は1つ**: **印刷範囲に出る導出セルは、すべてエラー級チェックで
+  守られていること**（壊れたら必ず総合判定が鳴る）。検査対象は `scripts/model_surface.py`
+  が構造だけで決める——**ラベルやシンクをモデルごとに列挙しない**（「（参考）」という
+  名前の行がDCF唯一の入力だった、という事故はラベル判定が原因だった）。
+  表示専用行（マージン・成長率・コンプ中央値・サマリー見出し）も自動的に対象になり、
+  エンジンが「表示行タイ」を自動生成する。変異テストは不活性セルを毎回一覧出力する
+- **バリュエーションは3手法とも「同一のブリッジ」に乗せる**:
+  `株式価値 = PV(Exit価値) + PV(計画期間のFCF) + 期首現金 − 有利子負債`。
+  違ってよいのは**Exit価値の当て方だけ**（EBITDA倍率／上場倍率／取引倍率）。
+  DCFだけが計画期間のFCF（＝Exitへ辿り着く費用）を負担し、類似上場・類似取引が
+  負担しないと、**Exitの事業をタダで渡した値段**が並ぶ（実測: 開き6.6倍のうち
+  ほぼ全部が方法論の食い違いだった）。割引率も**その列のケースのもの**を使う
+  （中位を全列に焼き込むと、低位列が保守的でなくなる）。
+  この2つは**手法をまたぐ不変条件**でしか捕まらない（→ check_design_spec 原則10）:
+  `(手法X − Xのアンカー現在価値) − (手法① − ①のPV(TV)) = 0`
+- **採用レンジは「3手法が重なる帯」**（下限＝各手法の低位の最大／上限＝高位の最小）。
+  中位のMIN〜MAXにすると、株式価値が残差である資本集約型では、残差がゼロ近傍の
+  手法が下限を支配して帯が桁で開く（実測: 28.8倍 → 重なる帯なら5.4倍）
+- **期首残高入力への参照は `$F$` 固定でコンパイルされる**（同列参照だと、期首値を
+  1列にしか入れない使い方で静かに壊れる）。境界値テストはF列単独投入で検査する
+- **全入力に basis（根拠タグ）が必須**（無ければビルド失敗）
+- **印刷面の青字入力は必ず参照されていること**（機械ゲート）。参照が `$F$` 固定なのに
+  値をF〜J全列に複製すると、G〜Jは「編集できるのに何も起きない孤児セル」になる
+  （期初現金のJ列を990億円にしても総合判定OKだった）。全期間共通の定数は2年目以降を
+  `=$F$r` の数式に、期首・期初の境界値は2年目以降を空にする
+- **ベンチマーク逸脱（KPIの「要説明」）はアラート級チェックに機械的に配線する**。
+  KPIシートを見れば分かる、は逃げ道。最も不都合な数字ほどサマリー1ページ目に出す
+- **ラベルは分母に従わせる**。分母が新規出荷台数なのに「顧客獲得単価（CAC）」と
+  名乗ると、1顧客が複数単位を導入する事業では投資家が桁で誤解する
+- **中身のない見出しを印刷面に出さない**（機械ゲート）。`check()` は予約であり実体は
+  印刷範囲外に書かれるので、その手前に見出しを置くと空の見出しページになる
+- **損益計画は金額の階段だけを連続させる**。比率行は下の専用ブロックに集約する
+  （売上−原価=粗利を目で追えなくなる）
+- **チェックの許容差は単位に合わせる**。%・倍のエラー級チェックを円スケールの
+  既定許容差（±0.5）で判定すると、IRRが5pt動いても総合判定OKになる。
+  エンジンは %・倍のエラー級チェックに0.005以下の許容差を強制する（違反はビルド失敗）
+- **期首境界値（稼働数・簿価・累計償却・負債・人員・売掛買掛・繰越欠損金）は
+  すべて入力行で持つ**。数式内のリテラル0は defect（既存事業に使った瞬間に
+  初年度が静かに消え、ロール整合も両辺で同じゼロを読んで沈黙する）
+- スイッチは `CHOOSE(MEDIAN(1, スイッチ, ケース数), …)` でクランプし、総合判定は
+  `SUM(IFERROR(各チェック, 1))` で包む（定義域外やゼロ除算で判定セル自体が
+  計算不能になる自壊を防ぐ）
+- 不都合な事実（現金不足・ランウェイ不足・ソース記載レンジの超過・ベンチマーク
+  逸脱）はアラート級で**必ず点灯させる**。隠すと採点で見抜かれ、開示すれば加点される
+- 検証機構（照合・感応度・シェア検証）は必ず数式連動。値貼りの検証表は腐る

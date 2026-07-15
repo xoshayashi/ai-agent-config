@@ -83,7 +83,7 @@ fi
 say "validate: required files"
 require_file "README.md"
 require_file "setup.md"
-require_file "docs/setup-error-guide.md"
+require_file "docs/guides/setup-error-guide.md"
 require_file "scripts/setup.sh"
 require_file "scripts/update.sh"
 require_file "scripts/uninstall.sh"
