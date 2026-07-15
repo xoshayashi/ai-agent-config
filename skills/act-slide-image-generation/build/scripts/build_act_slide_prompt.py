@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 GEOMETRY = json.loads((ROOT / "references" / "canonical-geometry.json").read_text(encoding="utf-8"))
 DEFAULT_DESIGN_TOKENS_PATH = ROOT / "references" / "design-tokens.json"
 ALLOWED_SIZES = {"2048x1152"}
+MAX_GENERATION_CONTRACT_BYTES = 6144
 UNRESOLVED_COMPOSITION = "UNRESOLVED - describe the content-led composition intent"
 UNRESOLVED_ALIGNMENT = "UNRESOLVED - describe the composition-specific Grid/Flex nesting intent"
 
@@ -472,6 +473,14 @@ def read_layout_plan(path: str | None, mode: str, design_tokens: dict) -> dict |
             raise SystemExit("Invalid --layout-plan; horizontal structural-rule points share the declared baseline.")
         if rule["orientation"] == "vertical" and start["x"] != end["x"]:
             raise SystemExit("Invalid --layout-plan; vertical structural-rule points share one x coordinate.")
+        expected_start_x = shell["x"] + (rule["start_anchor"] - 1) * (geometry_grid["track_px"] + geometry_grid["gutter_px"])
+        expected_end_x = shell["x"] + (rule["end_anchor"] - 1) * (geometry_grid["track_px"] + geometry_grid["gutter_px"])
+        if rule["orientation"] == "horizontal":
+            expected_end_x -= geometry_grid["gutter_px"]
+            if abs(start["x"] - expected_start_x) > tolerance or abs(end["x"] - expected_end_x) > tolerance:
+                raise SystemExit("Invalid --layout-plan; horizontal structural-rule points match their declared column anchors within 4px.")
+        elif rule["start_anchor"] != rule["end_anchor"] or abs(start["x"] - expected_start_x) > tolerance:
+            raise SystemExit("Invalid --layout-plan; vertical structural-rule points share their declared column anchor within 4px.")
         if any(point["x"] < shell["x"] or point["x"] > shell["right"] or point["y"] < body_top or point["y"] > body_bottom for point in (start, end)):
             raise SystemExit("Invalid --layout-plan; structural-rule points stay inside the selected body envelope.")
 
@@ -494,7 +503,7 @@ def read_layout_plan(path: str | None, mode: str, design_tokens: dict) -> dict |
     if clarity["connector_count"] != len(connectors):
         raise SystemExit("Invalid --layout-plan; clarity connector count matches the registered connector plan.")
     for connector in connectors:
-        if connector["route"] != "orthogonal" or not connector["waypoints"]:
+        if not connector["waypoints"]:
             continue
         source = component_by_id[connector["from_id"]]["bounds"]
         target = component_by_id[connector["to_id"]]["bounds"]
@@ -527,6 +536,8 @@ def read_layout_plan(path: str | None, mode: str, design_tokens: dict) -> dict |
     for container in containers:
         if not required_container.issubset(container) or container["id"] not in node_ids or container["main_axis"] not in {"row", "column"}:
             raise SystemExit("Invalid --layout-plan; each Flex container requires the complete container contract.")
+        if container["wrap"] not in {"nowrap", "wrap"}:
+            raise SystemExit("Invalid --layout-plan; Flex wrap is nowrap or wrap.")
         if container["gap_px"] not in GEOMETRY["flex"]["gap_tokens_px"]:
             raise SystemExit("Invalid --layout-plan; Flex gap uses 16, 24, 32, or 48px.")
         if container["justify"] not in allowed_justify or container["align"] not in allowed_align:
@@ -558,6 +569,12 @@ def read_layout_plan(path: str | None, mode: str, design_tokens: dict) -> dict |
             allocation_cross = allocation["h"] if container["main_axis"] == "row" else allocation["w"]
             if child["min_main_px"] > allocation_main or child["min_cross_px"] > allocation_cross or child["min_cross_px"] > cross_size:
                 raise SystemExit("Invalid --layout-plan; every Flex child allocation satisfies its minimum sizes.")
+            cross_lo, cross_hi = GEOMETRY["flex"]["cross_axis_fill_range"]
+            if not cross_lo <= allocation_cross / cross_size <= cross_hi:
+                raise SystemExit("Invalid --layout-plan; every Flex child fills 82-100% of its parent cross axis.")
+            component_bounds = component_by_id[child["id"]]["bounds"]
+            if any(abs(allocation[key] - component_bounds[key]) > tolerance for key in ("x", "y", "w", "h")):
+                raise SystemExit("Invalid --layout-plan; every Flex child allocation matches its registered component bounds within 4px.")
             allocation_rectangles.append(allocation)
         ordered_children = sorted(container["children"], key=lambda child: child["allocation_bounds"]["x" if container["main_axis"] == "row" else "y"])
         for previous, current in zip(ordered_children, ordered_children[1:]):
@@ -919,20 +936,26 @@ Render only these quoted strings, each at its bound component and occurrence cou
 {copy_lines}
 
 VISUAL SYSTEM
-Noto Sans JP / Geist; design_tokens={json.dumps(compiled['design_tokens'], ensure_ascii=False, separators=(',', ':'))}; tones={json.dumps(compiled['tones'], ensure_ascii=False, separators=(',', ':'))}; shared grid edges; equal peer geometry; straight rules and orthogonal connectors; one consistent mark family.
+Noto Sans JP / Geist; design_tokens={json.dumps(compiled['design_tokens'], ensure_ascii=False, separators=(',', ':'))}; tones={json.dumps(compiled['tones'], ensure_ascii=False, separators=(',', ':'))}; shared edges; equal peers; straight rules; orthogonal connectors.
 
 PRESERVATION STATE
-{reference} Keep the left-aligned fixed header, independent rounded regions, quiet outer bands, exact copy, one grammar, one connector set, and one emphasis system. source_plan={json.dumps(compiled['source_plan'], ensure_ascii=False, separators=(',', ':'))}. message_box_plan={json.dumps(compiled['message_box_plan'], ensure_ascii=False, separators=(',', ':'))}.
+{reference} Preserve fixed left header, independent rounded regions, quiet outer bands, exact copy, one grammar and emphasis system. source_plan={json.dumps(compiled['source_plan'], ensure_ascii=False, separators=(',', ':'))}. message_box_plan={json.dumps(compiled['message_box_plan'], ensure_ascii=False, separators=(',', ':'))}.
 
 ACCEPTANCE
-Exact-copy OCR and occurrence match; header inventory matches its plan; body stays inside its envelope and reaches lower closure; shared axes, peer dimensions, distribution, radii, tones, and connector endpoints match the plan; overflow/clipping/overlap=0; Source: appears only for one external reference; Assumption: and Note: stay explicitly labeled; empty provenance keeps the footer quiet; every message box is text-only and uses the canonical copy-derived height.
+Exact-copy OCR/count match; header inventory matches; body stays in its envelope and reaches closure; shared axes, peers, radii, tones and connector endpoints match; overflow/clipping/overlap=0; Source: appears only for one external reference; Assumption: and Note: stay labeled; empty provenance keeps the footer quiet; every message box is text-only with copy-derived height.
 """
 
 
 def build_prompt(brief: str, mode: str, composition: str, alignment: str, layout_plan: dict | None, language: str, size: str, quality: str, design_tokens: dict) -> str:
     if mode in {"single-slide-image", "repair"}:
         assert layout_plan is not None
-        return lean_contract(brief, mode, composition, alignment, layout_plan, language, size, quality, design_tokens)
+        prompt = lean_contract(brief, mode, composition, alignment, layout_plan, language, size, quality, design_tokens)
+        prompt_bytes = len(prompt.encode("utf-8"))
+        if prompt_bytes > MAX_GENERATION_CONTRACT_BYTES:
+            raise SystemExit(
+                f"Compiled generation contract is {prompt_bytes} bytes; condense the brief or exact copy to fit the {MAX_GENERATION_CONTRACT_BYTES}-byte budget."
+            )
+        return prompt
     header = common_header(brief, mode, language, size, quality, design_tokens)
     if mode in {"deck-plan", "text-structure"}:
         return f"{header}\n\n{planning_tail(mode)}"

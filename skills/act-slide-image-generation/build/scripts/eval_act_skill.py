@@ -825,13 +825,17 @@ def check_layout_plan_geometry_rejections() -> list[Result]:
         ("component_anchor_geometry_drift", lambda plan: plan["component_geometry_plan"]["components"][0]["bounds"].update(x=180, w=644)),
         ("peer_module_size_drift", lambda plan: plan["component_geometry_plan"]["components"][0]["bounds"].update(w=620)),
         ("flex_gap_mismatch", lambda plan: plan["flex_plan"]["containers"][0]["children"][1]["allocation_bounds"].update(x=860, w=643)),
+        ("flex_cross_axis_underfill", lambda plan: [plan["flex_plan"]["containers"][0]["children"][0].update(min_cross_px=80), plan["flex_plan"]["containers"][0]["children"][0]["allocation_bounds"].update(h=80)]),
+        ("flex_invalid_wrap", lambda plan: plan["flex_plan"]["containers"][0].update(wrap="wrpa")),
         ("freeform_connector_route", lambda plan: plan["connector_plan"]["connectors"][0].update(route="freeform")),
         ("connector_crossing", lambda plan: plan["connector_plan"]["connectors"][0].update(crossing_count=1)),
         ("connector_endpoint_drift", lambda plan: plan["connector_plan"]["connectors"][0]["waypoints"][0].update(x=800)),
+        ("declared_arc_endpoint_drift", lambda plan: [plan["connector_plan"]["connectors"][0].update(route="declared_arc"), plan["connector_plan"]["connectors"][0]["waypoints"][0].update(x=800)]),
         ("connector_waypoint_in_header", lambda plan: plan["connector_plan"]["connectors"][0]["waypoints"][0].update(y=96)),
         ("connector_unknown_port", lambda plan: plan["connector_plan"]["connectors"][0].update(source_port="accent_edge")),
         ("unregistered_rule_parent", lambda plan: plan["structural_rule_plan"]["rules"][0].update(parent_id="missing")),
         ("rule_stroke_out_of_range", lambda plan: plan["structural_rule_plan"]["rules"][0].update(stroke_px=6)),
+        ("rule_anchor_point_drift", lambda plan: plan["structural_rule_plan"]["rules"][0]["start_point"].update(x=266)),
         ("grid_rigidity_below_gate", lambda plan: plan["rigidity_plan"].update(edge_registration_score=0.80, grid_rigidity_score=0.912)),
         ("orphan_region_present", lambda plan: plan["rigidity_plan"].update(orphan_region_count=1)),
         ("too_many_visible_strings", lambda plan: plan["model_fit_plan"].update(visible_string_count=24)),
@@ -1041,6 +1045,39 @@ def check_design_token_swap() -> list[Result]:
     ]
 
 
+def check_compiled_prompt_budget_rejection() -> Result:
+    script = ROOT / "build" / "scripts" / "build_act_slide_prompt.py"
+    with tempfile.TemporaryDirectory() as tmp:
+        brief_path = Path(tmp) / "oversized-brief.txt"
+        brief_path.write_text("検証" * 1300, encoding="utf-8")
+        proc = subprocess.run(
+            [
+                sys.executable,
+                str(script),
+                str(brief_path),
+                "--mode",
+                "single-slide-image",
+                "--archetype",
+                "content-led composition",
+                "--grid-mode",
+                "hybrid Grid/Flex",
+                "--layout-plan",
+                "build/evals/sample-layout-plan.json",
+            ],
+            cwd=ROOT,
+            text=True,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            check=False,
+        )
+    output = proc.stdout + proc.stderr
+    return Result(
+        "compiled_prompt_budget_rejection",
+        proc.returncode == 1 and "6144-byte budget" in output,
+        output[:1200],
+    )
+
+
 def main() -> int:
     config = load_config()
     files = runtime_files(config["runtime_scan_globs"])
@@ -1067,6 +1104,7 @@ def main() -> int:
     results.append(check_footer_present_layout_plan())
     results.append(check_one_line_footer_layout_plan())
     results.extend(check_design_token_swap())
+    results.append(check_compiled_prompt_budget_rejection())
     for check in config["helper_checks"]:
         results.append(run_helper_check(check))
     results.append(check_final_generation_prompt_hygiene())
