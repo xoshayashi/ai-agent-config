@@ -236,7 +236,8 @@ for status in \
   "$shell_zshrc_status" \
   "$codex_notify_status" "$claude_notify_status" \
   "$claude_status" "$codex_status" "$agy_status" \
-  "$python3_status" "$openpyxl_status" "$pptx_deps_status" "$fonts_status"; do
+  "$python3_status" "$openpyxl_status" "$pptx_deps_status" "$fonts_status" \
+  "$libreoffice_status" "$pdftoppm_status"; do
   [ "$status" = "ok" ] || mark_status warn
 done
 

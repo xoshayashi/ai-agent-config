@@ -1064,6 +1064,9 @@ check_manual_auth_steps() {
     say "  gh auth login"
     say "  gcloud auth login"
     say "  hf auth login"
+    say "  claude   # /login"
+    say "  codex login"
+    say "  git config --global user.name / user.email (if unset)"
     return 0
   fi
 
@@ -1103,7 +1106,10 @@ check_manual_auth_steps() {
   # このリポジトリが設定する主役 CLI — Claude Code と Codex — のログインも見る(以前は漏れていた)。
   # 認証は資格情報ファイルの有無で推定する(資格情報はリポジトリに置けないため、手順だけ示す)。
   if command -v claude >/dev/null 2>&1; then
-    if [ -f "$HOME/.claude/.credentials.json" ] || [ -f "$HOME/.claude/.credentials" ]; then
+    # macOS では Claude Code の資格情報は Keychain に入る(ファイルではない)。まず Keychain を
+    # 見て、無ければ Linux/Windows のファイルを見る — 逆にするとサインイン済みでも毎回 nag する。
+    if security find-generic-password -s "Claude Code-credentials" >/dev/null 2>&1 \
+      || [ -f "$HOME/.claude/.credentials.json" ] || [ -f "$HOME/.claude/.credentials" ]; then
       say "ok: claude code credentials present"
     else
       manual_auth_command "claude   # 起動して /login で Claude Code にサインイン"
