@@ -422,7 +422,10 @@ class Sheet:
         # (2) ラベルは■必達なのに実体はalert、という食い違い
         # が起きる。実際に非負チェック5本がマーカー無しで出荷されていた。
         mark = {"error": "■必達 ", "alert": "□要説明 "}[cls]
-        label = mark + re.sub(r"^[■□](必達|要説明)\s*", "", label)
+        # マーカーを剥いだ本体（core）はここで一度だけ作る。備考合成でも使うので、
+        # 同じ正規表現を後段で再適用しない（パターンの二重管理を避ける）。
+        bare = re.sub(r"^[■□](必達|要説明)\s*", "", label)
+        label = mark + bare
         # 単位とスケールの整合。%・倍・係数のチェックを円スケールの許容差
         # （既定0.5）で判定すると、5ptの誤差すら素通りする（実際に起きた）。
         if cls == "error" and fmt in (FMT["pct"], FMT["x"]) \
@@ -430,9 +433,57 @@ class Sheet:
             raise ModelError(
                 f"チェック『{label}』は%・倍単位なのに許容差{tolerance}"
                 "（円スケール）。0.005以下を明示すること")
-        # 備考は「何を守るか／破れたら何が起きるか」が主。許容差は末尾に短く。
+        # 備考は「何を守るか／破れたら何が起きるか」が主。整合性チェックは
+        # 初心者にとって最も意味の取りづらい行なので、**全チェックに意味解説を
+        # 保証する**。呼び出し側が守る/破れたらを書いていなければ、ラベルの型から
+        # 既定の解説を合成する（手書きが無くても説明ゼロのチェックを出さない）。
+        core = bare.replace("（0=OK）", "").strip()
+        if not (note and "守る" in note and "破れたら" in note):
+            if "一致確認" in core:
+                subj = core.replace("の一致確認", "")
+                g = (f"守る: {subj}が独立経路で再計算した値と一致すること"
+                     f"／破れたら: 配線が壊れ、壊れた数字が黙って印刷される")
+            elif "非負" in core:
+                subj = core.replace("非負", "")
+                g = (f"守る: {subj}が負にならないこと"
+                     f"／破れたら: 増減の向きが逆か、期首残高が過大")
+            elif "照合" in core:
+                g = ("守る: モデル値がソース記載レンジ内であること"
+                     "／破れたら: 計画がソースの主張から外れている")
+            elif "範囲" in core:
+                g = ("守る: 選択値が定義域内であること"
+                     "／破れたら: 全シートが計算不能になる")
+            elif any(p in core for p in _VIOLATION_PATS):
+                # **ラベルが「壊れた状態」を述べているアラート**（現金がマイナス／
+                # 持分が100%でない／…と不一致／…を超過／…を下回る 等）。
+                # 「守る: {core}が保たれること」と組むと意味が反転する
+                # （現金が負のままを守る、100%でないを守る…＝逆）。
+                # 反転しないよう、守るは**その状態を避けること**とする。
+                # 綺麗に否定できる語尾だけ肯定形にし、それ以外は「避ける」で包む。
+                inv = core
+                for a, b in (("でないこと", "であること"), ("でない", "であること"),
+                             ("と不一致", "が一致すること"),
+                             ("を超過", "を超えないこと"),
+                             ("を下回る", "を下回らないこと"),
+                             ("を上回る", "を上回らないこと")):
+                    if a in inv:
+                        inv = inv.replace(a, b)
+                        break
+                if inv != core:
+                    g = f"守る: {inv}／破れたら: {core}"
+                else:
+                    g = f"守る: 「{core}」を避けること／破れたら: {core}が起きている"
+            else:
+                g = f"守る: {core}が保たれること／破れたら: この前提が崩れる"
+            # 手書きnoteに「守る」だけ有り「破れたら」無しのとき、合成の守るを
+            # 前置すると守るが二重になる。合成は破れたら側を補い、守るは手書きを尊重。
+            if note and "守る" in note:
+                note = f"{note}／破れたら: {core}（要説明）" \
+                    if "破れたら" not in note else note
+            else:
+                note = f"{g}。{note}" if note else g
         tol_note = f"（±{tolerance}）"
-        note = f"{note}{tol_note}" if note else f"配線の検算{tol_note}"
+        note = f"{note}{tol_note}"
         self._pending.append(
             dict(label=label, formula=formula, fmt=fmt, note=note,
                  tolerance=tolerance, cls=cls, unit=unit, scope=scope))
@@ -629,6 +680,19 @@ class Compiler:
 SHEET_NAMES = {"revenue": "売上計画", "headcount": "人員計画", "costs": "費用計画"}
 BASIS_OK = {"実績", "契約", "記載", "仮置き", "ベンチマーク", "逆算"}
 
+# アラートのラベルが「壊れた状態」を述べている表現。備考の自動合成でこれを
+# 検知しないと「守る: 現金がマイナスが保たれること」のように意味が反転する。
+_VIOLATION_PATS = ("でない", "不一致", "超過", "マイナス", "下回る", "上回る",
+                   "ショート", "未達", "反転", "がない", "0以下")
+
+# story_checks のうち、実際に「記載値の照合行」を生むキー（build_story_inputs の
+# mapping と一致させること）。tol_amount/tol_share は許容誤差であって照合ではない。
+RECON_STORY_KEYS = {
+    "y5_recurring_revenue", "y5_implementation_revenue", "y5_total_som",
+    "y5_b2b_units", "y5_toc_paid_users", "tam", "net_sam",
+    "som_sam_share", "som_tam_share",
+}
+
 
 def validate_tree(cfg):
     ids, calc_deps = {}, {}
@@ -674,6 +738,33 @@ def validate_tree(cfg):
                             f"{d['id']} が後方定義の {dep} を前方参照"
                             "（prev()以外の前方参照は禁止。宣言順を計算順に）")
             seen.add(d["id"])
+
+    # 分解ガイド 停止条件S2の機械化: 逆算（目標から解いた値）は、必ず照合チェックと
+    # セットにする。照合がないと「目標に合うよう解いた数字」が独立の根拠を持つ
+    # かのように出荷される（＝逃げ道）。
+    # 照合は**集約でもよい**（例: 3セグメントの期末稼働数を y5_b2b_units 合計で
+    # 突き合わせる）が、**実際に照合行になるもの**でなければならない。
+    #   - source_bounds は driver が実在しないと build_story_inputs が黙って
+    #     読み飛ばす（誤記で照合ゼロ）。→ driver が ids にある行だけ数える。
+    #   - story_checks の tol_amount/tol_share は許容誤差であって照合ではない。
+    #     → 実際に記載値の行を生む RECON_STORY_KEYS（build_story_inputs の
+    #       mapping と一致）か scenario_reference があるときだけ照合とみなす。
+    back_solved = [did for did, d in ids.items() if d.get("basis") == "逆算"]
+    if back_solved:
+        # scenario_reference は「（記載）各ケースの到達点」の表示行であって、
+        # モデル値と突き合わせる照合チェックそのものではない（照合の実体は
+        # RECON_STORY_KEYS が生む記載値行をサマリーが比較して作る）。照合と
+        # 数えない。
+        real_bounds = any(b.get("driver") in ids
+                          for b in (cfg.get("source_bounds") or []))
+        real_story = bool(RECON_STORY_KEYS & set(cfg.get("story_checks") or {}))
+        if not (real_bounds or real_story):
+            raise ModelError(
+                f"逆算ドライバー {back_solved} に実際の照合チェックがない"
+                "（分解ガイド停止条件S2）。source_bounds（driverは実在ID）か"
+                f"story_checks（{sorted(RECON_STORY_KEYS)} のいずれか）で"
+                "記載値・実測値と突き合わせること。許容誤差キーや誤記IDは照合に"
+                "ならない。逆算は独立の根拠にならない")
     return ids
 
 
@@ -748,6 +839,22 @@ def _case_block(s, reg, d, case_names):
     # 「ラベルと単位はあるが値が1つもない」空行として印刷面に12本残り、
     # 前提条件を8ページに膨らませていた（修正が別の逃げ道を作った実例）。
     # ラベルは採用値行が持つ。
+    # 分解ガイド 停止条件S3の機械化: 3ケースが全期間で同値なら、それは
+    # シナリオ変数ではなく定数。ケースブロックは行を増やすだけで何も語らない
+    # （重複＝「重複のない見せ方」に反する）。ケースを外して定数入力にする。
+    # 比較は**期間数に展開してから**行う。row() はスカラー・短いリストを
+    # 「最後の値を繰り返して」埋めるので、values: 1 と cases: [1,1,1] は
+    # 全期間で同一に描画される。生の [1] と [1,1,1] を比べると見逃す（レビュー指摘）。
+    def _expand(v):
+        vals = v if isinstance(v, list) else [v]
+        return [vals[t] if t < len(vals) else vals[-1] for t in range(s.p)]
+    _base_e = _expand(d["values"])
+    _cases = d.get("cases", {})
+    if _cases and all(_expand(v) == _base_e for v in _cases.values()):
+        raise ModelError(
+            f"ドライバー『{d['id']}』は3ケースが全期間で同値。"
+            "シナリオ変数でないのでケースを外す（分解ガイド停止条件S3）。"
+            "差をつけるか、cases を削除して定数入力にすること")
     s.blank()
     case_rows = {}
     base_vals = d["values"]
@@ -2297,14 +2404,19 @@ def build_capval_inputs(s, cfg):
                 # 今払う価格は今決まっており、後から下振れしたら安く入れた、
                 # ということにはならない。動かすとDownsideのMOICが上振れする。
                 # ケース連動は後続ラウンド（i>=1）だけ。
-                if scale and i >= 1 and "a_switch" in s.reg.cells:
+                # かつ**ケースが実際に差を持つときだけ**ケースブロックにする。
+                # scale が非Baseで1.0に解決される（キー欠落・全て1.0）と合成ケースが
+                # base と同値になり、S3ゲートが自分の合成行で発火してしまう。
+                # 差が無いラウンドは定数行にする（S3の意図と一致）。
+                case_vals = {cn: pv * scale.get(cn, 1.0) for cn in cnames[1:]}
+                differentiated = any(v != pv for v in case_vals.values())
+                if scale and i >= 1 and differentiated \
+                        and "a_switch" in s.reg.cells:
                     _case_block(s, s.reg, {
                         "id": f"a_ct_post{i}",
                         "label": f"ポストマネー：{rd['label']}",
                         "unit": "百万円", "fmt": "m", "basis": "仮置き",
-                        "values": pv,
-                        "cases": {cn: pv * scale.get(cn, 1.0)
-                                  for cn in cnames[1:]},
+                        "values": pv, "cases": case_vals,
                         "case_sources": {
                             cn: f"ケースの到達点に比例（×{scale.get(cn, 1.0)}）"
                             for cn in cnames[1:]},
@@ -2383,6 +2495,8 @@ def build_story_inputs(s, cfg):
                   note="サマリーの照合ブロックが参照（超過で赤字）")
         const_row(s, "照合許容誤差：市場シェア", sc.get("tol_share", 0.05),
                   "pct", "a_ck_tol_share", "%", italic=True, basis="仮置き")
+        # キーは RECON_STORY_KEYS と一致させる（validate_tree のS2ゲートと
+        # 同じ集合。片方だけ増減するとゲートが照合を見落とす）。
         mapping = [
             ("y5_recurring_revenue", "最終年Recurring収益", "m", "百万円"),
             ("y5_implementation_revenue", "最終年一時収益", "m", "百万円"),
@@ -2394,6 +2508,8 @@ def build_story_inputs(s, cfg):
             ("som_sam_share", "SOM/Net SAM（記載値）", "pct", "%"),
             ("som_tam_share", "SOM/TAM（記載値）", "pct", "%"),
         ]
+        assert {k for k, *_ in mapping} == RECON_STORY_KEYS, \
+            "mapping と RECON_STORY_KEYS が不一致（S2ゲートが照合を見落とす）"
         for key, label, fk, unit in mapping:
             if key in sc:
                 const_row(s, label, sc[key], fk, f"a_ck_{key}", unit,
