@@ -716,14 +716,30 @@ install_link() {
   run ln -s "$src" "$dst"
 }
 
+remove_retired_instruction_links() {
+  # 旧名 AI_AGENT_INSTRUCTIONS.md は INSTRUCTIONS.md へ改名した。過去に張った旧名リンクが
+  # 各 home に残ると、指す先(改名で消えた旧ファイル)を失って孤児化する。管理下のものだけ掃除する。
+  old_src="$config_home/instructions/AI_AGENT_INSTRUCTIONS.md"
+  for target_home in "$codex_home" "$claude_home"; do
+    dst="$target_home/AI_AGENT_INSTRUCTIONS.md"
+    [ -L "$dst" ] || continue
+    current=$(readlink "$dst" 2>/dev/null || true)
+    if [ "$current" = "$old_src" ]; then
+      trash_managed_path "$dst" "retired instruction link"
+    else
+      warn "skip unmanaged instruction path: $dst -> $current"
+    fi
+  done
+}
+
 install_instruction_links() {
   src_root="$config_home/instructions"
   install_link "$src_root/AGENTS.md" "$codex_home/AGENTS.md"
-  install_link "$src_root/AI_AGENT_INSTRUCTIONS.md" "$codex_home/AI_AGENT_INSTRUCTIONS.md"
+  install_link "$src_root/INSTRUCTIONS.md" "$codex_home/INSTRUCTIONS.md"
   install_link "$src_root/DESIGN.md" "$codex_home/DESIGN.md"
 
   install_link "$src_root/CLAUDE.md" "$claude_home/CLAUDE.md"
-  install_link "$src_root/AI_AGENT_INSTRUCTIONS.md" "$claude_home/AI_AGENT_INSTRUCTIONS.md"
+  install_link "$src_root/INSTRUCTIONS.md" "$claude_home/INSTRUCTIONS.md"
   install_link "$src_root/DESIGN.md" "$claude_home/DESIGN.md"
 }
 
@@ -1154,6 +1170,7 @@ post_setup_manual_steps() {
 
 move_existing_skill_backups
 install_instruction_links
+remove_retired_instruction_links
 install_shell_links
 remove_retired_skill_links
 install_skill_links

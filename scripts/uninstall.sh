@@ -167,12 +167,16 @@ say "config: $config_home"
 
 src_root="$config_home/instructions"
 remove_managed_link "$codex_home/AGENTS.md" "$src_root/AGENTS.md" "instruction link"
-remove_managed_link "$codex_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "instruction link"
+remove_managed_link "$codex_home/INSTRUCTIONS.md" "$src_root/INSTRUCTIONS.md" "instruction link"
 remove_managed_link "$codex_home/DESIGN.md" "$src_root/DESIGN.md" "instruction link"
 
 remove_managed_link "$claude_home/CLAUDE.md" "$src_root/CLAUDE.md" "instruction link"
-remove_managed_link "$claude_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "instruction link"
+remove_managed_link "$claude_home/INSTRUCTIONS.md" "$src_root/INSTRUCTIONS.md" "instruction link"
 remove_managed_link "$claude_home/DESIGN.md" "$src_root/DESIGN.md" "instruction link"
+
+# 旧名 AI_AGENT_INSTRUCTIONS.md へのリンクが残っていれば併せて外す(INSTRUCTIONS.md へ改名済み)。
+remove_managed_link "$codex_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "retired instruction link"
+remove_managed_link "$claude_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "retired instruction link"
 
 remove_shell_links
 

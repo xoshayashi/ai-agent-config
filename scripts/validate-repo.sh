@@ -98,7 +98,7 @@ require_file "macos/defaults/com.apple.symbolichotkeys.plist"
   || warn "missing optional display snapshot: macos/displays/current.sh"
 require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
-require_file "instructions/AI_AGENT_INSTRUCTIONS.md"
+require_file "instructions/INSTRUCTIONS.md"
 require_file "instructions/DESIGN.md"
 require_file "shell/.zshrc"
 require_file ".github/workflows/validate.yml"
@@ -151,12 +151,21 @@ fi
 say "validate: entrypoint wording"
 ensure_root_entrypoint_gone "AGENTS.md"
 ensure_root_entrypoint_gone "CLAUDE.md"
-grep -Fq "~/.codex/AI_AGENT_INSTRUCTIONS.md" "$repo_root/instructions/AGENTS.md" \
-  || fail "Codex AGENTS entrypoint must point to ~/.codex/AI_AGENT_INSTRUCTIONS.md"
+grep -Fq "~/.codex/INSTRUCTIONS.md" "$repo_root/instructions/AGENTS.md" \
+  || fail "Codex AGENTS entrypoint must point to ~/.codex/INSTRUCTIONS.md"
 grep -Fq "~/.codex/DESIGN.md" "$repo_root/instructions/AGENTS.md" \
   || fail "Codex AGENTS entrypoint must point to ~/.codex/DESIGN.md"
+grep -Fq "@./INSTRUCTIONS.md" "$repo_root/instructions/CLAUDE.md" \
+  || fail "Claude entrypoint must import @./INSTRUCTIONS.md"
 ! grep -Fq "HOOKS.md" "$repo_root/instructions/AGENTS.md" "$repo_root/instructions/CLAUDE.md" \
   || fail "instruction entrypoints must reference only current instruction files"
+# The instructions file was renamed AI_AGENT_INSTRUCTIONS.md -> INSTRUCTIONS.md. The old name
+# may survive ONLY in the migration cleanup (setup.sh / uninstall.sh). Guard against a stray
+# reference creeping back into the entrypoints, docs, or the instructions themselves.
+! grep -rlF "AI_AGENT_INSTRUCTIONS.md" \
+    "$repo_root/instructions" "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/docs" \
+    "$repo_root/scripts/health-check.sh" 2>/dev/null | grep -q . \
+  || fail "retired filename AI_AGENT_INSTRUCTIONS.md must not be referenced outside the migration cleanup"
 
 say "validate: docs and instructions stay within current scope"
 ! grep -REq "autonomous-runner|skill-improvement-bot|safe_delete_guard|HOOKS\\.md|schedule-update|schedule-skill-improvement" \
@@ -165,7 +174,7 @@ say "validate: docs and instructions stay within current scope"
 ! grep -REq --exclude-dir=.venv --exclude-dir=.pytest_cache "daily-llm-history-instruction-review|codex-automation-daily-review|Codex App Automations|日次 instruction|日次レビュー|履歴レビュー" \
   "$repo_root/README.md" "$repo_root/setup.md" "$repo_root/docs" "$repo_root/instructions" "$repo_root/skills" \
   || fail "daily history review automation has been removed and must not be referenced"
-grep -Fq '## Coding Collaboration Defaults' "$repo_root/instructions/AI_AGENT_INSTRUCTIONS.md" \
+grep -Fq '## Coding Collaboration Defaults' "$repo_root/instructions/INSTRUCTIONS.md" \
   || fail "shared instructions must include coding collaboration defaults"
 grep -Fq 'Coding Collaboration Defaults' "$repo_root/README.md" \
   || fail "README.md must mention coding collaboration defaults"

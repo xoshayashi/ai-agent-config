@@ -192,11 +192,11 @@ if [ "$git_status" != "ok" ]; then
 fi
 
 codex_agents_status=$(link_status_for "$codex_home/AGENTS.md" "$config_home/instructions/AGENTS.md")
-codex_shared_status=$(link_status_for "$codex_home/AI_AGENT_INSTRUCTIONS.md" "$config_home/instructions/AI_AGENT_INSTRUCTIONS.md")
+codex_instructions_status=$(link_status_for "$codex_home/INSTRUCTIONS.md" "$config_home/instructions/INSTRUCTIONS.md")
 codex_design_status=$(link_status_for "$codex_home/DESIGN.md" "$config_home/instructions/DESIGN.md")
 codex_skills_status=$(skills_status_for "$codex_home")
 claude_entry_status=$(link_status_for "$claude_home/CLAUDE.md" "$config_home/instructions/CLAUDE.md")
-claude_shared_status=$(link_status_for "$claude_home/AI_AGENT_INSTRUCTIONS.md" "$config_home/instructions/AI_AGENT_INSTRUCTIONS.md")
+claude_instructions_status=$(link_status_for "$claude_home/INSTRUCTIONS.md" "$config_home/instructions/INSTRUCTIONS.md")
 claude_design_status=$(link_status_for "$claude_home/DESIGN.md" "$config_home/instructions/DESIGN.md")
 claude_skills_status=$(skills_status_for "$claude_home")
 
@@ -231,8 +231,8 @@ fi
 # 総合判定には、このリポジトリが設定する主役 CLI(claude / codex / agy)の存在と、
 # スライド用フォントも入れる — これらが欠けていても ok と出す嘘の合格を防ぐ。
 for status in \
-  "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status" \
-  "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status" \
+  "$codex_agents_status" "$codex_instructions_status" "$codex_design_status" "$codex_skills_status" \
+  "$claude_entry_status" "$claude_instructions_status" "$claude_design_status" "$claude_skills_status" \
   "$shell_zshrc_status" \
   "$codex_notify_status" "$claude_notify_status" \
   "$claude_status" "$codex_status" "$agy_status" \
@@ -251,8 +251,8 @@ if [ "$format" = "json" ]; then
   printf '  "repository": {"status": "%s", "branch": "%s", "dirty": %s},\n' "$repo_status" "$(json_escape "$repo_branch")" "$(json_nullable_bool "$repo_dirty")"
   printf '  "commands": {"git": "%s", "claude": "%s", "codex": "%s", "agy": "%s"},\n' "$git_status" "$claude_status" "$codex_status" "$agy_status"
   printf '  "links": {\n'
-  printf '    "codex_AGENTS.md": "%s", "codex_AI_AGENT_INSTRUCTIONS.md": "%s", "codex_DESIGN.md": "%s", "codex_skills": "%s",\n' "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status"
-  printf '    "claude_CLAUDE.md": "%s", "claude_AI_AGENT_INSTRUCTIONS.md": "%s", "claude_DESIGN.md": "%s", "claude_skills": "%s",\n' "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status"
+  printf '    "codex_AGENTS.md": "%s", "codex_INSTRUCTIONS.md": "%s", "codex_DESIGN.md": "%s", "codex_skills": "%s",\n' "$codex_agents_status" "$codex_instructions_status" "$codex_design_status" "$codex_skills_status"
+  printf '    "claude_CLAUDE.md": "%s", "claude_INSTRUCTIONS.md": "%s", "claude_DESIGN.md": "%s", "claude_skills": "%s",\n' "$claude_entry_status" "$claude_instructions_status" "$claude_design_status" "$claude_skills_status"
   printf '    "shell_.zshrc": "%s"\n' "$shell_zshrc_status"
   printf '  },\n'
   printf '  "notifications": {"codex": "%s", "claude": "%s"},\n' "$codex_notify_status" "$claude_notify_status"
@@ -264,9 +264,9 @@ else
   printf 'config: %s\n' "$(display_path "$config_home")"
   printf 'repository: %s branch=%s dirty=%s\n' "$repo_status" "$repo_branch" "$repo_dirty"
   printf 'commands: git=%s claude=%s codex=%s agy=%s\n' "$git_status" "$claude_status" "$codex_status" "$agy_status"
-  printf 'links: codex(AGENTS=%s shared=%s design=%s skills=%s) claude(CLAUDE=%s shared=%s design=%s skills=%s)\n' \
-    "$codex_agents_status" "$codex_shared_status" "$codex_design_status" "$codex_skills_status" \
-    "$claude_entry_status" "$claude_shared_status" "$claude_design_status" "$claude_skills_status"
+  printf 'links: codex(AGENTS=%s INSTRUCTIONS=%s design=%s skills=%s) claude(CLAUDE=%s INSTRUCTIONS=%s design=%s skills=%s)\n' \
+    "$codex_agents_status" "$codex_instructions_status" "$codex_design_status" "$codex_skills_status" \
+    "$claude_entry_status" "$claude_instructions_status" "$claude_design_status" "$claude_skills_status"
   printf 'shell: zshrc=%s\n' "$shell_zshrc_status"
   printf 'notifications: codex=%s claude=%s\n' \
     "$codex_notify_status" "$claude_notify_status"
