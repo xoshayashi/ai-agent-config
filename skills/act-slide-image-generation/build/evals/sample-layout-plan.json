@@ -256,7 +256,7 @@
     "body_width_target": 0.87,
     "body_height_target": 0.88,
     "container_width_target": 0.87,
-    "container_height_target": 0.88,
+    "container_height_target": 0.71,
     "allocated_area_target": 0.73,
     "foreground_area_target": 0.30,
     "text_ink_area_share_target": 0.12,

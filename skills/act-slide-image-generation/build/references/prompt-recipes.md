@@ -47,12 +47,12 @@ edge_margin_balance_lock:
   body side margins: derive from the 78-92% width-utilization target; asymmetry is available when the body union remains optically balanced
 intentional_space_coverage_lock:
   approval: every content slide passes 78-92% body width; footer-absent body height 82-94% of the reachable band; footer-present body height 78-90%
-  container_fill: top-level container passes 82-94% width; footer-absent height 86-96%; footer-present height 84-94%
+  container_fill: main-grid container passes 82-94% width; footer-absent height 65-80%; footer-present height 65-85%
   area_fill: allocated child rectangles cover 58-80% of the available body band; meaningful text and object foreground covers 18-38% of the visible body envelope
   ink_fill: text ink covers 6-20% and meaningful-object ink covers 10-30% of the visible body envelope; their spatial union defines foreground fill
   proximity: group-internal gaps < group-separation gaps; heading-to-owned-content gap < separation above heading
   rhythm: repeated same-level gaps snap to the 8px grid within a half-unit
-  centroid: area-weighted painted body components, including direct Grid children and the painted message box, 58-62% in both footer modes; deviation is repair_required
+  centroid: area-weighted painted body components, including direct Grid children and the painted message box, 58-62% without a footer and 55-60% with a footer; deviation is repair_required
   vertical body utilization: apply the selected footer-mode height band; a pilot refines distribution inside that band
   footer_absent_closure: lowest meaningful body pixel y=857..869; actual H1-top margin and canvas-bottom body margin differ by <=12px
   header/body proportion: compact header, body as dominant visual mass

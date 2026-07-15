@@ -68,12 +68,12 @@ Measure the combined body silhouette, including main and supporting regions, thr
 
 - Body side margins are selected from the target width utilization and may be asymmetric when visual weight remains balanced
 - Footer absent: lowest meaningful body pixel lands at `y=857..869`; canvas-bottom visible margin and actual H1-top visible margin differ by <=12px
-- Footer present: treat the provenance frame as bottom furniture; keep decision-carrying body text visually clear of its `y=866..914` band
+- Footer present: use the dedicated `y=190..842` body envelope and keep the `y=843..865` separation band clear before the provenance frame at `y=866..914`
 - Occupancy, region weights, and blank bands: measure visible envelope, top-level container, allocated region area, meaningful foreground area, text union, and object union according to `grid-flex-layout.md`
 - Proximity: related-element gaps are smaller than group-separation gaps; heading-to-owned-content gap is smaller than the separation above the heading
 - Rhythm: repeated same-level gaps use the declared spacing token and snap to the shared 8px grid within ±4px
 - Optical centroid: the body-only centroid passes the footer-mode range; values outside the range are repair-required
-- Vertical body utilization: footer-absent 82-94% and footer-present 78-90% of the reachable `y=190..869` band
+- Vertical body utilization: footer-absent 82-94% of `y=190..869` and footer-present 78-90% of `y=190..842`
 - Header/body proportion: the compact header introduces the page and the body remains the dominant visual mass at thumbnail size
 - Single aspect-locked chart, diagram, or illustration: preserve native aspect ratio within 5% and use the dedicated 55-88% body-width band
 
@@ -84,15 +84,15 @@ Prioritize shell bounds, >=20pt body text, connected reading path, grouping prox
 Freeze the three-zone silhouette before prompting:
 
 - Header visible marks: `y=66..155`, compact text-only entry
-- Body target envelope: `y=190..869` in both footer modes; visible sources occupy the separate footer frame
+- Body target envelope: `y=190..869` without a footer and `y=190..842` with a footer; visible sources occupy the separate footer frame
 - Required body width utilization: 78-92% of the 1528px available body width; a single aspect-locked focal object uses 55-88% while its complete body passes 78-92%
 - Required body height utilization: footer-absent 82-94% of the reachable body band; footer-present 78-90%
-- Top-level layout container: 82-94% width; footer-absent 86-96% height; footer-present 84-94% height
+- Main-grid layout container: 82-94% width; footer-absent 65-80% height; footer-present 65-85% height
 - Allocated child-region area fill: 58-80% of the available footer-mode body band
 - Meaningful foreground fill: 18-38% of the visible body envelope, pilot-calibrated within the same content mode
 - Text ink area: 6-20% of the visible body envelope; meaningful-object ink area: 10-30%; their spatial union defines foreground fill
 - Footer-absent area-weighted body vertical centroid: 58-62% of the full 941px canvas height
-- Footer-present area-weighted body vertical centroid: 58-62% of the full 941px canvas height
+- Footer-present area-weighted body vertical centroid: 55-60% of the full 941px canvas height
 - Centroid mass: every painted body component, including direct Grid children and the painted message box, weighted by rectangle area; the message box remains outside primary-body horizontal occupancy
 - Remaining blank space: one explicitly named quiet region that supports the reading path
 

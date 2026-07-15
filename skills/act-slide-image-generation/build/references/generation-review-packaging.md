@@ -72,6 +72,8 @@ Require the render audit to mirror the generation plan field-for-field. A comple
 
 Create `slides_package/speaker_notes.json` with ordered slide IDs and speaker notes. Package one full-bleed approved PNG per slide. Render the package back for QA and compare it with the `slides_final/` masters.
 
+Apply `speaker_notes_persuasion_lock`: each note explains the evidence-to-claim warrant, ends with a landing sentence, and hands the audience to the next slide through a concise signpost transition. Register the `notes_persuasion_arc`, and use a hook or objection pre-emption only when it materially improves the decision argument.
+
 ### Output deduplication
 
 Keep each final slide PNG exactly once under `slides_final/`. Keep one composite `contact_sheet_review.png`, one requested delivery wrapper, and compact metadata such as `speaker_notes.json` and `review_manifest.json`. Place render-back QA files in a temporary directory outside the delivery root and remove that directory after visual verification. A PDF created only as an intermediate render is temporary. Before delivery, scan by content hash and remove duplicate PNGs outside `slides_final/`; the contact sheet is the only approved derived PNG because it combines all pages for review.

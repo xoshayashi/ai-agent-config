@@ -38,8 +38,8 @@ For `nowrap`, satisfy `sum(basis_px) + (item_count - 1) × gap_px <= container_m
 
 Measure four distinct quantities against the selected footer-mode body band:
 
-1. `primary_body_visible_envelope`: union bounding box of meaningful main-grid text and objects; width 78-92%; footer-absent height 82-94% of the reachable body band; footer-present height 78-90%. The canonical full-width message box is an auxiliary conclusion band and stays outside this horizontal-width measure.
-2. `top_level_layout_container`: width 82-94%; footer-absent height 86-96% of the reachable body band; footer-present height 84-94%.
+1. `primary_body_visible_envelope`: horizontal union of meaningful non-message components plus the vertical union of every painted body component; width 78-92%; footer-absent height 82-94% of the reachable body band; footer-present height 78-90%. The canonical full-width message box is an auxiliary conclusion band and stays outside only the horizontal-width measure.
+2. `top_level_layout_container`: union of declared main-grid regions; width 82-94%; footer-absent height 65-80% of the reachable body band; footer-present height 65-85%.
 3. `allocated_region_area_fill`: union of child `allocation_bounds` divided by the available footer-mode body-band area; 58-80%.
 4. `meaningful_foreground_area_fill`: visible text glyphs plus meaningful object surfaces divided by the body visible envelope; initial range 18-38%, then pilot-calibrated within the same content mode.
 
@@ -47,7 +47,7 @@ Count text glyph ink, data marks, icons, filled shapes, and information-bearing 
 
 For an aspect-locked focal object, preserve its 55-88% object-width band while the complete body passes the standard width band and its selected footer-mode height band.
 
-Measure the area-weighted vertical centroid of every painted body component, including direct Grid children and the painted message box, against the full 941px canvas height: 58-62% in both footer modes. Include the message box in vertical mass, allocated area, and bottom closure while measuring primary-body horizontal occupancy from the main grid regions. In footer-absent mode, place the lowest meaningful allocation edge at `y=857..869` and keep the actual first-H1-pixel margin versus canvas-bottom/body margin difference within 12px.
+Measure the area-weighted vertical centroid of every painted body component, including direct Grid children and the painted message box, against the full 941px canvas height: 58-62% without a footer and 55-60% with a footer. Include the message box in vertical mass, allocated area, and bottom closure while measuring primary-body horizontal occupancy from non-message components. Footer-present layouts use the dedicated `y=190..842` body envelope and omit the canonical bottom message box. In footer-absent mode, place the lowest meaningful allocation edge at `y=857..869` and keep the actual first-H1-pixel margin versus canvas-bottom/body margin difference within 12px.
 
 ## Plan And Render Audit
 

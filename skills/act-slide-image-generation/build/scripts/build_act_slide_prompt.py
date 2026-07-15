@@ -155,7 +155,10 @@ def read_layout_plan(path: str | None, mode: str, design_tokens: dict) -> dict |
     atom_ids = {atom["id"] for atom in atoms}
     if not isinstance(argument["evidence_atom_ids"], list) or not argument["evidence_atom_ids"] or not set(argument["evidence_atom_ids"]).issubset(atom_ids):
         raise SystemExit("Invalid --layout-plan; evidence_atom_ids bind the slide claim to registered visible evidence atoms.")
-    h1_text = next(atom["exact_text"] for atom in atoms if atom["component_id"] == "header_h1")
+    header_atoms = {component_id: [atom for atom in atoms if atom["component_id"] == component_id] for component_id in ("header_h1", "header_subtitle")}
+    if any(len(bound_atoms) != 1 for bound_atoms in header_atoms.values()):
+        raise SystemExit("Invalid --layout-plan; header inventory binds exactly one text atom to header_h1 and header_subtitle.")
+    h1_text = header_atoms["header_h1"][0]["exact_text"]
     if argument["claim"] != h1_text or argument["new_contribution"] != argument["claim"]:
         raise SystemExit("Invalid --layout-plan; the action title, slide claim, and new contribution are one proposition.")
     if not isinstance(argument["open_items"], list) or any(
@@ -197,9 +200,6 @@ def read_layout_plan(path: str | None, mode: str, design_tokens: dict) -> dict |
         raise SystemExit("Invalid --layout-plan; open closure rows and owner/due-date open_items are present together.")
     if any(atom["anchor_line"] not in range(1, 18) or (atom["component_id"] != "footer_master" and atom["baseline_step"] % GEOMETRY["grid"]["unit_px"]) for atom in atoms):
         raise SystemExit("Invalid --layout-plan; every content atom has one grid anchor and one 8px body baseline; the footer atom uses its canonical centered baseline.")
-    header_atoms = {component_id: [atom for atom in atoms if atom["component_id"] == component_id] for component_id in ("header_h1", "header_subtitle")}
-    if any(len(bound_atoms) != 1 for bound_atoms in header_atoms.values()):
-        raise SystemExit("Invalid --layout-plan; header inventory binds exactly one text atom to header_h1 and header_subtitle.")
     for component_id, geometry_key in (("header_h1", "h1"), ("header_subtitle", "subtitle")):
         atom = header_atoms[component_id][0]
         if atom["anchor_line"] != 1 or atom["baseline_step"] != GEOMETRY["header"][geometry_key]["baseline_y"] or atom["max_lines"] != 1:
@@ -243,6 +243,8 @@ def read_layout_plan(path: str | None, mode: str, design_tokens: dict) -> dict |
     message_box_plan = plan["message_box_plan"]
     if set(message_box_plan) != {"boxes"} or not isinstance(message_box_plan["boxes"], list):
         raise SystemExit("Invalid --layout-plan; message_box_plan uses the explicit shape {'boxes': []} when no message box is present.")
+    if plan["footer_mode"] == "present" and message_box_plan["boxes"]:
+        raise SystemExit("Invalid --layout-plan; footer-present layouts reserve the dedicated clear body envelope and use no canonical bottom message box.")
     clarity = plan["clarity_plan"]
     required_clarity = {"primary_relationship", "visual_grammar", "major_region_count", "region_roles", "start_region_id", "landing_region_id", "reading_path", "connector_count", "connector_set_count", "visual_anchor_count", "emphasis_system_count", "outer_frame_role", "redundant_encoding_count", "mark_language_consistency", "region_internal_distribution_consistency", "thumbnail_path_status"}
     if not required_clarity.issubset(clarity):
@@ -600,20 +602,26 @@ def read_layout_plan(path: str | None, mode: str, design_tokens: dict) -> dict |
     ink_targets = (occupancy["text_ink_area_share_target"], occupancy["object_ink_area_share_target"])
     if sum(ink_targets) < occupancy["foreground_area_target"] - 0.02 or sum(ink_targets) > 1.0:
         raise SystemExit("Invalid --layout-plan; text and object ink shares support the foreground-union target while allowing overlap.")
-    union_x1 = min(box["x"] for box in region_boxes.values())
-    union_y1 = min(box["y"] for box in region_boxes.values())
-    union_x2 = max(box["x"] + box["w"] for box in region_boxes.values())
-    message_box_rectangles = [component["bounds"] for component in components if component["type"] == "message_box"]
-    union_y2 = max([box["y"] + box["h"] for box in region_boxes.values()] + [box["y"] + box["h"] for box in message_box_rectangles])
-    derived_container_width = (union_x2 - union_x1) / body["available_width"]
+    container_x1 = min(box["x"] for box in region_boxes.values())
+    container_y1 = min(box["y"] for box in region_boxes.values())
+    container_x2 = max(box["x"] + box["w"] for box in region_boxes.values())
+    container_y2 = max(box["y"] + box["h"] for box in region_boxes.values())
+    derived_container_width = (container_x2 - container_x1) / body["available_width"]
     available_height = body["available_height_without_footer"] if plan["footer_mode"] == "absent" else body["available_height_with_footer"]
-    derived_container_height = (union_y2 - union_y1) / available_height
+    derived_container_height = (container_y2 - container_y1) / available_height
     if abs(occupancy["container_width_target"] - derived_container_width) > 0.02 or abs(occupancy["container_height_target"] - derived_container_height) > 0.02:
         raise SystemExit("Invalid --layout-plan; container occupancy targets match derived grid geometry within 0.02.")
-    if abs(occupancy["body_width_target"] - derived_container_width) > 0.02 or abs(occupancy["body_height_target"] - derived_container_height) > 0.02:
+    painted_body_rectangles = [component["bounds"] for component in components]
+    primary_body_rectangles = [component["bounds"] for component in components if component["type"] != "message_box"]
+    body_x1 = min(box["x"] for box in primary_body_rectangles)
+    body_x2 = max(box["x"] + box["w"] for box in primary_body_rectangles)
+    body_y1 = min(box["y"] for box in painted_body_rectangles)
+    body_y2 = max(box["y"] + box["h"] for box in painted_body_rectangles)
+    derived_body_width = (body_x2 - body_x1) / body["available_width"]
+    derived_body_height = (body_y2 - body_y1) / available_height
+    if abs(occupancy["body_width_target"] - derived_body_width) > 0.02 or abs(occupancy["body_height_target"] - derived_body_height) > 0.02:
         raise SystemExit("Invalid --layout-plan; body envelope targets match the derived primary-body width and complete vertical envelope within 0.02.")
     body_band_area = body["available_width"] * available_height
-    painted_body_rectangles = [component["bounds"] for component in components]
     derived_allocated_area = rectangle_union_area(painted_body_rectangles) / body_band_area
     if abs(occupancy["allocated_area_target"] - derived_allocated_area) > 0.02:
         raise SystemExit("Invalid --layout-plan; allocated-area target matches the union of child allocation rectangles within 0.02.")
@@ -665,8 +673,8 @@ def read_layout_plan(path: str | None, mode: str, design_tokens: dict) -> dict |
     quiet_bounds = quiet["bounds"]
     if not {"x", "y", "w", "h"}.issubset(quiet_bounds) or quiet_bounds["x"] < shell["x"] or quiet_bounds["x"] + quiet_bounds["w"] > shell["right"] or quiet_bounds["y"] < shell["y"] or quiet_bounds["y"] + quiet_bounds["h"] > shell["bottom"]:
         raise SystemExit("Invalid --layout-plan; quiet_region stays inside the canonical shell.")
-    if any(rectangles_overlap(quiet_bounds, rectangle) for rectangle in allocation_rectangles):
-        raise SystemExit("Invalid --layout-plan; quiet_region remains clear of allocated child regions.")
+    if any(rectangles_overlap(quiet_bounds, rectangle) for rectangle in painted_body_rectangles):
+        raise SystemExit("Invalid --layout-plan; quiet_region remains clear of every painted body component.")
     return plan
 
 

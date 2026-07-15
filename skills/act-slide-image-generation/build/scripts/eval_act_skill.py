@@ -78,7 +78,7 @@ def check_geometry_arithmetic() -> list[Result]:
     centroid_range = body["centroid_y_range_without_footer"]
     footer_centroid_range = body["centroid_y_range_with_footer"]
     centroid_ok = centroid_range == [0.58, 0.62]
-    footer_centroid_ok = footer_centroid_range == [0.58, 0.62]
+    footer_centroid_ok = footer_centroid_range == [0.55, 0.60]
     quiet_without = body["quiet_clearance_range_without_footer"]
     quiet_with = body["quiet_clearance_range_with_footer"]
     quiet_without_ok = 0 < quiet_without[0] < quiet_without[1] and header["clearance_datum_y"] + quiet_without[1] < body["target_envelope_without_footer"]["bottom"]
@@ -305,7 +305,12 @@ def check_deck_plan_output_hygiene() -> Result:
     combined = proc.stdout + proc.stderr
     if proc.returncode != 0:
         return Result("deck_plan_output_hygiene", False, combined[:2000])
-    required = [
+    canvas_contract = slice_named_block(combined, "non_negotiable_canvas_contract:", "planning_scope:")
+    planning_scope = slice_named_block(combined, "planning_scope:", "generation_handoff:")
+    generation_handoff = slice_named_block(combined, "generation_handoff:", "__END_OF_DECK_PLAN_OUTPUT__")
+    if not canvas_contract or not planning_scope or not generation_handoff:
+        return Result("deck_plan_output_hygiene", False, "missing scoped deck-plan blocks")
+    required_contract = [
         "non_negotiable_canvas_contract",
         "composition_clarity",
         "78-92%",
@@ -314,13 +319,18 @@ def check_deck_plan_output_hygiene() -> Result:
         "flex_contract",
         "layout_tree_gate",
         "58-62%",
-        "generation_handoff",
     ]
-    missing = [needle for needle in required if needle not in combined]
+    required_planning = ["argument_closure_lock", "deck_argument_plan", "closure_matrix"]
+    required_handoff = ["generation_handoff", "grid_plan", "exact_text"]
+    missing = (
+        [needle for needle in required_contract if needle not in canvas_contract]
+        + [needle for needle in required_planning if needle not in planning_scope]
+        + [needle for needle in required_handoff if needle not in generation_handoff]
+    )
     if missing:
         return Result("deck_plan_output_hygiene", False, "missing deck-plan terms: " + ", ".join(missing))
     rigid = ["density_tier", "layout_diversity_plan", "mece_support_gate", "icon_density_budget"]
-    present = [needle for needle in rigid if needle in combined]
+    present = [needle for needle in rigid if needle in canvas_contract + planning_scope]
     if present:
         return Result("deck_plan_output_hygiene", False, "rigid body terms leaked: " + ", ".join(present))
     return Result("deck_plan_output_hygiene", True)
@@ -788,6 +798,9 @@ def check_layout_plan_geometry_rejections() -> list[Result]:
             "padding_px": 24,
         })
 
+    def overlap_quiet_region_with_direct_grid_content(plan: dict) -> None:
+        plan["quiet_region"]["bounds"] = {"x": 169, "y": 272, "w": 96, "h": 96}
+
     cases: list[tuple[str, callable]] = [
         ("argument_plan_missing", lambda plan: plan.pop("slide_argument_plan")),
         ("argument_evidence_unbound", lambda plan: plan["slide_argument_plan"].update(evidence_atom_ids=["missing_atom"])),
@@ -799,6 +812,7 @@ def check_layout_plan_geometry_rejections() -> list[Result]:
         ("body_target_exceeds_container", lambda plan: plan["occupancy_plan"].update(body_width_target=0.94)),
         ("body_target_in_range_but_derived_mismatch", lambda plan: plan["occupancy_plan"].update(body_width_target=0.80)),
         ("direct_grid_component_changes_mass", add_direct_grid_component),
+        ("quiet_region_over_painted_component", overlap_quiet_region_with_direct_grid_content),
         ("header_geometry_present", lambda plan: plan["header_furniture_plan"].update(visible_geometry_count=1)),
         ("flex_outside_shell", lambda plan: plan["flex_plan"]["containers"][0]["bounds"].update(x=0)),
         ("off_baseline_row", lambda plan: plan["grid_plan"]["regions"][0].update(row_start=250)),
@@ -843,6 +857,7 @@ def check_layout_plan_geometry_rejections() -> list[Result]:
         ("header_h1_off_master_baseline", lambda plan: plan["content_atom_registry"]["atoms"][0].update(baseline_step=800)),
         ("header_subtitle_wrong_anchor", lambda plan: plan["content_atom_registry"]["atoms"][1].update(anchor_line=2)),
         ("source_footer_mode_mismatch", lambda plan: plan.update(footer_mode="present")),
+        ("footer_present_message_box", lambda plan: add_visible_source(plan)),
         ("source_internal_class", lambda plan: plan["source_plan"].update(visibility="visible", reference_class="internal_note", publication_title="Meeting memo", locator="https://example.com/memo", source_line="Source: Meeting memo")),
         ("source_locator_not_traceable", lambda plan: plan["source_plan"].update(visibility="visible", reference_class="external_publication", publication_title="Report", locator="report.pdf", source_line="Source: Report")),
         ("source_prefix_not_exact", lambda plan: plan["source_plan"].update(visibility="visible", reference_class="external_publication", publication_title="Report", locator="https://example.com/report", source_line="Reference: Report")),
@@ -889,10 +904,37 @@ def check_layout_plan_geometry_rejections() -> list[Result]:
     return results
 
 
+def configure_footer_present_body(plan: dict) -> None:
+    """Fit the sample body to the footer-present envelope without a bottom message box."""
+    plan["footer_mode"] = "present"
+    plan["message_box_plan"]["boxes"] = []
+    plan["layout_tree"]["nodes"] = [node for node in plan["layout_tree"]["nodes"] if node["id"] != "message_box"]
+    plan["component_geometry_plan"]["components"] = [
+        component for component in plan["component_geometry_plan"]["components"] if component["id"] != "message_box"
+    ]
+    takeaway = next(atom for atom in plan["content_atom_registry"]["atoms"] if atom["id"] == "takeaway")
+    takeaway.update(component_id="item_b", anchor_line=12, baseline_step=720)
+    plan["grid_plan"]["regions"][0]["row_end"] = 816
+    container = plan["flex_plan"]["containers"][0]
+    container["bounds"]["h"] = 544
+    for child in container["children"]:
+        child["allocation_bounds"]["h"] = 544
+    for component in plan["component_geometry_plan"]["components"]:
+        component["bounds"]["h"] = 544
+        component["bottom_baseline_step"] = 816
+    for waypoint in plan["connector_plan"]["connectors"][0]["waypoints"]:
+        waypoint["y"] = 544
+    plan["occupancy_plan"].update(
+        body_height_target=0.83,
+        container_height_target=0.83,
+        allocated_area_target=0.72,
+    )
+
+
 def check_footer_present_layout_plan() -> Result:
     script = ROOT / "build" / "scripts" / "build_act_slide_prompt.py"
     plan = json.loads((ROOT / "build" / "evals" / "sample-layout-plan.json").read_text(encoding="utf-8"))
-    plan["footer_mode"] = "present"
+    configure_footer_present_body(plan)
     plan["source_plan"] = {
         "visibility": "visible",
         "reference_class": "external_publication",
@@ -942,7 +984,7 @@ def check_footer_present_layout_plan() -> Result:
 def check_one_line_footer_layout_plan() -> Result:
     script = ROOT / "build" / "scripts" / "build_act_slide_prompt.py"
     plan = json.loads((ROOT / "build" / "evals" / "sample-layout-plan.json").read_text(encoding="utf-8"))
-    plan["footer_mode"] = "present"
+    configure_footer_present_body(plan)
     plan["source_plan"] = {"visibility": "visible", "reference_class": "external_publication", "publication_title": "Public Report", "locator": "https://example.com/report", "source_line": "Source: Public Report", "annotations": []}
     plan["content_atom_registry"]["atoms"].append({"id": "source", "exact_text": "Source: Public Report", "semantic_role": "footer", "component_id": "footer_master", "anchor_line": 1, "baseline_step": 895, "max_lines": 1, "expected_occurrences": 1})
     plan["model_fit_plan"]["visible_string_count"] += 1
