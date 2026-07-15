@@ -110,6 +110,20 @@
       ]
     },
     {
+      "id": "adversarial_self_generated_header_geometry",
+      "class": "adversarial",
+      "brief": "本文の罫線やコネクタがヘッダー帯へ侵入し、タイトル横の装飾に見える。",
+      "expected_route": "restore_header_inventory",
+      "hard_gates": [
+        "header_surface_continuity",
+        "header_visible_component_inventory",
+        "body_geometry_containment"
+      ],
+      "pairwise_review": [
+        "header_consistency"
+      ]
+    },
+    {
       "id": "adversarial_conflicting_styles",
       "class": "adversarial",
       "brief": "複数参照画像で色・字体・レイアウトが競合。",

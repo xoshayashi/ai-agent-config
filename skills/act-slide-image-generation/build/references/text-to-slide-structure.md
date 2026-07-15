@@ -1,12 +1,15 @@
-# Text To Slide Structure Compatibility Route
+# Text To Slide Structure Route
 
-This compatibility entry preserves the historical filename while keeping one source of truth per concern.
+Use this entry to route prose through the image-model-adaptive construction process before layout and generation.
 
 Use:
 
 - `content-and-story.md` for brief decomposition, story logic, evidence, density, and ordinal semantics
-- `core-layout-and-typography.md` for the fixed deck-wide 38pt H1, 32pt gray subtitle, header copy budgets, visible outer-padding measurement, and body balance
+- `argument-closure-and-deck-logic.md` for slide-level reasoning closure and deck-level dependency closure
+- `image-model-adaptive-construction.md` for content atoms, copy capacity, topology complexity, prompt compilation, and repair routing
+- `grid-flex-layout.md` and `consulting-grid-rigidity.md` for validated parent and component geometry
+- `core-layout-and-typography.md` for the fixed deck-wide 28pt H1 and 20pt gray subtitle, pilot-calibrated rendered heights, the `equity_story_master` shell, text-only message boxes, and body balance
 - `generation-review-packaging.md` for prompt handoff, actual-PNG review, repair, manifest approval, and packaging
 - `prompt-recipes.md` for the minimal current scaffold route
 
-Current master summary: quiet text-only header, H1 38pt/700 `#2D332E`, subtitle 32pt/400 `#626A64`, H1 <=28 and subtitle <=36 Japanese full-width-equivalent characters, deck-wide visible glyph-height spread <=2px, and normalized top/bottom visible-margin difference <=0.005.
+Process summary: freeze the governing decision, `deck_argument_plan`, `closure_matrix`, and exact-copy ledger; close every slide's question, claim, evidence, warrant, implication, and transition; verify every deck dependency and final owner/timing/success measure; bind each content atom to one component; approve copy capacity and model fit; validate the complete 1672x941 plan; compile only visible states into a concise 2048x1152 render prompt; audit the actual PNG; route measured variance to focused edit or zero-base regeneration.

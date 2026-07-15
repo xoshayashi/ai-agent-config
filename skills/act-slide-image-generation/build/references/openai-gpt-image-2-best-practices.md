@@ -75,7 +75,7 @@ Important size rule:
 
 Other model constraints from the official references:
 
-- Prompt length for GPT image models can be long enough for detailed slide specs, but keep the final prompt structured and only include text that should render.
+- Planning context may remain detailed. Compile the final render prompt into concise labeled visible-state blocks and include only the geometry, copy, material, and preservation states the image model must draw.
 - `n` can be used for variations when exploring, but generate one final text-heavy slide at a time for easier QA.
 - `gpt-image-2` does not support transparent background. Requests with `background: "transparent"` fail.
 - Omit `input_fidelity` for `gpt-image-2`; image inputs are processed at high fidelity automatically.
@@ -95,40 +95,7 @@ Other model constraints from the official references:
 
 ## Prompt Shape For Slide Images
 
-Use a skimmable production template:
-
-```text
-Goal:
-Create/draw a guideline-aware strategy slide image for [audience/use].
-
-Image generation settings:
-model=gpt-image-2
-size=2048x1152
-quality=high
-background=opaque
-format=png
-
-Layout:
-[coordinate-aware grid, regions, component inventory, x/y/w/h]
-
-Exact text:
-Render ONLY these text strings, verbatim:
-- H1: "..."
-- Subtitle: "..."
-- Label 1: "..."
-
-Style:
-[embedded ACT palette, typography, icon style, human-crafted rhythm]
-
-Constraints:
-[preserve grid, no extra text, brand-safe visual subject selection, source policy]
-
-Negative prompt:
-[things to avoid]
-
-QA:
-[post-generation checks]
-```
+Compile the production prompt with `scripts/build_act_slide_prompt.py --mode single-slide-image --layout-plan PATH`. The validated plan supplies the exact copy, 2048x1152 render map, semantic palette, body geometry, source state, and `header_furniture_plan`. The resulting contract uses the fixed blocks `DELIVERABLE`, `MESSAGE`, `CANVAS`, `LAYOUT MAP`, `EXACT COPY`, `VISUAL SYSTEM`, `PRESERVATION STATE`, and `ACCEPTANCE`. Its header target is an uninterrupted canvas whose complete visible inventory is `[header_h1, header_subtitle]` and whose geometry count is zero. Use the compiler output as the first-render prompt and as the baseline for focused repairs.
 
 ## Text And Dense Layout Rules
 
@@ -137,7 +104,9 @@ QA:
 - Keep text short; reduce labels before asking the model to render many small words.
 - Convert abstract messages into a concrete visual anchor before generation: name the observable scene or object, viewpoint/crop, and 2-4 specific visual details.
 - Specify font style, size, color, and placement for text.
-- Apply max_text_size_lock: H1 stays at the deck-wide 38pt master with 40pt cap, subtitle stays at 32pt with 34pt cap, message-box/Insight max 26pt, and body/data labels max 24pt.
+- Apply the fixed header master: H1 stays at 28pt with 47-50px visible height on the 1672 basis; subtitle stays at 20pt with 33-35px visible height. The first approved slide becomes the pilot and subsequent header heights stay within 2px.
+- Compile message boxes as text-only components. Use zero icons and the 1672-basis master `x=72 y=796 w=1528 h=73`, one centered 17pt line, a 25px line metric, and 24px horizontal/vertical padding.
+- Compile one provenance footer atom. Reserve the exact `Source: ` prefix for a traceable external publication; use `Assumption: ` and `Note: ` for concise labeled internal provenance, with an empty footer when all three entries are absent.
 - For brand names or unusual words, spell them letter-by-letter.
 - Ask for sharp text rendering and high contrast.
 - Use `quality: "medium"` or `quality: "high"` for dense text, small labels, multi-font layouts, and final slides.
@@ -164,7 +133,7 @@ Keep everything else exactly the same: layout, grid, arrows, labels, source text
 - Move to `quality: "high"` for final ACT slides with Japanese text, small labels, tables, diagrams, or brand-sensitive components.
 - Generate one slide at a time for text-heavy slides; batch only when text is minimal or the slide family is simple.
 - Use reference images for screenshot repair or style matching, but name each input explicitly: `Image 1: current slide render`, `Image 2: style reference`.
-- Preserve the footer/source alignment position even when no Source text is rendered; do not draw a visible horizontal line for that baseline.
+- When Assumption or Note provides provenance without a Source entry, keep the canonical footer alignment on uninterrupted canvas.
 - Run a visual QA pass after generation, preferably with high-detail/original vision inspection for dense screenshots.
 - Model/route QA must explicitly confirm the image used Codex built-in image generation, not local rendering.
 - Script-boundary QA must explicitly confirm that any prompt builder or packaging script was not used to create the final PNG pixels.
