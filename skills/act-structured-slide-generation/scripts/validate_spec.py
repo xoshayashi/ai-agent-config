@@ -10,6 +10,7 @@ Exit 0 = OK (warnings allowed), exit 1 = errors that must be fixed in the spec.
 from __future__ import annotations
 
 import json
+import re
 import math
 import sys
 from pathlib import Path
@@ -650,6 +651,11 @@ def main() -> int:
             ncol = len(s.get("columns", []))
             if not 2 <= ncol <= 4:
                 errors.append(f"{loc}: column_framework の columns は 2-4 本({ncol} 本)")
+            long_head = [c.get("heading", f"col{j+1}") for j, c in enumerate(s.get("columns", []))
+                         if ja_len(str(c.get("label", "")) + str(c.get("heading", ""))) > 36]
+            if long_head:
+                warns.append(f"{loc}: 柱の見出しが長い({', '.join(h[:12] for h in long_head)}) — ラベル込みで36字以内。"
+                             "帯は3行で頭打ちにし、超える分は溢れて描かれる")
             fat = [c.get("heading", f"col{j+1}") for j, c in enumerate(s.get("columns", []))
                    if len(c.get("items", [])) > 4]
             if fat:
@@ -732,10 +738,21 @@ def main() -> int:
         # 利用者の指示: Note は要らない)。言いたいことは本文か speaker_notes へ
         if s.get("note") and pat not in ("cover", "section_divider"):
             try:
-                from deck_argument import claim_tokens, exhibit_tokens
-                # 数値は図表側(exhibit)でも主張側(claim: statement の recap、insight 等)でもよい —
-                # recap が「68億円」を描く締めページの定義注記まで削らせない(Codex レビュー指摘、PR #158)
-                if not (exhibit_tokens(s) | claim_tokens(s)):
+                from deck_argument import claim_tokens, exhibit_tokens, exhibit_values, claim_values
+                # 数値は図表側(exhibit)でも主張側(claim: statement の recap、insight 等)でもよく、
+                # 単位の無い裸の数(5点満点の「5」「3」)も数える — 分母や定義を添える注記を削らせない
+                # (Codex レビュー指摘、PR #158)
+                def _has_bare_number(vals) -> bool:
+                    for v in vals:
+                        if isinstance(v, bool):
+                            continue
+                        if isinstance(v, (int, float)):
+                            return True
+                        if isinstance(v, str) and re.search(r"\d", v):
+                            return True
+                    return False
+                if not (exhibit_tokens(s) | claim_tokens(s)) \
+                        and not _has_bare_number(exhibit_values(s)) and not _has_bare_number(claim_values(s)):
                     warns.append(f"{loc}: note「{str(s['note'])[:20]}」— 数値の無いページに Note を置かない。"
                                  "解説は本文か speaker_notes へ移し、note は削除する")
             except Exception as exc:

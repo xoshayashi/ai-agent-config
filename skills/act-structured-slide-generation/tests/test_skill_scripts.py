@@ -3328,3 +3328,40 @@ def test_explicit_labels_break_on_phrases_even_with_punctuation():
     assert broken == "Off-Marketを探さず、\n生み出す", broken
     chunks, _ = D._segments("Off-Marketを探さず、生み出す")
     assert chunks[0].startswith("Off-Market"), chunks
+
+
+def test_note_is_allowed_for_unitless_numbers(tmp_path):
+    """5点満点の「5」「3」のような単位の無い数にも注記は付けられる(Codex レビュー、PR #158)。"""
+    deck = {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+        "pattern": "comparison_table", "title": "評価は5点満点で比べる", "subtitle": "s",
+        "table": {"headers": ["評価軸", "当社", "他社"], "rows": [["導入の速さ", "5", "3"], ["価格", "4", "4"]]},
+        "note": "5点満点"}]}
+    spec = tmp_path / "n2.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    assert "Note を置かない" not in run("validate_spec.py", spec).stdout
+
+
+def test_sen_yen_units_stay_with_their_number():
+    """「10,590千円」は数と単位で1語(Codex レビュー、PR #158)。"""
+    D = _deck_text()
+    spans = {t[a:b] for t in ["売上高10,590千円、在庫3千台"] for a, b in D._unbreakable_spans(t)}
+    assert {"10,590千円", "3千台"} <= spans, spans
+
+
+def test_column_framework_keeps_a_card_under_a_long_header(tmp_path):
+    """見出しが何行にも折り返しても、柱の本文カードは 1.4in 以上残る(Codex レビュー、PR #158)。"""
+    from pptx.util import Emu
+    long_heading = "従業員300名から999名の中堅製造業のうち紙の日報が残る工場へ社労士パートナーの顧問先から新規獲得を進める"
+    deck = {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+        "pattern": "column_framework", "title": "3本柱", "subtitle": "s",
+        "columns": [{"label": "01", "heading": long_heading, "items": ["x"]},
+                    {"label": "02", "heading": "部品表連携", "items": ["y"]},
+                    {"label": "03", "heading": "保守サブスク", "items": ["z"]}]}]}
+    spec = tmp_path / "cf2.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    assert "柱の見出しが長い" in run("validate_spec.py", spec).stdout
+    out = tmp_path / "cf2.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    slide = pptx.Presentation(out).slides[0]
+    cards = [Emu(sh.height).inches for sh in slide.shapes if getattr(sh, "name", "") == "card"]
+    assert cards and min(cards) >= 1.4 - 1e-6, cards

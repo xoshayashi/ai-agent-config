@@ -2970,6 +2970,10 @@ def _column_framework_layout(cols: list, h: float) -> dict:
     head_rows = max(_text_lines((f"{c['label']}  " if c.get("label") else "") + c.get("heading", ""),
                                 cw - 0.32, HEAD_PT, 600, "label") for c in cols)
     head_h = max(0.56, head_rows * drawn_line_h(HEAD_PT) + 0.22)
+    # 見出し帯は3行まで、かつカードに最低 1.4in を残す。長い見出しが帯を育て続けると、fit_band が
+    # 帯を本文帯に収めたあとの引き算で card_h が 0 以下になり、カードが 0.1in の筋になる
+    # (Codex レビュー指摘、PR #158)。超えるぶんは溢れとして verify が名指しする
+    head_h = min(head_h, max(0.56, 3 * drawn_line_h(HEAD_PT) + 0.22), max(0.56, h - 0.10 - 0.12 - 1.4))
     has_outcome = any(c.get("outcome") for c in cols)
     outcome_pt = TS["section_heading"]
     # 入らないときは余白から詰める(reclaim ladder): 項目間 → 器の内側余白。型は縮めない
@@ -2998,7 +3002,7 @@ def _column_framework_layout(cols: list, h: float) -> dict:
         if head_h + 0.12 + card_min <= h - 0.10:
             break
     band_h, off = fit_band(h - 0.10, head_h + 0.12 + card_min, top_anchored=not has_outcome)
-    card_h = band_h - head_h - 0.12
+    card_h = max(1.4, band_h - head_h - 0.12)
     col_h = [(_stack_drawn_h(b, text_w) if b else 0.0) for b in col_blocks]
     return dict(n=n, cw=cw, gut=gut, head_h=head_h, HEAD_PT=HEAD_PT, has_outcome=has_outcome,
                 outcome_pt=outcome_pt, pad=pad, text_w=text_w, col_blocks=col_blocks, col_h=col_h,
