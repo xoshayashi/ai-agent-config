@@ -399,7 +399,10 @@ def _has_subject(text: str) -> bool:
     """主語の助詞(が・は)で終わる文節のあとに述語が続くか。文節は deck_text._words で切るので、
     「がん検診」「はがき」のような語頭の仮名や、文末の「売上高は」だけの見出しは主語に数えない。"""
     toks = _dt_words(text)
-    return any(len(t) >= 2 and t.endswith(_SUBJECT_PARTICLES) for t in toks[:-1])
+    return any(len(t) >= 2 and t.endswith(_SUBJECT_PARTICLES) and t not in _PRENOMINAL_GA for t in toks[:-1])
+
+
+_PRENOMINAL_GA = ("我が", "わが")      # 連体詞の「が」(我が社)。_words は後ろの名詞に結ぶが、単独でも主語に数えない
 
 
 def display_wrap_text(text: str, w_in: float, size_pt: float, weight: int = 400,

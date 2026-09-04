@@ -3137,8 +3137,9 @@ def test_nominal_predicate_sentences_are_body_copy():
                  "施策の進捗は横ばい", "本社は東京", "需要が旺盛"):        # 述語の語彙に依らない
         assert not B._looks_like_label(text), text
     for text in ("全社展開の可能性", "必要投資額", "対応方針", "可能", "必要", "重要顧客の維持",
-                 "がん検診の受診率", "はがきの送付", "売上高は"):
+                 "がん検診の受診率", "はがきの送付", "売上高は", "我が社の競争優位", "わが国の水準"):
         assert B._looks_like_label(text), text
+    assert not B._has_subject("我が社の競争優位") and not B._has_subject("我が 社")   # 連体詞の「が」は主語ではない
 
 
 def test_i_adjective_sentences_are_body_copy():
