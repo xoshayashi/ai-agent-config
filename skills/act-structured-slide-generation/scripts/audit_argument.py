@@ -302,7 +302,8 @@ def check_thesis(deck, errors) -> None:
     # 「3段階の打ち手」のような語りの数まで出所を要求してしまう(レビュー指摘、2026-09-04)
     # 文字列で探すときは数値を丸ごと一致させる — 「7段階」を「17段階」「27段階」で満たさない
     # (Codex レビュー指摘、PR #158)
-    whole = re.compile(r"(?<![\d.,])" + re.escape(token) + r"(?!\d)")
+    # 符号も一致させる — 「7段階」を「-7段階」「△7段階」で満たさない(Codex レビュー指摘、PR #158)
+    whole = re.compile(r"(?<![\d.,\-−△▲+±])" + re.escape(token) + r"(?!\d)")
 
     def _shown(s: dict) -> bool:
         if token in exhibit_tokens(s):

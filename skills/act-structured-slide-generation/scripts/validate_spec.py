@@ -746,13 +746,21 @@ def main() -> int:
                 # 数値は図表側(exhibit)の単位付きトークンか裸の数(5点満点の「5」「3」)、または主張側
                 # (recap の「68億円」)の単位付きトークンで示されていればよい。主張側の裸の数(タイトルの
                 # 「3本柱」)は数えない — 数えるとほぼ全ページで note が通ってしまう(Claude レビュー指摘、PR #158)
+                # 構造の番号(Step 1、Phase 2、01、第3段階)や期間のラベル(2024年、Q1、FY25)は数値ではない —
+                # これらで note を通すと、番号付きの流れページなら何でも通る(Codex レビュー指摘、PR #158)
+                # 裸の「5」(採点)は数値のまま。番号は接頭辞・接尾辞・先頭の 0 を伴うものだけ
+                _structural = re.compile(
+                    r"(?:step|phase|stage|wave|level|no\.?|#|第)\s*\d{1,2}(?:段階|期|章|回|次|位)?"
+                    r"|\d{1,2}(?:段階|期|章|回|次|位)|0\d"
+                    r"|(?:19|20)\d{2}\s*年?(?:度|下期|上期)?|FY\s?\d{2,4}|Q[1-4]|第[1-4]四半期|\d{1,2}月", re.I)
+
                 def _has_bare_number(vals) -> bool:
                     for v in vals:
                         if isinstance(v, bool):
                             continue
                         if isinstance(v, (int, float)):
                             return True
-                        if isinstance(v, str) and re.search(r"\d", v):
+                        if isinstance(v, str) and re.search(r"\d", v) and not _structural.fullmatch(v.strip()):
                             return True
                     return False
                 if not (exhibit_tokens(s) | claim_tokens(s)) and not _has_bare_number(exhibit_values(s)):

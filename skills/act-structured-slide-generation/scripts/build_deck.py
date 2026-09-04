@@ -1032,7 +1032,9 @@ def add_act_chart(slide, x, y, w, h, cspec: dict):
             # バッジの余白ぶん軸を伸ばす。積み上げは列ごとの合計が天井。100%積み上げは軸が 0-1 の
             # 比率なので触らない — 生の値で天井を決めると図表が数%の高さに潰れる(Codex レビュー、PR #158)
             if ctype in STACKED:
-                top = max(sum(vals) for vals in zip(*(s["values"] for s in cspec["series"])))
+                # 正負が混じる積み上げは、負の系列がゼロの下側に描かれる。合計で天井を決めると正の山より
+                # 低い軸になり図表が潰れる — 正の成分の合計が天井(Codex レビュー指摘、PR #158)
+                top = max(sum(v for v in vals if v > 0) for vals in zip(*(s["values"] for s in cspec["series"])))
             else:
                 top = max(v for s in cspec["series"] for v in s["values"])
             val_ax.maximum_scale = top * 1.28

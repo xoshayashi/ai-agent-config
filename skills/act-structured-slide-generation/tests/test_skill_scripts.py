@@ -1369,6 +1369,21 @@ def test_annotation_on_a_horizontal_bar_is_rejected(tmp_path):
     assert "横棒" not in run("validate_spec.py", spec).stdout
 
 
+def test_signed_stacked_column_headroom_uses_the_positive_stack(tmp_path):
+    """正負が混じる積み上げ棒に annotation があるとき、軸の天井は正の成分の合計から取る。合計(100-90=10)で
+    決めると正の山(100)が軸の外に出る(Codex レビュー、PR #158)。"""
+    deck = _minimal_deck()
+    deck["slides"][0]["chart"] = {"type": "stacked_column", "unit": "億円", "categories": ["2029", "2030"],
+                                  "series": [{"name": "利益", "values": [100, 120]}, {"name": "損失", "values": [-90, -30]}],
+                                  "annotation": {"badge": "+20%"}, "focal_category": 1}
+    spec = tmp_path / "signed.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "signed.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    charts = [sh.chart for sh in pptx.Presentation(out).slides[0].shapes if sh.has_chart]
+    assert charts and charts[0].value_axis.maximum_scale >= 120, charts[0].value_axis.maximum_scale
+
+
 def test_negative_waterfall_stays_inside_slide(tmp_path):
     from pptx.util import Inches
 
@@ -3114,6 +3129,13 @@ def test_thesis_literal_match_is_a_whole_number(tmp_path):
     spec.write_text(json.dumps(base, ensure_ascii=False))
     r = run("audit_argument.py", spec)
     assert "120社」を示す図表がどのページにも無い" in r.stdout, r.stdout
+    # 符号違い「-7段階」「△7段階」は反証であって証拠ではない(Codex レビュー、PR #158)
+    base["meta"]["thesis"] = {"statement": "7段階でつなぐ", "value": "7", "unit": "段階"}
+    for shown in ("-7段階", "△7段階", "−7段階"):
+        base["slides"][0]["table"]["rows"] = [[f"評価は{shown}", "x"]]
+        spec.write_text(json.dumps(base, ensure_ascii=False))
+        r = run("audit_argument.py", spec)
+        assert "7段階」を示す図表がどのページにも無い" in r.stdout, (shown, r.stdout)
 
 
 def test_metric_proof_accepts_a_zero_hero_value(tmp_path):
@@ -3260,6 +3282,17 @@ def test_note_is_allowed_when_only_claim_side_shows_the_number(tmp_path):
                          "left": {"heading": "A", "items": [{"heading": "h", "body": "x"}]},
                          "right": {"heading": "B", "items": [{"heading": "h", "body": "y"}]},
                          "note": "数値の無いページの注記"}
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" in run("validate_spec.py", spec).stdout
+    # 構造の番号(Step 1)や期間のラベル(2024年)だけのページも通さない(Codex レビュー、PR #158)
+    base["slides"][0] = {"pattern": "process_flow", "title": "t", "subtitle": "s",
+                         "steps": [{"label": f"Step {i}", "items": ["体制の整備", "役割の明文化"]} for i in (1, 2, 3)],
+                         "note": "数値の無い流れページの注記"}
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" in run("validate_spec.py", spec).stdout
+    base["slides"][0] = {"pattern": "comparison_table", "title": "t", "subtitle": "s",
+                         "table": {"headers": ["項目", "2024年", "2025年"], "rows": [["体制", "整備", "運用"]]},
+                         "note": "期間ラベルだけの注記"}
     spec.write_text(json.dumps(base, ensure_ascii=False))
     assert "Note を置かない" in run("validate_spec.py", spec).stdout
     # タイトルや小見出し(主張側)に裸の数があっても、図表側に数値が無ければ note は通さない
