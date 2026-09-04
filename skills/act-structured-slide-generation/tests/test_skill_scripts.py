@@ -3190,6 +3190,28 @@ def test_metric_proof_hero_must_be_in_its_chart(tmp_path):
     d["slides"][0]["chart"]["line"]["values"] = [12.0, 12.8]
     spec.write_text(json.dumps(d, ensure_ascii=False))
     assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # bar に単位が無く line だけ % の combo: 単位の無い bar の 12.8 は 12.8% の証拠ではない(Codex レビュー)
+    d = deck([1, 2]); d["slides"][0]["hero"] = {"label": "成長率", "value": "12.8", "unit": "%"}
+    d["meta"]["thesis"] = {"statement": "成長率12.8%", "value": "12.8", "unit": "%"}
+    d["slides"][0]["chart"] = {"kind": "combo", "categories": ["Q1", "Q2"], "bar": {"name": "ARR", "values": [10, 12.8]},
+                               "line": {"name": "成長率", "values": [20, 30], "unit": "%"}}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # categories を指すパスの derivation は根拠にならない(Codex レビュー)
+    d = deck([100, 200]); d["slides"][0]["chart"]["categories"] = ["1", "2"]
+    d["slides"][0]["hero"] = {"label": "差", "value": "1", "unit": "億円"}
+    d["meta"]["thesis"] = {"statement": "差1億円", "value": "1", "unit": "億円"}
+    d["slides"][0]["derivation"] = {"kind": "delta", "a": "chart.categories[0]", "b": "chart.categories[1]", "value": 1, "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # 億円の棒と % の折れ線の値を混ぜた derivation はどちらの図表も証明しない(Claude レビュー)
+    d = deck([1, 2]); d["slides"][0]["hero"] = {"label": "x", "value": "20.15", "unit": "億円"}
+    d["meta"]["thesis"] = {"statement": "20.15億円", "value": "20.15", "unit": "億円"}
+    d["slides"][0]["chart"] = {"kind": "combo", "categories": ["Q1", "Q2"], "bar": {"name": "ARR", "values": [9.85, 12.8], "unit": "億円"},
+                               "line": {"name": "成長率", "values": [28, 30], "unit": "%"}}
+    d["slides"][0]["derivation"] = {"kind": "delta", "a": 9.85, "b": 30, "value": 20.15, "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
     # 100%積み上げの最終カテゴリ合計(60+40)は hero 100% の証拠
     d = deck([30, 60]); d["slides"][0]["chart"].update({"type": "stacked_column_100", "unit": "%"})
     d["slides"][0]["chart"]["series"].append({"name": "他", "values": [70, 40]})

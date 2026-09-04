@@ -275,6 +275,10 @@ def _chart_numbers(chart: dict, unit: str = "") -> list[float]:
     返す: 配列の単位は最も近い上位の dict の unit(combo の bar.unit / line.unit、native の chart.unit)。
     二軸の combo で % の折れ線の 12.8 を 12.8億円 の証拠にしない(Codex / Claude レビュー指摘、PR #158)。"""
     out: list[float] = []
+    # 単位をどこかに持つ図表では、単位の無い配列は要求された単位に合わない(二軸 combo の bar に単位が
+    # 無く line だけ % のとき、bar の 12.8 を 12.8% の証拠にしない — Codex レビュー指摘)。単位を全く
+    # 持たない図表だけ、配列をそのまま返す
+    typed = bool(_chart_units(chart))
 
     def walk(node, in_list: bool, scope: str) -> None:
         if isinstance(node, dict):
@@ -285,7 +289,7 @@ def _chart_numbers(chart: dict, unit: str = "") -> list[float]:
         elif isinstance(node, list):
             for v in node:
                 walk(v, True, scope)
-        elif in_list and not isinstance(node, bool) and (not unit or not scope or scope == unit):
+        elif in_list and not isinstance(node, bool) and (not unit or not typed or scope == unit):
             n = to_number(node)
             if n is not None:
                 out.append(n)
@@ -314,25 +318,40 @@ def _same(v: float, val: float, printed: str) -> bool:
     return (v >= 0) == (val >= 0) and matches(v, val, printed)
 
 
-def _derivation_grounded(deriv: dict, nums: list[float]) -> bool:
-    """derivation の被演算子が図表の値(hero と同じ単位の配列)から取られているか。数はどれかの図表の値と
-    一致、文字列は chart への参照パスであること。value / unit / kind は結果の宣言であって被演算子ではない。"""
-    def ok(node) -> bool:
+def _derivation_grounded(slide: dict, deriv: dict, chart: dict) -> bool:
+    """derivation の被演算子が図表の値から取られているか。数はどれかの図表の値と一致、文字列のパスは
+    解決した先が図表の値(配列)であること — categories や制御値を指すパスは根拠にならない(Codex レビュー
+    指摘)。被演算子はひとつの単位の配列にそろって載ること — 億円の棒と % の折れ線の値を混ぜた式は、
+    どちらの図表も証明していない(Claude レビュー指摘)。value / unit / kind と from / to / years / n は
+    結果の宣言や位置の指定であって被演算子ではない。"""
+    operands = {k: v for k, v in deriv.items()
+                if k not in ("value", "unit", "kind", "label", "years", "from", "to", "n", "index", "at")}
+    if not operands:
+        return False
+
+    def ok(node, nums: list[float]) -> bool:
         if isinstance(node, bool):
             return False
         if isinstance(node, (int, float)):
             return any(_same(n, float(node), str(node)) for n in nums)
         if isinstance(node, str):
-            return node.startswith("chart")
+            try:
+                got = resolve_path(slide, node)
+            except Exception:
+                return False
+            if isinstance(got, list):
+                return bool(got) and all(isinstance(g, (int, float)) and ok(g, nums) for g in got)
+            return isinstance(got, (int, float)) and ok(got, nums)
         if isinstance(node, dict):
-            return all(ok(v) for v in node.values())
+            return all(ok(v, nums) for v in node.values())
         if isinstance(node, list):
-            return all(ok(v) for v in node)
+            return bool(node) and all(ok(v, nums) for v in node)
         return False
-    # from / to / years / n は位置や期間の指定であって図表の値ではない(Codex レビュー指摘)
-    operands = {k: v for k, v in deriv.items()
-                if k not in ("value", "unit", "kind", "label", "years", "from", "to", "n", "index", "at")}
-    return bool(operands) and ok(operands)
+    for unit in (_chart_units(chart) or {""}):
+        nums = _chart_numbers(chart, unit)
+        if nums and ok(operands, nums):
+            return True
+    return False
 
 
 def _check_hero_in_chart(loc: str, s: dict, errors) -> None:
@@ -351,7 +370,7 @@ def _check_hero_in_chart(loc: str, s: dict, errors) -> None:
     deriv = s.get("derivation") or {}
     d_val = to_number(deriv.get("value")) if deriv else None
     if d_val is not None and str(deriv.get("unit") or "") == h_unit \
-            and _derivation_grounded(deriv, _chart_numbers(chart)) and _same(d_val, val, printed):
+            and _derivation_grounded(s, deriv, chart) and _same(d_val, val, printed):
         return
     c_units = _chart_units(chart)
     if h_unit and c_units and h_unit not in c_units:
