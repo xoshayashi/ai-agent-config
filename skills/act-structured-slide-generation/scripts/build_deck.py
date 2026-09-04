@@ -504,6 +504,10 @@ def _parts_lines(parts, width_in: float) -> int:
     if len(parts) == 1:
         text, size, weight, _c = parts[0]
         return _text_lines(str(text), width_in, size, weight)
+    if len({sz for _t, sz, _w, _c in parts}) == 1:
+        # 同じ級数のラン(葉のラベル + 太字の値)は _wrap_parts と同じ文字列・同じ太さで数える。
+        # 幅の割り算では、文節で折った行が1行増えたぶんを取りこぼす(Claude レビュー指摘、PR #158)
+        return _text_lines("".join(str(t) for t, *_ in parts), width_in, parts[0][1], max(w for _t, _s, w, _c in parts))
     width = sum(text_width_in(str(t), sz, wt) for t, sz, wt, _c in parts)
     return max(1, math.ceil(width / max(0.05, width_in) - 1e-9))
 

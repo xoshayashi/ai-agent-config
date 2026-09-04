@@ -3455,6 +3455,9 @@ def test_stack_block_measures_the_bold_value_when_wrapping(tmp_path):
         for segs in lines:
             width = sum(D.text_width_in(t, 12, wt) for t, wt in segs)
             assert width <= w_in + 0.02, (label, segs, width)
+        # 高さを積む側(_parts_lines)も、描いた行数と同じ答えを出す。少なく数えると葉の箱が1行ぶん低くなり、
+        # 下の葉に食い込む(Claude レビュー、PR #158)
+        assert bd._parts_lines([(label, 12, 400, ink), (value, 12, 700, ink)], w_in) == len(lines), (label, lines)
 
 
 def test_verify_names_a_thin_card_and_passes_a_full_one(tmp_path):
