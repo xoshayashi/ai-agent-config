@@ -531,7 +531,7 @@ def _words(text: str) -> list[str]:
     # 次の語に掛かる前置き(「その場」「約1,630人」)は、そこで切ると意味が宙に浮く
     # 連体詞は後ろの名詞に掛かる(「次の/世代」「同じ/場所」で切ると意味が宙に浮く。2026-09-04)
     _DEMONSTRATIVE = ("その", "この", "あの", "どの", "わが", "次の", "同じ", "前の", "翌")
-    _APPROX = ("約", "およそ", "最大", "最小", "上限", "下限")
+    _APPROX = _QUANTITY_WORDS
     # 送り仮名で終わる語のあとに自立語が続くのは、複合語の途中(「積み/上げ」「問い/合わせ」)。
     # 助詞で終わっているときだけ、そこが語の切れ目になる
     merged: list[str] = []
@@ -732,8 +732,10 @@ _MULTI_UNITS = tuple(sorted(("百万円", "万時間", "千時間", "カ月", "�
                             key=len, reverse=True))
 
 
-# 数の直前に付く符号・概数の印。行末にこれだけ残ると「営業損失は△ / 2.8億円」と読める
-_QUANTITY_PREFIXES = "△▲−-+±約"
+# 数の直前に付く概数・範囲の語と符号。行末にこれだけ残ると「営業損失は△ / 2.8億円」「最大 / 1,630人」と
+# 読める。_words() の前置き判定と同じ表(Codex レビュー指摘、PR #158)
+_QUANTITY_WORDS = ("約", "およそ", "最大", "最小", "上限", "下限")
+_QUANTITY_PREFIXES = tuple(sorted(_QUANTITY_WORDS + tuple("△▲−-+±"), key=len, reverse=True))
 
 
 def _is_quantity(run: str) -> bool:
@@ -787,9 +789,11 @@ def _unbreakable_spans(text: str) -> list[tuple[int, int]]:
             # 数の前の符号や概数の印(△2.8億円、−3.2%、約1,630人)も同じ語 — 行末に印だけ残さない
             # (Codex レビュー指摘、PR #158)
             a = i
-            if text[i].isdigit() and i > 0 and text[i - 1] in _QUANTITY_PREFIXES \
-                    and not (spans and spans[-1][1] > i - 1):
-                a = i - 1
+            if text[i].isdigit():
+                for pre in _QUANTITY_PREFIXES:
+                    if i >= len(pre) and text.endswith(pre, 0, i) and not (spans and spans[-1][1] > i - len(pre)):
+                        a = i - len(pre)
+                        break
             spans.append((a, j))
             i = j
             continue

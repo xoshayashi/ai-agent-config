@@ -610,7 +610,9 @@ def _wrap_parts(parts, w_in: float):
     if len(parts) == 1:
         return [(display_wrap_text(parts[0][0], w_in, parts[0][1], parts[0][2]), *parts[0][1:])]
     joined = "".join(pt[0] for pt in parts)
-    wrapped = display_wrap_text(joined, w_in, parts[0][1], parts[0][2])
+    # 幅は最も太いランの字幅で測る。ラベルの字幅で測ると太字の値のぶんを読み違え、行が箱から出る
+    # (Claude レビュー指摘、PR #158)。太めに見積もって早めに折るほうが安全
+    wrapped = display_wrap_text(joined, w_in, parts[0][1], max(pt[2] for pt in parts))
     if wrapped == joined:
         return parts
     out, k = [], 0

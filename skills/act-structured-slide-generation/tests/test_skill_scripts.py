@@ -3375,6 +3375,13 @@ def test_quantity_prefix_stays_with_its_number():
             lines = dt.wrap_natural(text, width, 16).split("\n")
             for line in lines:
                 assert not line.endswith(tuple("△▲−+約")), (width, lines)
+    # 複数字の前置き(およそ・最大・上限)も同じ語(Codex レビュー、PR #158)
+    for text, word in (("導入対象となる従業員数は最大1,630人に設定", "最大1,630人"), ("在庫はおよそ3週間分", "およそ3週間分"),
+                       ("上限200件まで受け付ける", "上限200件")):
+        assert word in {text[a:b] for a, b in dt._unbreakable_spans(text)}, text
+        for width in (1.6, 1.8, 2.0):
+            for line in dt.wrap_natural(text, width, 16).split("\n"):
+                assert not line.endswith(("最大", "およそ", "上限")), (width, line)
     # 英数の連なり(2020-2025)は既存のハイフン結合のまま、前の語に食い込まない
     spans = {t[a:b] for t in ["計画は2020-2025年"] for a, b in dt._unbreakable_spans(t)}
     assert "2020-2025年" in spans, spans
@@ -3415,6 +3422,39 @@ def test_stack_block_wraps_label_and_value_as_one_line():
             pos += len(t)
     spans = D._unbreakable_spans(joined)
     assert breaks and all(not D._inside_span(b, spans) for b in breaks), (joined, breaks, spans)
+
+
+def test_stack_block_measures_the_bold_value_when_wrapping(tmp_path):
+    """ラベル(400)+太字の値(700)の段落は、太いほうの字幅で折返しを決める。ラベルの字幅で測ると
+    太字ぶんを読み違えて行が箱から出る(Claude レビュー、PR #158)。描かれる各行の実幅を、ランごとの
+    太さで足し合わせて箱幅に収まることを確かめる。"""
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import build_deck as bd
+    D = _deck_text()
+    from pptx.dml.color import RGBColor
+    ink = RGBColor(0x2D, 0x33, 0x2E)
+    w_in = 1.5
+    for label, value in (("既存顧客からの紹介経由の受注", "  1,842件"), ("保守契約の年間更新額", "  12.8億円"),
+                         ("パートナー経由の新規獲得件数", "  2,410件")):
+        prs = pptx.Presentation()
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        tb, _ = bd.stack_block(slide, 0.5, 0.5, w_in, 1.2,
+                               [{"parts": [(label, 12, 400, ink), (value, 12, 700, ink)], "size": 12, "kind": "text"}])
+        p = tb.text_frame.paragraphs[0]
+        lines, cur = [], []                      # [(text, weight)] per drawn line
+        for child in p._p:
+            if child.tag == f"{bd.A_NS}br":
+                lines.append(cur)
+                cur = []
+            elif child.tag == f"{bd.A_NS}r":
+                t = child.findtext(f"{bd.A_NS}t") or ""
+                bold = child.find(f"{bd.A_NS}rPr").get("b") == "1"
+                cur.append((t, 700 if bold else 400))
+        lines.append(cur)
+        assert len(lines) >= 2, (label, lines)
+        for segs in lines:
+            width = sum(D.text_width_in(t, 12, wt) for t, wt in segs)
+            assert width <= w_in + 0.02, (label, segs, width)
 
 
 def test_verify_names_a_thin_card_and_passes_a_full_one(tmp_path):
