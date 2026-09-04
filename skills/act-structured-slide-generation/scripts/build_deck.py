@@ -593,12 +593,38 @@ def stack_block(slide, x, y, w, h, blocks, *, align=PP_ALIGN.LEFT):
         if i < len(spc) and spc[i] > 0:
             p.space_after = Pt(spc[i] * 72)
         parts = b["parts"]
-        if len(parts) == 1:
-            parts = [(display_wrap_text(parts[0][0], w, parts[0][1], parts[0][2]), *parts[0][1:])]
+        if b.get("kind", "text") == "text":
+            parts = _wrap_parts(parts, w)
         for part in parts:
             _add_script_runs(p, part[0], part[1], part[2], part[3])
     tb.height = Inches(_clamp_box(x, top, w, _stack_drawn_h(blocks, w))[3])
     return tb, ink_total
+
+
+def _wrap_parts(parts, w_in: float):
+    """1段落を成すラン(葉のラベル + 値、見出しの番号 + 文)をまとめて折り返し、改行を元のランに
+    配り直す。ランごとに折り返すと、値の幅を知らないラベルが行末でカタカナ語や数量を割る
+    (Claude レビュー指摘、PR #158)。数値(kind="numeral")は級数が違うので呼ばない。"""
+    if not parts or any(not isinstance(pt[0], str) for pt in parts):
+        return parts
+    if len(parts) == 1:
+        return [(display_wrap_text(parts[0][0], w_in, parts[0][1], parts[0][2]), *parts[0][1:])]
+    joined = "".join(pt[0] for pt in parts)
+    wrapped = display_wrap_text(joined, w_in, parts[0][1], parts[0][2])
+    if wrapped == joined:
+        return parts
+    out, k = [], 0
+    for pt in parts:
+        buf, need = [], len(pt[0])
+        while need > 0 and k < len(wrapped):
+            ch = wrapped[k]
+            k += 1
+            buf.append(ch)
+            if ch != "\n":
+                need -= 1
+        text = re.sub(r" *\n *", "\n", "".join(buf))     # 改行の前後の区切り空白は落とす
+        out.append((text, *pt[1:]))
+    return out
 
 
 def add_bullets(slide, x, y, w, h, items, size, color, *, line_spacing=1.3,

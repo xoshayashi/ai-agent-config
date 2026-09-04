@@ -3363,11 +3363,79 @@ def test_per_day_compound_units_stay_with_their_number():
             assert "万時間" not in line or "/日" in line, (width, line)
 
 
+def test_quantity_prefix_stays_with_its_number():
+    """「△2.8億円」「約1,630人」は符号・概数の印から単位まで1語。狭い列でも印だけが行末に残らない
+    (Codex レビュー、PR #158)。"""
+    dt = _deck_text()
+    for text, word in (("営業損失は△2.8億円まで縮小", "△2.8億円"), ("従業員は約1,630人に増加", "約1,630人"),
+                       ("利益率は−3.2ptの低下", "−3.2pt")):
+        spans = {text[a:b] for a, b in dt._unbreakable_spans(text)}
+        assert word in spans, spans
+        for width in (1.2, 1.3, 1.45, 1.6):
+            lines = dt.wrap_natural(text, width, 16).split("\n")
+            for line in lines:
+                assert not line.endswith(tuple("△▲−+約")), (width, lines)
+    # 英数の連なり(2020-2025)は既存のハイフン結合のまま、前の語に食い込まない
+    spans = {t[a:b] for t in ["計画は2020-2025年"] for a, b in dt._unbreakable_spans(t)}
+    assert "2020-2025年" in spans, spans
+
+
 def test_sen_yen_units_stay_with_their_number():
     """「10,590千円」は数と単位で1語(Codex レビュー、PR #158)。"""
     D = _deck_text()
     spans = {t[a:b] for t in ["売上高10,590千円、在庫3千台"] for a, b in D._unbreakable_spans(t)}
     assert {"10,590千円", "3千台"} <= spans, spans
+
+
+def test_stack_block_wraps_label_and_value_as_one_line():
+    """葉のラベルと値(「顧客サポート体制の整備  12件」)は1段落2ランだが、折返しは全体で決める。
+    ランごとに折り返すと、値の幅を知らないラベルが行末で語を割る(Claude レビュー、PR #158)。"""
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import build_deck as bd
+    D = _deck_text()
+    from pptx.dml.color import RGBColor
+    prs = pptx.Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    ink = RGBColor(0x2D, 0x33, 0x2E)
+    label, value = "顧客サポート体制の整備", "  12件"
+    tb, _ = bd.stack_block(slide, 0.5, 0.5, 1.6, 1.0,
+                           [{"parts": [(label, 12, 400, ink), (value, 12, 700, ink)], "size": 12, "kind": "text"}])
+    p = tb.text_frame.paragraphs[0]
+    runs = [r.text for r in p.runs]
+    assert "".join(runs).replace(" ", "") == (label + value).replace(" ", "")
+    assert len(p._p.findall(f"{bd.A_NS}br")) >= 1, runs      # 1.6in には入らないので折り返す
+    # 改行の位置は語の途中に落ちない: ランの切れ目と <a:br> の位置を、結合した文字列の上で確かめる
+    joined, breaks, pos = "", [], 0
+    for child in p._p:
+        if child.tag == f"{bd.A_NS}br":
+            breaks.append(pos)
+        elif child.tag == f"{bd.A_NS}r":
+            t = child.findtext(f"{bd.A_NS}t") or ""
+            joined += t
+            pos += len(t)
+    spans = D._unbreakable_spans(joined)
+    assert breaks and all(not D._inside_span(b, spans) for b in breaks), (joined, breaks, spans)
+
+
+def test_verify_names_a_thin_card_and_passes_a_full_one(tmp_path):
+    """verify_deck.check_card_fill: 文字がカード高の 60% に届かないカードを名指しし、足りていれば黙る。"""
+    def deck(items):
+        return {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+            "pattern": "process_flow", "title": "3段階で進める", "subtitle": "s",
+            "steps": [{"label": f"Step {i}", "items": items} for i in (1, 2, 3)]}]}
+    thin = tmp_path / "thin.json"
+    thin.write_text(json.dumps(deck(["体制の整備"]), ensure_ascii=False))
+    out = tmp_path / "thin.pptx"
+    assert run("build_deck.py", thin, "-o", out).returncode == 0
+    r = run("verify_deck.py", out)
+    assert "カードの中身が薄い" in r.stdout, r.stdout
+    full = tmp_path / "full.json"
+    full.write_text(json.dumps(deck(["事業責任者の任命と役割の明文化", "コアチーム12名の組成", "開発パートナーの選定と契約",
+                                     "週次の進捗会議を設ける", "顧客10社への先行ヒアリング"]), ensure_ascii=False))
+    out = tmp_path / "full.pptx"
+    assert run("build_deck.py", full, "-o", out).returncode == 0
+    r = run("verify_deck.py", out)
+    assert "カードの中身が薄い" not in r.stdout, r.stdout
 
 
 def test_column_framework_keeps_a_card_under_a_long_header(tmp_path):

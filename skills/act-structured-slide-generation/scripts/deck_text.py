@@ -732,6 +732,15 @@ _MULTI_UNITS = tuple(sorted(("百万円", "万時間", "千時間", "カ月", "�
                             key=len, reverse=True))
 
 
+# 数の直前に付く符号・概数の印。行末にこれだけ残ると「営業損失は△ / 2.8億円」と読める
+_QUANTITY_PREFIXES = "△▲−-+±約"
+
+
+def _is_quantity(run: str) -> bool:
+    """数字の連なり(1,630 / 2.8 / 2020-2025 / 3/4)。単位や助数詞が続けば同じ語として扱う。"""
+    return any(ch.isdigit() for ch in run) and all(ch.isdigit() or ch in ",.-‐–/" for ch in run)
+
+
 def _unbreakable_spans(text: str) -> list[tuple[int, int]]:
     """レンダラの自然折返しで割れると読みづらい語の範囲 [start, end)。カタカナ語、英単語
     (ハイフンや大文字始まりの空白で結ばれた名前も1語)、数量と単位。漢字・ひらがなの境界は
@@ -762,7 +771,7 @@ def _unbreakable_spans(text: str) -> list[tuple[int, int]]:
                 else:
                     break
             # 数量と単位(2030年、8,420社、14カ月、3週間)。複数字の単位は丸ごと、そのあと1字の助数詞
-            if text[i:j].replace(",", "").replace(".", "").isdigit():
+            if _is_quantity(text[i:j]):
                 for unit in _MULTI_UNITS:
                     if text.startswith(unit, j):
                         j += len(unit)
@@ -775,7 +784,13 @@ def _unbreakable_spans(text: str) -> list[tuple[int, int]]:
                     j += 1
                     while j < n and text[j] in _COUNTERS:
                         j += 1
-            spans.append((i, j))
+            # 数の前の符号や概数の印(△2.8億円、−3.2%、約1,630人)も同じ語 — 行末に印だけ残さない
+            # (Codex レビュー指摘、PR #158)
+            a = i
+            if text[i].isdigit() and i > 0 and text[i - 1] in _QUANTITY_PREFIXES \
+                    and not (spans and spans[-1][1] > i - 1):
+                a = i - 1
+            spans.append((a, j))
             i = j
             continue
         i += 1
