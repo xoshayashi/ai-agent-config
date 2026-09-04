@@ -412,6 +412,10 @@ def _check_hero_in_chart(loc: str, s: dict, errors) -> None:
             and _derivation_grounded(s, deriv, chart) and _same(d_val, val, printed):
         return
     c_units = _chart_units(chart)
+    if not h_unit and c_units:
+        errors.append(f"{loc}: hero に unit が無く、chart の単位({' / '.join(sorted(c_units))})のどれと照合するか"
+                      "決まらない — hero に単位を付ける")
+        return
     if h_unit and c_units and h_unit not in c_units:
         errors.append(f"{loc}: hero の単位「{h_unit}」が chart の単位({' / '.join(sorted(c_units))})と違う — "
                       "hero を証明する図表は同じ単位で描くか、図表の値から導く derivation を宣言する")

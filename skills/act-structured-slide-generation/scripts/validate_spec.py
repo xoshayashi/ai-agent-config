@@ -679,6 +679,9 @@ def main() -> int:
             hero = s.get("hero") or {}
             if hero.get("value") is None or str(hero.get("value")).strip() == "":
                 errors.append(f"{loc}: metric_proof の hero に value がない")   # 0 は正当な値(事故ゼロ等)
+            if hero.get("value") not in (None, "") and not hero.get("unit"):
+                # 単位の無い hero は、二軸の図表でどの配列と照合するか決まらない(Codex レビュー指摘、PR #158)
+                errors.append(f"{loc}: metric_proof の hero に unit がない — 図表と同じ単位(億円 / % / 社)を付ける")
             if ja_len(hero.get("label", "")) > BUDGET["kpi_label_max_chars_ja"]:
                 errors.append(f"{loc}: hero label '{hero.get('label')}' too long")
             if len(s.get("facts", [])) > 4:

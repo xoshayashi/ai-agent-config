@@ -229,7 +229,8 @@ must be proved elsewhere or carry `source`/`assumption`.
 ### 23. `metric_proof`
 
 The banker "metric proof page": one hero number cluster on the left (4 cols) and the chart that
-proves it on the right (8 cols). `hero: {label, value, unit, delta, delta_dir, note}`,
+proves it on the right (8 cols). `hero: {label, value, unit, delta, delta_dir, note}` (`unit` is
+required — it names which of the chart's value arrays proves the hero),
 `chart` (native or image kind), optional `facts: [{label, value, unit?}]` (≤4 hairline rows; a fact
 with a `unit` is drawn as value + unit, and the argument audit counts that pair as shown). The hero
 stack locks to the chart's plot top, the facts rail locks to the chart bottom, and all slack

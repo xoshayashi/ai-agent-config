@@ -1382,6 +1382,12 @@ def test_stacked_100_axis_bounds_in_percent_are_scaled_to_fractions(tmp_path):
     assert run("build_deck.py", spec, "-o", out).returncode == 0
     ax = [sh.chart for sh in pptx.Presentation(out).slides[0].shapes if sh.has_chart][0].value_axis
     assert abs(ax.maximum_scale - 1.0) < 1e-9 and ax.minimum_scale == 0.0, (ax.maximum_scale, ax.minimum_scale)
+    # 比率で書いた余白(1.1)はそのまま(Claude レビュー、PR #158)
+    deck["slides"][0]["chart"]["y_max"] = 1.1
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    ax = [sh.chart for sh in pptx.Presentation(out).slides[0].shapes if sh.has_chart][0].value_axis
+    assert abs(ax.maximum_scale - 1.1) < 1e-9, ax.maximum_scale
 
 
 def test_signed_stacked_column_headroom_uses_the_positive_stack(tmp_path):
@@ -3280,6 +3286,13 @@ def test_metric_proof_hero_must_be_in_its_chart(tmp_path):
     d["slides"][0]["hero"]["value"] = "100"; d["meta"]["thesis"]["value"] = "100"
     spec.write_text(json.dumps(d, ensure_ascii=False))
     assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # 単位の無い hero は、単位を持つ図表のどの配列と照合するか決まらない — validate と audit の両方が弾く(Codex レビュー)
+    d = deck([1, 2]); d["slides"][0]["hero"] = {"label": "x", "value": "12.8"}
+    d["slides"][0]["chart"] = {"kind": "combo", "categories": ["Q1", "Q2"], "bar": {"name": "ARR", "values": [1, 2], "unit": "億円"},
+                               "line": {"name": "率", "values": [10, 12.8], "unit": "%"}}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "hero に unit がない" in run("validate_spec.py", spec).stdout
+    assert "hero に unit が無く" in run("audit_argument.py", spec).stdout
     # CAGR の from / to は位置の指定であって図表の値ではない — 0 と 4 が系列に無くても derivation は根拠になる
     d = deck([9.85, 10.52, 11.28, 11.95, 12.8]); d["slides"][0]["chart"]["categories"] = ["Q1", "Q2", "Q3", "Q4", "Q5"]
     d["slides"][0]["hero"] = {"label": "年率成長", "value": "6.8", "unit": "%"}
