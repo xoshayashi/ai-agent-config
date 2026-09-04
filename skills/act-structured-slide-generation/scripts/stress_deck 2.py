@@ -259,9 +259,8 @@ def run_variant(outdir: Path, variant: str, template: str | None, images: bool) 
     """Write, validate, build and audit one variant.
 
     Returns {"validate_errors", "verify_failures", "hard_failures", "messages"}. `hard_failures`
-    counts the one defect no variant may produce — a frame outside the slide (HARD). Text
-    straddling a shape edge under `overload` is copy overflow that verify names, not a contract
-    violation, so it is reported in `verify_failures` but does not gate the exit code; `verify_failures` is the full count and must be 0 for max / min."""
+    counts the defects no variant may produce (a frame outside the slide, text straddling a
+    shape edge); `verify_failures` is the full count and must be 0 for max / min."""
     import build_deck
     import verify_deck
     outdir.mkdir(parents=True, exist_ok=True)

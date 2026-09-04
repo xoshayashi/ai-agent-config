@@ -300,10 +300,14 @@ def check_thesis(deck, errors) -> None:
     # 結論の数値は、図表の数値トークン(数値+単位)か、図表の文字列そのもの(「街づくりの7段階」の
     # ような構造の数、単位表に無い単位)のどちらかで示されていればよい。構造の数を単位表に足すと、
     # 「3段階の打ち手」のような語りの数まで出所を要求してしまう(レビュー指摘、2026-09-04)
+    # 文字列で探すときは数値を丸ごと一致させる — 「7段階」を「17段階」「27段階」で満たさない
+    # (Codex レビュー指摘、PR #158)
+    whole = re.compile(r"(?<![\d.,])" + re.escape(token) + r"(?!\d)")
+
     def _shown(s: dict) -> bool:
         if token in exhibit_tokens(s):
             return True
-        return any(token in str(v).replace(",", "") for v in exhibit_values(s) if isinstance(v, str))
+        return any(whole.search(str(v).replace(",", "")) for v in exhibit_values(s) if isinstance(v, str))
     if not any(_shown(s) for s in deck.get("slides", [])):
         errors.append(f"meta.thesis の数値「{token}」を示す図表がどのページにも無い")
 

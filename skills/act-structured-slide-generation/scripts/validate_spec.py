@@ -667,8 +667,8 @@ def main() -> int:
                               "枝を減らすかツリーを2枚に分ける")
         if pat == "metric_proof":
             hero = s.get("hero") or {}
-            if not hero.get("value"):
-                errors.append(f"{loc}: metric_proof の hero に value がない")
+            if hero.get("value") is None or str(hero.get("value")).strip() == "":
+                errors.append(f"{loc}: metric_proof の hero に value がない")   # 0 は正当な値(事故ゼロ等)
             if ja_len(hero.get("label", "")) > BUDGET["kpi_label_max_chars_ja"]:
                 errors.append(f"{loc}: hero label '{hero.get('label')}' too long")
             if len(s.get("facts", [])) > 4:
@@ -697,7 +697,11 @@ def main() -> int:
         # 見出し帯・隣のカードと釣り合わない。足すべき行数と1行の字数を具体的に示す
         if pat in ("process_flow", "column_framework", "two_column"):
             try:
-                from build_deck import card_copy_estimate
+                import build_deck as _bd
+                # 見積もりはビルドと同じ物差しで — import 時の既定(standard)ではなく、このデッキの
+                # テンプレートの型スケール・レイアウトを当ててから測る(Codex レビュー指摘、PR #158)
+                _bd._apply_tokens(tokens)
+                card_copy_estimate = _bd.card_copy_estimate
                 floor_ = BUDGET_FILL.get("card_text_floor", 0.6)
                 for est in card_copy_estimate(s):
                     if est["ratio"] < floor_:

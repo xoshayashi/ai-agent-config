@@ -3070,3 +3070,59 @@ def test_image_assets_register_the_act_fonts_for_matplotlib():
         pytest.skip("Act fonts not installed")
     act_theme.apply_matplotlib()
     assert act_theme.fonts_present() == []
+
+
+def test_thesis_literal_match_is_a_whole_number(tmp_path):
+    """結論の数値を図表の文字列で探すとき、「7段階」は「17段階」では満たされない(Codex レビュー、PR #158)。"""
+    base = {"meta": {"title": "t", "basis": "テスト",
+                     "thesis": {"statement": "7段階でつなぐ", "value": "7", "unit": "段階"}},
+            "slides": [{"pattern": "comparison_table", "title": "t", "subtitle": "s",
+                        "table": {"headers": ["段階", "動き"], "rows": [["全17段階の1つ目", "x"]]}}]}
+    spec = tmp_path / "a.json"
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    r = run("audit_argument.py", spec)
+    assert "7段階」を示す図表がどのページにも無い" in r.stdout, r.stdout
+    base["slides"][0]["table"]["rows"] = [["街づくりの7段階", "x"]]
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    r = run("audit_argument.py", spec)
+    assert "示す図表がどのページにも無い" not in r.stdout, r.stdout
+    # 桁区切りを外した「1,120社」→「1120社」が「120社」を満たしてもいけない(Claude レビュー、PR #158)
+    base["meta"]["thesis"] = {"statement": "顧客120社", "value": "120", "unit": "社"}
+    base["slides"][0]["table"]["rows"] = [["累計1,120社のうち", "x"]]
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    r = run("audit_argument.py", spec)
+    assert "120社」を示す図表がどのページにも無い" in r.stdout, r.stdout
+
+
+def test_metric_proof_accepts_a_zero_hero_value(tmp_path):
+    """事故ゼロのような 0 は正当な hero の値。欠落と区別する(Codex レビュー、PR #158)。"""
+    deck = {"meta": {"title": "t", "basis": "テスト"},
+            "slides": [{"pattern": "metric_proof", "title": "重大事故は0件", "subtitle": "s",
+                        "hero": {"label": "重大事故", "value": 0, "unit": "件"},
+                        "chart": {"type": "column", "unit": "件", "categories": ["FY24", "FY25"],
+                                  "series": [{"name": "事故", "values": [2, 0]}]},
+                        "assumption": "テスト"}]}
+    spec = tmp_path / "z.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    assert "hero に value がない" not in r.stdout, r.stdout
+
+
+def test_card_copy_estimate_uses_the_deck_template(tmp_path):
+    """validate の本文量の見積もりは、そのデッキのテンプレート(bold は型が大きい)で測る
+    (Codex レビュー、PR #158)。同じ本文でも bold のほうが行数が増え、比率が上がる。"""
+    B = _import_build_deck()
+    D = _deck_text()
+    slide = {"pattern": "two_column", "title": "t", "subtitle": "s",
+             "left": {"heading": "A", "items": [{"heading": "h", "body": "住民と店、店と店、企業と人、地域と企業、行政と住民、需要と供給をつなぐ"}]},
+             "right": {"heading": "B", "items": [{"heading": "h", "body": "新しい事業、新しい店、新しい文化、新しい雇用、新しい人、新しい需要が生まれる"}]}}
+    B._apply_tokens(D.resolve_tokens(None))
+    std_h = B.body_region(slide)[1]
+    std = B.card_copy_estimate(slide)[0]
+    B._apply_tokens(D.resolve_tokens("bold"))
+    bold_h = B.body_region(slide)[1]
+    bold = B.card_copy_estimate(slide)[0]
+    B._apply_tokens(D.resolve_tokens(None))
+    # bold は見出しが大きく本文帯が狭い — 見積もりの物差し(本文帯)がテンプレートに追従している
+    assert bold_h < std_h, (std_h, bold_h)
+    assert bold["card_h"] <= 0.74 * (bold_h - 0.1) + 1e-6 or bold["card_h"] == std["card_h"]
