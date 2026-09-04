@@ -738,10 +738,10 @@ def main() -> int:
         # 利用者の指示: Note は要らない)。言いたいことは本文か speaker_notes へ
         if s.get("note") and pat not in ("cover", "section_divider"):
             try:
-                from deck_argument import claim_tokens, exhibit_tokens, exhibit_values, claim_values
-                # 数値は図表側(exhibit)でも主張側(claim: statement の recap、insight 等)でもよく、
-                # 単位の無い裸の数(5点満点の「5」「3」)も数える — 分母や定義を添える注記を削らせない
-                # (Codex レビュー指摘、PR #158)
+                from deck_argument import claim_tokens, exhibit_tokens, exhibit_values
+                # 数値は図表側(exhibit)の単位付きトークンか裸の数(5点満点の「5」「3」)、または主張側
+                # (recap の「68億円」)の単位付きトークンで示されていればよい。主張側の裸の数(タイトルの
+                # 「3本柱」)は数えない — 数えるとほぼ全ページで note が通ってしまう(Claude レビュー指摘、PR #158)
                 def _has_bare_number(vals) -> bool:
                     for v in vals:
                         if isinstance(v, bool):
@@ -751,8 +751,7 @@ def main() -> int:
                         if isinstance(v, str) and re.search(r"\d", v):
                             return True
                     return False
-                if not (exhibit_tokens(s) | claim_tokens(s)) \
-                        and not _has_bare_number(exhibit_values(s)) and not _has_bare_number(claim_values(s)):
+                if not (exhibit_tokens(s) | claim_tokens(s)) and not _has_bare_number(exhibit_values(s)):
                     warns.append(f"{loc}: note「{str(s['note'])[:20]}」— 数値の無いページに Note を置かない。"
                                  "解説は本文か speaker_notes へ移し、note は削除する")
             except Exception as exc:

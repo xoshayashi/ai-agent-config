@@ -769,6 +769,12 @@ def _unbreakable_spans(text: str) -> list[tuple[int, int]]:
                         break
                 while j < n and text[j] in _COUNTERS:
                     j += 1
+                # 「/」で結ぶ複合単位(365万時間/日、120件/月、2万円/人)は分母の助数詞まで1語
+                # (Codex レビュー指摘、PR #158: 「/日」が次行の頭に落ちていた)
+                if j + 1 < n and text[j] == "/" and text[j + 1] in _COUNTERS:
+                    j += 1
+                    while j < n and text[j] in _COUNTERS:
+                        j += 1
             spans.append((i, j))
             i = j
             continue

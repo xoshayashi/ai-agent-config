@@ -3226,6 +3226,12 @@ def test_note_is_allowed_when_only_claim_side_shows_the_number(tmp_path):
                          "note": "数値の無いページの注記"}
     spec.write_text(json.dumps(base, ensure_ascii=False))
     assert "Note を置かない" in run("validate_spec.py", spec).stdout
+    # タイトルや小見出し(主張側)に裸の数があっても、図表側に数値が無ければ note は通さない
+    # (Claude レビュー、PR #158: 主張側の裸の数まで数えるとほぼ全ページで通ってしまう)
+    base["slides"][0]["title"] = "3本柱で進める"
+    base["slides"][0]["subtitle"] = "第2四半期の計画"
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" in run("validate_spec.py", spec).stdout
 
 
 def test_multi_character_units_stay_with_their_number():
@@ -3339,6 +3345,22 @@ def test_note_is_allowed_for_unitless_numbers(tmp_path):
     spec = tmp_path / "n2.json"
     spec.write_text(json.dumps(deck, ensure_ascii=False))
     assert "Note を置かない" not in run("validate_spec.py", spec).stdout
+
+
+def test_per_day_compound_units_stay_with_their_number():
+    """「365万時間/日」「120件/月」は分母の助数詞まで1語。狭いカードでも「/日」が行頭に落ちない
+    (Codex レビュー、PR #158)。"""
+    dt = _deck_text()
+    text = "不足は365万時間/日に拡大"
+    spans = dt._unbreakable_spans(text)
+    a = text.index("365")
+    assert (a, a + len("365万時間/日")) in spans
+    # 数字の後ろに「/」が続いても、助数詞でなければ延ばさない(「3/4」は数字どうし = ascii 側で結ぶ)
+    assert (0, len("120件/月")) in dt._unbreakable_spans("120件/月の受注")
+    for width in (1.6, 1.77, 2.0, 2.3):
+        for line in dt.wrap_natural(text, width, 16).split("\n"):
+            assert not line.startswith("/"), (width, line)
+            assert "万時間" not in line or "/日" in line, (width, line)
 
 
 def test_sen_yen_units_stay_with_their_number():
