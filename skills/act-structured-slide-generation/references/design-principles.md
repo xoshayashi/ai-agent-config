@@ -106,6 +106,15 @@ Do not default to oversized left text plus company/date metadata. Omit company/d
 is legally or operationally required. A close should feel like the deck's final move, not a
 fixed end-card.
 
+## Accessibility
+
+- Never carry meaning by colour alone: a decline, a forecast, a focal item also gets a glyph
+  (△, a dashed bar, a label) or a word, so the slide still reads in greyscale.
+- Keep contrast readable from the back of a projector-lit room: body ink on surface tint, light
+  ink only on the deep fills, no mid-grey on mid-grey.
+- The main claim must be recognisable in the thumbnail: one focal object, one bold line, the
+  title first. If the page reads only at full size, the hierarchy is too flat.
+
 ## Density And Composition
 
 - Avoid both underfilled pages and overstuffed pages. Dense does not mean cramped; it means

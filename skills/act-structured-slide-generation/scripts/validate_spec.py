@@ -707,8 +707,11 @@ def main() -> int:
             try:
                 import build_deck as _bd
                 # 見積もりはビルドと同じ物差しで — import 時の既定(standard)ではなく、このデッキの
-                # テンプレートの型スケール・レイアウトを当ててから測る(Codex レビュー指摘、PR #158)
-                _bd._apply_tokens(tokens)
+                # テンプレートの型スケール・レイアウトを当ててから測る(Codex レビュー指摘、PR #158)。
+                # 当てるのはデッキにつき1回(同じ tokens を毎スライド当て直さない)
+                if getattr(_bd, "_VALIDATE_TOKENS_APPLIED", None) is not tokens:
+                    _bd._apply_tokens(tokens)
+                    _bd._VALIDATE_TOKENS_APPLIED = tokens
                 card_copy_estimate = _bd.card_copy_estimate
                 floor_ = BUDGET_FILL.get("card_text_floor", 0.6)
                 for est in card_copy_estimate(s):

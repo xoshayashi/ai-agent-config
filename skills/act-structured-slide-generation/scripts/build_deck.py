@@ -2960,7 +2960,9 @@ def _column_framework_layout(cols: list, h: float) -> dict:
     gut = LAY["gutter_in"]
     cw = (w - gut * (n - 1)) / n
     HEAD_PT = TS["body_small"]
-    head_rows = max(_text_lines(("00  " if c.get("label") else "") + c.get("heading", ""),
+    # 見出し帯の行数は、描くものと同じ文字列(実際のラベル + 見出し)で数える。「00  」の仮置きでは
+    # 「Pillar 1」のような長いラベルの折返しを取りこぼし、帯が低く出る(Claude レビュー指摘、PR #158)
+    head_rows = max(_text_lines((f"{c['label']}  " if c.get("label") else "") + c.get("heading", ""),
                                 cw - 0.32, HEAD_PT, 600, "label") for c in cols)
     head_h = max(0.56, head_rows * drawn_line_h(HEAD_PT) + 0.22)
     has_outcome = any(c.get("outcome") for c in cols)
