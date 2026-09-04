@@ -3186,6 +3186,29 @@ def test_metric_proof_hero_must_be_in_its_chart(tmp_path):
     d["slides"][0]["chart"]["bar"]["values"] = [1, 2]
     spec.write_text(json.dumps(d, ensure_ascii=False))
     assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # 二軸の combo: % の折れ線にある 12.8 は 12.8億円 の証拠ではない(Codex / Claude レビュー、PR #158)
+    d["slides"][0]["chart"]["line"]["values"] = [12.0, 12.8]
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # 100%積み上げの最終カテゴリ合計(60+40)は hero 100% の証拠
+    d = deck([30, 60]); d["slides"][0]["chart"].update({"type": "stacked_column_100", "unit": "%"})
+    d["slides"][0]["chart"]["series"].append({"name": "他", "values": [70, 40]})
+    d["slides"][0]["hero"] = {"label": "カバー率", "value": "100", "unit": "%"}
+    d["meta"]["thesis"] = {"statement": "カバー率100%", "value": "100", "unit": "%"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    # CAGR の from / to は位置の指定であって図表の値ではない — 0 と 4 が系列に無くても derivation は根拠になる
+    d = deck([9.85, 10.52, 11.28, 11.95, 12.8]); d["slides"][0]["chart"]["categories"] = ["Q1", "Q2", "Q3", "Q4", "Q5"]
+    d["slides"][0]["hero"] = {"label": "年率成長", "value": "6.8", "unit": "%"}
+    d["slides"][0]["derivation"] = {"kind": "cagr", "of": "chart.series[0].values", "from": 0, "to": 4, "value": 6.8, "unit": "%"}
+    d["meta"]["thesis"] = {"statement": "年率6.8%", "value": "6.8", "unit": "%"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    r = run("audit_argument.py", spec)
+    assert "chart に無い" not in r.stdout and "単位「%」が chart の単位" not in r.stdout, r.stdout
+    # 同じ形で derivation が無ければ、% の hero は 億円 の図表では証明できない
+    del d["slides"][0]["derivation"]
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "単位「%」が chart の単位" in run("audit_argument.py", spec).stdout
 
 
 def test_metric_proof_accepts_a_zero_hero_value(tmp_path):

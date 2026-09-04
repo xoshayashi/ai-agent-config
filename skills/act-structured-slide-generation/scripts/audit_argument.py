@@ -268,25 +268,28 @@ def check_identity(i, s, errors) -> None:
         _check_hero_in_chart(loc, s, errors)
 
 
-def _chart_numbers(chart: dict) -> list[float]:
+def _chart_numbers(chart: dict, unit: str = "") -> list[float]:
     """図表データの数値 — 配列の中の数(native の series.values、画像図表 combo の bar/line の values、
     area の series …)。focal_category や y_max のような単独のスカラーは制御値であって数えない。
-    categories / labels / headers の配列は軸ラベルなので数えない。"""
+    categories / labels / headers の配列は軸ラベルなので数えない。unit を渡すと、その単位の配列だけを
+    返す: 配列の単位は最も近い上位の dict の unit(combo の bar.unit / line.unit、native の chart.unit)。
+    二軸の combo で % の折れ線の 12.8 を 12.8億円 の証拠にしない(Codex / Claude レビュー指摘、PR #158)。"""
     out: list[float] = []
 
-    def walk(node, in_list: bool) -> None:
+    def walk(node, in_list: bool, scope: str) -> None:
         if isinstance(node, dict):
+            scope = str(node.get("unit") or scope)
             for k, v in node.items():
                 if k not in ("categories", "labels", "headers"):
-                    walk(v, False)
+                    walk(v, False, scope)
         elif isinstance(node, list):
             for v in node:
-                walk(v, True)
-        elif in_list and not isinstance(node, bool):
+                walk(v, True, scope)
+        elif in_list and not isinstance(node, bool) and (not unit or not scope or scope == unit):
             n = to_number(node)
             if n is not None:
                 out.append(n)
-    walk(chart, False)
+    walk(chart, False, "")
     return out
 
 
@@ -312,8 +315,8 @@ def _same(v: float, val: float, printed: str) -> bool:
 
 
 def _derivation_grounded(deriv: dict, nums: list[float]) -> bool:
-    """derivation の被演算子が図表の値から取られているか。数はどれかの図表の値と一致、文字列は
-    chart への参照パスであること。value / unit / kind は結果の宣言であって被演算子ではない。"""
+    """derivation の被演算子が図表の値(hero と同じ単位の配列)から取られているか。数はどれかの図表の値と
+    一致、文字列は chart への参照パスであること。value / unit / kind は結果の宣言であって被演算子ではない。"""
     def ok(node) -> bool:
         if isinstance(node, bool):
             return False
@@ -326,7 +329,9 @@ def _derivation_grounded(deriv: dict, nums: list[float]) -> bool:
         if isinstance(node, list):
             return all(ok(v) for v in node)
         return False
-    operands = {k: v for k, v in deriv.items() if k not in ("value", "unit", "kind", "years", "label")}
+    # from / to / years / n は位置や期間の指定であって図表の値ではない(Codex レビュー指摘)
+    operands = {k: v for k, v in deriv.items()
+                if k not in ("value", "unit", "kind", "label", "years", "from", "to", "n", "index", "at")}
     return bool(operands) and ok(operands)
 
 
@@ -342,27 +347,29 @@ def _check_hero_in_chart(loc: str, s: dict, errors) -> None:
         return
     printed = str(hero.get("value"))
     h_unit = str(hero.get("unit") or "")
+    # 図表の値から導いた同じ単位の derivation は、単位が図表と違っても(億円の系列から CAGR の %)証明になる
+    deriv = s.get("derivation") or {}
+    d_val = to_number(deriv.get("value")) if deriv else None
+    if d_val is not None and str(deriv.get("unit") or "") == h_unit \
+            and _derivation_grounded(deriv, _chart_numbers(chart)) and _same(d_val, val, printed):
+        return
     c_units = _chart_units(chart)
     if h_unit and c_units and h_unit not in c_units:
         errors.append(f"{loc}: hero の単位「{h_unit}」が chart の単位({' / '.join(sorted(c_units))})と違う — "
-                      "hero を証明する図表は同じ単位で描く")
+                      "hero を証明する図表は同じ単位で描くか、図表の値から導く derivation を宣言する")
         return
-    nums = _chart_numbers(chart)
+    nums = _chart_numbers(chart, h_unit)
     if not nums:
         errors.append(f"{loc}: hero の値 {printed}{h_unit} を照合できる図表データが chart に無い — "
-                      "系列の値を持つ図表で hero を証明する")
+                      "同じ単位の系列の値を持つ図表で hero を証明する")
         return
     shown = list(nums)
     ctype, kind = chart.get("type", "column"), chart.get("kind")
     series = chart.get("series") or []
-    if (ctype in ("stacked_column", "stacked_bar") and not kind) or kind == "area":
+    if (ctype in ("stacked_column", "stacked_bar", "stacked_column_100") and not kind) or kind == "area":
         last = [to_number((ser.get("values") or [None])[-1]) for ser in series if isinstance(ser, dict)]
         if last and all(v is not None for v in last):
             shown.append(sum(last))                         # 積み上げの最終カテゴリの合計
-    deriv = s.get("derivation") or {}
-    d_val = to_number(deriv.get("value")) if deriv else None
-    if d_val is not None and str(deriv.get("unit") or "") == h_unit and _derivation_grounded(deriv, nums):
-        shown.append(d_val)
     if not any(_same(v, val, printed) for v in shown):
         errors.append(f"{loc}: hero の値 {printed}{h_unit} が chart に無い — "
                       "系列の値か、図表の値から導いた同じ単位の derivation で hero を図表から導く"

@@ -234,10 +234,12 @@ proves it on the right (8 cols). `hero: {label, value, unit, delta, delta_dir, n
 with a `unit` is drawn as value + unit, and the argument audit counts that pair as shown). The hero
 stack locks to the chart's plot top, the facts rail locks to the chart bottom, and all slack
 lands between them. `derivation` belongs here whenever the hero is computed from the series;
-`audit_argument` requires the hero value, sign included, to appear in the chart's data (native
-series or an image chart's value arrays), or to be the last-category total of a stacked chart, or
-to be a same-unit `derivation` whose operands are chart values — the chart proves the hero, never
-the other way round. A chart in another unit, or with no data arrays, is an error.
+`audit_argument` requires the hero value, sign included, to appear in the chart's data arrays
+that carry the hero's unit (native series, or a combo's `bar` / `line` — a `%` line never proves a
+`億円` hero), or to be the last-category total of a stacked chart, or to be a same-unit
+`derivation` whose operands are chart values or `chart…` paths (a CAGR in `%` derived from a
+`億円` series is the normal case) — the chart proves the hero, never the other way round. A
+chart in another unit with no such derivation, or with no data arrays, is an error.
 
 ### 24. `logic_tree`
 
