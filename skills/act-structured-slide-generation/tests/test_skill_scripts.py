@@ -3133,9 +3133,11 @@ def test_nominal_predicate_sentences_are_body_copy():
     本文として自然折返しに任せ、文節改行を入れない(Codex レビュー、PR #158)。名詞句のラベルは残す。"""
     sys.path.insert(0, str(SKILL / "scripts"))
     import build_deck as B
-    for text in ("全社展開が可能", "追加投資が必要", "現行体制では対応が困難", "在庫は十分", "外部委託も有効"):
+    for text in ("全社展開が可能", "追加投資が必要", "現行体制では対応が困難", "在庫は十分",
+                 "施策の進捗は横ばい", "本社は東京", "需要が旺盛"):        # 述語の語彙に依らない
         assert not B._looks_like_label(text), text
-    for text in ("全社展開の可能性", "必要投資額", "対応方針", "可能", "必要", "重要顧客の維持"):
+    for text in ("全社展開の可能性", "必要投資額", "対応方針", "可能", "必要", "重要顧客の維持",
+                 "がん検診の受診率", "はがきの送付", "売上高は"):
         assert B._looks_like_label(text), text
 
 

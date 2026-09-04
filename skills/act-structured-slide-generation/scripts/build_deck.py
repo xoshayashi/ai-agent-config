@@ -63,6 +63,7 @@ A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 # 表示長(_ja_len)と全角→半角(hw)は deck_text.py の単一実装を使う — validate_spec の
 # 字数バジェット・lint_render の readback 照合と同一実装であることが契約
 import act_theme
+from deck_text import _words as _dt_words
 from deck_text import (EA_DIGIT_RUN, MEASURE_OK, SCRIPT_RUN, drawn_line_h, footer_text,
                        header_slots, hw, ink_center_offset_in, ink_slacks, is_prose,
                        ja_len as _ja_len, leading,
@@ -377,12 +378,9 @@ def _add_line_runs(p, text, size_pt, weight, color):
 
 
 _SENTENCE_ENDINGS = tuple("るうくすつぬぶむぐいただずぬ")   # 動詞・形容詞・助動詞の終止形の末尾(体言止めではない)
-# 名詞・形容動詞の語幹で終わる述語(「全社展開が可能」「追加投資が必要」)。主語の助詞を伴えば文であって
-# 体言止めのラベルではない(Codex レビュー指摘、PR #158)。「可能性」「必要投資額」のような名詞は末尾が違う
-_NOMINAL_PREDICATES = ("可能", "不可能", "不可", "必要", "不要", "必須", "困難", "容易", "重要", "有効", "無効",
-                       "十分", "不十分", "不足", "過剰", "妥当", "明確", "不明", "未定", "急務", "最適", "有利",
-                       "不利", "同等", "別", "無理", "未達", "達成済み", "対応済み", "完了", "未完了", "前提")
-_SUBJECT_PARTICLES = ("が", "は", "も", "には", "では", "とは")
+# 主語の助詞。「全社展開が可能」「施策の進捗は横ばい」のように主語を立てた文は、名詞で終わっていても
+# 体言止めのラベルではなく本文。述語の語彙を列挙せず、主語+述語の構造で見る(Codex レビュー指摘、PR #158)
+_SUBJECT_PARTICLES = ("が", "は")
 
 
 def _looks_like_label(text: str) -> bool:
@@ -392,11 +390,16 @@ def _looks_like_label(text: str) -> bool:
     t = text.rstrip()
     if not t or is_prose(t) or _ja_len(t) > LABEL_MAX_CHARS:
         return False
-    if t.endswith(_NOMINAL_PREDICATES):
-        stem = t[:-max(len(p) for p in _NOMINAL_PREDICATES if t.endswith(p))]
-        if any(p in stem for p in _SUBJECT_PARTICLES):
-            return False                                  # 「全社展開が可能」= 主語 + 名詞述語の文
+    if _has_subject(t):
+        return False                                      # 「全社展開が可能」= 主語 + 述語の文
     return not t.endswith(_SENTENCE_ENDINGS)
+
+
+def _has_subject(text: str) -> bool:
+    """主語の助詞(が・は)で終わる文節のあとに述語が続くか。文節は deck_text._words で切るので、
+    「がん検診」「はがき」のような語頭の仮名や、文末の「売上高は」だけの見出しは主語に数えない。"""
+    toks = _dt_words(text)
+    return any(len(t) >= 2 and t.endswith(_SUBJECT_PARTICLES) for t in toks[:-1])
 
 
 def display_wrap_text(text: str, w_in: float, size_pt: float, weight: int = 400,
