@@ -318,9 +318,31 @@ def _same(v: float, val: float, printed: str) -> bool:
     return (v >= 0) == (val >= 0) and matches(v, val, printed)
 
 
-# 図表の値の配列を指すパス(chart.series[0].values、chart.bar.values[-1])。focal_category / y_max のような
-# 制御値や categories を指すパスは、たまたま同じ数でも根拠にならない(Codex レビュー指摘)
+# 図表の値の配列を指すパス(chart.series[0].values、chart.bar.values[1])。focal_category / y_max のような
+# 制御値や categories を指すパスは、たまたま同じ数でも根拠にならない(Codex レビュー指摘)。添字は
+# 0 以上(resolve_path も負の添字を持たない)
 _VALUE_PATH = re.compile(r"^chart(?:\.[a-z_]+|\[\d+\])*\.values(?:\[\d+\])?$")
+
+
+def _path_unit(slide: dict, path: str) -> str:
+    """パスが指す配列の実効単位 — 経路上で最も近い dict の unit(combo の line.unit、native の chart.unit)。
+    値の一致だけで見ると、億円の棒と同じ数を持つ % の折れ線のパスが億円の根拠になる(Codex レビュー指摘)。"""
+    node, unit = slide, ""
+    for seg in re.findall(r"[^.\[\]]+|\[\d+\]", path.strip()):
+        if isinstance(node, dict):
+            unit = str(node.get("unit") or unit)
+        if seg.startswith("["):
+            if not isinstance(node, list):
+                return unit
+            i = int(seg[1:-1])
+            node = node[i] if i < len(node) else None
+        elif isinstance(node, dict):
+            node = node.get(seg)
+        else:
+            return unit
+    if isinstance(node, dict):
+        unit = str(node.get("unit") or unit)
+    return unit
 # 単位を変えない演算(差・和)は被演算子も結果と同じ単位。率・倍率・構成比は単位が変わる(億円→%)
 _SAME_UNIT_KINDS = ("delta", "sum")
 
@@ -337,7 +359,9 @@ def _derivation_grounded(slide: dict, deriv: dict, chart: dict) -> bool:
     if not operands:
         return False
 
-    def ok(node, nums: list[float]) -> bool:
+    typed = bool(_chart_units(chart))
+
+    def ok(node, nums: list[float], unit: str) -> bool:
         if isinstance(node, bool):
             return False
         if isinstance(node, (int, float)):
@@ -345,24 +369,26 @@ def _derivation_grounded(slide: dict, deriv: dict, chart: dict) -> bool:
         if isinstance(node, str):
             if not _VALUE_PATH.match(node.strip()):
                 return False
+            if typed and _path_unit(slide, node) != unit:
+                return False                              # 別単位の配列を指すパスは、同じ数でも根拠にならない
             try:
                 got = resolve_path(slide, node)
             except Exception:
                 return False
             if isinstance(got, list):
-                return bool(got) and all(isinstance(g, (int, float)) and ok(g, nums) for g in got)
-            return isinstance(got, (int, float)) and ok(got, nums)
+                return bool(got) and all(isinstance(g, (int, float)) and ok(g, nums, unit) for g in got)
+            return isinstance(got, (int, float)) and ok(got, nums, unit)
         if isinstance(node, dict):
-            return all(ok(v, nums) for v in node.values())
+            return all(ok(v, nums, unit) for v in node.values())
         if isinstance(node, list):
-            return bool(node) and all(ok(v, nums) for v in node)
+            return bool(node) and all(ok(v, nums, unit) for v in node)
         return False
     units = _chart_units(chart) or {""}
-    if deriv.get("kind") in _SAME_UNIT_KINDS:
-        units = {u for u in units if u == str(deriv.get("unit") or "")} if _chart_units(chart) else units
+    if deriv.get("kind") in _SAME_UNIT_KINDS and typed:
+        units = {u for u in units if u == str(deriv.get("unit") or "")}
     for unit in units:
         nums = _chart_numbers(chart, unit)
-        if nums and ok(operands, nums):
+        if nums and ok(operands, nums, unit):
             return True
     return False
 

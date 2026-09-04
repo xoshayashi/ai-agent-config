@@ -237,9 +237,11 @@ lands between them. `derivation` belongs here whenever the hero is computed from
 `audit_argument` requires the hero value, sign included, to appear in the chart's data arrays
 that carry the hero's unit (native series, or a combo's `bar` / `line` — a `%` line never proves an
 `oku-yen` hero), or to be the last-category total of a stacked chart, or to be a same-unit
-`derivation` whose operands are chart values or `chart…` paths (a CAGR in `%` derived from an
-`oku-yen` series is the normal case) — the chart proves the hero, never the other way round. A
-chart in another unit with no such derivation, or with no data arrays, is an error.
+`derivation` whose operands are chart values or `chart…values[i]` paths, all taken from arrays
+of one unit (a CAGR in `%` derived from an `oku-yen` series is the normal case; `delta` and
+`sum` keep their unit, so their operands must come from arrays in the result's unit) — the chart
+proves the hero, never the other way round. A chart in another unit with no such derivation, or
+with no data arrays, is an error.
 
 ### 24. `logic_tree`
 

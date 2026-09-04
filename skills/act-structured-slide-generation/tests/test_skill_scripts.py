@@ -3219,6 +3219,14 @@ def test_metric_proof_hero_must_be_in_its_chart(tmp_path):
     d["slides"][0]["derivation"] = {"kind": "delta", "a": 10, "b": 30, "value": 20, "unit": "億円"}
     spec.write_text(json.dumps(d, ensure_ascii=False))
     assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # 億円の棒と % の折れ線が同じ数 [10, 30] を持つとき、line を指すパスの差は億円の根拠にならない(Codex レビュー)
+    d["slides"][0]["chart"]["bar"]["values"] = [10, 30]; d["slides"][0]["chart"]["line"]["values"] = [10, 30]
+    d["slides"][0]["derivation"] = {"kind": "delta", "a": "chart.line.values[0]", "b": "chart.line.values[1]", "value": 20, "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    d["slides"][0]["derivation"] = {"kind": "delta", "a": "chart.bar.values[0]", "b": "chart.bar.values[1]", "value": 20, "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
     # 制御値を指すパス(chart.focal_category / chart.y_max)は、たまたま系列と同じ数でも根拠にならない(Codex レビュー)
     d = deck([1, 3]); d["slides"][0]["chart"].update({"focal_category": 1, "y_max": 3})
     d["slides"][0]["hero"] = {"label": "差", "value": "2", "unit": "億円"}
