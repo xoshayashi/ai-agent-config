@@ -782,8 +782,12 @@ def _unbreakable_spans(text: str) -> list[tuple[int, int]]:
                     j += 1
                 # 「/」で結ぶ複合単位(365万時間/日、120件/月、2万円/人)は分母の助数詞まで1語
                 # (Codex レビュー指摘、PR #158: 「/日」が次行の頭に落ちていた)
-                if j + 1 < n and text[j] == "/" and text[j + 1] in _COUNTERS:
-                    j += 1
+                if j + 1 < n and text[j] == "/":
+                    den = next((u for u in _MULTI_UNITS if text.startswith(u, j + 1)), None)
+                    if den:                                          # 120件/カ月、2万円/時間、3社/週間
+                        j += 1 + len(den)
+                    elif text[j + 1] in _COUNTERS:
+                        j += 1
                     while j < n and text[j] in _COUNTERS:
                         j += 1
             # 数の前の符号や概数の印(△2.8億円、−3.2%、約1,630人)も同じ語 — 行末に印だけ残さない

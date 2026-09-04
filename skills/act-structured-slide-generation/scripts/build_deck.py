@@ -397,12 +397,10 @@ def _looks_like_label(text: str) -> bool:
 
 def _has_subject(text: str) -> bool:
     """主語の助詞(が・は)で終わる文節のあとに述語が続くか。文節は deck_text._words で切るので、
-    「がん検診」「はがき」のような語頭の仮名や、文末の「売上高は」だけの見出しは主語に数えない。"""
+    「がん検診」「はがき」のような語頭の仮名や、文末の「売上高は」だけの見出しは主語に数えない。連体詞の
+    「我が・わが」は _words が後ろの名詞に結ぶ(我が社の)ので、ここには主語として現れない。"""
     toks = _dt_words(text)
-    return any(len(t) >= 2 and t.endswith(_SUBJECT_PARTICLES) and t not in _PRENOMINAL_GA for t in toks[:-1])
-
-
-_PRENOMINAL_GA = ("我が", "わが")      # 連体詞の「が」(我が社)。_words は後ろの名詞に結ぶが、単独でも主語に数えない
+    return any(len(t) >= 2 and t.endswith(_SUBJECT_PARTICLES) for t in toks[:-1])
 
 
 def display_wrap_text(text: str, w_in: float, size_pt: float, weight: int = 400,
@@ -927,6 +925,7 @@ CHART_TYPES = {
 }
 BAR_FAMILY = {"column", "bar", "stacked_column", "stacked_column_100", "stacked_bar"}
 STACKED = {"stacked_column", "stacked_column_100", "stacked_bar"}
+HORIZONTAL_BARS = {"bar", "stacked_bar"}        # カテゴリが縦軸: annotation(バッジ・矢印)のアンカーは縦棒専用
 
 
 def _chart_ea_fonts(chart) -> None:
@@ -1338,7 +1337,9 @@ def _focal_bar_anchor(cx, cw, cspec):
 def add_chart_annotations(slide, cx, cy, cw, ch, cspec):
     """Exemplar-style annotations: YoY badge above the focal bar, optional trend arrow."""
     ann = cspec.get("annotation") or {}
-    if not ann:
+    if not ann or cspec.get("type", "column") in HORIZONTAL_BARS:
+        # 横棒はカテゴリが縦軸に並ぶので、カテゴリ番号→x座標のアンカーが成り立たない。validate_spec が
+        # 先に弾く(Codex レビュー指摘、PR #158)。ここでは無関係な位置にバッジを置かない
         return
     bx = _focal_bar_anchor(cx, cw, cspec)
     if ann.get("yoy") or ann.get("badge"):

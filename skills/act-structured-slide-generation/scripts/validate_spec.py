@@ -587,6 +587,10 @@ def main() -> int:
                 ctype = chart.get("type", "column")
                 if ctype not in SUPPORTED_CHART_TYPES:
                     errors.append(f"{cloc}: chart type '{ctype}' は未対応 — {' / '.join(SUPPORTED_CHART_TYPES)} から選ぶ")
+                if chart.get("annotation") and ctype in ("bar", "stacked_bar"):
+                    # 横棒はカテゴリが縦軸に並び、バッジ・矢印のアンカー(カテゴリ番号→x座標)が成り立たない
+                    errors.append(f"{cloc}: annotation(badge / yoy / trend_arrow)は横棒 '{ctype}' では描けない — "
+                                  "縦棒(column / stacked_column)にするか annotation を外す")
                 cats, series = chart.get("categories", []), chart.get("series", [])
                 if not cats or not series:
                     errors.append(f"{cloc}: chart needs categories and series")

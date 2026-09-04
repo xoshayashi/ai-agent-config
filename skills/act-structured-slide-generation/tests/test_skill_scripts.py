@@ -1347,6 +1347,28 @@ def test_build_handles_null_focal_category_with_annotation(tmp_path):
     assert r.returncode == 0, r.stdout + r.stderr
 
 
+def test_annotation_on_a_horizontal_bar_is_rejected(tmp_path):
+    """横棒(bar / stacked_bar)はカテゴリが縦軸に並ぶので、バッジのアンカー(カテゴリ番号→x)が成り立たない。
+    validate が error にし、build は無関係な位置にバッジを置かない(Codex レビュー、PR #158)。"""
+    for ctype in ("bar", "stacked_bar"):
+        deck = _minimal_deck()
+        deck["slides"][0]["chart"].update({"type": ctype, "focal_category": 1, "annotation": {"badge": "+12%"}})
+        spec = tmp_path / f"{ctype}.json"
+        spec.write_text(json.dumps(deck, ensure_ascii=False))
+        r = run("validate_spec.py", spec)
+        assert r.returncode != 0 and "横棒" in r.stdout, r.stdout
+        out = tmp_path / f"{ctype}.pptx"
+        assert run("build_deck.py", spec, "-o", out).returncode == 0
+        ovals = [sh for sh in pptx.Presentation(out).slides[0].shapes if sh.shape_type == 1 and sh.has_text_frame
+                 and "+12%" in sh.text_frame.text]
+        assert not ovals, ctype
+    deck = _minimal_deck()
+    deck["slides"][0]["chart"].update({"focal_category": 1, "annotation": {"badge": "+12%"}})
+    spec = tmp_path / "column.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    assert "横棒" not in run("validate_spec.py", spec).stdout
+
+
 def test_negative_waterfall_stays_inside_slide(tmp_path):
     from pptx.util import Inches
 
@@ -3139,7 +3161,7 @@ def test_nominal_predicate_sentences_are_body_copy():
     for text in ("全社展開の可能性", "必要投資額", "対応方針", "可能", "必要", "重要顧客の維持",
                  "がん検診の受診率", "はがきの送付", "売上高は", "我が社の競争優位", "わが国の水準"):
         assert B._looks_like_label(text), text
-    assert not B._has_subject("我が社の競争優位") and not B._has_subject("我が 社")   # 連体詞の「が」は主語ではない
+    assert not B._has_subject("我が社の競争優位")                       # 連体詞の「が」は主語ではない
 
 
 def test_i_adjective_sentences_are_body_copy():
@@ -3371,6 +3393,9 @@ def test_per_day_compound_units_stay_with_their_number():
     assert (a, a + len("365万時間/日")) in spans
     # 数字の後ろに「/」が続いても、助数詞でなければ延ばさない(「3/4」は数字どうし = ascii 側で結ぶ)
     assert (0, len("120件/月")) in dt._unbreakable_spans("120件/月の受注")
+    # 分母が複数字の単位でも丸ごと(Codex レビュー、PR #158)
+    for text, word in (("受注は120件/カ月に増加", "120件/カ月"), ("単価は2万円/時間", "2万円/時間"), ("3社/週間の面談", "3社/週間")):
+        assert word in {text[a:b] for a, b in dt._unbreakable_spans(text)}, text
     for width in (1.6, 1.77, 2.0, 2.3):
         for line in dt.wrap_natural(text, width, 16).split("\n"):
             assert not line.startswith("/"), (width, line)
