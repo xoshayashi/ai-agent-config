@@ -56,7 +56,13 @@ may already have everything, in which case use the system `python3` and do NOT c
 ```bash
 python3 -c "import pptx, PIL, lxml, fontTools, matplotlib, matplotlib_venn, graphviz" && \
   command -v soffice dot >/dev/null && echo "ready — no venv needed"
+python3 scripts/setup_fonts.py --check   # the six static fonts the renderer measures with
 ```
+
+`deck_text` measures every line with the same font files it draws with (Geist and Noto Sans
+JP, 400 / 600 / 700). Run `setup_fonts.py` without `--check` once to install them into
+`~/Library/Fonts`; without them the line breaks and header limits are computed on a fallback
+font and drift from the render.
 
 If something is missing, install it into the system Python (macOS / Homebrew):
 
@@ -93,7 +99,7 @@ native-only deck runs without them, and they are only needed when a deck uses an
    `outline.md` and set it as `meta.template` (§2); every slide then wears it. See
    `references/templates.md`.
 2. Read all provided source material before drafting. Record provenance in `outline.md`.
-3. Write `outline.md` with audience/action, governing thought, chapter spine, action-title
+3. Write `outline.md` (starter: `assets/outline.md`) with audience/action, governing thought, chapter spine, action-title
    sequence, evidence status, open questions, and talk-time budget. For every chapter, name
    the one concrete scene it must put in the reader's head (who is standing where, what they
    do next, what changes) — the chapter's slides are then judged by whether that scene comes
@@ -174,21 +180,53 @@ Per-line character limits are never written down: they are derived from the rend
 renderer read. Changing a type scale or a layout width moves the limit automatically — do not
 reintroduce hard-coded character budgets for headers.
 
-**Line breaks.** Write copy; the builder writes the line breaks. Short display text (labels,
-headings, cell text, conclusion lines) breaks at phrase boundaries so the phrasing shows in
-the shape; sentences and body copy fill their lines, each line ending on a whole word. The
-renderer is never left to wrap an overflowing sentence — its letter spacing differs from the
-builder's by a fraction, and that fraction is what drops a break inside a word. A symbolic closing message is composed as
-a form — its measure, its line balance and its surrounding whitespace are chosen together. A
-`\n` you type is honoured as a forced break, which is what makes it right for a slot with an
-exact line count (the cover subtitle's two lines). When a word is wider than its column,
-`verify_deck` names it: shorten the word or widen the column. See
-`references/copy-and-title-rules.md`.
+**Line breaks.** Write copy; the builder writes the breaks, and it writes them differently for
+the two kinds of text. Short display text (labels, headings, chevron labels, outcome lines,
+cell text) breaks at phrase boundaries so the phrasing shows in the shape — break these
+properly. Body copy (sentences, item bodies) gets no authored breaks: it is handed to the
+renderer as written and wraps naturally — kanji and kana wrap anywhere, as Japanese text does.
+The builder inserts a break only where the natural wrap would land inside a katakana word, a
+Latin word or name, or a number and its unit, or where the last line would hold a single
+character, and it inserts it only at that spot; every other line end is the renderer's
+(`deck_text.wrap_natural`). Never break body copy at clause boundaries for shape. A `\n` you
+type is honoured as a forced break, which is what makes it right for a slot with an exact line
+count (the cover subtitle's two lines). A symbolic closing message is composed as a form
+(`shape_message`). When a word is wider than its column, `verify_deck` names it: shorten the
+word or widen the column. See `references/copy-and-title-rules.md`.
 
 **Emphasis without dashes.** On a slide, a clause break is a comma and an emphasis break is a
 line. A point that deserves to stand alone gets its own line — on a statement slide it becomes
 the `lead`, with the sentence that supports it set below in smaller type. `validate_spec`
 flags dashes in slide-visible text.
+
+**Body fill contract.** Occupancy is one rule, not a per-slide feeling: `tokens.json` →
+`layout.fill` and `build_deck.fit_band` grow every content-sized block toward 74% of the body
+band (never past 1.75× its own content, 1.3× for top-anchored bullet cards) and centre the
+remainder. When copy exceeds a pattern's cap, the renderer climbs a reclaim ladder (line
+spacing → item gap → inner padding) and then *reports* the overflow — it never shrinks type and
+never pushes a frame off the slide. `verify_deck` fails text that straddles a bar/card edge;
+`lint_render` fails an evidence slide whose rendered body occupancy is under 50%. Treat either
+as a copy or pattern-choice defect, not something to nudge. See
+`references/grid-and-flex-strategy.md` (Body Fill Contract).
+
+**Card copy volume (one-shot balance).** A card pattern (`process_flow`, `column_framework`,
+`two_column`) sizes its cards from the fullest card and grows them toward the body band, so a
+card carrying three short phrases ends up half empty and out of balance with its header band and
+its neighbours. Write to the card, not to the minimum: a bold one-line lead (`desc` / `heading`)
+plus three items, each about two lines at that column width — for a 4-step flow that is roughly
+10 characters of lead and 12-17 characters per item; for 3 pillars, 15-25 characters per item
+body. `validate_spec.py` estimates every card with the renderer's own geometry
+(`build_deck.card_copy_estimate`) and names the shortfall in lines and characters when a card's
+copy is under `tokens.layout.fill.card_text_floor` (60% of the card); `verify_deck.py` re-measures
+the built file. Fix by adding copy, never by enlarging type or shrinking the card.
+
+**Consulting page shapes.** Three structures are native primitives (see `deck-spec.md`
+22-24) and should be chosen by judgment like any other: `column_framework` (2-4 pillars with
+aligned rows and a locked outcome strip — parallel structure, never a sequence),
+`metric_proof` (hero number cluster + the chart that proves it + facts rail), `logic_tree`
+(issue / driver / KPI tree, root → branches → leaves, all editable shapes). Mix shift is a
+native `stacked_column_100`; a chart with short comparable takeaways can use
+`chart_insight` `layout: chart_top` to vary the page rhythm.
 
 **Text frames.** A group that reads as one thing is one text box, built from paragraphs
 (label -> value -> note; heading -> body; a whole interpretation rail). Leading follows the
@@ -197,7 +235,9 @@ and every frame is the size of its text. `verify_deck` reports overlapping frame
 `references/grid-and-flex-strategy.md`.
 
 Source, assumption, and note fields stay small in the footer area; page numbers are never
-rendered.
+rendered. `note` exists only to change how a number reads (denominator, definition, scope) —
+never as commentary or a navigation hint, and never on a slide that shows no number;
+`validate_spec` warns on such a note. Put the remark in the body or in `speaker_notes` instead.
 
 ### 2b. Talk Script (speaker_notes)
 
@@ -307,7 +347,8 @@ rendered PNGs. Inspect at least these issues:
 - page numbers
 - placeholder sources, unsupported assumptions, or invented facts
 
-Record findings in `review-log.md`. Repair in this order:
+Work through the seven lenses in `references/visual-qa-and-repair-rubric.md` and pick each
+fix from its repair menu (R1-R14). Record findings in `review-log.md`. Repair in this order:
 
 `P0 unreadable/overlap/factual contradiction -> P1 grid, evidence, source, and hierarchy defects -> P2 polish`
 
@@ -375,30 +416,33 @@ Read only what the task needs, but do not skip the required workflow references.
 | `references/deck-spec.md` | `deck.json` schema, pattern fields, chart spec, copy rules |
 | `references/templates.md` | Deck-level design templates (`meta.template`): the selectable looks and their bounds |
 | `references/templates/*.json` | The template patches themselves (`standard`, `navy`, `monochrome`, `bold`) |
-| `references/design-principles.md` | Act visual grammar and slide-level design decisions |
+| `references/design-principles.md` | Act visual grammar, hierarchy, color, density judgment, and page rhythm |
 | `references/grid-and-flex-strategy.md` | Granular grid/flex contract for layout consistency |
 | `references/composition-vocabulary.md` | Composition moves, not templates |
 | `references/composition-atoms.md` | IR-slide composition atoms + evidence-emphasis move→knob map |
 | `references/ir-slide-design-principles.md` | IR and investor-deck design principles |
 | `references/evidence-and-claim-rules.md` | Claim/evidence/status/source discipline |
 | `references/data-and-diagram-rules.md` | Chart and diagram selection rules |
-| `references/visual-hierarchy-rules.md` | Reading path, emphasis, alignment, accessibility |
 | `references/copy-and-title-rules.md` | Action titles, Japanese slide copy, line-break discipline |
 | `references/argument-integrity.md` | The argument contract enforced by `audit_argument.py` |
 | `references/concreteness.md` | Scenes, named mechanisms, felt scale (lexicon: `concreteness-lexicon.json`) |
 | `references/commitment-lexicon.json` | Terms that decide promise / rank / hedge / motion |
 | `references/talk-script-and-tts.md` | Speaker-notes readings a voice can say (table: `tts_readings.json`) |
-| `references/design-richness-rules.md` | Freshness and impact without decoration |
 | `references/humanize.md` | Remove AI-like generic output |
 | `references/anti-patterns.md` | Failure modes to hunt before delivery |
-| `references/all-perspective-review.md` | Twenty-lens review checklist |
-| `references/review-and-repair-rubric.md` | Operational repair menu and scoring gate |
-| `references/visual-qa-and-repair-rubric.md` | Render-based multi-lens visual QA |
+| `references/visual-qa-and-repair-rubric.md` | Render-based review loop: seven lenses, P0/P1/P2 severity, repair menu R1-R14, approve / repair / redesign verdict |
 | `references/pptx-pitfalls.md` | python-pptx implementation pitfalls |
 | `references/tokens.json` | Single source for Act color, type, and grid tokens |
 | `scripts/act_theme.py` | Token-core adapter: feeds tokens.json to every backend (native, matplotlib, Graphviz) |
 | `scripts/act_assets.py` | Image-asset backend: Act-styled deterministic charts/diagrams for objects native cannot draw |
-| `assets/deck-workspace-template/` | Optional starter for `outline.md` and `review-log.md` |
+| `scripts/stress_deck.py` | Dynamic-generation regression guard: every pattern at min / documented max / past capacity |
+| `scripts/setup_fonts.py` | Installs / checks the Geist + Noto Sans JP static fonts the renderer measures with |
+| `scripts/deck_text.py`, `scripts/deck_argument.py` | Shared modules: text measurement, header slots, template registry; evidence-vs-claim key split (used by validate, build, audit, contact sheet) |
+| `scripts/contact_sheet.py` | Contact sheet and header strip from rendered PNGs (called by `render_deck.sh`) |
+| `evals/rubric.json`, `evals/evals.json`, `evals/scenario-earnings.md` | Deck-scoring rubric read by `eval_deck.py`; skill eval cases; clean-base earnings scenario |
+| `evals/skill-rubric.json` | Rubric for reviewing the skill itself (hand it to the milestone-review reviewer) |
+| `examples/sample-deck.json`, `sample-earnings-deck.json`, `sample-consulting-deck.json` | Canonical decks: proposal, earnings, consulting (pillars / metric proof / logic tree / mix shift) |
+| `assets/outline.md`, `assets/review-log.md` | Optional starters for the workspace `outline.md` and `review-log.md` |
 
 ## Skill Maintenance
 
@@ -406,8 +450,16 @@ Use:
 
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests -p no:cacheprovider
+python3 scripts/stress_deck.py -o /tmp/stress --images     # every pattern at min / max / overload, all templates via --template
 python3 /Users/sh/.claude/plugins/marketplaces/claude-plugins-official/plugins/skill-creator/skills/skill-creator/scripts/quick_validate.py .
 ```
+
+After touching a renderer, rebuild and render the three example decks and read the contact
+sheets — the stress fixture proves nothing breaks, the examples prove it still looks right.
+
+For an independent review of the skill itself, give the reviewer `evals/skill-rubric.json`
+(via the milestone-review skill) and record the outcome in the task's progress log, not in
+this directory — the skill tree carries only what a run needs.
 
 Remove caches after local testing if they appear:
 

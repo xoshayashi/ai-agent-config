@@ -46,6 +46,35 @@ Rules that keep the area consistent across the deck:
   margin. Do not stretch a block to 100% of the area just to remove whitespace — centered
   breathing is preferable to a wall of edge-to-edge content.
 
+## Body Fill Contract (`tokens.layout.fill`)
+
+Occupancy is one rule for every pattern, not a per-pattern constant. `build_deck.fit_band(h,
+content_h)` returns the block height and its symmetric offset:
+
+- **Grow toward the target.** A content-sized block grows until it occupies `band_target`
+  (0.74) of the body height, so a short spec never leaves a dead band above and below.
+- **Never past the stretch cap.** It grows at most `stretch` (1.75×) beyond its own content —
+  a three-line card is not inflated to four inches. Containers whose content is top-anchored
+  (bullet cards, item stacks) use `stretch_top` (1.3×) so the card bottom never becomes a void.
+- **Centre the remainder.** Whatever height is left becomes equal top and bottom air.
+- **Reclaim before overflowing.** When content exceeds the body, the pattern climbs a ladder —
+  line spacing, then item gaps, then inner padding — before it overflows. Type is never shrunk.
+  Overflow is then a spec defect that `verify_deck` names (frame overflow, text straddling a
+  shape edge); `lint_render` separately fails any evidence slide whose rendered body occupancy
+  is under `occupancy_floor` (0.50).
+- **Aligned values across cards.** Cards in one row start their stacks at the same y, so the
+  values of neighbouring KPI cards read on one line whatever their notes do underneath.
+
+The stress fixture (`scripts/stress_deck.py`) exercises every pattern at its documented caps
+and past them; it is the contract's regression test.
+
+**Card text floor.** The fill contract grows a card toward the band, so a card with three
+short phrases ends up half empty and out of balance with its header band and its neighbours.
+`validate_spec` (before the build, via `build_deck.card_copy_estimate`, the renderer's own
+geometry) and `verify_deck.check_card_fill` (after, on the built file) warn when the text inside a
+`surface_tint` card spans less than `tokens.layout.fill.card_text_floor` (60%) of the card height. The repair is more copy — a
+`desc` lead plus fuller items — never a larger type size.
+
 ## Container Breathing Contract
 
 These rules govern any content-sized container (cards, table rows, roadmap cells, step
@@ -165,7 +194,8 @@ its lines like any other prose and keeps a margin of whitespace on the right.
   in the silhouette. A clause too long for one line is broken at a phrase boundary, and a
   word is never broken.
 - Line lengths are balanced (a DP over clause/phrase units minimises the spread), and the
-  last line stays long enough to hold the sentence's weight.
+  last line stays long enough to hold the sentence's weight. This is the one place lines are
+  shaped rather than filled — body copy fills its lines (see copy-and-title-rules).
 - The measure is chosen shorter than the available width, so the block keeps a margin of
   whitespace on the right and reads as placed rather than packed. The block is then centred
   in the free region above the supporting strip.

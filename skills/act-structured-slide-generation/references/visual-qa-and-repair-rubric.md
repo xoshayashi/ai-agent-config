@@ -1,13 +1,15 @@
 # Visual QA and repair rubric
 
-Purpose: review lens for generated slide blueprints, rendered PNGs, or PPTX.
-Use after `review-and-repair-rubric.md` when the deck is IR, investor, earnings, or any
-evidence-heavy decision material.
+Purpose: the render-based review and repair loop for every deck (SKILL.md §4). Run it after
+`lint_render` and before the independent rubric loop, on the rendered PNGs and `deck.json`
+together. Investor-heavy lenses weigh more on IR / earnings decks, but every lens is asked of
+every substantive slide. Severity uses the same P0 / P1 / P2 scale as SKILL.md and
+`review-log.md`.
 
 Output findings in priority order:
 
 ```text
-Severity: High / Medium / Low
+Severity: P0 / P1 / P2
 Slide:
 Finding:
 Why it matters:
@@ -30,7 +32,7 @@ Ask:
 - Is the page about growth, profitability, risk, progress, capital allocation, or credibility?
 - Can a skeptical reader identify what changed and why it matters?
 
-High-severity findings:
+P0 findings:
 
 - The slide does not change an investment belief.
 - The claim is stronger than the evidence.
@@ -55,7 +57,7 @@ Ask:
 - Does any title overpromise future results?
 - Are proprietary metrics defined at first use?
 
-High-severity findings:
+P0 findings:
 
 - Forecast/target looks like actual.
 - Source or assumption is missing for a material number.
@@ -81,7 +83,7 @@ Ask:
 - Is freshness coming from composition and scale rather than decoration?
 - Does the page differ from neighbors without breaking deck system?
 
-High-severity findings:
+P0 findings:
 
 - Body objects float as small islands or collide.
 - Multiple objects compete as protagonist.
@@ -106,7 +108,7 @@ Ask:
 - Are axes, direct labels, units, periods, and annotations sufficient?
 - Are comparisons fair and comparable?
 
-High-severity findings:
+P0 findings:
 
 - Single current-value bar used as if comparison exists.
 - Non-comparable bars or axes imply false comparison.
@@ -131,7 +133,7 @@ Ask:
 - Does the page imply a commitment where only a plan or scenario exists?
 - Is legal text readable but not dominating proof pages?
 
-High-severity findings:
+P0 findings:
 
 - Target, opportunity, or scenario is written as guaranteed outcome.
 - Required caveat is absent or buried in body prose.
@@ -156,7 +158,7 @@ Ask:
 - Is the repair instruction local and executable?
 - Did changes affect only intended slides in render diff?
 
-High-severity findings:
+P0 findings:
 
 - Design requires hand-edited coordinates or rasterized slides.
 - Text only fits by shrinking below token scale.
@@ -173,11 +175,61 @@ Acceptance check:
 - `validate_spec`, `build_deck`, `verify_deck`, render, and `lint_render` pass; visual diff
   matches intended repairs.
 
+## 7. Narrative And Strategy Lens
+
+Ask:
+
+- What strategic belief, priority, or decision does this slide move? Is it more than a neutral
+  fact introduction?
+- What role does the slide play in the deck's argument? Does it bridge from the previous page
+  and set up the next one?
+- Could the slide be shuffled elsewhere in the deck without anyone noticing?
+
+P0 findings:
+
+- The slide moves no belief and asks for no decision.
+- The title read-through breaks at this slide (the claim does not follow from the previous one).
+
+Repair:
+
+- Rewrite the takeaway around the decision it should move, or fold the slide into its neighbour.
+- Fix the bridge in the title sequence first, then in the `speaker_notes`.
+
+Acceptance check:
+
+- Reading only the action titles, the argument still runs through this slide.
+
 ## Severity Guide
 
-- **High**: misleads, cannot be read, cannot be audited, or fails the slide's core purpose.
-- **Medium**: readable but weakens trust, hierarchy, comparison, or rhythm.
-- **Low**: polish issue with limited decision impact.
+- **P0**: factual contradiction, unreadable proof, overlap, cut-off text, impossible source,
+  broken render, or a slide that fails its core purpose.
+- **P1**: grid/flex breach, weak evidence, title mismatch, excessive whitespace, cramped
+  hierarchy, single-bar chart, fixed closing page — readable but weakens trust, hierarchy,
+  comparison, or rhythm.
+- **P2**: polish, minor rhythm, small alignment drift, or optional copy tightening.
+
+Repair in severity order (P0 -> P1 -> P2) and record every finding in `review-log.md`.
+
+## Repair Menu
+
+- **R1. Rewrite title**: use when the slide has a topic title or claim/evidence mismatch.
+- **R2. Split slide**: use when two claims or protagonists compete.
+- **R3. Strengthen evidence**: add source, denominator, period, or better proof.
+- **R4. Change composition move**: switch from cards/two-column/equal grid to a move that
+  matches the evidence.
+- **R5. Enlarge focal object**: scale chart/table/value/image before adding decoration.
+- **R6. Rebuild grid/flex**: redefine role map, spans, alignment spine, bands, and gaps.
+- **R7. Repair density**: move excess detail to notes/appendix or fill dead space with larger
+  proof objects.
+- **R8. Repair metric spacing**: separate value, unit, and YoY/delta subline.
+- **R9. Replace single-bar chart**: use comparison, gauge, range, hero number, or table row.
+- **R10. Rebalance close**: choose thesis, proof strip, decision request, next actions, quote,
+  or legal close.
+- **R11. Normalize color**: reduce accent, remove decoration, stabilize meaning.
+- **R12. Fix source discipline**: separate source, assumption, note, and legal caveat.
+- **R13. Fix production defect**: overflow, cropping, font substitution, broken render.
+- **R14. Return to outline**: use when the chapter spine, governing thought, or evidence base
+  is wrong.
 
 ## Repair-Or-Redesign Decision
 
@@ -194,5 +246,7 @@ Use **redesign** when:
 - The composition atom is mismatched to the data shape.
 - More than one main claim must remain visible.
 
-Use **approve** only when all lenses have no High findings and no unresolved Medium finding
-that affects trust, readability, or implementation.
+Use **approve** only when all lenses have no P0 findings and no unresolved P1 finding
+that affects trust, readability, or implementation. The scoring gate (`evals/rubric.json`,
+at least 95 after independent judging) is a separate, later step: a beautiful deck with
+unsupported claims still fails it.

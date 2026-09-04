@@ -10,6 +10,8 @@ Exit 0 = OK (warnings allowed), exit 1 = errors that must be fixed in the spec.
 from __future__ import annotations
 
 import json
+import re
+import math
 import sys
 from pathlib import Path
 
@@ -20,11 +22,13 @@ REF = Path(__file__).resolve().parent.parent / "references"
 
 TOKENS = json.loads((Path(__file__).resolve().parent.parent / "references" / "tokens.json").read_text())
 BUDGET = TOKENS["text_budget"]
+BUDGET_FILL = TOKENS["layout"].get("fill", {})   # card_text_floor: カード本文量の下限(build 前の見積もりに使う)
 ALLOWED_COLORS = set(TOKENS["colors"].values())
 FORBIDDEN = set(TOKENS["color_policy"]["forbidden_colors"])
 ACCENT = TOKENS["colors"]["accent"]
 # build_deck.py の CHART_TYPES と同期(テスト test_chart_type_lists_stay_in_sync が担保)
-SUPPORTED_CHART_TYPES = ("column", "stacked_column", "bar", "line", "donut")
+SUPPORTED_CHART_TYPES = ("column", "stacked_column", "stacked_column_100", "bar", "stacked_bar",
+                         "line", "donut")
 
 # 各パターンの必須「データ」フィールド(本文の中身)。見出し(title / subtitle / desc)は
 # ここに書かない — 有無も行数も _check_header_contract がヘッダー契約から一元的に見る
@@ -51,13 +55,18 @@ PATTERNS = {
     "guidance_progress": ["current"],
     "diagram": ["diagram"],
     "chart_grid": ["charts"],
+    "column_framework": ["columns"],
+    "metric_proof": ["hero", "chart"],
+    "logic_tree": ["root", "branches"],
 }
 EVIDENCE_PATTERNS = {
     "chart_insight", "market_sizing", "comparison_table", "competitive_landscape",
     "financial_summary", "waterfall", "kpi_dashboard",
     "financial_highlights", "metrics_rows", "driver_decomposition", "guidance_progress",
-    "diagram", "chart_grid",
+    "diagram", "chart_grid", "metric_proof", "logic_tree",
 }
+# 関係・構造の定性主張が正当なパターン: タイトルに数字が無くても警告しない
+QUALITATIVE_EVIDENCE = {"competitive_landscape", "diagram", "logic_tree"}
 # chart/diagram objects rendered via the image-asset backend (act_assets), not native charts.
 # 必須フィールドは act_assets の各レンダラーが spec[...] で直接参照するキー —
 # ここで検査しないと validate は 0 errors で通り、build が KeyError/ValueError で落ちる
@@ -260,7 +269,7 @@ def main() -> int:
             if "。" in title.rstrip("。"):
                 warns.append(f"{loc}: タイトルに文が2つ — 1スライド1メッセージ。分割するか一文に絞る")
             # competitive_landscape / diagram は関係・構造の定性主張が正当なため数字必須から除外
-            if pat in EVIDENCE_PATTERNS and pat not in ("competitive_landscape", "diagram") and not any(ch.isdigit() for ch in title):
+            if pat in EVIDENCE_PATTERNS and pat not in QUALITATIVE_EVIDENCE and not any(ch.isdigit() for ch in title):
                 warns.append(f"{loc}: エビデンススライドのタイトルに数字がない — 図表が証明する結論の数値を1つ入れる")
 
         dg = s.get("diagram") or {}
@@ -273,6 +282,11 @@ def main() -> int:
         if pat == "financial_highlights" and len(s.get("groups", [])) > 3:
             warns.append(f"{loc}: financial_highlights の groups が {len(s['groups'])} 件 — ヒーローカードは3枚まで。"
                          "4件目以降の主指標は補助ストリップへ回るため、グループを3つに絞るかスライドを分割する")
+        if pat == "financial_highlights":
+            n_support = sum(max(0, len(g.get("metrics", [])) - 1) for g in s.get("groups", []))
+            if n_support > 4:
+                warns.append(f"{loc}: 補助指標が {n_support} 件 — カードは4枚まで。5件目以降は注記行に1行でたたまれる"
+                             "(読ませたい指標なら metrics_rows へ分ける)")
 
         # speaker_notes はトークスクリプト専用。設計メタデータの混入と、読み上げに
         # 耐えない薄さを検出する(cover と構造スライドは薄くてよい)
@@ -311,7 +325,7 @@ def main() -> int:
             # スクリプトが偽陽性になる。value/values と unit が同じ dict にある構造
             # (KPI・チャート系列)は「値+単位」の結合トークンとしても照合する。
             _corpus_parts, _unit_pairs = [], set()
-            _UNIT_RE = _re_ts.compile(r"(億円|兆円|億|兆|万|円|%|％|件|社|名|人|カ月|ヶ月|か月|週間|時間|倍|pt)")
+            _UNIT_RE = _re_ts.compile(r"(億円|兆円|万円|万人|万件|万社|億|兆|万|円|%|％|件|社|名|人|カ月|ヶ月|か月|週間|時間|倍|pt)")
             def _numstr(x):
                 xs = str(x)
                 return xs[:-2] if xs.endswith(".0") else xs
@@ -417,7 +431,7 @@ def main() -> int:
             _NEG_MARKERS = ("△", "▲", "-", "−", "マイナス", "赤字", "損失", "減少", "減益", "減収", "減")
             # 構造カウント(ステップ/フェーズ/行/列/セル等)は「スライドの構成要素を数えた」
             # 正当なナレーションなので照合対象にしない — 対象は証拠数値の単位のみ
-            for m in _re_ts.finditer(r"(\d[\d,.]*)(億円|兆円|億|兆|万|円|%|％|件|社|名|人|カ月|ヶ月|か月|週間|時間|倍|pt)", notes):
+            for m in _re_ts.finditer(r"(\d[\d,.]*)(億円|兆円|万円|万人|万件|万社|億|兆|万|円|%|％|件|社|名|人|カ月|ヶ月|か月|週間|時間|倍|pt)", notes):
                 token = m.group(1).replace(",", "") + m.group(2)
                 if token not in _unit_pairs and token not in _corpus:
                     alien.append(m.group(0))
@@ -573,9 +587,22 @@ def main() -> int:
                 ctype = chart.get("type", "column")
                 if ctype not in SUPPORTED_CHART_TYPES:
                     errors.append(f"{cloc}: chart type '{ctype}' は未対応 — {' / '.join(SUPPORTED_CHART_TYPES)} から選ぶ")
+                if ctype == "stacked_column_100" and chart.get("unit") not in ("%", "％"):
+                    # 軸は 0-100% の構成比で描かれ、unit の注記もその単位で出る — 億円と書くと図表が嘘になり、
+                    # 無指定だと監査が単位無しのデータとして何でも照合する。% を必須にする(Codex レビュー指摘)
+                    errors.append(f"{cloc}: stacked_column_100 の unit は % を必ず付ける — 「{chart.get('unit') or ''}」"
+                                  "の値をそのまま見せるなら stacked_column にする")
+                if chart.get("annotation") and ctype in ("bar", "stacked_bar"):
+                    # 横棒はカテゴリが縦軸に並び、バッジ・矢印のアンカー(カテゴリ番号→x座標)が成り立たない
+                    errors.append(f"{cloc}: annotation(badge / yoy / trend_arrow)は横棒 '{ctype}' では描けない — "
+                                  "縦棒(column / stacked_column)にするか annotation を外す")
                 cats, series = chart.get("categories", []), chart.get("series", [])
                 if not cats or not series:
                     errors.append(f"{cloc}: chart needs categories and series")
+                if any(isinstance(ser, dict) and ser.get("unit") for ser in series):
+                    # native 図表は chart.unit で全系列を描く。系列ごとの単位は描かれず、監査も数えない
+                    warns.append(f"{cloc}: native chart は series.unit を描かない — 単位は chart.unit に1つ。"
+                                 "系列ごとに単位が違うなら image kind 'combo' にする")
                 values_numeric = True
                 for ser in series:
                     if len(ser.get("values", [])) != len(cats):
@@ -605,7 +632,8 @@ def main() -> int:
                             warns.append(f"{cloc}: forecast_from 以降のカテゴリに予想表記(E/計画/予想)がない: {', '.join(unmarked[:3])}")
                 if not chart.get("unit"):
                     warns.append(f"{cloc}: chart has no 'unit' — add one (e.g. 億円, %) unless truly unitless")
-                if values_numeric and chart.get("type", "column") in ("column", "bar", "stacked_column") and any(
+                if values_numeric and chart.get("type", "column") in (
+                        "column", "bar", "stacked_column", "stacked_column_100", "stacked_bar") and any(
                         float(v) < 0 for ser in series for v in ser.get("values", [])):
                     warns.append(f"{cloc}: negative values in a {chart.get('type', 'column')} chart — LibreOffice render-QA draws them wrong (PowerPoint is fine); prefer 'line', the waterfall pattern, or keep negatives in a table")
 
@@ -631,8 +659,56 @@ def main() -> int:
         # カードに本文が入らない(そもそも読み手が追える分解ではない)
         if pat == "driver_decomposition" and len(s.get("factors", [])) > 5:
             errors.append(f"{loc}: {len(s['factors'])} factors — max 5")
+        # 柱・ツリーの上限: 幅は12グリッドを分け合うので、超えると本文がカードに入らない
+        if pat == "column_framework":
+            ncol = len(s.get("columns", []))
+            if not 2 <= ncol <= 4:
+                errors.append(f"{loc}: column_framework の columns は 2-4 本({ncol} 本)")
+            long_head = [c.get("heading", f"col{j+1}") for j, c in enumerate(s.get("columns", []))
+                         if ja_len(str(c.get("label", "")) + str(c.get("heading", ""))) > 36]
+            if long_head:
+                warns.append(f"{loc}: 柱の見出しが長い({', '.join(h[:12] for h in long_head)}) — ラベル込みで36字以内。"
+                             "帯は3行で頭打ちにし、超える分は溢れて描かれる")
+            fat = [c.get("heading", f"col{j+1}") for j, c in enumerate(s.get("columns", []))
+                   if len(c.get("items", [])) > 4]
+            if fat:
+                warns.append(f"{loc}: 柱の項目が4個超({', '.join(fat)}) — 柱あたり4項目以内。超える分は詳細スライドへ")
+        if pat == "logic_tree":
+            brs = s.get("branches", [])
+            if not 2 <= len(brs) <= 4:
+                errors.append(f"{loc}: logic_tree の branches は 2-4 本({len(brs)} 本)")
+            over = [b.get("label", f"branch{j+1}") for j, b in enumerate(brs) if len(b.get("leaves", []) or []) > 3]
+            if over:
+                errors.append(f"{loc}: 枝の葉が3個超({', '.join(over)}) — 枝あたり3葉以内。超えるなら枝を分けるかスライドを分割")
+            rows_ = sum(max(1, len(b.get("leaves", []) or [])) for b in brs)
+            if rows_ > 8:
+                errors.append(f"{loc}: ツリーの行数(葉、葉のない枝は1行)が {rows_} 行 — 8行までしか本文帯に入らない。"
+                              "枝を減らすかツリーを2枚に分ける")
+        if pat == "metric_proof":
+            hero = s.get("hero") or {}
+            if hero.get("value") is None or str(hero.get("value")).strip() == "":
+                errors.append(f"{loc}: metric_proof の hero に value がない")   # 0 は正当な値(事故ゼロ等)
+            if hero.get("value") not in (None, "") and not hero.get("unit"):
+                # 単位の無い hero は、二軸の図表でどの配列と照合するか決まらない(Codex レビュー指摘、PR #158)
+                errors.append(f"{loc}: metric_proof の hero に unit がない — 図表と同じ単位(億円 / % / 社)を付ける")
+            if ja_len(hero.get("label", "")) > BUDGET["kpi_label_max_chars_ja"]:
+                errors.append(f"{loc}: hero label '{hero.get('label')}' too long")
+            if len(s.get("facts", [])) > 4:
+                errors.append(f"{loc}: facts は4行以内({len(s['facts'])} 行)")
+            # ヒーローの注記が長いと、下端に寄せた事実レールを押し下げて図表の下端を越える
+            if s.get("facts") and ja_len(str(hero.get("note", ""))) > 40:
+                warns.append(f"{loc}: hero.note が長い({ja_len(str(hero.get('note')))}字) — facts と同居する"
+                             "ときは40字以内。長い説明は speaker_notes へ")
         if len(s.get("takeaways", [])) > 3:
             errors.append(f"{loc}: {len(s['takeaways'])} takeaways — max 3")
+        # chart_top では要点が図表の下に横並びになる。要点の本文が長いとレールが図表を圧迫する
+        # (描画側は図表に 1.6in を残してレールを頭打ちにするので、長い要点は溢れて描かれる)
+        if pat == "chart_insight" and s.get("layout") == "chart_top":
+            long_t = [t for t in s.get("takeaways", [])
+                      if ja_len(str((t or {}).get("body", "")) if isinstance(t, dict) else str(t)) > 60]
+            if long_t:
+                warns.append(f"{loc}: chart_top の要点が長い({len(long_t)}件、60字超) — "
+                             "要点は2行以内に。長い説明は speaker_notes へ")
         if pat == "financial_summary" and not (s.get("table") or s.get("chart")):
             errors.append(f"{loc}: financial_summary には table か chart の少なくとも一方が必要")
         # 比較表の列上限(rubric.json layout と同じ 4 列)。年度列が並ぶ financial_summary は対象外
@@ -650,6 +726,65 @@ def main() -> int:
                     elif not 0.0 <= float(v) <= 1.0:
                         errors.append(f"{loc}: player '{pname}' の {ax}={v} が 0-1 の範囲外")
 
+        # カード型の本文量: 描画と同じ寸法計算(build_deck.card_copy_estimate)で、各カードの本文が
+        # カード高の card_text_floor に届くかをビルド前に見る。届かないカードは、下半分が空いて
+        # 見出し帯・隣のカードと釣り合わない。足すべき行数と1行の字数を具体的に示す
+        if pat in ("process_flow", "column_framework", "two_column"):
+            try:
+                import build_deck as _bd
+                # 見積もりはビルドと同じ物差しで — import 時の既定(standard)ではなく、このデッキの
+                # テンプレートの型スケール・レイアウトを当ててから測る(Codex レビュー指摘、PR #158)。
+                # 当てるのはデッキにつき1回(同じ tokens を毎スライド当て直さない)
+                if getattr(_bd, "_VALIDATE_TOKENS_APPLIED", None) is not tokens:
+                    _bd._apply_tokens(tokens)
+                    _bd._VALIDATE_TOKENS_APPLIED = tokens
+                card_copy_estimate = _bd.card_copy_estimate
+                floor_ = BUDGET_FILL.get("card_text_floor", 0.6)
+                for est in card_copy_estimate(s):
+                    if est["ratio"] < floor_:
+                        need_h = floor_ * est["card_h"] - est["content_h"]
+                        need_lines = max(1, math.ceil(need_h / max(0.05, est["line_h"])))
+                        warns.append(f"{loc}: カード「{est['card'][:14]}」の本文が薄い(カード高の {est['ratio']:.0%}、"
+                                     f"下限 {floor_:.0%}) — あと約{need_lines}行(1行約{est['hint_chars']}字)足す。"
+                                     "目安は太字の1行(desc / heading)+項目3つ、各項目がその列幅で2行")
+            except Exception as exc:  # 見積もりが壊れていれば黙らず告げる(検査を無効化しない)
+                warns.append(f"{loc}: カード本文量の見積もりに失敗 ({exc})")
+        # note は「数値の読み方を変える注記」(分母・定義・集計範囲)だけに使う。数値の無いページの
+        # note は解説や案内であり、フッターの Note 行として読ませるものではない(2026-09-04、
+        # 利用者の指示: Note は要らない)。言いたいことは本文か speaker_notes へ
+        if s.get("note") and pat not in ("cover", "section_divider"):
+            try:
+                from deck_argument import claim_tokens, exhibit_tokens, exhibit_values
+                # 数値は図表側(exhibit)の単位付きトークンか裸の数(5点満点の「5」「3」)、または主張側
+                # (recap の「68億円」)の単位付きトークンで示されていればよい。主張側の裸の数(タイトルの
+                # 「3本柱」)は数えない — 数えるとほぼ全ページで note が通ってしまう(Claude レビュー指摘、PR #158)
+                # 構造の番号(Step 1: 体制構築、Phase 2、第3段階、01)や期間のラベル(2024年、Q1、FY25)は数値では
+                # ない — これらで note を通すと、番号付きの流れページなら何でも通る(Codex レビュー指摘、PR #158)。
+                # 番号は先頭の接頭辞つきだけを外し、残りに数字があれば数値と見る。「街づくりの7段階」「5」のような
+                # 図表の値はそのまま数値(Claude レビュー指摘、PR #158: 段階の数は結論の証拠として扱っている)
+                # 先頭の 0 付き番号(01、02: 体制)は区切りか末尾が続くときだけ。「05件」の 05 は値(Claude レビュー指摘)
+                _ordinal = re.compile(r"^(?:(?:step|phase|stage|wave|level|no\.?|#)\s*\d{1,2}"
+                                      r"|第\d{1,2}(?:段階|期|章|回|次|位|ステップ)?|0\d(?=$|[\s:：.\-–]))", re.I)
+                # 期間は範囲(FY24/25、2024/25、2024-2026年)も丸ごと外す(Codex レビュー指摘)
+                # 裸の「2024」は年ではなく件数かもしれない — 年は「年」の印か範囲の形があるときだけ(Codex レビュー指摘)
+                _period = re.compile(r"(?:19|20)\d{2}(?:\s*[/\-–〜~]\s*(?:19|20)?\d{2}\s*年?|\s*年)(?:度|下期|上期)?"
+                                     r"|FY\s?\d{2,4}(?:\s*[/\-–〜~]\s*(?:FY)?\d{2,4})?|Q[1-4](?:\s*[/\-–〜~]\s*Q?[1-4])?"
+                                     r"|第[1-4]四半期|\d{1,2}月", re.I)
+
+                def _has_bare_number(vals) -> bool:
+                    for v in vals:
+                        if isinstance(v, bool):
+                            continue
+                        if isinstance(v, (int, float)):
+                            return True
+                        if isinstance(v, str) and re.search(r"\d", _period.sub("", _ordinal.sub("", v.strip(), count=1))):
+                            return True
+                    return False
+                if not (exhibit_tokens(s) | claim_tokens(s)) and not _has_bare_number(exhibit_values(s)):
+                    warns.append(f"{loc}: note「{str(s['note'])[:20]}」— 数値の無いページに Note を置かない。"
+                                 "解説は本文か speaker_notes へ移し、note は削除する")
+            except Exception as exc:
+                warns.append(f"{loc}: note の判定に失敗 ({exc})")
         texts = list(iter_texts({k: v for k, v in s.items() if k != "pattern"}))
         joined = " ".join(texts)
         for b in BANNED_PHRASES:
@@ -669,7 +804,7 @@ def main() -> int:
     # header kicker (label above the title) is retired — it breaks header uniformity
     for i, s in enumerate(slides, start=1):
         if s.get("kicker"):
-            warns.append(f"slide {i}: ヘッダー上の kicker「{s['kicker']}」— ヘッダーの統一性を崩すため使わない。問いはサブタイトルか speaker_notes へ(build_deck は描画しない)")
+            warns.append(f"slide {i}: ヘッダー上の kicker「{s['kicker']}」— ヘッダーの統一性を崩すため廃止。問いはサブタイトルか speaker_notes へ(build_deck は無視して描画しない)")
 
     # executive_summary の points は section_divider の章立てと整合させる(冒頭サマリー=章マップ)。
     # 許容形は (a) 1:1 で kicker=章タイトル、または (b) 各章が同数の点をまとめる均等グルーピング
@@ -721,7 +856,7 @@ def main() -> int:
     # visual rhythm: only a LONGER read deck suffers the wall-of-content problem; a short
     # talk deck is meant to flow continuously, so it is not pushed toward a rest/divider
     # there. In a read deck, insert a rest (section_divider or a quiet statement) every
-    # 3-5 slides. [design-principles 11b]
+    # 3-5 slides. [design-principles: Section Dividers]
     if is_long_deck:
         run = 0
         for i, s in enumerate(slides, start=1):
@@ -735,7 +870,8 @@ def main() -> int:
     # structural uniformity (the strongest AI tell): too many exactly-3-item slides
     counts = []
     for s in slides:
-        for key in ("points", "takeaways", "kpis", "items", "steps", "notes", "factors", "groups"):
+        for key in ("points", "takeaways", "kpis", "items", "steps", "notes", "factors", "groups",
+                    "columns", "branches"):
             if isinstance(s.get(key), list) and s.get("pattern") not in ("agenda", "waterfall"):
                 counts.append(len(s[key]))
     if counts and len([c for c in counts if c == 3]) / len(counts) > 0.6:

@@ -21,7 +21,7 @@ from pathlib import Path
 
 import act_theme as theme
 
-BACKEND_VERSION = "1"  # bump on renderer-code changes or a Graphviz CLI upgrade (not in the hash)
+BACKEND_VERSION = "2"  # bump on renderer-code changes or a Graphviz CLI upgrade (not in the hash). 2: フォント登録(豆腐の修正)
 
 
 def _renderer_versions() -> str:

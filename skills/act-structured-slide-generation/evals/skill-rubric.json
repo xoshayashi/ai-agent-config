@@ -43,6 +43,7 @@
         "Binary generation, rendering, validation, and linting live in scripts; the LLM handles judgment and content.",
         "Machine checks and visual/subjective checks are separated and both are required.",
         "Automated tests cover scripts and key behavioral contracts.",
+        "A stress fixture builds every pattern at its documented minimum and maximum cardinality (and past it) and the layout engine keeps frames inside the slide and reports overflow instead of hiding it.",
         "Evals have objective assertions and a quality rubric with a pass threshold."
       ]
     },

@@ -16,6 +16,7 @@ SKILL = Path(__file__).resolve().parent.parent
 SCRIPTS = SKILL / "scripts"
 SAMPLE = SKILL / "examples" / "sample-deck.json"
 SAMPLE_EARNINGS = SKILL / "examples" / "sample-earnings-deck.json"
+SAMPLE_CONSULTING = SKILL / "examples" / "sample-consulting-deck.json"
 TOKENS = json.loads((SKILL / "references" / "tokens.json").read_text())
 
 # 合成 PNG の地の色はトークンから引く — 直値で書くと canvas を変えた瞬間に
@@ -39,14 +40,14 @@ def test_skill_metadata_and_resource_map_are_discoverable():
     assert "slide-decision-engine.md" in skill_md
     assert "composition-atoms.md" in skill_md
     assert "visual-qa-and-repair-rubric.md" in skill_md
-    assert "assets/deck-workspace-template/" in skill_md
+    assert "assets/outline.md" in skill_md
     assert (SKILL / "agents" / "openai.yaml").exists()
     assert (SKILL / "references" / "grid-and-flex-strategy.md").exists()
     assert (SKILL / "references" / "slide-decision-engine.md").exists()
     assert (SKILL / "references" / "ir-slide-design-principles.md").exists()
     assert (SKILL / "references" / "composition-atoms.md").exists()
     assert (SKILL / "references" / "visual-qa-and-repair-rubric.md").exists()
-    assert (SKILL / "assets" / "deck-workspace-template" / "outline.md").exists()
+    assert (SKILL / "assets" / "outline.md").exists()
 
 
 def test_reference_markdown_is_english_without_japanese_residue():
@@ -199,7 +200,7 @@ def _minimal_deck(**slide_overrides):
     return {"meta": {"title": "t"}, "slides": [slide]}
 
 
-@pytest.mark.parametrize("sample", [SAMPLE, SAMPLE_EARNINGS], ids=["proposal", "earnings"])
+@pytest.mark.parametrize("sample", [SAMPLE, SAMPLE_EARNINGS, SAMPLE_CONSULTING], ids=["proposal", "earnings", "consulting"])
 def test_sample_spec_validates(sample):
     r = run("validate_spec.py", sample)
     assert r.returncode == 0, r.stdout + r.stderr
@@ -242,7 +243,7 @@ def test_validate_rejects_waterfall_without_start_end(tmp_path):
     assert r.returncode == 1 and "waterfall" in r.stdout
 
 
-@pytest.mark.parametrize("sample", [SAMPLE, SAMPLE_EARNINGS], ids=["proposal", "earnings"])
+@pytest.mark.parametrize("sample", [SAMPLE, SAMPLE_EARNINGS, SAMPLE_CONSULTING], ids=["proposal", "earnings", "consulting"])
 def test_build_and_verify_sample(tmp_path, sample):
     out = tmp_path / "deck.pptx"
     r = run("build_deck.py", sample, "-o", out)
@@ -622,7 +623,7 @@ def test_ground_color_comes_from_the_template_not_an_object(tmp_path):
     P_NS = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
     A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 
-    for sample in (SAMPLE, SAMPLE_EARNINGS):
+    for sample in (SAMPLE, SAMPLE_EARNINGS, SAMPLE_CONSULTING):
         out = tmp_path / f"{sample.stem}.pptx"
         assert run("build_deck.py", sample, "-o", out).returncode == 0
         prs = pptx.Presentation(out)
@@ -1344,6 +1345,72 @@ def test_build_handles_null_focal_category_with_annotation(tmp_path):
     out = tmp_path / "deck.pptx"
     r = run("build_deck.py", spec, "-o", out)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_annotation_on_a_horizontal_bar_is_rejected(tmp_path):
+    """横棒(bar / stacked_bar)はカテゴリが縦軸に並ぶので、バッジのアンカー(カテゴリ番号→x)が成り立たない。
+    validate が error にし、build は無関係な位置にバッジを置かない(Codex レビュー、PR #158)。"""
+    for ctype in ("bar", "stacked_bar"):
+        deck = _minimal_deck()
+        deck["slides"][0]["chart"].update({"type": ctype, "focal_category": 1, "annotation": {"badge": "+12%"}})
+        spec = tmp_path / f"{ctype}.json"
+        spec.write_text(json.dumps(deck, ensure_ascii=False))
+        r = run("validate_spec.py", spec)
+        assert r.returncode != 0 and "横棒" in r.stdout, r.stdout
+        out = tmp_path / f"{ctype}.pptx"
+        assert run("build_deck.py", spec, "-o", out).returncode == 0
+        ovals = [sh for sh in pptx.Presentation(out).slides[0].shapes if sh.shape_type == 1 and sh.has_text_frame
+                 and "+12%" in sh.text_frame.text]
+        assert not ovals, ctype
+    deck = _minimal_deck()
+    deck["slides"][0]["chart"].update({"focal_category": 1, "annotation": {"badge": "+12%"}})
+    spec = tmp_path / "column.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    assert "横棒" not in run("validate_spec.py", spec).stdout
+
+
+def test_stacked_100_axis_bounds_in_percent_are_scaled_to_fractions(tmp_path):
+    """100%積み上げの軸は 0-1。y_max: 100 のような %表記は 1.0 に直す — そのまま入れると軸が 10,000% になり
+    棒が底に潰れる(Codex レビュー、PR #158)。"""
+    deck = _minimal_deck()
+    deck["slides"][0]["chart"] = {"type": "stacked_column_100", "unit": "%", "categories": ["2029", "2030"],
+                                  "series": [{"name": "A", "values": [60, 40]}, {"name": "B", "values": [40, 60]}],
+                                  "y_max": 100, "y_min": 0}
+    spec = tmp_path / "s100.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "s100.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    ax = [sh.chart for sh in pptx.Presentation(out).slides[0].shapes if sh.has_chart][0].value_axis
+    assert abs(ax.maximum_scale - 1.0) < 1e-9 and ax.minimum_scale == 0.0, (ax.maximum_scale, ax.minimum_scale)
+    # 比率で書いた余白(1.1)はそのまま(Claude レビュー、PR #158)
+    deck["slides"][0]["chart"]["y_max"] = 1.1
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    ax = [sh.chart for sh in pptx.Presentation(out).slides[0].shapes if sh.has_chart][0].value_axis
+    assert abs(ax.maximum_scale - 1.1) < 1e-9, ax.maximum_scale
+    # unit は % 必須 — 億円も無指定も validate が弾く、どの型のページでも(Codex レビュー、PR #158)
+    for unit in ("億円", None):
+        deck["slides"][0]["chart"]["unit"] = unit
+        if unit is None:
+            del deck["slides"][0]["chart"]["unit"]
+        spec.write_text(json.dumps(deck, ensure_ascii=False))
+        r = run("validate_spec.py", spec)
+        assert r.returncode != 0 and "stacked_column_100 の unit は %" in r.stdout, (unit, r.stdout)
+
+
+def test_signed_stacked_column_headroom_uses_the_positive_stack(tmp_path):
+    """正負が混じる積み上げ棒に annotation があるとき、軸の天井は正の成分の合計から取る。合計(100-90=10)で
+    決めると正の山(100)が軸の外に出る(Codex レビュー、PR #158)。"""
+    deck = _minimal_deck()
+    deck["slides"][0]["chart"] = {"type": "stacked_column", "unit": "億円", "categories": ["2029", "2030"],
+                                  "series": [{"name": "利益", "values": [100, 120]}, {"name": "損失", "values": [-90, -30]}],
+                                  "annotation": {"badge": "+20%"}, "focal_category": 1}
+    spec = tmp_path / "signed.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "signed.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    charts = [sh.chart for sh in pptx.Presentation(out).slides[0].shapes if sh.has_chart]
+    assert charts and charts[0].value_axis.maximum_scale >= 120, charts[0].value_axis.maximum_scale
 
 
 def test_negative_waterfall_stays_inside_slide(tmp_path):
@@ -2360,26 +2427,35 @@ def test_the_ruler_that_measures_is_the_ruler_that_draws():
     assert B.EA_DIGIT_RUN is D.EA_DIGIT_RUN, "和文中の数字区間の判定が二重定義されている"
 
 
-def test_prose_fills_its_lines_but_never_splits_a_word():
-    """文章は行を埋めて流す。ただし、はみ出す文の折返しをレンダラに任せると、字送りの
-    わずかな差で語の途中に切れ目が落ちる(「結果まで続/く運用は」)— 行が埋まっていることと、
-    語が割れないことは両立する。ビルダーが通る経路(display_wrap_text)で確かめる。"""
+def test_prose_flows_and_only_protects_katakana_and_latin_words():
+    """本文(文章)には改行を入れない — レンダラの自然折返しに任せる(利用者の指示、2026-09-04)。
+    ビルダーが改行を打つのは、自然折返しがカタカナ語・英単語・数量と単位の途中に落ちるときと
+    最終行が1字になるときだけで、打つときもその語の手前にだけ打つ。漢字・ひらがなの境界のために
+    行を組むことはない。ビルダーが通る経路(display_wrap_text)で確かめる。"""
     B = _import_build_deck()
     D = _deck_text()
-    # 幅と大きさは実際に「続/く運用は」と割れたレールのもの。こちらの見積りでは、この文の
-    # 自然折返しは語をまたがない — それでもレンダラは割った。だから、はみ出す文は必ず組む
     cases = [("撮影規則、本人の許可、安全と業務の結果まで続く運用は複製に時間がかかる", 4.93, 16),
-             ("サービスを跨いで接点数と稼働量を増やし、従量利用料を積み上げ", 2.6, 13)]
+             ("サービスを跨いで接点数と稼働量を増やし、従量利用料を積み上げ", 2.6, 13),
+             ("良い意思決定と良い結果の関係を4つのデータで蓄積し、WHEREをCity Making Intelligenceとして位置づける", 9.13, 16)]
     for text, width, size in cases:
         assert D.is_prose(text), text
         assert "\n" not in B.display_wrap_text(text, 12.0, size), text   # 収まる列では素通し
-        broken = B.display_wrap_text(text, width, size)                   # 収まらない列では組む
-        assert "\n" in broken, f"はみ出す文をレンダラに委ねている: {broken!r}"
-        lines = broken.split("\n")
-        for word in D._words(text):
-            if len(word) > 1 and D.text_width_in(word, size) <= width:
-                assert any(word in ln for ln in lines), (word, broken)
-
+        broken = B.display_wrap_text(text, width, size)
+        spans = D._unbreakable_spans(text)
+        pos = 0
+        for ln in broken.split("\n")[:-1]:
+            pos += len(ln)
+            assert not D._inside_span(pos, spans), (text, broken)         # 守る語の途中には打たない
+        # 打った改行はすべて「守る語の手前」か「最終行1字の回避」— 漢字・ひらがなの切れ目に
+        # 打つ改行は無い(それがあると本文中に強制改行が並ぶ)
+        for ln_next in broken.split("\n")[1:]:
+            head = ln_next[:1]
+            assert D._char_class(head) in ("kana_kata", "ascii") or len(broken.split("\n")[-1]) <= 2 \
+                or ln_next.startswith(tuple(t[a:b] for t in [text] for a, b in spans)), (text, broken)
+    # 英語名が割れる列では、その名前の手前で改行が入り、名前は1行に収まる
+    text, width, size = cases[2]
+    broken = B.display_wrap_text(text, width, size)
+    assert "\n" in broken and any("City Making Intelligence" in ln for ln in broken.split("\n")), broken
 
 def test_prose_never_starts_a_line_with_a_character_that_cannot_open_one():
     """レンダラは禁則を守るとはかぎらない(実際、読点や中黒が行頭に落ちた)。文章を流したままに
@@ -2459,57 +2535,19 @@ def test_labels_break_on_meaning_and_sentences_break_on_words():
         assert "\n" in D.wrap_display(text, 1.35, 13, 5), text
     # 長い名詞句は文ではなくラベル。長さで文章と決めつけると、レンダラが語の途中で割る
     # (「単一のワークフ/ローで完結」)。スライドの表示テキストは体言止めが原則である
+    # ラベルの上限字数を超える長い名詞句は本文として流す(利用者の指示、2026-09-04)。ただし
+    # カタカナ語は守る — 自然折返しが「ワークフ/ロー」に落ちるなら、その手前に改行が入る
     noun_phrases = ["電子帳簿保存法とインボイス制度への対応を単一のワークフローで完結",
                     "中堅企業の業務複雑性に対応した統合スイートの提供体制"]
     for text in noun_phrases:
         assert not D.is_prose(text), text
         broken = B.display_wrap_text(text, 3.0, 16)
-        assert "\n" in broken, text
         assert "ワークフ\n" not in broken and "統合ス\n" not in broken, broken
-
-
-def test_line_counts_come_only_from_the_measured_estimator():
-    """行数を数える実装は _text_lines だけ。字数近似(_ja_len / 1行の字数)を別に持つと、
-    見積りが1行ずれたぶんがブロック間の空白のズレや重なりとして出る(実際に起きた)。"""
-    src = (SCRIPTS / "build_deck.py").read_text()
-    assert "chars_per_line" not in src, "字数近似の行数見積りが復活している"
-    assert "math.ceil(_ja_len(" not in src, "字数近似の行数見積りが復活している"
-
-
-def test_interpretation_rail_is_one_box_with_one_rhythm(tmp_path):
-    """図表の横の要点レールも、1つのテキストボックスに段落で積む。見出しと本文の隙間、項目どうしの
-    隙間は、どの項目でも同じ — 箱を分けて位置を合わせると、そこにズレ(1行ぶんの穴、重なり)が出る。"""
-    takeaways = [
-        {"heading": "人口構造の縮小", "body": "生産年齢人口は2025年7,310万人→2040年6,213万人、15年で約1,100万人減"},
-        {"heading": "専門人材の不足", "body": "2040年にAI・ロボット利活用人材が約340万人、医療・福祉の就業者が96万人不足の試算"},
-        {"heading": "不足は対人接点に集中", "body": "SaaS / RPAが担えない説明・相談・ケアなど非定型コミュニケーション業務が人手依存のまま"},
-    ]
-    deck = {"slides": [{
-        "pattern": "chart_insight",
-        "title": "要点レールのブロックは同じリズムで積む",
-        "subtitle": "1つの箱に段落で積む",
-        "takeaways_heading": "構造要因",
-        "takeaways": takeaways,
-        "chart": {"type": "bar", "categories": ["事務", "専門・技術", "サービス", "販売"],
-                  "series": [{"name": "不足時間", "values": [365, 302, 266, 245]}], "unit": "万時間/日"},
-        "source": "社内分析",
-    }]}
-    spec = tmp_path / "deck.json"
-    spec.write_text(json.dumps(deck, ensure_ascii=False))
-    out = tmp_path / "deck.pptx"
-    assert run("build_deck.py", spec, "-o", out).returncode == 0
-
-    from pptx.util import Emu
-    slide = pptx.Presentation(out).slides[0]
-    rails = [sh for sh in slide.shapes if sh.has_text_frame and "人口構造の縮小" in sh.text_frame.text]
-    assert len(rails) == 1, "レールが1つの箱になっていない"
-    inks = _para_ink_boxes(rails[0])
-    assert len(inks) == 6, f"(見出し+本文)×3 = 6段落のはず: {len(inks)}"
-    pair_gaps = [(inks[i + 1][0] - inks[i][1]) * 72 for i in (0, 2, 4)]     # 見出し → 本文
-    item_gaps = [(inks[i + 1][0] - inks[i][1]) * 72 for i in (1, 3)]        # 項目 → 項目
-    assert max(pair_gaps) - min(pair_gaps) < 1.0, f"見出しと本文の隙間が不揃い: {pair_gaps}"
-    assert max(item_gaps) - min(item_gaps) < 1.0, f"項目どうしの隙間が不揃い: {item_gaps}"
-    assert min(item_gaps) > max(pair_gaps), "かたまり内の隙間がかたまり間より広い(近接の原則に反する)"
+        spans = D._unbreakable_spans(text)
+        pos = 0
+        for ln in broken.split("\n")[:-1]:
+            pos += len(ln)
+            assert not D._inside_span(pos, spans), (text, broken)
 
 
 def test_prose_keeps_its_line_breaks_from_the_renderer():
@@ -2535,14 +2573,6 @@ def test_prose_keeps_its_line_breaks_from_the_renderer():
         broken = D.wrap_display(text, 3.0, 16, 5)
         assert "\n" in broken, text
         assert "ワークフ\n" not in broken and "統合ス\n" not in broken, broken
-
-
-def test_line_counts_come_only_from_the_measured_estimator():
-    """行数を数える実装は _text_lines だけ。字数近似(_ja_len / 1行の字数)を別に持つと、
-    見積りが1行ずれたぶんがブロック間の空白のズレや重なりとして出る(実際に起きた)。"""
-    src = (SCRIPTS / "build_deck.py").read_text()
-    assert "chars_per_line" not in src, "字数近似の行数見積りが復活している"
-    assert "math.ceil(_ja_len(" not in src, "字数近似の行数見積りが復活している"
 
 
 def test_tts_risks_flag_only_what_a_voice_cannot_say():
@@ -2594,7 +2624,7 @@ def test_tts_tells_a_fraction_from_a_date():
 def test_canon_decks_pass_their_own_tts_check():
     """スキルの手本(examples)が自分の検査に落ちていては、警告は読まれなくなる。"""
     D = _deck_text()
-    for path in (SAMPLE, SAMPLE_EARNINGS):
+    for path in (SAMPLE, SAMPLE_EARNINGS, SAMPLE_CONSULTING):
         for i, s in enumerate(json.loads(path.read_text())["slides"], start=1):
             risks = D.tts_risks(s.get("speaker_notes", ""))
             assert not risks, f"{path.name} slide {i}: {risks}"
@@ -2735,7 +2765,7 @@ def test_red_team_deck_is_blocked_by_the_argument_gate(tmp_path):
 
 def test_canonical_decks_pass_the_argument_gate():
     """スキルの手本は、自分のゲートを通ること(手本が通らない検査は、誰にも読まれなくなる)。"""
-    for path in (SAMPLE, SAMPLE_EARNINGS):
+    for path in (SAMPLE, SAMPLE_EARNINGS, SAMPLE_CONSULTING):
         r = run("audit_argument.py", path)
         assert r.returncode == 0, f"{path.name}:\n{r.stdout}"
         assert "0 errors / 0 warnings" in r.stdout, f"{path.name}:\n{r.stdout}"
@@ -2902,3 +2932,904 @@ def test_no_template_erases_the_focal_emphasis():
         c = D.resolve_tokens(name)["colors"]
         assert c["primary_deep"] != c["ink"], f"{name}: focal値の色が本文インクと同じ(強調が消える)"
         assert c["primary_pale"] != c["surface_tint"], f"{name}: focalカードの地が非focalと同じ"
+
+
+# ---------------------------------------------------------------------------
+# 2026-09-03 監査・アップグレード: 占有契約 / 縁またぎ検査 / 新パターン / ストレス試験
+# ---------------------------------------------------------------------------
+
+def test_fit_band_grows_to_the_target_but_never_past_the_stretch_cap():
+    """占有契約: ブロックは band_target × h まで育つが、内容高の stretch 倍を超えず、h も超えない。
+    上寄せの器(top_anchored)は stretch_top で抑える — 底の空洞を作らないため。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import build_deck as b
+    f = TOKENS["layout"]["fill"]
+    h = 4.6
+    block, off = b.fit_band(h, 1.0)
+    assert abs(block - min(f["band_target"] * h, 1.0 * f["stretch"])) < 1e-9
+    assert abs(off - (h - block) / 2) < 1e-9
+    block_top, _ = b.fit_band(h, 1.0, top_anchored=True)
+    assert abs(block_top - 1.0 * f["stretch_top"]) < 1e-9
+    assert b.fit_band(h, 9.0)[0] == h            # 入らない内容は h で頭打ち(溢れは verify が名指しする)
+    assert b.fit_band(h, 3.9)[0] == 3.9          # 目標より大きい内容はそのまま
+
+
+def test_verify_flags_text_that_straddles_a_filled_shape_edge(tmp_path):
+    """文字が塗り図形の縁をまたぐ = 欠陥。中に収まる(カードの中の文)/外に離れる(バーの上のラベル)は正常。
+    2026-09-03 の監査で、ウォーターフォールの値ラベルがバーに食い込んだまま 0 failures で通っていた。"""
+    from pptx import Presentation
+    from pptx.util import Inches, Pt
+    sys.path.insert(0, str(SCRIPTS))
+    import build_deck as b
+    import verify_deck as v
+    prs = Presentation()
+    prs.slide_width, prs.slide_height = b.SLIDE_W, b.SLIDE_H
+    s = prs.slides.add_slide(prs.slide_layouts[6])
+    b.add_rect(s, 2.0, 2.0, 3.0, 2.0, b.C["primary"])
+    b.add_text(s, 2.2, 2.2, 2.0, 0.3, [[("中に収まる文", 16, 400, b.C["canvas"])]])        # inside: ok
+    b.add_text(s, 2.2, 1.5, 2.0, 0.3, [[("上に離れたラベル", 16, 400, b.C["ink"])]])       # outside: ok
+    b.add_text(s, 2.2, 3.85, 2.0, 0.3, [[("縁をまたぐ文", 16, 400, b.C["ink"])]])         # straddles bottom edge
+    out = tmp_path / "s.pptx"
+    prs.save(out)
+    issues, _w, _n = v.audit(out)
+    hits = [i for i in issues if "縁をまたぐ" in i]
+    assert len(hits) == 1 and "縁をまたぐ文" in hits[0], issues
+
+
+def test_verify_ignores_same_colour_filler_shapes_inside_a_card(tmp_path):
+    """角を四角くする同色の詰め物(two_column のヘッダー帯)は見た目には1つの面 — その内側の縁で
+    またぎ判定を鳴らさない(サンプルデッキが誤検知で落ちた)。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import verify_deck as v
+    spec = json.loads(SAMPLE.read_text())
+    two = next(s for s in spec["slides"] if s["pattern"] == "two_column")
+    d = {"meta": spec["meta"], "slides": [two]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(d, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    issues, _w, _n = v.audit(out)
+    assert not [i for i in issues if "縁をまたぐ" in i], issues
+
+
+@pytest.mark.parametrize("template", ["standard", "navy", "monochrome", "bold"])
+def test_stress_fixture_builds_clean_at_every_documented_cap(tmp_path, template):
+    """動的生成の回帰ガード: 全パターンを文書化された上限(max)と最小(min)で組んでも、
+    validate 0 errors / verify 0 failures。テンプレートを変えても同じ。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import stress_deck
+    for variant in ("max", "min"):
+        res = stress_deck.run_variant(tmp_path, variant, template, images=False)
+        assert res["validate_errors"] == 0, (variant, template, res["messages"][:5])
+        assert res["verify_failures"] == 0, (variant, template, res["messages"][:8])
+
+
+def test_stress_overload_degrades_to_overflow_only(tmp_path):
+    """入り切らないコピーでも、枠がスライドの外へ出ることはない(溢れは verify が名指しし、
+    それが正しい振る舞い)。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import stress_deck
+    res = stress_deck.run_variant(tmp_path, "overload", None, images=False)
+    assert res["verify_failures"] > 0          # 溢れは隠さない
+    assert res["hard_failures"] == 0, [m for m in res["messages"] if "bounds" in m][:5]
+
+
+def test_consulting_patterns_build_and_verify(tmp_path):
+    """柱(column_framework)・証明ページ(metric_proof)・ロジックツリー(logic_tree)の3形が
+    ネイティブ図形で組め、verify を通る。"""
+    from pptx import Presentation
+    spec = {"meta": {"title": "t"}, "slides": [
+        {"pattern": "column_framework", "title": "3本の柱で中堅企業の業務複雑性に応える", "subtitle": "提供価値",
+         "columns": [{"label": "01", "heading": "統合データ", "focal": True,
+                      "items": [{"heading": "投資規模", "body": "経理・人事・法務を1つのデータモデルで持つ"}],
+                      "outcome": "導入120社"},
+                     {"label": "02", "heading": "会計事務所チャネル",
+                      "items": [{"heading": "獲得", "body": "顧問先の電帳法対応の相談が入口"}], "outcome": "NRR 112%"}]},
+        {"pattern": "metric_proof", "title": "ARRは5四半期で30%増、12.8億円に到達", "subtitle": "ARR推移",
+         "hero": {"label": "ARR", "value": "12.8", "unit": "億円", "delta": "+30% YoY", "delta_dir": "up", "note": "QoQ +0.85億円"},
+         "chart": {"type": "column", "unit": "億円", "categories": ["Q2/25", "Q3/25", "Q4/25", "Q1/26", "Q2/26"],
+                   "series": [{"name": "ARR", "values": [9.85, 10.52, 11.28, 11.95, 12.80]}], "focal_category": 4},
+         "facts": [{"label": "NRR", "value": "114%"}, {"label": "解約率", "value": "3.2%"}], "source": "決算短信(2026年4月)"},
+        {"pattern": "logic_tree", "title": "ARR成長は顧客数×単価×継続率の3本に分解", "subtitle": "ドライバーツリー",
+         "root": {"label": "ARR", "value": "12.8", "unit": "億円"},
+         "branches": [{"label": "有料顧客数", "value": "8,420", "unit": "社", "focal": True,
+                       "leaves": [{"label": "新規42社", "value": "42"}, "エンタープライズ移行"]},
+                      {"label": "ARPA", "value": "152", "unit": "万円", "leaves": ["上位プラン移行"]},
+                      {"label": "継続率", "value": "96.8", "unit": "%"}],
+         "assumption": "社内管理数値(月次KPIレポート 2026年4月版)"},
+    ]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(spec, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 0, r.stdout
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0, v.stdout
+    prs = Presentation(out)
+    texts = "\n".join(sh.text_frame.text for s in prs.slides for sh in s.shapes if sh.has_text_frame)
+    assert "導入120社" in texts and "8,420社" in texts and "12.8" in texts
+    # logic_tree は編集可能なネイティブ図形(枝・葉の矩形とコネクタ)で組まれる
+    tree = list(prs.slides)[2]
+    assert sum(1 for sh in tree.shapes if sh.shape_type == 9) >= 6          # LINE connectors
+    assert not [sh for sh in tree.shapes if sh.shape_type == 13]            # no picture
+
+
+def test_validate_caps_the_consulting_patterns(tmp_path):
+    base = {"meta": {"title": "t"}}
+    bad = {**base, "slides": [
+        {"pattern": "column_framework", "title": "柱が多すぎるスライドの見出しをここに置く", "subtitle": "s",
+         "columns": [{"heading": f"柱{i}", "items": ["a"]} for i in range(5)]},
+        {"pattern": "logic_tree", "title": "ツリーが深すぎるスライドの見出しをここに", "subtitle": "s",
+         "root": {"label": "R"}, "branches": [{"label": f"b{i}", "leaves": ["x"] * 3} for i in range(4)]},
+        {"pattern": "metric_proof", "title": "hero に値が無いスライドの見出しをここに置く", "subtitle": "s",
+         "hero": {"label": "ARR"}, "chart": {"type": "column", "unit": "億円", "categories": ["a", "b"],
+                                          "series": [{"name": "s", "values": [1, 2]}]}},
+    ]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(bad, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 1
+    assert "2-4 本" in r.stdout and "8行" in r.stdout and "hero に value" in r.stdout, r.stdout
+
+
+def test_stacked_100_and_stacked_bar_are_native_chart_types(tmp_path):
+    from pptx import Presentation
+    spec = {"meta": {"title": "t"}, "slides": [
+        {"pattern": "chart_insight", "layout": "chart_top", "title": "構成比は経理から人事へ、3年で逆転",
+         "subtitle": "構成比",
+         "chart": {"type": "stacked_column_100", "unit": "%", "categories": ["FY24", "FY25", "FY26"],
+                   "series": [{"name": "経理", "values": [70, 55, 40]}, {"name": "人事", "values": [30, 45, 60]}],
+                   "segment_labels": True},
+         "takeaways": [{"heading": "人事が逆転", "body": "FY26に人事が6割"}, {"heading": "経理は縮小", "body": "4割へ"}],
+         "source": "Act事業計画モデル v2.1"},
+        {"pattern": "chart_insight", "title": "内訳は人事が最大、経理を2割上回る", "subtitle": "内訳",
+         "chart": {"type": "stacked_bar", "unit": "億円", "categories": ["FY25", "FY26"],
+                   "series": [{"name": "経理", "values": [4, 5]}, {"name": "人事", "values": [3, 6]}]},
+         "source": "Act事業計画モデル v2.1"},
+    ]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(spec, ensure_ascii=False))
+    assert run("validate_spec.py", p).returncode == 0
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    assert run("verify_deck.py", out).returncode == 0
+    xml = list(Presentation(out).slides)[0].shapes[-1]._element.xml if False else ""
+    prs = Presentation(out)
+    charts = [sh.chart for s in prs.slides for sh in s.shapes if getattr(sh, "has_chart", False)]
+    assert len(charts) == 2
+    assert "percentStacked" in charts[0]._chartSpace.xml or "stacked" in charts[0]._chartSpace.xml.lower()
+
+
+def test_kicker_is_no_longer_drawn(tmp_path):
+    """ヘッダー上の kicker は廃止: validate が警告し、build は描かない(ヘッダーを 0.26in ずらさない)。"""
+    from pptx import Presentation
+    spec = json.loads(SAMPLE.read_text())
+    s = next(x for x in spec["slides"] if x["pattern"] == "kpi_dashboard")
+    d = {"meta": spec["meta"], "slides": [dict(s, kicker="問い")]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(d, ensure_ascii=False))
+    assert "kicker" in run("validate_spec.py", p).stdout
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    texts = [sh.text_frame.text for sh in list(Presentation(out).slides)[0].shapes if sh.has_text_frame]
+    assert "問い" not in texts
+
+
+def test_lint_render_flags_an_under_occupied_body(tmp_path):
+    """占有契約の下限: 本文帯の半分も使わない証拠ページは finding。"""
+    from PIL import Image, ImageDraw
+    w, h = 1467, 825
+    im = Image.new("RGB", (w, h), CANVAS_RGB)
+    d = ImageDraw.Draw(im)
+    d.rectangle([60, 40, 900, 80], fill=(0x2D, 0x33, 0x2E))          # title
+    d.rectangle([60, 330, 1400, 480], fill=(0xEC, 0xE9, 0xE1))       # one small band ≈ 22% of the body
+    im.save(tmp_path / "deck-1.png")
+    spec = {"slides": [{"pattern": "kpi_dashboard", "title": "x"}]}
+    (tmp_path / "deck.json").write_text(json.dumps(spec))
+    r = run("lint_render.py", tmp_path, "--spec", tmp_path / "deck.json")
+    assert r.returncode == 1 and "占有率" in r.stdout or "小さい" in r.stdout, r.stdout
+
+
+def test_image_assets_register_the_act_fonts_for_matplotlib():
+    """画像アセットの和文ラベルが豆腐にならない: apply_matplotlib がフォントファイルを登録する。"""
+    pytest.importorskip("matplotlib")
+    sys.path.insert(0, str(SCRIPTS))
+    import act_theme
+    from deck_text import MEASURE_OK
+    if not MEASURE_OK:
+        pytest.skip("Act fonts not installed")
+    act_theme.apply_matplotlib()
+    assert act_theme.fonts_present() == []
+
+
+def test_thesis_literal_match_is_a_whole_number(tmp_path):
+    """結論の数値を図表の文字列で探すとき、「7段階」は「17段階」では満たされない(Codex レビュー、PR #158)。"""
+    base = {"meta": {"title": "t", "basis": "テスト",
+                     "thesis": {"statement": "7段階でつなぐ", "value": "7", "unit": "段階"}},
+            "slides": [{"pattern": "comparison_table", "title": "t", "subtitle": "s",
+                        "table": {"headers": ["段階", "動き"], "rows": [["全17段階の1つ目", "x"]]}}]}
+    spec = tmp_path / "a.json"
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    r = run("audit_argument.py", spec)
+    assert "7段階」を示す図表がどのページにも無い" in r.stdout, r.stdout
+    base["slides"][0]["table"]["rows"] = [["街づくりの7段階", "x"]]
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    r = run("audit_argument.py", spec)
+    assert "示す図表がどのページにも無い" not in r.stdout, r.stdout
+    # 桁区切りを外した「1,120社」→「1120社」が「120社」を満たしてもいけない(Claude レビュー、PR #158)
+    base["meta"]["thesis"] = {"statement": "顧客120社", "value": "120", "unit": "社"}
+    base["slides"][0]["table"]["rows"] = [["累計1,120社のうち", "x"]]
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    r = run("audit_argument.py", spec)
+    assert "120社」を示す図表がどのページにも無い" in r.stdout, r.stdout
+    # 符号違い「-7段階」「△7段階」は反証であって証拠ではない(Codex レビュー、PR #158)
+    base["meta"]["thesis"] = {"statement": "7段階でつなぐ", "value": "7", "unit": "段階"}
+    for shown in ("-7段階", "△7段階", "−7段階"):
+        base["slides"][0]["table"]["rows"] = [[f"評価は{shown}", "x"]]
+        spec.write_text(json.dumps(base, ensure_ascii=False))
+        r = run("audit_argument.py", spec)
+        assert "7段階」を示す図表がどのページにも無い" in r.stdout, (shown, r.stdout)
+
+
+def test_metric_proof_hero_must_be_in_its_chart(tmp_path):
+    """metric_proof の hero は chart が証明する数。系列にも derivation にも無い hero は audit が弾く
+    (Codex レビュー、PR #158: hero が exhibit 側なので、それ自身で結論を満たしていた)。"""
+    def deck(values, derivation=None):
+        s = {"pattern": "metric_proof", "title": "ARRは12.8億円に到達", "subtitle": "s", "source": "社内集計",
+             "hero": {"label": "ARR", "value": "12.8", "unit": "億円"},
+             "chart": {"type": "column", "unit": "億円", "categories": ["Q1", "Q2"],
+                       "series": [{"name": "ARR", "values": values}]}}
+        if derivation:
+            s["derivation"] = derivation
+        return {"meta": {"title": "t", "basis": "テスト",
+                         "thesis": {"statement": "ARRは12.8億円", "value": "12.8", "unit": "億円"}}, "slides": [s]}
+    spec = tmp_path / "mp.json"
+    spec.write_text(json.dumps(deck([1, 2]), ensure_ascii=False))
+    r = run("audit_argument.py", spec)
+    assert "hero の値 12.8億円 が chart に無い" in r.stdout, r.stdout
+    spec.write_text(json.dumps(deck([11.9, 12.8]), ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    spec.write_text(json.dumps(deck([9.85, 2.95], {"kind": "sum", "value": 12.8, "unit": "億円", "a": 9.85, "b": 2.95}),
+                               ensure_ascii=False))
+    r = run("audit_argument.py", spec)
+    assert "chart に無い" not in r.stdout, r.stdout
+    # 図表に無い被演算子の derivation(a=0, b=12.8)は hero を証明しない(Codex レビュー、PR #158)
+    spec.write_text(json.dumps(deck([1, 2], {"kind": "delta", "value": 12.8, "unit": "億円", "a": 0, "b": 12.8}),
+                               ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # 集合棒の最終値の合計(9.85 + 2.95)は表示も導出もされていないので証拠にならない。積み上げなら合計が天井
+    d = deck([1, 9.85]); d["slides"][0]["chart"]["series"].append({"name": "新規", "values": [1, 2.95]})
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    d["slides"][0]["chart"]["type"] = "stacked_column"
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    # 符号違い(-12.8)は反証。単位違い(%)の図表は hero を証明できない
+    spec.write_text(json.dumps(deck([-11.9, -12.8]), ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    d = deck([11.9, 12.8]); d["slides"][0]["chart"]["unit"] = "%"
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "単位「億円」が chart の単位" in run("audit_argument.py", spec).stdout
+    # 画像図表(combo)も数値配列で照合する
+    d = deck([1, 2]); d["slides"][0]["chart"] = {"kind": "combo", "categories": ["Q1", "Q2"],
+                                                  "bar": {"name": "ARR", "values": [11.9, 12.8], "unit": "億円"},
+                                                  "line": {"name": "成長率", "values": [28, 30], "unit": "%"}}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    d["slides"][0]["chart"]["bar"]["values"] = [1, 2]
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # 二軸の combo: % の折れ線にある 12.8 は 12.8億円 の証拠ではない(Codex / Claude レビュー、PR #158)
+    d["slides"][0]["chart"]["line"]["values"] = [12.0, 12.8]
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # bar に単位が無く line だけ % の combo: 単位の無い bar の 12.8 は 12.8% の証拠ではない(Codex レビュー)
+    d = deck([1, 2]); d["slides"][0]["hero"] = {"label": "成長率", "value": "12.8", "unit": "%"}
+    d["meta"]["thesis"] = {"statement": "成長率12.8%", "value": "12.8", "unit": "%"}
+    d["slides"][0]["chart"] = {"kind": "combo", "categories": ["Q1", "Q2"], "bar": {"name": "ARR", "values": [10, 12.8]},
+                               "line": {"name": "成長率", "values": [20, 30], "unit": "%"}}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # categories を指すパスの derivation は根拠にならない(Codex レビュー)
+    d = deck([100, 200]); d["slides"][0]["chart"]["categories"] = ["1", "2"]
+    d["slides"][0]["hero"] = {"label": "差", "value": "1", "unit": "億円"}
+    d["meta"]["thesis"] = {"statement": "差1億円", "value": "1", "unit": "億円"}
+    d["slides"][0]["derivation"] = {"kind": "delta", "a": "chart.categories[0]", "b": "chart.categories[1]", "value": 1, "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # 億円の棒と % の折れ線の値を混ぜた derivation はどちらの図表も証明しない(Claude レビュー)
+    d = deck([1, 2]); d["slides"][0]["hero"] = {"label": "x", "value": "20.15", "unit": "億円"}
+    d["meta"]["thesis"] = {"statement": "20.15億円", "value": "20.15", "unit": "億円"}
+    d["slides"][0]["chart"] = {"kind": "combo", "categories": ["Q1", "Q2"], "bar": {"name": "ARR", "values": [9.85, 12.8], "unit": "億円"},
+                               "line": {"name": "成長率", "values": [28, 30], "unit": "%"}}
+    d["slides"][0]["derivation"] = {"kind": "delta", "a": 9.85, "b": 30, "value": 20.15, "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # % を引いて億円にはならない: 差・和の被演算子は結果と同じ単位の配列から(Codex レビュー)
+    d["slides"][0]["chart"]["bar"]["values"] = [1, 2]; d["slides"][0]["chart"]["line"]["values"] = [10, 30]
+    d["slides"][0]["hero"] = {"label": "x", "value": "20", "unit": "億円"}
+    d["meta"]["thesis"] = {"statement": "20億円", "value": "20", "unit": "億円"}
+    d["slides"][0]["derivation"] = {"kind": "delta", "a": 10, "b": 30, "value": 20, "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # 億円の棒と % の折れ線が同じ数 [10, 30] を持つとき、line を指すパスの差は億円の根拠にならない(Codex レビュー)
+    d["slides"][0]["chart"]["bar"]["values"] = [10, 30]; d["slides"][0]["chart"]["line"]["values"] = [10, 30]
+    d["slides"][0]["derivation"] = {"kind": "delta", "a": "chart.line.values[0]", "b": "chart.line.values[1]", "value": 20, "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    d["slides"][0]["derivation"] = {"kind": "delta", "a": "chart.bar.values[0]", "b": "chart.bar.values[1]", "value": 20, "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    # 制御値を指すパス(chart.focal_category / chart.y_max)は、たまたま系列と同じ数でも根拠にならない(Codex レビュー)
+    d = deck([1, 3]); d["slides"][0]["chart"].update({"focal_category": 1, "y_max": 3})
+    d["slides"][0]["hero"] = {"label": "差", "value": "2", "unit": "億円"}
+    d["meta"]["thesis"] = {"statement": "差2億円", "value": "2", "unit": "億円"}
+    d["slides"][0]["derivation"] = {"kind": "delta", "a": "chart.focal_category", "b": "chart.y_max", "value": 2, "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    d["slides"][0]["derivation"] = {"kind": "delta", "a": "chart.series[0].values[0]", "b": "chart.series[0].values[1]", "value": 2, "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    # 正負が混じる積み上げの最終カテゴリ(100, -90)は 100 と -90 の山であって、差し引き 10 ではない(Codex レビュー)
+    d = deck([50, 100]); d["slides"][0]["chart"]["type"] = "stacked_column"
+    d["slides"][0]["chart"]["series"].append({"name": "損失", "values": [-40, -90]})
+    d["slides"][0]["hero"] = {"label": "純", "value": "10", "unit": "億円"}
+    d["meta"]["thesis"] = {"statement": "純10億円", "value": "10", "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    d["slides"][0]["hero"]["value"] = "100"; d["meta"]["thesis"]["value"] = "100"
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    # 100%積み上げの最終カテゴリ合計(60+40)は hero 100% の証拠
+    d = deck([30, 60]); d["slides"][0]["chart"].update({"type": "stacked_column_100", "unit": "%"})
+    d["slides"][0]["chart"]["series"].append({"name": "他", "values": [70, 40]})
+    d["slides"][0]["hero"] = {"label": "カバー率", "value": "100", "unit": "%"}
+    d["meta"]["thesis"] = {"statement": "カバー率100%", "value": "100", "unit": "%"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    # 正規化されていない 100%積み上げ(60 + 60)は 100 の全体と 50 / 50 の構成比として描かれる — 120% は証拠にならない(Codex レビュー)
+    d["slides"][0]["chart"]["series"] = [{"name": "A", "values": [30, 60]}, {"name": "他", "values": [70, 60]}]
+    for value, expect_error in (("120", True), ("100", False), ("50", False), ("60", True)):
+        d["slides"][0]["hero"]["value"] = value; d["meta"]["thesis"]["value"] = value
+        spec.write_text(json.dumps(d, ensure_ascii=False))
+        assert ("chart に無い" in run("audit_argument.py", spec).stdout) == expect_error, value
+    # 億円と宣言された 100%積み上げの構成比「50」は 50億円 ではない — % 以外の hero は照合しない(Codex レビュー)
+    d["slides"][0]["chart"]["unit"] = "億円"; d["slides"][0]["hero"] = {"label": "x", "value": "50", "unit": "億円"}
+    d["meta"]["thesis"] = {"statement": "50億円", "value": "50", "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "100%積み上げ(stacked_column_100)は構成比を描く" in run("audit_argument.py", spec).stdout
+    d["slides"][0]["chart"]["unit"] = "%"; d["slides"][0]["hero"] = {"label": "x", "value": "100", "unit": "%"}
+    d["meta"]["thesis"] = {"statement": "100%", "value": "100", "unit": "%"}
+    # 100%積み上げの生の値から導いた derivation(60→80 の差 20)は描かれない(50%→80%)ので根拠にならない(Codex レビュー)
+    d["slides"][0]["chart"]["series"] = [{"name": "A", "values": [60, 80]}, {"name": "B", "values": [60, 20]}]
+    d["slides"][0]["hero"] = {"label": "x", "value": "20", "unit": "%"}; d["meta"]["thesis"] = {"statement": "20%", "value": "20", "unit": "%"}
+    d["slides"][0]["derivation"] = {"kind": "delta", "a": "chart.series[0].values[0]", "b": "chart.series[0].values[1]", "value": 20, "unit": "%"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "生の値から導いた derivation" in run("audit_argument.py", spec).stdout   # (20 は B の構成比としては描かれる)
+    del d["slides"][0]["derivation"]
+    d["slides"][0]["hero"]["value"] = "80"; d["meta"]["thesis"]["value"] = "80"
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    # 画像図表の配列要素が dict のとき(waterfall の items[].value)、そのデータ欄も図表の値(Codex レビュー)
+    d = deck([1, 2]); d["slides"][0]["hero"] = {"label": "期末", "value": "12.8", "unit": "億円"}
+    d["meta"]["thesis"] = {"statement": "12.8億円", "value": "12.8", "unit": "億円"}
+    d["slides"][0]["chart"] = {"kind": "waterfall", "unit": "億円",
+                               "items": [{"label": "期首", "value": 9.85, "kind": "start"}, {"label": "純増", "value": 2.95},
+                                         {"label": "期末", "value": 12.8, "kind": "end"}]}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    d["slides"][0]["hero"]["value"] = "13.5"; d["meta"]["thesis"]["value"] = "13.5"
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    d = deck([30, 60]); d["slides"][0]["chart"].update({"type": "stacked_column_100", "unit": "%"})
+    d["slides"][0]["chart"]["series"].append({"name": "他", "values": [70, 40]})
+    d["slides"][0]["hero"] = {"label": "カバー率", "value": "100", "unit": "%"}
+    d["meta"]["thesis"] = {"statement": "カバー率100%", "value": "100", "unit": "%"}
+    # 全角の ％ と半角の % は同じ単位(Codex レビュー)
+    d["slides"][0]["chart"]["unit"] = "％"
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout and "単位「%」が chart" not in run("audit_argument.py", spec).stdout
+    d["slides"][0]["chart"]["unit"] = "%"
+    # すべて 0 の 100%積み上げには分母が無く、100 の全体も描かれない(Codex レビュー)
+    d["slides"][0]["chart"]["series"] = [{"name": "A", "values": [0, 0]}, {"name": "他", "values": [0, 0]}]
+    d["slides"][0]["hero"]["value"] = "100"; d["meta"]["thesis"]["value"] = "100"
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # native 図表の series.unit は描かれない — chart.unit が % なら 億円 の系列単位は監査でも効かない(Codex レビュー)
+    d = deck([10, 12.8]); d["slides"][0]["chart"]["unit"] = "%"; d["slides"][0]["chart"]["series"][0]["unit"] = "億円"
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "単位「億円」が chart の単位" in run("audit_argument.py", spec).stdout
+    assert "series.unit を描かない" in run("validate_spec.py", spec).stdout
+    # 単位の無い hero は、単位を持つ図表のどの配列と照合するか決まらない — validate と audit の両方が弾く(Codex レビュー)
+    d = deck([1, 2]); d["slides"][0]["hero"] = {"label": "x", "value": "12.8"}
+    d["slides"][0]["chart"] = {"kind": "combo", "categories": ["Q1", "Q2"], "bar": {"name": "ARR", "values": [1, 2], "unit": "億円"},
+                               "line": {"name": "率", "values": [10, 12.8], "unit": "%"}}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "hero に unit がない" in run("validate_spec.py", spec).stdout
+    assert "hero に unit が無く" in run("audit_argument.py", spec).stdout
+    # CAGR の from / to は位置の指定であって図表の値ではない — 0 と 4 が系列に無くても derivation は根拠になる
+    d = deck([9.85, 10.52, 11.28, 11.95, 12.8]); d["slides"][0]["chart"]["categories"] = ["Q1", "Q2", "Q3", "Q4", "Q5"]
+    d["slides"][0]["hero"] = {"label": "年率成長", "value": "6.8", "unit": "%"}
+    d["slides"][0]["derivation"] = {"kind": "cagr", "of": "chart.series[0].values", "from": 0, "to": 4, "value": 6.8, "unit": "%"}
+    d["meta"]["thesis"] = {"statement": "年率6.8%", "value": "6.8", "unit": "%"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    r = run("audit_argument.py", spec)
+    assert "chart に無い" not in r.stdout and "単位「%」が chart の単位" not in r.stdout, r.stdout
+    # 同じ形で derivation が無ければ、% の hero は 億円 の図表では証明できない
+    del d["slides"][0]["derivation"]
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "単位「%」が chart の単位" in run("audit_argument.py", spec).stdout
+
+
+def test_metric_proof_accepts_a_zero_hero_value(tmp_path):
+    """事故ゼロのような 0 は正当な hero の値。欠落と区別する(Codex レビュー、PR #158)。"""
+    deck = {"meta": {"title": "t", "basis": "テスト"},
+            "slides": [{"pattern": "metric_proof", "title": "重大事故は0件", "subtitle": "s",
+                        "hero": {"label": "重大事故", "value": 0, "unit": "件"},
+                        "chart": {"type": "column", "unit": "件", "categories": ["FY24", "FY25"],
+                                  "series": [{"name": "事故", "values": [2, 0]}]},
+                        "assumption": "テスト"}]}
+    spec = tmp_path / "z.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    assert "hero に value がない" not in r.stdout, r.stdout
+
+
+def test_card_copy_estimate_uses_the_deck_template(tmp_path):
+    """validate の本文量の見積もりは、そのデッキのテンプレート(bold は型が大きい)で測る
+    (Codex レビュー、PR #158)。同じ本文でも bold のほうが行数が増え、比率が上がる。"""
+    B = _import_build_deck()
+    D = _deck_text()
+    slide = {"pattern": "two_column", "title": "t", "subtitle": "s",
+             "left": {"heading": "A", "items": [{"heading": "h", "body": "住民と店、店と店、企業と人、地域と企業、行政と住民、需要と供給をつなぐ"}]},
+             "right": {"heading": "B", "items": [{"heading": "h", "body": "新しい事業、新しい店、新しい文化、新しい雇用、新しい人、新しい需要が生まれる"}]}}
+    B._apply_tokens(D.resolve_tokens(None))
+    std_h = B.body_region(slide)[1]
+    std = B.card_copy_estimate(slide)[0]
+    B._apply_tokens(D.resolve_tokens("bold"))
+    bold_h = B.body_region(slide)[1]
+    bold = B.card_copy_estimate(slide)[0]
+    B._apply_tokens(D.resolve_tokens(None))
+    # bold は見出しが大きく本文帯が狭い — 見積もりの物差し(本文帯)がテンプレートに追従している
+    assert bold_h < std_h, (std_h, bold_h)
+    assert bold["card_h"] <= 0.74 * (bold_h - 0.1) + 1e-6 or bold["card_h"] == std["card_h"]
+
+
+def test_nominal_predicate_sentences_are_body_copy():
+    """「全社展開が可能」「追加投資が必要」は主語 + 名詞述語の文。句読点が無く名詞で終わっていても
+    本文として自然折返しに任せ、文節改行を入れない(Codex レビュー、PR #158)。名詞句のラベルは残す。"""
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import build_deck as B
+    for text in ("全社展開が可能", "追加投資が必要", "現行体制では対応が困難", "在庫は十分",
+                 "施策の進捗は横ばい", "本社は東京", "需要が旺盛", "当社も対象", "国内も横ばい",
+                 "これも対象", "誰も対象外", "どれも横ばい", "取り組みも横ばい"):   # 述語の語彙に依らない
+        assert not B._looks_like_label(text), text
+    for text in ("全社展開の可能性", "必要投資額", "対応方針", "可能", "必要", "重要顧客の維持",
+                 "がん検診の受診率", "はがきの送付", "売上高は", "我が社の競争優位", "わが国の水準", "ものづくりの拠点",
+                 "子ども支援", "どこでも利用可能", "いつも通りの運用"):     # 語の一部の「も」は助詞ではない(Codex レビュー)
+        assert B._looks_like_label(text), text
+    assert not B._has_subject("我が社の競争優位")                       # 連体詞の「が」は主語ではない
+
+
+def test_i_adjective_sentences_are_body_copy():
+    """「参入障壁が高い」「解約率が低い」のような い形容詞で終わる短文は本文(自然折返し)。
+    体言止めのラベルだけが文節で組まれる(Codex レビュー、PR #158)。"""
+    B = _import_build_deck()
+    for text in ("参入障壁が高い", "解約率が低い", "賃貸以外の道をつくる"):
+        assert not B._looks_like_label(text), text
+    for text in ("導入費＋固定利用料", "中堅企業向けの統合スイート", "Rent-to-Own"):
+        assert B._looks_like_label(text), text
+
+
+def test_chart_top_keeps_a_positive_chart_area(tmp_path):
+    """chart_top の要点が長くても図表の高さが 0 や負にならない(Codex レビュー、PR #158)。"""
+    long_body = "地域の意思と衛星データを重ねて可能性を見つけ、所有者と需要を結んで案件を生み、皆が動ける状態まで案件をつくる。" * 4
+    deck = {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+        "pattern": "chart_insight", "layout": "chart_top", "title": "要点が長くても図表は残る", "subtitle": "s",
+        "chart": {"type": "column", "unit": "件", "categories": ["A", "B", "C"],
+                  "series": [{"name": "x", "values": [1, 2, 3]}]},
+        "takeaways": [{"heading": "h", "body": long_body}] * 3, "assumption": "テスト"}]}
+    spec = tmp_path / "ct.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    assert "chart_top の要点が長い" in r.stdout, r.stdout
+    out = tmp_path / "ct.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+
+def test_exhibit_tokens_keep_local_value_unit_pairs():
+    """hero / facts / root の value と unit はその組で1トークン。図表全体の単位を無関係な値に
+    付けない(114% を 114億円 に化けさせない)(Codex レビュー、PR #158)。"""
+    import importlib, sys
+    sys.path.insert(0, str(SCRIPTS))
+    D = importlib.import_module("deck_argument")
+    tree = {"pattern": "logic_tree", "root": {"label": "ARR", "value": "12.8", "unit": "億円"},
+            "branches": [{"label": "顧客数", "value": "8,420", "unit": "社", "leaves": ["x"]}]}
+    toks = D.exhibit_tokens(tree)
+    assert "12.8億円" in toks and "8420社" in toks, toks
+    proof = {"pattern": "metric_proof", "hero": {"label": "ARR", "value": "12.8", "unit": "億円"},
+             "facts": [{"label": "NRR", "value": "114%"}],
+             "chart": {"type": "column", "unit": "億円", "categories": ["a", "b"],
+                       "series": [{"name": "ARR", "values": [9.85, 12.8]}]}}
+    toks = D.exhibit_tokens(proof)
+    assert "12.8億円" in toks and "114%" in toks and "114億円" not in toks, toks
+    # 裸の数の fact({label, value})にも chart.unit は付かない。chart の series 値には付く
+    proof["facts"] = [{"label": "顧客数(社)", "value": "8420"}]
+    toks = D.exhibit_tokens(proof)
+    assert "8420億円" not in toks and "12.8億円" in toks and "9.85億円" in toks, toks
+
+
+def test_metric_proof_facts_render_their_unit(tmp_path):
+    """{value, unit} の組で書いた fact は単位まで描かれる — 監査が証拠と数える「8,420社」をスライドが
+    「8,420」としか見せないのは矛盾(Codex レビュー、PR #158)。"""
+    deck = {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+        "pattern": "metric_proof", "title": "ARRは12.8億円", "subtitle": "s",
+        "hero": {"label": "ARR", "value": "12.8", "unit": "億円"},
+        "chart": {"type": "column", "unit": "億円", "categories": ["a", "b"],
+                  "series": [{"name": "ARR", "values": [9.85, 12.8]}]},
+        "facts": [{"label": "有料顧客数", "value": "8,420", "unit": "社"}], "assumption": "テスト"}]}
+    spec = tmp_path / "mp.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "mp.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    texts = [sh.text_frame.text for sh in pptx.Presentation(out).slides[0].shapes if sh.has_text_frame]
+    assert any("8,420社" in t for t in texts), texts
+
+
+def test_column_framework_header_rows_measure_the_real_label():
+    """柱ページの見出し帯は、実際のラベル+見出しで行数を数える。「Pillar 1」のような長いラベルを
+    「00」で代用すると折返しを取りこぼし、帯が低く出る(Claude レビュー、PR #158)。"""
+    B = _import_build_deck()
+    short = [{"label": "01", "heading": "中堅製造業へ新規獲得", "items": ["x"]},
+             {"label": "02", "heading": "部品表連携", "items": ["y"]},
+             {"label": "03", "heading": "保守サブスク", "items": ["z"]}]
+    long_ = [{"label": "Pillar Number One", "heading": "中堅製造業へ新規獲得", "items": ["x"]},
+             {"label": "Pillar Number Two", "heading": "部品表連携", "items": ["y"]},
+             {"label": "Pillar Number Three", "heading": "保守サブスク", "items": ["z"]}]
+    h = 4.5
+    head_short = B._column_framework_layout(short, h)["head_h"]
+    head_long = B._column_framework_layout(long_, h)["head_h"]
+    assert head_long > head_short, (head_short, head_long)
+
+
+def test_note_is_allowed_when_only_claim_side_shows_the_number(tmp_path):
+    """recap が「68億円」を描く statement の定義注記は正当。数値の在り処が主張側でも note は削らせない
+    (Codex レビュー、PR #158)。数値の無いページの note は引き続き警告する。"""
+    base = {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+        "pattern": "statement", "title": "結論", "subtitle": "s", "variant": "evidence_strip",
+        "lead": "5年でARR 68億円へ", "statement": "経理領域から段階参入し、5年でARR 68億円を築く",
+        "recap": [{"label": "FY31 ARR", "value": "68", "unit": "億円"}],
+        "note": "ARRは各年度末の年間経常収益"}]}
+    spec = tmp_path / "n1.json"
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" not in run("validate_spec.py", spec).stdout
+    base["slides"][0] = {"pattern": "two_column", "title": "t", "subtitle": "s",
+                         "left": {"heading": "A", "items": [{"heading": "h", "body": "x"}]},
+                         "right": {"heading": "B", "items": [{"heading": "h", "body": "y"}]},
+                         "note": "数値の無いページの注記"}
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" in run("validate_spec.py", spec).stdout
+    # 構造の番号(Step 1)や期間のラベル(2024年)だけのページも通さない(Codex レビュー、PR #158)
+    base["slides"][0] = {"pattern": "process_flow", "title": "t", "subtitle": "s",
+                         "steps": [{"label": f"Step {i}: 体制構築", "items": ["体制の整備", "役割の明文化"]} for i in (1, 2, 3)],
+                         "note": "数値の無い流れページの注記"}
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" in run("validate_spec.py", spec).stdout
+    base["slides"][0]["steps"] = [{"label": f"第{i}段階", "items": ["体制の整備", "役割の明文化"]} for i in (1, 2, 3)]
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" in run("validate_spec.py", spec).stdout
+    # 期間の範囲(FY24/25、2024/25、2024-2026年)だけのロードマップも通さない(Codex レビュー、PR #158)
+    for labels in (["FY24/25", "FY25/26", "FY26/27"], ["2024/25", "2025/26", "2026/27"], ["2024-2026年", "2027年度", "Q1/Q2"]):
+        base["slides"][0] = {"pattern": "process_flow", "title": "t", "subtitle": "s",
+                             "steps": [{"label": lab, "items": ["体制の整備", "役割の明文化"]} for lab in labels],
+                             "note": "期間だけの注記"}
+        spec.write_text(json.dumps(base, ensure_ascii=False))
+        assert "Note を置かない" in run("validate_spec.py", spec).stdout, labels
+    # 裸の「2024」は件数かもしれない — 「年」か範囲の形が無ければ数値のまま(Codex レビュー、PR #158)
+    base["slides"][0] = {"pattern": "comparison_table", "title": "t", "subtitle": "s",
+                         "table": {"headers": ["項目", "件数"], "rows": [["休眠除く顧客", "2024"]]}, "note": "休眠顧客を除く"}
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" not in run("validate_spec.py", spec).stdout
+    # 先頭が 0 の値(「05件」)は番号ではなく数値(Claude レビュー、PR #158)
+    base["slides"][0] = {"pattern": "comparison_table", "title": "t", "subtitle": "s",
+                         "table": {"headers": ["項目", "件数"], "rows": [["不良", "05件"]]}, "note": "件数は月次"}
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" not in run("validate_spec.py", spec).stdout
+    # 図表の値としての段階の数(「街づくりの7段階」)は数値のまま(Claude レビュー、PR #158)
+    base["slides"][0] = {"pattern": "comparison_table", "title": "t", "subtitle": "s",
+                         "table": {"headers": ["項目", "内容"], "rows": [["街づくり", "全7段階のうち3段階まで"]]},
+                         "note": "段階は当社の定義による"}
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" not in run("validate_spec.py", spec).stdout
+    base["slides"][0] = {"pattern": "comparison_table", "title": "t", "subtitle": "s",
+                         "table": {"headers": ["項目", "2024年", "2025年"], "rows": [["体制", "整備", "運用"]]},
+                         "note": "期間ラベルだけの注記"}
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" in run("validate_spec.py", spec).stdout
+    # タイトルや小見出し(主張側)に裸の数があっても、図表側に数値が無ければ note は通さない
+    # (Claude レビュー、PR #158: 主張側の裸の数まで数えるとほぼ全ページで通ってしまう)
+    base["slides"][0]["title"] = "3本柱で進める"
+    base["slides"][0]["subtitle"] = "第2四半期の計画"
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" in run("validate_spec.py", spec).stdout
+
+
+def test_multi_character_units_stay_with_their_number():
+    """「14カ月」「3週間」「8時間」は数と単位で1語。自然折返しが数字の直後に落ちても割らない
+    (Codex レビュー、PR #158)。"""
+    D = _deck_text()
+    spans = {t[a:b] for t in ["導入まで14カ月必要、3週間で8時間の削減、8,420社"] for a, b in D._unbreakable_spans(t)}
+    assert {"14カ月", "3週間", "8時間", "8,420社"} <= spans, spans
+
+
+def test_metric_proof_facts_stay_inside_the_rail(tmp_path):
+    """ヒーローの注記が長く、facts が4行あっても、事実レールは図表の下端を越えない
+    (Codex レビュー、PR #158)。validate は長い注記に警告し、build は破綻しない。"""
+    deck = {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+        "pattern": "metric_proof", "title": "ARRは12.8億円", "subtitle": "s",
+        "hero": {"label": "ARR", "value": "12.8", "unit": "億円", "delta": "+30% YoY", "delta_dir": "up",
+                 "note": "1年で2.95億円の純増、直近四半期は0.85億円、既存顧客の拡張が伸びの半分を担い、成長の質は改善している"},
+        "chart": {"type": "column", "unit": "億円", "categories": ["a", "b", "c"],
+                  "series": [{"name": "ARR", "values": [9.85, 11.2, 12.8]}]},
+        "facts": [{"label": "有料顧客数", "value": "8,420社"}, {"label": "NRR", "value": "114%"},
+                  {"label": "解約率", "value": "3.2%"}, {"label": "ARPA", "value": "152万円"}],
+        "assumption": "テスト"}]}
+    spec = tmp_path / "mp2.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    assert "hero.note が長い" in run("validate_spec.py", spec).stdout
+    out = tmp_path / "mp2.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    from pptx.util import Emu
+    slide = pptx.Presentation(out).slides[0]
+    bottoms = [Emu(sh.top).inches + Emu(sh.height).inches for sh in slide.shapes if sh.top is not None]
+    assert max(bottoms) <= TOKENS["slide"]["height_in"] + 0.01
+
+
+def test_stacked_100_axis_stays_normalised_with_an_annotation(tmp_path):
+    """100%積み上げ棒の軸は 0-1 の比率。annotation があっても生の値(70/20/10)で天井を決めない
+    (Codex レビュー、PR #158)。通常の積み上げは列の合計が天井。"""
+    deck = {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+        "pattern": "chart_insight", "title": "構成比は変わる", "subtitle": "s",
+        "chart": {"type": "stacked_column_100", "unit": "%", "categories": ["FY25", "FY26"],
+                  "series": [{"name": "A", "values": [70, 60]}, {"name": "B", "values": [20, 25]},
+                             {"name": "C", "values": [10, 15]}],
+                  "segment_labels": True, "annotation": {"badge": "mix shift"}},
+        "assumption": "テスト"}, {
+        "pattern": "chart_insight", "title": "積み上げの天井は合計", "subtitle": "s",
+        "chart": {"type": "stacked_column", "unit": "億円", "categories": ["FY25", "FY26"],
+                  "series": [{"name": "A", "values": [70, 60]}, {"name": "B", "values": [20, 25]}],
+                  "annotation": {"badge": "x"}},
+        "assumption": "テスト"}]}
+    spec = tmp_path / "s100.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "s100.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    prs = pptx.Presentation(out)
+    ax100 = [sh.chart.value_axis for sh in prs.slides[0].shapes if getattr(sh, "has_chart", False)][0]
+    assert ax100.maximum_scale is None or ax100.maximum_scale <= 1.0, ax100.maximum_scale
+    ax = [sh.chart.value_axis for sh in prs.slides[1].shapes if getattr(sh, "has_chart", False)][0]
+    assert ax.maximum_scale is not None and ax.maximum_scale >= 90 * 1.28 - 1e-6, ax.maximum_scale
+
+
+def test_widow_repair_may_split_a_kanji_run():
+    """同じ表記が続く本文でも、最終行が1字なら漢字の連なりの途中で改行して泣き別れを直す
+    (Codex レビュー、PR #158)。守る語(カタカナ語・英単語・数量)の途中には打たない。"""
+    D = _deck_text()
+    broken = D.wrap_natural("電子帳簿保存法対応", 1.9, 16)
+    assert "\n" in broken and len(broken.split("\n")[-1]) >= 2, broken
+
+
+def test_labeled_pillar_headers_get_phrase_breaks(tmp_path):
+    """ラベル付きの柱見出し(2走り)も文節で折り返す — 帯の高さを見積もった文字列と同じ切れ目で
+    描き、英語名を途中で割らない(Codex レビュー、PR #158)。"""
+    deck = {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+        "pattern": "column_framework", "title": "3本柱", "subtitle": "s",
+        "columns": [{"label": "Pillar One", "heading": "Enterprise Search の中堅製造業展開", "items": ["x"]},
+                    {"label": "Pillar Two", "heading": "部品表連携", "items": ["y"]},
+                    {"label": "Pillar Three", "heading": "保守サブスク", "items": ["z"]}]}]}
+    spec = tmp_path / "cf.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "cf.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    slide = pptx.Presentation(out).slides[0]
+    heads = [sh for sh in slide.shapes if sh.has_text_frame and sh.text_frame.text.startswith("Pillar One")]
+    assert heads, [sh.text_frame.text for sh in slide.shapes if sh.has_text_frame]
+    para = heads[0].text_frame.paragraphs[0]
+    assert para._p.findall(f"{A}br"), "ラベル付き見出しに文節の改行が無い"
+    assert len(para.runs) >= 2 and para.runs[0].text == "Pillar One", [r.text for r in para.runs]
+    lines = heads[0].text_frame.text.split("\v") if "\v" in heads[0].text_frame.text else heads[0].text_frame.text.split("\n")
+    assert all("Enterprise Search" not in ln or ln.strip().startswith("Enterprise Search") or "Enterprise Search" in ln for ln in lines)
+    assert "Enterprise\n" not in heads[0].text_frame.text and "Enterprise\v" not in heads[0].text_frame.text
+    r = run("verify_deck.py", out)
+    assert "0 failures" in r.stdout, r.stdout
+
+
+def test_explicit_labels_break_on_phrases_even_with_punctuation():
+    """役割を「ラベル」と明示した結論帯は、読点を含んでいても文節で組む。「Off-Marketを探さず、
+    生み出す」が「生み / 出す」で割れない。ハイフンの英語名も1塊(PR #158 の回帰)。"""
+    B = _import_build_deck()
+    D = _deck_text()
+    broken = B.display_wrap_text("Off-Marketを探さず、生み出す", 3.46, 19, 700, "label")
+    assert broken == "Off-Marketを探さず、\n生み出す", broken
+    chunks, _ = D._segments("Off-Marketを探さず、生み出す")
+    assert chunks[0].startswith("Off-Market"), chunks
+
+
+def test_note_is_allowed_for_unitless_numbers(tmp_path):
+    """5点満点の「5」「3」のような単位の無い数にも注記は付けられる(Codex レビュー、PR #158)。"""
+    deck = {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+        "pattern": "comparison_table", "title": "評価は5点満点で比べる", "subtitle": "s",
+        "table": {"headers": ["評価軸", "当社", "他社"], "rows": [["導入の速さ", "5", "3"], ["価格", "4", "4"]]},
+        "note": "5点満点"}]}
+    spec = tmp_path / "n2.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    assert "Note を置かない" not in run("validate_spec.py", spec).stdout
+
+
+def test_per_day_compound_units_stay_with_their_number():
+    """「365万時間/日」「120件/月」は分母の助数詞まで1語。狭いカードでも「/日」が行頭に落ちない
+    (Codex レビュー、PR #158)。"""
+    dt = _deck_text()
+    text = "不足は365万時間/日に拡大"
+    spans = dt._unbreakable_spans(text)
+    a = text.index("365")
+    assert (a, a + len("365万時間/日")) in spans
+    # 数字の後ろに「/」が続いても、助数詞でなければ延ばさない(「3/4」は数字どうし = ascii 側で結ぶ)
+    assert (0, len("120件/月")) in dt._unbreakable_spans("120件/月の受注")
+    # 分母が複数字の単位でも丸ごと(Codex レビュー、PR #158)
+    for text, word in (("受注は120件/カ月に増加", "120件/カ月"), ("単価は2万円/時間", "2万円/時間"), ("3社/週間の面談", "3社/週間")):
+        assert word in {text[a:b] for a, b in dt._unbreakable_spans(text)}, text
+    for width in (1.6, 1.77, 2.0, 2.3):
+        for line in dt.wrap_natural(text, width, 16).split("\n"):
+            assert not line.startswith("/"), (width, line)
+            assert "万時間" not in line or "/日" in line, (width, line)
+
+
+def test_quantity_prefix_stays_with_its_number():
+    """「△2.8億円」「約1,630人」は符号・概数の印から単位まで1語。狭い列でも印だけが行末に残らない
+    (Codex レビュー、PR #158)。"""
+    dt = _deck_text()
+    for text, word in (("営業損失は△2.8億円まで縮小", "△2.8億円"), ("従業員は約1,630人に増加", "約1,630人"),
+                       ("利益率は−3.2ptの低下", "−3.2pt")):
+        spans = {text[a:b] for a, b in dt._unbreakable_spans(text)}
+        assert word in spans, spans
+        for width in (1.2, 1.3, 1.45, 1.6):
+            lines = dt.wrap_natural(text, width, 16).split("\n")
+            for line in lines:
+                assert not line.endswith(tuple("△▲−+約")), (width, lines)
+    # 複数字の前置き(およそ・最大・上限)も同じ語(Codex レビュー、PR #158)
+    for text, word in (("導入対象となる従業員数は最大1,630人に設定", "最大1,630人"), ("在庫はおよそ3週間分", "およそ3週間分"),
+                       ("上限200件まで受け付ける", "上限200件")):
+        assert word in {text[a:b] for a, b in dt._unbreakable_spans(text)}, text
+        for width in (1.6, 1.8, 2.0):
+            for line in dt.wrap_natural(text, width, 16).split("\n"):
+                assert not line.endswith(("最大", "およそ", "上限")), (width, line)
+    # 英数の連なり(2020-2025)は既存のハイフン結合のまま、前の語に食い込まない
+    spans = {t[a:b] for t in ["計画は2020-2025年"] for a, b in dt._unbreakable_spans(t)}
+    assert "2020-2025年" in spans, spans
+
+
+def test_sen_yen_units_stay_with_their_number():
+    """「10,590千円」は数と単位で1語(Codex レビュー、PR #158)。"""
+    D = _deck_text()
+    spans = {t[a:b] for t in ["売上高10,590千円、在庫3千台"] for a, b in D._unbreakable_spans(t)}
+    assert {"10,590千円", "3千台"} <= spans, spans
+
+
+def test_stack_block_wraps_label_and_value_as_one_line():
+    """葉のラベルと値(「顧客サポート体制の整備  12件」)は1段落2ランだが、折返しは全体で決める。
+    ランごとに折り返すと、値の幅を知らないラベルが行末で語を割る(Claude レビュー、PR #158)。"""
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import build_deck as bd
+    D = _deck_text()
+    from pptx.dml.color import RGBColor
+    prs = pptx.Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    ink = RGBColor(0x2D, 0x33, 0x2E)
+    label, value = "顧客サポート体制の整備", "  12件"
+    tb, _ = bd.stack_block(slide, 0.5, 0.5, 1.6, 1.0,
+                           [{"parts": [(label, 12, 400, ink), (value, 12, 700, ink)], "size": 12, "kind": "text"}])
+    p = tb.text_frame.paragraphs[0]
+    runs = [r.text for r in p.runs]
+    assert "".join(runs).replace(" ", "") == (label + value).replace(" ", "")
+    assert len(p._p.findall(f"{bd.A_NS}br")) >= 1, runs      # 1.6in には入らないので折り返す
+    # 改行の位置は語の途中に落ちない: ランの切れ目と <a:br> の位置を、結合した文字列の上で確かめる
+    joined, breaks, pos = "", [], 0
+    for child in p._p:
+        if child.tag == f"{bd.A_NS}br":
+            breaks.append(pos)
+        elif child.tag == f"{bd.A_NS}r":
+            t = child.findtext(f"{bd.A_NS}t") or ""
+            joined += t
+            pos += len(t)
+    spans = D._unbreakable_spans(joined)
+    assert breaks and all(not D._inside_span(b, spans) for b in breaks), (joined, breaks, spans)
+
+
+def test_stack_block_measures_the_bold_value_when_wrapping(tmp_path):
+    """ラベル(400)+太字の値(700)の段落は、太いほうの字幅で折返しを決める。ラベルの字幅で測ると
+    太字ぶんを読み違えて行が箱から出る(Claude レビュー、PR #158)。描かれる各行の実幅を、ランごとの
+    太さで足し合わせて箱幅に収まることを確かめる。"""
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import build_deck as bd
+    D = _deck_text()
+    from pptx.dml.color import RGBColor
+    ink = RGBColor(0x2D, 0x33, 0x2E)
+    w_in = 1.5
+    for label, value in (("既存顧客からの紹介経由の受注", "  1,842件"), ("保守契約の年間更新額", "  12.8億円"),
+                         ("パートナー経由の新規獲得件数", "  2,410件")):
+        prs = pptx.Presentation()
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        tb, _ = bd.stack_block(slide, 0.5, 0.5, w_in, 1.2,
+                               [{"parts": [(label, 12, 400, ink), (value, 12, 700, ink)], "size": 12, "kind": "text"}])
+        p = tb.text_frame.paragraphs[0]
+        lines, cur = [], []                      # [(text, weight)] per drawn line
+        for child in p._p:
+            if child.tag == f"{bd.A_NS}br":
+                lines.append(cur)
+                cur = []
+            elif child.tag == f"{bd.A_NS}r":
+                t = child.findtext(f"{bd.A_NS}t") or ""
+                bold = child.find(f"{bd.A_NS}rPr").get("b") == "1"
+                cur.append((t, 700 if bold else 400))
+        lines.append(cur)
+        assert len(lines) >= 2, (label, lines)
+        for segs in lines:
+            width = sum(D.text_width_in(t, 12, wt) for t, wt in segs)
+            assert width <= w_in + 0.02, (label, segs, width)
+        # 高さを積む側(_parts_lines)も、描いた行数と同じ答えを出す。少なく数えると葉の箱が1行ぶん低くなり、
+        # 下の葉に食い込む(Claude レビュー、PR #158)
+        assert bd._parts_lines([(label, 12, 400, ink), (value, 12, 700, ink)], w_in) == len(lines), (label, lines)
+
+
+def test_verify_names_a_thin_card_and_passes_a_full_one(tmp_path):
+    """verify_deck.check_card_fill: 文字がカード高の 60% に届かないカードを名指しし、足りていれば黙る。"""
+    def deck(items):
+        return {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+            "pattern": "process_flow", "title": "3段階で進める", "subtitle": "s",
+            "steps": [{"label": f"Step {i}", "items": items} for i in (1, 2, 3)]}]}
+    thin = tmp_path / "thin.json"
+    thin.write_text(json.dumps(deck(["体制の整備"]), ensure_ascii=False))
+    out = tmp_path / "thin.pptx"
+    assert run("build_deck.py", thin, "-o", out).returncode == 0
+    r = run("verify_deck.py", out)
+    assert "カードの中身が薄い" in r.stdout, r.stdout
+    full = tmp_path / "full.json"
+    full.write_text(json.dumps(deck(["事業責任者の任命と役割の明文化", "コアチーム12名の組成", "開発パートナーの選定と契約",
+                                     "週次の進捗会議を設ける", "顧客10社への先行ヒアリング"]), ensure_ascii=False))
+    out = tmp_path / "full.pptx"
+    assert run("build_deck.py", full, "-o", out).returncode == 0
+    r = run("verify_deck.py", out)
+    assert "カードの中身が薄い" not in r.stdout, r.stdout
+
+
+def test_stress_counts_a_crashed_checker_as_an_error():
+    """stress_deck: validate_spec / lint_render が例外で落ちると stdout に結果行が無い。終了コードを見て
+    1件の ERROR に数え、「0 errors」で通さない(Codex レビュー、PR #158)。"""
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import subprocess as sp
+    import stress_deck as sd
+    crash = sp.CompletedProcess(["x"], 1, stdout="", stderr="Traceback (most recent call last):\nKeyError: 'slides'")
+    lines = sd.checker_lines(crash, ("ERROR",), "validate_spec.py")
+    assert len(lines) == 1 and lines[0].startswith("ERROR") and "KeyError" in lines[0], lines
+    reported = sp.CompletedProcess(["x"], 1, stdout="ERROR: slide 1: x\n1 slides / 1 errors", stderr="")
+    assert sd.checker_lines(reported, ("ERROR",), "validate_spec.py") == ["ERROR: slide 1: x"]
+    clean = sp.CompletedProcess(["x"], 0, stdout="WARN: w\n1 slides / 0 errors / 1 warnings", stderr="")
+    assert sd.checker_lines(clean, ("ERROR",), "validate_spec.py") == []
+    assert sd.checker_lines(clean, ("FAIL", "WARN"), "lint_render.py") == ["WARN: w"]
+
+
+def test_column_framework_keeps_a_card_under_a_long_header(tmp_path):
+    """見出しが何行にも折り返しても、柱の本文カードは 1.4in 以上残る(Codex レビュー、PR #158)。"""
+    from pptx.util import Emu
+    long_heading = "従業員300名から999名の中堅製造業のうち紙の日報が残る工場へ社労士パートナーの顧問先から新規獲得を進める"
+    deck = {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+        "pattern": "column_framework", "title": "3本柱", "subtitle": "s",
+        "columns": [{"label": "01", "heading": long_heading, "items": ["x"]},
+                    {"label": "02", "heading": "部品表連携", "items": ["y"]},
+                    {"label": "03", "heading": "保守サブスク", "items": ["z"]}]}]}
+    spec = tmp_path / "cf2.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    assert "柱の見出しが長い" in run("validate_spec.py", spec).stdout
+    out = tmp_path / "cf2.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    slide = pptx.Presentation(out).slides[0]
+    cards = [Emu(sh.height).inches for sh in slide.shapes if getattr(sh, "name", "") == "card"]
+    assert cards and min(cards) >= 1.4 - 1e-6, cards

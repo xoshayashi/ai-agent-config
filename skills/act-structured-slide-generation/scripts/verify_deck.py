@@ -13,7 +13,7 @@ import sys
 from pathlib import Path
 
 from deck_text import (MEASURE_OK, _natural_lines, _words as words, drawn_line_h,
-                       text_width_in as _measure)
+                       text_width_in as _measure, _safe_breaks, _unbreakable_spans, _inside_span)
 from pptx import Presentation
 from pptx.util import Emu
 
@@ -129,8 +129,14 @@ def check_natural_wrap(shape, warns, where, width_in: float | None = None):
                 warns.append(f"{where}: 値と単位が列に収まらない — '{text[:20]}'"
                              f"(数字の大きさを下げるか、列を広げる。単位が割れて描かれる)")
             continue
-        too_wide = [w for w in words(text)
-                    if len(w) > 1 and text_width_in(w, size, weight) > avail]
+        # 「語」は、割れると読みづらい範囲(deck_text._unbreakable_spans): カタカナ語、英単語、
+        # 数量と単位。漢字・ひらがなはどこでも折り返せるので語とは数えない(利用者の指示、2026-09-04)
+        _spans = _unbreakable_spans(text)
+        segs = [text[a:b] for a, b in _spans]
+        # 列幅より広い語の判定には、4字以上の漢字の連なり(電子帳簿保存法対応)も数える — 折返しの
+        # 対象にはしないが、列に入らず途中で割れて描かれるならコピーか列幅の問題として知らせる
+        segs += [m.group() for m in re.finditer(r"[\u4e00-\u9fff]{4,}", text)]
+        too_wide = [w for w in segs if len(w) > 1 and text_width_in(w, size, weight) > avail]
         if too_wide:
             warns.append(f"{where}: 列幅に収まらない語 — '{too_wide[0]}'"
                          f"(語を短くするか列を広げる。語の途中で割れて描かれる)")
@@ -145,12 +151,19 @@ def check_natural_wrap(shape, warns, where, width_in: float | None = None):
             continue
         # 折返しを任せた段落。レンダラの行が語をまたぐなら、その列にはこの文が長すぎる
         if drawn == 1 and text_width_in(text, size, weight) > cap:
-            lines = _natural_lines(text, cap, size, weight)
-            broken = [w for w in words(text)
-                      if len(w) > 1 and all(w not in ln for ln in lines)]
-            if broken:
-                warns.append(f"{where}: 語を割らずには組めない文 — '{broken[0]}' が行をまたぐ"
-                             f"(コピーを短くするか列を広げる)")
+            # ビルダーが手を入れなかった段落。レンダラの自然折返し(箱幅、0.3em 狭い幅)の切れ目が
+            # 安全な境界の外に落ちるなら、その語が途切れて描かれる
+            for width in (avail, cap):
+                pos, start = [], 0
+                for ln in _natural_lines(text, width, size, weight):
+                    start += len(ln)
+                    pos.append(start)
+                bad = [q for q in pos[:-1] if _inside_span(q, _spans)]
+                if bad:
+                    q = bad[0]
+                    warns.append(f"{where}: 語を割らずには組めない文 — '{text[max(0, q - 4):q + 4]}' が行をまたぐ"
+                                 f"(コピーを短くするか列を広げる)")
+                    break
 
 
 def check_table_wrap(shape, warns, where):
@@ -224,6 +237,99 @@ def _ink_bbox(shape):
     return (x0, y0, x0 + max_w, y0 + used_h)
 
 
+def _solid_shapes(slide):
+    """塗りのある自動図形(バー・カード・矢羽・帯)の枠。線(コネクタ)・文字だけの箱・塗りなしの
+    枠線図形は除く — 文字が「縁をまたぐ」ことが問題になるのは、面のある図形だけ。"""
+    from pptx.enum.dml import MSO_FILL
+    out = []
+    for sh in slide.shapes:
+        if sh.shape_type != 1 or sh.left is None or sh.width is None:      # 1 = AUTO_SHAPE
+            continue
+        if sh.has_text_frame and sh.text_frame.text.strip():
+            continue
+        try:
+            if sh.fill.type != MSO_FILL.SOLID:
+                continue
+            rgb = str(sh.fill.fore_color.rgb)
+        except Exception:
+            continue
+        out.append((_bbox(sh), sh, rgb))
+    # 同色の図形に完全に含まれる図形(角を四角くする詰め物など)は、見た目には1つの面 —
+    # その内側の縁は存在しないので、またぎ判定の対象から外す
+    def _inside(a, b):
+        return a[0] >= b[0] - 0.005 and a[1] >= b[1] - 0.005 and a[2] <= b[2] + 0.005 and a[3] <= b[3] + 0.005
+    keep = []
+    for i, (bb, sh, rgb) in enumerate(out):
+        if any(j != i and rgb == rgb2 and _inside(bb, bb2) and bb != bb2
+               for j, (bb2, _s2, rgb2) in enumerate(out)):
+            continue
+        keep.append((bb, sh))
+    return keep
+
+
+def check_straddle(slide, idx, issues) -> None:
+    """文字が塗り図形の「縁をまたぐ」= バーの上に載った値ラベル、カードからはみ出した本文。
+    文字が図形の中に収まる(カードの中の文)のも、外に離れている(バーの上のラベル)のも正しい。
+    中途半端に重なる状態だけが欠陥 — 面積の 12〜88% が図形にかかっていれば、字面は縁の上にある。
+    機械ゲートが text↔text と text↔chart しか見ていなかったため、ウォーターフォールの値ラベルが
+    バーに食い込んだまま「0 failures」で通っていた(監査 2026-09-03)。"""
+    solids = _solid_shapes(slide)
+    if not solids:
+        return
+    for shape in slide.shapes:
+        if shape.shape_type != 17 or not shape.has_text_frame or not shape.text_frame.text.strip():
+            continue
+        if shape.left is None:
+            continue
+        tb = _ink_bbox(shape)
+        t_area = max(1e-6, (tb[2] - tb[0]) * (tb[3] - tb[1]))
+        for sb, _sh in solids:
+            ow = min(tb[2], sb[2]) - max(tb[0], sb[0])
+            oh = min(tb[3], sb[3]) - max(tb[1], sb[1])
+            if ow <= 0.08 or oh <= 0.04:
+                continue
+            frac = ow * oh / t_area
+            if 0.12 < frac < 0.88:
+                issues.append(f"slide {idx}: テキストが図形の縁をまたぐ({frac:.0%} が面にかかる) — "
+                              f"'{shape.text_frame.text[:18]}'(ラベルを図形の外へ出すか、中へ収める)")
+                break
+
+
+CARD_FILL_FLOOR = TOKENS["layout"].get("fill", {}).get("card_text_floor", 0.6)   # validate_spec と同じ既定
+
+
+def check_card_fill(slide, idx, warns) -> None:
+    """カード(surface_tint の塗り)の中身が薄くないか。占有契約(fit_band)はカードの高さを本文帯に
+    合わせて育てるので、コピーが短いとカードの下半分が空く — 見出し・帯・他のカードと釣り合わない
+    (2026-09-04、利用者の指摘)。カードの内側に収まる文字のインク範囲(上端〜下端)が、カード高の
+    card_text_floor(既定 60%)に届かなければ警告する。1.2in 未満の低いカード(帯・結論ストリップ)は対象外。
+    直し方はコピーを足すこと。型を大きくして埋めるのは、ここでは選ばない。"""
+    # 対象は「縦に読むカード」: 高さ 1.2in 以上で、幅が高さの3倍未満のもの。要約ページの横長の
+    # 行(幅12in × 高さ1.6in)は中身を上下中央に置く帯なので、下半分が空く問題は起きない
+    # 対象はビルダーが "card" と名付けた図形(process_flow / column_framework / two_column の本文カード)。
+    # 章扉の側面パネルやロードマップのセルは同じ塗りでもカードではない
+    cards = [(bb, sh) for bb, sh in _solid_shapes(slide)
+             if getattr(sh, "name", "") == "card" and (bb[3] - bb[1]) >= 1.2]
+    if not cards:
+        return
+    texts = [_ink_bbox(sh) for sh in slide.shapes
+             if sh.shape_type == 17 and sh.has_text_frame and sh.text_frame.text.strip()
+             and sh.left is not None]
+    for cb, _sh in cards:
+        # 面積の半分以上がカードに載る文字を「中身」と数える。あふれた本文も数えないと、
+        # 溢れているカードを「薄い」と誤判定する。範囲はカードの内側で切る
+        inside = [tb for tb in texts if _overlap_frac(tb, cb) >= 0.5
+                  and (tb[2] - tb[0]) * (tb[3] - tb[1]) <= (cb[2] - cb[0]) * (cb[3] - cb[1])]
+        if not inside:
+            continue
+        span = min(max(tb[3] for tb in inside), cb[3]) - max(min(tb[1] for tb in inside), cb[1])
+        card_h = cb[3] - cb[1]
+        ratio = span / card_h if card_h > 0 else 1.0
+        if ratio < CARD_FILL_FLOOR:
+            warns.append(f"slide {idx}: カードの中身が薄い(文字がカード高の {ratio:.0%}、下限 {CARD_FILL_FLOOR:.0%}) — "
+                         "項目や説明を足して、見出し・帯と釣り合う量にする(型は大きくしない)")
+
+
 def check_frame_overlaps(slide, idx, warns) -> None:
     """テキストボックスの「枠」どうしの重なり。描かれる文字が正しくても、枠が重なった pptx は
     編集で掴み違える(下の枠を選べない)。枠は文字を囲むだけの大きさに保つこと。"""
@@ -268,11 +374,9 @@ def check_collisions(slide, idx, issues) -> None:
                     f"slide {idx}: テキストが図表に重なる — '{label}'")
 
 
-def main() -> int:
-    if len(sys.argv) != 2:
-        print(__doc__)
-        return 1
-    path = Path(sys.argv[1])
+def audit(path: Path) -> tuple[list[str], list[str], int]:
+    """Run every check on a built .pptx and return (failures, warnings, slide_count).
+    The CLI prints them; stress_deck / tests call this directly."""
     prs = Presentation(path)
     issues: list[str] = []
     warns: list[str] = []
@@ -330,16 +434,25 @@ def main() -> int:
         if n_text == 0:
             issues.append(f"slide {idx}: no text at all")
         check_collisions(slide, idx, issues)
+        if _measure_ok:
+            check_straddle(slide, idx, issues)
+            check_card_fill(slide, idx, warns)
         check_frame_overlaps(slide, idx, warns)
 
     if not _measure_ok:
         warns.append("NotoSansJP-{400,600,700}.ttf not found — overflow measurement skipped (install fonts)")
+    return issues, warns, len(list(prs.slides))
 
+
+def main() -> int:
+    if len(sys.argv) != 2:
+        print(__doc__)
+        return 1
+    issues, warns, n = audit(Path(sys.argv[1]))
     for w in warns:
         print(f"WARN: {w}")
     for i in issues:
         print(f"FAIL: {i}")
-    n = len(list(prs.slides))
     print(f"\n{n} slides / {len(issues)} failures / {len(warns)} warnings")
     return 1 if issues else 0
 

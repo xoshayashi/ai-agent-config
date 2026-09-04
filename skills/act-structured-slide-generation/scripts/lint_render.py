@@ -37,6 +37,12 @@ WHITE = (0xFF, 0xFF, 0xFF)
 # top/bottom/right の3辺が誤検知になる。見切れ判定の本体は 0.02〜0.85 の被覆率ゲート
 TOL = 26
 BAND = 6  # px
+# 本文帯の占有率の下限(tokens.layout.fill.occupancy_floor)。読めないときは 0.5 に退避
+try:
+    OCCUPANCY_FLOOR = float(json.loads((Path(__file__).resolve().parent.parent / "references"
+                                        / "tokens.json").read_text())["layout"]["fill"]["occupancy_floor"])
+except Exception:
+    OCCUPANCY_FLOOR = 0.5
 
 
 def is_ground(px, tol: int) -> bool:
@@ -96,6 +102,11 @@ def balance_scan(im: Image.Image) -> list[str]:
     hits = []
     if body_extent < 0.36 and top_gap > 0.20 and bot_gap > 0.20:
         hits.append(f"本文領域に対してオブジェクトが小さい(占有{body_extent:.0%})— カード/行/主数値を大きくし、余白を設計された密度に戻す")
+    elif body_extent < OCCUPANCY_FLOOR:
+        # 占有契約(tokens.layout.fill.occupancy_floor): 本文帯の半分も使わない証拠ページは、
+        # 中身が薄いか、パターンが充填規則を外れている。fit_band を通す/内容を足す/分割する
+        hits.append(f"本文帯の占有率 {body_extent:.0%} が下限 {OCCUPANCY_FLOOR:.0%} 未満 — "
+                    "ブロックを占有契約(fit_band)で育てるか、証拠を足すか、隣のスライドと統合する")
     if bot_gap > 0.33 and bot_gap > 2.5 * max(top_gap, 0.02):
         hits.append(f"下部に大きな空白(本文帯の{bot_gap:.0%})— 中身が上に張り付いている。分割/統合かパターン変更を検討")
     if top_gap > 0.33 and top_gap > 2.5 * max(bot_gap, 0.02):

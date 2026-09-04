@@ -7,7 +7,9 @@
       "name": "earnings-deck-ja",
       "prompt": "Use evals/scenario-earnings.md as the input prompt and generate a 10-12 slide Japanese earnings presentation.",
       "expected_output": "All lint checks green plus rubric score >=95. Action-title read-through works, and every number in the deck comes from the scenario.",
-      "files": ["evals/scenario-earnings.md"],
+      "files": [
+        "evals/scenario-earnings.md"
+      ],
       "assertions": [
         "validate_spec.py / verify_deck.py / lint_render.py all exit 0",
         "slide count is 10-12",
@@ -21,13 +23,27 @@
       "name": "strategy-proposal-ja",
       "prompt": "Use the same market-entry theme as examples/sample-deck.json, but write a new deck.json from scratch as a 14-16 slide Japanese proposal deck.",
       "expected_output": "All lint checks green. The story covers market size, competition, entry logic, and financial impact, and includes waterfall and 2x2 positioning pages.",
-      "files": ["examples/sample-deck.json"],
+      "files": [
+        "examples/sample-deck.json"
+      ],
       "assertions": [
         "validate_spec.py / verify_deck.py / lint_render.py all exit 0",
         "slide count is 14-16",
         "waterfall and competitive_landscape patterns are included",
         "render/contact-sheet.png is generated",
         "eval_deck.py with rubric.json scores >=95"
+      ]
+    }
+  ],
+  "structural_evals": [
+    {
+      "id": 3,
+      "name": "stress-fixture-all-patterns",
+      "command": "for t in standard navy monochrome bold; do python3 scripts/stress_deck.py -o stress/$t --template $t --images --lint || exit 1; done",
+      "expected_output": "For each template: max and min variants validate 0 errors and verify 0 failures; max also renders and passes lint_render with 0 findings; overload keeps every frame inside the slide (overflow findings are expected and must be reported).",
+      "assertions": [
+        "stress_deck.py exits 0 for standard, navy, monochrome, bold (the loop runs every template)",
+        "the rendered stress-max deck of every template passes lint_render with 0 findings (--lint)"
       ]
     }
   ],
