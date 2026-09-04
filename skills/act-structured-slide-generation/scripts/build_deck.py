@@ -63,6 +63,7 @@ A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 # 表示長(_ja_len)と全角→半角(hw)は deck_text.py の単一実装を使う — validate_spec の
 # 字数バジェット・lint_render の readback 照合と同一実装であることが契約
 import act_theme
+from deck_text import _char_class as _dt_char_class
 from deck_text import _words as _dt_words
 from deck_text import (EA_DIGIT_RUN, MEASURE_OK, SCRIPT_RUN, drawn_line_h, footer_text,
                        header_slots, hw, ink_center_offset_in, ink_slacks, is_prose,
@@ -400,7 +401,15 @@ def _has_subject(text: str) -> bool:
     「がん検診」「はがき」のような語頭の仮名や、文末の「売上高は」だけの見出しは主語に数えない。連体詞の
     「我が・わが」は _words が後ろの名詞に結ぶ(我が社の)ので、ここには主語として現れない。"""
     toks = _dt_words(text)
-    return any(len(t) >= 2 and t.endswith(_SUBJECT_PARTICLES) for t in toks[:-1])
+    return any(len(t) >= 2 and t.endswith(_SUBJECT_PARTICLES) and _is_particle_tail(t) for t in toks[:-1])
+
+
+def _is_particle_tail(tok: str) -> bool:
+    """文節末の が・は・も が助詞か。「子ども」「どこでも」のように前がひらがなの「も」は語の一部
+    (Codex レビュー指摘、PR #158)。漢字・カタカナ・英数のあとに付く「も」だけ助詞と見る"""
+    if tok.endswith("も"):
+        return _dt_char_class(tok[-2]) != "kana_hira"
+    return True
 
 
 def display_wrap_text(text: str, w_in: float, size_pt: float, weight: int = 400,

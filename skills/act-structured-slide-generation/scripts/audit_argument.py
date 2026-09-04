@@ -268,6 +268,9 @@ def check_identity(i, s, errors) -> None:
         _check_hero_in_chart(loc, s, errors)
 
 
+_DATA_SCALAR_KEYS = {"value", "x", "y", "r", "size", "start", "end"}   # 配列要素の dict が持つデータ欄
+
+
 def _chart_numbers(chart: dict, unit: str = "") -> list[float]:
     """図表データの数値 — 配列の中の数(native の series.values、画像図表 combo の bar/line の values、
     area の series …)。focal_category や y_max のような単独のスカラーは制御値であって数えない。
@@ -288,8 +291,11 @@ def _chart_numbers(chart: dict, unit: str = "") -> list[float]:
             if nested or node is chart:
                 scope = str(node.get("unit") or scope)
             for k, v in node.items():
-                if k not in ("categories", "labels", "headers"):
-                    walk(v, False, scope)
+                if k in ("categories", "labels", "headers"):
+                    continue
+                # 配列の要素が dict のとき(waterfall の items[].value、scatter の points[].x/y)、そのデータ
+                # 欄のスカラーも図表の値(Codex レビュー指摘、PR #158)。name / label / kind は数えない
+                walk(v, in_list and k in _DATA_SCALAR_KEYS, scope)
         elif isinstance(node, list):
             for v in node:
                 walk(v, True, scope)
@@ -417,7 +423,10 @@ def _check_hero_in_chart(loc: str, s: dict, errors) -> None:
     # 図表の値から導いた同じ単位の derivation は、単位が図表と違っても(億円の系列から CAGR の %)証明になる
     deriv = s.get("derivation") or {}
     d_val = to_number(deriv.get("value")) if deriv else None
-    if d_val is not None and str(deriv.get("unit") or "") == h_unit \
+    is_100 = chart.get("type", "column") == "stacked_column_100" and not chart.get("kind")
+    # 100%積み上げの生の値(60 → 80)は描かれない(50% → 80% と描かれる)ので、生の値から導いた derivation は
+    # hero の根拠にならない — hero は表示される構成比か全体の 100 で言う(Codex レビュー指摘、PR #158)
+    if d_val is not None and not is_100 and str(deriv.get("unit") or "") == h_unit \
             and _derivation_grounded(s, deriv, chart) and _same(d_val, val, printed):
         return
     c_units = _chart_units(chart)
@@ -437,7 +446,7 @@ def _check_hero_in_chart(loc: str, s: dict, errors) -> None:
     shown = list(nums)
     ctype, kind = chart.get("type", "column"), chart.get("kind")
     series = chart.get("series") or []
-    if ctype == "stacked_column_100" and not kind:
+    if is_100:
         # 100%積み上げは各カテゴリを 100 に正規化して描く。生の値(60 + 60)ではなく、表示される構成比
         # (50 / 50)と全体の 100 が hero の候補(Codex レビュー指摘、PR #158)。構成比は % でしか読めない —
         # 億円と宣言された 100%積み上げの「50」は 50億円 ではない(Codex レビュー指摘)
@@ -445,6 +454,9 @@ def _check_hero_in_chart(loc: str, s: dict, errors) -> None:
             errors.append(f"{loc}: 100%積み上げ(stacked_column_100)は構成比を描く — hero の単位「{h_unit}」では"
                           "照合できない。hero と chart の unit を % にするか、積み上げ棒(stacked_column)にする")
             return
+        if deriv:
+            errors.append(f"{loc}: 100%積み上げの生の値から導いた derivation は hero の根拠にならない(描かれるのは"
+                          "構成比) — hero は表示される構成比か 100 で言い、差は本文で述べる")
         cols = [[to_number(v) for v in (ser.get("values") or [])] for ser in series if isinstance(ser, dict)]
         shown = []
         for col in zip(*cols):

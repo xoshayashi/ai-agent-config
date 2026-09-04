@@ -1388,6 +1388,11 @@ def test_stacked_100_axis_bounds_in_percent_are_scaled_to_fractions(tmp_path):
     assert run("build_deck.py", spec, "-o", out).returncode == 0
     ax = [sh.chart for sh in pptx.Presentation(out).slides[0].shapes if sh.has_chart][0].value_axis
     assert abs(ax.maximum_scale - 1.1) < 1e-9, ax.maximum_scale
+    # unit は % 以外を validate が弾く — どの型のページでも(Codex レビュー、PR #158)
+    deck["slides"][0]["chart"]["unit"] = "億円"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    assert r.returncode != 0 and "stacked_column_100 の unit は %" in r.stdout, r.stdout
 
 
 def test_signed_stacked_column_headroom_uses_the_positive_stack(tmp_path):
@@ -3288,6 +3293,31 @@ def test_metric_proof_hero_must_be_in_its_chart(tmp_path):
     assert "100%積み上げ(stacked_column_100)は構成比を描く" in run("audit_argument.py", spec).stdout
     d["slides"][0]["chart"]["unit"] = "%"; d["slides"][0]["hero"] = {"label": "x", "value": "100", "unit": "%"}
     d["meta"]["thesis"] = {"statement": "100%", "value": "100", "unit": "%"}
+    # 100%積み上げの生の値から導いた derivation(60→80 の差 20)は描かれない(50%→80%)ので根拠にならない(Codex レビュー)
+    d["slides"][0]["chart"]["series"] = [{"name": "A", "values": [60, 80]}, {"name": "B", "values": [60, 20]}]
+    d["slides"][0]["hero"] = {"label": "x", "value": "20", "unit": "%"}; d["meta"]["thesis"] = {"statement": "20%", "value": "20", "unit": "%"}
+    d["slides"][0]["derivation"] = {"kind": "delta", "a": "chart.series[0].values[0]", "b": "chart.series[0].values[1]", "value": 20, "unit": "%"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "生の値から導いた derivation" in run("audit_argument.py", spec).stdout   # (20 は B の構成比としては描かれる)
+    del d["slides"][0]["derivation"]
+    d["slides"][0]["hero"]["value"] = "80"; d["meta"]["thesis"]["value"] = "80"
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    # 画像図表の配列要素が dict のとき(waterfall の items[].value)、そのデータ欄も図表の値(Codex レビュー)
+    d = deck([1, 2]); d["slides"][0]["hero"] = {"label": "期末", "value": "12.8", "unit": "億円"}
+    d["meta"]["thesis"] = {"statement": "12.8億円", "value": "12.8", "unit": "億円"}
+    d["slides"][0]["chart"] = {"kind": "waterfall", "unit": "億円",
+                               "items": [{"label": "期首", "value": 9.85, "kind": "start"}, {"label": "純増", "value": 2.95},
+                                         {"label": "期末", "value": 12.8, "kind": "end"}]}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    d["slides"][0]["hero"]["value"] = "13.5"; d["meta"]["thesis"]["value"] = "13.5"
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    d = deck([30, 60]); d["slides"][0]["chart"].update({"type": "stacked_column_100", "unit": "%"})
+    d["slides"][0]["chart"]["series"].append({"name": "他", "values": [70, 40]})
+    d["slides"][0]["hero"] = {"label": "カバー率", "value": "100", "unit": "%"}
+    d["meta"]["thesis"] = {"statement": "カバー率100%", "value": "100", "unit": "%"}
     # すべて 0 の 100%積み上げには分母が無く、100 の全体も描かれない(Codex レビュー)
     d["slides"][0]["chart"]["series"] = [{"name": "A", "values": [0, 0]}, {"name": "他", "values": [0, 0]}]
     d["slides"][0]["hero"]["value"] = "100"; d["meta"]["thesis"]["value"] = "100"
@@ -3362,7 +3392,8 @@ def test_nominal_predicate_sentences_are_body_copy():
                  "施策の進捗は横ばい", "本社は東京", "需要が旺盛", "当社も対象", "国内も横ばい"):   # 述語の語彙に依らない
         assert not B._looks_like_label(text), text
     for text in ("全社展開の可能性", "必要投資額", "対応方針", "可能", "必要", "重要顧客の維持",
-                 "がん検診の受診率", "はがきの送付", "売上高は", "我が社の競争優位", "わが国の水準", "ものづくりの拠点"):
+                 "がん検診の受診率", "はがきの送付", "売上高は", "我が社の競争優位", "わが国の水準", "ものづくりの拠点",
+                 "子ども支援", "どこでも利用可能"):     # 語の一部の「も」は助詞ではない(Codex レビュー)
         assert B._looks_like_label(text), text
     assert not B._has_subject("我が社の競争優位")                       # 連体詞の「が」は主語ではない
 
