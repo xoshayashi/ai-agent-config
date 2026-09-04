@@ -3286,10 +3286,19 @@ def test_note_is_allowed_when_only_claim_side_shows_the_number(tmp_path):
     assert "Note を置かない" in run("validate_spec.py", spec).stdout
     # 構造の番号(Step 1)や期間のラベル(2024年)だけのページも通さない(Codex レビュー、PR #158)
     base["slides"][0] = {"pattern": "process_flow", "title": "t", "subtitle": "s",
-                         "steps": [{"label": f"Step {i}", "items": ["体制の整備", "役割の明文化"]} for i in (1, 2, 3)],
+                         "steps": [{"label": f"Step {i}: 体制構築", "items": ["体制の整備", "役割の明文化"]} for i in (1, 2, 3)],
                          "note": "数値の無い流れページの注記"}
     spec.write_text(json.dumps(base, ensure_ascii=False))
     assert "Note を置かない" in run("validate_spec.py", spec).stdout
+    base["slides"][0]["steps"] = [{"label": f"第{i}段階", "items": ["体制の整備", "役割の明文化"]} for i in (1, 2, 3)]
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" in run("validate_spec.py", spec).stdout
+    # 図表の値としての段階の数(「街づくりの7段階」)は数値のまま(Claude レビュー、PR #158)
+    base["slides"][0] = {"pattern": "comparison_table", "title": "t", "subtitle": "s",
+                         "table": {"headers": ["項目", "内容"], "rows": [["街づくり", "全7段階のうち3段階まで"]]},
+                         "note": "段階は当社の定義による"}
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" not in run("validate_spec.py", spec).stdout
     base["slides"][0] = {"pattern": "comparison_table", "title": "t", "subtitle": "s",
                          "table": {"headers": ["項目", "2024年", "2025年"], "rows": [["体制", "整備", "運用"]]},
                          "note": "期間ラベルだけの注記"}
