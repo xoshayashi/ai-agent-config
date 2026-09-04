@@ -594,6 +594,10 @@ def main() -> int:
                 cats, series = chart.get("categories", []), chart.get("series", [])
                 if not cats or not series:
                     errors.append(f"{cloc}: chart needs categories and series")
+                if any(isinstance(ser, dict) and ser.get("unit") for ser in series):
+                    # native 図表は chart.unit で全系列を描く。系列ごとの単位は描かれず、監査も数えない
+                    warns.append(f"{cloc}: native chart は series.unit を描かない — 単位は chart.unit に1つ。"
+                                 "系列ごとに単位が違うなら image kind 'combo' にする")
                 values_numeric = True
                 for ser in series:
                     if len(ser.get("values", [])) != len(cats):

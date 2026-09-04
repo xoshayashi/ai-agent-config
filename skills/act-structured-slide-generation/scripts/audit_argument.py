@@ -279,10 +279,14 @@ def _chart_numbers(chart: dict, unit: str = "") -> list[float]:
     # 無く line だけ % のとき、bar の 12.8 を 12.8% の証拠にしない — Codex レビュー指摘)。単位を全く
     # 持たない図表だけ、配列をそのまま返す
     typed = bool(_chart_units(chart))
+    # native 図表(kind 無し)は chart.unit で全系列を描く — series[].unit は描画に効かないので、単位の
+    # 範囲も chart.unit だけ(Codex レビュー指摘)。入れ子の unit を見るのは画像図表(combo の bar / line)だけ
+    nested = bool(chart.get("kind"))
 
     def walk(node, in_list: bool, scope: str) -> None:
         if isinstance(node, dict):
-            scope = str(node.get("unit") or scope)
+            if nested or node is chart:
+                scope = str(node.get("unit") or scope)
             for k, v in node.items():
                 if k not in ("categories", "labels", "headers"):
                     walk(v, False, scope)
@@ -298,6 +302,10 @@ def _chart_numbers(chart: dict, unit: str = "") -> list[float]:
 
 
 def _chart_units(chart: dict) -> set[str]:
+    """図表が描く単位。native 図表は chart.unit だけ(series[].unit は描画に効かない)。画像図表は
+    入れ子の unit(combo の bar.unit / line.unit)も数える。"""
+    if not chart.get("kind"):
+        return {str(chart["unit"])} if chart.get("unit") else set()
     units: set[str] = set()
 
     def walk(node) -> None:
@@ -328,8 +336,9 @@ def _path_unit(slide: dict, path: str) -> str:
     """パスが指す配列の実効単位 — 経路上で最も近い dict の unit(combo の line.unit、native の chart.unit)。
     値の一致だけで見ると、億円の棒と同じ数を持つ % の折れ線のパスが億円の根拠になる(Codex レビュー指摘)。"""
     node, unit = slide, ""
+    nested = bool((slide.get("chart") or {}).get("kind"))     # native 図表は chart.unit だけが効く
     for seg in re.findall(r"[^.\[\]]+|\[\d+\]", path.strip()):
-        if isinstance(node, dict):
+        if isinstance(node, dict) and (nested or node is slide.get("chart")):
             unit = str(node.get("unit") or unit)
         if seg.startswith("["):
             if not isinstance(node, list):
@@ -340,7 +349,7 @@ def _path_unit(slide: dict, path: str) -> str:
             node = node.get(seg)
         else:
             return unit
-    if isinstance(node, dict):
+    if isinstance(node, dict) and nested:
         unit = str(node.get("unit") or unit)
     return unit
 # 単位を変えない演算(差・和)は被演算子も結果と同じ単位。率・倍率・構成比は単位が変わる(億円→%)
@@ -430,7 +439,12 @@ def _check_hero_in_chart(loc: str, s: dict, errors) -> None:
     series = chart.get("series") or []
     if ctype == "stacked_column_100" and not kind:
         # 100%積み上げは各カテゴリを 100 に正規化して描く。生の値(60 + 60)ではなく、表示される構成比
-        # (50 / 50)と全体の 100 が hero の候補(Codex レビュー指摘、PR #158)
+        # (50 / 50)と全体の 100 が hero の候補(Codex レビュー指摘、PR #158)。構成比は % でしか読めない —
+        # 億円と宣言された 100%積み上げの「50」は 50億円 ではない(Codex レビュー指摘)
+        if h_unit not in ("%", "％"):
+            errors.append(f"{loc}: 100%積み上げ(stacked_column_100)は構成比を描く — hero の単位「{h_unit}」では"
+                          "照合できない。hero と chart の unit を % にするか、積み上げ棒(stacked_column)にする")
+            return
         cols = [[to_number(v) for v in (ser.get("values") or [])] for ser in series if isinstance(ser, dict)]
         shown = []
         for col in zip(*cols):

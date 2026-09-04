@@ -380,7 +380,7 @@ def _add_line_runs(p, text, size_pt, weight, color):
 _SENTENCE_ENDINGS = tuple("るうくすつぬぶむぐいただずぬ")   # 動詞・形容詞・助動詞の終止形の末尾(体言止めではない)
 # 主語の助詞。「全社展開が可能」「施策の進捗は横ばい」のように主語を立てた文は、名詞で終わっていても
 # 体言止めのラベルではなく本文。述語の語彙を列挙せず、主語+述語の構造で見る(Codex レビュー指摘、PR #158)
-_SUBJECT_PARTICLES = ("が", "は")
+_SUBJECT_PARTICLES = ("が", "は", "も")
 
 
 def _looks_like_label(text: str) -> bool:

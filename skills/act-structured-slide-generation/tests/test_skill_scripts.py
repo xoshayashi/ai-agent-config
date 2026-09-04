@@ -3281,11 +3281,23 @@ def test_metric_proof_hero_must_be_in_its_chart(tmp_path):
         d["slides"][0]["hero"]["value"] = value; d["meta"]["thesis"]["value"] = value
         spec.write_text(json.dumps(d, ensure_ascii=False))
         assert ("chart に無い" in run("audit_argument.py", spec).stdout) == expect_error, value
+    # 億円と宣言された 100%積み上げの構成比「50」は 50億円 ではない — % 以外の hero は照合しない(Codex レビュー)
+    d["slides"][0]["chart"]["unit"] = "億円"; d["slides"][0]["hero"] = {"label": "x", "value": "50", "unit": "億円"}
+    d["meta"]["thesis"] = {"statement": "50億円", "value": "50", "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "100%積み上げ(stacked_column_100)は構成比を描く" in run("audit_argument.py", spec).stdout
+    d["slides"][0]["chart"]["unit"] = "%"; d["slides"][0]["hero"] = {"label": "x", "value": "100", "unit": "%"}
+    d["meta"]["thesis"] = {"statement": "100%", "value": "100", "unit": "%"}
     # すべて 0 の 100%積み上げには分母が無く、100 の全体も描かれない(Codex レビュー)
     d["slides"][0]["chart"]["series"] = [{"name": "A", "values": [0, 0]}, {"name": "他", "values": [0, 0]}]
     d["slides"][0]["hero"]["value"] = "100"; d["meta"]["thesis"]["value"] = "100"
     spec.write_text(json.dumps(d, ensure_ascii=False))
     assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # native 図表の series.unit は描かれない — chart.unit が % なら 億円 の系列単位は監査でも効かない(Codex レビュー)
+    d = deck([10, 12.8]); d["slides"][0]["chart"]["unit"] = "%"; d["slides"][0]["chart"]["series"][0]["unit"] = "億円"
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "単位「億円」が chart の単位" in run("audit_argument.py", spec).stdout
+    assert "series.unit を描かない" in run("validate_spec.py", spec).stdout
     # 単位の無い hero は、単位を持つ図表のどの配列と照合するか決まらない — validate と audit の両方が弾く(Codex レビュー)
     d = deck([1, 2]); d["slides"][0]["hero"] = {"label": "x", "value": "12.8"}
     d["slides"][0]["chart"] = {"kind": "combo", "categories": ["Q1", "Q2"], "bar": {"name": "ARR", "values": [1, 2], "unit": "億円"},
@@ -3347,10 +3359,10 @@ def test_nominal_predicate_sentences_are_body_copy():
     sys.path.insert(0, str(SKILL / "scripts"))
     import build_deck as B
     for text in ("全社展開が可能", "追加投資が必要", "現行体制では対応が困難", "在庫は十分",
-                 "施策の進捗は横ばい", "本社は東京", "需要が旺盛"):        # 述語の語彙に依らない
+                 "施策の進捗は横ばい", "本社は東京", "需要が旺盛", "当社も対象", "国内も横ばい"):   # 述語の語彙に依らない
         assert not B._looks_like_label(text), text
     for text in ("全社展開の可能性", "必要投資額", "対応方針", "可能", "必要", "重要顧客の維持",
-                 "がん検診の受診率", "はがきの送付", "売上高は", "我が社の競争優位", "わが国の水準"):
+                 "がん検診の受診率", "はがきの送付", "売上高は", "我が社の競争優位", "わが国の水準", "ものづくりの拠点"):
         assert B._looks_like_label(text), text
     assert not B._has_subject("我が社の競争優位")                       # 連体詞の「が」は主語ではない
 

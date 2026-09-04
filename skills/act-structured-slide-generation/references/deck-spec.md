@@ -298,6 +298,10 @@ Shared by `chart_insight` and `financial_summary`:
   "annotation": {"badge": "3-yr 2.8x", "yoy": "+17.8%", "trend_arrow": true}
 }
 ```
+On `stacked_column_100` the value axis runs 0–1, so `y_max` / `y_min` are fractions (`1.1`
+for 10% headroom); a bound above 2 is read as a percent and divided by 100 (`y_max: 100`
+→ 1.0). `series[].unit` is not drawn on native charts — one `chart.unit` per chart; a
+second measure in another unit is an image `kind: "combo"`.
 
 ### Emphasis and annotation knobs (use these instead of inventing layout)
 
