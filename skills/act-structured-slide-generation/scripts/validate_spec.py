@@ -675,6 +675,14 @@ def main() -> int:
                 errors.append(f"{loc}: facts は4行以内({len(s['facts'])} 行)")
         if len(s.get("takeaways", [])) > 3:
             errors.append(f"{loc}: {len(s['takeaways'])} takeaways — max 3")
+        # chart_top では要点が図表の下に横並びになる。要点の本文が長いとレールが図表を圧迫する
+        # (描画側は図表に 1.6in を残してレールを頭打ちにするので、長い要点は溢れて描かれる)
+        if pat == "chart_insight" and s.get("layout") == "chart_top":
+            long_t = [t for t in s.get("takeaways", [])
+                      if ja_len(str((t or {}).get("body", "")) if isinstance(t, dict) else str(t)) > 60]
+            if long_t:
+                warns.append(f"{loc}: chart_top の要点が長い({len(long_t)}件、60字超) — "
+                             "要点は2行以内に。長い説明は speaker_notes へ")
         if pat == "financial_summary" and not (s.get("table") or s.get("chart")):
             errors.append(f"{loc}: financial_summary には table か chart の少なくとも一方が必要")
         # 比較表の列上限(rubric.json layout と同じ 4 列)。年度列が並ぶ financial_summary は対象外

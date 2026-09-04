@@ -1361,8 +1361,11 @@ def p_chart_insight(slide, spec, deck):
         col_w = (cw - gut * (n - 1)) / n
         blocks = [_rail_blocks([t]) for t in takeaways[:n]]
         row_h = max(_stack_drawn_h(b, col_w - 0.1) for b in blocks) if blocks else 0.0
-        rail_h = row_h + 0.30
-        chart_y, chart_h = y0 + 0.22, h - rail_h - 0.48
+        # 要点レールは図表を潰すまで育てない: 図表には最低 CHART_TOP_MIN_H を残し、要点がそれより
+        # 長ければレールを頭打ちにする(はみ出しは verify が名指しする。Codex レビュー指摘、PR #158)
+        CHART_TOP_MIN_H = 1.6
+        rail_h = min(row_h + 0.30, max(0.30, h - 0.48 - CHART_TOP_MIN_H))
+        chart_y, chart_h = y0 + 0.22, max(CHART_TOP_MIN_H, h - rail_h - 0.48)
         if akind:
             place_asset(slide, chart, cx, chart_y, cw, chart_h)
         else:

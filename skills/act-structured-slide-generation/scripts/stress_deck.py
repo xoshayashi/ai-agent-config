@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Stress fixture for dynamic (spec-driven, variable-n) deck generation.
 
-Usage: stress_deck.py [-o OUTDIR] [--variant max|min|both] [--template NAME] [--images]
+Usage: stress_deck.py [-o OUTDIR] [--variant max|min|overload|all] [--template NAME] [--images] [--lint]
 
 Generates a synthetic deck.json that exercises EVERY pattern at its minimum and maximum
 cardinality with long, wrap-prone Japanese copy, then builds it and audits the .pptx with
@@ -14,6 +14,7 @@ meant to pass audit_argument; validate_spec must still report 0 errors (header c
 cardinality caps, data shape) — that is asserted here too.
 
 --images adds the image-asset patterns (diagram, combo chart); they need matplotlib/Graphviz.
+--lint renders the max variant (LibreOffice) and runs lint_render on it; its findings gate the exit code.
 """
 from __future__ import annotations
 
@@ -255,7 +256,8 @@ HARD = ("out of slide bounds",)   # どの変種でも許されない欠陥: 枠
 # (overload では文字が器から溢れて縁をまたぐ — それは verify が名指しすべき溢れであって、契約違反ではない)
 
 
-def run_variant(outdir: Path, variant: str, template: str | None, images: bool) -> dict:
+def run_variant(outdir: Path, variant: str, template: str | None, images: bool,
+                lint: bool = False) -> dict:
     """Write, validate, build and audit one variant.
 
     Returns {"validate_errors", "verify_failures", "hard_failures", "messages"}. `hard_failures`
@@ -274,8 +276,19 @@ def run_variant(outdir: Path, variant: str, template: str | None, images: bool) 
     build_deck.build(spec, pptx)
     issues, _warns, _n = verify_deck.audit(pptx)
     hard = [i for i in issues if any(k in i for k in HARD)]
+    lint_findings = None
+    if lint and variant == "max":
+        # 描画後の占有率ゲート(lint_render)も回す — verify が通っても本文帯が空くと lint が落ちる
+        # (evals.json の主張をここで実際に検証する。Codex レビュー指摘、PR #158)
+        rdir = outdir / f"{tag}-render"
+        subprocess.run(["sh", str(HERE / "render_deck.sh"), str(pptx), str(rdir)],
+                       capture_output=True, text=True, check=True)
+        lr = subprocess.run([sys.executable, str(HERE / "lint_render.py"), str(rdir), "--spec", str(spec)],
+                            capture_output=True, text=True)
+        lint_findings = [ln for ln in lr.stdout.splitlines() if ln.startswith(("FAIL", "WARN"))]
     return {"validate_errors": len(v_err), "verify_failures": len(issues), "hard_failures": len(hard),
-            "messages": v_err + issues, "pptx": pptx, "spec": spec}
+            "lint_findings": lint_findings, "messages": v_err + issues + (lint_findings or []),
+            "pptx": pptx, "spec": spec}
 
 
 def main() -> int:
@@ -284,16 +297,19 @@ def main() -> int:
     ap.add_argument("--variant", choices=[*VARIANTS, "all"], default="all")
     ap.add_argument("--template", default=None)
     ap.add_argument("--images", action="store_true")
+    ap.add_argument("--lint", action="store_true", help="render the max variant and run lint_render (needs LibreOffice)")
     args = ap.parse_args()
     bad = 0
     for variant in (VARIANTS if args.variant == "all" else [args.variant]):
-        res = run_variant(args.out, variant, args.template, args.images)
+        res = run_variant(args.out, variant, args.template, args.images, args.lint)
         for m in res["messages"]:
             print(f"  {m}")
+        lint_note = "" if res["lint_findings"] is None else f" / lint findings {len(res['lint_findings'])}"
         print(f"{variant:8} template={args.template or 'standard':11} validate errors {res['validate_errors']}"
-              f" / verify failures {res['verify_failures']} (hard {res['hard_failures']})")
-        # overload は溢れて当然。契約は「枠が外に出ない・縁をまたがない」だけ
+              f" / verify failures {res['verify_failures']} (hard {res['hard_failures']}){lint_note}")
+        # overload は溢れて当然。契約は「枠が外に出ない」だけ。max / min は validate・verify(・lint)が 0
         bad += res["hard_failures"] if variant == "overload" else res["validate_errors"] + res["verify_failures"]
+        bad += len(res["lint_findings"] or [])
     return 1 if bad else 0
 
 

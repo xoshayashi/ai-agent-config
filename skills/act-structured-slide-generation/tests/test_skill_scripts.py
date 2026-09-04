@@ -3126,3 +3126,29 @@ def test_card_copy_estimate_uses_the_deck_template(tmp_path):
     # bold は見出しが大きく本文帯が狭い — 見積もりの物差し(本文帯)がテンプレートに追従している
     assert bold_h < std_h, (std_h, bold_h)
     assert bold["card_h"] <= 0.74 * (bold_h - 0.1) + 1e-6 or bold["card_h"] == std["card_h"]
+
+
+def test_i_adjective_sentences_are_body_copy():
+    """「参入障壁が高い」「解約率が低い」のような い形容詞で終わる短文は本文(自然折返し)。
+    体言止めのラベルだけが文節で組まれる(Codex レビュー、PR #158)。"""
+    B = _import_build_deck()
+    for text in ("参入障壁が高い", "解約率が低い", "賃貸以外の道をつくる"):
+        assert not B._looks_like_label(text), text
+    for text in ("導入費＋固定利用料", "中堅企業向けの統合スイート", "Rent-to-Own"):
+        assert B._looks_like_label(text), text
+
+
+def test_chart_top_keeps_a_positive_chart_area(tmp_path):
+    """chart_top の要点が長くても図表の高さが 0 や負にならない(Codex レビュー、PR #158)。"""
+    long_body = "地域の意思と衛星データを重ねて可能性を見つけ、所有者と需要を結んで案件を生み、皆が動ける状態まで案件をつくる。" * 4
+    deck = {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+        "pattern": "chart_insight", "layout": "chart_top", "title": "要点が長くても図表は残る", "subtitle": "s",
+        "chart": {"type": "column", "unit": "件", "categories": ["A", "B", "C"],
+                  "series": [{"name": "x", "values": [1, 2, 3]}]},
+        "takeaways": [{"heading": "h", "body": long_body}] * 3, "assumption": "テスト"}]}
+    spec = tmp_path / "ct.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    r = run("validate_spec.py", spec)
+    assert "chart_top の要点が長い" in r.stdout, r.stdout
+    out = tmp_path / "ct.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
