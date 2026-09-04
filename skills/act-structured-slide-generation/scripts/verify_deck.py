@@ -295,14 +295,14 @@ def check_straddle(slide, idx, issues) -> None:
                 break
 
 
-CARD_FILL_FLOOR = TOKENS["layout"].get("fill", {}).get("card_text_floor", 0.45)
+CARD_FILL_FLOOR = TOKENS["layout"].get("fill", {}).get("card_text_floor", 0.6)   # validate_spec と同じ既定
 
 
 def check_card_fill(slide, idx, warns) -> None:
     """カード(surface_tint の塗り)の中身が薄くないか。占有契約(fit_band)はカードの高さを本文帯に
     合わせて育てるので、コピーが短いとカードの下半分が空く — 見出し・帯・他のカードと釣り合わない
     (2026-09-04、利用者の指摘)。カードの内側に収まる文字のインク範囲(上端〜下端)が、カード高の
-    card_text_floor(既定 45%)に届かなければ警告する。1.2in 未満の低いカード(帯・結論ストリップ)は対象外。
+    card_text_floor(既定 60%)に届かなければ警告する。1.2in 未満の低いカード(帯・結論ストリップ)は対象外。
     直し方はコピーを足すこと。型を大きくして埋めるのは、ここでは選ばない。"""
     # 対象は「縦に読むカード」: 高さ 1.2in 以上で、幅が高さの3倍未満のもの。要約ページの横長の
     # 行(幅12in × 高さ1.6in)は中身を上下中央に置く帯なので、下半分が空く問題は起きない

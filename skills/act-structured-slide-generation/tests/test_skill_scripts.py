@@ -3170,3 +3170,19 @@ def test_exhibit_tokens_keep_local_value_unit_pairs():
                        "series": [{"name": "ARR", "values": [9.85, 12.8]}]}}
     toks = D.exhibit_tokens(proof)
     assert "12.8億円" in toks and "114%" in toks and "114億円" not in toks, toks
+
+
+def test_column_framework_header_rows_measure_the_real_label():
+    """柱ページの見出し帯は、実際のラベル+見出しで行数を数える。「Pillar 1」のような長いラベルを
+    「00」で代用すると折返しを取りこぼし、帯が低く出る(Claude レビュー、PR #158)。"""
+    B = _import_build_deck()
+    short = [{"label": "01", "heading": "中堅製造業へ新規獲得", "items": ["x"]},
+             {"label": "02", "heading": "部品表連携", "items": ["y"]},
+             {"label": "03", "heading": "保守サブスク", "items": ["z"]}]
+    long_ = [{"label": "Pillar Number One", "heading": "中堅製造業へ新規獲得", "items": ["x"]},
+             {"label": "Pillar Number Two", "heading": "部品表連携", "items": ["y"]},
+             {"label": "Pillar Number Three", "heading": "保守サブスク", "items": ["z"]}]
+    h = 4.5
+    head_short = B._column_framework_layout(short, h)["head_h"]
+    head_long = B._column_framework_layout(long_, h)["head_h"]
+    assert head_long > head_short, (head_short, head_long)
