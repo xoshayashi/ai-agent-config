@@ -3291,3 +3291,29 @@ def test_widow_repair_may_split_a_kanji_run():
     D = _deck_text()
     broken = D.wrap_natural("電子帳簿保存法対応", 1.9, 16)
     assert "\n" in broken and len(broken.split("\n")[-1]) >= 2, broken
+
+
+def test_labeled_pillar_headers_get_phrase_breaks(tmp_path):
+    """ラベル付きの柱見出し(2走り)も文節で折り返す — 帯の高さを見積もった文字列と同じ切れ目で
+    描き、英語名を途中で割らない(Codex レビュー、PR #158)。"""
+    deck = {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+        "pattern": "column_framework", "title": "3本柱", "subtitle": "s",
+        "columns": [{"label": "Pillar One", "heading": "Enterprise Search の中堅製造業展開", "items": ["x"]},
+                    {"label": "Pillar Two", "heading": "部品表連携", "items": ["y"]},
+                    {"label": "Pillar Three", "heading": "保守サブスク", "items": ["z"]}]}]}
+    spec = tmp_path / "cf.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "cf.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+    slide = pptx.Presentation(out).slides[0]
+    heads = [sh for sh in slide.shapes if sh.has_text_frame and sh.text_frame.text.startswith("Pillar One")]
+    assert heads, [sh.text_frame.text for sh in slide.shapes if sh.has_text_frame]
+    para = heads[0].text_frame.paragraphs[0]
+    assert para._p.findall(f"{A}br"), "ラベル付き見出しに文節の改行が無い"
+    assert len(para.runs) >= 2 and para.runs[0].text == "Pillar One", [r.text for r in para.runs]
+    lines = heads[0].text_frame.text.split("\v") if "\v" in heads[0].text_frame.text else heads[0].text_frame.text.split("\n")
+    assert all("Enterprise Search" not in ln or ln.strip().startswith("Enterprise Search") or "Enterprise Search" in ln for ln in lines)
+    assert "Enterprise\n" not in heads[0].text_frame.text and "Enterprise\v" not in heads[0].text_frame.text
+    r = run("verify_deck.py", out)
+    assert "0 failures" in r.stdout, r.stdout

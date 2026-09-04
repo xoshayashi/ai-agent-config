@@ -3034,8 +3034,17 @@ def p_column_framework(slide, spec, deck):
         add_rect(slide, cx_, y_top, cw, head_h, head_fill, radius_pt=pillar_r)
         parts = []
         if c.get("label"):
-            parts.append((str(c["label"]), HEAD_PT, 700, head_ink))
-            parts.append(("  " + c.get("heading", ""), HEAD_PT, 600, head_ink))
+            # ラベル+見出しは2つの走りになる。add_text の文節折返しは1走りの段落にしか掛からないので、
+            # ここで結合文字列を文節で折り返し(帯の高さを見積もった _text_lines と同じ文字列・役割)、
+            # ラベルの走りと残りの走りに戻す — レンダラ任せの折返しでは英語名や見積もりとずれる
+            # (Codex レビュー指摘、PR #158)
+            lab = str(c["label"])
+            joined = display_wrap_text(f"{lab}  {c.get('heading', '')}", cw - 0.32, HEAD_PT, 600, "label")
+            if joined.startswith(lab):
+                parts.append((lab, HEAD_PT, 700, head_ink))
+                parts.append((joined[len(lab):], HEAD_PT, 600, head_ink))
+            else:
+                parts.append((joined, HEAD_PT, 600, head_ink))
         else:
             parts.append((c.get("heading", ""), HEAD_PT, 600, head_ink))
         # 見出し帯の文字は左右・上下とも中央(2026-09-04、利用者の指示)。ラベル(01 等)と見出しは
@@ -3043,7 +3052,8 @@ def p_column_framework(slide, spec, deck):
         # 下側に余白を持つので、箱を MIDDLE に置くと字面が帯の中心より下に座る。その差
         # (ink_center_offset_in)だけ箱を持ち上げる(300dpi 実測で約 0.16em)
         add_text(slide, cx_ + 0.16, y_top - ink_center_offset_in(HEAD_PT), cw - 0.32, head_h, [parts],
-                 anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.CENTER, wrap_role="label")
+                 anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.CENTER, wrap_role="label",
+                 display_wrap=not c.get("label"))
         cy = y_top + head_h + 0.12
         add_rect(slide, cx_, cy, cw, card_h, C["surface_tint"], radius_pt=pillar_r, name="card")
         if col_blocks[ci]:
