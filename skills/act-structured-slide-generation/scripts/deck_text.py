@@ -868,7 +868,12 @@ def wrap_natural(text: str, width_in: float, size_pt: float, weight: int = 400) 
         tail_ends.append(st)
     if len(tail_ends) >= 2 and not _tail_ok(text[tail_ends[-2]:]):
         prev_start = tail_ends[-3] if len(tail_ends) >= 3 else last_start
-        cands = [p for p in safe if prev_start < p < tail_ends[-2] and not _inside_span(p, spans)]
+        # 泣き別れの修復は、守る語の外で禁則に触れない位置ならどこでもよい — 漢字の連なりの途中も
+        # 含める(「電子帳簿保存法対」+「応」を「電子帳簿保存法」+「対応」に)。安全な境界だけに
+        # 限ると、同じ表記が続く文で候補が空になり、1字の最終行が残る(Codex レビュー指摘、PR #158)
+        cands = [p for p in range(prev_start + 1, tail_ends[-2])
+                 if not _inside_span(p, spans) and text[p] not in _NO_LINE_START
+                 and text[p - 1] not in _NO_LINE_END]
         if cands:
             p_ = max(cands)
             if text_width_in(text[p_:], size_pt, weight) <= cap:

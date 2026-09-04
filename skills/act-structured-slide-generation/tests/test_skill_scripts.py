@@ -3257,3 +3257,37 @@ def test_metric_proof_facts_stay_inside_the_rail(tmp_path):
     slide = pptx.Presentation(out).slides[0]
     bottoms = [Emu(sh.top).inches + Emu(sh.height).inches for sh in slide.shapes if sh.top is not None]
     assert max(bottoms) <= TOKENS["slide"]["height_in"] + 0.01
+
+
+def test_stacked_100_axis_stays_normalised_with_an_annotation(tmp_path):
+    """100%積み上げ棒の軸は 0-1 の比率。annotation があっても生の値(70/20/10)で天井を決めない
+    (Codex レビュー、PR #158)。通常の積み上げは列の合計が天井。"""
+    deck = {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+        "pattern": "chart_insight", "title": "構成比は変わる", "subtitle": "s",
+        "chart": {"type": "stacked_column_100", "unit": "%", "categories": ["FY25", "FY26"],
+                  "series": [{"name": "A", "values": [70, 60]}, {"name": "B", "values": [20, 25]},
+                             {"name": "C", "values": [10, 15]}],
+                  "segment_labels": True, "annotation": {"badge": "mix shift"}},
+        "assumption": "テスト"}, {
+        "pattern": "chart_insight", "title": "積み上げの天井は合計", "subtitle": "s",
+        "chart": {"type": "stacked_column", "unit": "億円", "categories": ["FY25", "FY26"],
+                  "series": [{"name": "A", "values": [70, 60]}, {"name": "B", "values": [20, 25]}],
+                  "annotation": {"badge": "x"}},
+        "assumption": "テスト"}]}
+    spec = tmp_path / "s100.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "s100.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    prs = pptx.Presentation(out)
+    ax100 = [sh.chart.value_axis for sh in prs.slides[0].shapes if getattr(sh, "has_chart", False)][0]
+    assert ax100.maximum_scale is None or ax100.maximum_scale <= 1.0, ax100.maximum_scale
+    ax = [sh.chart.value_axis for sh in prs.slides[1].shapes if getattr(sh, "has_chart", False)][0]
+    assert ax.maximum_scale is not None and ax.maximum_scale >= 90 * 1.28 - 1e-6, ax.maximum_scale
+
+
+def test_widow_repair_may_split_a_kanji_run():
+    """同じ表記が続く本文でも、最終行が1字なら漢字の連なりの途中で改行して泣き別れを直す
+    (Codex レビュー、PR #158)。守る語(カタカナ語・英単語・数量)の途中には打たない。"""
+    D = _deck_text()
+    broken = D.wrap_natural("電子帳簿保存法対応", 1.9, 16)
+    assert "\n" in broken and len(broken.split("\n")[-1]) >= 2, broken

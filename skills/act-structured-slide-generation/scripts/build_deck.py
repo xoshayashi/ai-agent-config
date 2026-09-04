@@ -981,8 +981,13 @@ def add_act_chart(slide, x, y, w, h, cspec: dict):
             val_ax.tick_labels.number_format_is_linked = False
         if cspec.get("y_max") is not None:
             val_ax.maximum_scale = float(cspec["y_max"])
-        elif cspec.get("annotation"):
-            top = max(v for s in cspec["series"] for v in s["values"])
+        elif cspec.get("annotation") and ctype != "stacked_column_100":
+            # バッジの余白ぶん軸を伸ばす。積み上げは列ごとの合計が天井。100%積み上げは軸が 0-1 の
+            # 比率なので触らない — 生の値で天井を決めると図表が数%の高さに潰れる(Codex レビュー、PR #158)
+            if ctype in STACKED:
+                top = max(sum(vals) for vals in zip(*(s["values"] for s in cspec["series"])))
+            else:
+                top = max(v for s in cspec["series"] for v in s["values"])
             val_ax.maximum_scale = top * 1.28
         if cspec.get("y_min") is None and all(
                 v >= 0 for s in cspec["series"] for v in s["values"]):
