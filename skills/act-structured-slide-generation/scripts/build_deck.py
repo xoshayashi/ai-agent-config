@@ -377,6 +377,12 @@ def _add_line_runs(p, text, size_pt, weight, color):
 
 
 _SENTENCE_ENDINGS = tuple("るうくすつぬぶむぐいただずぬ")   # 動詞・形容詞・助動詞の終止形の末尾(体言止めではない)
+# 名詞・形容動詞の語幹で終わる述語(「全社展開が可能」「追加投資が必要」)。主語の助詞を伴えば文であって
+# 体言止めのラベルではない(Codex レビュー指摘、PR #158)。「可能性」「必要投資額」のような名詞は末尾が違う
+_NOMINAL_PREDICATES = ("可能", "不可能", "不可", "必要", "不要", "必須", "困難", "容易", "重要", "有効", "無効",
+                       "十分", "不十分", "不足", "過剰", "妥当", "明確", "不明", "未定", "急務", "最適", "有利",
+                       "不利", "同等", "別", "無理", "未達", "達成済み", "対応済み", "完了", "未完了", "前提")
+_SUBJECT_PARTICLES = ("が", "は", "も", "には", "では", "とは")
 
 
 def _looks_like_label(text: str) -> bool:
@@ -386,6 +392,10 @@ def _looks_like_label(text: str) -> bool:
     t = text.rstrip()
     if not t or is_prose(t) or _ja_len(t) > LABEL_MAX_CHARS:
         return False
+    if t.endswith(_NOMINAL_PREDICATES):
+        stem = t[:-max(len(p) for p in _NOMINAL_PREDICATES if t.endswith(p))]
+        if any(p in stem for p in _SUBJECT_PARTICLES):
+            return False                                  # 「全社展開が可能」= 主語 + 名詞述語の文
     return not t.endswith(_SENTENCE_ENDINGS)
 
 

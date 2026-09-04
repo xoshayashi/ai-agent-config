@@ -3128,6 +3128,17 @@ def test_card_copy_estimate_uses_the_deck_template(tmp_path):
     assert bold["card_h"] <= 0.74 * (bold_h - 0.1) + 1e-6 or bold["card_h"] == std["card_h"]
 
 
+def test_nominal_predicate_sentences_are_body_copy():
+    """「全社展開が可能」「追加投資が必要」は主語 + 名詞述語の文。句読点が無く名詞で終わっていても
+    本文として自然折返しに任せ、文節改行を入れない(Codex レビュー、PR #158)。名詞句のラベルは残す。"""
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import build_deck as B
+    for text in ("全社展開が可能", "追加投資が必要", "現行体制では対応が困難", "在庫は十分", "外部委託も有効"):
+        assert not B._looks_like_label(text), text
+    for text in ("全社展開の可能性", "必要投資額", "対応方針", "可能", "必要", "重要顧客の維持"):
+        assert B._looks_like_label(text), text
+
+
 def test_i_adjective_sentences_are_body_copy():
     """「参入障壁が高い」「解約率が低い」のような い形容詞で終わる短文は本文(自然折返し)。
     体言止めのラベルだけが文節で組まれる(Codex レビュー、PR #158)。"""

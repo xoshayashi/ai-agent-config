@@ -56,7 +56,8 @@ The builder writes the breaks; `validate_spec` / `verify_deck` name what it cann
 - **Labels — chevron labels, headings, outcome lines, table headers — break on meaning.**
   A renderer passes `role="label"` for these; text with no role is treated as a label only
   when it has no punctuation, fits `tokens.line_break.label_max_chars_ja`, and ends on a noun
-  (a short sentence ending on a verb, "chintai-igai no michi wo tsukuru", is body copy). The
+  (a short sentence ending on a verb, "chintai-igai no michi wo tsukuru", is body copy, and so
+  is a subject plus a nominal predicate, "zensha tenkai ga kanou"). The
   break lands on a phrase boundary (bunsetsu) and line lengths are balanced, so the phrasing
   shows in the shape of the block. Particles and symbols stay with the word they belong to, a
   number stays with its counter, okurigana stays with its stem, and a prenominal adjective
