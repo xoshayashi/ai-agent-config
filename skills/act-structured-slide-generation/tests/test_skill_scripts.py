@@ -3293,6 +3293,18 @@ def test_note_is_allowed_when_only_claim_side_shows_the_number(tmp_path):
     base["slides"][0]["steps"] = [{"label": f"第{i}段階", "items": ["体制の整備", "役割の明文化"]} for i in (1, 2, 3)]
     spec.write_text(json.dumps(base, ensure_ascii=False))
     assert "Note を置かない" in run("validate_spec.py", spec).stdout
+    # 期間の範囲(FY24/25、2024/25、2024-2026年)だけのロードマップも通さない(Codex レビュー、PR #158)
+    for labels in (["FY24/25", "FY25/26", "FY26/27"], ["2024/25", "2025/26", "2026/27"], ["2024-2026年", "2027年度", "Q1/Q2"]):
+        base["slides"][0] = {"pattern": "process_flow", "title": "t", "subtitle": "s",
+                             "steps": [{"label": lab, "items": ["体制の整備", "役割の明文化"]} for lab in labels],
+                             "note": "期間だけの注記"}
+        spec.write_text(json.dumps(base, ensure_ascii=False))
+        assert "Note を置かない" in run("validate_spec.py", spec).stdout, labels
+    # 先頭が 0 の値(「05件」)は番号ではなく数値(Claude レビュー、PR #158)
+    base["slides"][0] = {"pattern": "comparison_table", "title": "t", "subtitle": "s",
+                         "table": {"headers": ["項目", "件数"], "rows": [["不良", "05件"]]}, "note": "件数は月次"}
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" not in run("validate_spec.py", spec).stdout
     # 図表の値としての段階の数(「街づくりの7段階」)は数値のまま(Claude レビュー、PR #158)
     base["slides"][0] = {"pattern": "comparison_table", "title": "t", "subtitle": "s",
                          "table": {"headers": ["項目", "内容"], "rows": [["街づくり", "全7段階のうち3段階まで"]]},
