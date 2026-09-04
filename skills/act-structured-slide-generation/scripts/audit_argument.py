@@ -268,31 +268,105 @@ def check_identity(i, s, errors) -> None:
         _check_hero_in_chart(loc, s, errors)
 
 
+def _chart_numbers(chart: dict) -> list[float]:
+    """図表データの数値 — 配列の中の数(native の series.values、画像図表 combo の bar/line の values、
+    area の series …)。focal_category や y_max のような単独のスカラーは制御値であって数えない。
+    categories / labels / headers の配列は軸ラベルなので数えない。"""
+    out: list[float] = []
+
+    def walk(node, in_list: bool) -> None:
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if k not in ("categories", "labels", "headers"):
+                    walk(v, False)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v, True)
+        elif in_list and not isinstance(node, bool):
+            n = to_number(node)
+            if n is not None:
+                out.append(n)
+    walk(chart, False)
+    return out
+
+
+def _chart_units(chart: dict) -> set[str]:
+    units: set[str] = set()
+
+    def walk(node) -> None:
+        if isinstance(node, dict):
+            if node.get("unit"):
+                units.add(str(node["unit"]))
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+    walk(chart)
+    return units
+
+
+def _same(v: float, val: float, printed: str) -> bool:
+    """書かれた桁で一致し、符号も同じ(-12.8 は 12.8 の証拠ではない)。"""
+    return (v >= 0) == (val >= 0) and matches(v, val, printed)
+
+
+def _derivation_grounded(deriv: dict, nums: list[float]) -> bool:
+    """derivation の被演算子が図表の値から取られているか。数はどれかの図表の値と一致、文字列は
+    chart への参照パスであること。value / unit / kind は結果の宣言であって被演算子ではない。"""
+    def ok(node) -> bool:
+        if isinstance(node, bool):
+            return False
+        if isinstance(node, (int, float)):
+            return any(_same(n, float(node), str(node)) for n in nums)
+        if isinstance(node, str):
+            return node.startswith("chart")
+        if isinstance(node, dict):
+            return all(ok(v) for v in node.values())
+        if isinstance(node, list):
+            return all(ok(v) for v in node)
+        return False
+    operands = {k: v for k, v in deriv.items() if k not in ("value", "unit", "kind", "years", "label")}
+    return bool(operands) and ok(operands)
+
+
 def _check_hero_in_chart(loc: str, s: dict, errors) -> None:
     """metric_proof の hero は、隣の chart が証明する数。hero は exhibit 側に数えるので、それ自身で
-    結論トークンを満たしてしまう — hero の値が chart の系列値(単位が同じとき)か、系列の最終カテゴリの
-    積み上げ合計か、derivation の値のどれかと一致することを求める(Codex レビュー指摘、PR #158)。
-    画像図表(kind)や単位の違う chart は数値で照合できないので見ない。"""
+    結論トークンを満たしてしまう — hero の値が (a) 図表データの値、(b) 積み上げ型の最終カテゴリの合計、
+    (c) 図表の値から導いた同じ単位の derivation の値、のどれかと符号ごと一致することを求める
+    (Codex レビュー指摘、PR #158)。画像図表(combo / area など)も数値配列を持つので同じく照合する。
+    単位が違う図表や、照合できる数値の無い図表は、hero を証明していないので error。"""
     hero, chart = s.get("hero") or {}, s.get("chart") or {}
     val = to_number(hero.get("value"))
+    if val is None or not chart:
+        return
+    printed = str(hero.get("value"))
+    h_unit = str(hero.get("unit") or "")
+    c_units = _chart_units(chart)
+    if h_unit and c_units and h_unit not in c_units:
+        errors.append(f"{loc}: hero の単位「{h_unit}」が chart の単位({' / '.join(sorted(c_units))})と違う — "
+                      "hero を証明する図表は同じ単位で描く")
+        return
+    nums = _chart_numbers(chart)
+    if not nums:
+        errors.append(f"{loc}: hero の値 {printed}{h_unit} を照合できる図表データが chart に無い — "
+                      "系列の値を持つ図表で hero を証明する")
+        return
+    shown = list(nums)
+    ctype, kind = chart.get("type", "column"), chart.get("kind")
     series = chart.get("series") or []
-    if val is None or chart.get("kind") or not series:
-        return
-    h_unit, c_unit = str(hero.get("unit") or ""), str(chart.get("unit") or "")
-    if h_unit and c_unit and h_unit != c_unit:
-        return
-    shown: list[float] = []
-    for ser in series:
-        shown += [to_number(v) for v in ser.get("values") or []]
-    last = [to_number((ser.get("values") or [None])[-1]) for ser in series]
-    if all(v is not None for v in last):
-        shown.append(sum(last))                             # 積み上げの最終カテゴリの合計
+    if (ctype in ("stacked_column", "stacked_bar") and not kind) or kind == "area":
+        last = [to_number((ser.get("values") or [None])[-1]) for ser in series if isinstance(ser, dict)]
+        if last and all(v is not None for v in last):
+            shown.append(sum(last))                         # 積み上げの最終カテゴリの合計
     deriv = s.get("derivation") or {}
-    if deriv.get("value") is not None:
-        shown.append(to_number(deriv.get("value")))
-    if not any(v is not None and matches(v, val, str(hero.get("value"))) for v in shown):
-        errors.append(f"{loc}: hero の値 {hero.get('value')}{h_unit} が chart に無い — "
-                      "系列の値か derivation で hero を図表から導く(hero が自分を証明してはいけない)")
+    d_val = to_number(deriv.get("value")) if deriv else None
+    if d_val is not None and str(deriv.get("unit") or "") == h_unit and _derivation_grounded(deriv, nums):
+        shown.append(d_val)
+    if not any(_same(v, val, printed) for v in shown):
+        errors.append(f"{loc}: hero の値 {printed}{h_unit} が chart に無い — "
+                      "系列の値か、図表の値から導いた同じ単位の derivation で hero を図表から導く"
+                      "(hero が自分を証明してはいけない)")
 
 
 def check_recap(deck, errors) -> None:

@@ -3160,6 +3160,32 @@ def test_metric_proof_hero_must_be_in_its_chart(tmp_path):
                                ensure_ascii=False))
     r = run("audit_argument.py", spec)
     assert "chart に無い" not in r.stdout, r.stdout
+    # 図表に無い被演算子の derivation(a=0, b=12.8)は hero を証明しない(Codex レビュー、PR #158)
+    spec.write_text(json.dumps(deck([1, 2], {"kind": "delta", "value": 12.8, "unit": "億円", "a": 0, "b": 12.8}),
+                               ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # 集合棒の最終値の合計(9.85 + 2.95)は表示も導出もされていないので証拠にならない。積み上げなら合計が天井
+    d = deck([1, 9.85]); d["slides"][0]["chart"]["series"].append({"name": "新規", "values": [1, 2.95]})
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    d["slides"][0]["chart"]["type"] = "stacked_column"
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    # 符号違い(-12.8)は反証。単位違い(%)の図表は hero を証明できない
+    spec.write_text(json.dumps(deck([-11.9, -12.8]), ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    d = deck([11.9, 12.8]); d["slides"][0]["chart"]["unit"] = "%"
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "単位「億円」が chart の単位" in run("audit_argument.py", spec).stdout
+    # 画像図表(combo)も数値配列で照合する
+    d = deck([1, 2]); d["slides"][0]["chart"] = {"kind": "combo", "categories": ["Q1", "Q2"],
+                                                  "bar": {"name": "ARR", "values": [11.9, 12.8], "unit": "億円"},
+                                                  "line": {"name": "成長率", "values": [28, 30], "unit": "%"}}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    d["slides"][0]["chart"]["bar"]["values"] = [1, 2]
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
 
 
 def test_metric_proof_accepts_a_zero_hero_value(tmp_path):
