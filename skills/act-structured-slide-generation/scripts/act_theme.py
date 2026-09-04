@@ -80,7 +80,19 @@ def apply_matplotlib():
     import matplotlib
 
     matplotlib.use("Agg")
+    from matplotlib import font_manager as fm
     from matplotlib import pyplot as plt
+
+    # フォントはファイルで登録する。matplotlib のフォントキャッシュはインストール前の状態で
+    # 固まりがちで、そのまま描くと和文ラベルが豆腐(□)になる(ストレス試験で再現)。
+    # 物差し(deck_text)が見ている同じ TTF を matplotlib にも渡す — 一度登録すれば findfont が解決する
+    try:
+        from deck_text import _FONT_FILES
+        for path in _FONT_FILES.values():
+            if path:
+                fm.fontManager.addfont(path)
+    except Exception:
+        pass
 
     plt.rcParams.update({
         "figure.facecolor": COLORS["canvas"],

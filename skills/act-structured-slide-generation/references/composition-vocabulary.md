@@ -195,6 +195,18 @@ the story. Do not use a fixed closing template.
 - Guidance progress -> `guidance_progress`
 - Driver equation -> `driver_decomposition`
 - Flexible close -> `statement`
+- Pillar / framework columns (parallel, not sequence) -> `column_framework`
+- Oversized number + chart that proves it (metric proof page) -> `metric_proof`
+- Driver equation / tree, issue tree -> `driver_decomposition` (≤5 factors in a row) or
+  `logic_tree` (root → branches → leaves, native and editable)
+- Mix shift over time -> `chart_insight` with `stacked_column_100`
+- Chart with short comparable takeaways -> `chart_insight` `layout: chart_top`
+- Small multiples -> `chart_grid`
+- Two-axis combo, area, radar -> `chart_insight` with an image `kind` (`combo`, `area`,
+  `radar`; see `data-and-diagram-rules.md`)
+- Hub and spoke, system map, org tree -> `diagram` with `kind: node_graph | org_tree`
+- Ring / flywheel, funnel, pyramid, Venn, coverage matrix -> `diagram` with
+  `kind: ring | funnel | pyramid | venn | matrix` (image track, `render_route` = image)
 
 When the fit is weak, compose primitives or extend the renderer rather than forcing the
 evidence into a rigid pattern.

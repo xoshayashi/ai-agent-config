@@ -42,6 +42,18 @@ Use this file during self-review. These are defects to hunt, not style preferenc
 - **F23. Generic market size**: TAM is presented without reachable opportunity or assumptions.
 - **F24. Cause-free movement**: chart shows movement but no driver, event, or interpretation.
 
+## Production Anti-Patterns (machine-checked since 2026-09)
+
+- **F25. Label on the edge**: a value label, delta, or heading whose glyphs cross a bar, card,
+  or band edge. `verify_deck` reports it as a straddle failure; the fix is a measured frame
+  height (`drawn_line_h`) and an anchor above or inside the shape, never a nudge by eye.
+- **F26. Under-occupied body**: content-sized cards or rows that use less than half of the body
+  band. `lint_render` reports the occupancy; the fix is the shared fill contract (`fit_band`),
+  not a per-slide constant.
+- **F27. Silent overload**: a spec past a pattern's cap that renders with text spilling over
+  its frame. `validate_spec` caps cardinality; the reclaim ladder compresses gaps first; what
+  still does not fit is reported, never hidden and never shrunk.
+
 ## Capstone Test
 
 If the slide disappeared, would the reader's decision or belief change less? If not, delete,

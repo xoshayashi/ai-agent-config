@@ -124,6 +124,24 @@ Consequence for verification: a paragraph is no longer one line. `verify_deck` s
 paragraph at `<a:br/>` before measuring width and counting wrapped lines; measuring the
 paragraph as one run of text over-estimates its width and mis-counts its lines.
 
+### 14c. A label above a shape needs a measured frame, anchored at its bottom
+
+A value label placed at `y_top - 0.26` in a `0.22in` box, top-anchored, draws its glyphs INTO
+the bar: the drawn line at 15.5pt is ~0.32in tall, so the ink overruns the nominal box and
+crosses the bar edge (waterfall and guidance bars, found in the 2026-09 audit with every gate
+green). Size the frame with `deck_text.drawn_line_h`, place its bottom a fixed gap above the
+shape, and anchor the text to the bottom (`MSO_ANCHOR.BOTTOM`). `verify_deck.check_straddle`
+now fails any text frame whose ink covers 12-88% of a solid autoshape — fully inside (card
+text) and fully outside (a floated label) are the only two correct states.
+
+### 14d. matplotlib must be handed the Act font files
+
+matplotlib's font cache is built once and does not pick up fonts installed later, so image
+assets rendered Japanese labels as tofu (□) while the native slides were fine.
+`act_theme.apply_matplotlib` registers the same TTFs `deck_text` measures with
+(`font_manager.fontManager.addfont`), and `act_assets.BACKEND_VERSION` was bumped so cached
+tofu assets are regenerated.
+
 ### 15. Vertically centered text: the box center is not the ink center
 
 With `MSO_ANCHOR.MIDDLE` the renderer centers the *line box*. Japanese text carries descender

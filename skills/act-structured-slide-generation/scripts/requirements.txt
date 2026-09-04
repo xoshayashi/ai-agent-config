@@ -9,5 +9,4 @@ fonttools>=4.50
 matplotlib>=3.9
 matplotlib-venn>=1.1
 graphviz>=0.21      # Python wrapper that shells out to the `dot` CLI
-resvg_py>=0.3       # SVG rasteriser for recoloured Lucide icons (deterministic, no native deps)
 pytest>=8.0  # dev: tests

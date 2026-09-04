@@ -30,7 +30,8 @@ from deck_argument import (  # noqa: E402
     lexicon, matches, resolve_path, to_number, visible_strings,
 )
 
-SYNTHESIS = {"executive_summary", "statement", "two_column", "cover", "section_divider", "agenda"}
+SYNTHESIS = {"executive_summary", "statement", "two_column", "column_framework",
+             "cover", "section_divider", "agenda"}
 STRUCTURAL = {"cover", "section_divider", "agenda"}
 FORWARD_PATTERNS = {"roadmap", "guidance_progress"}
 
@@ -263,6 +264,225 @@ def check_identity(i, s, errors) -> None:
         nums = [n for n in nums if n is not None]
         if len(nums) >= 2 and any(a < b for a, b in zip(nums, nums[1:])):
             errors.append(f"{loc}: 入れ子が逆(TAM ≥ SAM ≥ SOM の順に小さくなること): {nums}")
+    if s.get("pattern") == "metric_proof":
+        _check_hero_in_chart(loc, s, errors)
+
+
+_DATA_SCALAR_KEYS = {"value", "x", "y", "r", "size", "start", "end"}   # 配列要素の dict が持つデータ欄
+
+
+def _unit_key(u) -> str:
+    """単位の比較用の表記。全角の ％ は %(validate も両方を受ける — Codex レビュー指摘、PR #158)"""
+    return str(u or "").strip().replace("％", "%")
+
+
+def _chart_numbers(chart: dict, unit: str = "") -> list[float]:
+    """図表データの数値 — 配列の中の数(native の series.values、画像図表 combo の bar/line の values、
+    area の series …)。focal_category や y_max のような単独のスカラーは制御値であって数えない。
+    categories / labels / headers の配列は軸ラベルなので数えない。unit を渡すと、その単位の配列だけを
+    返す: 配列の単位は最も近い上位の dict の unit(combo の bar.unit / line.unit、native の chart.unit)。
+    二軸の combo で % の折れ線の 12.8 を 12.8億円 の証拠にしない(Codex / Claude レビュー指摘、PR #158)。"""
+    out: list[float] = []
+    # 単位をどこかに持つ図表では、単位の無い配列は要求された単位に合わない(二軸 combo の bar に単位が
+    # 無く line だけ % のとき、bar の 12.8 を 12.8% の証拠にしない — Codex レビュー指摘)。単位を全く
+    # 持たない図表だけ、配列をそのまま返す
+    typed = bool(_chart_units(chart))
+    # native 図表(kind 無し)は chart.unit で全系列を描く — series[].unit は描画に効かないので、単位の
+    # 範囲も chart.unit だけ(Codex レビュー指摘)。入れ子の unit を見るのは画像図表(combo の bar / line)だけ
+    nested = bool(chart.get("kind"))
+
+    def walk(node, in_list: bool, scope: str) -> None:
+        if isinstance(node, dict):
+            if nested or node is chart:
+                scope = _unit_key(node.get("unit")) or scope
+            for k, v in node.items():
+                if k in ("categories", "labels", "headers"):
+                    continue
+                # 配列の要素が dict のとき(waterfall の items[].value、scatter の points[].x/y)、そのデータ
+                # 欄のスカラーも図表の値(Codex レビュー指摘、PR #158)。name / label / kind は数えない
+                walk(v, in_list and k in _DATA_SCALAR_KEYS, scope)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v, True, scope)
+        elif in_list and not isinstance(node, bool) and (not unit or not typed or scope == unit):
+            n = to_number(node)
+            if n is not None:
+                out.append(n)
+    walk(chart, False, "")
+    return out
+
+
+def _chart_units(chart: dict) -> set[str]:
+    """図表が描く単位。native 図表は chart.unit だけ(series[].unit は描画に効かない)。画像図表は
+    入れ子の unit(combo の bar.unit / line.unit)も数える。"""
+    if not chart.get("kind"):
+        return {_unit_key(chart["unit"])} if chart.get("unit") else set()
+    units: set[str] = set()
+
+    def walk(node) -> None:
+        if isinstance(node, dict):
+            if node.get("unit"):
+                units.add(_unit_key(node["unit"]))
+            for v in node.values():
+                walk(v)
+        elif isinstance(node, list):
+            for v in node:
+                walk(v)
+    walk(chart)
+    return units
+
+
+def _same(v: float, val: float, printed: str) -> bool:
+    """書かれた桁で一致し、符号も同じ(-12.8 は 12.8 の証拠ではない)。"""
+    return (v >= 0) == (val >= 0) and matches(v, val, printed)
+
+
+# 図表の値の配列を指すパス(chart.series[0].values、chart.bar.values[1])。focal_category / y_max のような
+# 制御値や categories を指すパスは、たまたま同じ数でも根拠にならない(Codex レビュー指摘)。添字は
+# 0 以上(resolve_path も負の添字を持たない)
+_VALUE_PATH = re.compile(r"^chart(?:\.[a-z_]+|\[\d+\])*\.values(?:\[\d+\])?$")
+
+
+def _path_unit(slide: dict, path: str) -> str:
+    """パスが指す配列の実効単位 — 経路上で最も近い dict の unit(combo の line.unit、native の chart.unit)。
+    値の一致だけで見ると、億円の棒と同じ数を持つ % の折れ線のパスが億円の根拠になる(Codex レビュー指摘)。"""
+    node, unit = slide, ""
+    nested = bool((slide.get("chart") or {}).get("kind"))     # native 図表は chart.unit だけが効く
+    for seg in re.findall(r"[^.\[\]]+|\[\d+\]", path.strip()):
+        if isinstance(node, dict) and (nested or node is slide.get("chart")):
+            unit = _unit_key(node.get("unit")) or unit
+        if seg.startswith("["):
+            if not isinstance(node, list):
+                return unit
+            i = int(seg[1:-1])
+            node = node[i] if i < len(node) else None
+        elif isinstance(node, dict):
+            node = node.get(seg)
+        else:
+            return unit
+    if isinstance(node, dict) and nested:
+        unit = _unit_key(node.get("unit")) or unit
+    return unit
+# 単位を変えない演算(差・和)は被演算子も結果と同じ単位。率・倍率・構成比は単位が変わる(億円→%)
+_SAME_UNIT_KINDS = ("delta", "sum")
+
+
+def _derivation_grounded(slide: dict, deriv: dict, chart: dict) -> bool:
+    """derivation の被演算子が図表の値から取られているか。数はどれかの図表の値と一致、文字列のパスは
+    値の配列を指し(_VALUE_PATH)、解決した先が図表の値であること。被演算子はひとつの単位の配列に
+    そろって載ること — 億円の棒と % の折れ線の値を混ぜた式はどちらの図表も証明していない(Claude
+    レビュー指摘)。差・和はその単位が結果の単位でもあること — % を引いて億円にはならない(Codex
+    レビュー指摘)。value / unit / kind と from / to / years / n は結果の宣言や位置の指定であって
+    被演算子ではない。"""
+    operands = {k: v for k, v in deriv.items()
+                if k not in ("value", "unit", "kind", "label", "years", "from", "to", "n", "index", "at")}
+    if not operands:
+        return False
+
+    typed = bool(_chart_units(chart))
+
+    def ok(node, nums: list[float], unit: str) -> bool:
+        if isinstance(node, bool):
+            return False
+        if isinstance(node, (int, float)):
+            return any(_same(n, float(node), str(node)) for n in nums)
+        if isinstance(node, str):
+            if not _VALUE_PATH.match(node.strip()):
+                return False
+            if typed and _path_unit(slide, node) != unit:
+                return False                              # 別単位の配列を指すパスは、同じ数でも根拠にならない
+            try:
+                got = resolve_path(slide, node)
+            except Exception:
+                return False
+            if isinstance(got, list):
+                return bool(got) and all(isinstance(g, (int, float)) and ok(g, nums, unit) for g in got)
+            return isinstance(got, (int, float)) and ok(got, nums, unit)
+        if isinstance(node, dict):
+            return all(ok(v, nums, unit) for v in node.values())
+        if isinstance(node, list):
+            return bool(node) and all(ok(v, nums, unit) for v in node)
+        return False
+    units = _chart_units(chart) or {""}
+    if deriv.get("kind") in _SAME_UNIT_KINDS and typed:
+        units = {u for u in units if u == _unit_key(deriv.get("unit"))}
+    for unit in units:
+        nums = _chart_numbers(chart, unit)
+        if nums and ok(operands, nums, unit):
+            return True
+    return False
+
+
+def _check_hero_in_chart(loc: str, s: dict, errors) -> None:
+    """metric_proof の hero は、隣の chart が証明する数。hero は exhibit 側に数えるので、それ自身で
+    結論トークンを満たしてしまう — hero の値が (a) 図表データの値、(b) 積み上げ型の最終カテゴリの合計、
+    (c) 図表の値から導いた同じ単位の derivation の値、のどれかと符号ごと一致することを求める
+    (Codex レビュー指摘、PR #158)。画像図表(combo / area など)も数値配列を持つので同じく照合する。
+    単位が違う図表や、照合できる数値の無い図表は、hero を証明していないので error。"""
+    hero, chart = s.get("hero") or {}, s.get("chart") or {}
+    val = to_number(hero.get("value"))
+    if val is None or not chart:
+        return
+    printed = str(hero.get("value"))
+    h_unit = _unit_key(hero.get("unit"))
+    # 図表の値から導いた同じ単位の derivation は、単位が図表と違っても(億円の系列から CAGR の %)証明になる
+    deriv = s.get("derivation") or {}
+    d_val = to_number(deriv.get("value")) if deriv else None
+    is_100 = chart.get("type", "column") == "stacked_column_100" and not chart.get("kind")
+    # 100%積み上げの生の値(60 → 80)は描かれない(50% → 80% と描かれる)ので、生の値から導いた derivation は
+    # hero の根拠にならない — hero は表示される構成比か全体の 100 で言う(Codex レビュー指摘、PR #158)
+    if d_val is not None and not is_100 and _unit_key(deriv.get("unit")) == h_unit \
+            and _derivation_grounded(s, deriv, chart) and _same(d_val, val, printed):
+        return
+    c_units = _chart_units(chart)
+    if not h_unit and c_units:
+        errors.append(f"{loc}: hero に unit が無く、chart の単位({' / '.join(sorted(c_units))})のどれと照合するか"
+                      "決まらない — hero に単位を付ける")
+        return
+    if h_unit and c_units and h_unit not in c_units:
+        errors.append(f"{loc}: hero の単位「{h_unit}」が chart の単位({' / '.join(sorted(c_units))})と違う — "
+                      "hero を証明する図表は同じ単位で描くか、図表の値から導く derivation を宣言する")
+        return
+    nums = _chart_numbers(chart, h_unit)
+    if not nums:
+        errors.append(f"{loc}: hero の値 {printed}{h_unit} を照合できる図表データが chart に無い — "
+                      "同じ単位の系列の値を持つ図表で hero を証明する")
+        return
+    shown = list(nums)
+    ctype, kind = chart.get("type", "column"), chart.get("kind")
+    series = chart.get("series") or []
+    if is_100:
+        # 100%積み上げは各カテゴリを 100 に正規化して描く。生の値(60 + 60)ではなく、表示される構成比
+        # (50 / 50)と全体の 100 が hero の候補(Codex レビュー指摘、PR #158)。構成比は % でしか読めない —
+        # 億円と宣言された 100%積み上げの「50」は 50億円 ではない(Codex レビュー指摘)
+        if h_unit != "%":
+            errors.append(f"{loc}: 100%積み上げ(stacked_column_100)は構成比を描く — hero の単位「{h_unit}」では"
+                          "照合できない。hero と chart の unit を % にするか、積み上げ棒(stacked_column)にする")
+            return
+        if deriv:
+            errors.append(f"{loc}: 100%積み上げの生の値から導いた derivation は hero の根拠にならない(描かれるのは"
+                          "構成比) — hero は表示される構成比か 100 で言い、差は本文で述べる")
+        cols = [[to_number(v) for v in (ser.get("values") or [])] for ser in series if isinstance(ser, dict)]
+        shown = []
+        for col in zip(*cols):
+            vals = [v for v in col if v is not None]
+            tot = sum(v for v in vals if v > 0)
+            if tot > 0:
+                shown += [v / tot * 100 for v in vals]
+        if shown:
+            shown.append(100.0)                             # 全体の 100 は、分母のあるカテゴリがあるときだけ
+    elif (ctype in ("stacked_column", "stacked_bar") and not kind) or kind == "area":
+        last = [to_number((ser.get("values") or [None])[-1]) for ser in series if isinstance(ser, dict)]
+        if last and all(v is not None for v in last):
+            # 積み上げの最終カテゴリの合計。正負が混じるときは上下に別々の山として描かれるので、
+            # 正の合計と負の合計を別に数え、差し引きの値は数えない(Codex レビュー指摘)
+            pos, neg = [v for v in last if v > 0], [v for v in last if v < 0]
+            shown += [sum(pos)] if pos else []
+            shown += [sum(neg)] if neg else []
+    if not any(_same(v, val, printed) for v in shown):
+        errors.append(f"{loc}: hero の値 {printed}{h_unit} が chart に無い — "
+                      "系列の値か、図表の値から導いた同じ単位の derivation で hero を図表から導く"
+                      "(hero が自分を証明してはいけない)")
 
 
 def check_recap(deck, errors) -> None:
@@ -296,7 +516,19 @@ def check_thesis(deck, errors) -> None:
         errors.append("meta.thesis に value と unit がない — 結論は数値で言い切る")
         return
     token = f"{value}{unit}".replace(",", "")
-    if not any(token in exhibit_tokens(s) for s in deck.get("slides", [])):
+    # 結論の数値は、図表の数値トークン(数値+単位)か、図表の文字列そのもの(「街づくりの7段階」の
+    # ような構造の数、単位表に無い単位)のどちらかで示されていればよい。構造の数を単位表に足すと、
+    # 「3段階の打ち手」のような語りの数まで出所を要求してしまう(レビュー指摘、2026-09-04)
+    # 文字列で探すときは数値を丸ごと一致させる — 「7段階」を「17段階」「27段階」で満たさない
+    # (Codex レビュー指摘、PR #158)
+    # 符号も一致させる — 「7段階」を「-7段階」「△7段階」で満たさない(Codex レビュー指摘、PR #158)
+    whole = re.compile(r"(?<![\d.,\-−△▲+±])" + re.escape(token) + r"(?!\d)")
+
+    def _shown(s: dict) -> bool:
+        if token in exhibit_tokens(s):
+            return True
+        return any(whole.search(str(v).replace(",", "")) for v in exhibit_values(s) if isinstance(v, str))
+    if not any(_shown(s) for s in deck.get("slides", [])):
         errors.append(f"meta.thesis の数値「{token}」を示す図表がどのページにも無い")
 
 

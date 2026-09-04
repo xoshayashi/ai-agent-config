@@ -118,7 +118,7 @@ Know exactly where your judgment is still the only thing standing:
 - **Whether the deck engages the strongest objection**, and whether the question was worth
  asking at all.
 
-These belong to `references/all-perspective-review.md`, the rubric in `eval_deck.py`, and the
+These belong to `references/visual-qa-and-repair-rubric.md`, the rubric in `eval_deck.py`, and the
 reader.
 
 ## 14. Repairing a finding

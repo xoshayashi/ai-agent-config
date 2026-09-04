@@ -159,8 +159,7 @@ Use local repairs before redesign:
 - Grid/flex contract: `grid-and-flex-strategy.md`
 - Claims and trust: `evidence-and-claim-rules.md`
 - Chart/diagram/image choice: `data-and-diagram-rules.md`
-- Review and repair: `visual-qa-and-repair-rubric.md`, `review-and-repair-rubric.md`,
-  `anti-patterns.md`
+- Review and repair: `visual-qa-and-repair-rubric.md`, `anti-patterns.md`
 
 ## 9. Incorporating New Observations
 

@@ -50,40 +50,40 @@ one source of truth and no per-slide-type rules to remember:
 
 ## Line Breaks
 
-A line break is part of the writing. Two kinds of text want two different things from it,
-and the builder gives each what it wants — the author writes copy, not line breaks.
+A line break is part of the writing, and the two kinds of text want different things from it.
+The builder writes the breaks; `validate_spec` / `verify_deck` name what it cannot fix.
 
-- **Short display text — labels, headings, cell text, conclusion lines — breaks on meaning.**
-  Up to `tokens.line_break.label_max_chars_ja`, the break lands on a phrase boundary
-  (bunsetsu), so the phrasing shows in the shape of the block — a fee label breaks after the
-  connective, a growth phrase breaks after its particle. Particles and symbols stay with the
-  word they belong to, a number stays with its counter, and okurigana stays with its stem.
-- **Everything longer — sentences and body copy — fills its lines, and the builder writes the
-  breaks.** A sentence that fits its column is left alone. One that does not is set by
-  `deck_text.wrap_prose`: each line is filled to the last whole word, and the word that would
-  straddle the break starts the next line. Leaving that wrap to the renderer is what puts a
-  break inside a word — its letter spacing differs from ours by a fraction, and a fraction is
-  all it takes to land between a stem and its okurigana. A filled line and an unbroken word
-  are not in tension; you get both by deciding the break yourself.
+- **Labels — chevron labels, headings, outcome lines, table headers — break on meaning.**
+  A renderer passes `role="label"` for these; text with no role is treated as a label only
+  when it has no punctuation, fits `tokens.line_break.label_max_chars_ja`, and ends on a noun
+  (a short sentence ending on a verb, "chintai-igai no michi wo tsukuru", is body copy, and so
+  is any sentence that sets up a subject with ga / wa, "zensha tenkai ga kanou"). The
+  break lands on a phrase boundary (bunsetsu) and line lengths are balanced, so the phrasing
+  shows in the shape of the block. Particles and symbols stay with the word they belong to, a
+  number stays with its counter, okurigana stays with its stem, and a prenominal adjective
+  (tsugi-no, onaji, kono) stays with its noun. Break these properly.
+- **Body copy — sentences and item bodies — gets no authored breaks (2026-09-04).** The text
+  is handed to the renderer as written and wraps naturally; kanji and kana may wrap anywhere,
+  as Japanese text does. The builder inserts a break in two cases only
+  (`deck_text.wrap_natural`), and only at that spot: the natural wrap would fall inside a
+  katakana word, a Latin word or name (Pre-Market, City Making Intelligence), or a number and
+  its counter — or the last line would hold a single character. Every other line end is left
+  to the renderer. Lines are never shortened, balanced, or broken at clause boundaries for
+  shape. A sentence that would need two more lines than the natural wrap, or that holds such a
+  word wider than the column, is left entirely to the renderer and `verify_deck` names it.
 - **A line never opens on a character that cannot open one.** A comma, a full stop, a middle
-  dot or a closing bracket belongs to the line above, and a qualifier stays with what it
-  qualifies: a demonstrative and its noun, an approximator and its figure, a number and its
-  counter are one word each, however the particle before them reads.
-- **A number keeps the size that fits its card.** A value and its unit are one line; when that
-  line is wider than the card, the renderer drops the unit onto a second line and splits it.
-  The builder steps the numeral down until the line fits, and uses one size across the cards
-  so the comparison is not distorted.
+  dot or a closing bracket stays on the line above — and when it does not fit there, the
+  character before it moves down with it, because renderers do not hang punctuation past the
+  margin and a line handed over too wide wraps early and leaves an empty line. An opening
+  bracket never ends a line.
+- **A number keeps the size that fits its card.** A value and its unit are one line; the
+  builder steps the numeral down until the line fits, and uses one size across the cards so
+  the comparison is not distorted.
 - **A symbolic message is composed as a form.** See the message-slide contract in
   `grid-and-flex-strategy.md`: measure, balance and breathing are chosen together.
-- **Copy that fits its column is copy that survives layout.** Keeping a word whole must not
-  cost a line: when it does, the column is carrying more copy than it can hold, and the lines
-  come out short and stepped. `verify_deck` names the paragraph; say it in fewer words.
-- **A last line carries weight.** A line holding a single word is a widow; the builder pulls a
-  word down from the line above to balance the pair. Copy that ends on a two-character
-  fragment is copy to tighten.
 - **Copy that fits its column is copy that survives layout.** When a single word is wider than
-  its column, `verify_deck` names it: shorten the word or widen the column. Type size stays
-  as designed.
+  its column, `verify_deck` names it: shorten the word or widen the column. Type size stays as
+  designed.
 - **Meaning is carried by commas and by line breaks.** A slide reads at a glance, so a clause
   break is a comma and an emphasis break is a new line. When a point deserves to stand alone,
   give it its own line — a statement slide gives it the `lead`. (`validate_spec` flags a dash
