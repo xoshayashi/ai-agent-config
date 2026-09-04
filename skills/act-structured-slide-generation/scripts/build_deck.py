@@ -3106,8 +3106,11 @@ def p_metric_proof(slide, spec, deck):
         for f in facts:
             add_text(slide, hx, fy, hw * 0.58, row_h,
                      [[(f.get("label", ""), TS["kpi_label"], 600, C["ink_subtle"])]], anchor=MSO_ANCHOR.MIDDLE)
+            # 値と単位が組の fact({value, unit})は単位まで描く — 監査が「8,420社」を証拠と数えるのに
+            # スライドが「8,420」しか見せないのは矛盾(Codex レビュー指摘、PR #158)
+            fact_val = str(f.get("value", "")) + (str(f["unit"]) if f.get("unit") else "")
             add_text(slide, hx + hw * 0.58, fy, hw * 0.42, row_h,
-                     [[(str(f.get("value", "")), TS["body"], 700, C["ink"])]],
+                     [[(fact_val, TS["body"], 700, C["ink"])]],
                      align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE, wrap=False)
             fy += row_h
             add_line(slide, hx, fy - 0.02, hx + hw, fy - 0.02, C["rule"], 0.5)

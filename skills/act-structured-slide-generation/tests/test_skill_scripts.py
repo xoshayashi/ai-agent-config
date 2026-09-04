@@ -3170,6 +3170,27 @@ def test_exhibit_tokens_keep_local_value_unit_pairs():
                        "series": [{"name": "ARR", "values": [9.85, 12.8]}]}}
     toks = D.exhibit_tokens(proof)
     assert "12.8億円" in toks and "114%" in toks and "114億円" not in toks, toks
+    # 裸の数の fact({label, value})にも chart.unit は付かない。chart の series 値には付く
+    proof["facts"] = [{"label": "顧客数(社)", "value": "8420"}]
+    toks = D.exhibit_tokens(proof)
+    assert "8420億円" not in toks and "12.8億円" in toks and "9.85億円" in toks, toks
+
+
+def test_metric_proof_facts_render_their_unit(tmp_path):
+    """{value, unit} の組で書いた fact は単位まで描かれる — 監査が証拠と数える「8,420社」をスライドが
+    「8,420」としか見せないのは矛盾(Codex レビュー、PR #158)。"""
+    deck = {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+        "pattern": "metric_proof", "title": "ARRは12.8億円", "subtitle": "s",
+        "hero": {"label": "ARR", "value": "12.8", "unit": "億円"},
+        "chart": {"type": "column", "unit": "億円", "categories": ["a", "b"],
+                  "series": [{"name": "ARR", "values": [9.85, 12.8]}]},
+        "facts": [{"label": "有料顧客数", "value": "8,420", "unit": "社"}], "assumption": "テスト"}]}
+    spec = tmp_path / "mp.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = tmp_path / "mp.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    texts = [sh.text_frame.text for sh in pptx.Presentation(out).slides[0].shapes if sh.has_text_frame]
+    assert any("8,420社" in t for t in texts), texts
 
 
 def test_column_framework_header_rows_measure_the_real_label():

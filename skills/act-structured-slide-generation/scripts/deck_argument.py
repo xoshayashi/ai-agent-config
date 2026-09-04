@@ -146,14 +146,27 @@ def claim_values(slide: dict) -> list:
     return [v for v in out if isinstance(v, str)]
 
 
+# 図表全体の単位(chart.unit / slide.unit)を付けてよい裸の数の在り処。facts・hero・table のような
+# 隣接する構造の数に chart.unit を付けると「8420」が「8420億円」に化ける(Codex レビュー指摘、PR #158)
+UNIT_SCOPED_KEYS = {"chart", "charts", "series", "values", "items", "bars", "current", "stages", "phases"}
+
+
+def _unit_scoped_values(slide: dict) -> list:
+    """図表そのものの数値(chart の series 値、waterfall の items 等)だけを平らに集める。"""
+    out: list = []
+    _walk(slide, UNIT_SCOPED_KEYS, lambda v: _strings_and_numbers(v, out))
+    return out
+
+
 def exhibit_tokens(slide: dict) -> set[str]:
     """その図表が「示している」数値。"""
     values = exhibit_values(slide)
     tokens = material_tokens(values)
-    # 図表の裸の数値(chart の values 等)も、単位を付けたトークンとして数える
+    # 図表の裸の数値(chart の values 等)も、単位を付けたトークンとして数える — ただし対象は
+    # 図表データそのものだけで、facts / hero / table の数には付けない
     unit = slide.get("unit") or (slide.get("chart") or {}).get("unit")
     if unit:
-        for v in values:
+        for v in _unit_scoped_values(slide):
             # 図表全体の単位を付けるのは「裸の数」だけ。「114%」のように単位を持つ文字列や、
             # 単位と組になった値には付けない(そうしないと 114% が 114億円 に化ける)
             if isinstance(v, bool):
