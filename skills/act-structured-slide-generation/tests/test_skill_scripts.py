@@ -3212,6 +3212,33 @@ def test_metric_proof_hero_must_be_in_its_chart(tmp_path):
     d["slides"][0]["derivation"] = {"kind": "delta", "a": 9.85, "b": 30, "value": 20.15, "unit": "億円"}
     spec.write_text(json.dumps(d, ensure_ascii=False))
     assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # % を引いて億円にはならない: 差・和の被演算子は結果と同じ単位の配列から(Codex レビュー)
+    d["slides"][0]["chart"]["bar"]["values"] = [1, 2]; d["slides"][0]["chart"]["line"]["values"] = [10, 30]
+    d["slides"][0]["hero"] = {"label": "x", "value": "20", "unit": "億円"}
+    d["meta"]["thesis"] = {"statement": "20億円", "value": "20", "unit": "億円"}
+    d["slides"][0]["derivation"] = {"kind": "delta", "a": 10, "b": 30, "value": 20, "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    # 制御値を指すパス(chart.focal_category / chart.y_max)は、たまたま系列と同じ数でも根拠にならない(Codex レビュー)
+    d = deck([1, 3]); d["slides"][0]["chart"].update({"focal_category": 1, "y_max": 3})
+    d["slides"][0]["hero"] = {"label": "差", "value": "2", "unit": "億円"}
+    d["meta"]["thesis"] = {"statement": "差2億円", "value": "2", "unit": "億円"}
+    d["slides"][0]["derivation"] = {"kind": "delta", "a": "chart.focal_category", "b": "chart.y_max", "value": 2, "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    d["slides"][0]["derivation"] = {"kind": "delta", "a": "chart.series[0].values[0]", "b": "chart.series[0].values[1]", "value": 2, "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    # 正負が混じる積み上げの最終カテゴリ(100, -90)は 100 と -90 の山であって、差し引き 10 ではない(Codex レビュー)
+    d = deck([50, 100]); d["slides"][0]["chart"]["type"] = "stacked_column"
+    d["slides"][0]["chart"]["series"].append({"name": "損失", "values": [-40, -90]})
+    d["slides"][0]["hero"] = {"label": "純", "value": "10", "unit": "億円"}
+    d["meta"]["thesis"] = {"statement": "純10億円", "value": "10", "unit": "億円"}
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" in run("audit_argument.py", spec).stdout
+    d["slides"][0]["hero"]["value"] = "100"; d["meta"]["thesis"]["value"] = "100"
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
     # 100%積み上げの最終カテゴリ合計(60+40)は hero 100% の証拠
     d = deck([30, 60]); d["slides"][0]["chart"].update({"type": "stacked_column_100", "unit": "%"})
     d["slides"][0]["chart"]["series"].append({"name": "他", "values": [70, 40]})

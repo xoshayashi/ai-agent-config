@@ -318,12 +318,20 @@ def _same(v: float, val: float, printed: str) -> bool:
     return (v >= 0) == (val >= 0) and matches(v, val, printed)
 
 
+# 図表の値の配列を指すパス(chart.series[0].values、chart.bar.values[-1])。focal_category / y_max のような
+# 制御値や categories を指すパスは、たまたま同じ数でも根拠にならない(Codex レビュー指摘)
+_VALUE_PATH = re.compile(r"^chart(?:\.[a-z_]+|\[\d+\])*\.values(?:\[\d+\])?$")
+# 単位を変えない演算(差・和)は被演算子も結果と同じ単位。率・倍率・構成比は単位が変わる(億円→%)
+_SAME_UNIT_KINDS = ("delta", "sum")
+
+
 def _derivation_grounded(slide: dict, deriv: dict, chart: dict) -> bool:
     """derivation の被演算子が図表の値から取られているか。数はどれかの図表の値と一致、文字列のパスは
-    解決した先が図表の値(配列)であること — categories や制御値を指すパスは根拠にならない(Codex レビュー
-    指摘)。被演算子はひとつの単位の配列にそろって載ること — 億円の棒と % の折れ線の値を混ぜた式は、
-    どちらの図表も証明していない(Claude レビュー指摘)。value / unit / kind と from / to / years / n は
-    結果の宣言や位置の指定であって被演算子ではない。"""
+    値の配列を指し(_VALUE_PATH)、解決した先が図表の値であること。被演算子はひとつの単位の配列に
+    そろって載ること — 億円の棒と % の折れ線の値を混ぜた式はどちらの図表も証明していない(Claude
+    レビュー指摘)。差・和はその単位が結果の単位でもあること — % を引いて億円にはならない(Codex
+    レビュー指摘)。value / unit / kind と from / to / years / n は結果の宣言や位置の指定であって
+    被演算子ではない。"""
     operands = {k: v for k, v in deriv.items()
                 if k not in ("value", "unit", "kind", "label", "years", "from", "to", "n", "index", "at")}
     if not operands:
@@ -335,6 +343,8 @@ def _derivation_grounded(slide: dict, deriv: dict, chart: dict) -> bool:
         if isinstance(node, (int, float)):
             return any(_same(n, float(node), str(node)) for n in nums)
         if isinstance(node, str):
+            if not _VALUE_PATH.match(node.strip()):
+                return False
             try:
                 got = resolve_path(slide, node)
             except Exception:
@@ -347,7 +357,10 @@ def _derivation_grounded(slide: dict, deriv: dict, chart: dict) -> bool:
         if isinstance(node, list):
             return bool(node) and all(ok(v, nums) for v in node)
         return False
-    for unit in (_chart_units(chart) or {""}):
+    units = _chart_units(chart) or {""}
+    if deriv.get("kind") in _SAME_UNIT_KINDS:
+        units = {u for u in units if u == str(deriv.get("unit") or "")} if _chart_units(chart) else units
+    for unit in units:
         nums = _chart_numbers(chart, unit)
         if nums and ok(operands, nums):
             return True
@@ -388,7 +401,11 @@ def _check_hero_in_chart(loc: str, s: dict, errors) -> None:
     if (ctype in ("stacked_column", "stacked_bar", "stacked_column_100") and not kind) or kind == "area":
         last = [to_number((ser.get("values") or [None])[-1]) for ser in series if isinstance(ser, dict)]
         if last and all(v is not None for v in last):
-            shown.append(sum(last))                         # 積み上げの最終カテゴリの合計
+            # 積み上げの最終カテゴリの合計。正負が混じるときは上下に別々の山として描かれるので、
+            # 正の合計と負の合計を別に数え、差し引きの値は数えない(Codex レビュー指摘)
+            pos, neg = [v for v in last if v > 0], [v for v in last if v < 0]
+            shown += [sum(pos)] if pos else []
+            shown += [sum(neg)] if neg else []
     if not any(_same(v, val, printed) for v in shown):
         errors.append(f"{loc}: hero の値 {printed}{h_unit} が chart に無い — "
                       "系列の値か、図表の値から導いた同じ単位の derivation で hero を図表から導く"
