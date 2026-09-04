@@ -30,7 +30,8 @@ from deck_argument import (  # noqa: E402
     lexicon, matches, resolve_path, to_number, visible_strings,
 )
 
-SYNTHESIS = {"executive_summary", "statement", "two_column", "cover", "section_divider", "agenda"}
+SYNTHESIS = {"executive_summary", "statement", "two_column", "column_framework",
+             "cover", "section_divider", "agenda"}
 STRUCTURAL = {"cover", "section_divider", "agenda"}
 FORWARD_PATTERNS = {"roadmap", "guidance_progress"}
 
@@ -296,7 +297,14 @@ def check_thesis(deck, errors) -> None:
         errors.append("meta.thesis に value と unit がない — 結論は数値で言い切る")
         return
     token = f"{value}{unit}".replace(",", "")
-    if not any(token in exhibit_tokens(s) for s in deck.get("slides", [])):
+    # 結論の数値は、図表の数値トークン(数値+単位)か、図表の文字列そのもの(「街づくりの7段階」の
+    # ような構造の数、単位表に無い単位)のどちらかで示されていればよい。構造の数を単位表に足すと、
+    # 「3段階の打ち手」のような語りの数まで出所を要求してしまう(レビュー指摘、2026-09-04)
+    def _shown(s: dict) -> bool:
+        if token in exhibit_tokens(s):
+            return True
+        return any(token in str(v).replace(",", "") for v in exhibit_values(s) if isinstance(v, str))
+    if not any(_shown(s) for s in deck.get("slides", [])):
         errors.append(f"meta.thesis の数値「{token}」を示す図表がどのページにも無い")
 
 

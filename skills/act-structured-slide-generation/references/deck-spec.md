@@ -7,7 +7,9 @@ primitives, not design templates. Choose and combine them after the judgment pro
 
 - Top Level
 - Fields Common To Slides
-- The 21 Patterns
+- The 24 Patterns
+- Layout contract shared by every pattern
+- Argument fields
 - Chart Spec (native types, emphasis/annotation knobs, image chart kinds, annotation layer)
 - Table Spec
 - KPI / Metrics Spec
@@ -58,7 +60,10 @@ name. An absent template resolves to `standard`, which is byte-for-byte the pre-
   noise and it debases real citations. When the whole deck derives from one internal artifact,
   record it once in `meta.basis` (validated, never rendered) and omit per-slide `source`.
 - `assumption` (optional): internal estimate, plan, target, or scenario basis.
-- `note` (optional): definition, caveat, or denominator.
+- `note` (optional): a caveat that changes how a NUMBER on the slide reads — a denominator, a
+  definition, a scope. Never commentary, navigation ("the first row is the entry point") or a
+  restatement of the body; a note on a slide with no number is a defect (`validate_spec` warns).
+  Say those things in the body or in `speaker_notes`.
 - `speaker_notes` (optional): the presenter's TALK SCRIPT only — spoken-form claim,
   evidence walk in reading order, so-what with caveats, bridge to the next slide
   (~150-300 JA chars per content slide, natural spoken register). The script and the
@@ -73,7 +78,7 @@ name. An absent template resolves to `standard`, which is byte-for-byte the pre-
   for a kind the native engine could attempt. Default (unset) keeps native unless the `kind` is
   image-only (combo/area/org_tree/…). Escalate to image only for objects native cannot draw.
 
-## The 21 Patterns
+## The 24 Patterns
 
 ### 1. `cover`
 
@@ -105,8 +110,12 @@ focal/hero flags. Use cards only when side-by-side KPI comparison is the point.
 
 ### 6. `chart_insight`
 
-Chart plus interpretation. Use `chart`, optional `insight`, optional `bullets`, and optional
-`annotation`. The chart must prove the title; the interpretation rail explains the implication.
+Chart plus interpretation. Use `chart`, optional `takeaways` (≤3 heading/body pairs), optional
+`insight`, and optional `annotation`. The chart must prove the title; the interpretation rail
+explains the implication. `layout` chooses the composition: `chart_left` (default — chart 7
+cols, rail 5 cols), `chart_full` (no rail), or `chart_top` (chart full-width above, the
+takeaways in 2-3 columns below — for many-category time series and short, comparable takeaways;
+it also breaks the vertical-split monotony of a run of chart pages).
 
 ### 7. `market_sizing`
 
@@ -139,26 +148,19 @@ needs outcome and evidence of feasibility.
 
 ### 13. `two_column`
 
-Contrast primitive: options, before/after, current/future, problem/solution. Use asymmetry
+Contrast primitive: options, before/after, current/future, problem/solution. The header band text
+is vertically centred on the ink, not the line box. Use asymmetry
 when one side is more important; do not default to equal columns.
 
 ### 14. `process_flow`
 
-Step flow with up to five steps. Include what each step yields. Outcome labels after arrows
+Step flow with up to five steps. Each step takes `label`, optional `desc` (one bold lead line,
+~10 characters at 4 steps, ~8 at 5), `items` (≤3, each ~2 lines at the column width) and optional
+`outcome`. Chevron labels sit on the ink centre of the band (lifted by
+`deck_text.ink_center_offset_in`, like the `two_column` and `column_framework` header bands). Include what each step yields. Outcome labels after arrows
 should be large and centered when they are the key design objects. `focal_step` (0-based,
 default last) picks which step gets the solid emphasis chevron — set it when the title's
 claim hinges on a mid-flow step, so the visual focus matches the argument.
-
-## Argument fields (enforced by `audit_argument.py`)
-
-- `meta.thesis` — `{statement, value, unit}`: the deck's one claim and the figure that settles
-  it. Required; the figure must appear in some slide's exhibit.
-- `derivation` (per slide) — `{kind, value, unit, ...operands}`: how a computed figure was
-  computed. Kinds: `cagr`, `growth`, `multiple`, `share`, `ratio`, `delta`, `sum`. Operands are
-  numbers, lists, or paths into the slide (`"chart.series[0].values"`, `"current.actual"`).
-  The gate recomputes and compares at the precision printed.
-- `qualifier` (per slide) — `{universe, as_of}`: required on a slide that claims a rank or a
-  uniqueness, alongside a `source`.
 
 ### 15. `statement`
 
@@ -209,13 +211,70 @@ and latest-bar emphasis work. This is the native, editable way to do the common 
 grid, each with a CAGR badge" page. Prefer it over an image; escalate an individual cell to the
 image track only if that chart itself needs a kind native cannot draw.
 
+### 22. `column_framework`
+
+Pillar / framework page — the strategy-consulting staple: 2-4 parallel columns, each a header
+band plus a body card, with NO arrows (parallel structure, not sequence; use `process_flow` for
+sequence). `columns: [{label?, heading, focal?, items: [str | {heading, body}], outcome?}]`.
+`label` is a short chip ("01", "Pillar 1") set bold before the heading. When every column has the
+same item count, item *i* starts at the same y in every column (comparison rows read across);
+`outcome` locks a conclusion strip (rule + ▼ + bold line) to the card bottom. One `focal`
+column gets the solid lead header; without a focal, all headers are solid. The header band text is centred both ways, vertically on the ink (the CJK line box is
+lifted by `deck_text.ink_center_offset_in`), not on the line box. Header band and body
+card are drawn square (`tokens.layout.column_framework.radius_pt`, default 0), independent of the
+`layout.card.radius_pt` the other card patterns use. Caps: 2-4 columns,
+≤4 items per column (warn). Argument-wise it is a synthesis page like `two_column`: its numbers
+must be proved elsewhere or carry `source`/`assumption`.
+
+### 23. `metric_proof`
+
+The banker "metric proof page": one hero number cluster on the left (4 cols) and the chart that
+proves it on the right (8 cols). `hero: {label, value, unit, delta, delta_dir, note}`,
+`chart` (native or image kind), optional `facts: [{label, value}]` (≤4 hairline rows). The hero
+stack locks to the chart's plot top, the facts rail locks to the chart bottom, and all slack
+lands between them. `derivation` belongs here whenever the hero is computed from the series.
+
+### 24. `logic_tree`
+
+Issue tree / driver tree / KPI tree drawn with native shapes and connectors (editable). `root:
+{label, value?, unit?}`, `branches: [{label, value?, unit?, focal?, leaves: [str | {label,
+value?}]}]`. Root left, branches middle, leaves right; a branch centres on its leaves, the root
+on all branches; elbow connectors join them. Branch and leaf values are set inline after the
+label (one line each) so eight rows fit the body; the root stacks its value. Caps: 2-4 branches,
+≤3 leaves per branch, and ≤8 rows in total (a leafless branch counts as one row) — beyond that,
+split the tree. Titles may be qualitative (no number required).
+
+## Layout contract shared by every pattern
+
+`tokens.json` → `layout.fill` is the one body-occupancy rule (`build_deck.fit_band`). A block
+sized from its content first grows toward `band_target` × body height, but never past
+`stretch` × its own content (top-anchored containers such as bullet cards use the tighter
+`stretch_top`), and the remainder becomes symmetric air. When content exceeds the body, each
+pattern climbs a *reclaim ladder* (line spacing → item gap → inner padding) before it overflows;
+type is never shrunk, and an overflow is reported by `verify_deck` (text overflowing its frame,
+text straddling a shape edge) rather than hidden. `lint_render` fails a slide whose body
+occupancy is below `occupancy_floor`. `scripts/stress_deck.py` builds every pattern at its
+documented caps (`max`), at its minimum (`min`) and past capacity (`overload`) and is the
+regression guard for this contract.
+
+## Argument fields (enforced by `audit_argument.py`)
+
+- `meta.thesis` — `{statement, value, unit}`: the deck's one claim and the figure that settles
+  it. Required; the figure must appear in some slide's exhibit.
+- `derivation` (per slide) — `{kind, value, unit, ...operands}`: how a computed figure was
+  computed. Kinds: `cagr`, `growth`, `multiple`, `share`, `ratio`, `delta`, `sum`. Operands are
+  numbers, lists, or paths into the slide (`"chart.series[0].values"`, `"current.actual"`).
+  The gate recomputes and compares at the precision printed.
+- `qualifier` (per slide) — `{universe, as_of}`: required on a slide that claims a rank or a
+  uniqueness, alongside a `source`.
+
 ## Chart Spec
 
 Shared by `chart_insight` and `financial_summary`:
 
 ```json
 {
-  "type": "column | stacked_column | bar | line | donut",
+  "type": "column | stacked_column | stacked_column_100 | bar | stacked_bar | line | donut",
   "unit": "unit label",
   "categories": ["2024", "2025", "2026"],
   "series": [
@@ -243,7 +302,7 @@ evidence-emphasis moves are reproduced without a bespoke slide:
   only mutes when its `focal` is explicitly `false`, not merely absent).
 - `value_labels` (bool): direct value labels (defaults on for single series). Prefer direct
   labels over a value axis when the reader needs exact numbers.
-- `segment_labels` (bool, `stacked_column` only): print each component value inside its band.
+- `segment_labels` (bool, stacked types): print each component value inside its band.
   This is the "stacked total + segment values" evidence move; pair it with a total or
   ratio stated in the interpretation rail rather than a fragile total-on-top overlay. Labels are
   ink, so they read best on mid/light segment fills; keep the most saturated-dark segment small
@@ -257,7 +316,7 @@ evidence-emphasis moves are reproduced without a bespoke slide:
 
 ### Image chart kinds (rendered by the image-asset track)
 
-When a chart type is outside the five native types, set `kind` (not `type`) and the chart is
+When a chart type is outside the seven native types, set `kind` (not `type`) and the chart is
 rendered as an Act-styled image. `chart_insight` still supplies the title and `takeaways` rail
 natively around it.
 
@@ -266,7 +325,7 @@ natively around it.
 - `{"kind": "area", "categories": [...], "series": [{"name","values"}, …]}` — stacked-area over time.
 - `{"kind": "line_multi" | "radar" | "scatter" | "bubble" | "waterfall", …}` — see act_assets for fields.
 
-Use an image chart only when the native five cannot express the claim; native charts stay editable.
+Use an image chart only when the native seven cannot express the claim; native charts stay editable.
 
 **Annotation layer (matplotlib-rendered charts/diagrams).** Add `annotations` to attach
 leader-line callout boxes anchored to a specific mark — the recurring IR "point to the driver
@@ -281,7 +340,9 @@ Rules:
 
 - Use bars/columns for comparison, not a single current value.
 - Match the type to the question: `column`/`bar` compare, `line` shows trend, `stacked_column`
-  shows composition over time, `donut` shows a single share split. There is no native `combo`,
+  shows composition over time, `stacked_column_100` shows mix shift (the consulting share-over-time
+  bar — its axis is hidden when `segment_labels` carry the values), `stacked_bar` compares
+  breakdowns horizontally, `donut` shows a single share split. There is no native `combo`,
   `area`, or dual-axis `type`; when amount and rate must be read together, escalate to the
   image-asset `kind: "combo"` (see Image chart kinds above), or keep the second measure on its
   own `line` slide or in a table when separation reads more clearly.

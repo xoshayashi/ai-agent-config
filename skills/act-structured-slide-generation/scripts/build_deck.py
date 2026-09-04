@@ -64,8 +64,10 @@ A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 # 字数バジェット・lint_render の readback 照合と同一実装であることが契約
 import act_theme
 from deck_text import (EA_DIGIT_RUN, MEASURE_OK, SCRIPT_RUN, drawn_line_h, footer_text,
-                       header_slots, hw, ink_slacks, is_prose, ja_len as _ja_len, leading,
-                       resolve_tokens, template_of, text_width_in, wrap_display, wrap_prose)
+                       header_slots, hw, ink_center_offset_in, ink_slacks, is_prose,
+                       ja_len as _ja_len, leading,
+                       resolve_tokens, template_of, text_width_in, wrap_display, wrap_natural,
+                       wrap_prose)
 
 _apply_tokens(resolve_tokens(None))     # import 時は既定(standard) — build() でデッキのテンプレートに差し替える
 
@@ -79,7 +81,8 @@ def _label_w(text: str, size_pt: float, weight: int = 400) -> float:
     return text_width_in(text, size_pt, weight) + size_pt / 72.0 * 0.4 + 0.03
 
 
-def _text_lines(text: str, width_in: float, size_pt: float, weight: int = 400) -> int:
+def _text_lines(text: str, width_in: float, size_pt: float, weight: int = 400,
+                role: str | None = None) -> int:
     """描かれる行数。箱の高さを決める側と、改行を打つ側は同じ答えを見なければならない —
     字数近似で数えると、文節で1行増えたぶんがカードの下側余白から黙って差し引かれる。
 
@@ -90,7 +93,7 @@ def _text_lines(text: str, width_in: float, size_pt: float, weight: int = 400) -
     if not text:
         return 0
     total = 0
-    for line in display_wrap_text(str(text), width_in, size_pt, weight).split("\n"):
+    for line in display_wrap_text(str(text), width_in, size_pt, weight, role).split("\n"):
         w = text_width_in(line, size_pt, weight)
         total += max(1, math.ceil(w / max(0.05, width_in) - 1e-9))
     return max(1, total)
@@ -277,6 +280,23 @@ def grid(col_start: int, col_span: int) -> tuple[float, float]:
     return x, w
 
 
+def fit_band(h: float, content_h: float, *, top_anchored: bool = False,
+             target: float | None = None) -> tuple[float, float]:
+    """本文帯(高さ h)に、内容高 content_h のブロックを置くときの (ブロック高, 上オフセット)。
+
+    占有契約(tokens.layout.fill)を全パターンで1つにする: ブロックはまず band_target × h まで
+    育つが、内容高の stretch 倍を超えては育たない(3行のカードを4inにはしない)。残りは上下対称の
+    余白になる。中身を上寄せで置く器(箇条書きカード)は stretch_top で抑え、底の空洞を防ぐ。
+    パターンごとの 0.82h / 0.50h / 0.58h のような個別の充填係数は持たない — 占有率の揺れは
+    そこから生まれる。"""
+    f = LAY["fill"]
+    target = f["band_target"] if target is None else target
+    stretch = f["stretch_top"] if top_anchored else f["stretch"]
+    block = max(content_h, min(target * h, content_h * stretch))
+    block = min(h, block)
+    return block, max(0.0, (h - block) / 2)
+
+
 def _set_run_fonts(run, size_pt: float, weight: int = 400, color: RGBColor | None = None,
                    ea_latin: bool = False, latin_ea: bool = False,
                    lang: str | None = None) -> None:
@@ -356,31 +376,54 @@ def _add_line_runs(p, text, size_pt, weight, color):
         _set_run_fonts(r, size_pt, weight, color, lang="ja-JP")
 
 
-def display_wrap_text(text: str, w_in: float, size_pt: float, weight: int = 400) -> str:
-    """表示テキストの改行位置を決める。短いラベル・見出し・セル・結論句は文節の切れ目で割り、
-    それ以外(文章、長い表示テキスト)は行を埋めて語の切れ目で割る。手で改行してあるものは素通し。
-    レンダラに折返しを任せる経路はない — 任せると語の途中で切れ目が落ちる。
+_SENTENCE_ENDINGS = tuple("るうくすつぬぶむぐいただずぬ")   # 動詞・形容詞・助動詞の終止形の末尾(体言止めではない)
 
-    行数は「自然折返しの行数 + 1」までを許す。語の途中で割るくらいなら1行増やす、という
-    優先順位 — 増えた1行が箱に入らないなら、それは組版ではなくコピーが長すぎるという意味で、
-    verify_deck の overflow/重なり検査が拾う(直すのはコピーの側)。"""
+
+def _looks_like_label(text: str) -> bool:
+    """短い表示テキストか。句読点を含まず、上限字数以内で、体言止め(名詞・記号・英字で終わる)の
+    もの。動詞や形容詞で終わる短文(「賃貸以外の道をつくる」)は本文の一文として自然折返しに任せる
+    (利用者の指示、2026-09-04: 箇条書きやセルの文に強制改行を入れない)。"""
+    t = text.rstrip()
+    if not t or is_prose(t) or _ja_len(t) > LABEL_MAX_CHARS:
+        return False
+    return not t.endswith(_SENTENCE_ENDINGS)
+
+
+def display_wrap_text(text: str, w_in: float, size_pt: float, weight: int = 400,
+                      role: str | None = None) -> str:
+    """表示テキストの改行位置を決める(2026-09-04、利用者の指示)。
+      - ラベル(矢羽・見出し・結論帯・表の見出し。role="label" か、句読点が無く体言止めの短文):
+        文節の切れ目でしっかり改行し、行長をそろえる(wrap_display)
+      - 本文(文章、箇条書きの文、セルの文): 改行を入れない。自然折返しがカタカナ語・英単語・数量の
+        途中に落ちるときと最終行が1字のときだけ、その箇所に改行を打つ(wrap_natural)
+    手で改行してあるものは素通し。役割を渡さない呼び出しは文面から推定する。"""
     if not isinstance(text, str) or "\n" in text:
         return text
-    if not is_prose(text) and _ja_len(text) <= LABEL_MAX_CHARS:
-        # 短いラベル・見出し・結論句は、意味の切れ目(文節)で割る — 行の切れ目が文体に表れる
+    if role == "label" or (role is None and _looks_like_label(text)):
         natural = math.ceil(text_width_in(text, size_pt, weight) / max(0.05, w_in))
         broken = wrap_display(text, w_in, size_pt,
                               min(DISPLAY_WRAP_MAX_LINES, natural + 1), weight)
         if "\n" in broken:
             return broken
-    # 文章・長い表示テキスト、および文節で割れなかったもの: 自然に行を埋め、語が割れる行だけ
-    # その語を次行へ送る(行の埋まりを保ったまま、語は割らない)
-    return wrap_prose(text, w_in, size_pt, weight)
+    return wrap_natural(text, w_in, size_pt, weight)
+
+
+def _clamp_box(x: float, y: float, w: float, h: float) -> tuple[float, float, float, float]:
+    """枠をスライドの内側に留める。内容が本文帯を超えるとき(コピー過多)、文字は自分の枠から
+    溢れて verify が「overflows box」と名指しする — が、枠そのものがスライドの外へ出ると
+    PowerPoint で掴めないオブジェクトになり、欠陥の種類が変わる。溢れは1種類の欠陥に留める。"""
+    sw, sh = TOKENS["slide"]["width_in"], TOKENS["slide"]["height_in"]
+    x = min(max(0.0, x), sw - 0.1)
+    y = min(max(0.0, y), sh - 0.1)
+    w = max(0.1, min(w, sw - x))
+    h = max(0.1, min(h, sh - y))
+    return x, y, w, h
 
 
 def add_text(slide, x, y, w, h, runs, *, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.TOP,
              line_spacing: float | None = None, space_after_pt: float = 0.0, wrap=True,
-             autosize_off=True, display_wrap=True, role: str | None = None):
+             autosize_off=True, display_wrap=True, role: str | None = None,
+             wrap_role: str | None = None):
     """Add a textbox. `runs` is a list of paragraphs; each paragraph is a list of
     (text, size_pt, weight, color) tuples.
 
@@ -388,6 +431,7 @@ def add_text(slide, x, y, w, h, runs, *, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.
     文節の切れ目へ寄せてから組む。レンダラ任せの折返しは箱の幅だけを見て語の途中で割るので、
     「導入費＋固定利用/料」のように意味の切れ目と行の切れ目がずれる。長い本文には手を出さない
     (DISPLAY_WRAP_MAX_CHARS 超、または DISPLAY_WRAP_MAX_LINES に収まらないものは素通り)。"""
+    x, y, w, h = _clamp_box(x, y, w, h)
     tb = slide.shapes.add_textbox(Inches(x), Inches(y), Inches(w), Inches(h))
     tf = tb.text_frame
     tf.word_wrap = wrap
@@ -397,7 +441,7 @@ def add_text(slide, x, y, w, h, runs, *, align=PP_ALIGN.LEFT, anchor=MSO_ANCHOR.
     # 判断はここで行い、wrap フラグに関係なく文節へ寄せる
     if display_wrap:
         runs = [
-            [(display_wrap_text(para[0][0], w, para[0][1], para[0][2]), *para[0][1:])]
+            [(display_wrap_text(para[0][0], w, para[0][1], para[0][2], wrap_role), *para[0][1:])]
             if len(para) == 1
             else para
             for para in runs
@@ -536,6 +580,7 @@ def stack_block(slide, x, y, w, h, blocks, *, align=PP_ALIGN.LEFT):
                            leading(first["size"], first.get("role")))
     top = y + max(0.0, (h - ink_total) / 2) - above0     # インクが領域の中央に来るよう箱を置く
 
+    x, top, w, h = _clamp_box(x, top, w, h)
     tb = slide.shapes.add_textbox(Inches(x), Inches(top), Inches(w), Inches(h))
     tf = tb.text_frame
     tf.word_wrap = True
@@ -552,7 +597,7 @@ def stack_block(slide, x, y, w, h, blocks, *, align=PP_ALIGN.LEFT):
             parts = [(display_wrap_text(parts[0][0], w, parts[0][1], parts[0][2]), *parts[0][1:])]
         for part in parts:
             _add_script_runs(p, part[0], part[1], part[2], part[3])
-    tb.height = Inches(_stack_drawn_h(blocks, w))
+    tb.height = Inches(_clamp_box(x, top, w, _stack_drawn_h(blocks, w))[3])
     return tb, ink_total
 
 
@@ -604,9 +649,16 @@ def _strip_style(sh):
 
 
 def add_rect(slide, x, y, w, h, fill: RGBColor | None, *, line: RGBColor | None = None,
-             line_w_pt: float = 0.75, radius_pt: float = 0.0, dash: str | None = None):
+             line_w_pt: float = 0.75, radius_pt: float = 0.0, dash: str | None = None,
+             name: str | None = None):
+    """name: 図形の役割を pptx に残す("card" = 本文を上寄せで積むカード)。verify_deck の
+    カード本文量の検査はこの名前の図形だけを見る — 章扉の側面パネルやロードマップのセルは
+    同じ塗りでもカードではない(2026-09-04)。"""
     shape_type = MSO_SHAPE.ROUNDED_RECTANGLE if radius_pt > 0 else MSO_SHAPE.RECTANGLE
+    x, y, w, h = _clamp_box(x, y, w, h)
     sh = slide.shapes.add_shape(shape_type, Inches(x), Inches(y), Inches(w), Inches(h))
+    if name:
+        sh.name = name
     if radius_pt > 0:
         frac = min(0.5, (radius_pt / 72.0) / max(0.01, min(w, h)))
         sh.adjustments[0] = frac
@@ -632,6 +684,9 @@ def add_rect(slide, x, y, w, h, fill: RGBColor | None, *, line: RGBColor | None 
 
 
 def add_line(slide, x1, y1, x2, y2, color: RGBColor, w_pt: float = 0.75, dash: str | None = None):
+    sw, sh_ = TOKENS["slide"]["width_in"], TOKENS["slide"]["height_in"]
+    x1, x2 = (min(max(0.0, v), sw) for v in (x1, x2))
+    y1, y2 = (min(max(0.0, v), sh_) for v in (y1, y2))
     ln = slide.shapes.add_connector(MSO_CONNECTOR.STRAIGHT, Inches(x1), Inches(y1), Inches(x2), Inches(y2))
     ln.line.color.rgb = color
     ln.line.width = Pt(w_pt)
@@ -647,6 +702,7 @@ def add_line(slide, x1, y1, x2, y2, color: RGBColor, w_pt: float = 0.75, dash: s
 def add_chevron(slide, x, y, w, h, fill: RGBColor, tip_in: float = 0.30):
     # 矢羽は常に左辺フラットの PENTAGON(ホームベース形)。左に窪みのある CHEVRON は
     # 「前工程から食い込まれる」形で、Act ではどの位置のステップにも使わない(全パターン共通)
+    x, y, w, h = _clamp_box(x, y, w, h)
     sh = slide.shapes.add_shape(MSO_SHAPE.PENTAGON, Inches(x), Inches(y), Inches(w), Inches(h))
     sh.fill.solid()
     sh.fill.fore_color.rgb = fill
@@ -704,7 +760,9 @@ def title_lines(title: str, pattern: str = "default") -> int:
 
 
 def header_offset(spec: dict) -> float:
-    return 0.26 if spec.get("kicker") else 0.0
+    """ヘッダー上のキッカーは廃止(ヘッダーの統一性を崩す)。描画もオフセットも持たない —
+    validate_spec が警告し、build は黙って無視する。"""
+    return 0.0
 
 
 def header_metrics(spec: dict) -> dict:
@@ -743,9 +801,6 @@ def add_chrome(slide, spec: dict, page_no: int, total: int, deck: dict) -> None:
     オブジェクトになるだけで、地の色はスライドの背景に任せればよい。"""
     hdr = LAY["header"]
     m = header_metrics(spec)
-    if spec.get("kicker"):
-        add_text(slide, hdr["title_x_in"], 0.18, hdr["title_w_in"], 0.26,
-                 [[(spec["kicker"], 13, 600, C["ink_faint"])]])
     add_text(slide, hdr["title_x_in"], m["title_y"], hdr["title_w_in"], m["title_h"],
              [[(spec.get("title", ""), m["t_size"], 700, C["ink"])]], line_spacing=1.16)
     if spec.get("subtitle"):
@@ -816,10 +871,14 @@ def add_insight_bar(slide, spec: dict) -> None:
 CHART_TYPES = {
     "column": XL_CHART_TYPE.COLUMN_CLUSTERED,
     "stacked_column": XL_CHART_TYPE.COLUMN_STACKED,
+    "stacked_column_100": XL_CHART_TYPE.COLUMN_STACKED_100,   # 構成比の推移(ミックスシフト)
     "bar": XL_CHART_TYPE.BAR_CLUSTERED,
+    "stacked_bar": XL_CHART_TYPE.BAR_STACKED,                  # 横積み(内訳の比較)
     "line": XL_CHART_TYPE.LINE,
     "donut": XL_CHART_TYPE.DOUGHNUT,
 }
+BAR_FAMILY = {"column", "bar", "stacked_column", "stacked_column_100", "stacked_bar"}
+STACKED = {"stacked_column", "stacked_column_100", "stacked_bar"}
 
 
 def _chart_ea_fonts(chart) -> None:
@@ -896,16 +955,17 @@ def add_act_chart(slide, x, y, w, h, cspec: dict):
 
     if ctype != "donut":
         plot = chart.plots[0]
-        if ctype in ("column", "bar", "stacked_column"):
+        if ctype in BAR_FAMILY:
             plot.gap_width = CH["gap_width_pct"]
-            if nseries > 1 and ctype != "stacked_column":
+            if nseries > 1 and ctype not in STACKED:
                 plot.overlap = CH["overlap_pct"]
         cat_ax, val_ax = chart.category_axis, chart.value_axis
         show_labels = cspec.get("value_labels", nseries == 1)
         # 積み上げ棒のセグメント内ラベル(各構成値を帯の中に直接表示。IR頻出の
         # 「セグメント値+合計」型の証拠を型に依存せず出せるようにする opt-in)。
-        seg_labels = bool(cspec.get("segment_labels")) and ctype == "stacked_column"
-        axisless = cspec.get("axis_less", show_labels and nseries == 1 and ctype in ("column", "bar", "line"))
+        seg_labels = bool(cspec.get("segment_labels")) and ctype in STACKED
+        axisless = cspec.get("axis_less", (show_labels and nseries == 1 and ctype in ("column", "bar", "line"))
+                             or seg_labels)   # 帯の中に値があるなら軸は要らない(100%積み上げの "1,1,0" を消す)
         val_ax.has_major_gridlines = True
         val_ax.major_gridlines.format.line.color.rgb = C["chart_gray_light"]
         val_ax.major_gridlines.format.line.width = Pt(CH["gridline_width_pt"])
@@ -914,6 +974,8 @@ def add_act_chart(slide, x, y, w, h, cspec: dict):
         val_ax.tick_labels.font.size = Pt(TS["chart_axis"])
         val_ax.tick_labels.font.color.rgb = C["ink_faint"]
         axis_fmt = cspec.get("axis_number_format") or cspec.get("number_format")
+        if ctype == "stacked_column_100" and not cspec.get("axis_number_format"):
+            axis_fmt = "0%"                      # 100%積み上げの軸は比率(0-1)で刻まれる
         if axis_fmt:
             val_ax.tick_labels.number_format = axis_fmt
             val_ax.tick_labels.number_format_is_linked = False
@@ -948,6 +1010,8 @@ def add_act_chart(slide, x, y, w, h, cspec: dict):
                 dl.position = XL_LABEL_POSITION.CENTER   # 帯の中央にセグメント値
             elif ctype in ("column", "bar"):
                 dl.position = XL_LABEL_POSITION.OUTSIDE_END
+            elif ctype in STACKED:
+                dl.position = XL_LABEL_POSITION.CENTER   # 積み上げは OUTSIDE_END を持てない
             elif ctype == "line":
                 dl.position = XL_LABEL_POSITION.ABOVE
     _chart_ea_fonts(chart)
@@ -1039,8 +1103,9 @@ def p_section_divider(slide, spec, deck):
     # number 省略時は数字の段をレイアウトから除く(96pt 分の空洞をバーがブラケットしない)
     num_h = num_pt / 72.0 * 1.12 if has_num else 0.0
     num_gap = 0.08 if has_num else 0.0
-    title_h = 0.55
-    desc_h = 0.55 if spec.get("desc") else 0.0
+    # 見出し・説明の高さは級数から(固定 0.55 だと bold テンプレートの 36pt が説明に重なる)
+    title_h = drawn_line_h(TS["divider_title"]) + 0.06
+    desc_h = (drawn_line_h(TS["divider_desc"], None, 1.3) + 0.12) if spec.get("desc") else 0.0
     block_h = num_h + num_gap + title_h + desc_h
     by = H / 2 - block_h / 2 - 0.25
     block_cy = by + block_h / 2
@@ -1184,17 +1249,17 @@ def p_kpi_dashboard(slide, spec, deck):
 
     stacks = [card_blocks(k) for k in kpis]
     inner_hs = [stack_optical_height(b, text_w) for b in stacks]
-    content_h = max(inner_hs) + 2 * pad
-    rh = min((h - gut * (rows - 1)) / rows, max(1.30, content_h))
-    # 器と中身のサイズを釣り合わせる: 多段ダッシュボードは本文領域を充填して浮いた帯を防ぐ。
-    # 1段(4枚以下)は内容高のカードのまま、行そのものを本文内で中央寄せし、余白はカード内では
-    # なく行の外側に置く(背の高い空カードを作らない)
-    if rows > 1:
-        rh = max(rh, min((h - gut * (rows - 1)) / rows, (0.58 * h - gut * (rows - 1)) / rows))
-    else:
-        rh = max(rh, min(h - 0.20, 0.50 * h))
-    block_h = rows * rh + (rows - 1) * gut
-    y_base = y0 + 0.05 + max(0.0, (h - block_h) * 0.44)
+    stack_h = max(inner_hs)
+    content_h = max(1.30, stack_h + 2 * pad)
+    # 器と中身のサイズは占有契約(fit_band)が釣り合わせる: 段数によらず同じ規則で本文帯を
+    # 埋め、余りは上下対称の余白になる(カードの外側に置く — 背の高い空カードは作らない)
+    block_h, off = fit_band(h, rows * content_h + (rows - 1) * gut)
+    rh = (block_h - (rows - 1) * gut) / rows
+    y_base = y0 + off
+    # 横に並ぶ数値は同じ高さで読めることが先: 各カードの積みを「いちばん高い積み」の帯の
+    # 中央から同じ y で始める(カードごとに自分のインク高で中央寄せすると、注記の行数が
+    # 違うカードで値の高さがずれる)。ラベルは1行(kpi_label_max_chars)なので値の行も揃う
+    stack_top = pad + max(0.0, (rh - 2 * pad - stack_h) / 2)
     for i, k in enumerate(kpis):
         r_, c_ = divmod(i, cols)
         x = MX + c_ * (cw + gut)
@@ -1204,7 +1269,7 @@ def p_kpi_dashboard(slide, spec, deck):
                  C["primary_pale"] if k.get("focal") else C["surface_tint"],
                  radius_pt=LAY["card"]["radius_pt"])
         # インクの隙間で組む: 値の上下(ラベル・注記)が同じ余白で座り、上下インセットも対称
-        stack_block(slide, x + pad, y + pad, text_w, rh - 2 * pad, stacks[i])
+        stack_block(slide, x + pad, y + stack_top, text_w, inner_hs[i], stacks[i])
 
 
 def _focal_bar_anchor(cx, cw, cspec):
@@ -1287,6 +1352,30 @@ def p_chart_insight(slide, spec, deck):
     takeaways = spec.get("takeaways", [])
     chart = spec["chart"]
     akind = _asset_kind(chart)
+    if layout == "chart_top" and takeaways:
+        # 図表を全幅で上に、要点を下に横並び(2-3列)。カテゴリの多い時系列や、要点が短く
+        # 横に並べて比べたいときの構図 — 縦分割(chart_left)の単調さを散らす
+        n = min(3, len(takeaways))
+        cx, cw = grid(0, 12)
+        gut = LAY["gutter_in"]
+        col_w = (cw - gut * (n - 1)) / n
+        blocks = [_rail_blocks([t]) for t in takeaways[:n]]
+        row_h = max(_stack_drawn_h(b, col_w - 0.1) for b in blocks) if blocks else 0.0
+        rail_h = row_h + 0.30
+        chart_y, chart_h = y0 + 0.22, h - rail_h - 0.48
+        if akind:
+            place_asset(slide, chart, cx, chart_y, cw, chart_h)
+        else:
+            add_act_chart(slide, cx, chart_y, cw, chart_h, chart)
+            add_unit_note(slide, cx, chart_y, chart.get("unit"))
+            add_chart_annotations(slide, cx, chart_y, cw, chart_h, chart)
+        ry = chart_y + chart_h + 0.30
+        add_line(slide, cx, ry, cx + cw, ry, C["rule"], 0.75)
+        for i, b in enumerate(blocks):
+            tx = cx + i * (col_w + gut)
+            add_rect(slide, tx, ry, 0.5, 0.045, C["primary"])
+            stack_block(slide, tx, ry + 0.18, col_w - 0.1, stack_optical_height(b, col_w - 0.1), b)
+        return
     if layout == "chart_full" or not takeaways:
         cx, cw = grid(0, 12)
         if akind:
@@ -1699,6 +1788,12 @@ def p_competitive_landscape(slide, spec, deck):
                 max_w=max(0.6, right_edge - (cx + cw_ + 0.10)))
     _axis_label(ay.get("high", ""), cx + cw_ / 2, cy - 0.30, PP_ALIGN.CENTER)
     _axis_label(ay.get("low", ""), cx + cw_ / 2, cy + size + 0.06, PP_ALIGN.CENTER)
+    # 点そのものも障害物: ラベルが隣の点の上に載ると、どの点の名前か読めなくなる
+    for pl in spec.get("players", []):
+        dot_ = 0.5 if pl.get("focal") else 0.3
+        ddx = cx + pl["x"] * cw_ - dot_ / 2
+        ddy = cy + (1 - pl["y"]) * size - dot_ / 2
+        placed.append((ddx, ddy, ddx + dot_, ddy + dot_))
     for pl in spec.get("players", []):
         dot = 0.5 if pl.get("focal") else 0.3
         dx = cx + pl["x"] * cw_ - dot / 2
@@ -1715,9 +1810,31 @@ def p_competitive_landscape(slide, spec, deck):
         weight = 600 if pl.get("focal") else 400
         lab_w = _label_w(pl["name"], lab_pt, weight)          # 実測幅 = 1行に収まり、余分な枠を持たない
         lab_h = lab_pt / 72.0 * leading(lab_pt) + 0.02
-        lx, ly = dx + dot / 2 - lab_w / 2, dy + dot + 0.02
-        # 逃げ先は図の中(下の軸ラベルの手前)まで
-        ly = _free_below(placed, lx, ly, lab_w, lab_h, limit=cy + size - 0.02)
+        # ラベルは点の「そば」に置く: 下 → 右 → 左 → 上 の順に、他のラベルとも軸の語とも
+        # 触れない最初の位置を採る。下へ押し流すだけだと、近い2点のラベルが別の点の下に
+        # 落ちて対応が読めなくなる(SAP のラベルが Oracle の点の下に付く)
+        cands = [
+            (dx + dot / 2 - lab_w / 2, dy + dot + 0.02),                  # 下
+            (dx + dot + 0.06, dy + dot / 2 - lab_h / 2),                  # 右
+            (dx - 0.06 - lab_w, dy + dot / 2 - lab_h / 2),                # 左
+            (dx + dot / 2 - lab_w / 2, dy - 0.02 - lab_h),                # 上
+        ]
+
+        def _clear(lx_, ly_):
+            if lx_ < cx - 0.02 or lx_ + lab_w > cx + cw_ + 0.02:
+                return False
+            if ly_ < cy - 0.02 or ly_ + lab_h > cy + size + 0.02:
+                return False
+            return not any(lx_ < b[2] and b[0] < lx_ + lab_w and ly_ < b[3] and b[1] < ly_ + lab_h
+                           for b in placed)
+        lx, ly = cands[0]
+        for cx_, cy__ in cands:
+            if _clear(cx_, cy__):
+                lx, ly = cx_, cy__
+                break
+        else:
+            # 四方とも塞がっている = 点が密すぎる。下へ逃がすが、図の中(軸の語の手前)まで
+            ly = _free_below(placed, lx, ly, lab_w, lab_h, limit=cy + size - 0.02)
         placed.append((lx, ly, lx + lab_w, ly + lab_h))
         add_text(slide, lx, ly, lab_w, lab_h,
                  [[(pl["name"], lab_pt, weight,
@@ -1785,6 +1902,12 @@ def p_waterfall(slide, spec, deck):
     n = len(items)
     slot = w / n
     bar_w = slot * 0.62
+    # 値ラベルはバーの上に「浮かせる」。箱の高さは実描画の行高(drawn_line_h)から取り、
+    # 下端をバー上端の LABEL_GAP 上に揃える — 公称の 0.22in 箱に 15.5pt を上寄せで入れると
+    # 字面がバーの縁をまたいで描かれる(実際に起きた欠陥。verify の straddle 検査が拾う)
+    lab_pt = TS["chart_label"]
+    lab_h = drawn_line_h(lab_pt) + 0.02
+    LABEL_GAP = 0.05
     add_line(slide, x, zero_y, x + w, zero_y, C["chart_gray"], 0.75)
     for i, (it, (lo, hi)) in enumerate(zip(items, levels)):
         v = float(it["value"])
@@ -1812,8 +1935,9 @@ def p_waterfall(slide, spec, deck):
             label_v = ("△" if v < 0 else "+") + mag  # IR 慣行: 負値は - でなく △
         else:
             label_v = f"{v:,.1f}".rstrip("0").rstrip(".")
-        add_text(slide, bx - slot * 0.19, y_top - 0.26, slot, 0.22,
-                 [[(label_v, TS["chart_label"], 600, C["ink"])]], align=PP_ALIGN.CENTER)
+        add_text(slide, bx - slot * 0.19, y_top - LABEL_GAP - lab_h, slot, lab_h,
+                 [[(label_v, lab_pt, 600, C["ink"])]], align=PP_ALIGN.CENTER,
+                 anchor=MSO_ANCHOR.BOTTOM)
         add_text(slide, x + i * slot + 0.02, base_y + chart_h + 0.08, slot - 0.04, 0.55,
                  [[(it.get("label", ""), TS["chart_axis"], 600, C["ink_subtle"])]], align=PP_ALIGN.CENTER, line_spacing=1.05)
     add_unit_note(slide, x, y0 + 0.0, spec.get("unit"))
@@ -1874,17 +1998,19 @@ def p_roadmap(slide, spec, deck):
         # 余りは全行へ均等に配り、収まらない場合のみ等率で縮小する。
         avail = h - ph_h - 0.35
         cell_w = pw - 0.34
-        line_cell = TS["body_small"] / 72.0 * 1.2 * 1.13  # 描画 line_spacing=1.2 + 和文行ボックス補正
-        V_PAD = 0.30                                       # セル内の上下余白合計(対称)
-        slot_gap = 0.12                                    # 行スロット間ギャップ
-        mins = []
-        for row in rows:
-            ln = 1
-            for c_i in range(n):
-                cell = (row.get("cells") or [""] * n)[c_i] if c_i < len(row.get("cells", [])) else ""
-                if cell:
-                    ln = max(ln, _text_lines(str(cell), cell_w, TS["body_small"], 400))
-            mins.append(ln * line_cell + V_PAD + slot_gap)
+        # 入らないときは余白から詰める(reclaim ladder): 行間 → セル内余白 → 行間ギャップ。型は縮めない
+        for CELL_LS, V_PAD, slot_gap in ((1.2, 0.30, 0.12), (1.12, 0.18, 0.08), (1.06, 0.12, 0.06)):
+            line_cell = TS["body_small"] / 72.0 * CELL_LS * 1.13  # 描画 line_spacing + 和文行ボックス補正
+            mins = []
+            for row in rows:
+                ln = 1
+                for c_i in range(n):
+                    cell = (row.get("cells") or [""] * n)[c_i] if c_i < len(row.get("cells", [])) else ""
+                    if cell:
+                        ln = max(ln, _text_lines(str(cell), cell_w, TS["body_small"], 400))
+                mins.append(ln * line_cell + V_PAD + slot_gap)
+            if sum(mins) <= avail:
+                break
         extra = (avail - sum(mins)) / max(1, len(mins))
         if extra >= 0:
             slots = [m + extra for m in mins]
@@ -1903,7 +2029,7 @@ def p_roadmap(slide, spec, deck):
                 if cell:
                     add_text(slide, cx_ + 0.14, yy, cell_w, slot - slot_gap,
                              [[(str(cell), TS["body_small"], 400, C["ink_subtle"])]],
-                             line_spacing=1.2, anchor=MSO_ANCHOR.MIDDLE)
+                             line_spacing=CELL_LS, anchor=MSO_ANCHOR.MIDDLE)
             yy += slot
     else:
         row_h = h - ph_h - 0.35
@@ -1918,18 +2044,13 @@ def p_roadmap(slide, spec, deck):
                         line_spacing=1.25, space_after_pt=7, anchor=MSO_ANCHOR.MIDDLE)
 
 
-def p_two_column(slide, spec, deck):
-    y0, h = body_region(spec)
-    # card height follows the measured content of the fuller side (container ≒ content),
-    # then the block is centered — a full-height card over short content reads as neglect
-    HEAD_H, CONTENT_TOP, ITEM_GAP = 0.54, 0.80, 0.22  # ヘッダー帯と本文に上下の余裕を与える
-    # 行高の見積りは「描画と同じ line_spacing × 和文行ボックス補正 1.22(LibreOffice実測)」
-    # で行う。補正が甘いと不足分がすべてカード下側の内側余白から差し引かれ、下縁だけ
-    # 文字が近接する(上下余白の非対称は欠陥)。見出し行も同係数+space_after 実寸で積む。
-    LINE_H = (TS["body"] / 72.0) * 1.28 * 1.22
-    HEAD_LINE = (TS["body_small"] / 72.0) * 1.28 * 1.22 + 3 / 72.0
+def _two_column_layout(spec: dict, h: float) -> dict:
+    """2列ページの寸法(カード高、左右の項目ブロック高)。描画と card_copy_estimate が共有する。"""
+    HEAD_H = 0.54
     _, w_probe = grid(0, 6)
-    def _blocks(blk, w):
+
+    def _blocks(blk, w, ls, head_line):
+        line_h = (TS["body"] / 72.0) * ls * 1.22
         out = []
         for it in blk.get("items", []):
             head = it.get("heading") if isinstance(it, dict) else None
@@ -1938,38 +2059,60 @@ def p_two_column(slide, spec, deck):
             #   見出しあり → add_text(幅 w - 0.4)
             #   見出しなし → add_bullets(箱 w - 0.48、本文はさらに字下げ分だけ狭い)
             # 字下げ幅を直値で持たないこと — 変えたときにここだけ古い前提が残る
-            # (p_process_flow で実際に起きた)
             text_w = (w - 0.4) if head else (w - 0.48 - BULLET_INDENT_IN)
-            out.append((HEAD_LINE if head else 0.0)
-                       + _text_lines(body, text_w, TS["body"], 400) * LINE_H + 0.06)
+            out.append((head_line if head else 0.0)
+                       + _text_lines(body, text_w, TS["body"], 400) * line_h + 0.06)
         return out
-    side_blocks = {s: _blocks(spec.get(s, {}), w_probe) for s in ("left", "right")}
-    # 対比プリミティブの item は左右で行単位に比較される。item 数が同じ場合は各行の
-    # 高さを max(左, 右) に揃えて両カラムを同じ y から描く — 揃えないと行の対応が
-    # 崩れ、片側だけ下へずれた「配置ズレ」に見える。数が違う場合のみ独立に流す。
-    # カードの下側内側余白は上側(CONTENT_TOP - HEAD_H)と対称にする。内容実測高の
-    # 末尾 ITEM_GAP を除いた上で同値の余白を積む(下側だけ痩せた非対称は欠陥)
-    BOT_PAD = CONTENT_TOP - HEAD_H
-    aligned = bool(side_blocks["left"]) and len(side_blocks["left"]) == len(side_blocks["right"])
-    if aligned:
-        rows_h = [max(a, b) for a, b in zip(side_blocks["left"], side_blocks["right"])]
-        # ブロックの行送り(ピッチ)は可能な限り均一にする。行ごとの max 高のままだと、
-        # 折返し見積りの境界揺れがそのまま「1-2 個目だけ間隔が広い」不揃いに見える。
-        # 均一ピッチ(全ブロック中の最大高)が領域に収まるときは常に優先し、
-        # 収まらないときのみ行別高へフォールバックする。
-        pitch = max(rows_h)
-        n_rows = len(rows_h)
-        if CONTENT_TOP + pitch * n_rows + ITEM_GAP * (n_rows - 1) + BOT_PAD <= h - 0.1:
-            rows_h = [pitch] * n_rows
-        content_h = sum(rows_h) + n_rows * ITEM_GAP
-    else:
-        content_h = max((sum(b) + len(b) * ITEM_GAP) for b in side_blocks.values()) or 0.4
-    card_h = min(h - 0.1, max(1.9, CONTENT_TOP + content_h - ITEM_GAP + BOT_PAD))
-    y_top = y0 + 0.05 + max(0.0, (h - 0.1 - card_h) * 0.44)
+
+    # 入らないときは余白から詰める(reclaim ladder): 行間 → 項目間 → 帯と本文の余裕。型は縮めない。
+    # 行高の見積りは「描画と同じ line_spacing × 和文行ボックス補正 1.22(LibreOffice実測)」
+    # で行う。補正が甘いと不足分がすべてカード下側の内側余白から差し引かれ、下縁だけ
+    # 文字が近接する(上下余白の非対称は欠陥)。見出し行も同係数+space_after 実寸で積む。
+    LADDER = ((1.28, 0.22, 0.80), (1.20, 0.14, 0.72), (1.14, 0.10, 0.66))
+    for LS, ITEM_GAP, CONTENT_TOP in LADDER:
+        HEAD_LINE = (TS["body_small"] / 72.0) * LS * 1.22 + 3 / 72.0
+        side_blocks = {s: _blocks(spec.get(s, {}), w_probe, LS, HEAD_LINE) for s in ("left", "right")}
+        BOT_PAD = CONTENT_TOP - HEAD_H
+        # 対比プリミティブの item は左右で行単位に比較される。item 数が同じ場合は各行の
+        # 高さを max(左, 右) に揃えて両カラムを同じ y から描く — 揃えないと行の対応が
+        # 崩れ、片側だけ下へずれた「配置ズレ」に見える。数が違う場合のみ独立に流す。
+        aligned = bool(side_blocks["left"]) and len(side_blocks["left"]) == len(side_blocks["right"])
+        if aligned:
+            rows_h = [max(a, b) for a, b in zip(side_blocks["left"], side_blocks["right"])]
+            # ブロックの行送り(ピッチ)は可能な限り均一にする。均一ピッチ(全ブロック中の最大高)
+            # が領域に収まるときは常に優先し、収まらないときのみ行別高へフォールバックする。
+            pitch = max(rows_h)
+            n_rows = len(rows_h)
+            if CONTENT_TOP + pitch * n_rows + ITEM_GAP * (n_rows - 1) + BOT_PAD <= h - 0.1:
+                rows_h = [pitch] * n_rows
+            content_h = sum(rows_h) + n_rows * ITEM_GAP
+        else:
+            rows_h = None
+            content_h = max((sum(b) + len(b) * ITEM_GAP) for b in side_blocks.values()) or 0.4
+        card_min = max(1.9, CONTENT_TOP + content_h - ITEM_GAP + BOT_PAD)
+        if card_min <= h - 0.1:
+            break
+    # カード高は占有契約(fit_band)。項目は上寄せなので stretch_top で抑える
+    card_h, off = fit_band(h - 0.1, card_min, top_anchored=True)
+    line_h = (TS["body"] / 72.0) * LS * 1.22
+    side_h = {sd: (sum(b) + max(0, len(b) - 1) * ITEM_GAP) for sd, b in side_blocks.items()}
+    return dict(HEAD_H=HEAD_H, LS=LS, ITEM_GAP=ITEM_GAP, CONTENT_TOP=CONTENT_TOP, BOT_PAD=BOT_PAD,
+                side_blocks=side_blocks, rows_h=rows_h, aligned=aligned, card_min=card_min,
+                card_h=card_h, off=off, side_h=side_h, line_h=line_h)
+
+
+def p_two_column(slide, spec, deck):
+    y0, h = body_region(spec)
+    # card height follows the measured content of the fuller side (container ≒ content),
+    # then the block is centered — a full-height card over short content reads as neglect
+    L = _two_column_layout(spec, h)
+    HEAD_H, LS, ITEM_GAP, CONTENT_TOP, BOT_PAD = L["HEAD_H"], L["LS"], L["ITEM_GAP"], L["CONTENT_TOP"], L["BOT_PAD"]
+    side_blocks, rows_h, aligned, card_h, off = L["side_blocks"], L["rows_h"], L["aligned"], L["card_h"], L["off"]
+    y_top = y0 + 0.05 + off
     for side, (c0, span) in (("left", (0, 6)), ("right", (6, 6))):
         blk = spec.get(side, {})
         x, w = grid(c0, span)
-        add_rect(slide, x, y_top, w, card_h, C["surface_tint"], radius_pt=LAY["card"]["radius_pt"])
+        add_rect(slide, x, y_top, w, card_h, C["surface_tint"], radius_pt=LAY["card"]["radius_pt"], name="card")
         mark = blk.get("mark")
         if mark == "cross":
             hd_fill = C["chart_gray"]
@@ -1984,19 +2127,18 @@ def p_two_column(slide, spec, deck):
             head_txt = "× " + head_txt
         elif mark == "check":
             head_txt = "○ " + head_txt
-        add_text(slide, x + 0.16, y_top, w - 0.32, HEAD_H,
-                 [[(head_txt, TS["body_small"], 600, C["canvas"])]], anchor=MSO_ANCHOR.MIDDLE)
-        # 領域キャップでカードが実測内容より低い場合は、下側余白(上側と対称)を犠牲に
-        # せず item 間ギャップを床値(0.10)まで圧縮して収める。床値でも収まらない場合は
-        # コピー量の問題 — スペック側で本文を削る(タイポグラフィは縮小しない)。
-        # aligned 時は行送り(rows)を左右共通にし、各 item を同じ y から描く。
+        # 見出し帯の文字はインクで上下中央にする(行ボックス基準だと字面が下に座る。柱ページと同じ補正)
+        add_text(slide, x + 0.16, y_top - ink_center_offset_in(TS["body_small"]), w - 0.32, HEAD_H,
+                 [[(head_txt, TS["body_small"], 600, C["canvas"])]], anchor=MSO_ANCHOR.MIDDLE, wrap_role="label")
+        # 梯子の最後でも入らない場合は item 間ギャップを床値(0.08)まで圧縮して収める。
+        # それでも収まらない場合はコピー量の問題 — スペック側で本文を削る(タイポグラフィは縮小しない)。
         items = blk.get("items", [])
         blocks = side_blocks[side]
         rows = rows_h if aligned else blocks
         gap_eff = ITEM_GAP
         avail = card_h - CONTENT_TOP - BOT_PAD
         if len(rows) > 1 and sum(rows) + (len(rows) - 1) * ITEM_GAP > avail:
-            gap_eff = max(0.10, (avail - sum(rows)) / (len(rows) - 1))
+            gap_eff = max(0.08, (avail - sum(rows)) / (len(rows) - 1))
         yy = y_top + CONTENT_TOP
         for it, block_h, row_h in zip(items, blocks, rows):
             head = it.get("heading") if isinstance(it, dict) else None
@@ -2004,21 +2146,17 @@ def p_two_column(slide, spec, deck):
             if head:
                 add_text(slide, x + 0.2, yy, w - 0.4, block_h,
                          [[(head, TS["body_small"], 600, C["ink"])], [(body, TS["body"], 400, C["ink_subtle"])]],
-                         line_spacing=1.28, space_after_pt=3)
+                         line_spacing=LS, space_after_pt=3)
             else:
                 add_bullets(slide, x + 0.24, yy, w - 0.48, block_h,
-                            [body], TS["body"], C["ink_subtle"], line_spacing=1.28, space_after_pt=0)
+                            [body], TS["body"], C["ink_subtle"], line_spacing=LS, space_after_pt=0)
             yy += row_h + gap_eff
 
 
-def p_process_flow(slide, spec, deck):
-    """Horizontal step flow with descriptions under each step. Card height follows
-    the fullest step's measured content; the whole block centers in the body region.
-    箇条書きは ●+ぶら下げインデント+段落後スペース、矢羽の矢先はカード右端から
-    少しはみ出させて前進感を作る(参照モック準拠)。"""
-    steps = spec.get("steps", [])
-    y0, h = body_region(spec)
-    x, w = grid(0, 12)
+def _process_flow_layout(steps: list, h: float) -> dict:
+    """流れページの寸法(矢羽の高さ、カードの高さ、各カードの本文高)。描画(p_process_flow)と
+    ビルド前の見積もり(card_copy_estimate → validate_spec)が同じ数で語るための一か所。"""
+    _, w = grid(0, 12)
     n = max(1, len(steps))
     sw = w / n
     gut = LAY["gutter_in"]
@@ -2038,41 +2176,80 @@ def p_process_flow(slide, spec, deck):
     for _ in range(4):                                # 高さは単調に増えるだけなので数回で収束
         head_w = max(HEAD_MIN_W, sw - gut + overhang - head_h * TIP_RATIO - 0.12)
         head_rows = min(HEAD_MAX_ROWS,
-                        max((_text_lines(st.get("label", ""), head_w, HEAD_PT, 600)
+                        max((_text_lines(st.get("label", ""), head_w, HEAD_PT, 600, "label")
                              for st in steps), default=1))
         grown = max(HEAD_MIN_H, head_rows * head_line + 0.20)
         if grown <= head_h + 1e-6:
             break
         head_h = grown
-    line_h = (TS["body"] / 72.0) * 1.30 * 1.22  # 1.22 = 和文フォントの行ボックス補正(実測)
-    sp_h = 8 / 72.0
     card_pad = 0.56  # カード内左右の余白合計に相当する差し引き(gutter 別)
     # 箇条書きはぶら下げインデント(BULLET_INDENT_IN)の分だけ折返し幅が狭い。行数見積もり
     # は描画箱幅からインデントと安全余白を引いた実効幅で行う(引き忘れると card_h が足りず、
     # 折り返した項目が outcome の罫線に食い込む)。字下げ幅を直値で持たないこと — 記号や
     # インデントを変えたときに、ここだけ古い前提のまま残る
-    bullet_text_w = sw - LAY["gutter_in"] - card_pad - BULLET_INDENT_IN - 0.20
+    # 見積もり幅は描画幅そのもの(箱幅 − ぶら下げ)。以前はさらに 0.20in の「安全余白」を引いて
+    # いたが、それが 9字の項目を2行と数え、カードだけが育って下半分が空く原因だった(2026-09-04、
+    # 利用者の指摘)。折返し位置は _text_lines が描画と同じ display_wrap_text で数えるので、
+    # 余白を足す理由がない。ごく小さな計測差だけ 0.04in で吸収する
+    bullet_text_w = sw - LAY["gutter_in"] - card_pad - BULLET_INDENT_IN - 0.04
     outcome_text_w = sw - LAY["gutter_in"] - card_pad
     outcome_pt = TS["section_heading"]
-    content_h = 0.0
     has_outcome = any(st.get("outcome") for st in steps)
-    for st in steps:
-        used = 0.34 if st.get("desc") else 0.0
-        for b in st.get("items", []):
-            used += _text_lines(b, bullet_text_w, TS["body"], 400) * line_h + sp_h
-        content_h = max(content_h, used)
-    outcome_h = 0.0
-    if has_outcome:
+    out_text_h = (max(_text_lines(st.get("outcome", ""), outcome_text_w, outcome_pt, 700, "label")
+                      for st in steps) * (outcome_pt / 72.0) * 1.20 * 1.22) if has_outcome else 0.0
+
+    DESC_GAP = 0.10  # desc(太字の一行)と箇条書きの間の空気。無いと見出しと本文が一塊に見える
+
+    def _content(ls, sp_pt, desc_h):
+        line_h = (TS["body"] / 72.0) * ls * 1.22  # 1.22 = 和文フォントの行ボックス補正(実測)
+        out = []
+        for st in steps:
+            used = (desc_h + DESC_GAP) if st.get("desc") else 0.0
+            for b in st.get("items", []):
+                used += _text_lines(b, bullet_text_w, TS["body"], 400) * line_h + sp_pt / 72.0
+            out.append(used)
+        return out
+
+    # 入らないときは、余白から順に詰める(reclaim ladder): 行間 → 項目間 → 器の内側余白。
+    # 型は縮めない。梯子の最後でも入らなければコピー過多 — verify が溢れを名指しする
+    LADDER = ((1.30, 8, 0.26, 0.34), (1.20, 5, 0.18, 0.30), (1.14, 3, 0.14, 0.28))
+    for LS, SP_PT, PAD_Y, DESC_H in LADDER:
+        own_hs = _content(LS, SP_PT, DESC_H)
+        content_h = max(own_hs) if own_hs else 0.0
         # +0.46 = 罫線とテキストの間のゾーン(罫→▼→テキスト 0.26)+箇条書きとの分離 0.20。
         # outcome のテキスト高は全カードで共有し、罫・▼・結論の y を横一列に揃える
-        outcome_h = max(_text_lines(st.get("outcome", ""), outcome_text_w, outcome_pt, 700)
-                        for st in steps) * (outcome_pt / 72.0) * 1.20 * 1.22 + 0.46
-    # カードの上下内側余白は対称(0.26/0.26)。下側だけ痩せると outcome が下縁に近接する
-    card_h = min(h - head_h - 0.35, max(1.5, 0.26 + content_h + outcome_h + 0.26))
-    # フィルルール: 帯(シェブロン+カード)で本文領域を ~82% まで埋め、上下余白を詰める
-    # (中身はカード内で垂直中央に置く)
-    card_h = max(card_h, min(h - head_h - 0.35, 0.82 * h - head_h - 0.20))
-    y_top = y0 + 0.05 + max(0.05, (h - head_h - 0.25 - card_h - 0.1) * 0.42)
+        outcome_h = (out_text_h + 0.46) if has_outcome else 0.0
+        card_min = max(1.5, PAD_Y + content_h + outcome_h + PAD_Y)
+        if head_h + 0.15 + card_min <= h - 0.10:
+            break
+    # カードの上下内側余白は対称(PAD_Y/PAD_Y)。下側だけ痩せると outcome が下縁に近接する。
+    # カード高は占有契約(fit_band)が決める — 箇条書きは上寄せなので stretch_top で抑え、
+    # 底の空洞を作らない。帯(矢羽+カード)全体を本文帯の中央に置く
+    band_h, off = fit_band(h - 0.10, head_h + 0.15 + card_min, top_anchored=not has_outcome)
+    card_h = band_h - head_h - 0.15
+    line_h = (TS["body"] / 72.0) * LS * 1.22
+    return dict(n=n, sw=sw, gut=gut, overhang=overhang, head_h=head_h, HEAD_PT=HEAD_PT,
+                card_pad=card_pad, bullet_text_w=bullet_text_w, has_outcome=has_outcome,
+                out_text_h=out_text_h, LS=LS, SP_PT=SP_PT, PAD_Y=PAD_Y, DESC_H=DESC_H,
+                DESC_GAP=DESC_GAP, own_hs=own_hs, card_min=card_min, card_h=card_h, off=off,
+                line_h=line_h, outcome_pt=outcome_pt)
+
+
+def p_process_flow(slide, spec, deck):
+    """Horizontal step flow with descriptions under each step. Card height follows
+    the fullest step's measured content; the whole block centers in the body region.
+    箇条書きは ●+ぶら下げインデント+段落後スペース、矢羽の矢先はカード右端から
+    少しはみ出させて前進感を作る(参照モック準拠)。"""
+    steps = spec.get("steps", [])
+    y0, h = body_region(spec)
+    x, w = grid(0, 12)
+    L = _process_flow_layout(steps, h)
+    n, sw, gut, overhang = L["n"], L["sw"], L["gut"], L["overhang"]
+    head_h, HEAD_PT, card_pad = L["head_h"], L["HEAD_PT"], L["card_pad"]
+    has_outcome, out_text_h, outcome_pt = L["has_outcome"], L["out_text_h"], L["outcome_pt"]
+    LS, SP_PT, PAD_Y, DESC_H, DESC_GAP = L["LS"], L["SP_PT"], L["PAD_Y"], L["DESC_H"], L["DESC_GAP"]
+    own_hs, card_h, off = L["own_hs"], L["card_h"], L["off"]
+    y_top = y0 + 0.05 + off
     # 彩度は主役ステップに配給する。デフォルトは到達点(最終ステップ)だが、タイトルの
     # 主張を担うステップが途中にある場合は focal_step で指定する — タイトルの核心と
     # 強調色の位置がずれると、主張と視覚焦点の不一致になる
@@ -2087,43 +2264,38 @@ def p_process_flow(slide, spec, deck):
         label_color = C["canvas"] if i == focal_i else C["primary_deep"]
         add_chevron(slide, sx, y_top, sw - gut + overhang, head_h, head_fill)
         tip = head_h * 0.6  # PENTAGON: 左辺フラット、右にだけ矢先
-        add_text(slide, sx + 0.12, y_top, sw - gut + overhang - tip - 0.12, head_h,
+        # 矢羽の見出しもインクで上下中央にする(柱ページ・2列ページと同じ補正)
+        add_text(slide, sx + 0.12, y_top - ink_center_offset_in(HEAD_PT), sw - gut + overhang - tip - 0.12, head_h,
                  [[(st.get("label", ""), HEAD_PT, 600, label_color)]],
-                 anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.CENTER, wrap=False)
+                 anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.CENTER, wrap=False, wrap_role="label")
         cy = y_top + head_h + 0.15
-        add_rect(slide, sx, cy, sw - gut, card_h, C["surface_tint"], radius_pt=LAY["card"]["radius_pt"])
-        # このカード自身の内容高を実測し、items+outcome を1つの意味グループとして
-        # 垂直中央に置く。outcome をカード下端へ固定すると、短い箇条書きとの間に
-        # 大きな空白帯が生まれる。
-        own_h = (0.34 if st.get("desc") else 0.0)
-        for b in st.get("items", []):
-            own_h += _text_lines(b, bullet_text_w, TS["body"], 400) * line_h + sp_h
-        # 箇条書きは上端固定(上インセット0.26)、結論ストリップ(罫+▼+outcome)はカード
+        add_rect(slide, sx, cy, sw - gut, card_h, C["surface_tint"], radius_pt=LAY["card"]["radius_pt"], name="card")
+        own_h = own_hs[i]
+        # 箇条書きは上端固定(上インセット PAD_Y)、結論ストリップ(罫+▼+outcome)はカード
         # 下端から対称インセットで bottom edge-lock する。行高見積りの誤差はすべて
         # 中間の余白に吸収され、結論が下縁に沈む/浮くことがない。outcome テキスト高は
         # 全カード共有なので、罫・▼・結論の y は横一列に揃う。
-        iy = cy + 0.26
+        iy = cy + PAD_Y
         if st.get("desc"):
             add_text(slide, sx + 0.28, iy, sw - gut - 0.56, 0.28,
                      [[(st["desc"], 14.5, 600, C["ink"])]])
-            iy += 0.34
+            iy += DESC_H + DESC_GAP
         if st.get("outcome"):
-            out_text_h = outcome_h - 0.46
-            ty = cy + card_h - 0.26 - out_text_h
+            ty = cy + card_h - PAD_Y - out_text_h
             bullet_h = max(0.24, min(own_h, ty - 0.46 - iy))
             add_bullets(slide, sx + 0.30, iy, sw - gut - card_pad, bullet_h,
                         st.get("items", []), TS["body"], C["ink_subtle"],
-                        line_spacing=1.30, space_after_pt=8)
+                        line_spacing=LS, space_after_pt=SP_PT)
             add_line(slide, sx + 0.28, ty - 0.26, sx + sw - gut - 0.28, ty - 0.26, C["rule"], 0.5)
             add_text(slide, sx + 0.28, ty - 0.23, sw - gut - 0.56, 0.18,
                      [[("▼", 9, 400, C["primary"])]], align=PP_ALIGN.CENTER)
             add_text(slide, sx + 0.28, ty, sw - gut - 0.56, out_text_h,
                      [[(st["outcome"], outcome_pt, 700, C["ink"])]],
-                     align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE, line_spacing=1.20)
+                     align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE, line_spacing=1.20, wrap_role="label")
         else:
             add_bullets(slide, sx + 0.30, iy, sw - gut - card_pad, max(0.24, own_h),
                         st.get("items", []), TS["body"], C["ink_subtle"],
-                        line_spacing=1.30, space_after_pt=8)
+                        line_spacing=LS, space_after_pt=SP_PT)
 
 
 def _recap_blocks(m, focal=True):
@@ -2160,7 +2332,7 @@ def p_quote_or_statement(slide, spec, deck):
         # 支える一文は「文章」— 行を埋め、語だけ割らずに流す。行長は見出しに寄り添う幅に取り、
         # 右に余白を残す(占有バランス)
         sup_w = min(w, max(lead_w, w * MESSAGE_SUPPORT_MEASURE))
-        sup_lines = (wrap_prose(support, sup_w, sup_pt, 400).split("\n") if support else [])
+        sup_lines = (wrap_natural(support, sup_w, sup_pt, 400).split("\n") if support else [])
         # 高さは「実際に描かれる行の高さ」で取る。公称値で取ると、下に置く見出しが支え文へ寄る
         lead_h = len(lead_lines) * drawn_line_h(s_pt, "statement") + 0.10
         sup_h = (len(sup_lines) * drawn_line_h(sup_pt) + 0.10) if sup_lines else 0.0
@@ -2218,7 +2390,7 @@ def p_quote_or_statement(slide, spec, deck):
         # often wrap one line earlier in the rendered font than the simple JA estimate.
         text_h = (lines + 0.35) * (s_pt / 72.0) * 1.52 * 1.15 + 0.16
         sup_pt = TS["subtitle"]
-        sup_lines = wrap_prose(support, lw, sup_pt).split("\n") if support else []
+        sup_lines = wrap_natural(support, lw, sup_pt).split("\n") if support else []
         sup_h = (len(sup_lines) * drawn_line_h(sup_pt, None, leading(sup_pt)) + 0.06
                  if sup_lines else 0.0)
         sup_gap = 0.22 if sup_lines else 0.0
@@ -2277,7 +2449,7 @@ def p_quote_or_statement(slide, spec, deck):
     lines = sum(max(1, _text_lines(ln, eff_w, s_pt, 700)) for ln in stmt_lines)  # 実効幅で行数見積
     text_h = lines * (s_pt / 72.0) * 1.5 * 1.15 + 0.06  # 1.15 = 和文行ボックス補正
     sup_pt = TS["subtitle"]
-    sup_lines = wrap_prose(support, eff_w, sup_pt).split("\n") if support else []
+    sup_lines = wrap_natural(support, eff_w, sup_pt).split("\n") if support else []
     sup_h = (len(sup_lines) * drawn_line_h(sup_pt, None, leading(sup_pt)) + 0.06
              if sup_lines else 0.0)
     sup_gap = 0.26 if sup_lines else 0.0
@@ -2375,14 +2547,36 @@ def p_financial_highlights(slide, spec, deck):
         hero_items = hero_items[:hero_n]
 
     gap = LAY["gutter_in"]
-    hero_h = min(2.48, max(2.28, h * 0.44))
-    support_h = min(1.66, max(1.50, h * 0.30)) if support_items else 0.0
+    hero_w = (w - gap * (hero_n - 1)) / hero_n
+    wide = hero_w >= 5.0
+    # ヒーローカードの高さは中身から: ラベル行 + 主張(実測行数、狭いカードでは値の上に積む)
+    # + 値 + 指標行。固定 2.28in に 2 行の主張を入れると値の上に載る(ストレス試験で再現)
+    claim_pt = TS["section_heading"]
+    claim_h = 0.0
+    if not wide:
+        claim_h = max((_text_lines(g.get("claim", ""), hero_w - 0.48, claim_pt, 700)
+                       * drawn_line_h(claim_pt) for g, _m in hero_items[:hero_n] if g.get("claim")), default=0.0)
+    VALUE_H = 0.74
     support_heading_h = 0.34 if support_items else 0.0
-    note_h = 0.26 if notes else 0.0
-    group_h = hero_h + (0.40 + support_heading_h + 0.16 + support_h if support_items else 0) + note_h
+    n_support = min(4, len(support_items))
+    # 5件目以降の補助指標は1行の文字列にたたんで注記行と同じ行に置く(別行を増やすと帯を溢れる)
+    if len(support_items) > n_support:
+        notes.insert(0, " / ".join(f"{m.get('label','')}: {m.get('value','')}{m.get('unit','')}"
+                                   for _, m in support_items[n_support:]))
+    note_text = " / ".join(notes)
+    note_h = (_text_lines(note_text, w, TS["body_small"], 400) * drawn_line_h(TS["body_small"]) + 0.04) if notes else 0.0
+    # 入らないときは余白から詰める(reclaim ladder): 帯間ギャップ → カード内の上下余白 → 補助カード高。
+    # (HERO_TOP = 主張の上端, HERO_BOT = 指標行の下の余白, GAP_A = ヒーロー帯と補助見出しの間)
+    for HERO_TOP, HERO_BOT, GAP_A, GAP_B, SUP_MIN in ((0.54, 0.24, 0.40, 0.16, 1.64), (0.46, 0.16, 0.26, 0.10, 1.56),
+                                                      (0.44, 0.12, 0.20, 0.08, 1.56)):
+        hero_h = max(2.28 - (0.54 - HERO_TOP) - (0.24 - HERO_BOT),
+                     HERO_TOP + (claim_h + 0.08 if claim_h else 0.0) + VALUE_H + VALUE_DELTA_GAP_IN + 0.28 + HERO_BOT)
+        support_h = min(1.72, max(SUP_MIN, h * 0.30)) if support_items else 0.0
+        group_h = hero_h + (GAP_A + support_heading_h + GAP_B + support_h if support_items else 0) + note_h
+        if group_h <= h:
+            break
     y = y0 + max(0.03, (h - group_h) * 0.42)
 
-    hero_w = (w - gap * (hero_n - 1)) / hero_n
     any_focal = any(m.get("focal") for _, m in hero_items[:hero_n])
     for i, (g, m) in enumerate(hero_items[:hero_n]):
         hx = x + i * (hero_w + gap)
@@ -2392,44 +2586,60 @@ def p_financial_highlights(slide, spec, deck):
         add_rect(slide, hx + 0.24, y + 0.22, 0.10, 0.10, C["primary"])
         add_text(slide, hx + 0.40, y + 0.15, hero_w - 0.64, 0.30,
                  [[(g.get("label", ""), TS["kpi_label"], 700, C["ink"])]])
-        if g.get("claim"):
-            add_text(slide, hx + 0.24, y + 0.54, hero_w - 0.48, 0.48,
-                     [[(g["claim"], TS["section_heading"], 700, C["ink"])]], line_spacing=1.13)
+        # 幅の広いカード(1-2枚)では、主張(claim)を値の右に置いて面を使い切る。狭いカード
+        # (3枚)では値の上に積む — 右に置く幅がない
+        if g.get("claim") and not wide:
+            add_text(slide, hx + 0.24, y + HERO_TOP, hero_w - 0.48, claim_h + 0.04,
+                     [[(g["claim"], claim_pt, 700, C["ink"])]])
+        elif g.get("claim"):
+            cx_ = hx + hero_w * 0.50
+            add_line(slide, cx_ - 0.2, y + 0.62, cx_ - 0.2, y + hero_h - 0.40, C["rule"], 0.75)
+            add_text(slide, cx_, y + 0.62, hero_w * 0.50 - 0.28, hero_h - 1.02,
+                     [[(g["claim"], TS["section_heading"], 700, C["ink"])]],
+                     line_spacing=1.2, anchor=MSO_ANCHOR.MIDDLE)
         vcolor = C["primary_deep"] if focal else C["ink"]
-        vparts = [(str(m.get("value", "")), TS["kpi_value_hero"], 700, vcolor)]
+        # 主張を右に置いた広いカードでは、値と指標行の枠は左半分だけを持つ(枠の重なりは編集で掴み違える)。
+        # 半分の幅に収まらない値は、カードの数字と同じ物差し(_fit_value_size)で級数を下げる —
+        # 大きいまま置くと仕切り線を越えて主張の列に流れ込む(レビュー指摘、2026-09-04)
+        col_w = (hero_w * 0.50 - 0.44) if (wide and g.get("claim")) else (hero_w - 0.48)
+        vsize = _fit_value_size([m], col_w, TS["kpi_value_hero"]) if (wide and g.get("claim")) else TS["kpi_value_hero"]
+        vparts = [(str(m.get("value", "")), vsize, 700, vcolor)]
         if m.get("unit"):
             vparts.append(_unit_part(m["unit"], 17))
-        value_y = y + 1.02
-        value_h = 0.74
-        add_text(slide, hx + 0.24, value_y, hero_w - 0.48, value_h, [vparts],
+        value_y = y + HERO_TOP + (claim_h + 0.08 if claim_h else 0.0) + 0.10
+        value_h = VALUE_H
+        add_text(slide, hx + 0.24, value_y, col_w, value_h, [vparts],
                  anchor=MSO_ANCHOR.MIDDLE, wrap=False)
         metric_line = m.get("label", "")
         if m.get("delta"):
             metric_line = f"{metric_line}  {m['delta']}"
         metric_y = value_y + value_h + VALUE_DELTA_GAP_IN
-        add_text(slide, hx + 0.24, metric_y, hero_w - 0.48, 0.28,
+        add_text(slide, hx + 0.24, metric_y, col_w, 0.28,
                  [[(metric_line, TS["body"], 700, _delta_color(m.get("delta_dir"), m.get("positive_is_good", True)))]],
                  wrap=False)
 
     if support_items:
-        sy = y + hero_h + 0.40
+        sy = y + hero_h + GAP_A
         add_text(slide, x, sy, w, support_heading_h,
                  [[(spec.get("support_heading", "補助指標"), TS["section_heading"], 700, C["primary_deep"])]])
         add_line(slide, x, sy + support_heading_h + 0.04, x + w, sy + support_heading_h + 0.04, C["rule"], 0.75)
-        card_y = sy + support_heading_h + 0.16
-        n = min(4, len(support_items))
+        card_y = sy + support_heading_h + GAP_B
+        n = n_support
         cw = (w - gap * (n - 1)) / n
         for i, (g, m) in enumerate(support_items[:n]):
             cx = x + i * (cw + gap)
             add_rect(slide, cx, card_y, cw, support_h, C["canvas"], line=C["rule"],
                      radius_pt=LAY["card"]["radius_pt"])
-            add_text(slide, cx + 0.18, card_y + 0.16, cw - 0.36, 0.25,
+            # 値の枠は実描画の行高(34pt ≒ 0.63in)で持つ。0.50 の枠に中央寄せすると字面が枠の上へ
+            # はみ出し、ラベルの字面と重なる(verify が拾った)
+            s_top = 0.16 if support_h >= 1.64 else 0.10
+            add_text(slide, cx + 0.18, card_y + s_top, cw - 0.36, 0.25,
                      [[(m.get("label", ""), TS["kpi_label"], 600, C["ink_subtle"])]], wrap=False)
             vparts = [(str(m.get("value", "")), 34, 700, C["primary_deep"])]
             if m.get("unit"):
                 vparts.append(_unit_part(m["unit"], 15))
-            value_y = card_y + 0.47
-            value_h = 0.50
+            value_y = card_y + s_top + 0.30
+            value_h = drawn_line_h(34) + 0.02
             add_text(slide, cx + 0.18, value_y, cw - 0.36, value_h, [vparts],
                      anchor=MSO_ANCHOR.MIDDLE, wrap=False)
             if m.get("delta"):
@@ -2437,14 +2647,10 @@ def p_financial_highlights(slide, spec, deck):
                 add_text(slide, cx + 0.18, delta_y, cw - 0.36, 0.28,
                          [[(m["delta"], TS["kpi_sub"], 700, _delta_color(m.get("delta_dir"), m.get("positive_is_good", True)))]],
                          wrap=False)
-        if len(support_items) > n:
-            more = " / ".join(f"{m.get('label','')}: {m.get('value','')}{m.get('unit','')}" for _, m in support_items[n:])
-            add_text(slide, x, card_y + support_h + 0.08, w, 0.22,
-                     [[(more, TS["body_small"], 400, C["ink_faint"])]], wrap=False)
 
     if notes:
         add_text(slide, x, y + group_h - note_h + 0.04, w, note_h,
-                 [[(" / ".join(notes), TS["body_small"], 400, C["ink_subtle"])]], wrap=False)
+                 [[(note_text, TS["body_small"], 400, C["ink_subtle"])]])
 
 
 def p_metrics_rows(slide, spec, deck):
@@ -2456,9 +2662,12 @@ def p_metrics_rows(slide, spec, deck):
     gw = (CONTENT_W - gut * (n - 1)) / n
     max_rows = max((len(g.get("rows", [])) for g in columns), default=1)
     has_heading = any(g.get("heading") for g in columns)
-    row_h_all = min(0.95, (h - 0.13 - (0.36 if has_heading else 0.0)) / max(1, max_rows))
-    block_h = (0.36 if has_heading else 0.0) + max_rows * row_h_all
-    y_shift = max(0.0, (h - 0.08 - block_h) * 0.44)
+    head_h = 0.38 if has_heading else 0.0
+    # 行の高さは占有契約から: 行数が少なくても帯を空洞にせず、行送りを広げて埋める(上限 1.05in)
+    block_h, y_shift = fit_band(h - 0.08, head_h + max_rows * 0.72)
+    row_h_all = min(1.05, (block_h - head_h) / max(1, max_rows))
+    block_h = head_h + max_rows * row_h_all
+    y_shift = max(0.0, (h - 0.08 - block_h) / 2)
     for gi, g in enumerate(columns):
         gx = MX + gi * (gw + gut)
         gy = y0 + 0.08 + y_shift
@@ -2500,24 +2709,52 @@ def p_driver_decomposition(slide, spec, deck):
     note_w = max(0.4, cw - 0.3)     # 因数が増えるほどカードは痩せる — 幅は正のまま床を持つ
     note_lines = max((_text_lines(f.get("note", ""), note_w, factor_note_pt, 400) for f in factors),
                      default=0)
-    card_h = min(h - 0.75, max(1.7, 0.30 + 0.34 + 0.66 + (0.46 if has_delta else 0.0)
-                               + (0.12 + note_lines * note_line_h if note_lines else 0.0) + 0.26))
-    cy = y0 + 0.15 + max(0.0, (h - 0.55 - card_h) * 0.44)
+    caption = spec.get("formula_note")
+    if caption is None:
+        labels = [f.get("label", "").split("(")[0] for f in factors]
+        ops_ = spec.get("operators") or (["×"] * (n - 2) + ["="] if n >= 2 else [])
+        parts = []
+        for i, lb in enumerate(labels):
+            parts.append(lb)
+            if i < len(labels) - 1:
+                parts.append(ops_[i] if i < len(ops_) else "×")
+        caption = " ".join(parts)
+    caption_zone = 0.48 if caption else 0.0
+    # 因数カードは占有契約で本文帯を埋める。カードが育ったぶんは「値の塊」と「注記」の間の
+    # 余白になる(値の塊はカード中央、注記は下端ロック) — 空洞を上下に散らさない。
+    # 値の大きさはカード幅に収まるまで下げ(5因数の狭いカードで単位が割れない)、
+    # ラベルの高さは実測の行数から取る
+    inner_w = max(0.4, cw - 0.3)     # 因数が増えるほどカードは痩せる — 幅は正のまま床を持つ
+    vsize = _fit_value_size(factors, inner_w, 34)
+    value_h = drawn_line_h(vsize) + 0.02
+    label_pt = TS["kpi_label"]
+    label_h = max(_text_lines(f.get("label", ""), inner_w, label_pt, 600) for f in factors) * drawn_line_h(label_pt) + 0.02
+    delta_zone = (VALUE_DELTA_GAP_IN + 0.30) if has_delta else 0.0
+    group_h = label_h + 0.06 + value_h + delta_zone
+    note_zone = (0.12 + note_lines * note_line_h + 0.16) if note_lines else 0.0
+    content_h = max(1.7, 0.26 + group_h + note_zone + 0.26)
+    card_h, off = fit_band(h - caption_zone, content_h)
+    if card_h >= 2.6 and cw >= 2.8:
+        vsize = _fit_value_size(factors, inner_w, TS["kpi_value"])   # 背の高いカードは数字もヒーロー級で埋める
+        value_h = drawn_line_h(vsize) + 0.02
+        group_h = label_h + 0.06 + value_h + delta_zone
+    cy = y0 + off
     ops = spec.get("operators") or (["×"] * (n - 2) + ["="] if n >= 2 else [])
     for i, f in enumerate(factors):
         x = MX + i * (cw + op_w + gut * 2)
         emphasized = f.get("focal", i == n - 1)
         add_rect(slide, x, cy, cw, card_h, C["primary_pale"] if emphasized else None,
                  line=None if emphasized else C["rule"], line_w_pt=1.0, radius_pt=8)
-        add_text(slide, x + 0.15, cy + 0.22, cw - 0.3, 0.32,
-                 [[(f.get("label", ""), TS["kpi_label"], 600, C["ink_subtle"])]], align=PP_ALIGN.CENTER)
-        vparts = [(str(f.get("value", "")), 34, 700, C["primary_deep"])]
+        gy = cy + 0.26 + max(0.0, (card_h - 0.52 - note_zone - group_h) / 2)
+        add_text(slide, x + 0.15, gy, cw - 0.3, label_h,
+                 [[(f.get("label", ""), label_pt, 600, C["ink_subtle"])]], align=PP_ALIGN.CENTER)
+        vparts = [(str(f.get("value", "")), vsize, 700, C["primary_deep"])]
         if f.get("unit"):
-            vparts.append(_unit_part(f["unit"], 15))
-        vy = cy + 0.58
-        add_text(slide, x + 0.15, vy, cw - 0.3, 0.55, [vparts], align=PP_ALIGN.CENTER)
+            vparts.append(_unit_part(f["unit"], max(15, vsize * 0.45)))
+        vy = gy + label_h + 0.06
+        add_text(slide, x + 0.15, vy, cw - 0.3, value_h, [vparts], align=PP_ALIGN.CENTER, wrap=False)
         if f.get("delta"):
-            add_text(slide, x + 0.15, vy + 0.55 + VALUE_DELTA_GAP_IN, cw - 0.3, 0.30,
+            add_text(slide, x + 0.15, vy + value_h + VALUE_DELTA_GAP_IN, cw - 0.3, 0.30,
                      [[(f["delta"], TS["kpi_sub"], 600, _delta_color(f.get("delta_dir", "up"), f.get("positive_is_good", True)))]],
                      align=PP_ALIGN.CENTER)
         if f.get("note"):
@@ -2527,15 +2764,6 @@ def p_driver_decomposition(slide, spec, deck):
             add_text(slide, x + cw + gut, cy, op_w, card_h,
                      [[(ops[i] if i < len(ops) else "×", 26, 600, C["ink_subtle"])]],
                      align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
-    caption = spec.get("formula_note")
-    if caption is None:
-        labels = [f.get("label", "").split("(")[0] for f in factors]
-        parts = []
-        for i, lb in enumerate(labels):
-            parts.append(lb)
-            if i < len(labels) - 1:
-                parts.append(ops[i] if i < len(ops) else "×")
-        caption = " ".join(parts)
     if caption:
         add_text(slide, MX, cy + card_h + 0.22, CONTENT_W, 0.26,
                  [[(caption, TS["body_small"], 400, C["ink_faint"])]], align=PP_ALIGN.CENTER)
@@ -2639,13 +2867,15 @@ def p_guidance_progress(slide, spec, deck):
     slot = w / n
     bar_w = slot * 0.55
     add_line(slide, x, base_y + chart_h, x + w, base_y + chart_h, C["chart_gray"], 0.75)
+    bar_lab_h = drawn_line_h(TS["chart_label"]) + 0.02   # ラベルはバーの上に浮かせる(縁をまたがない)
     for i, b in enumerate(bars):
         v = float(b.get("value", 0))
         bh = chart_h * v / top
         bx = x + i * slot + (slot - bar_w) / 2
         add_rect(slide, bx, base_y + chart_h - bh, bar_w, bh, C["chart_gray"])
-        add_text(slide, bx - slot * 0.2, base_y + chart_h - bh - 0.26, bar_w + slot * 0.4, 0.22,
-                 [[(b.get("display", f"{v:,.0f}"), TS["chart_label"], 400, C["ink_subtle"])]], align=PP_ALIGN.CENTER, wrap=False)
+        add_text(slide, bx - slot * 0.2, base_y + chart_h - bh - 0.05 - bar_lab_h, bar_w + slot * 0.4, bar_lab_h,
+                 [[(b.get("display", f"{v:,.0f}"), TS["chart_label"], 400, C["ink_subtle"])]],
+                 align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.BOTTOM, wrap=False)
         add_text(slide, x + i * slot, base_y + chart_h + 0.08, slot, 0.3,
                  [[(b.get("label", ""), TS["chart_axis"], 400, C["ink_subtle"])]], align=PP_ALIGN.CENTER)
     bx = x + len(bars) * slot + (slot - bar_w) / 2
@@ -2657,20 +2887,26 @@ def p_guidance_progress(slide, spec, deck):
     if g_h > a_h + 0.02:
         add_rect(slide, bx, base_y + chart_h - g_h, bar_w, g_h - a_h, None,
                  line=C["primary_deep"], line_w_pt=1.25, dash="dash")
-    lab_h = TS["kpi_sub"] / 72.0 * 1.30          # ラベル1行ぶんの高さ(枠は文字ぶんだけ持つ)
+    # ラベルの枠は実描画の行高で持つ(公称 pt/72×1.30 では和文行ボックスより低く、字面が
+    # 破線枠の縁をまたぐ)。レンジ表記は破線枠の上に浮かせ、上限・下限は枠の右に置く
+    lab_h = drawn_line_h(TS["kpi_sub"]) + 0.02
+    gh_top = base_y + chart_h - g_h
     if cur.get("range_display"):
         range_x = max(x, bx - slot * 0.35)
         range_w = min(bar_w + slot * 0.7, x + w - range_x)
-        add_text(slide, range_x, base_y + chart_h - g_h - 0.34, range_w, lab_h,
-                 [[(cur["range_display"], TS["chart_label"], 700, C["ink"])]], align=PP_ALIGN.CENTER, wrap=False)
+        rl_h = drawn_line_h(TS["chart_label"]) + 0.02
+        add_text(slide, range_x, gh_top - 0.06 - rl_h, range_w, rl_h,
+                 [[(cur["range_display"], TS["chart_label"], 700, C["ink"])]],
+                 align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.BOTTOM, wrap=False)
     g_low = float(cur.get("guidance_low", 0) or 0)
     if g_low and g_low != g_high:
         low_h = chart_h * g_low / top
         add_line(slide, bx, base_y + chart_h - low_h, bx + bar_w, base_y + chart_h - low_h, C["primary_deep"], 0.75)
         # 上限・下限はデータの位置に紐づくので、レンジが狭いと2つのラベルが重なる。
-        # 枠が触れないところまで押し広げる(値の対応は行の高さぶんのズレでは崩れない)
-        hi_y = base_y + chart_h - g_h - 0.07
-        lo_y = max(base_y + chart_h - low_h + 0.04, hi_y + lab_h + 0.04)
+        # 上限は枠の上端のすぐ内側、下限はその下へ押し広げる(値の対応は行の高さぶんの
+        # ズレでは崩れない)。レンジ表記(枠の上)とは縦に離れる
+        hi_y = gh_top + 0.02
+        lo_y = max(base_y + chart_h - low_h - lab_h / 2, hi_y + lab_h + 0.04)
         lab_x = bx + bar_w + 0.08
         hi_txt = "上限 " + f"{g_high:,.0f}".rstrip("0").rstrip(".")
         lo_txt = "下限 " + f"{g_low:,.0f}".rstrip("0").rstrip(".")
@@ -2685,7 +2921,323 @@ def p_guidance_progress(slide, spec, deck):
     add_guidance_side(base_y + 0.2, chart_h)
 
 
+# ---------------------------------------------------------------- consulting structure patterns
+# 戦略コンサルの定番3形: 柱(フレームワーク列)・ロジックツリー・ヒーロー数値+図表の証明ページ。
+# いずれもネイティブ図形+テキストで組む(編集可能)。高さはすべて実測、占有は fit_band が決める。
+
+
+def _node_blocks(nd, pt: float, weight: int = 600, color=None, inline: bool = False):
+    """ツリーの節・柱の見出しなど「ラベル(+値)」の小さな塊。
+
+    inline=False: 値を数値の従属行として積む(根のような大きな節)。
+    inline=True : 値をラベルと同じ行の末尾に太字で置く(枝・葉)。行を増やさないので、
+                  葉が8つ並んでも本文帯に入る — 縦積みだと葉1つが 1.1in になり4つで溢れる。"""
+    label = nd if isinstance(nd, str) else nd.get("label", "")
+    val = None if isinstance(nd, str) else nd.get("value")
+    ink = color or C["ink"]
+    if inline and val not in (None, ""):
+        unit = nd.get("unit", "") if isinstance(nd, dict) else ""
+        return [{"parts": [(label, pt, weight, ink), ("  " + str(val) + unit, pt, 700, C["primary_deep"])],
+                 "size": pt, "kind": "text"}]
+    blocks = [{"parts": [(label, pt, weight, ink)], "size": pt, "kind": "text"}]
+    if val not in (None, ""):
+        vpt = TS["section_heading"]
+        vparts = [(str(val), vpt, 700, C["primary_deep"])]
+        if isinstance(nd, dict) and nd.get("unit"):
+            vparts.append(_unit_part(nd["unit"], 13))
+        blocks.append({"parts": vparts, "size": vpt, "kind": "numeral",
+                       "gap_before": OPT["gap_in"]["metric_subline"], "gap_name": "metric_subline"})
+    return blocks
+
+
+def _column_framework_layout(cols: list, h: float) -> dict:
+    """柱ページの寸法(見出し帯、カード、各列の本文高)。描画と card_copy_estimate が共有する。"""
+    _, w = grid(0, 12)
+    n = len(cols)
+    gut = LAY["gutter_in"]
+    cw = (w - gut * (n - 1)) / n
+    HEAD_PT = TS["body_small"]
+    head_rows = max(_text_lines(("00  " if c.get("label") else "") + c.get("heading", ""),
+                                cw - 0.32, HEAD_PT, 600, "label") for c in cols)
+    head_h = max(0.56, head_rows * drawn_line_h(HEAD_PT) + 0.22)
+    has_outcome = any(c.get("outcome") for c in cols)
+    outcome_pt = TS["section_heading"]
+    # 入らないときは余白から詰める(reclaim ladder): 項目間 → 器の内側余白。型は縮めない
+    for pad, gap_item in ((0.24, OPT["gap_in"]["item"]), (0.16, 0.20), (0.12, 0.14)):
+        text_w = cw - 2 * pad
+        # 行揃え: 全列の項目数が同じときだけ、項目 i の高さを列間の最大に合わせる
+        item_h = [[_stack_drawn_h(_rail_blocks([it]), text_w) for it in c.get("items", [])] for c in cols]
+        same_n = len({len(v) for v in item_h}) == 1 and item_h[0]
+        pitches = [max(col[i] for col in item_h) for i in range(len(item_h[0]))] if same_n else None
+        col_blocks = []
+        for ci, c in enumerate(cols):
+            blocks = []
+            for i, it in enumerate(c.get("items", [])):
+                b = _rail_blocks([it])
+                if blocks and b:
+                    slack = (pitches[i - 1] - item_h[ci][i - 1]) if pitches else 0.0
+                    b[0]["gap_before"] = gap_item + slack
+                    b[0]["gap_name"] = f"row{i}"    # 名前による均一化は列ごとの slack を消すので行ごとに固有
+                blocks.extend(b)
+            col_blocks.append(blocks)
+        body_h = max((_stack_drawn_h(b, text_w) for b in col_blocks if b), default=0.4)
+        out_text_h = (max(_text_lines(c.get("outcome", ""), text_w, outcome_pt, 700, "label") for c in cols)
+                      * drawn_line_h(outcome_pt) + 0.06) if has_outcome else 0.0
+        outcome_zone = (0.46 + out_text_h) if has_outcome else 0.0
+        card_min = max(1.4, pad + body_h + outcome_zone + pad)
+        if head_h + 0.12 + card_min <= h - 0.10:
+            break
+    band_h, off = fit_band(h - 0.10, head_h + 0.12 + card_min, top_anchored=not has_outcome)
+    card_h = band_h - head_h - 0.12
+    col_h = [(_stack_drawn_h(b, text_w) if b else 0.0) for b in col_blocks]
+    return dict(n=n, cw=cw, gut=gut, head_h=head_h, HEAD_PT=HEAD_PT, has_outcome=has_outcome,
+                outcome_pt=outcome_pt, pad=pad, text_w=text_w, col_blocks=col_blocks, col_h=col_h,
+                out_text_h=out_text_h, outcome_zone=outcome_zone, card_min=card_min,
+                card_h=card_h, off=off, line_h=drawn_line_h(TS["body"]))
+
+
+def p_column_framework(slide, spec, deck):
+    """柱(フレームワーク)ページ: 2-4本の柱を「見出し帯+本文カード」で並べる。
+
+    process_flow との違いは矢羽がない(順序ではなく並列の構造)ことと、本文が見出し+本文の
+    対で組めること。全列の項目数が同じなら、項目 i の上端を列間で揃える(比較の行が読める)。
+    outcome を持つ列があれば、結論ストリップ(罫+▼+太字)をカード下端にロックする。"""
+    cols = spec.get("columns", [])[:4]
+    if not cols:
+        return
+    y0, h = body_region(spec)
+    x, w = grid(0, 12)
+    L = _column_framework_layout(cols, h)
+    n, cw, gut, head_h, HEAD_PT = L["n"], L["cw"], L["gut"], L["head_h"], L["HEAD_PT"]
+    pad, text_w, col_blocks = L["pad"], L["text_w"], L["col_blocks"]
+    out_text_h, outcome_pt, card_h, off = L["out_text_h"], L["outcome_pt"], L["card_h"], L["off"]
+    y_top = y0 + 0.05 + off
+    any_focal = any(c.get("focal") for c in cols)
+    for ci, c in enumerate(cols):
+        cx_ = x + ci * (cw + gut)
+        focal = bool(c.get("focal"))
+        head_fill = C["primary"] if focal else (C["primary_pale"] if any_focal else C["primary_deep"])
+        head_ink = C["canvas"] if (focal or not any_focal) else C["primary_deep"]
+        # 柱ページは角丸を持たない(tokens.layout.column_framework.radius_pt、既定 0)。
+        # 見出し帯と本文カードの角は必ず同じ値にする — 片方だけ丸いと帯とカードが別物に見える
+        pillar_r = LAY.get("column_framework", {}).get("radius_pt", 0)
+        add_rect(slide, cx_, y_top, cw, head_h, head_fill, radius_pt=pillar_r)
+        parts = []
+        if c.get("label"):
+            parts.append((str(c["label"]), HEAD_PT, 700, head_ink))
+            parts.append(("  " + c.get("heading", ""), HEAD_PT, 600, head_ink))
+        else:
+            parts.append((c.get("heading", ""), HEAD_PT, 600, head_ink))
+        # 見出し帯の文字は左右・上下とも中央(2026-09-04、利用者の指示)。ラベル(01 等)と見出しは
+        # 一続きで中央に置く。上下は行ボックスではなくインクで中央にする — 和文の行ボックスは
+        # 下側に余白を持つので、箱を MIDDLE に置くと字面が帯の中心より下に座る。その差
+        # (ink_center_offset_in)だけ箱を持ち上げる(300dpi 実測で約 0.16em)
+        add_text(slide, cx_ + 0.16, y_top - ink_center_offset_in(HEAD_PT), cw - 0.32, head_h, [parts],
+                 anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.CENTER, wrap_role="label")
+        cy = y_top + head_h + 0.12
+        add_rect(slide, cx_, cy, cw, card_h, C["surface_tint"], radius_pt=pillar_r, name="card")
+        if col_blocks[ci]:
+            stack_block(slide, cx_ + pad, cy + pad, text_w,
+                        stack_optical_height(col_blocks[ci], text_w), col_blocks[ci])
+        if c.get("outcome"):
+            ty = cy + card_h - pad - out_text_h
+            add_line(slide, cx_ + pad, ty - 0.26, cx_ + cw - pad, ty - 0.26, C["rule"], 0.5)
+            add_text(slide, cx_ + pad, ty - 0.23, text_w, 0.18,
+                     [[("▼", 9, 400, C["primary"])]], align=PP_ALIGN.CENTER)
+            add_text(slide, cx_ + pad, ty, text_w, out_text_h,
+                     [[(c["outcome"], outcome_pt, 700, C["ink"])]],
+                     align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE, wrap_role="label")
+
+
+def p_metric_proof(slide, spec, deck):
+    """ヒーロー数値+図表の証明ページ(銀行流の metric proof page)。
+
+    左に値の塊(ラベル→大きな値→デルタ→注記)、右に図表。値の塊は図表のプロット上端に
+    ロックし、事実レール(facts)は図表の下端にロック — 余りは中間の余白に落ちる。"""
+    y0, h = body_region(spec)
+    hero = spec.get("hero") or {}
+    chart = spec.get("chart") or {}
+    facts = spec.get("facts", [])
+    SECTION_GAP = 0.22
+    hx, hw = grid(0, 4)
+    cx, cw = grid(4, 8)
+    hw -= SECTION_GAP
+    cx += SECTION_GAP
+    cw -= SECTION_GAP
+    chart_y, chart_h = y0 + 0.25, h - 0.30
+    if _asset_kind(chart):
+        place_asset(slide, chart, cx, chart_y, cw, chart_h)
+    elif chart:
+        add_act_chart(slide, cx, chart_y, cw, chart_h, chart)
+        add_unit_note(slide, cx, chart_y, chart.get("unit"))
+        add_chart_annotations(slide, cx, chart_y, cw, chart_h, chart)
+    vsize = _fit_value_size([hero], hw, TS["kpi_value_hero"])
+    gap = OPT["gap_in"]
+    vparts = [(str(hero.get("value", "")), vsize, 700, C["primary_deep"])]
+    if hero.get("unit"):
+        vparts.append(_unit_part(hero["unit"], vsize * 0.45))
+    blocks = [{"parts": [(hero.get("label", ""), TS["kpi_label"], 600, C["ink_subtle"])],
+               "size": TS["kpi_label"], "kind": "text"},
+              {"parts": vparts, "size": vsize, "kind": "numeral",
+               "gap_before": gap["value_meta"], "gap_name": "value_meta"}]
+    if hero.get("delta"):
+        blocks.append({"parts": [(_kpi_delta_text(hero), TS["kpi_sub"], 600,
+                                  _delta_color(hero.get("delta_dir"), hero.get("positive_is_good", True)))],
+                       "size": TS["kpi_sub"], "kind": "text", "gap_before": gap["metric_subline"],
+                       "gap_name": "metric_subline"})
+    if hero.get("note"):
+        blocks.append({"parts": [(hero["note"], TS["body"], 400, C["ink_faint"])],
+                       "size": TS["body"], "kind": "text", "gap_before": gap["value_meta"],
+                       "gap_name": "value_meta"})
+    stack_h = stack_optical_height(blocks, hw)
+    add_rect(slide, hx, chart_y + 0.02, 0.6, 0.05, C["primary"])
+    stack_block(slide, hx, chart_y + 0.24, hw, stack_h, blocks)
+    if facts:
+        row_h = 0.46
+        fy = chart_y + chart_h - len(facts) * row_h
+        top_of_stack = chart_y + 0.24 + _stack_drawn_h(blocks, hw)
+        fy = max(fy, top_of_stack + 0.40)
+        add_line(slide, hx, fy - 0.02, hx + hw, fy - 0.02, C["rule"], 0.75)
+        for f in facts:
+            add_text(slide, hx, fy, hw * 0.58, row_h,
+                     [[(f.get("label", ""), TS["kpi_label"], 600, C["ink_subtle"])]], anchor=MSO_ANCHOR.MIDDLE)
+            add_text(slide, hx + hw * 0.58, fy, hw * 0.42, row_h,
+                     [[(str(f.get("value", "")), TS["body"], 700, C["ink"])]],
+                     align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE, wrap=False)
+            fy += row_h
+            add_line(slide, hx, fy - 0.02, hx + hw, fy - 0.02, C["rule"], 0.5)
+
+
+def p_logic_tree(slide, spec, deck):
+    """ロジックツリー / ドライバーツリー(根 → 枝 ≤4 → 葉 ≤4/枝)。左から右へ、肘型の
+    コネクタで結ぶ。枝は自分の葉の縦幅の中央に、根は枝全体の中央に座る。値を持つ節は
+    値を従属行として積む(KPI ツリー)。focal の枝は淡い主色で立てる。"""
+    y0, h = body_region(spec)
+    root = spec.get("root") or {}
+    branches = spec.get("branches", [])[:4]
+    if not branches:
+        return
+    x, w = grid(0, 12)
+    has_leaves = any(b.get("leaves") for b in branches)
+    LANE = 0.5
+    if has_leaves:
+        widths = [(w - 2 * LANE) * 0.24, (w - 2 * LANE) * 0.30, (w - 2 * LANE) * 0.46]
+    else:
+        widths = [(w - LANE) * 0.38, (w - LANE) * 0.62]
+    xs = [x]
+    for wd in widths[:-1]:
+        xs.append(xs[-1] + wd + LANE)
+    NODE_PT = TS["body_small"]
+    leaf_blocks = [[_node_blocks(l, NODE_PT, 400, inline=True) for l in (b.get("leaves") or [])] for b in branches]
+    br_blocks = [_node_blocks(b, NODE_PT, 600, inline=True) for b in branches]
+    # 器の内側余白と行間は、入らないときだけ床値まで詰める(reclaim) — 型は縮めない
+    for pad, ROW_GAP, BR_GAP in ((0.12, 0.10, 0.26), (0.08, 0.06, 0.16)):
+        leaf_w = (widths[2] - 2 * pad) if has_leaves else 0.0
+        branch_w = widths[1] - 2 * pad
+        leaf_h = [[_stack_drawn_h(bl, leaf_w) + 2 * pad for bl in lbs] for lbs in leaf_blocks]
+        br_h = [_stack_drawn_h(bl, branch_w) + 2 * pad for bl in br_blocks]
+        spans = [max(br_h[i], (sum(lh) + ROW_GAP * (len(lh) - 1)) if lh else 0.0)
+                 for i, lh in enumerate(leaf_h)]
+        total = sum(spans) + BR_GAP * (len(branches) - 1)
+        if total <= h - 0.10:
+            break
+    block_h, off = fit_band(h - 0.10, total)
+    extra = max(0.0, block_h - total) / len(branches)
+    spans = [s + extra for s in spans]
+    y = y0 + 0.05 + off
+    # 根: 枝全体の縦中央
+    root_blocks = _node_blocks(root, TS["section_heading"], 700, C["canvas"])
+    for b in root_blocks[1:]:
+        b["parts"] = [(t, s, wt, C["canvas"]) for t, s, wt, _c in b["parts"]]
+    root_w = widths[0]
+    root_h = _stack_drawn_h(root_blocks, root_w - 2 * pad) + 2 * pad
+    root_h = max(root_h, 0.9)
+    ry = y + (block_h - root_h) / 2
+    add_rect(slide, xs[0], ry, root_w, root_h, C["primary_deep"], radius_pt=LAY["card"]["radius_pt"])
+    stack_block(slide, xs[0] + pad, ry + pad, root_w - 2 * pad, root_h - 2 * pad, root_blocks)
+    bus_x = xs[0] + root_w + LANE / 2
+    add_line(slide, xs[0] + root_w, ry + root_h / 2, bus_x, ry + root_h / 2, C["ink_faint"], 1.0)
+    by = y
+    branch_mids = []
+    for i, b in enumerate(branches):
+        span = spans[i]
+        bx, bw = xs[1], widths[1]
+        bh = br_h[i]
+        byy = by + (span - bh) / 2
+        focal = bool(b.get("focal"))
+        add_rect(slide, bx, byy, bw, bh, C["primary_pale"] if focal else C["surface_tint"],
+                 line=C["primary"] if focal else None, line_w_pt=1.25, radius_pt=6)
+        stack_block(slide, bx + pad, byy + pad, branch_w, bh - 2 * pad, br_blocks[i])
+        mid = byy + bh / 2
+        branch_mids.append(mid)
+        add_line(slide, bus_x, mid, bx, mid, C["ink_faint"], 1.0)
+        if leaf_blocks[i]:
+            lx, lw = xs[2], widths[2]
+            lbus = bx + bw + LANE / 2
+            add_line(slide, bx + bw, mid, lbus, mid, C["ink_faint"], 1.0)
+            n_l = len(leaf_blocks[i])
+            used = sum(leaf_h[i]) + ROW_GAP * (n_l - 1)
+            lgap = ROW_GAP + max(0.0, (span - used) / max(1, n_l - 1)) if n_l > 1 else ROW_GAP
+            ly = by + (span - (sum(leaf_h[i]) + lgap * (n_l - 1))) / 2
+            leaf_mids = []
+            for lb, lh in zip(leaf_blocks[i], leaf_h[i]):
+                add_rect(slide, lx, ly, lw, lh, C["canvas"], line=C["rule"], line_w_pt=0.75, radius_pt=4)
+                stack_block(slide, lx + pad, ly + pad, leaf_w, lh - 2 * pad, lb)
+                leaf_mids.append(ly + lh / 2)
+                add_line(slide, lbus, ly + lh / 2, lx, ly + lh / 2, C["ink_faint"], 0.75)
+                ly += lh + lgap
+            add_line(slide, lbus, min(leaf_mids + [mid]), lbus, max(leaf_mids + [mid]), C["ink_faint"], 1.0)
+        by += span + BR_GAP
+    add_line(slide, bus_x, min(branch_mids + [ry + root_h / 2]), bus_x,
+             max(branch_mids + [ry + root_h / 2]), C["ink_faint"], 1.0)
+
+
+def card_copy_estimate(spec: dict) -> list[dict]:
+    """カード型(process_flow / column_framework / two_column)の各カードについて、本文が占める高さと
+    カードの高さの見込みを返す。描画と同じ寸法計算(_*_layout)を使うので、validate_spec がビルド前に
+    「このコピー量ではカードの下半分が空く」と言える。返り値の各要素:
+    card(名前), content_h, card_h, ratio, line_h(1行の高さ), hint_chars(警告文に添える1行あたりの和文字数の目安。行数の計算には使わない — 行数は _text_lines の実測だけ)。"""
+    pat = spec.get("pattern")
+    if pat not in ("process_flow", "column_framework", "two_column"):
+        return []
+    _, h = body_region(spec)
+    em = TS["body"] / 72.0
+    out: list[dict] = []
+    if pat == "process_flow":
+        steps = spec.get("steps", [])
+        if not steps:
+            return []
+        L = _process_flow_layout(steps, h)
+        for st, own in zip(steps, L["own_hs"]):
+            content = own + ((0.46 + L["out_text_h"]) if st.get("outcome") else 0.0)
+            out.append(dict(card=st.get("label", ""), content_h=content, card_h=L["card_h"],
+                            line_h=L["line_h"], hint_chars=max(1, int(L["bullet_text_w"] // em))))
+    elif pat == "column_framework":
+        cols = spec.get("columns", [])[:4]
+        if not cols:
+            return []
+        L = _column_framework_layout(cols, h)
+        for c, ch in zip(cols, L["col_h"]):
+            content = ch + (L["outcome_zone"] if c.get("outcome") else 0.0)
+            out.append(dict(card=c.get("heading", ""), content_h=content, card_h=L["card_h"],
+                            line_h=L["line_h"], hint_chars=max(1, int(L["text_w"] // em))))
+    else:
+        L = _two_column_layout(spec, h)
+        _, w_side = grid(0, 6)
+        for sd in ("left", "right"):
+            blk = spec.get(sd, {})
+            out.append(dict(card=blk.get("heading", sd), content_h=L["HEAD_H"] + L["side_h"][sd],
+                            card_h=L["card_h"], line_h=L["line_h"],
+                            hint_chars=max(1, int((w_side - 0.4) // em))))
+    for o in out:
+        o["ratio"] = (o["content_h"] / o["card_h"]) if o["card_h"] > 0 else 1.0
+    return out
+
+
 PATTERNS = {
+    "column_framework": p_column_framework,
+    "metric_proof": p_metric_proof,
+    "logic_tree": p_logic_tree,
     "cover": p_cover,
     "agenda": p_agenda,
     "section_divider": p_section_divider,

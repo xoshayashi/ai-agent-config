@@ -43,7 +43,7 @@ through composition, object scale, asymmetry, and density control.
 - In time-series charts, the latest or conclusion period may be darkest; historical periods
   recede.
 - Color meaning must remain stable across the deck. Do not use the same accent for unrelated
-  meanings.
+  meanings, and do not change both chart grammar and color meaning when only the data changes.
 - Modern freshness must come from layout and hierarchy, not color noise.
 
 ## Charts And Evidence
@@ -118,6 +118,14 @@ fixed end-card.
   Unexplained whitespace is a defect.
 - Repetition is useful only when the reader needs comparison. Repeating a fixed layout for
   unrelated claims makes the deck look generated.
+- Prefer hairline rules and spacing over heavy boxes to separate roles.
+- Increase density when the reader needs comparison, when several evidence points verify one
+  claim, when a row/column structure makes the information easier to scan, or when the page
+  would otherwise be underfilled. Reduce density when two claims compete, when a chart or
+  table becomes unreadable, when detail belongs in notes or appendix, or when the page should
+  work as a rhythm reset. Density always comes with line spacing, role gaps, and hierarchy.
+- A deck is not a sequence of identical proof pages. Alternate overview and proof, dense and
+  quiet, quantitative and structural, comparison and implication, argument and decision.
 
 ## Evidence And Source Discipline
 
@@ -157,7 +165,11 @@ request. Replace generic self-introduction slides with proof that changes the re
 - grid/flex contract visible in notes but violated in render
 - content block not vertically centered in the content area — asymmetric top/bottom margin
   makes a table, rail, or card block drift downward (or upward) instead of sitting centered
-- large empty zones around small objects
+- large empty zones around small objects — the body fill contract (`tokens.layout.fill`) is
+  the one rule that decides how far a block grows; a slide under the occupancy floor is a lint
+  finding
+- a value label sitting on the edge of the bar or card it belongs to (`verify_deck` straddle
+  check)
 - excessive source/footer prominence
 - decoration used to create impact
 
