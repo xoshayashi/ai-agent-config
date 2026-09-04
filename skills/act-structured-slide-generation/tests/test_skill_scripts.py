@@ -3317,3 +3317,14 @@ def test_labeled_pillar_headers_get_phrase_breaks(tmp_path):
     assert "Enterprise\n" not in heads[0].text_frame.text and "Enterprise\v" not in heads[0].text_frame.text
     r = run("verify_deck.py", out)
     assert "0 failures" in r.stdout, r.stdout
+
+
+def test_explicit_labels_break_on_phrases_even_with_punctuation():
+    """役割を「ラベル」と明示した結論帯は、読点を含んでいても文節で組む。「Off-Marketを探さず、
+    生み出す」が「生み / 出す」で割れない。ハイフンの英語名も1塊(PR #158 の回帰)。"""
+    B = _import_build_deck()
+    D = _deck_text()
+    broken = B.display_wrap_text("Off-Marketを探さず、生み出す", 3.46, 19, 700, "label")
+    assert broken == "Off-Marketを探さず、\n生み出す", broken
+    chunks, _ = D._segments("Off-Marketを探さず、生み出す")
+    assert chunks[0].startswith("Off-Market"), chunks

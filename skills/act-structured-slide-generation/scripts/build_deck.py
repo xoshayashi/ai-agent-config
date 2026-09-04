@@ -402,7 +402,7 @@ def display_wrap_text(text: str, w_in: float, size_pt: float, weight: int = 400,
     if role == "label" or (role is None and _looks_like_label(text)):
         natural = math.ceil(text_width_in(text, size_pt, weight) / max(0.05, w_in))
         broken = wrap_display(text, w_in, size_pt,
-                              min(DISPLAY_WRAP_MAX_LINES, natural + 1), weight)
+                              min(DISPLAY_WRAP_MAX_LINES, natural + 1), weight, force=(role == "label"))
         if "\n" in broken:
             return broken
     return wrap_natural(text, w_in, size_pt, weight)

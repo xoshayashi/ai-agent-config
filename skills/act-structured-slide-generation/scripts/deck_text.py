@@ -458,6 +458,10 @@ def _segments(text: str) -> tuple[list[str], list[float]]:
         if sc > 0 and chunks[-1].endswith(" ") and _is_cap_latin(chunks[-1].rstrip().split(" ")[-1]) \
                 and _is_cap_latin(a):
             sc = 0.0
+        # ハイフンで結ばれた欧文(Off-Market、GPT-4)も1塊 — 「Off- / Market」で行を変えない
+        if sc > 0 and chunks[-1].endswith(("-", "‐", "–")) and _char_class(a[0]) == "ascii" \
+                and len(chunks[-1]) >= 2 and _char_class(chunks[-1][-2]) == "ascii":
+            sc = 0.0
         if sc > 0:
             chunks.append(a)
             scores.append(sc)
@@ -894,14 +898,17 @@ def wrap_natural(text: str, width_in: float, size_pt: float, weight: int = 400) 
 
 
 def wrap_display(text: str, width_in: float, size_pt: float, max_lines: int = 3,
-                 weight: int = 400) -> str:
+                 weight: int = 400, *, force: bool = False) -> str:
     """短い表示テキスト(ラベル・見出し・矢羽・結論句)を文節の切れ目で折り返した文字列("\n" 入り)に
     して返す。本文(文章)は wrap_natural が扱う。
 
     1行に収まるならそのまま返す。max_lines に収まらない長文にも手を出さない(本文は無理に
     改行を打つより自然折返しに任せたほうが崩れない)。幅はすべて実測(in)で扱う。
     """
-    if not text or "\n" in text or is_prose(text):
+    # force: 呼び出し側が役割を「ラベル」と明示したとき(結論帯・矢羽・見出し)は、句読点を含んでいても
+    # 文節で組む。推定だけに頼ると「Off-Marketを探さず、生み出す」が本文扱いになり、
+    # レンダラが「生み / 出す」で割る(PR #158 で実際に起きた)
+    if not text or "\n" in text or (is_prose(text) and not force):
         return text
     # 行はレンダラの折返し閾値の手前で切る。閾値ぎりぎりの行を作ると、レンダラ側が先に
     # 折り返し、こちらのソフト改行がそこへ重なって「空行」が1本入る(実測とレンダラの
