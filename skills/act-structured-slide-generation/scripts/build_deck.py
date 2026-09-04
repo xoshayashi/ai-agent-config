@@ -1026,8 +1026,11 @@ def add_act_chart(slide, x, y, w, h, cspec: dict):
         if axis_fmt:
             val_ax.tick_labels.number_format = axis_fmt
             val_ax.tick_labels.number_format_is_linked = False
+        def _axis_bound(v: float) -> float:
+            # 100%積み上げの軸は 0-1 の比率。y_max: 100 のような %表記の指定は 100 で割る(Codex レビュー指摘、PR #158)
+            return v / 100.0 if ctype == "stacked_column_100" and abs(v) > 1 else v
         if cspec.get("y_max") is not None:
-            val_ax.maximum_scale = float(cspec["y_max"])
+            val_ax.maximum_scale = _axis_bound(float(cspec["y_max"]))
         elif cspec.get("annotation") and ctype != "stacked_column_100":
             # バッジの余白ぶん軸を伸ばす。積み上げは列ごとの合計が天井。100%積み上げは軸が 0-1 の
             # 比率なので触らない — 生の値で天井を決めると図表が数%の高さに潰れる(Codex レビュー、PR #158)
@@ -1042,7 +1045,7 @@ def add_act_chart(slide, x, y, w, h, cspec: dict):
                 v >= 0 for s in cspec["series"] for v in s["values"]):
             val_ax.minimum_scale = 0.0
         if cspec.get("y_min") is not None:
-            val_ax.minimum_scale = float(cspec["y_min"])
+            val_ax.minimum_scale = _axis_bound(float(cspec["y_min"]))
         if axisless or cspec.get("hide_value_axis"):
             val_ax.visible = False
             val_ax.has_major_gridlines = False

@@ -434,7 +434,8 @@ def _check_hero_in_chart(loc: str, s: dict, errors) -> None:
             tot = sum(v for v in vals if v > 0)
             if tot > 0:
                 shown += [v / tot * 100 for v in vals]
-        shown.append(100.0)
+        if shown:
+            shown.append(100.0)                             # 全体の 100 は、分母のあるカテゴリがあるときだけ
     elif (ctype in ("stacked_column", "stacked_bar") and not kind) or kind == "area":
         last = [to_number((ser.get("values") or [None])[-1]) for ser in series if isinstance(ser, dict)]
         if last and all(v is not None for v in last):
