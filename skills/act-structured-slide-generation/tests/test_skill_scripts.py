@@ -1388,11 +1388,14 @@ def test_stacked_100_axis_bounds_in_percent_are_scaled_to_fractions(tmp_path):
     assert run("build_deck.py", spec, "-o", out).returncode == 0
     ax = [sh.chart for sh in pptx.Presentation(out).slides[0].shapes if sh.has_chart][0].value_axis
     assert abs(ax.maximum_scale - 1.1) < 1e-9, ax.maximum_scale
-    # unit は % 以外を validate が弾く — どの型のページでも(Codex レビュー、PR #158)
-    deck["slides"][0]["chart"]["unit"] = "億円"
-    spec.write_text(json.dumps(deck, ensure_ascii=False))
-    r = run("validate_spec.py", spec)
-    assert r.returncode != 0 and "stacked_column_100 の unit は %" in r.stdout, r.stdout
+    # unit は % 必須 — 億円も無指定も validate が弾く、どの型のページでも(Codex レビュー、PR #158)
+    for unit in ("億円", None):
+        deck["slides"][0]["chart"]["unit"] = unit
+        if unit is None:
+            del deck["slides"][0]["chart"]["unit"]
+        spec.write_text(json.dumps(deck, ensure_ascii=False))
+        r = run("validate_spec.py", spec)
+        assert r.returncode != 0 and "stacked_column_100 の unit は %" in r.stdout, (unit, r.stdout)
 
 
 def test_signed_stacked_column_headroom_uses_the_positive_stack(tmp_path):
@@ -3318,6 +3321,11 @@ def test_metric_proof_hero_must_be_in_its_chart(tmp_path):
     d["slides"][0]["chart"]["series"].append({"name": "他", "values": [70, 40]})
     d["slides"][0]["hero"] = {"label": "カバー率", "value": "100", "unit": "%"}
     d["meta"]["thesis"] = {"statement": "カバー率100%", "value": "100", "unit": "%"}
+    # 全角の ％ と半角の % は同じ単位(Codex レビュー)
+    d["slides"][0]["chart"]["unit"] = "％"
+    spec.write_text(json.dumps(d, ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout and "単位「%」が chart" not in run("audit_argument.py", spec).stdout
+    d["slides"][0]["chart"]["unit"] = "%"
     # すべて 0 の 100%積み上げには分母が無く、100 の全体も描かれない(Codex レビュー)
     d["slides"][0]["chart"]["series"] = [{"name": "A", "values": [0, 0]}, {"name": "他", "values": [0, 0]}]
     d["slides"][0]["hero"]["value"] = "100"; d["meta"]["thesis"]["value"] = "100"
@@ -3389,11 +3397,12 @@ def test_nominal_predicate_sentences_are_body_copy():
     sys.path.insert(0, str(SKILL / "scripts"))
     import build_deck as B
     for text in ("全社展開が可能", "追加投資が必要", "現行体制では対応が困難", "在庫は十分",
-                 "施策の進捗は横ばい", "本社は東京", "需要が旺盛", "当社も対象", "国内も横ばい"):   # 述語の語彙に依らない
+                 "施策の進捗は横ばい", "本社は東京", "需要が旺盛", "当社も対象", "国内も横ばい",
+                 "これも対象", "誰も対象外", "どれも横ばい", "取り組みも横ばい"):   # 述語の語彙に依らない
         assert not B._looks_like_label(text), text
     for text in ("全社展開の可能性", "必要投資額", "対応方針", "可能", "必要", "重要顧客の維持",
                  "がん検診の受診率", "はがきの送付", "売上高は", "我が社の競争優位", "わが国の水準", "ものづくりの拠点",
-                 "子ども支援", "どこでも利用可能"):     # 語の一部の「も」は助詞ではない(Codex レビュー)
+                 "子ども支援", "どこでも利用可能", "いつも通りの運用"):     # 語の一部の「も」は助詞ではない(Codex レビュー)
         assert B._looks_like_label(text), text
     assert not B._has_subject("我が社の競争優位")                       # 連体詞の「が」は主語ではない
 

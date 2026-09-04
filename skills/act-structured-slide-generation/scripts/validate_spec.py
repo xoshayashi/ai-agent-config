@@ -587,10 +587,11 @@ def main() -> int:
                 ctype = chart.get("type", "column")
                 if ctype not in SUPPORTED_CHART_TYPES:
                     errors.append(f"{cloc}: chart type '{ctype}' は未対応 — {' / '.join(SUPPORTED_CHART_TYPES)} から選ぶ")
-                if ctype == "stacked_column_100" and chart.get("unit") not in (None, "", "%", "％"):
-                    # 軸は 0-100% の構成比で描かれ、unit の注記もその単位で出る — 億円と書くと図表が嘘になる
-                    errors.append(f"{cloc}: stacked_column_100 の unit は % — 「{chart.get('unit')}」の値をそのまま"
-                                  "見せるなら stacked_column にする")
+                if ctype == "stacked_column_100" and chart.get("unit") not in ("%", "％"):
+                    # 軸は 0-100% の構成比で描かれ、unit の注記もその単位で出る — 億円と書くと図表が嘘になり、
+                    # 無指定だと監査が単位無しのデータとして何でも照合する。% を必須にする(Codex レビュー指摘)
+                    errors.append(f"{cloc}: stacked_column_100 の unit は % を必ず付ける — 「{chart.get('unit') or ''}」"
+                                  "の値をそのまま見せるなら stacked_column にする")
                 if chart.get("annotation") and ctype in ("bar", "stacked_bar"):
                     # 横棒はカテゴリが縦軸に並び、バッジ・矢印のアンカー(カテゴリ番号→x座標)が成り立たない
                     errors.append(f"{cloc}: annotation(badge / yoy / trend_arrow)は横棒 '{ctype}' では描けない — "

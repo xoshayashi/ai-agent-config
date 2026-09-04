@@ -63,7 +63,6 @@ A_NS = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
 # 表示長(_ja_len)と全角→半角(hw)は deck_text.py の単一実装を使う — validate_spec の
 # 字数バジェット・lint_render の readback 照合と同一実装であることが契約
 import act_theme
-from deck_text import _char_class as _dt_char_class
 from deck_text import _words as _dt_words
 from deck_text import (EA_DIGIT_RUN, MEASURE_OK, SCRIPT_RUN, drawn_line_h, footer_text,
                        header_slots, hw, ink_center_offset_in, ink_slacks, is_prose,
@@ -404,11 +403,15 @@ def _has_subject(text: str) -> bool:
     return any(len(t) >= 2 and t.endswith(_SUBJECT_PARTICLES) and _is_particle_tail(t) for t in toks[:-1])
 
 
+# 「も」で終わるが助詞ではない語。「子ども」「いつも」と、「どこでも / 誰でも / 見ても」の でも・ても
+_LEXICAL_MO = ("子ども", "こども", "いつも", "とても", "しかも", "もしも", "でも", "ても")
+
+
 def _is_particle_tail(tok: str) -> bool:
-    """文節末の が・は・も が助詞か。「子ども」「どこでも」のように前がひらがなの「も」は語の一部
-    (Codex レビュー指摘、PR #158)。漢字・カタカナ・英数のあとに付く「も」だけ助詞と見る"""
+    """文節末の が・は・も が助詞か。「子ども」「どこでも」の「も」は語の一部(Codex レビュー指摘、PR #158)。
+    前の文字で見ると「これも」「誰も」「取り組みも」の助詞まで落とすので、語形で除く(Claude / Codex レビュー指摘)"""
     if tok.endswith("も"):
-        return _dt_char_class(tok[-2]) != "kana_hira"
+        return not tok.endswith(_LEXICAL_MO)
     return True
 
 

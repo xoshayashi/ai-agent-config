@@ -271,6 +271,11 @@ def check_identity(i, s, errors) -> None:
 _DATA_SCALAR_KEYS = {"value", "x", "y", "r", "size", "start", "end"}   # 配列要素の dict が持つデータ欄
 
 
+def _unit_key(u) -> str:
+    """単位の比較用の表記。全角の ％ は %(validate も両方を受ける — Codex レビュー指摘、PR #158)"""
+    return str(u or "").strip().replace("％", "%")
+
+
 def _chart_numbers(chart: dict, unit: str = "") -> list[float]:
     """図表データの数値 — 配列の中の数(native の series.values、画像図表 combo の bar/line の values、
     area の series …)。focal_category や y_max のような単独のスカラーは制御値であって数えない。
@@ -289,7 +294,7 @@ def _chart_numbers(chart: dict, unit: str = "") -> list[float]:
     def walk(node, in_list: bool, scope: str) -> None:
         if isinstance(node, dict):
             if nested or node is chart:
-                scope = str(node.get("unit") or scope)
+                scope = _unit_key(node.get("unit")) or scope
             for k, v in node.items():
                 if k in ("categories", "labels", "headers"):
                     continue
@@ -311,13 +316,13 @@ def _chart_units(chart: dict) -> set[str]:
     """図表が描く単位。native 図表は chart.unit だけ(series[].unit は描画に効かない)。画像図表は
     入れ子の unit(combo の bar.unit / line.unit)も数える。"""
     if not chart.get("kind"):
-        return {str(chart["unit"])} if chart.get("unit") else set()
+        return {_unit_key(chart["unit"])} if chart.get("unit") else set()
     units: set[str] = set()
 
     def walk(node) -> None:
         if isinstance(node, dict):
             if node.get("unit"):
-                units.add(str(node["unit"]))
+                units.add(_unit_key(node["unit"]))
             for v in node.values():
                 walk(v)
         elif isinstance(node, list):
@@ -345,7 +350,7 @@ def _path_unit(slide: dict, path: str) -> str:
     nested = bool((slide.get("chart") or {}).get("kind"))     # native 図表は chart.unit だけが効く
     for seg in re.findall(r"[^.\[\]]+|\[\d+\]", path.strip()):
         if isinstance(node, dict) and (nested or node is slide.get("chart")):
-            unit = str(node.get("unit") or unit)
+            unit = _unit_key(node.get("unit")) or unit
         if seg.startswith("["):
             if not isinstance(node, list):
                 return unit
@@ -356,7 +361,7 @@ def _path_unit(slide: dict, path: str) -> str:
         else:
             return unit
     if isinstance(node, dict) and nested:
-        unit = str(node.get("unit") or unit)
+        unit = _unit_key(node.get("unit")) or unit
     return unit
 # 単位を変えない演算(差・和)は被演算子も結果と同じ単位。率・倍率・構成比は単位が変わる(億円→%)
 _SAME_UNIT_KINDS = ("delta", "sum")
@@ -400,7 +405,7 @@ def _derivation_grounded(slide: dict, deriv: dict, chart: dict) -> bool:
         return False
     units = _chart_units(chart) or {""}
     if deriv.get("kind") in _SAME_UNIT_KINDS and typed:
-        units = {u for u in units if u == str(deriv.get("unit") or "")}
+        units = {u for u in units if u == _unit_key(deriv.get("unit"))}
     for unit in units:
         nums = _chart_numbers(chart, unit)
         if nums and ok(operands, nums, unit):
@@ -419,14 +424,14 @@ def _check_hero_in_chart(loc: str, s: dict, errors) -> None:
     if val is None or not chart:
         return
     printed = str(hero.get("value"))
-    h_unit = str(hero.get("unit") or "")
+    h_unit = _unit_key(hero.get("unit"))
     # 図表の値から導いた同じ単位の derivation は、単位が図表と違っても(億円の系列から CAGR の %)証明になる
     deriv = s.get("derivation") or {}
     d_val = to_number(deriv.get("value")) if deriv else None
     is_100 = chart.get("type", "column") == "stacked_column_100" and not chart.get("kind")
     # 100%積み上げの生の値(60 → 80)は描かれない(50% → 80% と描かれる)ので、生の値から導いた derivation は
     # hero の根拠にならない — hero は表示される構成比か全体の 100 で言う(Codex レビュー指摘、PR #158)
-    if d_val is not None and not is_100 and str(deriv.get("unit") or "") == h_unit \
+    if d_val is not None and not is_100 and _unit_key(deriv.get("unit")) == h_unit \
             and _derivation_grounded(s, deriv, chart) and _same(d_val, val, printed):
         return
     c_units = _chart_units(chart)
@@ -450,7 +455,7 @@ def _check_hero_in_chart(loc: str, s: dict, errors) -> None:
         # 100%積み上げは各カテゴリを 100 に正規化して描く。生の値(60 + 60)ではなく、表示される構成比
         # (50 / 50)と全体の 100 が hero の候補(Codex レビュー指摘、PR #158)。構成比は % でしか読めない —
         # 億円と宣言された 100%積み上げの「50」は 50億円 ではない(Codex レビュー指摘)
-        if h_unit not in ("%", "％"):
+        if h_unit != "%":
             errors.append(f"{loc}: 100%積み上げ(stacked_column_100)は構成比を描く — hero の単位「{h_unit}」では"
                           "照合できない。hero と chart の unit を % にするか、積み上げ棒(stacked_column)にする")
             return
