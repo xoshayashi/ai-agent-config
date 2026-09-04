@@ -3152,3 +3152,21 @@ def test_chart_top_keeps_a_positive_chart_area(tmp_path):
     assert "chart_top の要点が長い" in r.stdout, r.stdout
     out = tmp_path / "ct.pptx"
     assert run("build_deck.py", spec, "-o", out).returncode == 0
+
+
+def test_exhibit_tokens_keep_local_value_unit_pairs():
+    """hero / facts / root の value と unit はその組で1トークン。図表全体の単位を無関係な値に
+    付けない(114% を 114億円 に化けさせない)(Codex レビュー、PR #158)。"""
+    import importlib, sys
+    sys.path.insert(0, str(SCRIPTS))
+    D = importlib.import_module("deck_argument")
+    tree = {"pattern": "logic_tree", "root": {"label": "ARR", "value": "12.8", "unit": "億円"},
+            "branches": [{"label": "顧客数", "value": "8,420", "unit": "社", "leaves": ["x"]}]}
+    toks = D.exhibit_tokens(tree)
+    assert "12.8億円" in toks and "8420社" in toks, toks
+    proof = {"pattern": "metric_proof", "hero": {"label": "ARR", "value": "12.8", "unit": "億円"},
+             "facts": [{"label": "NRR", "value": "114%"}],
+             "chart": {"type": "column", "unit": "億円", "categories": ["a", "b"],
+                       "series": [{"name": "ARR", "values": [9.85, 12.8]}]}}
+    toks = D.exhibit_tokens(proof)
+    assert "12.8億円" in toks and "114%" in toks and "114億円" not in toks, toks

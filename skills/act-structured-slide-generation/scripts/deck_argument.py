@@ -96,8 +96,15 @@ def _walk(obj, keys: set[str], collect):
 
 def _strings_and_numbers(obj, out: list):
     if isinstance(obj, dict):
+        # value と unit が並ぶ構造(hero / facts / root / branches / kpis)は、その組で1トークンにする。
+        # 平らにして「12.8」と「億円」に分けると、図表が示す「12.8億円」が消え、逆に図表全体の単位
+        # (chart.unit)が無関係な値に付く(Codex レビュー指摘、PR #158)
+        if "value" in obj and obj.get("unit") and not isinstance(obj["value"], (dict, list)):
+            out.append(f"{obj['value']}{obj['unit']}")
         for k, v in obj.items():
             if k in CONTROL_KEYS:
+                continue
+            if k in ("value", "unit") and "value" in obj and obj.get("unit"):
                 continue
             _strings_and_numbers(v, out)
     elif isinstance(obj, list):
@@ -147,7 +154,16 @@ def exhibit_tokens(slide: dict) -> set[str]:
     unit = slide.get("unit") or (slide.get("chart") or {}).get("unit")
     if unit:
         for v in values:
-            n = to_number(v) if not isinstance(v, bool) else None
+            # 図表全体の単位を付けるのは「裸の数」だけ。「114%」のように単位を持つ文字列や、
+            # 単位と組になった値には付けない(そうしないと 114% が 114億円 に化ける)
+            if isinstance(v, bool):
+                continue
+            if isinstance(v, (int, float)):
+                n = float(v)
+            elif isinstance(v, str) and re.fullmatch(NUM, v.strip().replace(",", "")):
+                n = to_number(v)
+            else:
+                continue
             if isinstance(n, float):
                 tokens.add(_fmt(n) + str(unit))
     return tokens
