@@ -721,6 +721,12 @@ def _break_classes(text: str) -> dict[int, str]:
     return out
 
 
+# 数字に続く複数字の単位(長いものから照合)。1字の助数詞は _COUNTERS
+_MULTI_UNITS = tuple(sorted(("百万円", "万時間", "カ月", "ヶ月", "か月", "週間", "時間", "万円", "億円", "兆円",
+                             "万人", "億人", "万件", "万社", "万台", "億円超", "pt", "％", "%"),
+                            key=len, reverse=True))
+
+
 def _unbreakable_spans(text: str) -> list[tuple[int, int]]:
     """レンダラの自然折返しで割れると読みづらい語の範囲 [start, end)。カタカナ語、英単語
     (ハイフンや大文字始まりの空白で結ばれた名前も1語)、数量と単位。漢字・ひらがなの境界は
@@ -750,8 +756,12 @@ def _unbreakable_spans(text: str) -> list[tuple[int, int]]:
                     j += 1                                       # Earned Ownership、City Making
                 else:
                     break
-            # 数量と単位(2030年、8,420社)
+            # 数量と単位(2030年、8,420社、14カ月、3週間)。複数字の単位は丸ごと、そのあと1字の助数詞
             if text[i:j].replace(",", "").replace(".", "").isdigit():
+                for unit in _MULTI_UNITS:
+                    if text.startswith(unit, j):
+                        j += len(unit)
+                        break
                 while j < n and text[j] in _COUNTERS:
                     j += 1
             spans.append((i, j))

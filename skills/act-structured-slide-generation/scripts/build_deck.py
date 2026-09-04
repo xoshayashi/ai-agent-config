@@ -3102,6 +3102,11 @@ def p_metric_proof(slide, spec, deck):
         fy = chart_y + chart_h - len(facts) * row_h
         top_of_stack = chart_y + 0.24 + _stack_drawn_h(blocks, hw)
         fy = max(fy, top_of_stack + 0.40)
+        # 事実レールは図表の下端より下へ出さない。ヒーローの注記が長く押し下げられたときは行高を
+        # 0.34in まで詰め、それでも入らなければ溢れとして verify が名指しする(Codex レビュー指摘、PR #158)
+        rail_bottom = chart_y + chart_h
+        if fy + len(facts) * row_h > rail_bottom:
+            row_h = max(0.34, (rail_bottom - fy) / len(facts))
         add_line(slide, hx, fy - 0.02, hx + hw, fy - 0.02, C["rule"], 0.75)
         for f in facts:
             add_text(slide, hx, fy, hw * 0.58, row_h,

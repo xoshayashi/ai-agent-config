@@ -3226,3 +3226,34 @@ def test_note_is_allowed_when_only_claim_side_shows_the_number(tmp_path):
                          "note": "数値の無いページの注記"}
     spec.write_text(json.dumps(base, ensure_ascii=False))
     assert "Note を置かない" in run("validate_spec.py", spec).stdout
+
+
+def test_multi_character_units_stay_with_their_number():
+    """「14カ月」「3週間」「8時間」は数と単位で1語。自然折返しが数字の直後に落ちても割らない
+    (Codex レビュー、PR #158)。"""
+    D = _deck_text()
+    spans = {t[a:b] for t in ["導入まで14カ月必要、3週間で8時間の削減、8,420社"] for a, b in D._unbreakable_spans(t)}
+    assert {"14カ月", "3週間", "8時間", "8,420社"} <= spans, spans
+
+
+def test_metric_proof_facts_stay_inside_the_rail(tmp_path):
+    """ヒーローの注記が長く、facts が4行あっても、事実レールは図表の下端を越えない
+    (Codex レビュー、PR #158)。validate は長い注記に警告し、build は破綻しない。"""
+    deck = {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+        "pattern": "metric_proof", "title": "ARRは12.8億円", "subtitle": "s",
+        "hero": {"label": "ARR", "value": "12.8", "unit": "億円", "delta": "+30% YoY", "delta_dir": "up",
+                 "note": "1年で2.95億円の純増、直近四半期は0.85億円、既存顧客の拡張が伸びの半分を担い、成長の質は改善している"},
+        "chart": {"type": "column", "unit": "億円", "categories": ["a", "b", "c"],
+                  "series": [{"name": "ARR", "values": [9.85, 11.2, 12.8]}]},
+        "facts": [{"label": "有料顧客数", "value": "8,420社"}, {"label": "NRR", "value": "114%"},
+                  {"label": "解約率", "value": "3.2%"}, {"label": "ARPA", "value": "152万円"}],
+        "assumption": "テスト"}]}
+    spec = tmp_path / "mp2.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    assert "hero.note が長い" in run("validate_spec.py", spec).stdout
+    out = tmp_path / "mp2.pptx"
+    assert run("build_deck.py", spec, "-o", out).returncode == 0
+    from pptx.util import Emu
+    slide = pptx.Presentation(out).slides[0]
+    bottoms = [Emu(sh.top).inches + Emu(sh.height).inches for sh in slide.shapes if sh.top is not None]
+    assert max(bottoms) <= TOKENS["slide"]["height_in"] + 0.01

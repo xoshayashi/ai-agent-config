@@ -673,6 +673,10 @@ def main() -> int:
                 errors.append(f"{loc}: hero label '{hero.get('label')}' too long")
             if len(s.get("facts", [])) > 4:
                 errors.append(f"{loc}: facts は4行以内({len(s['facts'])} 行)")
+            # ヒーローの注記が長いと、下端に寄せた事実レールを押し下げて図表の下端を越える
+            if s.get("facts") and ja_len(str(hero.get("note", ""))) > 40:
+                warns.append(f"{loc}: hero.note が長い({ja_len(str(hero.get('note')))}字) — facts と同居する"
+                             "ときは40字以内。長い説明は speaker_notes へ")
         if len(s.get("takeaways", [])) > 3:
             errors.append(f"{loc}: {len(s['takeaways'])} takeaways — max 3")
         # chart_top では要点が図表の下に横並びになる。要点の本文が長いとレールが図表を圧迫する
