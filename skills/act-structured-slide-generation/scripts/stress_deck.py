@@ -256,6 +256,17 @@ HARD = ("out of slide bounds",)   # どの変種でも許されない欠陥: 枠
 # (overload では文字が器から溢れて縁をまたぐ — それは verify が名指しすべき溢れであって、契約違反ではない)
 
 
+def checker_lines(r: subprocess.CompletedProcess, prefixes: tuple[str, ...], name: str) -> list[str]:
+    """検査スクリプトの結果行(ERROR / FAIL / WARN で始まる stdout)。スクリプト自体が例外などで落ちた
+    ときは stdout に結果行が無く、そのままだと「0 errors」に化ける — 終了コードが 0 でなく結果行も
+    無ければ、クラッシュを1件の ERROR として返す(Codex レビュー指摘、PR #158)。"""
+    lines = [ln for ln in r.stdout.splitlines() if ln.startswith(prefixes)]
+    if r.returncode != 0 and not any(ln.startswith(("ERROR", "FAIL")) for ln in lines):
+        tail = (r.stderr.strip().splitlines() or [""])[-1]
+        lines.append(f"ERROR: {name} exited {r.returncode} without reporting — {tail}")
+    return lines
+
+
 def run_variant(outdir: Path, variant: str, template: str | None, images: bool,
                 lint: bool = False) -> dict:
     """Write, validate, build and audit one variant.
@@ -271,7 +282,7 @@ def run_variant(outdir: Path, variant: str, template: str | None, images: bool,
     spec = outdir / f"{tag}.json"
     spec.write_text(json.dumps(make_deck(variant, template, images), ensure_ascii=False, indent=1))
     r = subprocess.run([sys.executable, str(HERE / "validate_spec.py"), str(spec)], capture_output=True, text=True)
-    v_err = [ln for ln in r.stdout.splitlines() if ln.startswith("ERROR")]
+    v_err = checker_lines(r, ("ERROR",), "validate_spec.py")
     pptx = outdir / f"{tag}.pptx"
     build_deck.build(spec, pptx)
     issues, _warns, _n = verify_deck.audit(pptx)
@@ -285,7 +296,7 @@ def run_variant(outdir: Path, variant: str, template: str | None, images: bool,
                        capture_output=True, text=True, check=True)
         lr = subprocess.run([sys.executable, str(HERE / "lint_render.py"), str(rdir), "--spec", str(spec)],
                             capture_output=True, text=True)
-        lint_findings = [ln for ln in lr.stdout.splitlines() if ln.startswith(("FAIL", "WARN"))]
+        lint_findings = checker_lines(lr, ("FAIL", "WARN"), "lint_render.py")
     return {"validate_errors": len(v_err), "verify_failures": len(issues), "hard_failures": len(hard),
             "lint_findings": lint_findings, "messages": v_err + issues + (lint_findings or []),
             "pptx": pptx, "spec": spec}

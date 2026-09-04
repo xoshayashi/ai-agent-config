@@ -3478,6 +3478,22 @@ def test_verify_names_a_thin_card_and_passes_a_full_one(tmp_path):
     assert "カードの中身が薄い" not in r.stdout, r.stdout
 
 
+def test_stress_counts_a_crashed_checker_as_an_error():
+    """stress_deck: validate_spec / lint_render が例外で落ちると stdout に結果行が無い。終了コードを見て
+    1件の ERROR に数え、「0 errors」で通さない(Codex レビュー、PR #158)。"""
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import subprocess as sp
+    import stress_deck as sd
+    crash = sp.CompletedProcess(["x"], 1, stdout="", stderr="Traceback (most recent call last):\nKeyError: 'slides'")
+    lines = sd.checker_lines(crash, ("ERROR",), "validate_spec.py")
+    assert len(lines) == 1 and lines[0].startswith("ERROR") and "KeyError" in lines[0], lines
+    reported = sp.CompletedProcess(["x"], 1, stdout="ERROR: slide 1: x\n1 slides / 1 errors", stderr="")
+    assert sd.checker_lines(reported, ("ERROR",), "validate_spec.py") == ["ERROR: slide 1: x"]
+    clean = sp.CompletedProcess(["x"], 0, stdout="WARN: w\n1 slides / 0 errors / 1 warnings", stderr="")
+    assert sd.checker_lines(clean, ("ERROR",), "validate_spec.py") == []
+    assert sd.checker_lines(clean, ("FAIL", "WARN"), "lint_render.py") == ["WARN: w"]
+
+
 def test_column_framework_keeps_a_card_under_a_long_header(tmp_path):
     """見出しが何行にも折り返しても、柱の本文カードは 1.4in 以上残る(Codex レビュー、PR #158)。"""
     from pptx.util import Emu
