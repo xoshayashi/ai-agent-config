@@ -264,6 +264,35 @@ def check_identity(i, s, errors) -> None:
         nums = [n for n in nums if n is not None]
         if len(nums) >= 2 and any(a < b for a, b in zip(nums, nums[1:])):
             errors.append(f"{loc}: 入れ子が逆(TAM ≥ SAM ≥ SOM の順に小さくなること): {nums}")
+    if s.get("pattern") == "metric_proof":
+        _check_hero_in_chart(loc, s, errors)
+
+
+def _check_hero_in_chart(loc: str, s: dict, errors) -> None:
+    """metric_proof の hero は、隣の chart が証明する数。hero は exhibit 側に数えるので、それ自身で
+    結論トークンを満たしてしまう — hero の値が chart の系列値(単位が同じとき)か、系列の最終カテゴリの
+    積み上げ合計か、derivation の値のどれかと一致することを求める(Codex レビュー指摘、PR #158)。
+    画像図表(kind)や単位の違う chart は数値で照合できないので見ない。"""
+    hero, chart = s.get("hero") or {}, s.get("chart") or {}
+    val = to_number(hero.get("value"))
+    series = chart.get("series") or []
+    if val is None or chart.get("kind") or not series:
+        return
+    h_unit, c_unit = str(hero.get("unit") or ""), str(chart.get("unit") or "")
+    if h_unit and c_unit and h_unit != c_unit:
+        return
+    shown: list[float] = []
+    for ser in series:
+        shown += [to_number(v) for v in ser.get("values") or []]
+    last = [to_number((ser.get("values") or [None])[-1]) for ser in series]
+    if all(v is not None for v in last):
+        shown.append(sum(last))                             # 積み上げの最終カテゴリの合計
+    deriv = s.get("derivation") or {}
+    if deriv.get("value") is not None:
+        shown.append(to_number(deriv.get("value")))
+    if not any(v is not None and matches(v, val, str(hero.get("value"))) for v in shown):
+        errors.append(f"{loc}: hero の値 {hero.get('value')}{h_unit} が chart に無い — "
+                      "系列の値か derivation で hero を図表から導く(hero が自分を証明してはいけない)")
 
 
 def check_recap(deck, errors) -> None:

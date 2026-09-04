@@ -3138,6 +3138,30 @@ def test_thesis_literal_match_is_a_whole_number(tmp_path):
         assert "7段階」を示す図表がどのページにも無い" in r.stdout, (shown, r.stdout)
 
 
+def test_metric_proof_hero_must_be_in_its_chart(tmp_path):
+    """metric_proof の hero は chart が証明する数。系列にも derivation にも無い hero は audit が弾く
+    (Codex レビュー、PR #158: hero が exhibit 側なので、それ自身で結論を満たしていた)。"""
+    def deck(values, derivation=None):
+        s = {"pattern": "metric_proof", "title": "ARRは12.8億円に到達", "subtitle": "s", "source": "社内集計",
+             "hero": {"label": "ARR", "value": "12.8", "unit": "億円"},
+             "chart": {"type": "column", "unit": "億円", "categories": ["Q1", "Q2"],
+                       "series": [{"name": "ARR", "values": values}]}}
+        if derivation:
+            s["derivation"] = derivation
+        return {"meta": {"title": "t", "basis": "テスト",
+                         "thesis": {"statement": "ARRは12.8億円", "value": "12.8", "unit": "億円"}}, "slides": [s]}
+    spec = tmp_path / "mp.json"
+    spec.write_text(json.dumps(deck([1, 2]), ensure_ascii=False))
+    r = run("audit_argument.py", spec)
+    assert "hero の値 12.8億円 が chart に無い" in r.stdout, r.stdout
+    spec.write_text(json.dumps(deck([11.9, 12.8]), ensure_ascii=False))
+    assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    spec.write_text(json.dumps(deck([9.85, 2.95], {"kind": "sum", "value": 12.8, "unit": "億円", "a": 9.85, "b": 2.95}),
+                               ensure_ascii=False))
+    r = run("audit_argument.py", spec)
+    assert "chart に無い" not in r.stdout, r.stdout
+
+
 def test_metric_proof_accepts_a_zero_hero_value(tmp_path):
     """事故ゼロのような 0 は正当な hero の値。欠落と区別する(Codex レビュー、PR #158)。"""
     deck = {"meta": {"title": "t", "basis": "テスト"},
@@ -3300,6 +3324,11 @@ def test_note_is_allowed_when_only_claim_side_shows_the_number(tmp_path):
                              "note": "期間だけの注記"}
         spec.write_text(json.dumps(base, ensure_ascii=False))
         assert "Note を置かない" in run("validate_spec.py", spec).stdout, labels
+    # 裸の「2024」は件数かもしれない — 「年」か範囲の形が無ければ数値のまま(Codex レビュー、PR #158)
+    base["slides"][0] = {"pattern": "comparison_table", "title": "t", "subtitle": "s",
+                         "table": {"headers": ["項目", "件数"], "rows": [["休眠除く顧客", "2024"]]}, "note": "休眠顧客を除く"}
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" not in run("validate_spec.py", spec).stdout
     # 先頭が 0 の値(「05件」)は番号ではなく数値(Claude レビュー、PR #158)
     base["slides"][0] = {"pattern": "comparison_table", "title": "t", "subtitle": "s",
                          "table": {"headers": ["項目", "件数"], "rows": [["不良", "05件"]]}, "note": "件数は月次"}

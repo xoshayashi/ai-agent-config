@@ -233,7 +233,9 @@ proves it on the right (8 cols). `hero: {label, value, unit, delta, delta_dir, n
 `chart` (native or image kind), optional `facts: [{label, value, unit?}]` (≤4 hairline rows; a fact
 with a `unit` is drawn as value + unit, and the argument audit counts that pair as shown). The hero
 stack locks to the chart's plot top, the facts rail locks to the chart bottom, and all slack
-lands between them. `derivation` belongs here whenever the hero is computed from the series.
+lands between them. `derivation` belongs here whenever the hero is computed from the series;
+`audit_argument` requires the hero value to appear in the series (or as the last-category stack
+total) or to be the `derivation` value — the chart proves the hero, never the other way round.
 
 ### 24. `logic_tree`
 
