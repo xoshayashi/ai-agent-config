@@ -3254,6 +3254,12 @@ def test_metric_proof_hero_must_be_in_its_chart(tmp_path):
     d["meta"]["thesis"] = {"statement": "カバー率100%", "value": "100", "unit": "%"}
     spec.write_text(json.dumps(d, ensure_ascii=False))
     assert "chart に無い" not in run("audit_argument.py", spec).stdout
+    # 正規化されていない 100%積み上げ(60 + 60)は 100 の全体と 50 / 50 の構成比として描かれる — 120% は証拠にならない(Codex レビュー)
+    d["slides"][0]["chart"]["series"] = [{"name": "A", "values": [30, 60]}, {"name": "他", "values": [70, 60]}]
+    for value, expect_error in (("120", True), ("100", False), ("50", False), ("60", True)):
+        d["slides"][0]["hero"]["value"] = value; d["meta"]["thesis"]["value"] = value
+        spec.write_text(json.dumps(d, ensure_ascii=False))
+        assert ("chart に無い" in run("audit_argument.py", spec).stdout) == expect_error, value
     # CAGR の from / to は位置の指定であって図表の値ではない — 0 と 4 が系列に無くても derivation は根拠になる
     d = deck([9.85, 10.52, 11.28, 11.95, 12.8]); d["slides"][0]["chart"]["categories"] = ["Q1", "Q2", "Q3", "Q4", "Q5"]
     d["slides"][0]["hero"] = {"label": "年率成長", "value": "6.8", "unit": "%"}

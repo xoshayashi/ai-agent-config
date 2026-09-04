@@ -424,7 +424,18 @@ def _check_hero_in_chart(loc: str, s: dict, errors) -> None:
     shown = list(nums)
     ctype, kind = chart.get("type", "column"), chart.get("kind")
     series = chart.get("series") or []
-    if (ctype in ("stacked_column", "stacked_bar", "stacked_column_100") and not kind) or kind == "area":
+    if ctype == "stacked_column_100" and not kind:
+        # 100%積み上げは各カテゴリを 100 に正規化して描く。生の値(60 + 60)ではなく、表示される構成比
+        # (50 / 50)と全体の 100 が hero の候補(Codex レビュー指摘、PR #158)
+        cols = [[to_number(v) for v in (ser.get("values") or [])] for ser in series if isinstance(ser, dict)]
+        shown = []
+        for col in zip(*cols):
+            vals = [v for v in col if v is not None]
+            tot = sum(v for v in vals if v > 0)
+            if tot > 0:
+                shown += [v / tot * 100 for v in vals]
+        shown.append(100.0)
+    elif (ctype in ("stacked_column", "stacked_bar") and not kind) or kind == "area":
         last = [to_number((ser.get("values") or [None])[-1]) for ser in series if isinstance(ser, dict)]
         if last and all(v is not None for v in last):
             # 積み上げの最終カテゴリの合計。正負が混じるときは上下に別々の山として描かれるので、
