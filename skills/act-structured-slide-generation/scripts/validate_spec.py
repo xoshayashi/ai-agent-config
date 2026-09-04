@@ -728,8 +728,10 @@ def main() -> int:
         # 利用者の指示: Note は要らない)。言いたいことは本文か speaker_notes へ
         if s.get("note") and pat not in ("cover", "section_divider"):
             try:
-                from deck_argument import exhibit_tokens
-                if not exhibit_tokens(s):
+                from deck_argument import claim_tokens, exhibit_tokens
+                # 数値は図表側(exhibit)でも主張側(claim: statement の recap、insight 等)でもよい —
+                # recap が「68億円」を描く締めページの定義注記まで削らせない(Codex レビュー指摘、PR #158)
+                if not (exhibit_tokens(s) | claim_tokens(s)):
                     warns.append(f"{loc}: note「{str(s['note'])[:20]}」— 数値の無いページに Note を置かない。"
                                  "解説は本文か speaker_notes へ移し、note は削除する")
             except Exception as exc:

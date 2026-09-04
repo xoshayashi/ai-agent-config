@@ -3207,3 +3207,22 @@ def test_column_framework_header_rows_measure_the_real_label():
     head_short = B._column_framework_layout(short, h)["head_h"]
     head_long = B._column_framework_layout(long_, h)["head_h"]
     assert head_long > head_short, (head_short, head_long)
+
+
+def test_note_is_allowed_when_only_claim_side_shows_the_number(tmp_path):
+    """recap が「68億円」を描く statement の定義注記は正当。数値の在り処が主張側でも note は削らせない
+    (Codex レビュー、PR #158)。数値の無いページの note は引き続き警告する。"""
+    base = {"meta": {"title": "t", "basis": "テスト"}, "slides": [{
+        "pattern": "statement", "title": "結論", "subtitle": "s", "variant": "evidence_strip",
+        "lead": "5年でARR 68億円へ", "statement": "経理領域から段階参入し、5年でARR 68億円を築く",
+        "recap": [{"label": "FY31 ARR", "value": "68", "unit": "億円"}],
+        "note": "ARRは各年度末の年間経常収益"}]}
+    spec = tmp_path / "n1.json"
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" not in run("validate_spec.py", spec).stdout
+    base["slides"][0] = {"pattern": "two_column", "title": "t", "subtitle": "s",
+                         "left": {"heading": "A", "items": [{"heading": "h", "body": "x"}]},
+                         "right": {"heading": "B", "items": [{"heading": "h", "body": "y"}]},
+                         "note": "数値の無いページの注記"}
+    spec.write_text(json.dumps(base, ensure_ascii=False))
+    assert "Note を置かない" in run("validate_spec.py", spec).stdout
