@@ -61,12 +61,14 @@ PATTERNS = {
     "milestone_timeline": ["milestones"],
     "risk_matrix": ["risks"],
     "hub_spoke": ["hub", "spokes"],
+    "before_after": ["rows"],
 }
 EVIDENCE_PATTERNS = {
     "chart_insight", "market_sizing", "comparison_table", "competitive_landscape",
     "financial_summary", "waterfall", "kpi_dashboard",
     "financial_highlights", "metrics_rows", "driver_decomposition", "guidance_progress",
     "diagram", "chart_grid", "metric_proof", "logic_tree", "risk_matrix", "hub_spoke",
+    "before_after",
 }
 # 関係・構造の定性主張が正当なパターン: タイトルに数字が無くても警告しない
 QUALITATIVE_EVIDENCE = {"competitive_landscape", "diagram", "logic_tree", "risk_matrix", "hub_spoke"}
@@ -704,6 +706,29 @@ def main() -> int:
             long_date = [str(m.get("date")) for m in ms_ if ja_len(str(m.get("date", ""))) > 10]
             if long_date:
                 warns.append(f"{loc}: date が長い({', '.join(d[:12] for d in long_date)}) — 10字以内(2026年4月 / Q3 FY26)")
+        if pat == "before_after":
+            rws = s.get("rows", [])
+            if not 2 <= len(rws) <= 5:
+                errors.append(f"{loc}: before_after の rows は 2-5 行({len(rws)} 行) — 1行なら metric_proof、6行以上は comparison_table")
+            empty = [str(r.get("label", j + 1)) for j, r in enumerate(rws)
+                     if not str(r.get("before", "")).strip() or not str(r.get("after", "")).strip()]
+            if empty:
+                errors.append(f"{loc}: before / after のどちらかが空の行({', '.join(empty)}) — 前後がそろわない観点は比較に置かない")
+            if sum(1 for r in rws if r.get("focal")) > 1:
+                errors.append(f"{loc}: focal が複数 — 立てる行は1つだけ")
+            if 2 <= len(rws) <= 5:
+                try:
+                    import build_deck as _bd
+                    if getattr(_bd, "_VALIDATE_TOKENS_APPLIED", None) is not tokens:
+                        _bd._apply_tokens(tokens)
+                        _bd._VALIDATE_TOKENS_APPLIED = tokens
+                    _, body_h = _bd.body_region(s)
+                    BL = _bd._before_after_layout(s, body_h)
+                    if BL["overflow"]:
+                        errors.append(f"{loc}: 行が本文帯に入らない(必要 {BL['need_h']:.2f}in > {body_h - 0.10:.2f}in) — "
+                                      "注記を短くするか、行を減らす")
+                except Exception as exc:
+                    warns.append(f"{loc}: before_after の寸法見積もりに失敗 ({exc})")
         if pat == "hub_spoke":
             sps = s.get("spokes", [])
             if not 3 <= len(sps) <= 6:

@@ -7,7 +7,7 @@ primitives, not design templates. Choose and combine them after the judgment pro
 
 - Top Level
 - Fields Common To Slides
-- The 27 Patterns
+- The 28 Patterns
 - Layout contract shared by every pattern
 - Argument fields
 - Chart Spec (native types, emphasis/annotation knobs, image chart kinds, annotation layer)
@@ -78,7 +78,7 @@ name. An absent template resolves to `standard`, which is byte-for-byte the pre-
   for a kind the native engine could attempt. Default (unset) keeps native unless the `kind` is
   image-only (combo/area/org_tree/…). Escalate to image only for objects native cannot draw.
 
-## The 27 Patterns
+## The 28 Patterns
 
 ### 1. `cover`
 
@@ -311,6 +311,28 @@ middle of every card, as in `logic_tree`.
   label + relation + two body lines per card at three per side). Use `diagram` with
   `kind: node_graph` only when parts also connect to each other, not just to the hub.
 - Evidence-wise it is qualitative, but it needs `source` or `assumption`.
+
+### 28. `before_after`
+
+Row-aligned before → after comparison: each row is one dimension read across as
+`label | before | → | after (+ delta)`. `rows: [{label, before, after, delta?, before_note?,
+after_note?, focal?}]`, optional `before_label` / `after_label` (default: the Japanese words for
+"before adoption" / "after adoption"). Columns are 3 | 3 | 1 | 5: the after column is the protagonist, wider and
+backed by a pale primary band from its header to the last row; before values are set in the
+subtle ink.
+
+- Use it when *how much each dimension changed* is the argument. `two_column` is the free
+  contrast (options, problem/solution) with no row alignment; one dimension alone is a
+  `metric_proof`; six or more is a `comparison_table`.
+- `delta` sits after the after value in bold primary, in the same paragraph.
+- Row heights come from the tallest of the three cells; spare height is shared equally so
+  the hairlines stay even. Validate measures rows with the builder's geometry and errors when
+  they cannot fit the body.
+- Caps: 2-5 rows (notes on every row fit up to four rows; at five rows keep notes to about
+  three rows), both `before` and `after` required on every row, one `focal` row at most
+  (primary label and a thin primary bar at its left edge).
+- `rows` is an exhibit key, so the values count as evidence for the title's numbers; the
+  slide still needs `source` or `assumption`.
 
 ## Layout contract shared by every pattern
 

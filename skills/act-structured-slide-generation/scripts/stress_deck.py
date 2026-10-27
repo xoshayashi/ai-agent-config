@@ -207,6 +207,15 @@ def make_deck(variant: str = "max", template: str | None = None, images: bool = 
                      "body": T(LONG if overload else "審査時間を平均2日から5分に短縮", "短縮"), "focal": i == 1}
                     for i in range(N(3, 6))],
          "assumption": "社内データ基盤の運用実績(2026年9月)"},
+        {"pattern": "before_after", "title": T("処理時間は1件12分から4分になり、差戻しは半減した", "12分→4分"),
+         "subtitle": "営業部120名のPoC 1期(2026年7-9月)",
+         "rows": [{"label": T("1件あたりの処理時間", f"観点{i + 1}"), "before": "12分", "after": "4分", "delta": "−67%",
+                   "focal": i == 0,
+                   # 5行すべてに注記を付けると本文帯に入らない(validate が error) — 現実的な上限は注記3行
+                   "before_note": T(LONG if overload else "紙の領収書を手入力", "手入力") if (overload or i < 3) else None,
+                   "after_note": T(LONG if overload else "領収書の撮影で自動入力", "自動") if (overload or i < 3) else None}
+                  for i in range(N(2, 5))],
+         "source": "PoC 1期の利用ログ(2026年10月集計)"},
         {"pattern": "financial_highlights", "title": T("上期売上64.8億円(+28%)で計画超過", "計画超過"),
          "subtitle": "FY2026 上期ハイライト",
          "groups": [{"label": T("業績", "業績"), "claim": T("増収と黒字幅拡大が両立、投資回収が前倒し" if overload else "増収と黒字拡大が両立", "両立"),

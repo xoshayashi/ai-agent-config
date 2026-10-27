@@ -189,7 +189,8 @@ the story. Do not use a fixed closing template.
 - Positioning quadrant -> `competitive_landscape`
 - Table conclusion -> `comparison_table`
 - Chart + interpretation rail -> `chart_insight`
-- Before/after or asymmetric split -> `two_column`
+- Before/after measured across aligned dimensions -> `before_after`
+- Free before/after, options, or asymmetric split -> `two_column`
 - Process flow -> `process_flow`
 - Current-location agenda -> `agenda`
 - Guidance progress -> `guidance_progress`

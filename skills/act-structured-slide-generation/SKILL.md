@@ -229,7 +229,9 @@ aligned rows and a locked outcome strip — parallel structure, never a sequence
 points, solid axis for actuals and dashed for plan via `current`) rather than a `roadmap`. For a risk
 review, `risk_matrix` places numbered risks on a 3x3 likelihood × impact grid beside their
 mitigations. When one platform coordinates several parts, `hub_spoke` draws the hub,
-3-6 spoke cards, and a relation line in each card, all as editable shapes. Mix shift is a
+3-6 spoke cards, and a relation line in each card, all as editable shapes. When change is
+the argument and it can be measured, `before_after` reads each dimension across one row
+(before → after + delta) instead of two free columns. Mix shift is a
 native `stacked_column_100`; a chart with short comparable takeaways can use
 `chart_insight` `layout: chart_top` to vary the page rhythm.
 

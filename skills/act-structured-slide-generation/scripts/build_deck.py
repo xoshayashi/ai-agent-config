@@ -3453,6 +3453,90 @@ def p_hub_spoke(slide, spec, deck):
         add_line(slide, bus_x, min(mids + [hub_mid]), bus_x, max(mids + [hub_mid]), C["ink_faint"], 1.0)
 
 
+def _ba_cell_blocks(value, note, *, after: bool, delta=None) -> list[dict]:
+    """前後比較の1セル: 値(after は濃く、差分を主色で添える) → 注記。"""
+    vpt = TS["section_heading"]
+    parts = [(str(value), vpt, 700 if after else 600, C["ink"] if after else C["ink_subtle"])]
+    if after and delta:
+        parts.append((f"  {delta}", TS["kpi_sub"], 700, C["primary_deep"]))
+    blocks = [{"parts": parts, "size": vpt, "kind": "text"}]
+    if note:
+        blocks.append({"parts": [(str(note), TS["body_small"], 400, C["ink_subtle"])], "size": TS["body_small"],
+                       "kind": "text", "gap_before": OPT["gap_in"]["heading_body"], "gap_name": "heading_body"})
+    return blocks
+
+
+def _before_after_layout(spec: dict, h: float) -> dict:
+    """前後比較の寸法: 観点(3列) | 前(3列) | 矢印(1列) | 後(5列)。行の高さは3セルの最大内容から
+    決め、余りは行へ均等に配る(行間の罫がそろう)。"""
+    rows = spec.get("rows", [])[:5]
+    cols = {"label": grid(0, 3), "before": grid(3, 3), "arrow": grid(6, 1), "after": grid(7, 5)}
+    HEAD_H = drawn_line_h(TS["body"]) + 0.24
+    for pad in (0.22, 0.14, 0.08):
+        cells = []
+        for r in rows:
+            lab = [{"parts": [(r.get("label", ""), RAIL_HEAD_PT, 600, C["primary_deep"] if r.get("focal") else C["ink"])],
+                    "size": RAIL_HEAD_PT, "kind": "text"}]
+            bef = _ba_cell_blocks(r.get("before", ""), r.get("before_note"), after=False)
+            aft = _ba_cell_blocks(r.get("after", ""), r.get("after_note"), after=True, delta=r.get("delta"))
+            cells.append((lab, bef, aft))
+        widths = (cols["label"][1] - 0.20, cols["before"][1] - 0.20, cols["after"][1] - 0.40)
+        mins = [max(_stack_drawn_h(b, wd) for b, wd in zip(c, widths)) + 2 * pad for c in cells]
+        content = HEAD_H + sum(mins)
+        if content <= h - 0.10:
+            break
+    band_h, off = fit_band(h - 0.10, content)
+    extra = max(0.0, band_h - content) / max(1, len(rows))
+    row_h = [m + extra for m in mins]
+    if content > h - 0.10:
+        # 詰めても入らない: 行を等率で縮めて図形を帯に留め、溢れは validate が名指しする
+        k = (h - 0.10 - HEAD_H) / sum(mins)
+        row_h = [m * k for m in mins]
+        band_h, off = h - 0.10, 0.0
+    return dict(rows=rows, cols=cols, HEAD_H=HEAD_H, pad=pad, cells=cells, widths=widths, row_h=row_h,
+                band_h=band_h, off=off, overflow=content > h - 0.10, need_h=content)
+
+
+def p_before_after(slide, spec, deck):
+    """前後比較: 観点ごとに「前 → 後」を同じ行で読ませる。two_column が自由な2列の対比なのに対し、
+    こちらは行がそろうことが要点(どの観点がどれだけ変わったか)。
+
+    後の列は5列ぶんの主役で、見出しから最終行まで淡い主色の帯を敷く。前の列は控えめな灰色の字。
+    差分(delta)は後の値の右に主色で添える。focal の行は観点を主色にし、左端に細い主色の棒を立てる。"""
+    y0, h = body_region(spec)
+    L = _before_after_layout(spec, h)
+    rows = L["rows"]
+    if not rows:
+        return
+    cols, HEAD_H, pad = L["cols"], L["HEAD_H"], L["pad"]
+    top = y0 + 0.05 + L["off"]
+    ax, aw = cols["after"]
+    add_rect(slide, ax, top, aw, L["band_h"], C["primary_pale"], radius_pt=LAY["card"]["radius_pt"])
+    head_pt = TS["body"]
+    bx, bw = cols["before"]
+    add_text(slide, bx + 0.10, top, bw - 0.20, HEAD_H,
+             [[(spec.get("before_label", "導入前"), head_pt, 600, C["ink_subtle"])]], anchor=MSO_ANCHOR.MIDDLE)
+    add_text(slide, ax + 0.20, top, aw - 0.40, HEAD_H,
+             [[(spec.get("after_label", "導入後"), head_pt, 700, C["primary_deep"])]], anchor=MSO_ANCHOR.MIDDLE)
+    lx, lw = cols["label"]
+    add_line(slide, lx, top + HEAD_H, ax + aw, top + HEAD_H, C["rule"], 0.75)
+    yy = top + HEAD_H
+    for i, (r, (lab, bef, aft), rh) in enumerate(zip(rows, L["cells"], L["row_h"])):
+        if r.get("focal"):
+            add_rect(slide, lx, yy + pad * 0.6, 0.06, rh - pad * 1.2, C["primary"])
+        # 文字幅はレイアウトの widths と同じ(行高を測った幅で描く)。観点は focal の棒の右から
+        lab_w, bef_w, aft_w = L["widths"]
+        for tx, tw, blocks in ((lx + 0.18, lab_w, lab), (bx + 0.10, bef_w, bef), (ax + 0.20, aft_w, aft)):
+            stack_block(slide, tx, yy + pad, tw, rh - 2 * pad, blocks)
+        arx, arw = cols["arrow"]
+        apt = TS["section_heading"]
+        add_text(slide, arx, yy + rh / 2 - drawn_line_h(apt) / 2 - ink_center_offset_in(apt), arw, drawn_line_h(apt),
+                 [[("→", apt, 700, C["primary"])]], align=PP_ALIGN.CENTER, wrap=False)
+        if i < len(rows) - 1:
+            add_line(slide, lx, yy + rh, ax + aw, yy + rh, C["rule"], 0.5)
+        yy += rh
+
+
 RISK_LEVELS = {"y": ["低", "中", "高"], "x": ["小", "中", "大"]}
 
 
@@ -3704,6 +3788,7 @@ PATTERNS = {
     "milestone_timeline": p_milestone_timeline,
     "risk_matrix": p_risk_matrix,
     "hub_spoke": p_hub_spoke,
+    "before_after": p_before_after,
     "cover": p_cover,
     "agenda": p_agenda,
     "section_divider": p_section_divider,

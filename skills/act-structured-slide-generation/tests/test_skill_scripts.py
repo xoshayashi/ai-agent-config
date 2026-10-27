@@ -3240,6 +3240,59 @@ def test_validate_checks_the_hub_spoke(tmp_path):
     assert r.returncode == 1 and "本文帯に入らない" in r.stdout, r.stdout
 
 
+def _ba_slide(**over):
+    sl = {"pattern": "before_after", "title": "経費精算の処理時間は1件12分から4分になり、差戻しは半減した",
+          "subtitle": "PoC 1期",
+          "rows": [
+              {"label": "処理時間", "before": "12分", "after": "4分", "delta": "−67%", "focal": True,
+               "before_note": "紙の領収書を手入力", "after_note": "撮影で自動入力"},
+              {"label": "差戻し率", "before": "18%", "after": "9%", "delta": "−9pt"},
+              {"label": "月次締め", "before": "7営業日", "after": "4営業日", "delta": "−3日"}],
+          "source": "PoC 1期の利用ログ(2026年10月集計)"}
+    sl.update(over)
+    return sl
+
+
+def test_before_after_aligns_rows_and_marks_the_after_column(tmp_path):
+    """前後比較: 行ごとに 前 → 後 が同じ高さに並び(矢印が行ごとに1つ)、後の列には淡い主色の帯。
+    差分は後の値と同じ段落に入る。"""
+    from pptx import Presentation
+    spec = {"meta": {"title": "t"}, "slides": [_ba_slide()]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(spec, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 0, r.stdout
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0, v.stdout
+    slide = list(Presentation(out).slides)[0]
+    tb = [sh for sh in slide.shapes if sh.has_text_frame]
+    arrows = [sh for sh in tb if sh.text_frame.text == "→"]
+    assert len(arrows) == 3
+    after = next(sh for sh in tb if sh.text_frame.text.startswith("4分"))
+    before = next(sh for sh in tb if sh.text_frame.text.startswith("12分"))
+    assert "−67%" in after.text_frame.text
+    assert abs(after.top - before.top) < 914400 * 0.05            # 同じ行の上端がそろう
+    import build_deck as B
+    pale = str(B.C["primary_pale"])
+    assert any(sh.shape_type == 1 and sh.fill.type == 1 and str(sh.fill.fore_color.rgb) == pale for sh in slide.shapes)
+
+
+def test_validate_checks_the_before_after(tmp_path):
+    long_ = "電子帳簿保存法とインボイス制度への対応を単一のワークフローで完結させる統合基盤" * 3
+    bad = {"meta": {"title": "t"}, "slides": [
+        _ba_slide(rows=_ba_slide()["rows"][:1]),
+        _ba_slide(rows=[{**r, "after": ""} for r in _ba_slide()["rows"]]),
+        _ba_slide(rows=[{**r, "focal": True} for r in _ba_slide()["rows"]]),
+        _ba_slide(rows=[{**r, "before_note": long_, "after_note": long_} for r in _ba_slide()["rows"] * 2][:5]),
+    ]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(bad, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 1
+    for needle in ("2-5 行", "どちらかが空", "focal が複数", "本文帯に入らない"):
+        assert needle in r.stdout, (needle, r.stdout)
+
+
 def test_stacked_100_and_stacked_bar_are_native_chart_types(tmp_path):
     from pptx import Presentation
     spec = {"meta": {"title": "t"}, "slides": [
