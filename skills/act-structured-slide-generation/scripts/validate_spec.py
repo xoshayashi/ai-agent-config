@@ -73,6 +73,47 @@ EVIDENCE_PATTERNS = {
 }
 # 関係・構造の定性主張が正当なパターン: タイトルに数字が無くても警告しない
 QUALITATIVE_EVIDENCE = {"competitive_landscape", "diagram", "logic_tree", "risk_matrix", "hub_spoke"}
+
+
+def _builder(tokens):
+    """描画と同じ物差しで測るための build_deck。import 時の既定(standard)ではなく、このデッキの
+    テンプレートの型スケール・レイアウトを当てて返す(Codex レビュー指摘、PR #158)。当てるのは
+    デッキにつき1回(同じ tokens を毎スライド当て直さない)。"""
+    import build_deck as _bd
+    if getattr(_bd, "_VALIDATE_TOKENS_APPLIED", None) is not tokens:
+        _bd._apply_tokens(tokens)
+        _bd._VALIDATE_TOKENS_APPLIED = tokens
+    return _bd
+
+
+def _risk_fit(bd, s, h):
+    R = bd._risk_rail_layout(s, h)
+    return {**R, "need_h": R["need"]}
+
+
+# パターン → (寸法関数, 本文帯に入らないときの直し方)。寸法関数は overflow と need_h を返す
+FIT_CHECKS = {
+    "milestone_timeline": (lambda bd, s, h: bd._milestone_timeline_layout(s.get("milestones", [])[:6], h),
+                           "本文を短くするか、節を減らす"),
+    "risk_matrix": (_risk_fit, "対策の文を短くする(4件なら各1-2行)"),
+    "hub_spoke": (lambda bd, s, h: bd._hub_spoke_layout(s, h),
+                  "本文を短くするか、周辺を減らす(片側3枚、各カードは名前+関係+本文2行まで)"),
+    "before_after": (lambda bd, s, h: bd._before_after_layout(s, h), "注記を短くするか、行を減らす"),
+    "case_strip": (lambda bd, s, h: bd._case_strip_layout(s, h), "本文か声を短くする"),
+}
+
+
+def _check_fit(errors, warns, loc, s, tokens) -> None:
+    """カードや行が本文帯に入るかを、描画と同じ寸法計算で見る。入らないものは描くと溢れる。"""
+    fn, fix = FIT_CHECKS[s.get("pattern")]
+    try:
+        bd = _builder(tokens)
+        _, body_h = bd.body_region(s)
+        L = fn(bd, s, body_h)
+        if L["overflow"]:
+            errors.append(f"{loc}: 本文帯に入らない(必要 {L['need_h']:.2f}in > {body_h - 0.10:.2f}in) — {fix}")
+    except Exception as exc:  # 見積もりが壊れていれば黙らず告げる(検査を無効化しない)
+        warns.append(f"{loc}: {s.get('pattern')} の寸法見積もりに失敗 ({exc})")
 # chart/diagram objects rendered via the image-asset backend (act_assets), not native charts.
 # 必須フィールドは act_assets の各レンダラーが spec[...] で直接参照するキー —
 # ここで検査しないと validate は 0 errors で通り、build が KeyError/ValueError で落ちる
@@ -704,6 +745,8 @@ def main() -> int:
                 errors.append(f"{loc}: focal が複数 — 立てる節は1つだけ")
             if ms_ and not any(m.get("decision") for m in ms_):
                 warns.append(f"{loc}: decision の節がない — 判断の時期を見せないなら roadmap か process_flow を選ぶ")
+            if 3 <= len(ms_) <= 6:
+                _check_fit(errors, warns, loc, s, tokens)
             long_date = [str(m.get("date")) for m in ms_ if ja_len(str(m.get("date", ""))) > 10]
             if long_date:
                 warns.append(f"{loc}: date が長い({', '.join(d[:12] for d in long_date)}) — 10字以内(2026年4月 / Q3 FY26)")
@@ -722,18 +765,7 @@ def main() -> int:
             if sum(1 for c in css if c.get("focal")) > 1:
                 errors.append(f"{loc}: focal が複数 — 立てる事例は1つだけ")
             if 2 <= len(css) <= 4:
-                try:
-                    import build_deck as _bd
-                    if getattr(_bd, "_VALIDATE_TOKENS_APPLIED", None) is not tokens:
-                        _bd._apply_tokens(tokens)
-                        _bd._VALIDATE_TOKENS_APPLIED = tokens
-                    _, body_h = _bd.body_region(s)
-                    CL = _bd._case_strip_layout(s, body_h)
-                    if CL["overflow"]:
-                        errors.append(f"{loc}: 事例カードが本文帯に入らない(必要 {CL['need_h']:.2f}in > {body_h - 0.10:.2f}in) — "
-                                      "本文か声を短くする")
-                except Exception as exc:
-                    warns.append(f"{loc}: case_strip の寸法見積もりに失敗 ({exc})")
+                _check_fit(errors, warns, loc, s, tokens)
         if pat == "before_after":
             rws = s.get("rows", [])
             if not 2 <= len(rws) <= 5:
@@ -745,18 +777,7 @@ def main() -> int:
             if sum(1 for r in rws if r.get("focal")) > 1:
                 errors.append(f"{loc}: focal が複数 — 立てる行は1つだけ")
             if 2 <= len(rws) <= 5:
-                try:
-                    import build_deck as _bd
-                    if getattr(_bd, "_VALIDATE_TOKENS_APPLIED", None) is not tokens:
-                        _bd._apply_tokens(tokens)
-                        _bd._VALIDATE_TOKENS_APPLIED = tokens
-                    _, body_h = _bd.body_region(s)
-                    BL = _bd._before_after_layout(s, body_h)
-                    if BL["overflow"]:
-                        errors.append(f"{loc}: 行が本文帯に入らない(必要 {BL['need_h']:.2f}in > {body_h - 0.10:.2f}in) — "
-                                      "注記を短くするか、行を減らす")
-                except Exception as exc:
-                    warns.append(f"{loc}: before_after の寸法見積もりに失敗 ({exc})")
+                _check_fit(errors, warns, loc, s, tokens)
         if pat == "hub_spoke":
             sps = s.get("spokes", [])
             if not 3 <= len(sps) <= 6:
@@ -766,18 +787,7 @@ def main() -> int:
             if sum(1 for sp in sps if sp.get("focal")) > 1:
                 errors.append(f"{loc}: focal が複数 — 立てる周辺は1つだけ")
             if 3 <= len(sps) <= 6:
-                try:
-                    import build_deck as _bd
-                    if getattr(_bd, "_VALIDATE_TOKENS_APPLIED", None) is not tokens:
-                        _bd._apply_tokens(tokens)
-                        _bd._VALIDATE_TOKENS_APPLIED = tokens
-                    _, body_h = _bd.body_region(s)
-                    HL = _bd._hub_spoke_layout(s, body_h)
-                    if HL["overflow"]:
-                        errors.append(f"{loc}: 周辺カードが本文帯に入らない(必要 {HL['need_h']:.2f}in > {body_h - 0.10:.2f}in) — "
-                                      "本文を短くするか、周辺を減らす(片側3枚、各カードは名前+関係+本文2行まで)")
-                except Exception as exc:  # 見積もりが壊れていれば黙らず告げる
-                    warns.append(f"{loc}: hub_spoke の寸法見積もりに失敗 ({exc})")
+                _check_fit(errors, warns, loc, s, tokens)
             norel = [str(sp.get("label", j + 1)) for j, sp in enumerate(sps) if not sp.get("relation")]
             if norel:
                 warns.append(f"{loc}: relation のない周辺({', '.join(norel)}) — 中心と何が行き来するかを1行で書く"
@@ -793,6 +803,18 @@ def main() -> int:
                         errors.append(f"{loc}: リスク '{r.get('label', j + 1)}' の {ax}={v!r} — 1-3 の整数で指定")
             if sum(1 for r in rk if r.get("focal")) > 1:
                 errors.append(f"{loc}: focal が複数 — 立てるリスクは1つだけ")
+            for ax_key in ("x_axis", "y_axis"):
+                lv = (s.get(ax_key) or {}).get("levels")
+                if lv is not None and not (isinstance(lv, list) and len(lv) == 3):
+                    errors.append(f"{loc}: {ax_key}.levels は低い順に3つ(例: 低 / 中 / 高) — いまは {lv!r}")
+            badge = [str(r["id"]) if r.get("id") not in (None, "") else str(j + 1) for j, r in enumerate(rk)]
+            dup = sorted({b for b in badge if badge.count(b) > 1})
+            if dup:
+                errors.append(f"{loc}: リスクの番号が重複({', '.join(dup)}) — マトリクスとレールで同じ丸が2つ出て対応が読めない")
+            levels_ok = all(isinstance(r.get(a), int) and not isinstance(r.get(a), bool) and 1 <= r.get(a) <= 3
+                            for r in rk for a in ("likelihood", "impact"))
+            if 2 <= len(rk) <= 4 and levels_ok:
+                _check_fit(errors, warns, loc, s, tokens)
             nomit = [str(r.get("label", j + 1)) for j, r in enumerate(rk) if not r.get("mitigation")]
             if nomit:
                 warns.append(f"{loc}: 対策(mitigation)のないリスク({', '.join(nomit)}) — 並べるだけのリスク表は判断材料にならない")
@@ -847,14 +869,7 @@ def main() -> int:
         if pat in ("process_flow", "column_framework", "two_column", "milestone_timeline", "hub_spoke",
                    "case_strip"):
             try:
-                import build_deck as _bd
-                # 見積もりはビルドと同じ物差しで — import 時の既定(standard)ではなく、このデッキの
-                # テンプレートの型スケール・レイアウトを当ててから測る(Codex レビュー指摘、PR #158)。
-                # 当てるのはデッキにつき1回(同じ tokens を毎スライド当て直さない)
-                if getattr(_bd, "_VALIDATE_TOKENS_APPLIED", None) is not tokens:
-                    _bd._apply_tokens(tokens)
-                    _bd._VALIDATE_TOKENS_APPLIED = tokens
-                card_copy_estimate = _bd.card_copy_estimate
+                card_copy_estimate = _builder(tokens).card_copy_estimate     # ビルドと同じ物差し
                 floor_ = BUDGET_FILL.get("card_text_floor", 0.6)
                 for est in card_copy_estimate(s):
                     if est["ratio"] < floor_:

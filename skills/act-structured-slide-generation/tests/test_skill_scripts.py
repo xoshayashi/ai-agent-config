@@ -3347,6 +3347,58 @@ def test_validate_checks_the_case_strip(tmp_path):
         assert needle in r.stdout, (needle, r.stdout)
 
 
+def test_new_patterns_keep_shapes_on_slide_and_validate_names_overflow(tmp_path):
+    """レビュー指摘(2026-10-27): 長すぎる本文で、タイムラインのカードがスライドの外へ伸びた。
+    リスクの対策レールも validate を素通りした。どちらも validate が error にし、
+    描いても図形は本文帯の中に留まる。"""
+    from pptx import Presentation
+    long_ = "電子帳簿保存法とインボイス制度への対応を単一のワークフローで完結させる統合基盤" * 4
+    tl = _timeline_slide()
+    tl["milestones"] = [{**m, "body": long_} for m in tl["milestones"]]
+    rk = _risk_slide(risks=[{**r, "mitigation": long_} for r in _risk_slide()["risks"]])
+    spec = {"meta": {"title": "t"}, "slides": [tl, rk]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(spec, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 1 and r.stdout.count("本文帯に入らない") == 2, r.stdout
+    out = tmp_path / "deck.pptx"
+    b = run("build_deck.py", p, "-o", out)
+    assert b.returncode == 0 and "収まらない" in b.stdout
+    for slide in Presentation(out).slides:
+        for sh in slide.shapes:
+            assert (sh.top + sh.height) / 914400 <= 7.5 + 1e-6, sh.name
+
+
+def test_review_edge_cases_for_the_new_patterns(tmp_path):
+    """レビュー指摘: 軸の水準が3つでない、id 0 / 重複、delta 0、current に bool、hub の値の扱い。"""
+    from pptx import Presentation
+    import build_deck as B
+    import deck_argument as A
+    # hub の値は図表の数値(thesis の裏づけになる)
+    assert "1.2億" in A.exhibit_tokens(_hub_slide())
+    # id 0 は正当な番号、無ければ並び順
+    assert B.risk_ids([{"id": 0}, {"id": 1}, {}]) == ["0", "1", "3"]
+    bad = {"meta": {"title": "t"}, "slides": [
+        _risk_slide(y_axis={"title": "発生可能性", "levels": ["低", "高"]}),
+        _risk_slide(risks=[{**r, "id": "R1"} for r in _risk_slide()["risks"]]),
+    ]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(bad, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert "levels は低い順に3つ" in r.stdout and "番号が重複" in r.stdout, r.stdout
+    ok = {"meta": {"title": "t"}, "slides": [
+        _ba_slide(rows=[{**_ba_slide()["rows"][0], "delta": 0}] + _ba_slide()["rows"][1:]),
+        _timeline_slide(current=True),
+    ]}
+    p.write_text(json.dumps(ok, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    s_ba, s_tl = list(Presentation(out).slides)
+    assert any(sh.has_text_frame and sh.text_frame.text.split("\n")[0].split() == ["4分", "0"]
+               for sh in s_ba.shapes)                                       # delta 0 も描く
+    dashed = [sh for sh in s_tl.shapes if sh.shape_type == 9
+              and sh.line._get_or_add_ln().find("{http://schemas.openxmlformats.org/drawingml/2006/main}prstDash") is not None]
+    assert not dashed                                                       # current=True は添字として扱わない
+
+
 def test_stacked_100_and_stacked_bar_are_native_chart_types(tmp_path):
     from pptx import Presentation
     spec = {"meta": {"title": "t"}, "slides": [

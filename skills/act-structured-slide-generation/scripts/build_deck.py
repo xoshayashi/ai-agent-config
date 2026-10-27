@@ -3318,17 +3318,24 @@ def _milestone_timeline_layout(ms: list, h: float) -> dict:
     AXIS_H = 0.40                      # 判断ポイントのひし形(最大 0.36in)が収まる帯
     legend_h = drawn_line_h(TS["kpi_sub"]) + 0.14
     # 入らないときは余白から詰める(reclaim ladder): カードの内側余白 → 帯間の隙間。型は縮めない
+    blocks = [_milestone_blocks(m) for m in ms]       # 余白に依らないので梯子の外で1回だけ組む
     for pad, gap in ((0.22, 0.16), (0.16, 0.12), (0.12, 0.08)):
         text_w = cw - 2 * pad
-        blocks = [_milestone_blocks(m) for m in ms]
         col_h = [_stack_drawn_h(b, text_w) for b in blocks]
         card_min = max(1.2, max(col_h) + 2 * pad)
         content = date_h + gap + AXIS_H + gap + card_min + legend_h
         if content <= h - 0.10:
             break
     band_h, off = fit_band(h - 0.10, content, top_anchored=True)
-    card_h = max(card_min, band_h - (date_h + gap + AXIS_H + gap + legend_h))
+    chrome = date_h + gap + AXIS_H + gap + legend_h
+    card_h = max(card_min, band_h - chrome)
+    overflow = content > h - 0.10
+    if overflow:
+        # 詰めても入らない = 本文が長すぎる。カードを本文帯の中で止め(スライドの外へ伸ばさない)、
+        # 溢れは validate の error とビルドの警告で名指しする
+        card_h = max(0.4, h - 0.10 - chrome)
     return dict(n=n, cw=cw, gut=gut, date_h=date_h, DATE_PT=DATE_PT, AXIS_H=AXIS_H, gap=gap,
+                overflow=overflow, need_h=content,
                 pad=pad, text_w=text_w, blocks=blocks, col_h=col_h, card_h=card_h,
                 legend_h=legend_h, off=off, line_h=drawn_line_h(TS["body"]))
 
@@ -3374,9 +3381,9 @@ def _hub_spoke_layout(spec: dict, h: float) -> dict:
     n_left = (len(spokes) + 1) // 2
     sides = [spokes[:n_left], spokes[n_left:]]
     _, side_w = grid(0, 4)
+    blocks = [_spoke_blocks(sp) for sp in spokes]
     for pad, gap in ((0.20, 0.22), (0.14, 0.14), (0.10, 0.08)):
         text_w = side_w - 2 * pad
-        blocks = [_spoke_blocks(sp) for sp in spokes]
         col_h = [_stack_drawn_h(b, text_w) for b in blocks]
         card_h = max(col_h, default=0.4) + 2 * pad
         rows = max(len(sd) for sd in sides)
@@ -3397,7 +3404,7 @@ def _hub_spoke_layout(spec: dict, h: float) -> dict:
 def p_hub_spoke(slide, spec, deck):
     """ハブ&スポーク: 中心の資産・基盤(hub)と、それがつなぐ3-6の要素(spokes)。
 
-    中心は 4-7 列目の濃色ノード、周辺は左右 4 列ずつのカード。中心からの線は肘型のバスで
+    中心は 6-7 列目(grid(5, 2))の濃色ノード、周辺は左右 4 列ずつのカード(1-4 列 / 9-12 列)。中心からの線は肘型のバスで
     各カードの中央へ結ぶ(logic_tree と同じ作図)。関係(relation)はカード先頭の1行に置く —
     線の上に語を浮かせると、細い通路で折れて読めない。focal の周辺は線も主色で太く引く。"""
     hub = spec.get("hub") or {}
@@ -3457,7 +3464,7 @@ def _ba_cell_blocks(value, note, *, after: bool, delta=None) -> list[dict]:
     """前後比較の1セル: 値(after は濃く、差分を主色で添える) → 注記。"""
     vpt = TS["section_heading"]
     parts = [(str(value), vpt, 700 if after else 600, C["ink"] if after else C["ink_subtle"])]
-    if after and delta:
+    if after and delta not in (None, ""):          # delta 0(変化なし)も描く
         parts.append((f"  {delta}", TS["kpi_sub"], 700, C["primary_deep"]))
     blocks = [{"parts": parts, "size": vpt, "kind": "text"}]
     if note:
@@ -3472,15 +3479,15 @@ def _before_after_layout(spec: dict, h: float) -> dict:
     rows = spec.get("rows", [])[:5]
     cols = {"label": grid(0, 3), "before": grid(3, 3), "arrow": grid(6, 1), "after": grid(7, 5)}
     HEAD_H = drawn_line_h(TS["body"]) + 0.24
+    cells = []
+    for r in rows:
+        lab = [{"parts": [(r.get("label", ""), RAIL_HEAD_PT, 600, C["primary_deep"] if r.get("focal") else C["ink"])],
+                "size": RAIL_HEAD_PT, "kind": "text"}]
+        bef = _ba_cell_blocks(r.get("before", ""), r.get("before_note"), after=False)
+        aft = _ba_cell_blocks(r.get("after", ""), r.get("after_note"), after=True, delta=r.get("delta"))
+        cells.append((lab, bef, aft))
+    widths = (cols["label"][1] - 0.20, cols["before"][1] - 0.20, cols["after"][1] - 0.40)
     for pad in (0.22, 0.14, 0.08):
-        cells = []
-        for r in rows:
-            lab = [{"parts": [(r.get("label", ""), RAIL_HEAD_PT, 600, C["primary_deep"] if r.get("focal") else C["ink"])],
-                    "size": RAIL_HEAD_PT, "kind": "text"}]
-            bef = _ba_cell_blocks(r.get("before", ""), r.get("before_note"), after=False)
-            aft = _ba_cell_blocks(r.get("after", ""), r.get("after_note"), after=True, delta=r.get("delta"))
-            cells.append((lab, bef, aft))
-        widths = (cols["label"][1] - 0.20, cols["before"][1] - 0.20, cols["after"][1] - 0.40)
         mins = [max(_stack_drawn_h(b, wd) for b, wd in zip(c, widths)) + 2 * pad for c in cells]
         content = HEAD_H + sum(mins)
         if content <= h - 0.10:
@@ -3576,9 +3583,9 @@ def _case_strip_layout(spec: dict, h: float) -> dict:
     gut = LAY["gutter_in"]
     cw = (w - gut * (n - 1)) / n
     RULE_GAP = 0.20
+    blocks = [_case_blocks(cs) for cs in cases]
     for pad in (0.26, 0.18, 0.12):
         text_w = cw - 2 * pad
-        blocks = [_case_blocks(cs) for cs in cases]
         head_h = max((_stack_drawn_h(hd, text_w) for hd, _ in blocks), default=0.3)
         body_h = [_stack_drawn_h(bd, text_w) for _, bd in blocks]
         card_min = 2 * pad + head_h + 2 * RULE_GAP + max(body_h, default=0.3)
@@ -3664,6 +3671,42 @@ def _risk_row_blocks(r: dict, sev: str) -> list[dict]:
     return blocks
 
 
+def risk_ids(risks: list) -> list[str]:
+    """丸に入れる番号。id が明示されていればそれ(0 も正当な id)、無ければ並び順の 1 始まり。"""
+    return [str(r["id"]) if r.get("id") not in (None, "") else str(i + 1) for i, r in enumerate(risks)]
+
+
+RISK_BADGE_D = 0.46
+
+
+def _risk_rail_layout(spec: dict, h: float) -> dict:
+    """対策レールの寸法(見出し + 行)。描画と validate が共有する。詰めても入らないときは行を
+    等率で縮め、内側余白も行に比例させる(余白だけが残って文字が行の外へ出ないように)。"""
+    risks = spec.get("risks", [])[:4]
+    rx, rw = grid(7, 5)
+    D = RISK_BADGE_D
+    text_x = rx + D + 0.18
+    text_w = rx + rw - text_x - 0.10
+    rows = [_risk_row_blocks(r, risk_severity(int(r.get("likelihood", 1)), int(r.get("impact", 1)))) for r in risks]
+    row_hs = [_stack_drawn_h(b, text_w) for b in rows]
+    HEAD = 0.5
+    region_h = h - 0.10                    # レールは本文帯の高さ全体を使える(下に軸の語はない)
+    # 最後の段(0.03)は 4 件 × 対策2行の上限で使う。行の罫と字のあいだは描画行高の余白が受け持つ
+    for pad in (0.16, 0.10, 0.06, 0.03):
+        need = HEAD + sum(rh + 2 * pad for rh in row_hs)
+        if need <= region_h:
+            break
+    slots = [rh + 2 * pad for rh in row_hs]
+    pads = [pad] * len(slots)
+    overflow = need > region_h
+    if overflow:
+        k = (region_h - HEAD) / sum(slots)
+        slots = [sl * k for sl in slots]
+        pads = [pad * k for _ in slots]
+    return dict(risks=risks, rx=rx, rw=rw, D=D, text_x=text_x, text_w=text_w, rows=rows, HEAD=HEAD,
+                region_h=region_h, need=need, slots=slots, pads=pads, overflow=overflow)
+
+
 def p_risk_matrix(slide, spec, deck):
     """リスクマトリクス: 左に発生可能性(縦)× 影響(横)の 3x3、右に番号つきの対策レール。
 
@@ -3699,8 +3742,8 @@ def p_risk_matrix(slide, spec, deck):
                  align=PP_ALIGN.CENTER)
     add_text(slide, gx, top + gh + 0.06 + lab_h + 0.04, gw, lab_h, [[(f"{xa['title']} →", ax_pt, 600, C["ink_subtle"])]],
              align=PP_ALIGN.CENTER)
-    ids = [str(r.get("id") or i + 1) for i, r in enumerate(risks)]
-    D = 0.46
+    ids = risk_ids(risks)
+    D = RISK_BADGE_D
     cells: dict[tuple[int, int], list[int]] = {}
     for i, r in enumerate(risks):
         cells.setdefault((int(r.get("likelihood", 1)), int(r.get("impact", 1))), []).append(i)
@@ -3715,31 +3758,21 @@ def p_risk_matrix(slide, spec, deck):
                 xx = ccx + (k - (len(rr) - 1) / 2) * (D + 0.10)
                 _risk_badge(slide, xx, yy, D, ids[idx], focal=bool(risks[idx].get("focal")))
     # 対策レール: 見出し + 罫 → 行(番号の丸 + リスク名と優先度 + 対策)。行の間は罫で分ける
-    rx, rw = grid(7, 5)
-    text_x = rx + D + 0.18
-    text_w = rx + rw - text_x - 0.10
-    rows = [_risk_row_blocks(r, risk_severity(int(r.get("likelihood", 1)), int(r.get("impact", 1)))) for r in risks]
-    row_hs = [_stack_drawn_h(b, text_w) for b in rows]
-    HEAD = 0.5
-    for pad in (0.16, 0.10, 0.06):
-        need = HEAD + sum(rh + 2 * pad for rh in row_hs)
-        if need <= h - 0.10:
-            break
-    region_y, region_h = y0 + 0.05, h - 0.10        # レールは本文帯の高さ全体を使える(下に軸の語はない)
-    ry = region_y + max(0.0, (region_h - need) / 2)
-    slots = [rh + 2 * pad for rh in row_hs]
-    if need > region_h:
-        # 詰めても入らない = 対策の文が長すぎる。図形は帯の中に留め(行を等率で縮める)、
-        # 文字の溢れは verify に名指しさせる — 丸や罫を本文帯の外へ押し出さない
-        k = (region_h - HEAD) / sum(slots)
-        slots = [sl * k for sl in slots]
+    R = _risk_rail_layout(spec, h)
+    rx, rw, text_x, text_w, rows, HEAD = R["rx"], R["rw"], R["text_x"], R["text_w"], R["rows"], R["HEAD"]
+    if R["overflow"]:
+        # 図形は帯の中に留め(行を等率で縮める)、溢れは validate の error とこの警告で名指しする
+        print(f"WARN: 対策レールが本文帯に収まらない({R['need']:.2f}in > {R['region_h']:.2f}in) — 対策の文を短くする")
+    ry = y0 + 0.05 + max(0.0, (R["region_h"] - R["need"]) / 2)
     add_text(slide, rx, ry, rw, 0.3, [[(spec.get("rail_heading", "対応方針"), 16, 600, C["primary_deep"])]])
     add_line(slide, rx, ry + 0.34, rx + rw, ry + 0.34, C["rule"], 0.75)
     yy = ry + HEAD
-    for i, (r, blocks, slot) in enumerate(zip(risks, rows, slots)):
+    for i, (r, blocks, slot, pad) in enumerate(zip(risks, rows, R["slots"], R["pads"])):
         if r.get("focal"):
             add_rect(slide, rx, yy, rw, slot, C["primary_pale"], radius_pt=4)
-        _risk_badge(slide, rx + 0.08 + D / 2, yy + pad + min(slot - 2 * pad, D) / 2, D, ids[i], focal=bool(r.get("focal")))
+        # 丸は1行目の高さに置くが、縮んだ行でも行の中に収める(中心は行の上端 + 半径 〜 行の中央)
+        by = yy + min(pad + D / 2, max(D / 2, slot / 2))
+        _risk_badge(slide, rx + 0.08 + D / 2, by, D, ids[i], focal=bool(r.get("focal")))
         stack_block(slide, text_x, yy + pad, text_w, stack_optical_height(blocks, text_w), blocks)
         if i < len(risks) - 1:
             add_line(slide, rx, yy + slot, rx + rw, yy + slot, C["rule"], 0.5)
@@ -3759,9 +3792,13 @@ def p_milestone_timeline(slide, spec, deck):
     y0, h = body_region(spec)
     x, w = grid(0, 12)
     L = _milestone_timeline_layout(ms, h)
+    if L["overflow"]:
+        print(f"WARN: マイルストーンのカードが本文帯に収まらない({L['need_h']:.2f}in > {h - 0.10:.2f}in) — "
+              "本文を短くするか、節を減らす")
     n, cw, gut, gap, pad = L["n"], L["cw"], L["gut"], L["gap"], L["pad"]
     cur = spec.get("current")
-    cur = cur if isinstance(cur, int) and 0 <= cur < n else None
+    # bool は int の子なので明示的に外す(validate と同じ判定)
+    cur = cur if isinstance(cur, int) and not isinstance(cur, bool) and 0 <= cur < n else None
     y = y0 + 0.05 + L["off"]
     centers = [x + i * (cw + gut) + cw / 2 for i in range(n)]
     axis_y = y + L["date_h"] + gap + L["AXIS_H"] / 2

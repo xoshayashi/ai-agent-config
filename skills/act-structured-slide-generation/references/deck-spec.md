@@ -272,7 +272,8 @@ workstreams; `process_flow` shows a sequence without dates; this pattern shows t
 - The legend (bottom right) lists only the marks actually drawn.
 - Copy: `date` ≤10 characters (a month or `Q3 FY26`); `label` one bold line; `body` about
   three lines at the column width (~20 characters at 5 columns). Cards are named `card`, so
-  `validate_spec` / `verify_deck` warn when a card's text is under 60% of its height.
+  `validate_spec` / `verify_deck` warn when a card's text is under 60% of its height, and
+  validate errors when the cards cannot fit the body (the build keeps them on the slide).
 - Argument-wise it is a forward pattern like `roadmap`: future dates are plan, not fact.
 
 ### 26. `risk_matrix`
@@ -286,8 +287,10 @@ optional `x_axis` / `y_axis: {title, levels: [low, mid, high]}` and `rail_headin
   order; the rail also states the severity in words, so color is never the only signal.
 - Each risk is a numbered badge in its cell (several in one cell sit side by side) and the
   same badge opens its rail row. One `focal` risk at most: danger badge, pale primary row.
-- Caps: 2-4 risks (the rail holds four rows of a bold line plus a two-line mitigation), integer levels 1-3, `id` ≤2 characters. A risk
-  without `mitigation` gets a warning: a list of risks with no response is not a decision aid.
+- Caps: 2-4 risks (the rail holds four rows of a bold line plus a two-line mitigation), integer levels 1-3, `id` ≤2 characters and unique (`0` is a valid id), and
+  exactly three `levels` per axis when given. Validate errors when the rail cannot fit the
+  body. A risk without `mitigation` gets a warning: a list of risks with no response is not
+  a decision aid.
 - Evidence-wise it is qualitative (no number required in the title) but needs `source` or
   `assumption` naming who assessed the risks and when.
 
@@ -310,6 +313,7 @@ middle of every card, as in `logic_tree`.
   validate measures them with the builder's own geometry and errors when they do not (about
   label + relation + two body lines per card at three per side). Use `diagram` with
   `kind: node_graph` only when parts also connect to each other, not just to the hub.
+- `hub` is an exhibit key: a hub value (monthly volume, user base) counts as a shown number.
 - Evidence-wise it is qualitative, but it needs `source` or `assumption`.
 
 ### 28. `before_after`
@@ -324,7 +328,8 @@ subtle ink.
 - Use it when *how much each dimension changed* is the argument. `two_column` is the free
   contrast (options, problem/solution) with no row alignment; one dimension alone is a
   `metric_proof`; six or more is a `comparison_table`.
-- `delta` sits after the after value in bold primary, in the same paragraph.
+- `delta` sits after the after value in bold primary, in the same paragraph (`0` is drawn:
+  "unchanged" is a result).
 - Row heights come from the tallest of the three cells; spare height is shared equally so
   the hairlines stay even. Validate measures rows with the builder's geometry and errors when
   they cannot fit the body.

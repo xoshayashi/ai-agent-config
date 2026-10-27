@@ -19,7 +19,7 @@ EXHIBIT_KEYS = {
     "chart", "charts", "table", "kpis", "stages", "items", "phases", "rows", "cells",
     "steps", "groups", "columns", "factors", "players", "diagram", "bars", "current",
     "side", "segments", "metrics", "recap_metrics", "series", "values", "headers",
-    "hero", "facts", "root", "branches", "leaves",
+    "hero", "facts", "root", "branches", "leaves", "hub",
 }
 # 主張(CLAIM): 散文。読み手に向かって言い切る場所
 CLAIM_KEYS = {
