@@ -3293,6 +3293,60 @@ def test_validate_checks_the_before_after(tmp_path):
         assert needle in r.stdout, (needle, r.stdout)
 
 
+def _case_slide(**over):
+    sl = {"pattern": "case_strip", "title": "導入3社とも月次締めを3日以上短縮した", "subtitle": "先行導入3社の成果",
+          "cases": [
+              {"segment": "製造業 / 従業員1,200名", "name": "東邦精機", "hero": {"label": "月次締めの短縮", "value": "4", "unit": "日"},
+               "body": "工場ごとの経費を1つの承認フローに統合した", "quote": "締め日の残業がほぼなくなった"},
+              {"name": "みなと商事", "hero": {"label": "月次締めの短縮", "value": "3", "unit": "日"},
+               "body": "法人カードの明細と自動で突合した", "focal": True},
+              {"segment": "IT / 従業員650名", "name": "クラウドリンク", "hero": {"label": "月次締めの短縮", "value": "3", "unit": "日"},
+               "body": "海外拠点の外貨精算を同じ基盤に載せた"}],
+          "source": "各社の利用ログと経理部ヒアリング(2026年10月)"}
+    sl.update(over)
+    return sl
+
+
+def test_case_strip_aligns_names_and_counts_results_as_evidence(tmp_path):
+    """事例の証拠帯: カードは同じ高さ、社名の行と罫は全カードで同じ高さにそろう(属性の無い
+    事例でも社名が上がらない)。成果は hero なので、論証監査は「4日」を図表の数値として数える。"""
+    from pptx import Presentation
+    import deck_argument as A
+    s0 = _case_slide()
+    assert {"4日", "3日"} <= A.exhibit_tokens(s0)
+    spec = {"meta": {"title": "t"}, "slides": [s0]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(spec, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 0, r.stdout
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0, v.stdout
+    slide = list(Presentation(out).slides)[0]
+    cards = [sh for sh in slide.shapes if sh.name == "card"]
+    assert len(cards) == 3 and len({c.height for c in cards}) == 1
+    names = [sh for sh in slide.shapes if sh.has_text_frame and sh.text_frame.text.split("\n")[-1] in ("東邦精機", "みなと商事", "クラウドリンク")]
+    assert len(names) == 3
+    bottoms = {round((sh.top + sh.height) / 914400, 2) for sh in names}
+    assert max(bottoms) - min(bottoms) < 0.03, bottoms             # 社名の下端がそろう
+
+
+def test_validate_checks_the_case_strip(tmp_path):
+    long_ = "電子帳簿保存法とインボイス制度への対応を単一のワークフローで完結させる統合基盤" * 4
+    bad = {"meta": {"title": "t"}, "slides": [
+        _case_slide(cases=_case_slide()["cases"][:1]),
+        _case_slide(cases=[{**c, "hero": {"label": "x", "value": "4"}} for c in _case_slide()["cases"]]),
+        _case_slide(cases=[{**c, "name": ""} for c in _case_slide()["cases"]]),
+        _case_slide(cases=[{**c, "focal": True} for c in _case_slide()["cases"]]),
+        _case_slide(cases=[{**c, "body": long_, "quote": long_} for c in _case_slide()["cases"]]),
+    ]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(bad, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 1
+    for needle in ("2-4 件", "hero.value と hero.unit", "name がない", "focal が複数", "本文帯に入らない"):
+        assert needle in r.stdout, (needle, r.stdout)
+
+
 def test_stacked_100_and_stacked_bar_are_native_chart_types(tmp_path):
     from pptx import Presentation
     spec = {"meta": {"title": "t"}, "slides": [

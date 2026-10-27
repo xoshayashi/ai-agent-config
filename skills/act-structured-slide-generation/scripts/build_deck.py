@@ -3537,6 +3537,93 @@ def p_before_after(slide, spec, deck):
         yy += rh
 
 
+def _case_blocks(cs: dict) -> tuple[list[dict], list[dict]]:
+    """事例カード1枚ぶん: (上段 = 属性 → 社名、下段 = 成果の数値 → 成果の名前 → 本文 → 声)。
+    上段と下段のあいだに罫を引くので、2つに分けて返す。"""
+    gap = OPT["gap_in"]
+    head = []
+    if cs.get("segment"):
+        head.append({"parts": [(cs["segment"], TS["kpi_sub"], 400, C["ink_faint"])], "size": TS["kpi_sub"], "kind": "text"})
+    head.append({"parts": [(cs.get("name", ""), RAIL_HEAD_PT, 600, C["ink"])], "size": RAIL_HEAD_PT, "kind": "text",
+                 "gap_before": gap["heading_body"] if head else 0.0, "gap_name": "case_name"})
+    body = []
+    hero = cs.get("hero") or {}
+    if hero.get("value") not in (None, ""):
+        vpt = TS["kpi_value"]
+        vparts = [(str(hero["value"]), vpt, 700, C["primary_deep"])]
+        if hero.get("unit"):
+            vparts.append(_unit_part(hero["unit"], 17))
+        body.append({"parts": vparts, "size": vpt, "kind": "numeral"})
+        if hero.get("label"):
+            body.append({"parts": [(hero["label"], TS["kpi_sub"], 600, C["ink_subtle"])], "size": TS["kpi_sub"],
+                         "kind": "text", "gap_before": gap["metric_subline"], "gap_name": "metric_subline"})
+    if cs.get("body"):
+        body.append({"parts": [(cs["body"], TS["body"], 400, C["ink_subtle"])], "size": TS["body"], "kind": "text",
+                     "gap_before": gap["item"] if body else 0.0, "gap_name": "case_body"})
+    if cs.get("quote"):
+        q = str(cs["quote"]).strip("「」")
+        body.append({"parts": [(f"「{q}」", TS["body_small"], 400, C["ink_subtle"])], "size": TS["body_small"],
+                     "kind": "text", "gap_before": gap["item"] if body else 0.0, "gap_name": "case_quote"})
+    return head, body
+
+
+def _case_strip_layout(spec: dict, h: float) -> dict:
+    """事例帯の寸法: 2-4 枚のカードを同じ高さで横に並べる。上段(属性・社名)の高さは全カードで
+    そろえる(罫と成果の数値の位置が横一列に読める)。描画と card_copy_estimate が共有する。"""
+    cases = spec.get("cases", [])[:4]
+    _, w = grid(0, 12)
+    n = max(1, len(cases))
+    gut = LAY["gutter_in"]
+    cw = (w - gut * (n - 1)) / n
+    RULE_GAP = 0.20
+    for pad in (0.26, 0.18, 0.12):
+        text_w = cw - 2 * pad
+        blocks = [_case_blocks(cs) for cs in cases]
+        head_h = max((_stack_drawn_h(hd, text_w) for hd, _ in blocks), default=0.3)
+        body_h = [_stack_drawn_h(bd, text_w) for _, bd in blocks]
+        card_min = 2 * pad + head_h + 2 * RULE_GAP + max(body_h, default=0.3)
+        if card_min <= h - 0.10:
+            break
+    card_h, off = fit_band(h - 0.10, card_min, top_anchored=True)
+    overflow = card_min > h - 0.10
+    return dict(cases=cases, n=n, cw=cw, gut=gut, pad=pad, text_w=text_w, blocks=blocks, head_h=head_h,
+                body_h=body_h, RULE_GAP=RULE_GAP, card_h=card_h, off=off, overflow=overflow, need_h=card_min,
+                line_h=drawn_line_h(TS["body"]))
+
+
+def p_case_strip(slide, spec, deck):
+    """事例の証拠帯: 2-4 件の顧客事例を同じ文法のカードで並べる(属性 → 社名 → 罫 → 成果の数値 →
+    成果の名前 → 何をしたか → 本人の声)。締めの飾りではなく、タイトルの主張を事例で証明する
+    ページ(composition-vocabulary: Evidence Strip)。成果は hero(値・単位・名前)で持つので、
+    論証監査はそれを図表の数値として数える。focal の事例は淡い主色のカードで立てる。"""
+    y0, h = body_region(spec)
+    L = _case_strip_layout(spec, h)
+    cases = L["cases"]
+    if not cases:
+        return
+    if L["overflow"]:
+        print(f"WARN: 事例カードが本文帯に収まらない({L['need_h']:.2f}in > {h - 0.10:.2f}in) — "
+              "本文か声を短くする")
+    x, _w = grid(0, 12)
+    top = y0 + 0.05 + L["off"]
+    card_h = min(L["card_h"], h - 0.10)
+    pad, text_w, head_h, RG = L["pad"], L["text_w"], L["head_h"], L["RULE_GAP"]
+    for i, cs in enumerate(cases):
+        cx_ = x + i * (L["cw"] + L["gut"])
+        focal = bool(cs.get("focal"))
+        add_rect(slide, cx_, top, L["cw"], card_h, C["primary_pale"] if focal else C["surface_tint"],
+                 line=C["primary"] if focal else None, line_w_pt=1.25,
+                 radius_pt=LAY["card"]["radius_pt"], name="card")
+        head, body = L["blocks"][i]
+        # 上段は下端をそろえる(社名の行が全カードで同じ高さに来る) — 属性の有無で社名が上下しない
+        own = _stack_drawn_h(head, text_w)
+        stack_block(slide, cx_ + pad, top + pad + (head_h - own), text_w, stack_optical_height(head, text_w), head)
+        ry = top + pad + head_h + RG
+        add_line(slide, cx_ + pad, ry, cx_ + L["cw"] - pad, ry, C["primary"] if focal else C["rule"], 0.75)
+        if body:
+            stack_block(slide, cx_ + pad, ry + RG, text_w, stack_optical_height(body, text_w), body)
+
+
 RISK_LEVELS = {"y": ["低", "中", "高"], "x": ["小", "中", "大"]}
 
 
@@ -3732,7 +3819,8 @@ def card_copy_estimate(spec: dict) -> list[dict]:
     「このコピー量ではカードの下半分が空く」と言える。返り値の各要素:
     card(名前), content_h, card_h, ratio, line_h(1行の高さ), hint_chars(警告文に添える1行あたりの和文字数の目安。行数の計算には使わない — 行数は _text_lines の実測だけ)。"""
     pat = spec.get("pattern")
-    if pat not in ("process_flow", "column_framework", "two_column", "milestone_timeline", "hub_spoke"):
+    if pat not in ("process_flow", "column_framework", "two_column", "milestone_timeline", "hub_spoke",
+                   "case_strip"):
         return []
     _, h = body_region(spec)
     em = TS["body"] / 72.0
@@ -3763,6 +3851,11 @@ def card_copy_estimate(spec: dict) -> list[dict]:
         for m, ch in zip(ms, L["col_h"]):
             out.append(dict(card=m.get("label", "") or m.get("date", ""), content_h=ch, card_h=L["card_h"],
                             line_h=L["line_h"], hint_chars=max(1, int(L["text_w"] // em))))
+    elif pat == "case_strip":
+        L = _case_strip_layout(spec, h)
+        for cs, bh in zip(L["cases"], L["body_h"]):
+            out.append(dict(card=cs.get("name", ""), content_h=L["head_h"] + 2 * L["RULE_GAP"] + bh,
+                            card_h=L["card_h"], line_h=L["line_h"], hint_chars=max(1, int(L["text_w"] // em))))
     elif pat == "hub_spoke":
         L = _hub_spoke_layout(spec, h)
         for sp, ch in zip(L["spokes"], L["col_h"]):
@@ -3789,6 +3882,7 @@ PATTERNS = {
     "risk_matrix": p_risk_matrix,
     "hub_spoke": p_hub_spoke,
     "before_after": p_before_after,
+    "case_strip": p_case_strip,
     "cover": p_cover,
     "agenda": p_agenda,
     "section_divider": p_section_divider,

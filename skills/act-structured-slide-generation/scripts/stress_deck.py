@@ -216,6 +216,15 @@ def make_deck(variant: str = "max", template: str | None = None, images: bool = 
                    "after_note": T(LONG if overload else "領収書の撮影で自動入力", "自動") if (overload or i < 3) else None}
                   for i in range(N(2, 5))],
          "source": "PoC 1期の利用ログ(2026年10月集計)"},
+        {"pattern": "case_strip", "title": T("先行導入の全社が月次締めを3日以上短縮した", "3日以上短縮"),
+         "subtitle": "先行導入企業の成果(2026年4-9月)",
+         "cases": [{"segment": T("製造業 / 従業員1,200名", "製造"), "name": T("東邦精機", f"A{i + 1}社"),
+                    "hero": {"label": T("月次締めの短縮", "短縮"), "value": "4", "unit": "日"},
+                    "body": T(LONG if overload else "工場ごとの経費を1つの承認フローに統合した", "統合"),
+                    "quote": T(LONG if overload else "締め日の残業がほぼなくなった", "残業減") if v != "min" else None,
+                    "focal": i == 1}
+                   for i in range(N(2, 4))],
+         "source": "各社の利用ログと経理部ヒアリング(2026年10月)"},
         {"pattern": "financial_highlights", "title": T("上期売上64.8億円(+28%)で計画超過", "計画超過"),
          "subtitle": "FY2026 上期ハイライト",
          "groups": [{"label": T("業績", "業績"), "claim": T("増収と黒字幅拡大が両立、投資回収が前倒し" if overload else "増収と黒字拡大が両立", "両立"),

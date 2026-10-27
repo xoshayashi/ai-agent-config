@@ -62,13 +62,14 @@ PATTERNS = {
     "risk_matrix": ["risks"],
     "hub_spoke": ["hub", "spokes"],
     "before_after": ["rows"],
+    "case_strip": ["cases"],
 }
 EVIDENCE_PATTERNS = {
     "chart_insight", "market_sizing", "comparison_table", "competitive_landscape",
     "financial_summary", "waterfall", "kpi_dashboard",
     "financial_highlights", "metrics_rows", "driver_decomposition", "guidance_progress",
     "diagram", "chart_grid", "metric_proof", "logic_tree", "risk_matrix", "hub_spoke",
-    "before_after",
+    "before_after", "case_strip",
 }
 # 関係・構造の定性主張が正当なパターン: タイトルに数字が無くても警告しない
 QUALITATIVE_EVIDENCE = {"competitive_landscape", "diagram", "logic_tree", "risk_matrix", "hub_spoke"}
@@ -706,6 +707,33 @@ def main() -> int:
             long_date = [str(m.get("date")) for m in ms_ if ja_len(str(m.get("date", ""))) > 10]
             if long_date:
                 warns.append(f"{loc}: date が長い({', '.join(d[:12] for d in long_date)}) — 10字以内(2026年4月 / Q3 FY26)")
+        if pat == "case_strip":
+            css = s.get("cases", [])
+            if not 2 <= len(css) <= 4:
+                errors.append(f"{loc}: case_strip の cases は 2-4 件({len(css)} 件) — 1件なら metric_proof か statement の quote")
+            nohero = [str(c.get("name", j + 1)) for j, c in enumerate(css)
+                      if (c.get("hero") or {}).get("value") in (None, "") or not (c.get("hero") or {}).get("unit")]
+            if nohero:
+                errors.append(f"{loc}: 成果の数値(hero.value と hero.unit)がない事例({', '.join(nohero)}) — "
+                              "証拠帯の事例は、何がどれだけ変わったかを数値で持つ")
+            noname = [j + 1 for j, c in enumerate(css) if not str(c.get("name", "")).strip()]
+            if noname:
+                errors.append(f"{loc}: 事例 {noname} に name がない — 誰の事例かを名指す(匿名なら「製造業A社」)")
+            if sum(1 for c in css if c.get("focal")) > 1:
+                errors.append(f"{loc}: focal が複数 — 立てる事例は1つだけ")
+            if 2 <= len(css) <= 4:
+                try:
+                    import build_deck as _bd
+                    if getattr(_bd, "_VALIDATE_TOKENS_APPLIED", None) is not tokens:
+                        _bd._apply_tokens(tokens)
+                        _bd._VALIDATE_TOKENS_APPLIED = tokens
+                    _, body_h = _bd.body_region(s)
+                    CL = _bd._case_strip_layout(s, body_h)
+                    if CL["overflow"]:
+                        errors.append(f"{loc}: 事例カードが本文帯に入らない(必要 {CL['need_h']:.2f}in > {body_h - 0.10:.2f}in) — "
+                                      "本文か声を短くする")
+                except Exception as exc:
+                    warns.append(f"{loc}: case_strip の寸法見積もりに失敗 ({exc})")
         if pat == "before_after":
             rws = s.get("rows", [])
             if not 2 <= len(rws) <= 5:
@@ -816,7 +844,8 @@ def main() -> int:
         # カード型の本文量: 描画と同じ寸法計算(build_deck.card_copy_estimate)で、各カードの本文が
         # カード高の card_text_floor に届くかをビルド前に見る。届かないカードは、下半分が空いて
         # 見出し帯・隣のカードと釣り合わない。足すべき行数と1行の字数を具体的に示す
-        if pat in ("process_flow", "column_framework", "two_column", "milestone_timeline", "hub_spoke"):
+        if pat in ("process_flow", "column_framework", "two_column", "milestone_timeline", "hub_spoke",
+                   "case_strip"):
             try:
                 import build_deck as _bd
                 # 見積もりはビルドと同じ物差しで — import 時の既定(standard)ではなく、このデッキの

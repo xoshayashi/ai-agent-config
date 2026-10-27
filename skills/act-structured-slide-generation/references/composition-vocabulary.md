@@ -197,6 +197,7 @@ the story. Do not use a fixed closing template.
 - Timeline with decision points (dated milestones, actual vs plan) -> `milestone_timeline`
 - Risk assessment (likelihood × impact with mitigations) -> `risk_matrix`
 - Driver equation -> `driver_decomposition`
+- Evidence strip of customer cases with a result each -> `case_strip`
 - Flexible close -> `statement`
 - Pillar / framework columns (parallel, not sequence) -> `column_framework`
 - Oversized number + chart that proves it (metric proof page) -> `metric_proof`

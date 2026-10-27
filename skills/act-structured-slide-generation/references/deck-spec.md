@@ -7,7 +7,7 @@ primitives, not design templates. Choose and combine them after the judgment pro
 
 - Top Level
 - Fields Common To Slides
-- The 28 Patterns
+- The 29 Patterns
 - Layout contract shared by every pattern
 - Argument fields
 - Chart Spec (native types, emphasis/annotation knobs, image chart kinds, annotation layer)
@@ -78,7 +78,7 @@ name. An absent template resolves to `standard`, which is byte-for-byte the pre-
   for a kind the native engine could attempt. Default (unset) keeps native unless the `kind` is
   image-only (combo/area/org_tree/…). Escalate to image only for objects native cannot draw.
 
-## The 28 Patterns
+## The 29 Patterns
 
 ### 1. `cover`
 
@@ -333,6 +333,24 @@ subtle ink.
   (primary label and a thin primary bar at its left edge).
 - `rows` is an exhibit key, so the values count as evidence for the title's numbers; the
   slide still needs `source` or `assumption`.
+
+### 29. `case_strip`
+
+Evidence strip of 2-4 customer cases in one grammar, so the reader compares like with like:
+segment → name → rule → result number → result label → what they did → their words.
+`cases: [{segment?, name, hero: {label, value, unit}, body, quote?, focal?}]`.
+
+- It proves the title with cases; it is not a closing decoration. Each case must carry a
+  result as `hero` with `value` and `unit` (validate error otherwise). `hero` is an exhibit
+  key, so `audit_argument` counts the results as shown numbers for the title.
+- Cards share one height, and the name line and rule sit at the same height on every card
+  (a case without `segment` does not shift its name up), so the results read across one row.
+- `quote` is set in brackets in the subtle ink; use the customer's words, not a paraphrase.
+- Caps: 2-4 cases, `name` required (an anonymised name such as "Manufacturer A" is fine), one
+  `focal` at most. Validate measures cards with the builder's geometry and errors when they
+  cannot fit the body. Cards are named `card`, so thin copy is reported too.
+- Keep the results comparable: the same metric across cases makes the strip an argument;
+  mixed metrics make it a collage.
 
 ## Layout contract shared by every pattern
 

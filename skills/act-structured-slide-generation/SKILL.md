@@ -231,7 +231,8 @@ review, `risk_matrix` places numbered risks on a 3x3 likelihood × impact grid b
 mitigations. When one platform coordinates several parts, `hub_spoke` draws the hub,
 3-6 spoke cards, and a relation line in each card, all as editable shapes. When change is
 the argument and it can be measured, `before_after` reads each dimension across one row
-(before → after + delta) instead of two free columns. Mix shift is a
+(before → after + delta) instead of two free columns. Customer proof is a `case_strip`:
+2-4 cases in one card grammar, each with a measured result. Mix shift is a
 native `stacked_column_100`; a chart with short comparable takeaways can use
 `chart_insight` `layout: chart_top` to vary the page rhythm.
 
