@@ -3132,6 +3132,57 @@ def test_validate_checks_the_milestone_timeline(tmp_path):
     assert "decision の節がない" in r.stdout, r.stdout
 
 
+def _risk_slide(**over):
+    sl = {"pattern": "risk_matrix", "title": "最優先は基幹会計との連携遅延、移行前に検証環境を用意する",
+          "subtitle": "リスク評価",
+          "risks": [
+              {"label": "基幹会計との連携遅延", "likelihood": 3, "impact": 3, "focal": True, "mitigation": "11月に検証環境を用意する"},
+              {"label": "現場の入力定着", "likelihood": 2, "impact": 2, "mitigation": "部門ごとに推進役を置く"},
+              {"label": "ベンダーの体制縮小", "likelihood": 2, "impact": 2, "mitigation": "担当者2名の常駐を契約に明記"}],
+          "assumption": "プロジェクト推進室によるリスク評価(2026年10月)"}
+    sl.update(over)
+    return sl
+
+
+def test_risk_matrix_places_numbered_risks_and_states_severity_in_words(tmp_path):
+    """リスクマトリクス: 3x3 のセル9枚 + 番号の丸(マトリクスとレールに1つずつ)。優先度は
+    色だけでなくレールに語で書く。セルの淡色はパレット内(verify の色監査を通る)。"""
+    from pptx import Presentation
+    from pptx.enum.shapes import MSO_SHAPE
+    spec = {"meta": {"title": "t"}, "slides": [_risk_slide()]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(spec, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 0, r.stdout
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0, v.stdout
+    slide = list(Presentation(out).slides)[0]
+    ovals = [sh for sh in slide.shapes if sh.shape_type == 1 and sh.auto_shape_type == MSO_SHAPE.OVAL]
+    assert len(ovals) == 6                                    # 3件 × (マトリクス + レール)
+    texts = [sh.text_frame.text for sh in slide.shapes if sh.has_text_frame]
+    joined = "\n".join(texts)
+    assert "優先度 高" in joined and joined.count("優先度 中") == 2
+    import build_deck as B
+    assert B.risk_severity(3, 3) == "高" and B.risk_severity(1, 3) == "中" and B.risk_severity(1, 2) == "低"
+
+
+def test_validate_checks_the_risk_matrix(tmp_path):
+    bad = {"meta": {"title": "t"}, "slides": [
+        _risk_slide(risks=_risk_slide()["risks"][:1]),
+        _risk_slide(risks=[{**r, "likelihood": 4} for r in _risk_slide()["risks"]]),
+        _risk_slide(risks=[{**r, "focal": True} for r in _risk_slide()["risks"]]),
+    ]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(bad, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 1
+    assert "2-4 件" in r.stdout and "likelihood=4" in r.stdout and "focal が複数" in r.stdout, r.stdout
+    nomit = {"meta": {"title": "t"}, "slides": [_risk_slide(risks=[
+        {k: x for k, x in r.items() if k != "mitigation"} for r in _risk_slide()["risks"]])]}
+    p.write_text(json.dumps(nomit, ensure_ascii=False))
+    assert "対策(mitigation)のないリスク" in run("validate_spec.py", p).stdout
+
+
 def test_stacked_100_and_stacked_bar_are_native_chart_types(tmp_path):
     from pptx import Presentation
     spec = {"meta": {"title": "t"}, "slides": [

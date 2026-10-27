@@ -194,6 +194,7 @@ the story. Do not use a fixed closing template.
 - Current-location agenda -> `agenda`
 - Guidance progress -> `guidance_progress`
 - Timeline with decision points (dated milestones, actual vs plan) -> `milestone_timeline`
+- Risk assessment (likelihood × impact with mitigations) -> `risk_matrix`
 - Driver equation -> `driver_decomposition`
 - Flexible close -> `statement`
 - Pillar / framework columns (parallel, not sequence) -> `column_framework`

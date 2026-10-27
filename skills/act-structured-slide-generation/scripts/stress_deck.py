@@ -194,6 +194,12 @@ def make_deck(variant: str = "max", template: str | None = None, images: bool = 
                          "decision": i % 2 == 1, "focal": i == 3}
                         for i in range(N(3, 6))],
          "assumption": "社内プロジェクト計画(2026年10月版)"},
+        {"pattern": "risk_matrix", "title": T("最優先は基幹会計との連携遅延、移行前に検証環境を用意する", "連携遅延"),
+         "subtitle": "全社展開のリスク評価(2026年10月時点)",
+         "risks": [{"label": T("基幹会計との連携遅延", f"R{i + 1}"), "likelihood": [3, 2, 2, 1, 3][i], "impact": [3, 3, 3, 2, 1][i],
+                    "focal": i == 0, "mitigation": T(LONG if overload else "11月に検証環境を用意し、仕訳連携を先行検証する", "検証")}
+                   for i in range(N(2, 4))],      # 2件目と3件目は同じセル(丸が横に並ぶ)
+         "assumption": "プロジェクト推進室によるリスク評価(2026年10月)"},
         {"pattern": "financial_highlights", "title": T("上期売上64.8億円(+28%)で計画超過", "計画超過"),
          "subtitle": "FY2026 上期ハイライト",
          "groups": [{"label": T("業績", "業績"), "claim": T("増収と黒字幅拡大が両立、投資回収が前倒し" if overload else "増収と黒字拡大が両立", "両立"),

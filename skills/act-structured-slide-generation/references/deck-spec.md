@@ -7,7 +7,7 @@ primitives, not design templates. Choose and combine them after the judgment pro
 
 - Top Level
 - Fields Common To Slides
-- The 25 Patterns
+- The 26 Patterns
 - Layout contract shared by every pattern
 - Argument fields
 - Chart Spec (native types, emphasis/annotation knobs, image chart kinds, annotation layer)
@@ -78,7 +78,7 @@ name. An absent template resolves to `standard`, which is byte-for-byte the pre-
   for a kind the native engine could attempt. Default (unset) keeps native unless the `kind` is
   image-only (combo/area/org_tree/…). Escalate to image only for objects native cannot draw.
 
-## The 25 Patterns
+## The 26 Patterns
 
 ### 1. `cover`
 
@@ -274,6 +274,22 @@ workstreams; `process_flow` shows a sequence without dates; this pattern shows t
   three lines at the column width (~20 characters at 5 columns). Cards are named `card`, so
   `validate_spec` / `verify_deck` warn when a card's text is under 60% of its height.
 - Argument-wise it is a forward pattern like `roadmap`: future dates are plan, not fact.
+
+### 26. `risk_matrix`
+
+Likelihood × impact matrix (3x3) on the left (7 cols) and a numbered mitigation rail on the
+right (5 cols). `risks: [{id?, label, likelihood: 1-3, impact: 1-3, mitigation, focal?}]`,
+optional `x_axis` / `y_axis: {title, levels: [low, mid, high]}` and `rail_heading`.
+
+- Severity is the product: ≥6 high, 3-4 mid, ≤2 low. Cells are tinted from the palette only
+  (low = canvas, mid = surface_tint, high = accent_pale), so lightness never inverts the
+  order; the rail also states the severity in words, so color is never the only signal.
+- Each risk is a numbered badge in its cell (several in one cell sit side by side) and the
+  same badge opens its rail row. One `focal` risk at most: danger badge, pale primary row.
+- Caps: 2-4 risks (the rail holds four rows of a bold line plus a two-line mitigation), integer levels 1-3, `id` ≤2 characters. A risk
+  without `mitigation` gets a warning: a list of risks with no response is not a decision aid.
+- Evidence-wise it is qualitative (no number required in the title) but needs `source` or
+  `assumption` naming who assessed the risks and when.
 
 ## Layout contract shared by every pattern
 

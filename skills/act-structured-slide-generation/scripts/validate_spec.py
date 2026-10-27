@@ -59,15 +59,16 @@ PATTERNS = {
     "metric_proof": ["hero", "chart"],
     "logic_tree": ["root", "branches"],
     "milestone_timeline": ["milestones"],
+    "risk_matrix": ["risks"],
 }
 EVIDENCE_PATTERNS = {
     "chart_insight", "market_sizing", "comparison_table", "competitive_landscape",
     "financial_summary", "waterfall", "kpi_dashboard",
     "financial_highlights", "metrics_rows", "driver_decomposition", "guidance_progress",
-    "diagram", "chart_grid", "metric_proof", "logic_tree",
+    "diagram", "chart_grid", "metric_proof", "logic_tree", "risk_matrix",
 }
 # 関係・構造の定性主張が正当なパターン: タイトルに数字が無くても警告しない
-QUALITATIVE_EVIDENCE = {"competitive_landscape", "diagram", "logic_tree"}
+QUALITATIVE_EVIDENCE = {"competitive_landscape", "diagram", "logic_tree", "risk_matrix"}
 # chart/diagram objects rendered via the image-asset backend (act_assets), not native charts.
 # 必須フィールドは act_assets の各レンダラーが spec[...] で直接参照するキー —
 # ここで検査しないと validate は 0 errors で通り、build が KeyError/ValueError で落ちる
@@ -702,6 +703,23 @@ def main() -> int:
             long_date = [str(m.get("date")) for m in ms_ if ja_len(str(m.get("date", ""))) > 10]
             if long_date:
                 warns.append(f"{loc}: date が長い({', '.join(d[:12] for d in long_date)}) — 10字以内(2026年4月 / Q3 FY26)")
+        if pat == "risk_matrix":
+            rk = s.get("risks", [])
+            if not 2 <= len(rk) <= 4:
+                errors.append(f"{loc}: risk_matrix の risks は 2-4 件({len(rk)} 件) — 右の対策レールに入るのは4行まで")
+            for j, r in enumerate(rk):
+                for ax in ("likelihood", "impact"):
+                    v = r.get(ax)
+                    if not (isinstance(v, int) and not isinstance(v, bool) and 1 <= v <= 3):
+                        errors.append(f"{loc}: リスク '{r.get('label', j + 1)}' の {ax}={v!r} — 1-3 の整数で指定")
+            if sum(1 for r in rk if r.get("focal")) > 1:
+                errors.append(f"{loc}: focal が複数 — 立てるリスクは1つだけ")
+            nomit = [str(r.get("label", j + 1)) for j, r in enumerate(rk) if not r.get("mitigation")]
+            if nomit:
+                warns.append(f"{loc}: 対策(mitigation)のないリスク({', '.join(nomit)}) — 並べるだけのリスク表は判断材料にならない")
+            ids_ = [str(r.get("id")) for r in rk if r.get("id") is not None]
+            if any(ja_len(i) > 2 for i in ids_):
+                warns.append(f"{loc}: id が長い — 丸の中に入るのは2字(R1 / 1 / A)まで")
         if pat == "metric_proof":
             hero = s.get("hero") or {}
             if hero.get("value") is None or str(hero.get("value")).strip() == "":

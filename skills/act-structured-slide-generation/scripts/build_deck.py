@@ -3351,6 +3351,128 @@ def _timeline_marker(slide, cx, cy, size, *, diamond: bool, fill, line=None):
     return sh
 
 
+RISK_LEVELS = {"y": ["低", "中", "高"], "x": ["小", "中", "大"]}
+
+
+def risk_severity(likelihood: int, impact: int) -> str:
+    """発生可能性 × 影響(各 1-3)の積で優先度を決める: 6 以上 = 高、3-4 = 中、2 以下 = 低。"""
+    score = likelihood * impact
+    return "高" if score >= 6 else ("中" if score >= 3 else "低")
+
+
+def _risk_fill(sev: str) -> RGBColor:
+    """優先度の3段はパレットの淡色だけで作る(混色はパレット外になり verify が落とす)。
+    明度が優先度と逆転しないよう、低 = canvas(地)、中 = surface_tint、高 = accent_pale(注意の黄)。
+    surface は surface_tint より濃く、中に使うと高より重く見える。色だけに頼らず、レールに語でも書く。"""
+    return {"高": C["accent_pale"], "中": C["surface_tint"], "低": C["canvas"]}[sev]
+
+
+def _risk_badge(slide, cx, cy, d, text, *, focal: bool):
+    sh = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(cx - d / 2), Inches(cy - d / 2), Inches(d), Inches(d))
+    sh.fill.solid()
+    sh.fill.fore_color.rgb = C["danger"] if focal else C["primary_deep"]
+    sh.line.fill.background()
+    sh.shadow.inherit = False
+    _strip_style(sh)
+    pt = TS["kpi_sub"]
+    add_text(slide, cx - d / 2, cy - d / 2 - ink_center_offset_in(pt), d, d, [[(text, pt, 700, C["canvas"])]],
+             align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE, wrap=False)
+
+
+def _risk_row_blocks(r: dict, sev: str) -> list[dict]:
+    """対策レールの1行: 見出し(リスク名 + 優先度の語) → 対策。優先度は色だけでなく語でも書く。"""
+    head = {"parts": [(r.get("label", ""), RAIL_HEAD_PT, 600, C["ink"]),
+                      (f"  優先度 {sev}", TS["kpi_sub"], 700, C["danger"] if sev == "高" else C["ink_subtle"])],
+            "size": RAIL_HEAD_PT, "kind": "text"}
+    blocks = [head]
+    if r.get("mitigation"):
+        blocks.append({"parts": [(r["mitigation"], TS["body"], 400, C["ink_subtle"])], "size": TS["body"],
+                       "kind": "text", "gap_before": OPT["gap_in"]["heading_body"], "gap_name": "heading_body"})
+    return blocks
+
+
+def p_risk_matrix(slide, spec, deck):
+    """リスクマトリクス: 左に発生可能性(縦)× 影響(横)の 3x3、右に番号つきの対策レール。
+
+    セルの色は優先度(積 ≥6 高 / 3-4 中 / ≤2 低)で3段に淡く塗り、レールにも「優先度 高」を語で
+    書く — 色だけで意味を伝えない。リスクは番号の丸でセルに置き、同じセルの複数は横に並べる。
+    focal のリスクは丸を危険色にし、レールの行を淡い主色で立てる。"""
+    risks = spec.get("risks", [])[:4]
+    if not risks:
+        return
+    y0, h = body_region(spec)
+    xa = {"title": "影響", "levels": RISK_LEVELS["x"], **(spec.get("x_axis") or {})}
+    ya = {"title": "発生可能性", "levels": RISK_LEVELS["y"], **(spec.get("y_axis") or {})}
+    mx, mw = grid(0, 7)
+    ax_pt = TS["chart_axis"]
+    lab_h = drawn_line_h(ax_pt)
+    row_lab_w = max(_label_w(str(t), ax_pt, 600) for t in ya["levels"]) + 0.18
+    gx = mx + row_lab_w
+    gw = mw - row_lab_w
+    top = y0 + 0.05 + lab_h + 0.10                         # 縦軸の題をグリッドの上に置く
+    gh = h - 0.10 - (lab_h + 0.10) - 2 * (lab_h + 0.06)    # 下に横軸の水準と題
+    cw, ch = gw / 3, gh / 3
+    add_text(slide, mx, y0 + 0.05, mw, lab_h, [[(f"{ya['title']} ↑", ax_pt, 600, C["ink_subtle"])]])
+    for row in range(3):              # row 0 = 上 = 発生可能性 高
+        lk = 3 - row
+        add_text(slide, mx, top + row * ch, row_lab_w - 0.12, ch, [[(str(ya["levels"][lk - 1]), ax_pt, 600, C["ink_subtle"])]],
+                 align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE)
+        for col in range(3):
+            im = col + 1
+            add_rect(slide, gx + col * cw, top + row * ch, cw, ch, _risk_fill(risk_severity(lk, im)),
+                     line=C["rule"], line_w_pt=0.75)      # 低のセルは地と同色なので、境界は罫で描く
+    for col in range(3):
+        add_text(slide, gx + col * cw, top + gh + 0.06, cw, lab_h, [[(str(xa["levels"][col]), ax_pt, 600, C["ink_subtle"])]],
+                 align=PP_ALIGN.CENTER)
+    add_text(slide, gx, top + gh + 0.06 + lab_h + 0.04, gw, lab_h, [[(f"{xa['title']} →", ax_pt, 600, C["ink_subtle"])]],
+             align=PP_ALIGN.CENTER)
+    ids = [str(r.get("id") or i + 1) for i, r in enumerate(risks)]
+    D = 0.46
+    cells: dict[tuple[int, int], list[int]] = {}
+    for i, r in enumerate(risks):
+        cells.setdefault((int(r.get("likelihood", 1)), int(r.get("impact", 1))), []).append(i)
+    for (lk, im), members in cells.items():
+        ccx = gx + (im - 1) * cw + cw / 2
+        ccy = top + (3 - lk) * ch + ch / 2
+        per_row = max(1, int((cw - 0.12) // (D + 0.10)))
+        rows_ = [members[k:k + per_row] for k in range(0, len(members), per_row)]
+        for ri, rr in enumerate(rows_):
+            yy = ccy + (ri - (len(rows_) - 1) / 2) * (D + 0.10)
+            for k, idx in enumerate(rr):
+                xx = ccx + (k - (len(rr) - 1) / 2) * (D + 0.10)
+                _risk_badge(slide, xx, yy, D, ids[idx], focal=bool(risks[idx].get("focal")))
+    # 対策レール: 見出し + 罫 → 行(番号の丸 + リスク名と優先度 + 対策)。行の間は罫で分ける
+    rx, rw = grid(7, 5)
+    text_x = rx + D + 0.18
+    text_w = rx + rw - text_x - 0.10
+    rows = [_risk_row_blocks(r, risk_severity(int(r.get("likelihood", 1)), int(r.get("impact", 1)))) for r in risks]
+    row_hs = [_stack_drawn_h(b, text_w) for b in rows]
+    HEAD = 0.5
+    for pad in (0.16, 0.10, 0.06):
+        need = HEAD + sum(rh + 2 * pad for rh in row_hs)
+        if need <= h - 0.10:
+            break
+    region_y, region_h = y0 + 0.05, h - 0.10        # レールは本文帯の高さ全体を使える(下に軸の語はない)
+    ry = region_y + max(0.0, (region_h - need) / 2)
+    slots = [rh + 2 * pad for rh in row_hs]
+    if need > region_h:
+        # 詰めても入らない = 対策の文が長すぎる。図形は帯の中に留め(行を等率で縮める)、
+        # 文字の溢れは verify に名指しさせる — 丸や罫を本文帯の外へ押し出さない
+        k = (region_h - HEAD) / sum(slots)
+        slots = [sl * k for sl in slots]
+    add_text(slide, rx, ry, rw, 0.3, [[(spec.get("rail_heading", "対応方針"), 16, 600, C["primary_deep"])]])
+    add_line(slide, rx, ry + 0.34, rx + rw, ry + 0.34, C["rule"], 0.75)
+    yy = ry + HEAD
+    for i, (r, blocks, slot) in enumerate(zip(risks, rows, slots)):
+        if r.get("focal"):
+            add_rect(slide, rx, yy, rw, slot, C["primary_pale"], radius_pt=4)
+        _risk_badge(slide, rx + 0.08 + D / 2, yy + pad + min(slot - 2 * pad, D) / 2, D, ids[i], focal=bool(r.get("focal")))
+        stack_block(slide, text_x, yy + pad, text_w, stack_optical_height(blocks, text_w), blocks)
+        if i < len(risks) - 1:
+            add_line(slide, rx, yy + slot, rx + rw, yy + slot, C["rule"], 0.5)
+        yy += slot
+
+
 def p_milestone_timeline(slide, spec, deck):
     """意思決定点つきタイムライン: 日付 → 軸上のマーカー → カード(判断タグ・見出し・本文)を
     3-6 列に並べる。roadmap が「段階」を見せるのに対し、こちらは「いつ・何が決まるか」を見せる。
@@ -3473,6 +3595,7 @@ PATTERNS = {
     "metric_proof": p_metric_proof,
     "logic_tree": p_logic_tree,
     "milestone_timeline": p_milestone_timeline,
+    "risk_matrix": p_risk_matrix,
     "cover": p_cover,
     "agenda": p_agenda,
     "section_divider": p_section_divider,
