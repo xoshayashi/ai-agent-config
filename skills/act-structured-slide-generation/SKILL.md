@@ -224,7 +224,9 @@ the built file. Fix by adding copy, never by enlarging type or shrinking the car
 22-24) and should be chosen by judgment like any other: `column_framework` (2-4 pillars with
 aligned rows and a locked outcome strip — parallel structure, never a sequence),
 `metric_proof` (hero number cluster + the chart that proves it + facts rail), `logic_tree`
-(issue / driver / KPI tree, root → branches → leaves, all editable shapes). Mix shift is a
+(issue / driver / KPI tree, root → branches → leaves, all editable shapes). When the question is
+*when is what decided*, use `milestone_timeline` (3-6 dated milestones, diamonds for decision
+points, solid axis for actuals and dashed for plan via `current`) rather than a `roadmap`. Mix shift is a
 native `stacked_column_100`; a chart with short comparable takeaways can use
 `chart_insight` `layout: chart_top` to vary the page rhythm.
 

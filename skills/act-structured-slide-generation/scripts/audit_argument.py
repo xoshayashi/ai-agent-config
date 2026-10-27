@@ -33,7 +33,7 @@ from deck_argument import (  # noqa: E402
 SYNTHESIS = {"executive_summary", "statement", "two_column", "column_framework",
              "cover", "section_divider", "agenda"}
 STRUCTURAL = {"cover", "section_divider", "agenda"}
-FORWARD_PATTERNS = {"roadmap", "guidance_progress"}
+FORWARD_PATTERNS = {"roadmap", "guidance_progress", "milestone_timeline"}
 
 
 def _slide_id(i: int, s: dict) -> str:

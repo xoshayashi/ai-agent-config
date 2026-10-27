@@ -187,6 +187,13 @@ def make_deck(variant: str = "max", template: str | None = None, images: bool = 
                                   for _ in range(N(0, [3, 3, 2, 0][i]))]}
                       for i in range(N(2, 4 if overload else 3))],   # 行数 8 が上限(3+3+2)
          "assumption": "社内管理数値(月次KPIレポート 2026年4月版)"},
+        {"pattern": "milestone_timeline", "title": T("2027年3月の経営会議で全社展開の可否を判断する", "3月に判断"),
+         "subtitle": "経費精算刷新の判断スケジュール", "current": 1,
+         "milestones": [{"date": f"2027年{i + 1}月", "label": T("PoC 2期の継続判断" if i % 2 else "要件定義を完了", f"節{i + 1}"),
+                         "body": T(LONG if overload else "全部門400名へ広げるかを1期の効果で決める", "効果"),
+                         "decision": i % 2 == 1, "focal": i == 3}
+                        for i in range(N(3, 6))],
+         "assumption": "社内プロジェクト計画(2026年10月版)"},
         {"pattern": "financial_highlights", "title": T("上期売上64.8億円(+28%)で計画超過", "計画超過"),
          "subtitle": "FY2026 上期ハイライト",
          "groups": [{"label": T("業績", "業績"), "claim": T("増収と黒字幅拡大が両立、投資回収が前倒し" if overload else "増収と黒字拡大が両立", "両立"),

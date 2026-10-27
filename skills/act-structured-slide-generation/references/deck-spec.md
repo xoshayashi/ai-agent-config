@@ -7,7 +7,7 @@ primitives, not design templates. Choose and combine them after the judgment pro
 
 - Top Level
 - Fields Common To Slides
-- The 24 Patterns
+- The 25 Patterns
 - Layout contract shared by every pattern
 - Argument fields
 - Chart Spec (native types, emphasis/annotation knobs, image chart kinds, annotation layer)
@@ -78,7 +78,7 @@ name. An absent template resolves to `standard`, which is byte-for-byte the pre-
   for a kind the native engine could attempt. Default (unset) keeps native unless the `kind` is
   image-only (combo/area/org_tree/…). Escalate to image only for objects native cannot draw.
 
-## The 24 Patterns
+## The 25 Patterns
 
 ### 1. `cover`
 
@@ -253,6 +253,27 @@ on all branches; elbow connectors join them. Branch and leaf values are set inli
 label (one line each) so eight rows fit the body; the root stacks its value. Caps: 2-4 branches,
 ≤3 leaves per branch, and ≤8 rows in total (a leafless branch counts as one row) — beyond that,
 split the tree. Titles may be qualitative (no number required).
+
+### 25. `milestone_timeline`
+
+Timeline with decision points: 3-6 dated milestones in columns, each a date above the axis, a
+marker on it, and a card below. `milestones: [{date, label, body?, decision?, focal?}]`,
+optional `current` (0-based index of the last achieved milestone). Use it when the reader's
+question is *when is what decided* — dates and decisions interact. `roadmap` shows stages and
+workstreams; `process_flow` shows a sequence without dates; this pattern shows the calendar.
+
+- `current` splits the axis: solid primary up to that milestone (actual), dashed after it
+  (plan), and achieved markers are filled while planned ones are outlined. Without `current`
+  the axis is one neutral line — do not omit it when some milestones are already done.
+- `decision: true` draws a diamond and opens the card with a "decision point" tag. A timeline with no
+  decision gets a validate warning: pick `roadmap` or `process_flow` instead.
+- One `focal` milestone at most (validate error otherwise); it gets the pale primary card and
+  a larger marker. Put it on the decision the title asks the reader to make.
+- The legend (bottom right) lists only the marks actually drawn.
+- Copy: `date` ≤10 characters (a month or `Q3 FY26`); `label` one bold line; `body` about
+  three lines at the column width (~20 characters at 5 columns). Cards are named `card`, so
+  `validate_spec` / `verify_deck` warn when a card's text is under 60% of its height.
+- Argument-wise it is a forward pattern like `roadmap`: future dates are plan, not fact.
 
 ## Layout contract shared by every pattern
 

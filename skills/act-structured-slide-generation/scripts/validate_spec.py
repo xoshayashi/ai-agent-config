@@ -58,6 +58,7 @@ PATTERNS = {
     "column_framework": ["columns"],
     "metric_proof": ["hero", "chart"],
     "logic_tree": ["root", "branches"],
+    "milestone_timeline": ["milestones"],
 }
 EVIDENCE_PATTERNS = {
     "chart_insight", "market_sizing", "comparison_table", "competitive_landscape",
@@ -684,6 +685,23 @@ def main() -> int:
             if rows_ > 8:
                 errors.append(f"{loc}: ツリーの行数(葉、葉のない枝は1行)が {rows_} 行 — 8行までしか本文帯に入らない。"
                               "枝を減らすかツリーを2枚に分ける")
+        if pat == "milestone_timeline":
+            ms_ = s.get("milestones", [])
+            if not 3 <= len(ms_) <= 6:
+                errors.append(f"{loc}: milestone_timeline の milestones は 3-6 個({len(ms_)} 個)")
+            nodate = [j + 1 for j, m in enumerate(ms_) if not str(m.get("date", "")).strip()]
+            if nodate:
+                errors.append(f"{loc}: マイルストーン {nodate} に date がない — 時期のない節はタイムラインに置かない")
+            cur = s.get("current")
+            if cur is not None and not (isinstance(cur, int) and not isinstance(cur, bool) and 0 <= cur < len(ms_)):
+                errors.append(f"{loc}: current={cur!r} が範囲外 — 0 始まりの添字(0-{len(ms_) - 1})で、実績の最後の節を指す")
+            if sum(1 for m in ms_ if m.get("focal")) > 1:
+                errors.append(f"{loc}: focal が複数 — 立てる節は1つだけ")
+            if ms_ and not any(m.get("decision") for m in ms_):
+                warns.append(f"{loc}: decision の節がない — 判断の時期を見せないなら roadmap か process_flow を選ぶ")
+            long_date = [str(m.get("date")) for m in ms_ if ja_len(str(m.get("date", ""))) > 10]
+            if long_date:
+                warns.append(f"{loc}: date が長い({', '.join(d[:12] for d in long_date)}) — 10字以内(2026年4月 / Q3 FY26)")
         if pat == "metric_proof":
             hero = s.get("hero") or {}
             if hero.get("value") is None or str(hero.get("value")).strip() == "":
@@ -729,7 +747,7 @@ def main() -> int:
         # カード型の本文量: 描画と同じ寸法計算(build_deck.card_copy_estimate)で、各カードの本文が
         # カード高の card_text_floor に届くかをビルド前に見る。届かないカードは、下半分が空いて
         # 見出し帯・隣のカードと釣り合わない。足すべき行数と1行の字数を具体的に示す
-        if pat in ("process_flow", "column_framework", "two_column"):
+        if pat in ("process_flow", "column_framework", "two_column", "milestone_timeline"):
             try:
                 import build_deck as _bd
                 # 見積もりはビルドと同じ物差しで — import 時の既定(standard)ではなく、このデッキの

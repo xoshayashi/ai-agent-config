@@ -3070,6 +3070,68 @@ def test_validate_caps_the_consulting_patterns(tmp_path):
     assert "2-4 本" in r.stdout and "8行" in r.stdout and "hero に value" in r.stdout, r.stdout
 
 
+def _timeline_slide(**over):
+    sl = {"pattern": "milestone_timeline", "title": "2027年3月の経営会議で全社展開の可否を判断する",
+          "subtitle": "判断スケジュール", "current": 1,
+          "milestones": [
+              {"date": "2026年7月", "label": "要件定義を完了", "body": "経理・人事・営業の3部門で承認フローを統一した"},
+              {"date": "2026年10月", "label": "PoC 1期を終了", "body": "営業部120名で処理時間が1件12分から4分に短縮"},
+              {"date": "2027年1月", "label": "PoC 2期の継続判断", "body": "全部門400名へ広げるかを1期の効果で決める", "decision": True},
+              {"date": "2027年3月", "label": "全社展開の可否", "body": "投資3.2億円の承認を経営会議に諮る",
+               "decision": True, "focal": True}],
+          "assumption": "社内プロジェクト計画(2026年10月版)"}
+    sl.update(over)
+    return sl
+
+
+def test_milestone_timeline_draws_actual_vs_plan_and_decisions(tmp_path):
+    """意思決定点つきタイムライン: current までの軸は実線、以降は破線。判断ポイントはひし形で、
+    実績側は塗り・計画側は白抜き。凡例は描いた記号だけを載せる。"""
+    from pptx import Presentation
+    from pptx.enum.shapes import MSO_SHAPE
+    spec = {"meta": {"title": "t"}, "slides": [_timeline_slide()]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(spec, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 0, r.stdout
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0, v.stdout
+    slide = list(Presentation(out).slides)[0]
+    autos = [sh for sh in slide.shapes if sh.shape_type == 1]
+    diamonds = [sh for sh in autos if sh.auto_shape_type == MSO_SHAPE.DIAMOND]
+    ovals = [sh for sh in autos if sh.auto_shape_type == MSO_SHAPE.OVAL]
+    assert len(diamonds) == 2 and len(ovals) == 2
+    dashed = [sh for sh in slide.shapes if sh.shape_type == 9
+              and sh.line._get_or_add_ln().find("{http://schemas.openxmlformats.org/drawingml/2006/main}prstDash") is not None]
+    assert len(dashed) == 1                                   # 計画側の軸だけが破線
+    texts = "\n".join(sh.text_frame.text for sh in slide.shapes if sh.has_text_frame)
+    assert texts.count("判断ポイント") == 3                     # カード2枚 + 凡例
+    assert "◇: 判断ポイント" in texts and "◆" not in texts      # 判断はどちらも計画側(白抜き)
+    assert "実線: 実績 / 破線: 計画" in texts
+    assert sum(1 for sh in slide.shapes if sh.name == "card") == 4
+
+
+def test_validate_checks_the_milestone_timeline(tmp_path):
+    two = _timeline_slide()
+    two["milestones"] = two["milestones"][:2]
+    bad = {"meta": {"title": "t"}, "slides": [
+        two,
+        _timeline_slide(current=4),
+        _timeline_slide(milestones=[{**m, "focal": True} for m in _timeline_slide()["milestones"]]),
+        _timeline_slide(milestones=[{k: x for k, x in m.items() if k != "date"} for m in _timeline_slide()["milestones"]]),
+    ]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(bad, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 1
+    assert "3-6 個" in r.stdout and "current=4" in r.stdout and "focal が複数" in r.stdout and "date がない" in r.stdout, r.stdout
+    nodec = {"meta": {"title": "t"}, "slides": [_timeline_slide(milestones=[
+        {k: x for k, x in m.items() if k != "decision"} for m in _timeline_slide()["milestones"]])]}
+    p.write_text(json.dumps(nodec, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert "decision の節がない" in r.stdout, r.stdout
+
+
 def test_stacked_100_and_stacked_bar_are_native_chart_types(tmp_path):
     from pptx import Presentation
     spec = {"meta": {"title": "t"}, "slides": [

@@ -3291,13 +3291,140 @@ def p_logic_tree(slide, spec, deck):
              max(branch_mids + [ry + root_h / 2]), C["ink_faint"], 1.0)
 
 
+DECISION_TAG = "判断ポイント"
+
+
+def _milestone_blocks(m: dict) -> list[dict]:
+    """マイルストーン1つぶんのカード本文(判断タグ → 見出し → 本文)。"""
+    blocks = []
+    if m.get("decision"):
+        blocks.append({"parts": [(DECISION_TAG, TS["kpi_sub"], 700, C["primary_deep"])],
+                       "size": TS["kpi_sub"], "kind": "text"})
+    for b in _rail_blocks([{"heading": m.get("label"), "body": m.get("body")}]):
+        if blocks and not b.get("gap_before"):
+            b["gap_before"], b["gap_name"] = OPT["gap_in"]["heading_body"], "tag"
+        blocks.append(b)
+    return blocks
+
+
+def _milestone_timeline_layout(ms: list, h: float) -> dict:
+    """タイムラインの寸法(日付行、軸帯、カード)。描画と card_copy_estimate が共有する。"""
+    _, w = grid(0, 12)
+    n = len(ms)
+    gut = LAY["gutter_in"]
+    cw = (w - gut * (n - 1)) / n
+    DATE_PT = TS["body"]
+    date_h = max(_text_lines(str(m.get("date", "")), cw, DATE_PT, 700, "label") for m in ms) * drawn_line_h(DATE_PT)
+    AXIS_H = 0.40                      # 判断ポイントのひし形(最大 0.36in)が収まる帯
+    legend_h = drawn_line_h(TS["kpi_sub"]) + 0.14
+    # 入らないときは余白から詰める(reclaim ladder): カードの内側余白 → 帯間の隙間。型は縮めない
+    for pad, gap in ((0.22, 0.16), (0.16, 0.12), (0.12, 0.08)):
+        text_w = cw - 2 * pad
+        blocks = [_milestone_blocks(m) for m in ms]
+        col_h = [_stack_drawn_h(b, text_w) for b in blocks]
+        card_min = max(1.2, max(col_h) + 2 * pad)
+        content = date_h + gap + AXIS_H + gap + card_min + legend_h
+        if content <= h - 0.10:
+            break
+    band_h, off = fit_band(h - 0.10, content, top_anchored=True)
+    card_h = max(card_min, band_h - (date_h + gap + AXIS_H + gap + legend_h))
+    return dict(n=n, cw=cw, gut=gut, date_h=date_h, DATE_PT=DATE_PT, AXIS_H=AXIS_H, gap=gap,
+                pad=pad, text_w=text_w, blocks=blocks, col_h=col_h, card_h=card_h,
+                legend_h=legend_h, off=off, line_h=drawn_line_h(TS["body"]))
+
+
+def _timeline_marker(slide, cx, cy, size, *, diamond: bool, fill, line=None):
+    shape = MSO_SHAPE.DIAMOND if diamond else MSO_SHAPE.OVAL
+    sh = slide.shapes.add_shape(shape, Inches(cx - size / 2), Inches(cy - size / 2), Inches(size), Inches(size))
+    if fill is None:
+        sh.fill.background()
+    else:
+        sh.fill.solid()
+        sh.fill.fore_color.rgb = fill
+    if line is None:
+        sh.line.fill.background()
+    else:
+        sh.line.color.rgb = line
+        sh.line.width = Pt(1.75)
+    sh.shadow.inherit = False
+    _strip_style(sh)
+    return sh
+
+
+def p_milestone_timeline(slide, spec, deck):
+    """意思決定点つきタイムライン: 日付 → 軸上のマーカー → カード(判断タグ・見出し・本文)を
+    3-6 列に並べる。roadmap が「段階」を見せるのに対し、こちらは「いつ・何が決まるか」を見せる。
+
+    current(0 始まり)を指定すると、そこまでの軸を実線(実績)、以降を破線(計画)で描き分ける —
+    実績と計画を同じ線で描かない(composition-vocabulary: Actual / Forecast Pair)。
+    decision: true の節はひし形で、カード先頭に「判断ポイント」を置く。focal は1つだけ立てる。"""
+    ms = spec.get("milestones", [])[:6]
+    if not ms:
+        return
+    y0, h = body_region(spec)
+    x, w = grid(0, 12)
+    L = _milestone_timeline_layout(ms, h)
+    n, cw, gut, gap, pad = L["n"], L["cw"], L["gut"], L["gap"], L["pad"]
+    cur = spec.get("current")
+    cur = cur if isinstance(cur, int) and 0 <= cur < n else None
+    y = y0 + 0.05 + L["off"]
+    centers = [x + i * (cw + gut) + cw / 2 for i in range(n)]
+    axis_y = y + L["date_h"] + gap + L["AXIS_H"] / 2
+    # 軸: 実績(〜current)は主色の実線、計画(current〜)は淡い破線。current が無ければ全体を中立の実線
+    if cur is None:
+        add_line(slide, x, axis_y, x + w, axis_y, C["ink_faint"], 1.5)
+    else:
+        split = centers[cur]
+        add_line(slide, x, axis_y, split, axis_y, C["primary"], 2.5)
+        if cur < n - 1:
+            add_line(slide, split, axis_y, x + w, axis_y, C["ink_faint"], 1.5, dash="dash")
+    card_y = axis_y + L["AXIS_H"] / 2 + gap
+    for i, m in enumerate(ms):
+        cx_ = x + i * (cw + gut)
+        focal = bool(m.get("focal"))
+        done = cur is not None and i <= cur
+        add_text(slide, cx_, y, cw, L["date_h"], [[(str(m.get("date", "")), L["DATE_PT"], 700,
+                                                     C["primary_deep"] if (done or cur is None) else C["ink_subtle"])]],
+                 align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.BOTTOM, wrap_role="label")
+        diamond = bool(m.get("decision"))
+        size = (0.36 if diamond else 0.24) + (0.06 if focal else 0.0)
+        if cur is None or done:
+            _timeline_marker(slide, centers[i], axis_y, size, diamond=diamond,
+                             fill=C["primary_deep"] if (diamond or focal) else C["primary"])
+        else:
+            # 計画の節は白抜き。注目の節だけはカードと同じ淡い主色で塗り、軸上でも目が止まるようにする
+            _timeline_marker(slide, centers[i], axis_y, size, diamond=diamond,
+                             fill=C["primary_pale"] if focal else C["canvas"],
+                             line=C["primary_deep"] if (diamond or focal) else C["primary"])
+        add_rect(slide, cx_, card_y, cw, L["card_h"], C["primary_pale"] if focal else C["surface_tint"],
+                 line=C["primary"] if focal else None, line_w_pt=1.25,
+                 radius_pt=LAY["card"]["radius_pt"], name="card")
+        blocks = L["blocks"][i]
+        if blocks:
+            stack_block(slide, cx_ + pad, card_y + pad, L["text_w"],
+                        stack_optical_height(blocks, L["text_w"]), blocks)
+    # 凡例: 描き分けた記号だけを載せる(使っていない記号の説明は置かない)
+    legend = []
+    if cur is not None:
+        legend.append("実線: 実績" if cur == n - 1 else "実線: 実績 / 破線: 計画")
+    # 判断ポイントの記号は描いた形に合わせる: 実績側は塗り(◆)、計画側は白抜き(◇)
+    dec = [i for i, m in enumerate(ms) if m.get("decision")]
+    if dec:
+        filled = {cur is None or i <= cur for i in dec}
+        legend.append("".join(sym for sym, on in (("◆", True in filled), ("◇", False in filled)) if on)
+                      + ": 判断ポイント")
+    if legend:
+        add_text(slide, x, card_y + L["card_h"] + 0.10, w, L["legend_h"] - 0.10,
+                 [[("   ".join(legend), TS["kpi_sub"], 400, C["ink_subtle"])]], align=PP_ALIGN.RIGHT)
+
+
 def card_copy_estimate(spec: dict) -> list[dict]:
     """カード型(process_flow / column_framework / two_column)の各カードについて、本文が占める高さと
     カードの高さの見込みを返す。描画と同じ寸法計算(_*_layout)を使うので、validate_spec がビルド前に
     「このコピー量ではカードの下半分が空く」と言える。返り値の各要素:
     card(名前), content_h, card_h, ratio, line_h(1行の高さ), hint_chars(警告文に添える1行あたりの和文字数の目安。行数の計算には使わない — 行数は _text_lines の実測だけ)。"""
     pat = spec.get("pattern")
-    if pat not in ("process_flow", "column_framework", "two_column"):
+    if pat not in ("process_flow", "column_framework", "two_column", "milestone_timeline"):
         return []
     _, h = body_region(spec)
     em = TS["body"] / 72.0
@@ -3320,6 +3447,14 @@ def card_copy_estimate(spec: dict) -> list[dict]:
             content = ch + (L["outcome_zone"] if c.get("outcome") else 0.0)
             out.append(dict(card=c.get("heading", ""), content_h=content, card_h=L["card_h"],
                             line_h=L["line_h"], hint_chars=max(1, int(L["text_w"] // em))))
+    elif pat == "milestone_timeline":
+        ms = spec.get("milestones", [])[:6]
+        if not ms:
+            return []
+        L = _milestone_timeline_layout(ms, h)
+        for m, ch in zip(ms, L["col_h"]):
+            out.append(dict(card=m.get("label", "") or m.get("date", ""), content_h=ch, card_h=L["card_h"],
+                            line_h=L["line_h"], hint_chars=max(1, int(L["text_w"] // em))))
     else:
         L = _two_column_layout(spec, h)
         _, w_side = grid(0, 6)
@@ -3337,6 +3472,7 @@ PATTERNS = {
     "column_framework": p_column_framework,
     "metric_proof": p_metric_proof,
     "logic_tree": p_logic_tree,
+    "milestone_timeline": p_milestone_timeline,
     "cover": p_cover,
     "agenda": p_agenda,
     "section_divider": p_section_divider,
