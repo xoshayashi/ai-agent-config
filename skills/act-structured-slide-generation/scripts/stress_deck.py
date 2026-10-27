@@ -200,6 +200,13 @@ def make_deck(variant: str = "max", template: str | None = None, images: bool = 
                     "focal": i == 0, "mitigation": T(LONG if overload else "11月に検証環境を用意し、仕訳連携を先行検証する", "検証")}
                    for i in range(N(2, 4))],      # 2件目と3件目は同じセル(丸が横に並ぶ)
          "assumption": "プロジェクト推進室によるリスク評価(2026年10月)"},
+        {"pattern": "hub_spoke", "title": T("決済データ基盤が5事業をつなぎ、与信と販促の精度を上げる", "基盤がつなぐ"),
+         "subtitle": "決済データ基盤と各事業の関係",
+         "hub": {"label": T("決済データ基盤", "基盤"), "value": "1.2億件"},
+         "spokes": [{"label": T("後払い与信", f"S{i + 1}"), "relation": T("与信スコアを受け取る", "受け取る"),
+                     "body": T(LONG if overload else "審査時間を平均2日から5分に短縮", "短縮"), "focal": i == 1}
+                    for i in range(N(3, 6))],
+         "assumption": "社内データ基盤の運用実績(2026年9月)"},
         {"pattern": "financial_highlights", "title": T("上期売上64.8億円(+28%)で計画超過", "計画超過"),
          "subtitle": "FY2026 上期ハイライト",
          "groups": [{"label": T("業績", "業績"), "claim": T("増収と黒字幅拡大が両立、投資回収が前倒し" if overload else "増収と黒字拡大が両立", "両立"),

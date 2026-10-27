@@ -7,7 +7,7 @@ primitives, not design templates. Choose and combine them after the judgment pro
 
 - Top Level
 - Fields Common To Slides
-- The 26 Patterns
+- The 27 Patterns
 - Layout contract shared by every pattern
 - Argument fields
 - Chart Spec (native types, emphasis/annotation knobs, image chart kinds, annotation layer)
@@ -78,7 +78,7 @@ name. An absent template resolves to `standard`, which is byte-for-byte the pre-
   for a kind the native engine could attempt. Default (unset) keeps native unless the `kind` is
   image-only (combo/area/org_tree/…). Escalate to image only for objects native cannot draw.
 
-## The 26 Patterns
+## The 27 Patterns
 
 ### 1. `cover`
 
@@ -290,6 +290,27 @@ optional `x_axis` / `y_axis: {title, levels: [low, mid, high]}` and `rail_headin
   without `mitigation` gets a warning: a list of risks with no response is not a decision aid.
 - Evidence-wise it is qualitative (no number required in the title) but needs `source` or
   `assumption` naming who assessed the risks and when.
+
+### 27. `hub_spoke`
+
+One hub (asset, platform, capability, channel) and the 3-6 parts it coordinates, drawn with
+native shapes and connectors. `hub: {label, value?, unit?}`, `spokes: [{label, relation, body?,
+focal?}]`. The hub is a dark node in columns 6-7; spokes are cards in columns 1-4 (the first
+half) and 9-12 (the rest); elbow connectors run from the hub through a bus in each lane to the
+middle of every card, as in `logic_tree`.
+
+- `relation` is the line that makes it a hub diagram rather than a list: what flows between
+  the hub and that part (data supplied, score received). It sits in bold primary directly
+  under the spoke label, inside the card — a label floating on a connector would wrap inside
+  the one-column lane. A spoke without `relation` gets a validate warning.
+- All spoke cards share one height (the tallest content) so the two columns read as one set;
+  cards are named `card`, so thin copy is reported by validate and verify.
+- One `focal` spoke at most: pale primary card and a thicker primary connector.
+- Caps: 3-6 spokes (2 is a `two_column`; 7+ should be grouped), and the cards must fit the body:
+  validate measures them with the builder's own geometry and errors when they do not (about
+  label + relation + two body lines per card at three per side). Use `diagram` with
+  `kind: node_graph` only when parts also connect to each other, not just to the hub.
+- Evidence-wise it is qualitative, but it needs `source` or `assumption`.
 
 ## Layout contract shared by every pattern
 

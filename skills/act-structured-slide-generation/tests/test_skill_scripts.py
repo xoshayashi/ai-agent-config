@@ -3183,6 +3183,63 @@ def test_validate_checks_the_risk_matrix(tmp_path):
     assert "対策(mitigation)のないリスク" in run("validate_spec.py", p).stdout
 
 
+def _hub_slide(**over):
+    sl = {"pattern": "hub_spoke", "title": "決済データ基盤が4事業をつなぎ、与信と販促の精度を上げる",
+          "subtitle": "基盤と各事業の関係", "hub": {"label": "決済データ基盤", "value": "1.2億件"},
+          "spokes": [
+              {"label": "加盟店決済", "relation": "取引データを供給", "body": "全国38万店の売上と時間帯別の客数"},
+              {"label": "後払い与信", "relation": "与信スコアを受け取る", "body": "審査時間を平均2日から5分に短縮", "focal": True},
+              {"label": "販促クーポン", "relation": "配信対象を受け取る", "body": "配信先を絞り、配信数を3割削減"},
+              {"label": "会計連携", "relation": "仕訳データを受け取る", "body": "加盟店の月次締めを3日短縮"}],
+          "assumption": "社内データ基盤の運用実績(2026年9月)"}
+    sl.update(over)
+    return sl
+
+
+def test_hub_spoke_connects_every_spoke_with_native_lines(tmp_path):
+    """ハブ&スポーク: 中心1 + 周辺4 のカードが左右2列に分かれ、全周辺が線で中心に結ばれる
+    (画像ではなく編集できるコネクタ)。関係の語はカードの中にある。"""
+    from pptx import Presentation
+    spec = {"meta": {"title": "t"}, "slides": [_hub_slide()]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(spec, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 0, r.stdout
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0, v.stdout
+    slide = list(Presentation(out).slides)[0]
+    cards = [sh for sh in slide.shapes if sh.name == "card"]
+    assert len(cards) == 4
+    assert len({round(c.left / 914400, 1) for c in cards}) == 2          # 左右2列
+    lines = [sh for sh in slide.shapes if sh.shape_type == 9]
+    assert len(lines) >= 4 + 2 * 2                                        # 周辺ごとの枝 + 各側の幹と縦バス
+    assert not [sh for sh in slide.shapes if sh.shape_type == 13]         # no picture
+    texts = "\n".join(sh.text_frame.text for sh in slide.shapes if sh.has_text_frame)
+    assert "与信スコアを受け取る" in texts and "1.2億件" in texts
+
+
+def test_validate_checks_the_hub_spoke(tmp_path):
+    bad = {"meta": {"title": "t"}, "slides": [
+        _hub_slide(spokes=_hub_slide()["spokes"][:2]),
+        _hub_slide(hub={"label": ""}),
+        _hub_slide(spokes=[{**sp, "focal": True} for sp in _hub_slide()["spokes"]]),
+    ]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(bad, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 1
+    assert "3-6 個" in r.stdout and "hub に label がない" in r.stdout and "focal が複数" in r.stdout, r.stdout
+    norel = {"meta": {"title": "t"}, "slides": [_hub_slide(spokes=[
+        {k: x for k, x in sp.items() if k != "relation"} for sp in _hub_slide()["spokes"]])]}
+    p.write_text(json.dumps(norel, ensure_ascii=False))
+    assert "relation のない周辺" in run("validate_spec.py", p).stdout
+    long_ = "電子帳簿保存法とインボイス制度への対応を単一のワークフローで完結させる統合基盤" * 2
+    over = {"meta": {"title": "t"}, "slides": [_hub_slide(spokes=[{**sp, "body": long_} for sp in _hub_slide()["spokes"] * 2][:6])]}
+    p.write_text(json.dumps(over, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 1 and "本文帯に入らない" in r.stdout, r.stdout
+
+
 def test_stacked_100_and_stacked_bar_are_native_chart_types(tmp_path):
     from pptx import Presentation
     spec = {"meta": {"title": "t"}, "slides": [

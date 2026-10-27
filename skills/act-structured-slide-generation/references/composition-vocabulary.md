@@ -206,7 +206,8 @@ the story. Do not use a fixed closing template.
 - Small multiples -> `chart_grid`
 - Two-axis combo, area, radar -> `chart_insight` with an image `kind` (`combo`, `area`,
   `radar`; see `data-and-diagram-rules.md`)
-- Hub and spoke, system map, org tree -> `diagram` with `kind: node_graph | org_tree`
+- Hub and spoke (parts connect only to the hub) -> `hub_spoke` (native, editable)
+- System map, org tree, spokes that also link to each other -> `diagram` with `kind: node_graph | org_tree`
 - Ring / flywheel, funnel, pyramid, Venn, coverage matrix -> `diagram` with
   `kind: ring | funnel | pyramid | venn | matrix` (image track, `render_route` = image)
 

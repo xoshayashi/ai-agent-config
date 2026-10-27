@@ -3351,6 +3351,108 @@ def _timeline_marker(slide, cx, cy, size, *, diamond: bool, fill, line=None):
     return sh
 
 
+def _spoke_blocks(sp: dict) -> list[dict]:
+    """周辺ノード1つぶんのカード本文(名前 → 関係 → 本文)。関係は中心との結びつきを1行で言い、
+    主色の太字で名前の直下に置く(「加盟店決済 / 取引データを供給」と読める順)。"""
+    gap = OPT["gap_in"]
+    blocks = []
+    if sp.get("label"):
+        blocks.append({"parts": [(sp["label"], RAIL_HEAD_PT, 600, C["ink"])], "size": RAIL_HEAD_PT, "kind": "text"})
+    if sp.get("relation"):
+        blocks.append({"parts": [(sp["relation"], TS["kpi_sub"], 700, C["primary_deep"])], "size": TS["kpi_sub"],
+                       "kind": "text", "gap_before": gap["heading_body"] if blocks else 0.0, "gap_name": "relation"})
+    if sp.get("body"):
+        blocks.append({"parts": [(sp["body"], TS["body"], 400, C["ink_subtle"])], "size": TS["body"],
+                       "kind": "text", "gap_before": gap["heading_body"] if blocks else 0.0, "gap_name": "heading_body"})
+    return blocks
+
+
+def _hub_spoke_layout(spec: dict, h: float) -> dict:
+    """ハブ&スポークの寸法。周辺を左右の列に振り分け(左 = 前半)、全カードを同じ高さにそろえる。
+    描画と card_copy_estimate が共有する。"""
+    spokes = spec.get("spokes", [])[:6]
+    n_left = (len(spokes) + 1) // 2
+    sides = [spokes[:n_left], spokes[n_left:]]
+    _, side_w = grid(0, 4)
+    for pad, gap in ((0.20, 0.22), (0.14, 0.14), (0.10, 0.08)):
+        text_w = side_w - 2 * pad
+        blocks = [_spoke_blocks(sp) for sp in spokes]
+        col_h = [_stack_drawn_h(b, text_w) for b in blocks]
+        card_h = max(col_h, default=0.4) + 2 * pad
+        rows = max(len(sd) for sd in sides)
+        content = rows * card_h + (rows - 1) * gap
+        if content <= h - 0.10:
+            break
+    band_h, off = fit_band(h - 0.10, content)
+    overflow = content > h - 0.10
+    if overflow:
+        # 詰めても入らない = コピーが多すぎる。図形は帯の中に留め、溢れは validate とビルドの警告で名指しする
+        card_h = (h - 0.10 - (rows - 1) * gap) / rows
+    return dict(spokes=spokes, sides=sides, n_left=n_left, side_w=side_w, pad=pad, gap=gap, overflow=overflow,
+                need_h=content,
+                text_w=text_w, blocks=blocks, col_h=col_h, card_h=card_h, band_h=band_h, off=off,
+                line_h=drawn_line_h(TS["body"]))
+
+
+def p_hub_spoke(slide, spec, deck):
+    """ハブ&スポーク: 中心の資産・基盤(hub)と、それがつなぐ3-6の要素(spokes)。
+
+    中心は 4-7 列目の濃色ノード、周辺は左右 4 列ずつのカード。中心からの線は肘型のバスで
+    各カードの中央へ結ぶ(logic_tree と同じ作図)。関係(relation)はカード先頭の1行に置く —
+    線の上に語を浮かせると、細い通路で折れて読めない。focal の周辺は線も主色で太く引く。"""
+    hub = spec.get("hub") or {}
+    y0, h = body_region(spec)
+    L = _hub_spoke_layout(spec, h)
+    spokes = L["spokes"]
+    if not spokes:
+        return
+    card_h, gap, pad = L["card_h"], L["gap"], L["pad"]
+    if L["overflow"]:
+        print(f"WARN: 周辺カードが本文帯に収まらない({L['need_h']:.2f}in > {h - 0.10:.2f}in) — "
+              "本文を短くするか、周辺の数を減らす")
+    hx, hw = grid(5, 2)
+    top = y0 + 0.05 + L["off"]
+    band_h = L["band_h"]
+    hub_blocks = _node_blocks(hub, TS["section_heading"], 700, C["canvas"])
+    for b in hub_blocks[1:]:
+        b["parts"] = [(t, s, wt, C["canvas"]) for t, s, wt, _c in b["parts"]]
+    for b in hub_blocks:
+        b["align"] = PP_ALIGN.CENTER
+    hpad = 0.16
+    hub_h = max(1.4, _stack_drawn_h(hub_blocks, hw - 2 * hpad) + 2 * hpad)
+    hy = top + (band_h - hub_h) / 2
+    add_rect(slide, hx, hy, hw, hub_h, C["primary_deep"], radius_pt=LAY["card"]["radius_pt"])
+    stack_block(slide, hx + hpad, hy + hpad, hw - 2 * hpad, hub_h - 2 * hpad, hub_blocks, align=PP_ALIGN.CENTER)
+    hub_mid = hy + hub_h / 2
+    for side, members in enumerate(L["sides"]):
+        if not members:
+            continue
+        sx, sw = grid(0 if side == 0 else 8, 4)
+        n = len(members)
+        used = n * card_h + (n - 1) * gap
+        yy = top + (band_h - used) / 2
+        # バスは中心と周辺の通路(1列ぶん)の中央
+        edge_hub = hx if side == 0 else hx + hw
+        edge_sp = sx + sw if side == 0 else sx
+        bus_x = (edge_hub + edge_sp) / 2
+        mids = []
+        for k, sp in enumerate(members):
+            i = k + (0 if side == 0 else L["n_left"])
+            focal = bool(sp.get("focal"))
+            add_rect(slide, sx, yy, sw, card_h, C["primary_pale"] if focal else C["surface_tint"],
+                     line=C["primary"] if focal else None, line_w_pt=1.25,
+                     radius_pt=LAY["card"]["radius_pt"], name="card")
+            if L["blocks"][i]:
+                stack_block(slide, sx + pad, yy + pad, L["text_w"], card_h - 2 * pad, L["blocks"][i])
+            mid = yy + card_h / 2
+            mids.append(mid)
+            add_line(slide, bus_x, mid, edge_sp, mid, C["primary"] if focal else C["ink_faint"],
+                     2.0 if focal else 1.0)
+            yy += card_h + gap
+        add_line(slide, edge_hub, hub_mid, bus_x, hub_mid, C["ink_faint"], 1.0)
+        add_line(slide, bus_x, min(mids + [hub_mid]), bus_x, max(mids + [hub_mid]), C["ink_faint"], 1.0)
+
+
 RISK_LEVELS = {"y": ["低", "中", "高"], "x": ["小", "中", "大"]}
 
 
@@ -3546,7 +3648,7 @@ def card_copy_estimate(spec: dict) -> list[dict]:
     「このコピー量ではカードの下半分が空く」と言える。返り値の各要素:
     card(名前), content_h, card_h, ratio, line_h(1行の高さ), hint_chars(警告文に添える1行あたりの和文字数の目安。行数の計算には使わない — 行数は _text_lines の実測だけ)。"""
     pat = spec.get("pattern")
-    if pat not in ("process_flow", "column_framework", "two_column", "milestone_timeline"):
+    if pat not in ("process_flow", "column_framework", "two_column", "milestone_timeline", "hub_spoke"):
         return []
     _, h = body_region(spec)
     em = TS["body"] / 72.0
@@ -3577,6 +3679,11 @@ def card_copy_estimate(spec: dict) -> list[dict]:
         for m, ch in zip(ms, L["col_h"]):
             out.append(dict(card=m.get("label", "") or m.get("date", ""), content_h=ch, card_h=L["card_h"],
                             line_h=L["line_h"], hint_chars=max(1, int(L["text_w"] // em))))
+    elif pat == "hub_spoke":
+        L = _hub_spoke_layout(spec, h)
+        for sp, ch in zip(L["spokes"], L["col_h"]):
+            out.append(dict(card=sp.get("label", ""), content_h=ch, card_h=L["card_h"],
+                            line_h=L["line_h"], hint_chars=max(1, int(L["text_w"] // em))))
     else:
         L = _two_column_layout(spec, h)
         _, w_side = grid(0, 6)
@@ -3596,6 +3703,7 @@ PATTERNS = {
     "logic_tree": p_logic_tree,
     "milestone_timeline": p_milestone_timeline,
     "risk_matrix": p_risk_matrix,
+    "hub_spoke": p_hub_spoke,
     "cover": p_cover,
     "agenda": p_agenda,
     "section_divider": p_section_divider,

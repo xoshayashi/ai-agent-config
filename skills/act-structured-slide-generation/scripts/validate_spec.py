@@ -60,15 +60,16 @@ PATTERNS = {
     "logic_tree": ["root", "branches"],
     "milestone_timeline": ["milestones"],
     "risk_matrix": ["risks"],
+    "hub_spoke": ["hub", "spokes"],
 }
 EVIDENCE_PATTERNS = {
     "chart_insight", "market_sizing", "comparison_table", "competitive_landscape",
     "financial_summary", "waterfall", "kpi_dashboard",
     "financial_highlights", "metrics_rows", "driver_decomposition", "guidance_progress",
-    "diagram", "chart_grid", "metric_proof", "logic_tree", "risk_matrix",
+    "diagram", "chart_grid", "metric_proof", "logic_tree", "risk_matrix", "hub_spoke",
 }
 # 関係・構造の定性主張が正当なパターン: タイトルに数字が無くても警告しない
-QUALITATIVE_EVIDENCE = {"competitive_landscape", "diagram", "logic_tree", "risk_matrix"}
+QUALITATIVE_EVIDENCE = {"competitive_landscape", "diagram", "logic_tree", "risk_matrix", "hub_spoke"}
 # chart/diagram objects rendered via the image-asset backend (act_assets), not native charts.
 # 必須フィールドは act_assets の各レンダラーが spec[...] で直接参照するキー —
 # ここで検査しないと validate は 0 errors で通り、build が KeyError/ValueError で落ちる
@@ -703,6 +704,31 @@ def main() -> int:
             long_date = [str(m.get("date")) for m in ms_ if ja_len(str(m.get("date", ""))) > 10]
             if long_date:
                 warns.append(f"{loc}: date が長い({', '.join(d[:12] for d in long_date)}) — 10字以内(2026年4月 / Q3 FY26)")
+        if pat == "hub_spoke":
+            sps = s.get("spokes", [])
+            if not 3 <= len(sps) <= 6:
+                errors.append(f"{loc}: hub_spoke の spokes は 3-6 個({len(sps)} 個) — 2つなら two_column、7つ以上は束ねて分ける")
+            if not str((s.get("hub") or {}).get("label", "")).strip():
+                errors.append(f"{loc}: hub に label がない — 中心が何かを名指す")
+            if sum(1 for sp in sps if sp.get("focal")) > 1:
+                errors.append(f"{loc}: focal が複数 — 立てる周辺は1つだけ")
+            if 3 <= len(sps) <= 6:
+                try:
+                    import build_deck as _bd
+                    if getattr(_bd, "_VALIDATE_TOKENS_APPLIED", None) is not tokens:
+                        _bd._apply_tokens(tokens)
+                        _bd._VALIDATE_TOKENS_APPLIED = tokens
+                    _, body_h = _bd.body_region(s)
+                    HL = _bd._hub_spoke_layout(s, body_h)
+                    if HL["overflow"]:
+                        errors.append(f"{loc}: 周辺カードが本文帯に入らない(必要 {HL['need_h']:.2f}in > {body_h - 0.10:.2f}in) — "
+                                      "本文を短くするか、周辺を減らす(片側3枚、各カードは名前+関係+本文2行まで)")
+                except Exception as exc:  # 見積もりが壊れていれば黙らず告げる
+                    warns.append(f"{loc}: hub_spoke の寸法見積もりに失敗 ({exc})")
+            norel = [str(sp.get("label", j + 1)) for j, sp in enumerate(sps) if not sp.get("relation")]
+            if norel:
+                warns.append(f"{loc}: relation のない周辺({', '.join(norel)}) — 中心と何が行き来するかを1行で書く"
+                             "(関係の語のないハブ図は、要素を並べただけになる)")
         if pat == "risk_matrix":
             rk = s.get("risks", [])
             if not 2 <= len(rk) <= 4:
@@ -765,7 +791,7 @@ def main() -> int:
         # カード型の本文量: 描画と同じ寸法計算(build_deck.card_copy_estimate)で、各カードの本文が
         # カード高の card_text_floor に届くかをビルド前に見る。届かないカードは、下半分が空いて
         # 見出し帯・隣のカードと釣り合わない。足すべき行数と1行の字数を具体的に示す
-        if pat in ("process_flow", "column_framework", "two_column", "milestone_timeline"):
+        if pat in ("process_flow", "column_framework", "two_column", "milestone_timeline", "hub_spoke"):
             try:
                 import build_deck as _bd
                 # 見積もりはビルドと同じ物差しで — import 時の既定(standard)ではなく、このデッキの
