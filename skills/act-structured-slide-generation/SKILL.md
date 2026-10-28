@@ -232,7 +232,16 @@ mitigations. When one platform coordinates several parts, `hub_spoke` draws the 
 3-6 spoke cards, and a relation line in each card, all as editable shapes. When change is
 the argument and it can be measured, `before_after` reads each dimension across one row
 (before → after + delta) instead of two free columns. Customer proof is a `case_strip`:
-2-4 cases in one card grammar, each with a measured result. Mix shift is a
+2-4 cases in one card grammar, each with a measured result.
+
+**Combinations and the consulting catalogue.** Most strategy-firm pages are combinations, not
+new shapes. `composite` writes them directly: a `grid` of 1-3 rows, each row a set of cells
+spanning the 12 columns, each cell one block (`text`, `kpi`, `callout`, `chart`, `table`,
+`diagram`). Reach for it before inventing a pattern, and add a dedicated pattern only for a
+new geometry. Three consulting staples with specific geometry are native too: `matrix_2x2`
+(quadrant content), `gantt` (workplan), `harvey_table` (options scored on criteria).
+`references/consulting-page-catalogue.md` maps each common archetype to its primitive or
+composite recipe. Mix shift is a
 native `stacked_column_100`; a chart with short comparable takeaways can use
 `chart_insight` `layout: chart_top` to vary the page rhythm.
 
@@ -427,6 +436,7 @@ Read only what the task needs, but do not skip the required workflow references.
 | `references/design-principles.md` | Act visual grammar, hierarchy, color, density judgment, and page rhythm |
 | `references/grid-and-flex-strategy.md` | Granular grid/flex contract for layout consistency |
 | `references/composition-vocabulary.md` | Composition moves, not templates |
+| `references/consulting-page-catalogue.md` | Strategy-firm page archetypes → dedicated pattern or `composite` recipe |
 | `references/composition-atoms.md` | IR-slide composition atoms + evidence-emphasis move→knob map |
 | `references/ir-slide-design-principles.md` | IR and investor-deck design principles |
 | `references/evidence-and-claim-rules.md` | Claim/evidence/status/source discipline |

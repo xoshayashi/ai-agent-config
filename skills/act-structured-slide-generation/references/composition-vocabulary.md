@@ -198,6 +198,11 @@ the story. Do not use a fixed closing template.
 - Risk assessment (likelihood × impact with mitigations) -> `risk_matrix`
 - Driver equation -> `driver_decomposition`
 - Evidence strip of customer cases with a result each -> `case_strip`
+- Any combination of chart / table / KPI / text / so-what / diagram on the grid -> `composite`
+  (see `consulting-page-catalogue.md` for the archetype recipes)
+- Quadrant content (SWOT, prioritisation, portfolio) -> `matrix_2x2`
+- Workplan (tasks, owners, periods) -> `gantt`
+- Options scored on criteria -> `harvey_table`
 - Flexible close -> `statement`
 - Pillar / framework columns (parallel, not sequence) -> `column_framework`
 - Oversized number + chart that proves it (metric proof page) -> `metric_proof`

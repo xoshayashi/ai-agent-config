@@ -225,6 +225,45 @@ def make_deck(variant: str = "max", template: str | None = None, images: bool = 
                     "focal": i == 1}
                    for i in range(N(2, 4))],
          "source": "各社の利用ログと経理部ヒアリング(2026年10月)"},
+        {"pattern": "composite", "title": T("中堅企業向けの売上は3年で2.1倍、成長の7割は既存顧客", "2.1倍"),
+         "subtitle": "セグメント別売上高の推移(億円)",
+         "grid": [
+             {"height": 3, "cells": [
+                 {"span": 7, "block": {"type": "chart", "chart": {"type": "stacked_column", "unit": "億円",
+                                       "categories": ["FY23", "FY24", "FY25", "FY26"],
+                                       "series": [{"name": "既存顧客", "values": [18, 24, 31, 38]},
+                                                  {"name": "新規顧客", "values": [6, 8, 10, 12]}]}}},
+                 {"span": 5, "block": {"type": "text", "heading": "示唆",
+                                       "points": [{"heading": T("既存顧客の拡大が主因", "主因"),
+                                                   "body": T(LONG if overload else "3年の増分26億円のうち20億円が既存顧客", "既存")}
+                                                  for _ in range(N(1, 2))]}}]},
+             {"height": 1, "cells": [{"span": 12, "block": {"type": "callout", "heading": "提言",
+                                      "statement": T("次の3年は既存顧客の上位プラン移行に営業資源を寄せる", "寄せる")}}]}],
+         "source": "社内売上データ(2026年9月)"},
+        {"pattern": "matrix_2x2", "title": T("優先すべきは経理と人事、法務は提携で補う", "経理と人事"),
+         "subtitle": "参入領域の優先度評価",
+         "x_axis": {"label": "自社の実行能力", "low": "低い", "high": "高い"},
+         "y_axis": {"label": "市場の魅力度", "low": "低い", "high": "高い"},
+         "quadrants": [{"position": pos, "tag": tag, "title": T("経理・人事", "経理"), "focal": pos == "tr",
+                        "items": [T(LONG if overload else "市場規模1.2兆円、年12%成長", "成長")] * N(1, 3)}
+                       for pos, tag in (("tr", "優先"), ("tl", "提携"), ("br", "維持"), ("bl", "撤退"))],
+         "assumption": "Act戦略チームによる評価(2026年10月)"},
+        {"pattern": "gantt", "title": T("移行は6カ月、4月の全社展開に向けて1月に判断する", "6カ月"),
+         "subtitle": "全社展開のワークプラン",
+         "periods": [f"{m}月" for m in (11, 12, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10)][: N(3, 12)], "today": 0,
+         "tasks": ([{"group": "準備"}] + [{"label": T("検証環境の構築と仕訳連携の検証" if overload else "検証環境の構築", f"T{i}"),
+                                          "owner": T("情報システム部", "情シス"), "start": 0, "end": min(i, N(3, 12) - 1),
+                                          "focal": i == 2} for i in range(N(1, 6))]   # group + 6 + 節目 = 上限 8 行
+                   + [{"label": "全社展開", "milestone": True, "start": N(3, 12) - 1}]),
+         "assumption": "プロジェクト計画(2026年10月版)"},
+        {"pattern": "harvey_table", "title": T("3案の比較ではM&Aが速度と機能で優位、費用は最も重い", "M&Aが優位"),
+         "subtitle": "人事・法務モジュールの獲得手段",
+         "criteria": [T("市場投入の速さ", "速さ"), T("機能の完成度", "機能"), T("投資額の軽さ", "投資"),
+                      T("統合リスクの低さ", "統合"), T("人材の確保", "人材"), T("既存顧客との適合", "適合")][: N(2, 6)],
+         "options": [{"label": T("M&A(人事・法務の2社)" if overload else "M&A", f"案{i + 1}"), "note": T("40億円 / 9カ月", "40億円"),
+                      "scores": [(i + j) % 5 for j in range(N(2, 6))], "verdict": "推奨" if i == 1 else "○", "focal": i == 1}
+                     for i in range(N(2, 4))],   # 注記つきの実測上限は4案(注記なしなら6案)
+         "assumption": "Act事業計画モデルに基づく試算"},
         {"pattern": "financial_highlights", "title": T("上期売上64.8億円(+28%)で計画超過", "計画超過"),
          "subtitle": "FY2026 上期ハイライト",
          "groups": [{"label": T("業績", "業績"), "claim": T("増収と黒字幅拡大が両立、投資回収が前倒し" if overload else "増収と黒字拡大が両立", "両立"),

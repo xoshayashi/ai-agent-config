@@ -7,7 +7,7 @@ primitives, not design templates. Choose and combine them after the judgment pro
 
 - Top Level
 - Fields Common To Slides
-- The 29 Patterns
+- The 33 Patterns
 - Layout contract shared by every pattern
 - Argument fields
 - Chart Spec (native types, emphasis/annotation knobs, image chart kinds, annotation layer)
@@ -78,7 +78,7 @@ name. An absent template resolves to `standard`, which is byte-for-byte the pre-
   for a kind the native engine could attempt. Default (unset) keeps native unless the `kind` is
   image-only (combo/area/org_tree/…). Escalate to image only for objects native cannot draw.
 
-## The 29 Patterns
+## The 33 Patterns
 
 ### 1. `cover`
 
@@ -356,6 +356,54 @@ segment → name → rule → result number → result label → what they did �
   cannot fit the body. Cards are named `card`, so thin copy is reported too.
 - Keep the results comparable: the same metric across cases makes the strip an argument;
   mixed metrics make it a collage.
+
+### 30. `composite`
+
+The grid of blocks: most consulting pages are combinations, not new shapes (chart 7 + notes 5,
+a KPI strip over a table, three issue cards over a so-what bar). `grid` is 1-3 rows; a row is
+`{height?, rules?, cells: [{span, block}]}` with spans as column shares of 12; a block is one of
+`text` (`heading?`, `points`, `style?: "card"`), `kpi` (`kpis` ≤4, `direction?: row | column`),
+`callout` (`statement`, `heading?`, `style: primary | accent | navy`), `chart` (`chart`, any
+native spec or image `kind`), `table` (`table`), `diagram` (`diagram`, image-track asset).
+Blocks call the same rectangle primitives the dedicated patterns use, so every combination is
+native and editable.
+
+- Row heights follow `height` weights, but a row that needs more gets its need first, and a
+  row with no chart / table / diagram never grows past 1.3x its content (spare height goes to
+  stretchable rows, or the grid is centred). Validate errors when the blocks cannot fit.
+- Evidence rules follow the content: with a chart, table, KPI or diagram block the page needs
+  `source` / `assumption` and a number in the title; text-and-callout composites are
+  qualitative. Charts inside blocks go through the same chart checks as `chart_insight`.
+- Consecutive composites count as the same pattern only when their grids match.
+- See `consulting-page-catalogue.md` for the archetype → recipe map.
+
+### 31. `matrix_2x2`
+
+Quadrant matrix with content in each quadrant (SWOT, prioritisation, portfolio, option
+sorting) — `competitive_landscape` places points, this one writes in the quadrants.
+`quadrants: [{position: tl | tr | bl | br, title, tag?, items, focal?}]` (exactly four, one per
+position), optional `x_axis` / `y_axis: {label?, low, high}` (both ends required when an axis
+is given; omit both axes for SWOT). One `focal` quadrant at most, ≤3 items per quadrant;
+validate errors when the quadrants cannot fit. `tag` is a short bold lead ("Invest", "S").
+
+### 32. `gantt`
+
+Workplan: `periods` (3-12 labels), `tasks: [{label, owner?, start, end?, milestone?, focal?} |
+{group}]` (2-8 rows including group header rows — the measured capacity of the body), optional `today` (period index, dashed
+danger line with a label) and `owner_label`. Columns: task 3 | owner 2 (only when an owner
+exists) | periods in the rest. Bars run from `start` to `end` (inclusive period indices);
+`milestone: true` draws a diamond at `start`. Owners sit in their own column so each row
+stays one line. Validate checks indices (`start ≤ end`, inside `periods`) and fit.
+
+### 33. `harvey_table`
+
+Options (rows) scored on criteria (columns) with Harvey balls 0-4, drawn as native shapes
+(an outline circle plus a pie from twelve o'clock). `criteria` (2-6), `options: [{label, note?,
+scores, verdict?, focal?}]` (2-6; `scores` one 0-4 integer per criterion), optional
+`verdict_label`, `legend_low` / `legend_high`. Measured capacity: about 4 options when they
+carry a `note`, 6 without (validate errors when the rows cannot fit). The legend is drawn with the same balls (fonts
+lack the quarter-circle glyphs). Name criteria so that a full ball is good ("low integration
+risk", not "integration risk"). One `focal` option at most (the recommendation).
 
 ## Layout contract shared by every pattern
 

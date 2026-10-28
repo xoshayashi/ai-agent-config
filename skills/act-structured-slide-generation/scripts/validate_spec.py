@@ -63,16 +63,49 @@ PATTERNS = {
     "hub_spoke": ["hub", "spokes"],
     "before_after": ["rows"],
     "case_strip": ["cases"],
+    "composite": ["grid"],
+    "matrix_2x2": ["quadrants"],
+    "gantt": ["periods", "tasks"],
+    "harvey_table": ["criteria", "options"],
 }
 EVIDENCE_PATTERNS = {
     "chart_insight", "market_sizing", "comparison_table", "competitive_landscape",
     "financial_summary", "waterfall", "kpi_dashboard",
     "financial_highlights", "metrics_rows", "driver_decomposition", "guidance_progress",
     "diagram", "chart_grid", "metric_proof", "logic_tree", "risk_matrix", "hub_spoke",
-    "before_after", "case_strip",
+    "before_after", "case_strip", "matrix_2x2", "harvey_table",
 }
 # 関係・構造の定性主張が正当なパターン: タイトルに数字が無くても警告しない
-QUALITATIVE_EVIDENCE = {"competitive_landscape", "diagram", "logic_tree", "risk_matrix", "hub_spoke"}
+QUALITATIVE_EVIDENCE = {"competitive_landscape", "diagram", "logic_tree", "risk_matrix", "hub_spoke",
+                        "matrix_2x2", "harvey_table"}
+
+
+def composite_blocks(s: dict) -> list[dict]:
+    """composite のセルに置かれたブロックを平らに並べる(行・セルの上限内)。"""
+    return [(c.get("block") or {}) for r in (s.get("grid") or [])[:3] for c in (r.get("cells") or [])[:4]]
+
+
+def is_evidence(s: dict) -> bool:
+    """数値の出所を名乗るべきページか。composite は中身で決まる: グラフ・表・KPI・図を持てば証拠ページ。"""
+    if s.get("pattern") == "composite":
+        return any(b.get("type") in ("chart", "table", "kpi", "diagram") for b in composite_blocks(s))
+    return s.get("pattern") in EVIDENCE_PATTERNS
+
+
+def is_qualitative(s: dict) -> bool:
+    """タイトルに数字が無くてよい証拠ページか。composite は KPI もグラフも持たないなら定性。"""
+    if s.get("pattern") == "composite":
+        return not any(b.get("type") in ("chart", "kpi") for b in composite_blocks(s))
+    return s.get("pattern") in QUALITATIVE_EVIDENCE
+
+
+def shape_signature(s: dict) -> str:
+    """同じパターンの連続を判定する名前。composite は行ごとの (列の取り分, ブロック種) が同じときだけ同型。"""
+    if s.get("pattern") != "composite":
+        return str(s.get("pattern"))
+    rows = (s.get("grid") or [])[:3]
+    return "composite:" + "|".join(",".join(f"{c.get('span')}{(c.get('block') or {}).get('type')}"
+                                            for c in (r.get("cells") or [])[:4]) for r in rows)
 
 
 def _builder(tokens):
@@ -100,6 +133,11 @@ FIT_CHECKS = {
                   "本文を短くするか、周辺を減らす(片側3枚、各カードは名前+関係+本文2行まで)"),
     "before_after": (lambda bd, s, h: bd._before_after_layout(s, h), "注記を短くするか、行を減らす"),
     "case_strip": (lambda bd, s, h: bd._case_strip_layout(s, h), "本文か声を短くする"),
+    "matrix_2x2": (lambda bd, s, h: bd._matrix_2x2_layout(s, h), "象限の項目を減らす(各象限2-3項目)"),
+    "gantt": (lambda bd, s, h: bd._gantt_layout(s, h), "タスクを束ねる(group 行を含めて8行まで、名前は1行)"),
+    "harvey_table": (lambda bd, s, h: bd._harvey_layout(s, h), "選択肢を減らすか、評価軸の名前を短くする"),
+    "composite": (lambda bd, s, h: bd._composite_layout(s, h),
+                  "ブロックの中身を減らすか、行を減らす(表の行・要点の数が多いセルから)"),
 }
 
 
@@ -316,7 +354,7 @@ def main() -> int:
             if "。" in title.rstrip("。"):
                 warns.append(f"{loc}: タイトルに文が2つ — 1スライド1メッセージ。分割するか一文に絞る")
             # competitive_landscape / diagram は関係・構造の定性主張が正当なため数字必須から除外
-            if pat in EVIDENCE_PATTERNS and pat not in QUALITATIVE_EVIDENCE and not any(ch.isdigit() for ch in title):
+            if is_evidence(s) and not is_qualitative(s) and not any(ch.isdigit() for ch in title):
                 warns.append(f"{loc}: エビデンススライドのタイトルに数字がない — 図表が証明する結論の数値を1つ入れる")
 
         dg = s.get("diagram") or {}
@@ -507,7 +545,7 @@ def main() -> int:
         # 記録すれば足りる(スライドには描画されない)。全スライドへ同一の内部出典フッターを
         # スタンプするのはノイズであり、source の信頼性自体を毀損する。
         deck_basis = (deck.get("meta") or {}).get("basis")
-        if pat in EVIDENCE_PATTERNS and not (s.get("source") or s.get("assumption") or deck_basis):
+        if is_evidence(s) and not (s.get("source") or s.get("assumption") or deck_basis):
             warns.append(f"{loc}: evidence slide without 'source' — add a real external source, "
                          "'assumption' for internal estimates, or meta.basis when the whole deck "
                          "derives from one internal artifact")
@@ -525,6 +563,8 @@ def main() -> int:
         # insight_style "primary" は淡緑バンドで描画され Accent を使わない(build_deck の描画と対応)
         insight_uses_accent = bool(s.get("insight")) and s.get("insight_style", "accent") == "accent"
         accent_uses = colors.count(ACCENT) + (1 if insight_uses_accent else 0)
+        if pat == "composite":     # accent の callout は Accent の一点強調を使う
+            accent_uses += sum(1 for b in composite_blocks(s) if b.get("type") == "callout" and b.get("style") == "accent")
         if accent_uses > TOKENS["color_policy"]["accent_max_uses_per_slide"]:
             errors.append(f"{loc}: Accent #{ACCENT} used {accent_uses}x — max 1 per slide (insight bar counts as the one use)")
 
@@ -541,6 +581,17 @@ def main() -> int:
             for _ci, _cell in enumerate(s.get("charts", []), start=1):
                 if isinstance(_cell, dict):
                     _charts.append((_cell.get("chart", _cell), f"{loc} cell {_ci}"))
+        if pat == "composite":
+            for _bi, _b in enumerate(composite_blocks(s), start=1):
+                if _b.get("type") == "chart" and isinstance(_b.get("chart"), dict):
+                    _charts.append((_b["chart"], f"{loc} block {_bi}"))
+                if _b.get("type") == "diagram":
+                    _dg = _b.get("diagram") or {}
+                    if _dg.get("kind") not in IMAGE_ASSET_KINDS:
+                        errors.append(f"{loc} block {_bi}: diagram kind '{_dg.get('kind')}' は未対応 — "
+                                      f"{', '.join(sorted(IMAGE_ASSET_KINDS))} から選ぶ")
+                    else:
+                        _charts.append((_dg, f"{loc} block {_bi} diagram"))
         if pat == "diagram":
             # diagram の asset spec も同じ image-kind 検査(必須フィールド/annotations 罠)に通す。
             # バイパスすると org_tree の edges 欠落などが 0 errors で通り、Graphviz 描画で落ちる
@@ -750,6 +801,94 @@ def main() -> int:
             long_date = [str(m.get("date")) for m in ms_ if ja_len(str(m.get("date", ""))) > 10]
             if long_date:
                 warns.append(f"{loc}: date が長い({', '.join(d[:12] for d in long_date)}) — 10字以内(2026年4月 / Q3 FY26)")
+        if pat == "matrix_2x2":
+            qs = s.get("quadrants", [])
+            pos_ = [q.get("position") for q in qs]
+            if sorted(p_ for p_ in pos_ if p_) != ["bl", "br", "tl", "tr"] or len(qs) != 4:
+                errors.append(f"{loc}: quadrants は tl / tr / bl / br の4つを1つずつ(いまは {pos_})")
+            if sum(1 for q in qs if q.get("focal")) > 1:
+                errors.append(f"{loc}: focal が複数 — 立てる象限は1つだけ")
+            fat = [str(q.get("title", "")) for q in qs if len(q.get("items", [])) > 3]
+            if fat:
+                errors.append(f"{loc}: 項目が3つを超える象限({', '.join(fat)}) — 象限あたり3項目まで")
+            for ax_key in ("x_axis", "y_axis"):
+                ax_ = s.get(ax_key)
+                if ax_ is not None and not (ax_.get("low") and ax_.get("high")):
+                    errors.append(f"{loc}: {ax_key} は low と high の両方を書く(片側だけの軸は読めない)")
+            if len(qs) == 4:
+                _check_fit(errors, warns, loc, s, tokens)
+        if pat == "gantt":
+            per = s.get("periods", [])
+            tks = s.get("tasks", [])
+            if not 3 <= len(per) <= 12:
+                errors.append(f"{loc}: gantt の periods は 3-12 個({len(per)} 個)")
+            if not 2 <= len(tks) <= 8:
+                errors.append(f"{loc}: gantt の tasks は 2-8 行({len(tks)} 行、group 行を含む) — 超えるならタスクを束ねるか2枚に分ける")
+            for j, t in enumerate(tks, start=1):
+                if t.get("group"):
+                    continue
+                st, en = t.get("start"), t.get("end", t.get("start"))
+                ok = all(isinstance(v, int) and not isinstance(v, bool) and 0 <= v < len(per) for v in (st, en))
+                if not ok or en < st:
+                    errors.append(f"{loc}: タスク {j}('{t.get('label', '')}')の start/end={st!r}/{en!r} — "
+                                  f"periods の添字(0-{len(per) - 1})で、start ≤ end")
+            if sum(1 for t in tks if t.get("focal")) > 2:
+                warns.append(f"{loc}: focal のタスクが3つ以上 — 強調は判断に関わる1-2本に絞る")
+            if 3 <= len(per) <= 12 and 2 <= len(tks) <= 8:
+                _check_fit(errors, warns, loc, s, tokens)
+        if pat == "harvey_table":
+            cr = s.get("criteria", [])
+            op = s.get("options", [])
+            if not 2 <= len(cr) <= 6:
+                errors.append(f"{loc}: harvey_table の criteria は 2-6 個({len(cr)} 個)")
+            if not 2 <= len(op) <= 6:
+                errors.append(f"{loc}: harvey_table の options は 2-6 個({len(op)} 個)")
+            for o in op:
+                sc = o.get("scores") or []
+                if len(sc) != len(cr) or any(not (isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 4) for v in sc):
+                    errors.append(f"{loc}: 選択肢 '{o.get('label', '')}' の scores={sc} — 評価軸と同じ数の 0-4 の整数")
+            if sum(1 for o in op if o.get("focal")) > 1:
+                errors.append(f"{loc}: focal が複数 — 推奨案は1つだけ")
+            if 2 <= len(cr) <= 6 and 2 <= len(op) <= 6:
+                _check_fit(errors, warns, loc, s, tokens)
+        if pat == "composite":
+            rows_ = s.get("grid") or []
+            if not 1 <= len(rows_) <= 3:
+                errors.append(f"{loc}: composite の grid は 1-3 行({len(rows_)} 行) — 4行以上は1枚に詰めすぎ。2枚に分ける")
+            for ri, r in enumerate(rows_, start=1):
+                cells_ = r.get("cells") or []
+                if not 1 <= len(cells_) <= 4:
+                    errors.append(f"{loc} row {ri}: cells は 1-4 個({len(cells_)} 個)")
+                spans = [c.get("span") for c in cells_]
+                if any(not (isinstance(sp, int) and not isinstance(sp, bool) and 2 <= sp <= 12) for sp in spans):
+                    errors.append(f"{loc} row {ri}: span は 2-12 の整数 — いまは {spans}")
+                elif sum(spans) > 12:
+                    errors.append(f"{loc} row {ri}: span の合計が {sum(spans)} — 12 列を超える")
+                elif sum(spans) < 12:
+                    warns.append(f"{loc} row {ri}: span の合計が {sum(spans)} — 右に {12 - sum(spans)} 列の空きが残る"
+                                 "(意図した余白でなければ 12 にそろえる)")
+                h_ = r.get("height", 1)
+                if not (isinstance(h_, (int, float)) and not isinstance(h_, bool) and h_ > 0):
+                    errors.append(f"{loc} row {ri}: height は正の数(行の高さの比) — いまは {h_!r}")
+                for ci, c in enumerate(cells_, start=1):
+                    b = c.get("block") or {}
+                    t = b.get("type")
+                    bl = f"{loc} row {ri} cell {ci}"
+                    if t not in ("text", "kpi", "callout", "chart", "table", "diagram"):
+                        errors.append(f"{bl}: block.type '{t}' は未対応 — text / kpi / callout / chart / table / diagram")
+                        continue
+                    need = {"text": "points", "kpi": "kpis", "callout": "statement", "chart": "chart",
+                            "table": "table", "diagram": "diagram"}[t]
+                    if not b.get(need):
+                        errors.append(f"{bl}: {t} ブロックに {need} がない")
+                    if t == "kpi" and len(b.get("kpis", [])) > 4:
+                        errors.append(f"{bl}: kpi ブロックは 4 つまで({len(b['kpis'])} つ)")
+                    if t == "table" and b.get("table") and not (b["table"].get("headers") and b["table"].get("rows")):
+                        errors.append(f"{bl}: table に headers と rows がない")
+                    if t == "chart" and isinstance(c.get("span"), int) and c["span"] < 4:
+                        warns.append(f"{bl}: グラフに {c['span']} 列は狭い — 4 列以上(目盛りと凡例が潰れる)")
+            if 1 <= len(rows_) <= 3:
+                _check_fit(errors, warns, loc, s, tokens)
         if pat == "case_strip":
             css = s.get("cases", [])
             if not 2 <= len(css) <= 4:
@@ -957,7 +1096,7 @@ def main() -> int:
     # adjacent-slide monotony: same content pattern back to back reads as a template loop
     prev_pat = None
     for i, s in enumerate(slides, start=1):
-        pat = s.get("pattern")
+        pat = shape_signature(s) if s.get("pattern") else None
         if pat and pat == prev_pat and pat not in STRUCTURAL:
             warns.append(f"slide {i}: 直前のスライドと同じパターン '{pat}' が連続 — 内容が同型でないなら構成を散らす")
         prev_pat = pat

@@ -3399,6 +3399,128 @@ def test_review_edge_cases_for_the_new_patterns(tmp_path):
     assert not dashed                                                       # current=True は添字として扱わない
 
 
+def _composite_slide(**over):
+    sl = {"pattern": "composite", "title": "中堅企業向けの売上は3年で2.1倍、成長の7割は既存顧客の拡大",
+          "subtitle": "セグメント別売上高(億円)",
+          "grid": [
+              {"height": 3, "cells": [
+                  {"span": 7, "block": {"type": "chart", "chart": {"type": "column", "unit": "億円",
+                                        "categories": ["FY23", "FY24", "FY25"], "series": [{"name": "売上", "values": [24, 32, 41]}]}}},
+                  {"span": 5, "block": {"type": "text", "heading": "示唆",
+                                        "points": [{"heading": "既存顧客の拡大が主因", "body": "増分の7割が追加購入"}]}}]},
+              {"height": 1, "cells": [{"span": 12, "block": {"type": "callout", "statement": "上位プラン移行に営業資源を寄せる"}}]}],
+          "source": "社内売上データ(2026年9月)"}
+    sl.update(over)
+    return sl
+
+
+def test_composite_draws_native_blocks_on_the_grid(tmp_path):
+    """グリッド合成: グラフはネイティブのチャート、示唆は同じ行の右、callout は下の行。KPI と表の行も組める。"""
+    from pptx import Presentation
+    kpi_table = _composite_slide(grid=[
+        {"cells": [{"span": 12, "block": {"type": "kpi", "kpis": [
+            {"label": "ARR", "value": "12.8", "unit": "億円", "delta": "+30% YoY", "delta_dir": "up"},
+            {"label": "解約率", "value": "3.2", "unit": "%", "delta": "−1.2pt", "delta_dir": "down"}]}}]},
+        {"height": 2, "cells": [{"span": 12, "block": {"type": "table", "table": {
+            "headers": ["指標", "計画", "実績"], "rows": [["ARR", "12.0億円", "12.8億円"], ["解約率", "3.8%", "3.2%"]]}}}]}],
+        title="ARRは計画を0.8億円上回り、解約率は3.2%に改善")
+    spec = {"meta": {"title": "t"}, "slides": [_composite_slide(), kpi_table]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(spec, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 0, r.stdout
+    assert "同じパターン" not in r.stdout                       # 中身の違う composite は連続しても同型ではない
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0, v.stdout
+    s1, s2 = list(Presentation(out).slides)
+    chart = next(sh for sh in s1.shapes if sh.has_chart)
+    rail = next(sh for sh in s1.shapes if sh.has_text_frame and "既存顧客の拡大が主因" in sh.text_frame.text)
+    call = next(sh for sh in s1.shapes if sh.has_text_frame and "上位プラン移行" in sh.text_frame.text)
+    assert rail.left > chart.left + chart.width and call.top > chart.top + chart.height
+    assert any(sh.has_table for sh in s2.shapes)
+    t2 = "\n".join(sh.text_frame.text for sh in s2.shapes if sh.has_text_frame)
+    assert "−1.2pt" in t2 and "▼ −1.2pt" not in t2               # 全角マイナスも符号(記号を二重にしない)
+
+
+def test_composite_caps_rows_that_cannot_stretch():
+    """テキストと callout だけの行は、重みどおりに伸ばさず中身の 1.3 倍まで。余りは上下中央の余白になる。"""
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import build_deck as B
+    sl = _composite_slide(grid=[
+        {"height": 3, "cells": [{"span": 4, "block": {"type": "text", "points": [{"heading": "論点", "body": "短い"}]}}] * 3},
+        {"height": 1, "cells": [{"span": 12, "block": {"type": "callout", "statement": "11月に決める"}}]}])
+    _, h = B.body_region(sl)
+    L = B._composite_layout(sl, h)
+    for rh, need in zip(L["row_h"], L["needs"]):
+        assert rh <= need * B.LAY["fill"]["stretch_top"] + 1e-6
+    assert L["off"] > 0
+    chart_sl = _composite_slide()
+    Lc = B._composite_layout(chart_sl, h)
+    assert Lc["off"] == 0 and Lc["row_h"][0] > Lc["needs"][0]   # グラフの行は余りを受け取る
+
+
+def test_validate_checks_the_composite(tmp_path):
+    text_only = _composite_slide(grid=[{"cells": [{"span": 12, "block": {"type": "text", "points": ["論点"]}}]}],
+                                 title="論点は価格ではなく導入工数にある", source=None)
+    bad = {"meta": {"title": "t"}, "slides": [
+        _composite_slide(grid=[{"cells": [{"span": 8, "block": {"type": "text", "points": ["a"]}},
+                                          {"span": 6, "block": {"type": "text", "points": ["b"]}}]}]),
+        _composite_slide(grid=[{"cells": [{"span": 12, "block": {"type": "sparkle"}}]}]),
+        _composite_slide(grid=[{"cells": [{"span": 12, "block": {"type": "chart"}}]}]),
+        _composite_slide(grid=[{"cells": [{"span": 6, "block": {"type": "callout", "style": "accent", "statement": "a"}},
+                                          {"span": 6, "block": {"type": "callout", "style": "accent", "statement": "b"}}]}]),
+        _composite_slide(grid=[{"cells": [{"span": 12, "block": {"type": "text", "points": ["a"]}}]}] * 4),
+        _composite_slide(source=None),
+        text_only,
+    ]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(bad, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 1
+    for needle in ("12 列を超える", "'sparkle' は未対応", "chart ブロックに chart がない", "Accent", "1-3 行"):
+        assert needle in r.stdout, (needle, r.stdout)
+    lines = r.stdout.splitlines()
+    assert any("slide 6" in l and ("source" in l or "出所" in l) for l in lines), r.stdout   # グラフを持つ composite は出所が要る
+    assert not any(l.startswith("ERROR: slide 7") for l in lines), r.stdout                  # テキストだけなら定性
+
+
+def test_matrix_gantt_and_harvey_draw_native_shapes(tmp_path):
+    """2x2 は象限カード4枚、ガントはバーと◆と今日の破線、ハーベイは score ごとの扇(PIE)。"""
+    from pptx import Presentation
+    from pptx.enum.shapes import MSO_SHAPE
+    mx = {"pattern": "matrix_2x2", "title": "優先すべきは経理と人事、法務は提携で補う", "subtitle": "優先度",
+          "x_axis": {"label": "実行能力", "low": "低い", "high": "高い"}, "y_axis": {"label": "魅力度", "low": "低い", "high": "高い"},
+          "quadrants": [{"position": p_, "title": t_, "items": ["市場規模1.2兆円"], "focal": p_ == "tr"}
+                        for p_, t_ in (("tr", "経理"), ("tl", "法務"), ("br", "販売"), ("bl", "生産"))],
+          "assumption": "Act戦略チームによる評価"}
+    gt = {"pattern": "gantt", "title": "移行は6カ月、1月に継続を判断する", "subtitle": "ワークプラン",
+          "periods": ["11月", "12月", "1月", "2月"], "today": 0,
+          "tasks": [{"group": "準備"}, {"label": "要件定義", "owner": "経理部", "start": 0, "end": 1},
+                    {"label": "継続判断", "milestone": True, "start": 2}, {"label": "移行", "start": 2, "end": 3, "focal": True}],
+          "assumption": "プロジェクト計画"}
+    hv = {"pattern": "harvey_table", "title": "M&Aが速度と機能で優位、費用は最も重い", "subtitle": "比較",
+          "criteria": ["速さ", "機能", "投資の軽さ"],
+          "options": [{"label": "自社開発", "scores": [1, 2, 3]}, {"label": "M&A", "scores": [4, 4, 0], "focal": True, "verdict": "推奨"}],
+          "assumption": "Act事業計画モデル"}
+    spec = {"meta": {"title": "t"}, "slides": [mx, gt, hv]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(spec, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 0, r.stdout
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0, v.stdout
+    s_mx, s_gt, s_hv = list(Presentation(out).slides)
+    assert sum(1 for sh in s_mx.shapes if sh.name == "card") == 4
+    autos = [sh for sh in s_gt.shapes if sh.shape_type == 1]
+    assert sum(1 for sh in autos if sh.auto_shape_type == MSO_SHAPE.DIAMOND) == 1
+    dashed = [sh for sh in s_gt.shapes if sh.shape_type == 9
+              and sh.line._get_or_add_ln().find("{http://schemas.openxmlformats.org/drawingml/2006/main}prstDash") is not None]
+    assert len(dashed) == 1
+    pies = [sh for sh in s_hv.shapes if sh.shape_type == 1 and sh.auto_shape_type == MSO_SHAPE.PIE]
+    assert len(pies) == 6              # 表の score 1・2・3 で3枚 + 凡例の 1・2・3 で3枚(0 と 4 は扇を持たない)
+
+
 def test_stacked_100_and_stacked_bar_are_native_chart_types(tmp_path):
     from pptx import Presentation
     spec = {"meta": {"title": "t"}, "slides": [

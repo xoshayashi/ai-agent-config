@@ -794,7 +794,9 @@ def _kpi_delta_text(k: dict) -> str:
     reserves the right number of lines and never collides with the note below it."""
     delta_text = str(k.get("delta", "")).lstrip()
     is_comparison_text = delta_text.startswith(("前年同期", "前期", "業界", "目標", "計画", "中央値"))
-    arrow = "" if delta_text.startswith(("+", "-", "△", "▲", "▼")) or is_comparison_text else \
+    # 符号には全角のマイナス(U+2212)も含める — 和文の資料では「−1.2pt」が普通に書かれ、
+    # 外すと「▼ −1.2pt」と記号が二重になる
+    arrow = "" if delta_text.startswith(("+", "-", "−", "△", "▲", "▼")) or is_comparison_text else \
         {"up": "▲ ", "down": "▼ "}.get(k.get("delta_dir"), "")
     return arrow + delta_text
 
@@ -3631,6 +3633,525 @@ def p_case_strip(slide, spec, deck):
             stack_block(slide, cx_ + pad, ry + RG, text_w, stack_optical_height(body, text_w), body)
 
 
+# ---------------------------------------------------------------- composite (grid of blocks)
+#
+# 戦略ファームのページの大半は「型」ではなく、12列グリッド上の領域の組み合わせでできている
+# (グラフ7列+示唆5列、KPI 3つの帯+表、論点カード3枚+so-what の帯 …)。composite はその組み合わせを
+# そのまま書く: grid = 行の並び、行 = セルの並び(span は 12 列の取り分)、セル = 1 つのブロック。
+# ブロックは既存の矩形プリミティブ(add_act_chart / add_act_table / place_asset / stack_block)を
+# 呼ぶだけなので、どの組み合わせも編集可能なネイティブ図形で組める。
+
+COMPOSITE_BLOCKS = ("text", "kpi", "callout", "chart", "table", "diagram")
+BLOCK_HEAD_H = 0.5          # 見出し(16pt)+ 罫。要点レール(_takeaways_rail)と同じ文法
+CHART_MIN_H = 1.8           # これより低いグラフは軸と目盛りで潰れる
+CALLOUT_PAD = 0.20
+
+
+def _blk_heading(slide, x, y, w, heading) -> float:
+    """ブロック見出し(主色 16pt + 罫)。描いた高さを返す。見出しが無ければ 0。"""
+    if not heading:
+        return 0.0
+    add_text(slide, x, y, w, 0.3, [[(heading, 16, 600, C["primary_deep"])]])
+    add_line(slide, x, y + 0.34, x + w, y + 0.34, C["rule"], 0.75)
+    return BLOCK_HEAD_H
+
+
+def _kpi_blocks(k: dict) -> list[dict]:
+    """KPI 1つ: ラベル → 値 + 単位 → 増減 → 注記。1つのテキストボックスに積む。"""
+    gap = OPT["gap_in"]
+    blocks = [{"parts": [(k.get("label", ""), TS["kpi_label"], 600, C["ink_subtle"])], "size": TS["kpi_label"], "kind": "text"}]
+    vpt = TS["kpi_value"]
+    vparts = [(str(k.get("value", "")), vpt, 700, C["primary_deep"])]
+    if k.get("unit"):
+        vparts.append(_unit_part(k["unit"], 17))
+    blocks.append({"parts": vparts, "size": vpt, "kind": "numeral", "gap_before": gap["metric_subline"],
+                   "gap_name": "kpi_value"})
+    if k.get("delta") not in (None, ""):
+        blocks.append({"parts": [(_kpi_delta_text(k), TS["kpi_sub"], 600,
+                                  _delta_color(k.get("delta_dir"), k.get("positive_is_good", True)))],
+                       "size": TS["kpi_sub"], "kind": "text", "gap_before": gap["metric_subline"], "gap_name": "kpi_delta"})
+    if k.get("note"):
+        blocks.append({"parts": [(k["note"], TS["body_small"], 400, C["ink_subtle"])], "size": TS["body_small"],
+                       "kind": "text", "gap_before": gap["heading_body"], "gap_name": "kpi_note"})
+    return blocks
+
+
+def _kpi_horizontal(b: dict, w: float, h: float) -> bool:
+    """KPI を横に並べるか。横長のセル(帯)なら横、縦長(サイドレール)なら縦に積む。"""
+    if b.get("direction") in ("row", "column"):
+        return b["direction"] == "row"
+    return w >= h * 1.6
+
+
+def _callout_fill(style: str):
+    return {"primary": (C["primary_pale"], C["primary_deep"], C["primary"]),
+            "accent": (C["accent_pale"], C["ink"], C["accent_line"]),
+            "navy": (C["navy"], C["canvas"], None)}.get(style, (C["primary_pale"], C["primary_deep"], C["primary"]))
+
+
+def _callout_blocks(b: dict, ink) -> list[dict]:
+    blocks = []
+    if b.get("heading"):
+        blocks.append({"parts": [(b["heading"], TS["kpi_sub"], 700, ink)], "size": TS["kpi_sub"], "kind": "text"})
+    blocks.append({"parts": [(b.get("statement", ""), TS["insight"], 600, ink)], "size": TS["insight"], "kind": "text",
+                   "gap_before": OPT["gap_in"]["heading_body"] if blocks else 0.0, "gap_name": "callout"})
+    return blocks
+
+
+def block_need_h(b: dict, w: float, h: float | None = None) -> float:
+    """ブロックが最低限必要とする高さ(in)。行の高さ配分と validate の溢れ判定が共有する。
+    グラフ・図は下限(CHART_MIN_H)、表は1行ずつの最小行高から見積もる。"""
+    t = b.get("type")
+    head = BLOCK_HEAD_H if b.get("heading") and t not in ("callout",) else 0.0
+    pad = 0.24 if b.get("style") == "card" else 0.0
+    if t == "text":
+        return head + _stack_drawn_h(_rail_blocks(b.get("points", [])), w - 2 * pad) + 2 * pad
+    if t == "kpi":
+        ks = b.get("kpis", [])
+        if not ks:
+            return head
+        if _kpi_horizontal(b, w, h if h is not None else w):
+            kw = (w - LAY["gutter_in"] * (len(ks) - 1)) / len(ks)
+            return head + max(_stack_drawn_h(_kpi_blocks(k), kw) for k in ks)
+        return head + sum(_stack_drawn_h(_kpi_blocks(k), w) for k in ks) + 0.36 * (len(ks) - 1)
+    if t == "callout":
+        _f, ink, bar = _callout_fill(b.get("style", "primary"))
+        return _stack_drawn_h(_callout_blocks(b, ink), w - 2 * CALLOUT_PAD - (0.10 if bar else 0)) + 2 * CALLOUT_PAD
+    if t in ("chart", "diagram"):
+        return head + CHART_MIN_H
+    if t == "table":
+        tb = b.get("table") or {}
+        row_h = TS["table_cell"] / 72.0 * 1.34 * 1.13 + 0.30      # add_act_table の1行の最小高
+        return head + row_h * (len(tb.get("rows", [])) + 1)
+    return head
+
+
+def _composite_layout(spec: dict, h: float) -> dict:
+    """行の高さ配分とセルの矩形。行の高さは height(重み、既定 1)で本文帯を分けるが、
+    中身が要る高さ(block_need_h)を下回る行は必要高に上げ、残りを他の行で分け直す。"""
+    rows = spec.get("grid", [])[:3]
+    GAP = 0.26
+    avail = h - 0.10 - GAP * max(0, len(rows) - 1)
+    cells_xywh = []          # 行ごとの [(x, w, block)]
+    needs = []
+    for r in rows:
+        col = 0
+        cells = []
+        for c in r.get("cells", [])[:4]:
+            span = int(c.get("span", 12 // max(1, len(r.get("cells", [])))))
+            cx_, cw_ = grid(col, span)
+            cells.append((cx_, cw_, c.get("block") or {}))
+            col += span
+        cells_xywh.append(cells)
+    weights = [float(r.get("height", 1)) for r in rows]
+    # 必要高の判定はセルの高さに依る(KPI の縦横)ので、重みで割った仮の高さで一度測る
+    share = [avail * wt / (sum(weights) or 1) for wt in weights]
+    needs = [max((block_need_h(b, cw_, share[i]) for _x, cw_, b in cells), default=0.0)
+             for i, cells in enumerate(cells_xywh)]
+    fixed: dict[int, float] = {}
+    for _ in range(len(rows)):
+        free = [i for i in range(len(rows)) if i not in fixed]
+        rest = avail - sum(fixed.values())
+        wsum = sum(weights[i] for i in free) or 1
+        grown = False
+        for i in free:
+            if rest * weights[i] / wsum < needs[i]:
+                fixed[i] = needs[i]
+                grown = True
+        if not grown:
+            break
+    free = [i for i in range(len(rows)) if i not in fixed]
+    rest = avail - sum(fixed.values())
+    wsum = sum(weights[i] for i in free) or 1
+    row_h = [fixed.get(i, rest * weights[i] / wsum) for i in range(len(rows))]
+    # 伸びて困る行の上限: グラフ・表・図を持たない行(テキスト・KPI・callout だけ)は、中身の
+    # stretch_top 倍までしか育てない — 重みどおりに伸ばすと上寄せの本文の下が空洞になる。
+    # 余った高さは伸ばせる行へ重みで配り、伸ばせる行が無ければ全体を上下中央に置く(fit_band と同じ占有契約)
+    stretchy = [any(b.get("type") in ("chart", "table", "diagram") for _x, _w, b in cells) for cells in cells_xywh]
+    caps = [float("inf") if stretchy[i] else max(needs[i], needs[i] * LAY["fill"]["stretch_top"])
+            for i in range(len(rows))]
+    spare = sum(max(0.0, rh - cap) for rh, cap in zip(row_h, caps))
+    row_h = [min(rh, cap) for rh, cap in zip(row_h, caps)]
+    grow = [i for i in range(len(rows)) if stretchy[i]]
+    if spare > 0 and grow:
+        gw = sum(weights[i] for i in grow) or 1
+        for i in grow:
+            row_h[i] += spare * weights[i] / gw
+        spare = 0.0
+    off = spare / 2
+    overflow = sum(needs) > avail + 1e-6
+    if overflow:
+        k = avail / max(1e-6, sum(row_h))
+        row_h = [rh * k for rh in row_h]
+        off = 0.0
+    return dict(rows=rows, cells=cells_xywh, row_h=row_h, needs=needs, GAP=GAP, avail=avail, off=off,
+                overflow=overflow, need_h=sum(needs) + GAP * max(0, len(rows) - 1))
+
+
+def _draw_block(slide, x, y, w, h, b: dict) -> None:
+    t = b.get("type")
+    if t == "callout":
+        fill, ink, bar = _callout_fill(b.get("style", "primary"))
+        add_rect(slide, x, y, w, h, fill, radius_pt=4)
+        inset = CALLOUT_PAD
+        if bar:
+            add_rect(slide, x, y, 0.08, h, bar)
+            inset += 0.10
+        blocks = _callout_blocks(b, ink)
+        stack_block(slide, x + inset, y + CALLOUT_PAD, w - inset - CALLOUT_PAD, h - 2 * CALLOUT_PAD, blocks)
+        return
+    card = b.get("style") == "card"
+    if card:
+        add_rect(slide, x, y, w, h, C["surface_tint"], radius_pt=LAY["card"]["radius_pt"], name="card")
+        x, y, w, h = x + 0.24, y + 0.24, w - 0.48, h - 0.48
+    y_head = _blk_heading(slide, x, y, w, b.get("heading"))
+    y, h = y + y_head, h - y_head
+    if t == "text":
+        blocks = _rail_blocks(b.get("points", []))
+        if blocks:
+            stack_block(slide, x, y, w, stack_optical_height(blocks, w), blocks)     # 上寄せ: 隣のグラフ上端とそろう
+    elif t == "kpi":
+        ks = b.get("kpis", [])
+        if not ks:
+            return
+        if _kpi_horizontal(b, w, h):
+            gut = LAY["gutter_in"]
+            kw = (w - gut * (len(ks) - 1)) / len(ks)
+            for i, k in enumerate(ks):
+                kx = x + i * (kw + gut)
+                if i:
+                    add_line(slide, kx - gut / 2, y + 0.04, kx - gut / 2, y + h - 0.04, C["rule"], 0.5)
+                blocks = _kpi_blocks(k)
+                stack_block(slide, kx, y, kw, h, blocks)
+        else:
+            hs = [_stack_drawn_h(_kpi_blocks(k), w) for k in ks]
+            slack = max(0.0, h - sum(hs)) / len(ks)
+            yy = y
+            for i, (k, kh) in enumerate(zip(ks, hs)):
+                slot = kh + slack
+                if i:
+                    add_line(slide, x, yy, x + w, yy, C["rule"], 0.5)
+                stack_block(slide, x, yy, w, slot, _kpi_blocks(k))
+                yy += slot
+    elif t == "chart":
+        ch = b.get("chart") or {}
+        if _asset_kind(ch):
+            place_asset(slide, ch, x, y, w, h)
+        else:
+            add_unit_note(slide, x, y, ch.get("unit"))
+            add_act_chart(slide, x, y + 0.22, w, h - 0.22, ch)
+            add_chart_annotations(slide, x, y + 0.22, w, h - 0.22, ch)
+    elif t == "table":
+        add_act_table(slide, x, y, w, h, b.get("table") or {})
+    elif t == "diagram":
+        place_asset(slide, b.get("diagram") or {}, x, y, w, h)
+
+
+def p_composite(slide, spec, deck):
+    """グリッド合成: grid の各行を本文帯の高さで分け、各セルにブロックを描く。行の間は 0.26in、
+    セルの間は 12 列グリッドの溝。行に rules: true を付けると、セルの間に細い縦罫を引く。"""
+    y0, h = body_region(spec)
+    L = _composite_layout(spec, h)
+    if not L["rows"]:
+        return
+    if L["overflow"]:
+        print(f"WARN: composite の行が本文帯に収まらない({L['need_h']:.2f}in > {h - 0.10:.2f}in) — "
+              "ブロックの中身を減らすか、行を減らす")
+    y = y0 + 0.05 + L["off"]
+    for r, cells, rh in zip(L["rows"], L["cells"], L["row_h"]):
+        for j, (cx_, cw_, b) in enumerate(cells):
+            if j and r.get("rules"):
+                gx = cx_ - LAY["gutter_in"] / 2
+                add_line(slide, gx, y, gx, y + rh, C["rule"], 0.75)
+            _draw_block(slide, cx_, y, cw_, rh, b)
+        y += rh + L["GAP"]
+
+
+# ---------------------------------------------------------------- matrix_2x2 (quadrant text)
+
+QUADRANT_POS = ("tl", "tr", "bl", "br")
+
+
+def _quadrant_blocks(q: dict, focal: bool) -> list[dict]:
+    """象限1つ: 名前(太字) → 項目。名前の前に記号(tag、「Star」「S」など)を置ける。"""
+    gap = OPT["gap_in"]
+    parts = []
+    if q.get("tag"):
+        parts.append((f"{q['tag']}  ", RAIL_HEAD_PT, 700, C["primary"]))
+    parts.append((q.get("title", ""), RAIL_HEAD_PT, 700 if focal else 600, C["primary_deep"] if focal else C["ink"]))
+    blocks = [{"parts": parts, "size": RAIL_HEAD_PT, "kind": "text"}]
+    for i, it in enumerate(q.get("items", [])):
+        blocks.append({"parts": [(str(it), TS["body"], 400, C["ink_subtle"])], "size": TS["body"], "kind": "text",
+                       "gap_before": gap["heading_body"] if i == 0 else gap["item"] * 0.6,
+                       "gap_name": "q_first" if i == 0 else "q_item"})
+    return blocks
+
+
+def _matrix_2x2_layout(spec: dict, h: float) -> dict:
+    """2x2 の寸法。軸があれば左に縦軸の水準、下に横軸の水準と題を置き、残りを4象限で分ける。"""
+    xa, ya = spec.get("x_axis") or {}, spec.get("y_axis") or {}
+    has_axes = bool(xa or ya)
+    x, w = grid(0, 12)
+    ax_pt = TS["chart_axis"]
+    lab_h = drawn_line_h(ax_pt)
+    left = (max(_label_w(str(ya.get(k, "")), ax_pt, 600) for k in ("low", "high")) + 0.30) if ya else 0.0
+    top_pad = (lab_h + 0.10) if ya.get("label") else 0.0
+    bottom = (lab_h + 0.10) if xa else 0.0     # 横軸は1行: 低い(左の象限の下)… 題 → … 高い(右の象限の下)
+    GAP = 0.14
+    gx, gw = x + left, w - left
+    gh = h - 0.10 - top_pad - bottom
+    qw, qh = (gw - GAP) / 2, (gh - GAP) / 2
+    quads = {q.get("position"): q for q in spec.get("quadrants", [])[:4]}
+    pad = 0.20
+    blocks = {pos: _quadrant_blocks(q, bool(q.get("focal"))) for pos, q in quads.items()}
+    needs = {pos: _stack_drawn_h(b, qw - 2 * pad) + 2 * pad for pos, b in blocks.items()}
+    need_h = top_pad + bottom + GAP + 2 * max(needs.values(), default=0.0)
+    return dict(xa=xa, ya=ya, has_axes=has_axes, x=x, w=w, gx=gx, gw=gw, gh=gh, qw=qw, qh=qh, GAP=GAP,
+                left=left, top_pad=top_pad, bottom=bottom, lab_h=lab_h, ax_pt=ax_pt, quads=quads, pad=pad,
+                blocks=blocks, needs=needs, need_h=need_h, overflow=need_h > h - 0.10 + 1e-6)
+
+
+def p_matrix_2x2(slide, spec, deck):
+    """2x2 の象限マトリクス(SWOT、優先度、BCG 型の事業ポートフォリオ、選択肢の整理)。
+    competitive_landscape が「点を置く」地図なのに対し、こちらは「象限ごとに中身を書く」。
+    軸(x_axis / y_axis)は任意: SWOT のように軸の無い 2x2 は象限の名前だけで読ませる。
+    focal の象限は淡い主色で立てる(推奨の打ち手、狙う領域)。"""
+    y0, h = body_region(spec)
+    L = _matrix_2x2_layout(spec, h)
+    if L["overflow"]:
+        print(f"WARN: 象限の中身が本文帯に収まらない({L['need_h']:.2f}in > {h - 0.10:.2f}in) — 項目を減らす")
+    top = y0 + 0.05 + L["top_pad"]
+    xa, ya, ax_pt, lab_h = L["xa"], L["ya"], L["ax_pt"], L["lab_h"]
+    if ya.get("label"):
+        add_text(slide, L["x"], y0 + 0.05, L["w"], lab_h, [[(f"{ya['label']} ↑", ax_pt, 600, C["ink_subtle"])]])
+    for pos in QUADRANT_POS:
+        q = L["quads"].get(pos)
+        col, row = (0 if pos[1] == "l" else 1), (0 if pos[0] == "t" else 1)
+        qx = L["gx"] + col * (L["qw"] + L["GAP"])
+        qy = top + row * (L["qh"] + L["GAP"])
+        focal = bool(q and q.get("focal"))
+        add_rect(slide, qx, qy, L["qw"], L["qh"], C["primary_pale"] if focal else C["surface_tint"],
+                 line=C["primary"] if focal else None, line_w_pt=1.25, radius_pt=LAY["card"]["radius_pt"], name="card")
+        if q:
+            b = L["blocks"][pos]
+            stack_block(slide, qx + L["pad"], qy + L["pad"], L["qw"] - 2 * L["pad"],
+                        stack_optical_height(b, L["qw"] - 2 * L["pad"]), b)
+    if ya:
+        for k, row in (("high", 0), ("low", 1)):
+            if ya.get(k):
+                add_text(slide, L["x"], top + row * (L["qh"] + L["GAP"]), L["left"] - 0.16, L["qh"],
+                         [[(str(ya[k]), ax_pt, 600, C["ink_subtle"])]], align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE)
+    if xa:
+        by = top + L["gh"] + 0.08
+        lo_w = _label_w(str(xa.get("low", "")), ax_pt, 600) + 0.04
+        hi_w = _label_w(str(xa.get("high", "")), ax_pt, 600) + 0.04
+        add_text(slide, L["gx"], by, lo_w, lab_h, [[(str(xa.get("low", "")), ax_pt, 600, C["ink_subtle"])]])
+        add_text(slide, L["gx"] + L["gw"] - hi_w, by, hi_w, lab_h,
+                 [[(str(xa.get("high", "")), ax_pt, 600, C["ink_subtle"])]], align=PP_ALIGN.RIGHT)
+        if xa.get("label"):
+            add_text(slide, L["gx"] + lo_w + 0.2, by, L["gw"] - lo_w - hi_w - 0.4, lab_h,
+                     [[(f"{xa['label']} →", ax_pt, 600, C["ink_subtle"])]], align=PP_ALIGN.CENTER)
+
+
+# ---------------------------------------------------------------- gantt (workplan)
+
+def _gantt_layout(spec: dict, h: float) -> dict:
+    """ガントの寸法: タスク名 3 列 | 担当 2 列(誰かに担当があるときだけ)| 期間(残り)を等分。
+    担当をタスク名の下に積むと1行が2段になり、8行で本文帯を超える — 列に分けて1段で読ませる。"""
+    periods = spec.get("periods", [])[:12]
+    tasks = spec.get("tasks", [])[:12]
+    has_owner = any(t.get("owner") for t in tasks)
+    lx, lw = grid(0, 3)
+    ox, ow = grid(3, 2) if has_owner else (None, 0.0)
+    tx, tw = grid(5, 7) if has_owner else grid(3, 9)
+    pw = tw / max(1, len(periods))
+    HEAD_H = drawn_line_h(TS["kpi_sub"]) + 0.22
+    lab_pt, own_pt = TS["body_small"], TS["kpi_sub"]
+    row_need = []
+    for t in tasks:
+        n_lab = _text_lines(str(t.get("label") or t.get("group", "")), lw - 0.12, lab_pt, 700 if t.get("group") else 400)
+        n_own = _text_lines(str(t.get("owner", "")), ow - 0.12, own_pt, 400) if t.get("owner") else 0
+        row_need.append(max(n_lab * drawn_line_h(lab_pt), n_own * drawn_line_h(own_pt)) + 0.12)
+    row_h = max(row_need, default=0.4)
+    avail = h - 0.10 - HEAD_H - 0.30            # 下に「現在」の札
+    need_h = HEAD_H + 0.30 + row_h * len(tasks)
+    if tasks and row_h * len(tasks) < avail:
+        row_h = min(avail / len(tasks), max(row_h, 0.56))   # 行は 0.56in まで育てる(それ以上は間延び)
+    if tasks and need_h > h - 0.10:
+        row_h = max(0.2, avail / len(tasks))     # 入らない: 行を縮めて図形を帯に留める(溢れは validate が名指し)
+    off = max(0.0, (h - 0.10 - (HEAD_H + 0.30 + row_h * len(tasks))) / 2)
+    return dict(off=off, periods=periods, tasks=tasks, lx=lx, lw=lw, ox=ox, ow=ow, tx=tx, tw=tw, pw=pw, HEAD_H=HEAD_H,
+                row_h=row_h, lab_pt=lab_pt, own_pt=own_pt, need_h=need_h, overflow=need_h > h - 0.10 + 1e-6)
+
+
+def p_gantt(slide, spec, deck):
+    """ワークプラン(ガント): 期間の列に、タスクのバーとマイルストーン(◆)を置く。
+    roadmap は段階の中身、milestone_timeline は判断の時期、gantt は「誰が・いつからいつまで」。
+    group の行は太字の見出し行(バー無し)。focal のタスクは濃い主色、today(期間の添字)に縦の破線。"""
+    y0, h = body_region(spec)
+    L = _gantt_layout(spec, h)
+    if not L["periods"] or not L["tasks"]:
+        return
+    if L["overflow"]:
+        print(f"WARN: ガントの行が本文帯に収まらない({L['need_h']:.2f}in > {h - 0.10:.2f}in) — タスクを束ねる")
+    top = y0 + 0.05 + L["off"]
+    tx, pw, row_h, HEAD_H = L["tx"], L["pw"], L["row_h"], L["HEAD_H"]
+    right = tx + L["tw"]
+    body_h = row_h * len(L["tasks"])
+    if L["ox"] is not None:
+        add_text(slide, L["ox"] + 0.06, top, L["ow"] - 0.12, HEAD_H,
+                 [[(spec.get("owner_label", "担当"), TS["kpi_sub"], 600, C["ink_subtle"])]], anchor=MSO_ANCHOR.MIDDLE)
+    for i, p in enumerate(L["periods"]):
+        px = tx + i * pw
+        add_text(slide, px, top, pw, HEAD_H, [[(str(p), TS["kpi_sub"], 600, C["ink_subtle"])]],
+                 align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE, wrap=False)
+        add_line(slide, px, top + HEAD_H, px, top + HEAD_H + body_h, C["rule"], 0.5)
+    add_line(slide, L["lx"], top + HEAD_H, right, top + HEAD_H, C["ink_faint"], 0.75)
+    yy = top + HEAD_H
+    for t in L["tasks"]:
+        if t.get("group"):
+            add_rect(slide, L["lx"], yy, right - L["lx"], row_h, C["surface_tint"])
+            add_text(slide, L["lx"] + 0.06, yy, L["lw"] - 0.12, row_h, [[(t["group"], L["lab_pt"], 700, C["ink"])]],
+                     anchor=MSO_ANCHOR.MIDDLE)
+            yy += row_h
+            continue
+        focal = bool(t.get("focal"))
+        add_text(slide, L["lx"] + 0.06, yy, L["lw"] - 0.12, row_h,
+                 [[(str(t.get("label", "")), L["lab_pt"], 600 if focal else 400, C["ink"])]], anchor=MSO_ANCHOR.MIDDLE)
+        if t.get("owner") and L["ox"] is not None:
+            add_text(slide, L["ox"] + 0.06, yy, L["ow"] - 0.12, row_h,
+                     [[(str(t["owner"]), L["own_pt"], 400, C["ink_subtle"])]], anchor=MSO_ANCHOR.MIDDLE)
+        if t.get("milestone"):
+            mi = int(t.get("start", 0))
+            d = min(0.30, row_h * 0.6)
+            _timeline_marker(slide, tx + (mi + 0.5) * pw, yy + row_h / 2, d, diamond=True,
+                             fill=C["primary_deep"] if focal else C["primary"])
+        else:
+            s0, e0 = int(t.get("start", 0)), int(t.get("end", t.get("start", 0)))
+            bh = min(0.24, row_h * 0.45)
+            add_rect(slide, tx + s0 * pw + 0.05, yy + (row_h - bh) / 2, (e0 - s0 + 1) * pw - 0.10, bh,
+                     C["primary_deep"] if focal else C["primary"], radius_pt=3)
+        add_line(slide, L["lx"], yy + row_h, right, yy + row_h, C["rule"], 0.5)
+        yy += row_h
+    today = spec.get("today")
+    if isinstance(today, (int, float)) and not isinstance(today, bool) and 0 <= today < len(L["periods"]):
+        tx_ = tx + (today + 0.5) * pw
+        add_line(slide, tx_, top + HEAD_H, tx_, top + HEAD_H + body_h, C["danger"], 1.25, dash="dash")
+        lab = spec.get("today_label", "現在")
+        lw_ = _label_w(lab, TS["kpi_sub"], 600) + 0.04
+        add_text(slide, tx_ - lw_ / 2, top + HEAD_H + body_h + 0.04, lw_, drawn_line_h(TS["kpi_sub"]),
+                 [[(lab, TS["kpi_sub"], 600, C["danger"])]], align=PP_ALIGN.CENTER)
+
+
+# ---------------------------------------------------------------- harvey_table
+
+def _harvey_ball(slide, cx, cy, d, score: int, color) -> None:
+    """ハーベイボール(0-4): 輪郭の円 + 12 時から時計回りに score/4 の扇。4 は塗りの円。"""
+    o = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(cx - d / 2), Inches(cy - d / 2), Inches(d), Inches(d))
+    o.line.color.rgb = color
+    o.line.width = Pt(1.25)
+    if score >= 4:
+        o.fill.solid()
+        o.fill.fore_color.rgb = color
+    else:
+        o.fill.solid()
+        o.fill.fore_color.rgb = C["canvas"]
+    o.shadow.inherit = False
+    _strip_style(o)
+    if 0 < score < 4:
+        p = slide.shapes.add_shape(MSO_SHAPE.PIE, Inches(cx - d / 2), Inches(cy - d / 2), Inches(d), Inches(d))
+        # python-pptx の角度調整値は「度 × 0.6」(OOXML の 60000 分の 1 度を 100000 で割った値)
+        p.adjustments[0] = 270 * 0.6
+        p.adjustments[1] = ((270 + score * 90) % 360) * 0.6
+        p.fill.solid()
+        p.fill.fore_color.rgb = color
+        p.line.fill.background()
+        p.shadow.inherit = False
+        _strip_style(p)
+
+
+def _harvey_layout(spec: dict, h: float) -> dict:
+    crit = spec.get("criteria", [])[:6]
+    opts = spec.get("options", [])[:6]
+    lx, lw = grid(0, 3)
+    has_total = any(o.get("verdict") for o in opts)
+    vx, vw = grid(10, 2) if has_total else (None, 0.0)
+    cx0, cw_all = grid(3, 7 if has_total else 9)
+    colw = cw_all / max(1, len(crit))
+    head_pt = TS["kpi_sub"]
+    HEAD_H = max(_text_lines(str(c), colw - 0.10, head_pt, 600, "label") for c in crit) * drawn_line_h(head_pt) + 0.22 if crit else 0.4
+    lab_need = [(_text_lines(str(o.get("label", "")), lw - 0.24, RAIL_HEAD_PT, 600)) * drawn_line_h(RAIL_HEAD_PT)
+                + (drawn_line_h(TS["kpi_sub"]) if o.get("note") else 0.0) + 0.16 for o in opts]
+    row_h = max(lab_need + [0.62])
+    need_h = HEAD_H + row_h * len(opts) + 0.40
+    avail = h - 0.10 - HEAD_H - 0.40
+    if opts and row_h * len(opts) < avail:
+        row_h = min(avail / len(opts), max(row_h, 0.78))
+    if opts and need_h > h - 0.10:
+        row_h = max(0.3, (h - 0.10 - HEAD_H - 0.46) / len(opts))   # 入らない: 行を縮めて帯に留める
+    used = HEAD_H + 0.06 + row_h * len(opts) + 0.40
+    off = max(0.0, (h - 0.10 - used) / 2)          # 表が短いときは本文帯の上下中央へ(上に貼り付けない)
+    return dict(crit=crit, off=off, opts=opts, lx=lx, lw=lw, cx0=cx0, colw=colw, vx=vx, vw=vw, HEAD_H=HEAD_H,
+                row_h=row_h, head_pt=head_pt, need_h=need_h, overflow=need_h > h - 0.10 + 1e-6)
+
+
+def p_harvey_table(slide, spec, deck):
+    """ハーベイボールの比較表: 選択肢(行)× 評価軸(列)を 0-4 の塗りで比べる。数値の表より
+    「どれがどの軸で強いか」が一目で読める。verdict(右端の総合評価)を持てる。focal の選択肢
+    (推奨案)は行を淡い主色にする。凡例(○ 0 … ● 4 の意味)は legend で書く。"""
+    y0, h = body_region(spec)
+    L = _harvey_layout(spec, h)
+    if not L["crit"] or not L["opts"]:
+        return
+    if L["overflow"]:
+        print(f"WARN: ハーベイ表が本文帯に収まらない({L['need_h']:.2f}in > {h - 0.10:.2f}in) — 選択肢を減らす")
+    top = y0 + 0.05 + L["off"]
+    HEAD_H, row_h, colw = L["HEAD_H"], L["row_h"], L["colw"]
+    right = (L["vx"] + L["vw"]) if L["vx"] is not None else (L["cx0"] + colw * len(L["crit"]))
+    for j, c in enumerate(L["crit"]):
+        add_text(slide, L["cx0"] + j * colw + 0.05, top, colw - 0.10, HEAD_H,
+                 [[(str(c), L["head_pt"], 600, C["ink_subtle"])]], align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.BOTTOM,
+                 wrap_role="label")
+    if L["vx"] is not None:
+        add_text(slide, L["vx"], top, L["vw"], HEAD_H, [[(spec.get("verdict_label", "総合評価"), L["head_pt"], 600, C["ink_subtle"])]],
+                 align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.BOTTOM)
+    add_line(slide, L["lx"], top + HEAD_H + 0.06, right, top + HEAD_H + 0.06, C["ink_faint"], 0.75)
+    yy = top + HEAD_H + 0.06
+    d = min(0.42, row_h * 0.55, colw * 0.5)
+    for o in L["opts"]:
+        focal = bool(o.get("focal"))
+        if focal:
+            add_rect(slide, L["lx"], yy, right - L["lx"], row_h, C["primary_pale"])
+        paras = [[(str(o.get("label", "")), RAIL_HEAD_PT, 700 if focal else 600, C["primary_deep"] if focal else C["ink"])]]
+        if o.get("note"):
+            paras.append([(str(o["note"]), TS["kpi_sub"], 400, C["ink_subtle"])])
+        add_text(slide, L["lx"] + 0.12, yy, L["lw"] - 0.24, row_h, paras, anchor=MSO_ANCHOR.MIDDLE)
+        for j, sc in enumerate((o.get("scores") or [])[:len(L["crit"])]):
+            _harvey_ball(slide, L["cx0"] + (j + 0.5) * colw, yy + row_h / 2, d, int(sc),
+                         C["primary_deep"] if focal else C["primary"])
+        if L["vx"] is not None and o.get("verdict"):
+            add_text(slide, L["vx"], yy, L["vw"], row_h, [[(str(o["verdict"]), RAIL_HEAD_PT, 700,
+                                                             C["primary_deep"] if focal else C["ink"])]],
+                     align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE)
+        yy += row_h
+        add_line(slide, L["lx"], yy, right, yy, C["rule"], 0.5)
+    # 凡例は文字(◔ ◕)ではなく同じ図形で描く — 和文フォントに 1/4・3/4 の円の字形が無いことがある
+    lo, hi = spec.get("legend_low", "弱い"), spec.get("legend_high", "強い")
+    pt = TS["kpi_sub"]
+    ld = 0.20
+    hi_w = _label_w(hi, pt, 400)
+    lo_w = _label_w(lo, pt, 400)
+    ly = yy + 0.12 + ld / 2
+    x_hi = right - hi_w
+    add_text(slide, x_hi, ly - drawn_line_h(pt) / 2, hi_w, drawn_line_h(pt), [[(hi, pt, 400, C["ink_subtle"])]])
+    bx = x_hi - 0.10 - ld / 2
+    for sc in (4, 3, 2, 1, 0):
+        _harvey_ball(slide, bx, ly, ld, sc, C["primary"])
+        bx -= ld + 0.08
+    add_text(slide, bx + ld / 2 + 0.08 - 0.10 - lo_w, ly - drawn_line_h(pt) / 2, lo_w, drawn_line_h(pt),
+             [[(lo, pt, 400, C["ink_subtle"])]])
+
+
 RISK_LEVELS = {"y": ["低", "中", "高"], "x": ["小", "中", "大"]}
 
 
@@ -3920,6 +4441,10 @@ PATTERNS = {
     "hub_spoke": p_hub_spoke,
     "before_after": p_before_after,
     "case_strip": p_case_strip,
+    "composite": p_composite,
+    "matrix_2x2": p_matrix_2x2,
+    "gantt": p_gantt,
+    "harvey_table": p_harvey_table,
     "cover": p_cover,
     "agenda": p_agenda,
     "section_divider": p_section_divider,
