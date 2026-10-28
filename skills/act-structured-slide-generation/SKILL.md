@@ -494,7 +494,7 @@ Use:
 ```bash
 PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests -p no:cacheprovider
 python3 scripts/stress_deck.py -o /tmp/stress --images     # every pattern at min / max / overload, all templates via --template
-python3 /Users/sh/.claude/plugins/marketplaces/claude-plugins-official/plugins/skill-creator/skills/skill-creator/scripts/quick_validate.py .
+python3 ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/skill-creator/skills/skill-creator/scripts/quick_validate.py .
 ```
 
 After touching a renderer, rebuild and render the three example decks and read the contact

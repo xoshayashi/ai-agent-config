@@ -22,6 +22,7 @@ import argparse
 import json
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
@@ -389,7 +390,9 @@ def run_variant(outdir: Path, variant: str, template: str | None, images: bool,
 
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("-o", "--out", type=Path, default=Path("stress"))
+    # 既定の出力先は一時ディレクトリ。カレント(スキルの中で実行すると skills/…/stress/)に書くと、
+    # 7MB の生成物がリポジトリの未追跡ファイルとして残る
+    ap.add_argument("-o", "--out", type=Path, default=Path(tempfile.gettempdir()) / "act-stress")
     ap.add_argument("--variant", choices=[*VARIANTS, "all"], default="all")
     ap.add_argument("--template", default=None)
     ap.add_argument("--images", action="store_true")
