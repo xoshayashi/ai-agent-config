@@ -63,7 +63,7 @@ PATTERNS = {
     "hub_spoke": ["hub", "spokes"],
     "before_after": ["rows"],
     "case_strip": ["cases"],
-    "composite": ["grid"],
+    "composite": [],          # grid か blocks のどちらか(下の composite の検査が見る)
     "matrix_2x2": ["quadrants"],
     "gantt": ["periods", "tasks"],
     "harvey_table": ["criteria", "options"],
@@ -81,7 +81,9 @@ QUALITATIVE_EVIDENCE = {"competitive_landscape", "diagram", "logic_tree", "risk_
 
 
 def composite_blocks(s: dict) -> list[dict]:
-    """composite のセルに置かれたブロックを平らに並べる(行・セルの上限内)。"""
+    """composite のブロックを平らに並べる。grid を書いた形はセルの中身、grid を省いた形は blocks。"""
+    if not s.get("grid") and s.get("blocks"):
+        return [b for b in s["blocks"] if isinstance(b, dict)]
     return [(c.get("block") or {}) for r in (s.get("grid") or [])[:3] for c in (r.get("cells") or [])[:4]]
 
 
@@ -104,6 +106,8 @@ def shape_signature(s: dict) -> str:
     """同じパターンの連続を判定する名前。composite は行ごとの (列の取り分, ブロック種) が同じときだけ同型。"""
     if s.get("pattern") != "composite":
         return str(s.get("pattern"))
+    if not s.get("grid") and s.get("blocks"):     # 配置探索に任せた形: ブロックの並びで比べる
+        return "composite:auto:" + ",".join(f"{b.get('role', '')}{b.get('type')}" for b in composite_blocks(s))
     from build_deck import composite_spans   # span 省略時の等分は描画と同じ規則で数える
     rows = (s.get("grid") or [])[:3]
     return "composite:" + "|".join(",".join(f"{sp}{(c.get('block') or {}).get('type')}"
@@ -142,6 +146,29 @@ FIT_CHECKS = {
     "composite": (lambda bd, s, h: bd._composite_layout(s, h),
                   "ブロックの中身を減らすか、行を減らす(表の行・要点の数が多いセルから)"),
 }
+
+
+def errors_for(errors: list, loc: str) -> bool:
+    """そのスライドで既にエラーが出ているか(配置探索は、ブロックが壊れていると意味をなさない)。"""
+    return any(e.startswith(loc) for e in errors)
+
+
+def _check_composite_block(errors, warns, bl: str, b: dict, span) -> None:
+    """composite の1ブロック: 種別、必須キー、上限。grid 形(span あり)と blocks 形(span は探索が決める)で共用。"""
+    t = b.get("type")
+    if t not in ("text", "kpi", "callout", "chart", "table", "diagram"):
+        errors.append(f"{bl}: block.type '{t}' は未対応 — text / kpi / callout / chart / table / diagram")
+        return
+    need = {"text": "points", "kpi": "kpis", "callout": "statement", "chart": "chart",
+            "table": "table", "diagram": "diagram"}[t]
+    if not b.get(need):
+        errors.append(f"{bl}: {t} ブロックに {need} がない")
+    if t == "kpi" and len(b.get("kpis", [])) > 4:
+        errors.append(f"{bl}: kpi ブロックは 4 つまで({len(b['kpis'])} つ)")
+    if t == "table" and b.get("table") and not (b["table"].get("headers") and b["table"].get("rows")):
+        errors.append(f"{bl}: table に headers と rows がない")
+    if t == "chart" and isinstance(span, int) and span < 4:
+        warns.append(f"{bl}: グラフに {span} 列は狭い — 4 列以上(目盛りと凡例が潰れる)")
 
 
 def _check_fit(errors, warns, loc, s, tokens) -> None:
@@ -854,7 +881,32 @@ def main() -> int:
                 errors.append(f"{loc}: focal が複数 — 推奨案は1つだけ")
             if 2 <= len(cr) <= 6 and 2 <= len(op) <= 6:
                 _check_fit(errors, warns, loc, s, tokens)
-        if pat == "composite":
+        if pat == "composite" and not s.get("grid") and not s.get("blocks"):
+            errors.append(f"{loc}: composite に grid も blocks も無い — 配置を自分で書くなら grid、"
+                          "探索に任せるなら blocks(role つき)")
+        if pat == "composite" and not s.get("grid") and s.get("blocks") is not None:
+            blks = s.get("blocks") or []
+            roles_ = [b.get("role") for b in blks]
+            bad_role = [r for r in roles_ if r is not None and r not in ("focal", "support", "context", "conclusion")]
+            if bad_role:
+                errors.append(f"{loc}: role {bad_role} は未対応 — focal / support / context / conclusion")
+            n_concl = sum(1 for b in blks if b.get("role") == "conclusion" or (b.get("role") is None and b.get("type") == "callout"))
+            n_body = len(blks) - n_concl
+            if not 1 <= n_body <= 4 or n_concl > 1:
+                errors.append(f"{loc}: blocks は本文 1-4 個 + 結論 0-1 個(いまは本文 {n_body}、結論 {n_concl})— "
+                              "多いなら grid を自分で書くか、スライドを分ける")
+            if sum(1 for r in roles_ if r == "focal") > 1:
+                errors.append(f"{loc}: focal が複数 — 読み手の問いに答えるブロックは1つ")
+            for bi, b in enumerate(blks, start=1):
+                _check_composite_block(errors, warns, f"{loc} block {bi}", b, None)
+            if not errors_for(errors, loc) and 1 <= n_body <= 4 and n_concl <= 1:
+                try:
+                    bd = _builder(tokens)
+                    if not bd.composite_grid(s):
+                        errors.append(f"{loc}: 本文帯に入る配置が無い — ブロックの中身を減らすか、スライドを分ける")
+                except Exception as exc:
+                    warns.append(f"{loc}: 配置探索に失敗 ({exc})")
+        if pat == "composite" and s.get("grid"):
             rows_ = s.get("grid") or []
             if not 1 <= len(rows_) <= 3:
                 errors.append(f"{loc}: composite の grid は 1-3 行({len(rows_)} 行) — 4行以上は1枚に詰めすぎ。2枚に分ける")
@@ -876,23 +928,8 @@ def main() -> int:
                 h_ = r.get("height", 1)
                 if not (isinstance(h_, (int, float)) and not isinstance(h_, bool) and h_ > 0):
                     errors.append(f"{loc} row {ri}: height は正の数(行の高さの比) — いまは {h_!r}")
-                for ci, c in enumerate(cells_, start=1):
-                    b = c.get("block") or {}
-                    t = b.get("type")
-                    bl = f"{loc} row {ri} cell {ci}"
-                    if t not in ("text", "kpi", "callout", "chart", "table", "diagram"):
-                        errors.append(f"{bl}: block.type '{t}' は未対応 — text / kpi / callout / chart / table / diagram")
-                        continue
-                    need = {"text": "points", "kpi": "kpis", "callout": "statement", "chart": "chart",
-                            "table": "table", "diagram": "diagram"}[t]
-                    if not b.get(need):
-                        errors.append(f"{bl}: {t} ブロックに {need} がない")
-                    if t == "kpi" and len(b.get("kpis", [])) > 4:
-                        errors.append(f"{bl}: kpi ブロックは 4 つまで({len(b['kpis'])} つ)")
-                    if t == "table" and b.get("table") and not (b["table"].get("headers") and b["table"].get("rows")):
-                        errors.append(f"{bl}: table に headers と rows がない")
-                    if t == "chart" and isinstance(c.get("span"), int) and c["span"] < 4:
-                        warns.append(f"{bl}: グラフに {c['span']} 列は狭い — 4 列以上(目盛りと凡例が潰れる)")
+                for ci, (c, sp) in enumerate(zip(cells_, spans), start=1):
+                    _check_composite_block(errors, warns, f"{loc} row {ri} cell {ci}", c.get("block") or {}, sp)
             if 1 <= len(rows_) <= 3:
                 _check_fit(errors, warns, loc, s, tokens)
         if pat == "case_strip":

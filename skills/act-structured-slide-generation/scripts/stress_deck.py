@@ -240,6 +240,14 @@ def make_deck(variant: str = "max", template: str | None = None, images: bool = 
              {"height": 1, "cells": [{"span": 12, "block": {"type": "callout", "heading": "提言",
                                       "statement": T("次の3年は既存顧客の上位プラン移行に営業資源を寄せる", "寄せる")}}]}],
          "source": "社内売上データ(2026年9月)"},
+        {"pattern": "composite", "title": T("論点は価格ではなく導入工数、初期支援の設計を先に決める", "導入工数"),
+         "subtitle": "失注24件のインタビュー結果(配置は探索に任せる)",
+         "blocks": [{"type": "text", "style": "card", "heading": hd,
+                     "points": [{"heading": T("失注理由の6割が導入工数", "工数"),
+                                 "body": T(LONG if overload else "24件中15件が移行の手間を挙げた", "15件")}] * N(1, 2)}
+                    for hd in ("論点", "示唆", "打ち手")]
+                   + [{"type": "callout", "style": "navy", "statement": T("11月の経営会議で、移行支援の有償・無償を決める", "決める")}],
+         "source": "営業部による失注インタビュー(2026年9月)"},
         {"pattern": "matrix_2x2", "title": T("優先すべきは経理と人事、法務は提携で補う", "経理と人事"),
          "subtitle": "参入領域の優先度評価",
          "x_axis": {"label": "自社の実行能力", "low": "低い", "high": "高い"},

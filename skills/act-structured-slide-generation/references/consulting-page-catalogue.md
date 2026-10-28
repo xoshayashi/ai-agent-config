@@ -11,8 +11,10 @@ primitive that draws the chosen composition.
 
 1. Name the archetype the composition needs (the reader question decides, not the topic).
 2. If the table points to a dedicated pattern, use it.
-3. If it points to a `composite` recipe, write the `grid` with the spans shown. Spans are
-   column shares of 12; `h` is the row-height weight.
+3. If it points to a `composite` recipe, either list the blocks with roles (`blocks`, the
+   preferred form: `layout_search.py` finds the arrangement and usually lands on the recipe
+   shown, which it also favours as a known-good prior) or write the `grid` with the spans shown.
+   Spans are column shares of 12; `h` is the row-height weight.
 4. If nothing fits, compose a new `grid` from the six blocks. Only when a page needs a shape
    no block can draw (a new geometry, not a new arrangement) add a dedicated pattern.
 

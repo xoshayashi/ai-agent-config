@@ -3527,6 +3527,80 @@ def test_composite_review_findings(tmp_path):
     assert B._harvey_layout(hv, tight)["overflow"]
 
 
+_LS_CHART = {"type": "chart", "chart": {"type": "column", "unit": "億円", "categories": ["FY23", "FY24", "FY25"],
+                                       "series": [{"name": "売上", "values": [24, 32, 41]}]}}
+_LS_TEXT = {"type": "text", "heading": "示唆", "points": [{"heading": "既存顧客の拡大が主因", "body": "3年の増分のうち7割が既存顧客の追加購入"}]}
+_LS_CALL = {"type": "callout", "statement": "次の3年は上位プラン移行に営業資源を寄せる"}
+
+
+def _ls_slide(blocks, **over):
+    sl = {"pattern": "composite", "title": "中堅企業向けの売上は3年で1.7倍、成長の7割は既存顧客",
+          "subtitle": "売上高の推移(億円)", "blocks": blocks, "source": "社内売上データ(2026年9月)"}
+    sl.update(over)
+    return sl
+
+
+def test_layout_search_ranks_known_good_compositions_first():
+    """配置探索: 役割つきのブロックから、定番の組み立てが首位に来る(グラフ7+示唆5+結論帯、同格カードの
+    等分、KPI の帯+表)。探索は決定的で、同じ入力には同じ案を返す。"""
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import build_deck as B
+    import layout_search as LS
+    top = LS.search(_ls_slide([{**_LS_CHART, "role": "focal"}, _LS_TEXT, _LS_CALL]), top=3, bd=B)
+    assert top[0]["desc"].startswith("chart:7 text:5 / callout:12"), [c["desc"] for c in top]
+    peers = LS.search(_ls_slide([{**_LS_TEXT, "heading": h} for h in ("論点", "示唆", "打ち手")] + [_LS_CALL]), top=1, bd=B)
+    assert peers[0]["desc"].startswith("text:4 text:4 text:4 / callout:12"), peers[0]["desc"]
+    kpi = {"type": "kpi", "role": "focal", "kpis": [{"label": "ARR", "value": "12.8", "unit": "億円"},
+                                                    {"label": "NRR", "value": "114", "unit": "%"}]}
+    table = {"type": "table", "table": {"headers": ["指標", "計画", "実績"], "rows": [["ARR", "12.0億円", "12.8億円"]]}}
+    assert LS.search(_ls_slide([kpi, table]), top=1, bd=B)[0]["desc"].startswith("kpi:12 / table:12")
+    a = LS.resolve(_ls_slide([{**_LS_CHART, "role": "focal"}, _LS_TEXT, _LS_CALL]), bd=B)
+    b = LS.resolve(_ls_slide([{**_LS_CHART, "role": "focal"}, _LS_TEXT, _LS_CALL]), bd=B)
+    assert json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
+    # 主役の指定を変えると、主役が最初(左上)に来る
+    flip = LS.search(_ls_slide([_LS_CHART, {**_LS_TEXT, "role": "focal"}, _LS_CALL]), top=1, bd=B)[0]
+    assert flip["grid"][0]["cells"][0]["block"]["type"] == "text"
+
+
+def test_composite_blocks_form_builds_without_a_grid(tmp_path):
+    """grid を書かず blocks だけの composite: validate・build・verify を通り、探索の最上位案で描かれる。
+    CLI は上位案を grid に書いたデッキを出せる(並べて見比べる用)。"""
+    from pptx import Presentation
+    spec = {"meta": {"title": "t"}, "slides": [_ls_slide([{**_LS_CHART, "role": "focal"}, _LS_TEXT, _LS_CALL])]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(spec, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 0, r.stdout
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0, v.stdout
+    slide = list(Presentation(out).slides)[0]
+    chart = next(sh for sh in slide.shapes if sh.has_chart)
+    rail = next(sh for sh in slide.shapes if sh.has_text_frame and "既存顧客の拡大が主因" in sh.text_frame.text)
+    assert rail.left > chart.left + chart.width                      # 主役のグラフが左、示唆が右
+    emit = tmp_path / "cands.json"
+    c = run("layout_search.py", p, "--slide", "1", "--top", "3", "--emit", emit)
+    assert c.returncode == 0 and "#1" in c.stdout and "#3" in c.stdout, c.stdout
+    cands = json.loads(emit.read_text())["slides"]
+    assert len(cands) == 3 and all(sl.get("grid") and "blocks" not in sl for sl in cands)
+
+
+def test_validate_checks_the_blocks_form(tmp_path):
+    huge = "電子帳簿保存法とインボイス制度への対応を単一のワークフローで完結させる統合基盤" * 6
+    bad = {"meta": {"title": "t"}, "slides": [
+        _ls_slide([{**_LS_CHART, "role": "focal"}, {**_LS_TEXT, "role": "focal"}]),
+        _ls_slide([{**_LS_CHART, "role": "hero"}]),
+        _ls_slide([_LS_TEXT] * 5),
+        {"pattern": "composite", "title": "配置の無いcompositeの見出し", "subtitle": "s"},
+        _ls_slide([{**_LS_TEXT, "points": [{"heading": "h", "body": huge}] * 3}, {**_LS_TEXT, "points": [{"heading": "h", "body": huge}] * 3}]),
+    ]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(bad, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 1
+    for needle in ("focal が複数", "role ['hero']", "本文 5", "grid も blocks も無い", "入る配置が無い"):
+        assert needle in r.stdout, (needle, r.stdout)
+
+
 def test_matrix_gantt_and_harvey_draw_native_shapes(tmp_path):
     """2x2 は象限カード4枚、ガントはバーと◆と今日の破線、ハーベイは score ごとの扇(PIE)。"""
     from pptx import Presentation

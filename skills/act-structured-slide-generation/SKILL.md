@@ -241,7 +241,17 @@ spanning the 12 columns, each cell one block (`text`, `kpi`, `callout`, `chart`,
 new geometry. Three consulting staples with specific geometry are native too: `matrix_2x2`
 (quadrant content), `gantt` (workplan), `harvey_table` (options scored on criteria).
 `references/consulting-page-catalogue.md` maps each common archetype to its primitive or
-composite recipe. Mix shift is a
+composite recipe.
+
+**Reason about content, let code measure the layout.** For a `composite`, prefer `blocks` over
+a hand-written `grid`: list the blocks and give each a `role` (`focal` answers the reader
+question; `support`, `context`, `conclusion`). `scripts/layout_search.py` enumerates the
+arrangements, measures them with the builder's geometry (fit, hierarchy, reading order,
+hollow cells, legibility, consistency, balance), and the build uses the best. Inspect the top
+three with `layout_search.py deck.json --slide N --top 3`; override only for a content reason,
+by pinning a `grid`. Never override because a layout "looks better" — models judge slide
+aesthetics poorly, which is why geometry is measured, not eyeballed
+(`references/layout-search.md`). Mix shift is a
 native `stacked_column_100`; a chart with short comparable takeaways can use
 `chart_insight` `layout: chart_top` to vary the page rhythm.
 
@@ -436,6 +446,7 @@ Read only what the task needs, but do not skip the required workflow references.
 | `references/design-principles.md` | Act visual grammar, hierarchy, color, density judgment, and page rhythm |
 | `references/grid-and-flex-strategy.md` | Granular grid/flex contract for layout consistency |
 | `references/composition-vocabulary.md` | Composition moves, not templates |
+| `references/layout-search.md` | Why and how `composite` blocks are arranged by search: roles, candidate grammar, verifiable scores, research sources |
 | `references/consulting-page-catalogue.md` | Strategy-firm page archetypes → dedicated pattern or `composite` recipe |
 | `references/composition-atoms.md` | IR-slide composition atoms + evidence-emphasis move→knob map |
 | `references/ir-slide-design-principles.md` | IR and investor-deck design principles |
@@ -453,6 +464,7 @@ Read only what the task needs, but do not skip the required workflow references.
 | `references/tokens.json` | Single source for Act color, type, and grid tokens |
 | `scripts/act_theme.py` | Token-core adapter: feeds tokens.json to every backend (native, matplotlib, Graphviz) |
 | `scripts/act_assets.py` | Image-asset backend: Act-styled deterministic charts/diagrams for objects native cannot draw |
+| `scripts/layout_search.py` | Ranks `composite` arrangements from role-tagged `blocks`; `--top`, `--emit` to compare candidates |
 | `scripts/stress_deck.py` | Dynamic-generation regression guard: every pattern at min / documented max / past capacity |
 | `scripts/setup_fonts.py` | Installs / checks the Geist + Noto Sans JP static fonts the renderer measures with |
 | `scripts/deck_text.py`, `scripts/deck_argument.py` | Shared modules: text measurement, header slots, template registry; evidence-vs-claim key split (used by validate, build, audit, contact sheet) |

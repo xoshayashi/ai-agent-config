@@ -377,6 +377,10 @@ native and editable.
   chart / table / KPI / diagram blocks are exhibits for `audit_argument`, so a number stated
   only in a callout is not "shown". Charts inside blocks get the same checks as `chart_insight`.
 - `span` may be omitted: cells without one share the remaining columns equally.
+- **Blocks form (preferred).** Omit `grid` and write `blocks: [{role?, type, ...}]` (1-4 body
+  blocks + at most one `conclusion`; roles `focal` (one), `support`, `context`, `conclusion`).
+  `layout_search.py` picks the arrangement by measured scores and the build draws the best
+  candidate; validate errors when no arrangement fits. See `layout-search.md`.
 - `style: "card"` works on every block except `callout`; the 0.24in inset is part of the
   measured height, and table blocks are measured with the table's own wrapped-line heights.
 - Consecutive composites count as the same pattern only when their grids match.
