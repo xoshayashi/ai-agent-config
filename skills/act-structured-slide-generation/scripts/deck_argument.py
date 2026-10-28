@@ -144,23 +144,25 @@ def audit_view(slide: dict) -> dict:
     (text の見出し・要点と callout は主張、chart / table / kpi / diagram は証拠)。他のパターンはそのまま。"""
     if slide.get("pattern") != "composite":
         return slide
-    view = {k: v for k, v in slide.items() if k != "grid"}
+    view = {k: v for k, v in slide.items() if k not in ("grid", "blocks")}
     claims: list = []
     exhibits: list = []
     charts = []
-    for r in (slide.get("grid") or []):
-        for c in (r.get("cells") or []):
-            b = c.get("block") or {}
-            keys = _COMPOSITE_KEYS.get(b.get("type"), ())
-            part = {k: b[k] for k in keys if k in b}
-            if b.get("type") in ("text", "callout"):
-                claims.append(part)
-            else:
-                if b.get("heading"):
-                    claims.append({"heading": b["heading"]})
-                exhibits.append(part)
-                if b.get("type") == "chart" and isinstance(b.get("chart"), dict):
-                    charts.append(b["chart"])
+    if slide.get("grid"):
+        cell_blocks = [(c.get("block") or {}) for r in slide["grid"] for c in (r.get("cells") or [])]
+    else:                                        # 配置探索に任せた形(blocks)も同じ振り分け
+        cell_blocks = [b for b in (slide.get("blocks") or []) if isinstance(b, dict)]
+    for b in cell_blocks:
+        keys = _COMPOSITE_KEYS.get(b.get("type"), ())
+        part = {k: b[k] for k in keys if k in b}
+        if b.get("type") in ("text", "callout"):
+            claims.append(part)
+        else:
+            if b.get("heading"):
+                claims.append({"heading": b["heading"]})
+            exhibits.append(part)
+            if b.get("type") == "chart" and isinstance(b.get("chart"), dict):
+                charts.append(b["chart"])
     view["points"] = claims                      # CLAIM_KEYS の 1 つ: 主張として歩かれる
     view["facts"] = exhibits                     # EXHIBIT_KEYS の 1 つ: 証拠として歩かれる
     if len(charts) == 1 and "chart" not in view:

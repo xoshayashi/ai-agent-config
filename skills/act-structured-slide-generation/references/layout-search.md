@@ -32,11 +32,15 @@ The common thread: language models are strong at deciding *what matters* and wea
    - `conclusion` — the one sentence to remember (a `callout`; it goes last, full width or as
      the right-hand cell of a situation / complication / resolution row).
    Defaults: a `callout` is the conclusion; when every body block has the same type and no
-   role (three issue cards) they are equal `support` peers; otherwise the first body block is
-   the focal one.
+   role (three issue cards) they are equal `support` peers; otherwise the first body block
+   without a role is the focal one. Writing both `grid` and `blocks` is an error (the grid
+   would silently win).
 2. **Enumerate (code).** One-, two- and three-row grids from a small grammar: row spans such as
    12, 7/5, 8/4, 6/6, 4/4/4, 6/3/3, 3/3/3/3, every ordering of the body blocks, and row-height
-   weights. A typical slide yields a few hundred candidates; search takes about 0.1s.
+   weights. Peer blocks (same type and role) keep the author's order, so three issue cards are
+   not permuted into duplicates. Measured: 90 candidates / 0.02s for chart + notes + conclusion,
+   254 / 0.04s for four peer cards + conclusion, about 6,000 / 0.23s for four distinct blocks +
+   conclusion. The result is cached per process, so validate and build each search once.
 3. **Measure (code).** Each candidate goes through `_composite_layout` and `block_need_h`, the
    same functions that draw the slide. Candidates that overflow the body, give a chart fewer
    than 4 columns, or give a table less than about 1in per column are dropped. The rest are scored.

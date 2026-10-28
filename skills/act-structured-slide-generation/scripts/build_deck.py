@@ -3774,30 +3774,36 @@ def composite_spans(row: dict) -> list[int]:
 _AUTO_GRID: dict = {}
 
 
-def composite_grid(spec: dict) -> list:
+def composite_grid(spec: dict, *, fallback: bool = True) -> list:
     """composite の grid。書かれていればそれ、無く blocks があれば配置探索(layout_search)の最上位案。
-    探索は決定的なので、同じ blocks・同じヘッダーには同じ案を返す(build と validate で一致する)。"""
+    探索は決定的なので、同じ blocks・同じヘッダー・同じ寸法トークンには同じ案を返す(build と validate で一致)。
+    fallback=False は「入る配置が無い」を空の grid で返す(validate が error にするため)。描画は fallback=True
+    で、等分の配置に落として溢れを描く(本文を空にしない)。"""
     if spec.get("grid"):
         return spec["grid"]
-    if not spec.get("blocks"):
+    blocks = [b for b in (spec.get("blocks") or []) if isinstance(b, dict)]
+    if not blocks:
         return []
+    spec = {**spec, "blocks": blocks}
     key = json.dumps({k: spec.get(k) for k in ("blocks", "title", "subtitle", "kicker", "insight",
                                                "source", "assumption", "note")},
-                     ensure_ascii=False, sort_keys=True, default=str) + "|" + json.dumps(LAY, sort_keys=True, default=str)
+                     ensure_ascii=False, sort_keys=True, default=str) + "|" + \
+        json.dumps([LAY, TS], sort_keys=True, default=str)        # 必要高は型スケールにも依る
     if key not in _AUTO_GRID:
         import layout_search
-        grid = layout_search.resolve(spec, bd=sys.modules[__name__])
-        if not grid:
-            # 入る配置が無い(validate は error にする)。本文を空にせず、本文ブロックを等分の1行・結論を
-            # 下の行に置いて描く — 溢れは隠さず verify と警告で名指しする
-            print("WARN: composite の blocks が本文帯に入る配置が無い — 等分の配置で描く(中身を減らすか分割する)")
-            roles = [layout_search.role_of(b, i, spec["blocks"]) for i, b in enumerate(spec["blocks"])]
-            body = [b for b, r in zip(spec["blocks"], roles) if r != "conclusion"][:4]
-            concl = [b for b, r in zip(spec["blocks"], roles) if r == "conclusion"][:1]
-            grid = [{"cells": [{"span": 12 // max(1, len(body)), "block": b} for b in body]}] if body else []
-            grid += [{"cells": [{"span": 12, "block": b}]} for b in concl]
-        _AUTO_GRID[key] = grid
-    return _AUTO_GRID[key]
+        _AUTO_GRID[key] = layout_search.resolve(spec, bd=sys.modules[__name__])
+    grid = _AUTO_GRID[key]
+    if not grid and fallback:
+        # 入る配置が無い(validate は error にする)。本文を空にせず、本文ブロックを等分の1行・結論を
+        # 下の行に置いて描く — 溢れは隠さず verify と警告で名指しする
+        import layout_search
+        print("WARN: composite の blocks が本文帯に入る配置が無い — 等分の配置で描く(中身を減らすか分割する)")
+        roles = [layout_search.role_of(b, i, blocks) for i, b in enumerate(blocks)]
+        body = [b for b, r in zip(blocks, roles) if r != "conclusion"][:4]
+        concl = [b for b, r in zip(blocks, roles) if r == "conclusion"][:1]
+        grid = [{"cells": [{"span": 12 // max(1, len(body)), "block": b} for b in body]}] if body else []
+        grid += [{"cells": [{"span": 12, "block": b}]} for b in concl]
+    return grid
 
 
 def _composite_layout(spec: dict, h: float) -> dict:

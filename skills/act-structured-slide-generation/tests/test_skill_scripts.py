@@ -3557,6 +3557,16 @@ def test_layout_search_ranks_known_good_compositions_first():
     a = LS.resolve(_ls_slide([{**_LS_CHART, "role": "focal"}, _LS_TEXT, _LS_CALL]), bd=B)
     b = LS.resolve(_ls_slide([{**_LS_CHART, "role": "focal"}, _LS_TEXT, _LS_CALL]), bd=B)
     assert json.dumps(a, sort_keys=True) == json.dumps(b, sort_keys=True)
+    # 1枚目に support と書いても、役割の無い次のブロックが主役になる(主役が消えない)
+    assert LS.role_of(_LS_CHART, 1, [{**_LS_TEXT, "role": "support"}, _LS_CHART, _LS_CALL]) == "focal"
+    # 同格のカードは書き手の順を保つ(並べ替えの重複を作らない)
+    peer_blocks = [{**_LS_TEXT, "heading": h} for h in ("論点", "示唆", "打ち手")] + [_LS_CALL]
+    for g, _roles, _shape in LS.candidates(peer_blocks):
+        heads = [c["block"].get("heading") for r in g for c in r["cells"] if c["block"].get("type") == "text"]
+        assert heads == ["論点", "示唆", "打ち手"], heads
+    # blocks 形の監査ビューは grid 形と同じ: グラフの裸の値に chart.unit が付く
+    import deck_argument as A
+    assert "41億円" in A.exhibit_tokens(_ls_slide([{**_LS_CHART, "role": "focal"}, _LS_TEXT]))
     # 主役の指定を変えると、主役が最初(左上)に来る
     flip = LS.search(_ls_slide([_LS_CHART, {**_LS_TEXT, "role": "focal"}, _LS_CALL]), top=1, bd=B)[0]
     assert flip["grid"][0]["cells"][0]["block"]["type"] == "text"
@@ -3597,8 +3607,16 @@ def test_validate_checks_the_blocks_form(tmp_path):
     p = tmp_path / "deck.json"; p.write_text(json.dumps(bad, ensure_ascii=False))
     r = run("validate_spec.py", p)
     assert r.returncode == 1
-    for needle in ("focal が複数", "role ['hero']", "本文 5", "grid も blocks も無い", "入る配置が無い"):
+    for needle in ("focal が複数", "role ['hero']", "本文 5", "grid も blocks も無い"):
         assert needle in r.stdout, (needle, r.stdout)
+    # 入らない配置は validate のエラーで名指しされる(ビルド側の警告文ではなく)
+    assert "ERROR: slide 5 (composite): 本文帯に入る配置が無い" in r.stdout, r.stdout
+    both = {"meta": {"title": "t"}, "slides": [{**_ls_slide([_LS_TEXT]), "grid": [{"cells": [{"span": 12, "block": _LS_TEXT}]}]},
+                                               _ls_slide(["text", _LS_TEXT])]}
+    p.write_text(json.dumps(both, ensure_ascii=False))
+    r2 = run("validate_spec.py", p)
+    assert "grid と blocks の両方" in r2.stdout and "オブジェクトではない" in r2.stdout, r2.stdout
+    assert "Traceback" not in r2.stdout + r2.stderr
 
 
 def test_matrix_gantt_and_harvey_draw_native_shapes(tmp_path):

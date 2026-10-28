@@ -106,10 +106,9 @@ def shape_signature(s: dict) -> str:
     """同じパターンの連続を判定する名前。composite は行ごとの (列の取り分, ブロック種) が同じときだけ同型。"""
     if s.get("pattern") != "composite":
         return str(s.get("pattern"))
-    if not s.get("grid") and s.get("blocks"):     # 配置探索に任せた形: ブロックの並びで比べる
-        return "composite:auto:" + ",".join(f"{b.get('role', '')}{b.get('type')}" for b in composite_blocks(s))
-    from build_deck import composite_spans   # span 省略時の等分は描画と同じ規則で数える
-    rows = (s.get("grid") or [])[:3]
+    from build_deck import composite_grid, composite_spans   # span 省略時の等分も描画と同じ規則
+    # 配置探索に任せた形も、実際に描く grid で比べる(手書きの grid と同じ並びなら同型)
+    rows = (s["grid"] if s.get("grid") else composite_grid(s, fallback=False))[:3]
     return "composite:" + "|".join(",".join(f"{sp}{(c.get('block') or {}).get('type')}"
                                             for c, sp in zip((r.get("cells") or [])[:4], composite_spans(r)))
                                    for r in rows)
@@ -146,11 +145,6 @@ FIT_CHECKS = {
     "composite": (lambda bd, s, h: bd._composite_layout(s, h),
                   "ブロックの中身を減らすか、行を減らす(表の行・要点の数が多いセルから)"),
 }
-
-
-def errors_for(errors: list, loc: str) -> bool:
-    """そのスライドで既にエラーが出ているか(配置探索は、ブロックが壊れていると意味をなさない)。"""
-    return any(e.startswith(loc) for e in errors)
 
 
 def _check_composite_block(errors, warns, bl: str, b: dict, span) -> None:
@@ -884,8 +878,14 @@ def main() -> int:
         if pat == "composite" and not s.get("grid") and not s.get("blocks"):
             errors.append(f"{loc}: composite に grid も blocks も無い — 配置を自分で書くなら grid、"
                           "探索に任せるなら blocks(role つき)")
+        if pat == "composite" and s.get("grid") and s.get("blocks"):
+            errors.append(f"{loc}: grid と blocks の両方がある — grid が優先され blocks は描かれない。どちらか一方にする")
         if pat == "composite" and not s.get("grid") and s.get("blocks") is not None:
-            blks = s.get("blocks") or []
+            raw = s.get("blocks") or []
+            nondict = [j for j, b in enumerate(raw, start=1) if not isinstance(b, dict)]
+            if nondict:
+                errors.append(f"{loc}: blocks {nondict} がオブジェクトではない — type を持つオブジェクトで書く")
+            blks = [b for b in raw if isinstance(b, dict)]
             roles_ = [b.get("role") for b in blks]
             bad_role = [r for r in roles_ if r is not None and r not in ("focal", "support", "context", "conclusion")]
             if bad_role:
@@ -897,12 +897,16 @@ def main() -> int:
                               "多いなら grid を自分で書くか、スライドを分ける")
             if sum(1 for r in roles_ if r == "focal") > 1:
                 errors.append(f"{loc}: focal が複数 — 読み手の問いに答えるブロックは1つ")
+            block_errs: list = []
             for bi, b in enumerate(blks, start=1):
-                _check_composite_block(errors, warns, f"{loc} block {bi}", b, None)
-            if not errors_for(errors, loc) and 1 <= n_body <= 4 and n_concl <= 1:
+                _check_composite_block(block_errs, warns, f"{loc} block {bi}", b, None)
+            errors.extend(block_errs)
+            # 配置探索はブロックが壊れていると意味をなさないので、ブロック自体のエラーがあるときだけ省く
+            # (同じスライドの別のエラー — Accent の数など — では止めない)
+            if not block_errs and not nondict and 1 <= n_body <= 4 and n_concl <= 1:
                 try:
                     bd = _builder(tokens)
-                    if not bd.composite_grid(s):
+                    if not bd.composite_grid(s, fallback=False):
                         errors.append(f"{loc}: 本文帯に入る配置が無い — ブロックの中身を減らすか、スライドを分ける")
                 except Exception as exc:
                     warns.append(f"{loc}: 配置探索に失敗 ({exc})")

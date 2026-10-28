@@ -62,23 +62,38 @@ def role_of(b: dict, i: int, blocks: list[dict]) -> str:
         return "support"
     if len(body) > 1 and len({x.get("type") for x in body}) == 1 and not any(x.get("role") for x in body):
         return "support"
-    first_body = next((j for j, x in enumerate(blocks) if x.get("type") != "callout"), None)
-    return "focal" if i == first_body else "support"
+    # 主役の既定は「役割を書いていない最初の本文ブロック」— 1枚目に support と明示されていても主役が消えない
+    first_free = next((j for j, x in enumerate(blocks) if x.get("type") != "callout" and not x.get("role")), None)
+    return "focal" if i == first_free else "support"
 
 
-def _rows_of(body: list[int], conclusion: list[int]):
+def _orderings(body: list[int], blocks: list[dict], roles: list[str]):
+    """本文ブロックの並び順。同じ種別・同じ役割の同格ブロック(論点カード3枚など)は、書き手の順を保つ —
+    入れ替えても同じ形になるうえ、同格の並び順は書き手の決めた読み順だから。"""
+    sig = {i: (blocks[i].get("type"), roles[i]) for i in body}
+    for perm in itertools.permutations(body):
+        ok = True
+        for a_, b_ in itertools.combinations(range(len(perm)), 2):
+            if sig[perm[a_]] == sig[perm[b_]] and perm[a_] > perm[b_]:
+                ok = False
+                break
+        if ok:
+            yield perm
+
+
+def _rows_of(body: list[int], conclusion: list[int], perms: list):
     """本文ブロック(添字)の並べ方 × 結論の行。結論は全幅の最下行(複数なら横に並べる)。"""
     k = len(body)
     shapes = []
     # 1 行
     for spans in ROW_SPANS.get(k, []):
-        for perm in itertools.permutations(body):
+        for perm in perms:
             shapes.append([list(zip(spans, perm))])
     # 2 行: 上 a 個 / 下 k-a 個
     for a in range(1, k):
         top_spans = ROW_SPANS.get(a, [])
         bot_spans = ROW_SPANS.get(k - a, [])
-        for perm in itertools.permutations(body):
+        for perm in perms:
             for ts in top_spans:
                 for bs in bot_spans:
                     shapes.append([list(zip(ts, perm[:a])), list(zip(bs, perm[a:]))])
@@ -94,7 +109,7 @@ def _rows_of(body: list[int], conclusion: list[int]):
     # 結論を本文の右に置く SCR 型(本文 2 個 + 結論 1 個 → 1 行 3 列)
     if len(conclusion) == 1 and 1 <= k <= 2:
         for spans in ROW_SPANS[k + 1]:
-            for perm in itertools.permutations(body):
+            for perm in perms:
                 out.append([list(zip(spans, list(perm) + conclusion))])
     return out
 
@@ -113,7 +128,8 @@ def candidates(blocks: list[dict]):
     body = [i for i, r in enumerate(roles) if r != "conclusion"]
     concl = [i for i, r in enumerate(roles) if r == "conclusion"]
     seen = set()
-    for shape in _rows_of(body, concl):
+    perms = list(_orderings(body, blocks, roles))
+    for shape in _rows_of(body, concl, perms):
         for wts in _weights_for(len(shape), bool(concl)):
             key = (tuple(tuple(r) for r in shape), wts)
             if key in seen:
@@ -269,9 +285,10 @@ def search(spec: dict, top: int = 3, bd=None) -> list[dict]:
     """composite の blocks から grid 候補を順位づけて返す。[{grid, total, parts, desc}]。"""
     if bd is None:
         import build_deck as bd
-    blocks = spec.get("blocks") or []
+    blocks = [b for b in (spec.get("blocks") or []) if isinstance(b, dict)]
     if not blocks:
         return []
+    spec = {**spec, "blocks": blocks}
     _, h = bd.body_region(spec)
     seen_geom: dict = {}
     # 同じブロック・同じ幅の必要高は何度も測らない(候補は数百、ブロックは数個)。探索の間だけ差し替える
