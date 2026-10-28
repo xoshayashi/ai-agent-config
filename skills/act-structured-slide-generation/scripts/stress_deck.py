@@ -325,6 +325,50 @@ def make_deck(variant: str = "max", template: str | None = None, images: bool = 
                                      "bar": {"name": "売上高", "values": [v_ * 10 for v_ in vals], "unit": "億円"},
                                      "line": {"name": "粗利率", "values": [70 + i for i in range(len(cats))], "unit": "%"}},
                            "takeaways": take, "source": "決算短信(2026年4月開示)"})
+    # 豊かさの部品(2026-10): 章トラッカー・評価表・引用・アイコンのタイル・目次のタイル・濃い示唆帯・端まで塗るパネル
+    n_score = N(2, 8 if overload else 6)
+    rich = [
+        {"pattern": "section_divider", "number": 2, "title": T("全社展開の進め方と投資の判断", "展開"),
+         "tracker_label": T("展開と投資", "展開"), "desc": T("段階展開の順番と判断点", "順番")},
+        {"pattern": "agenda", "title": T("次は全社展開の進め方と投資の判断に移る", "論点"), "subtitle": "本日の論点(再掲)",
+         "layout": "tiles", "current": 1 if v != "min" else None,
+         "items": [{"label": T("効果の確認" if not overload else LONG, f"論点{i + 1}"),
+                    "desc": T(LONG if overload else "PoC 2期の処理時間と差戻し率の実績", "実績")} for i in range(N(2, 5))]},
+        {"pattern": "scorecard", "title": T("6指標のうち4つが目標を超え、差戻し率だけが遅れている", "4指標が目標超え"),
+         "subtitle": "PoC 2期の主要指標(2026年9月時点)",
+         "rows": [{"label": T("承認の待ち時間" if not overload else "承認の待ち時間(部門長)", f"指標{i + 1}"),
+                   "note": T(LONG if overload else "申請から承認まで", "注") if (i < 1 or overload) else None,
+                   "value": "10,590" if i == 0 else "0.8", "unit": T("件/月", "日"),
+                   "trend": [12, 10, 7, 5, 4, 3][: N(3, 6)], "progress": [1.0, 0.62, 0.97, 0.0, 0.75, 1.2, 0.5, 0.33][i],
+                   "status": ["good", "bad", "good", "watch", "good", "good", "watch", "bad"][i], "focal": i == 0}
+                  for i in range(n_score)],
+         "insight": T("差戻しの原因は科目の選び間違いで、候補表示を足せば3期で目標に届く", "候補表示で解消"),
+         "insight_style": "deep", "source": "Source: 営業部PoCの申請ログ(2026年7-9月)"},
+        {"pattern": "pull_quote", "title": T("現場は締め日の残業がなくなったと受け止めた", "残業がなくなった"),
+         "subtitle": "営業部の声(PoC 2期のインタビュー)", "tone": "inverse" if v == "max" else None,
+         "quote": T("締め日の前に領収書を探して残る夜がなくなりました。月末も、普段どおりに帰れています。", "早く帰れる"),
+         "attribution": T("営業部 第二課 課長", "課長"), "role": T("PoC参加者32名のうちの1名、2026年9月のインタビュー", "参加者") if v != "min" else None,
+         "source": "Source: PoC参加者インタビュー(n=12、2026年9月)"},
+        {"pattern": "icon_grid", "title": T("全社展開は6つの準備がそろってから部門ごとに始める", "6つの準備"),
+         "subtitle": "展開前にそろえる準備",
+         "items": [{"icon": ["users", "workflow", "graduation-cap", "plug", "shield-check", "message-square",
+                             "calendar", "clock", "target"][i],
+                    "label": T("会計システム連携" if not overload else "会計システムとの仕訳連携", f"準備{i + 1}"),
+                    "desc": T(LONG if overload else "仕訳の取り込みを12月中に検証する", "検証"), "focal": i == 1}
+                   for i in range(N(3, 9 if overload else 6))]},
+        {"pattern": "composite", "title": T("投資3.2億円は2.1年で回収でき、1月に継続を判断する", "2.1年で回収"),
+         "subtitle": "投資と回収の見通し",
+         "grid": [{"cells": [
+             {"span": 4, "block": {"type": "callout", "style": "deep", "bleed": True,
+                                   "hero": {"value": "2.1", "unit": "年", "label": T("投資の回収期間", "回収")},
+                                   "statement": T(LONG if overload else "年1.5億円の削減で、投資3.2億円を回収する", "回収")}},
+             {"span": 8, "block": {"type": "chart", "heading": "削減額の累計(億円)",
+                                   "chart": {"type": "column", "unit": "億円", "categories": ["1年目", "2年目", "3年目"],
+                                             "series": [{"name": "累計削減", "values": [1.5, 3.0, 4.5]}], "focal_category": 1}}}]}],
+         "source": "Source: 経理部 試算(2026年10月)"},
+    ]
+    slides[-1:-1] = rich
+
     # drop None outcome keys so validate sees the real spec shape
     def _clean(o):
         if isinstance(o, dict):
@@ -332,7 +376,7 @@ def make_deck(variant: str = "max", template: str | None = None, images: bool = 
         if isinstance(o, list):
             return [_clean(x) for x in o]
         return o
-    meta = {"title": "Stress deck", "thesis": {"statement": "5年でARR 68億円", "value": "68", "unit": "億円"}}
+    meta = {"title": "Stress deck", "thesis": {"statement": "5年でARR 68億円", "value": "68", "unit": "億円"}, "tracker": True}
     if template:
         meta["template"] = template
     # 表現の部品(アイコン・反転)も容量の検査に含める: 並列の項目の全部にアイコン、表紙と締めは反転

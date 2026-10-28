@@ -60,6 +60,9 @@ cannot fit the body, and `rules: true` on a row draws thin vertical rules betwee
 | Benchmark table | accountability across rows and columns | `comparison_table` |
 | Before / after | measured change across aligned dimensions | `before_after` |
 | Customer proof | 2-4 cases, each with a result | `case_strip` |
+| Answer panel + proof | the answer as one dark number, the evidence beside it | composite `[callout(deep, hero, bleed) 4, chart 8]` |
+| Metric review | 6-8 metrics with trend, attainment and status | `scorecard` |
+| Voice of the customer | one quote with who, where and n | `pull_quote` |
 
 ### Structure and logic
 
@@ -75,6 +78,8 @@ cannot fit the body, and `rules: true` on a row draws thin vertical rules betwee
 | Hub and spoke | one platform coordinates several parts | `hub_spoke` |
 | Risk assessment | likelihood x impact with responses | `risk_matrix` |
 | Option evaluation | options scored on criteria, one recommended | `harvey_table` |
+| Capability / preparation set | 3-9 parallel items, each a label and one line | `icon_grid` |
+| Agenda reprise | where the talk is now, chapter by chapter | `agenda` `layout: "tiles"` + `current` |
 
 ### Time and execution
 

@@ -60,7 +60,33 @@ def is_content(px) -> bool:
     return not is_ground(px, TOL)
 
 
-def edge_scan(im: Image.Image) -> list[str]:
+def solid_bleed(px: list, pos: list) -> bool:
+    """端に触れた画素が、一続きの一色の面か。端まで塗った帯(濃い示唆帯・左右分割のパネル)は一色の面が
+    途切れずに端へ接し、見切れた文字や図形は字画ごとに途切れ、色も混ざる。最頻色(量子化)が 75% 以上で、
+    端に沿った位置が1-2本の連続した区間に収まるときだけ設計の塗りとみなす(面の縁のにじみは許す)。"""
+    if not px:
+        return False
+    from collections import Counter
+    q = Counter((r // 12, g // 12, b // 12) for r, g, b in px)
+    if q.most_common(1)[0][1] / len(px) < 0.75:
+        return False
+    pos = sorted(pos)
+    runs = 1 + sum(1 for a, b in zip(pos, pos[1:]) if b - a > 9)
+    return runs <= 2
+
+
+def designed_side_bleed(s: dict) -> bool:
+    """spec が左右の端まで塗る面を宣言しているか(濃い示唆帯、composite の bleed パネル)。"""
+    if s.get("insight") and s.get("insight_style") == "deep":
+        return True
+    if s.get("pattern") == "composite":
+        cells = [(c.get("block") or {}) for r in (s.get("grid") or []) for c in (r.get("cells") or [])]
+        cells += [b for b in (s.get("blocks") or []) if isinstance(b, dict)]
+        return any(b.get("type") == "callout" and b.get("bleed") for b in cells)
+    return False
+
+
+def edge_scan(im: Image.Image, side_bleed: bool = False) -> list[str]:
     w, h = im.size
     p = im.load()
     hits = []
@@ -71,11 +97,14 @@ def edge_scan(im: Image.Image) -> list[str]:
         "right": [(x, y) for x in range(w - BAND, w) for y in range(0, h, 3)],
     }
     for edge, pts in bands.items():
-        n = sum(1 for x, y in pts if is_content(p[x, y]))
+        on = [(x, y) for x, y in pts if is_content(p[x, y])]
+        hits_px = [p[x, y][:3] for x, y in on]
+        along = [y if edge in ("left", "right") else x for x, y in on]
+        n = len(hits_px)
         # full-bleed edges (cover band / divider rail) light up nearly the whole edge;
         # clipping shows as a partial run of content pixels
         frac = n / len(pts)
-        if 0.02 < frac < 0.85:
+        if 0.02 < frac < 0.85 and not (side_bleed and edge in ("left", "right") and solid_bleed(hits_px, along)):
             hits.append(f"{edge} edge {frac:.0%} content — 端で見切れている要素の疑い")
     return hits
 
@@ -172,12 +201,15 @@ def main() -> int:
 
     fullbleed: set[int] = set()
     no_balance: set[int] = set()
+    side_bleed: set[int] = set()     # spec が左右の端まで塗る面を宣言したスライド(示唆帯・分割パネル)
     if spec:
         for i, s in enumerate(spec.get("slides", []), start=1):
             if s.get("pattern") in ("cover", "section_divider"):
                 fullbleed.add(i)
-            if s.get("pattern") in ("cover", "section_divider", "statement", "agenda"):
+            if s.get("pattern") in ("cover", "section_divider", "statement", "agenda", "pull_quote"):
                 no_balance.add(i)
+            if designed_side_bleed(s):
+                side_bleed.add(i)
     if spec and len(spec.get("slides", [])) != len(pngs):
         findings.append(f"render {len(pngs)} 枚 vs spec {len(spec.get('slides', []))} 枚 — "
                         "枚数不一致。古い PNG の残留か再レンダー漏れを疑う")
@@ -185,7 +217,7 @@ def main() -> int:
         if i in fullbleed:
             continue
         im = Image.open(png).convert("RGB")  # decode once, share across both scans
-        for hit in edge_scan(im):
+        for hit in edge_scan(im, side_bleed=i in side_bleed):
             findings.append(f"slide {i}: {hit}")
         # balance needs pattern knowledge (statements/covers are legitimately sparse)
         if spec and i not in no_balance:

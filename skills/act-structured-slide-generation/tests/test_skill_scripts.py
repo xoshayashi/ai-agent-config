@@ -4658,3 +4658,106 @@ def test_column_framework_keeps_a_card_under_a_long_header(tmp_path):
     slide = pptx.Presentation(out).slides[0]
     cards = [Emu(sh.height).inches for sh in slide.shapes if getattr(sh, "name", "") == "card"]
     assert cards and min(cards) >= 1.4 - 1e-6, cards
+
+
+RICH_DECK = {"meta": {"title": "t", "tracker": True}, "slides": [
+    {"pattern": "section_divider", "number": 1, "title": "効果の確認", "tracker_label": "効果", "desc": "PoC 2期"},
+    {"pattern": "scorecard", "title": "4指標のうち3つが目標を超えた", "subtitle": "主要指標",
+     "rows": [{"label": "処理時間", "value": "4", "unit": "分", "trend": [12, 8, 4], "progress": 1.0, "status": "good", "focal": True},
+              {"label": "差戻し率", "value": "9", "unit": "%", "trend": [18, 12, 9], "progress": 0.6, "status": "bad"}],
+     "insight": "差戻しは候補表示で減らせる", "insight_style": "deep", "source": "Source: 申請ログ"},
+    {"pattern": "section_divider", "number": 2, "title": "展開と投資", "desc": "段階展開"},
+    {"pattern": "pull_quote", "title": "現場は残業がなくなったと受け止めた", "subtitle": "営業部の声", "tone": "inverse",
+     "quote": "締め日の前に残る夜がなくなりました", "attribution": "営業部 課長", "source": "Source: インタビュー"},
+    {"pattern": "icon_grid", "title": "展開の前に3つの準備をそろえる", "subtitle": "準備",
+     "items": [{"icon": "users", "label": "推進役", "desc": "部門ごとに1名"},
+               {"icon": "workflow", "label": "承認ルート", "desc": "2段にそろえる", "focal": True},
+               {"icon": "plug", "label": "連携", "desc": "12月に検証"}]},
+    {"pattern": "agenda", "title": "次は投資の判断に移る", "subtitle": "論点(再掲)", "layout": "tiles", "current": 1,
+     "items": [{"label": "効果", "desc": "実績"}, {"label": "投資", "desc": "回収"}]},
+    {"pattern": "composite", "title": "投資は2.1年で回収できる", "subtitle": "回収の見通し",
+     "grid": [{"cells": [{"span": 4, "block": {"type": "callout", "style": "deep", "bleed": True,
+                                               "hero": {"value": "2.1", "unit": "年", "label": "回収期間"}}},
+                         {"span": 8, "block": {"type": "chart", "chart": {"type": "column", "unit": "億円",
+                          "categories": ["1年目", "2年目"], "series": [{"name": "累計", "values": [1.5, 3.0]}]}}}]}],
+     "source": "Source: 試算"}]}
+
+
+def test_richness_primitives_build_natively_and_stay_inside_the_slide(tmp_path):
+    """章トラッカー・評価表(sparkline と達成率の棒)・引用・アイコンのタイル・目次のタイル・濃い示唆帯・
+    端まで塗るパネルが、編集できるネイティブ図形で描かれ、verify の検査(コントラスト含む)を通る。"""
+    from pptx import Presentation
+    from pptx.util import Emu
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(RICH_DECK, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert "0 errors" in r.stdout, r.stdout
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0 and "0 failures" in v.stdout, v.stdout
+    slides = list(Presentation(out).slides)
+    names = lambda i: [sh.name for sh in slides[i].shapes]   # noqa: E731
+    assert names(1).count("tracker") == 2 and names(3).count("tracker") == 2     # 章の数の丸(扉以外のページ)
+    assert "tracker" not in names(0)                                           # 章扉には描かない
+    assert names(1).count("sparkline") == 2                                    # 行ごとの推移線
+    band = next(sh for sh in slides[1].shapes if sh.name == "insight")
+    assert band.left == 0 and band.left + band.width == Presentation(out).slide_width   # 濃い帯は端から端まで
+    panel = next(sh for sh in slides[6].shapes if sh.name == "panel")
+    assert panel.left == 0                                                     # パネルは左端まで塗る
+    assert sum(1 for sh in slides[4].shapes if sh.name.startswith("icon:")) == 3
+    assert all(Emu(sh.left) >= 0 and sh.top + sh.height <= Presentation(out).slide_height
+               for s in slides for sh in s.shapes)
+
+
+def test_validate_names_richness_defects(tmp_path):
+    import copy
+    d = copy.deepcopy(RICH_DECK)
+    d["slides"][1]["rows"][0]["progress"] = 3
+    d["slides"][3].pop("attribution")
+    d["slides"][4]["items"][0].pop("icon")
+    d["slides"][2]["tracker_label"] = "全社展開の進め方と投資の判断と、そのための体制とスケジュールの全体像"
+    d["slides"][5]["current"] = True
+    d["slides"][6]["grid"][0]["cells"][0]["block"]["hero"] = "2.1"
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(d, ensure_ascii=False))
+    out = run("validate_spec.py", p).stdout
+    assert "progress=3" in out
+    assert "attribution" in out
+    assert "全項目に icon が要る" in out
+    assert "章トラッカー" in out
+    assert "current=True" in out
+    assert "hero は" in out
+    d2 = copy.deepcopy(RICH_DECK)
+    d2["slides"][4]["items"] = ["推進役", "承認", "連携"]
+    p.write_text(json.dumps(d2, ensure_ascii=False))
+    assert "文字列だけの項目は書けない" in run("validate_spec.py", p).stdout
+
+
+def test_lint_tells_a_designed_bleed_from_a_clipped_element():
+    sys.path.insert(0, str(SCRIPTS))
+    import lint_render as L
+    assert L.designed_side_bleed({"insight": "x", "insight_style": "deep"})
+    assert not L.designed_side_bleed({"insight": "x", "insight_style": "primary"})
+    assert L.designed_side_bleed({"pattern": "composite", "grid": [{"cells": [{"block": {"type": "callout", "bleed": True}}]}]})
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", (1466, 825), CANVAS_RGB)
+    ImageDraw.Draw(im).rectangle([1300, 300, 1465, 360], fill=(0, 79, 73))     # 右端に一色の図形
+    assert any("right edge" in h for h in L.edge_scan(im))                     # 宣言が無ければ見切れとして鳴る
+    assert not any("right edge" in h for h in L.edge_scan(im, side_bleed=True))
+    solid = [(0, 79, 73)] * 95 + [(90, 140, 135)] * 5
+    assert L.solid_bleed(solid, list(range(500, 600)))                         # 一続きの一色の面
+    assert not L.solid_bleed(solid, list(range(0, 1000, 10)))                  # 字画のように途切れる
+    assert not L.solid_bleed([(40, 40, 40), (120, 120, 120), (200, 200, 200)] * 30, list(range(90)))
+
+
+def test_eval_colour_criterion_follows_the_design_template():
+    """採点の color-1 はデッキの基本デザインで言い直す: navy のデッキをティールとの距離で減点させない。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import eval_deck as E
+    assert E.palette_criterion("standard") is None
+    navy = E.palette_criterion("navy")
+    assert "#1F3A66" in navy and "not distance from teal" in navy
+    E.TEMPLATE = "navy"
+    try:
+        assert "[color-1] The deck wears" in E.rubric_body()
+    finally:
+        E.TEMPLATE = "standard"

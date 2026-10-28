@@ -156,7 +156,13 @@ def audit_view(slide: dict) -> dict:
         keys = _COMPOSITE_KEYS.get(b.get("type"), ())
         part = {k: b[k] for k in keys if k in b}
         if b.get("type") in ("text", "callout"):
-            claims.append(part)
+            # パネルの hero(大きな数字+名前)は KPI と同じく「示す」数 — 図表側に数える。
+            # 一文(statement)は主張のまま(hero の数を言い換えた文は、図表の数で裏付けられる)
+            hero = b.get("hero") if b.get("type") == "callout" else None
+            if isinstance(hero, dict) and hero.get("value") not in (None, ""):
+                exhibits.append({"hero": hero})
+            if part:
+                claims.append(part)
         else:
             if b.get("heading"):
                 claims.append({"heading": b["heading"]})

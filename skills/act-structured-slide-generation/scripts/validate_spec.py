@@ -67,13 +67,16 @@ PATTERNS = {
     "matrix_2x2": ["quadrants"],
     "gantt": ["periods", "tasks"],
     "harvey_table": ["criteria", "options"],
+    "scorecard": ["rows"],
+    "pull_quote": ["quote", "attribution"],
+    "icon_grid": ["items"],
 }
 EVIDENCE_PATTERNS = {
     "chart_insight", "market_sizing", "comparison_table", "competitive_landscape",
     "financial_summary", "waterfall", "kpi_dashboard",
     "financial_highlights", "metrics_rows", "driver_decomposition", "guidance_progress",
     "diagram", "chart_grid", "metric_proof", "logic_tree", "risk_matrix", "hub_spoke",
-    "before_after", "case_strip", "matrix_2x2", "harvey_table",
+    "before_after", "case_strip", "matrix_2x2", "harvey_table", "scorecard",
 }
 # 関係・構造の定性主張が正当なパターン: タイトルに数字が無くても警告しない
 QUALITATIVE_EVIDENCE = {"competitive_landscape", "diagram", "logic_tree", "risk_matrix", "hub_spoke",
@@ -148,6 +151,11 @@ FIT_CHECKS = {
                          "柱の項目か本文を減らす(4本柱+結論帯なら各柱2項目まで)"),
     "gantt": (lambda bd, s, h: bd._gantt_layout(s, h), "タスクを束ねる(group 行を含めて8行まで、名前は1行)"),
     "harvey_table": (lambda bd, s, h: bd._harvey_layout(s, h), "選択肢を減らすか、評価軸の名前を短くする"),
+    "scorecard": (lambda bd, s, h: bd._scorecard_layout(s, h), "行を減らすか、指標の注記を短くする(8行まで)"),
+    "pull_quote": (lambda bd, s, h: bd._pull_quote_layout(s, h), "声を切る(30pt で4行、1行あたり約24字まで)"),
+    "icon_grid": (lambda bd, s, h: bd._icon_grid_layout(s, h), "一文を短くするか、項目を減らす"),
+    "agenda": (lambda bd, s, h: bd._agenda_tiles_layout(s, h) if s.get("layout") == "tiles"
+               else {"overflow": False, "need_h": 0.0}, "タイルの説明を短くする(各2行まで)"),
     "composite": (lambda bd, s, h: bd._composite_layout(s, h),
                   "ブロックの中身を減らすか、行を減らす(表の行・要点の数が多いセルから)"),
 }
@@ -177,14 +185,36 @@ def _check_composite_block(errors, warns, bl: str, b: dict, span) -> None:
         return
     need = {"text": "points", "kpi": "kpis", "callout": "statement", "chart": "chart",
             "table": "table", "diagram": "diagram"}[t]
-    if not b.get(need):
-        errors.append(f"{bl}: {t} ブロックに {need} がない")
+    hero = b.get("hero") if t == "callout" else None
+    if hero is not None and not isinstance(hero, dict):
+        errors.append(f"{bl}: callout の hero は {{value, unit?, label?}} の形({type(hero).__name__} は書けない)")
+        hero = None
+    if isinstance(hero, dict) and hero.get("value") in (None, ""):
+        errors.append(f"{bl}: callout の hero に value がない — 数字の無い hero は描かれない")
+    has_hero = isinstance(hero, dict) and hero.get("value") not in (None, "")
+    if not b.get(need) and not has_hero:
+        errors.append(f"{bl}: {t} ブロックに {need} がない" + ("(または hero)" if t == "callout" else ""))
+    if t == "callout" and b.get("style") not in (None, "primary", "accent", "navy", "deep"):
+        errors.append(f"{bl}: callout の style '{b.get('style')}' は未対応 — primary / accent / navy / deep")
+    if t == "callout" and b.get("bleed") and b.get("style") not in ("deep", "navy"):
+        warns.append(f"{bl}: bleed は濃い面(style deep / navy)で使う — 淡い面を端まで塗ると地と区別がつかない")
     if t == "kpi" and len(b.get("kpis", [])) > 4:
         errors.append(f"{bl}: kpi ブロックは 4 つまで({len(b['kpis'])} つ)")
     if t == "table" and b.get("table") and not (b["table"].get("headers") and b["table"].get("rows")):
         errors.append(f"{bl}: table に headers と rows がない")
     if t == "chart" and isinstance(span, int) and span < 4:
         warns.append(f"{bl}: グラフに {span} 列は狭い — 4 列以上(目盛りと凡例が潰れる)")
+
+
+def bd_label_w(tokens, text: str) -> float:
+    bd = _builder(tokens)
+    return bd._label_w(text, bd.RAIL_HEAD_PT, 600)
+
+
+def s_label_col(tokens) -> float:
+    """scorecard の指標名の列幅(描画の _scorecard_layout と同じ)。"""
+    bd = _builder(tokens)
+    return bd._scorecard_layout({"rows": [{}]}, 4.0)["widths"][0]
 
 
 def _check_fit(errors, warns, loc, s, tokens) -> None:
@@ -325,14 +355,15 @@ def print_outline(slides: list) -> None:
 
 # アイコンを持てる並列の項目: (パターン, 一覧のキー, ラベルのキー)。composite は別に見る
 ICON_SETS = [("executive_summary", "points", ("heading", "kicker")), ("kpi_dashboard", "kpis", ("label",)),
-             ("column_framework", "columns", ("heading",)), ("hub_spoke", "spokes", ("label",))]
-INVERSE_PATTERNS = {"cover", "statement", "section_divider"}
+             ("column_framework", "columns", ("heading",)), ("hub_spoke", "spokes", ("label",)),
+             ("icon_grid", "items", ("label",))]
+INVERSE_PATTERNS = {"cover", "statement", "section_divider", "pull_quote"}
 # それ自体が視覚の錨(大きな数字・濃い面・強調された系列・図)を持つパターン
 ANCHORED = {"cover", "section_divider", "agenda", "kpi_dashboard", "chart_insight", "chart_grid", "market_sizing",
             "waterfall", "financial_summary", "financial_highlights", "metrics_rows", "driver_decomposition",
             "guidance_progress", "diagram", "metric_proof", "logic_tree", "milestone_timeline", "risk_matrix",
             "hub_spoke", "before_after", "case_strip", "matrix_2x2", "gantt", "harvey_table",
-            "competitive_landscape", "roadmap", "process_flow"}
+            "competitive_landscape", "roadmap", "process_flow", "scorecard", "pull_quote", "icon_grid"}
 
 
 def check_icons(errors, warns, loc, s) -> None:
@@ -998,6 +1029,62 @@ def main() -> int:
                 warns.append(f"{loc}: focal のタスクが3つ以上 — 強調は判断に関わる1-2本に絞る")
             if 3 <= len(per) <= 12 and 2 <= len(tks) <= 8:
                 _check_fit(errors, warns, loc, s, tokens)
+        if pat == "scorecard":
+            rows_ = s.get("rows", [])
+            if not 2 <= len(rows_) <= 8:
+                errors.append(f"{loc}: scorecard の rows は 2-8 行({len(rows_)} 行) — 9 行以上は表(comparison_table)に")
+            label_col = s_label_col(tokens)
+            if any(not isinstance(r, dict) for r in rows_):
+                errors.append(f"{loc}: scorecard の rows は {{label, value, ...}} の形")
+                rows_ = [r for r in rows_ if isinstance(r, dict)]
+            for j, r in enumerate(rows_):
+                if not r.get("label"):
+                    errors.append(f"{loc}: scorecard の行 {j} に label がない")
+                pg = r.get("progress")
+                if pg is not None and (isinstance(pg, bool) or not isinstance(pg, (int, float)) or not 0 <= pg <= 1.5):
+                    errors.append(f"{loc}: scorecard の行 {j} の progress={pg!r} — 達成率は 0-1(1.0 = 100%)")
+                tr = r.get("trend")
+                if tr is not None and (not isinstance(tr, list) or len(tr) < 3
+                                       or any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in tr)):
+                    errors.append(f"{loc}: scorecard の行 {j} の trend は数値の配列(3点以上)")
+                if r.get("status") not in (None, "good", "watch", "bad"):
+                    errors.append(f"{loc}: scorecard の行 {j} の status '{r.get('status')}' — good / watch / bad")
+                if r.get("label") and bd_label_w(tokens, r["label"]) > label_col:
+                    errors.append(f"{loc}: scorecard の指標名 '{r['label']}' が1行に入らない — 短くして、補足は note へ")
+            if sum(1 for r in rows_ if r.get("focal")) > 2:
+                warns.append(f"{loc}: scorecard の focal 行が3つ以上 — 強調は判断に関わる1-2行に絞る")
+            if 2 <= len(rows_) <= 8 and len(rows_) == len(s.get("rows", [])):
+                _check_fit(errors, warns, loc, s, tokens)
+        if pat == "pull_quote":
+            q = str(s.get("quote", ""))
+            if len(q) > 110:
+                errors.append(f"{loc}: pull_quote の声が {len(q)} 字 — 110 字までに切る(30pt で4行。型は縮めない)")
+            if not str(s.get("attribution", "")).strip():
+                errors.append(f"{loc}: pull_quote に attribution(だれの声か)がない")
+            _check_fit(errors, warns, loc, s, tokens)
+        if pat == "icon_grid":
+            its = s.get("items", [])
+            if not 3 <= len(its) <= 9:
+                errors.append(f"{loc}: icon_grid の items は 3-9 個({len(its)} 個)")
+            if any(not isinstance(it, dict) for it in its):
+                errors.append(f"{loc}: icon_grid の items は {{icon, label, desc?}} の形 — 文字列だけの項目は書けない")
+                its = [it for it in its if isinstance(it, dict)]
+            if any(not it.get("icon") for it in its if isinstance(it, dict)):
+                errors.append(f"{loc}: icon_grid は全項目に icon が要る — 無い項目があるなら column_framework か executive_summary に")
+            if sum(1 for it in its if isinstance(it, dict) and it.get("focal")) > 1:
+                errors.append(f"{loc}: icon_grid の focal は1枚まで(濃い面は1画面に1つ)")
+            if 3 <= len(its) <= 9 and len(its) == len(s.get("items", [])):
+                _check_fit(errors, warns, loc, s, tokens)
+        if pat == "agenda" and s.get("layout") == "tiles":
+            its = s.get("items", [])
+            if not 2 <= len(its) <= 5:
+                errors.append(f"{loc}: agenda の tiles は 2-5 項目({len(its)} 項目) — 6 項目以上は縦の一覧(layout 省略)")
+            cur = s.get("current")
+            if cur is not None and (isinstance(cur, bool) or not (isinstance(cur, int) and 0 <= cur < len(its))):
+                errors.append(f"{loc}: agenda の current={cur!r} — items の添字")
+            _check_fit(errors, warns, loc, s, tokens)
+        if s.get("insight_style") not in (None, "accent", "primary", "deep"):
+            errors.append(f"{loc}: insight_style '{s.get('insight_style')}' — accent / primary / deep")
         if pat == "harvey_table":
             cr = s.get("criteria", [])
             op = s.get("options", [])
@@ -1285,7 +1372,7 @@ def main() -> int:
         warns.append(f"反転(tone: inverse)が {len(inv)}/{len(slides)} 枚 — 表紙・章扉・締めに絞る(目安は全体の 25% まで)")
     content_slides = [s for s in slides if s.get("pattern") not in STRUCTURAL]
     if len(slides) >= 8:
-        heroes = [s for s in slides if s.get("tone") == "inverse" or s.get("pattern") in ("metric_proof", "kpi_dashboard", "case_strip")
+        heroes = [s for s in slides if s.get("tone") == "inverse" or s.get("pattern") in ("metric_proof", "kpi_dashboard", "case_strip", "pull_quote", "scorecard")
                   or (s.get("pattern") == "statement" and s.get("recap"))]
         if not heroes:
             warns.append("山場のページが無い — 8 枚以上のデッキには、反転の表紙か締め、またはヒーロー数値のページを1枚以上置く")
@@ -1295,6 +1382,19 @@ def main() -> int:
             warns.append(f"型の多様性が低い(実質 {div:.1f} 型 / 内容 {len(content_slides)} 枚、目安 {floor_div:.1f} 以上) — "
                          "同じ型の繰り返しを composite の組み立てや別の型に置き換える")
 
+    # 章トラッカー: 章扉が2つ以上要る。丸の列と最長の章名が、右上の札(sticker)の場所を残して帯に入ること
+    if (deck.get("meta") or {}).get("tracker"):
+        divs = [s for s in slides if s.get("pattern") == "section_divider"]
+        if len(divs) < 2:
+            warns.append("meta.tracker は章扉(section_divider)が2つ以上のデッキで効く — いまは描かれない")
+        else:
+            bd = _builder(tokens)
+            chapters = [(d.get("number") or i + 1, d.get("title", "")) for i, d in enumerate(divs)]
+            room = bd.LAY["header"]["title_w_in"] - 1.8
+            for i, d in enumerate(divs):
+                lab = str(d.get("tracker_label") or d.get("title", ""))
+                if len(lab) > 16 or bd.tracker_width(chapters, lab) > room:
+                    errors.append(f"章トラッカー: 章 {i + 1} の名前 '{lab}' が長すぎる — 章扉に16字までの tracker_label を付ける")
     # adjacent-slide monotony: same content pattern back to back reads as a template loop
     prev_pat = None
     for i, s in enumerate(slides, start=1):

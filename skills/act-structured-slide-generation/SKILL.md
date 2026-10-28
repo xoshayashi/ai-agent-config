@@ -188,7 +188,7 @@ reintroduce hard-coded character budgets for headers.
 |---|---|---|
 | A known consulting archetype | the pattern or `composite` recipe it maps to | `consulting-page-catalogue.md` |
 | A combination (chart + notes + so-what, KPI strip + table, three issue cards + bar) | `composite` with role-tagged `blocks`; the layout search picks the arrangement | `layout-search.md` |
-| A specific geometry (pillars, tree, decision timeline, risk grid, hub, before/after, cases, 2x2, workplan, Harvey balls) | the dedicated pattern | `deck-spec.md` |
+| A specific geometry (pillars, tree, decision timeline, risk grid, hub, before/after, cases, 2x2, workplan, Harvey balls, scorecard, pull quote, icon tiles) | the dedicated pattern | `deck-spec.md` |
 | A chart beyond plain column / bar / line / stacked / donut | Vega-Lite (`kind: "vega"` or `mekko` / `slope` / `dumbbell` / `bullet`); waterfalls are always native | `charts-vega.md` |
 
 For `composite` blocks, give each block a `role` (`focal` answers the reader question;
@@ -204,9 +204,13 @@ illustrative sticker requires an `assumption`.
 `focal` item or series, a callout panel, or an `icon` set on parallel items (summary points, KPIs,
 pillars, spokes; all or none, always beside a label). Give the deck peaks with `tone: "inverse"`
 (the brand-dark surface) on the cover, the close or chapter dividers, at most about a quarter of
-the deck. Vary layouts; validate scores the deck's layout diversity. Keep the grid, type scale and
-palette fixed: richness is contrast, not new colours. Rules, sources and checks:
-`references/design-richness.md`.
+the deck. Between them, place two or three dark surfaces that carry an argument: a split-tone
+panel (composite `callout` `style: "deep"` + `hero` + `bleed`), a deep so-what band
+(`insight_style: "deep"`), or an inverse `pull_quote`. Use `scorecard` for metric reviews,
+`icon_grid` for parallel capabilities, agenda `layout: "tiles"` with `current` for the reprise,
+and `meta.tracker` in decks with chapters. Vary layouts; validate scores the deck's layout
+diversity. Keep the grid, type scale and palette fixed: richness is contrast, not new colours.
+Rules, sources and checks: `references/design-richness.md`.
 
 **Text frames.** A group that reads as one thing is one text box, built from paragraphs
 (label -> value -> note; heading -> body; a whole interpretation rail). Leading follows the
@@ -303,13 +307,14 @@ After self-repair, use an independent reviewer from the other CLI to score the r
 with `evals/rubric.json`. Iterate until the deck scores at least 95.
 
 ```bash
-python3 scripts/eval_deck.py render/ --judge codex --anchor "<slide-1 title phrase>"
-python3 scripts/eval_deck.py render/ --judge claude --anchor "<slide-1 title phrase>"
+python3 scripts/eval_deck.py render/ --judge codex --anchor "<slide-1 title phrase>" --spec deck.json
+python3 scripts/eval_deck.py render/ --judge claude --anchor "<slide-1 title phrase>" --spec deck.json
 ```
 
 The rubric loads automatically from `evals/rubric.json`; there is no `--rubric` flag.
 `--anchor` takes a phrase from slide 1's title so the judge's readback proves it scored
-the right images.
+the right images. `--spec` tells the judge the deck's design template, so a `navy`,
+`monochrome` or `bold` deck is judged within its own palette, not against teal.
 
 Use `--judge codex` when the host is Claude Code. Use `--judge claude` when the host is Codex.
 Every reported defect must be rechecked against the actual render before editing; judges can
@@ -361,7 +366,7 @@ Read only what the task needs, but do not skip the required workflow references.
 | `references/templates/*.json` | The template patches themselves (`standard`, `navy`, `monochrome`, `bold`) |
 | `references/design-principles.md` | Act visual grammar, hierarchy, color, density judgment, and page rhythm |
 | `references/grid-and-flex-strategy.md` | Granular grid/flex contract for layout consistency |
-| `references/design-richness.md` | Visual anchors, icons, inverse surfaces, rhythm, layout diversity, contrast: rules, checks, sources |
+| `references/design-richness.md` | Visual anchors, icons, inverse surfaces, split panels, deep bands, tracker, rhythm, layout diversity, contrast: rules, checks, sources |
 | `references/composition-vocabulary.md` | Composition moves, not templates |
 | `references/charts-vega.md` | Vega-Lite charts and consulting recipes (mekko / slope / dumbbell / bullet), chart choice by comparison, checks |
 | `references/layout-search.md` | Why and how `composite` blocks are arranged by search: roles, candidate grammar, verifiable scores, research sources |
