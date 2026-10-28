@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """Install or remove the shared notification hook in each CLI's config.
 
-Claude Code, Codex, and Gemini CLI each run shell commands on lifecycle
+Claude Code and Codex each run shell commands on lifecycle
 events ("hooks"). This helper wires the repo's notifications/notify.sh into
 those configs so a desktop notification fires when an agent finishes a turn
 or needs attention.
 
-All three target files are JSON, so they are merged in place rather than
+Both target files are JSON, so they are merged in place rather than
 symlinked: the CLI config files hold unrelated user settings that must be
 preserved. The merge is idempotent and reversible — managed entries are
 identified by the notify.sh path inside their command string.

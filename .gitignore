@@ -28,12 +28,10 @@ gha-creds-*.json
 .gemini/
 .serena/
 .memories/
-# Keep only the repository-owned GitHub workflows; local templates/config stay untracked.
+# Keep the repository-owned GitHub workflows (all of .github/workflows/); local templates/config stay untracked.
 .github/*
 !.github/
 !.github/workflows/
-!.github/workflows/claude-code-review.yml
-!.github/workflows/validate.yml
 
 # Local CLI-generated instruction entrypoints at repo root (canonical files live under instructions/)
 /CLAUDE.md
@@ -59,6 +57,6 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 
-# iTerm2 preference exports (machine-local)
-*.plist
-*.plist.*
+# iTerm2 preference exports (machine-local; tracked macOS defaults live in macos/defaults/)
+instructions/*.plist
+instructions/*.plist.*

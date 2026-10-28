@@ -47,6 +47,7 @@ macOS では `setup.sh` が先に Command Line Tools と Homebrew を確認し�
 - `pipx`
 - `graphviz`（スライド skill の図解に必要な `dot`）
 - `poppler`（スライド skill のレンダ検証に必要な `pdftoppm`）
+- `hashicorp/tap/vault`（`hashicorp/tap` を tap して導入。`vault` が既にあれば skip）
 
 `colab-cli` は Homebrew formula が無いため、`pipx` で Python CLI として入れます。
 既に入っている場合は PyPI の最新 version と比較し、更新がある場合だけ
@@ -54,7 +55,7 @@ macOS では `setup.sh` が先に Command Line Tools と Homebrew を確認し�
 
 Codex CLI は公式推奨の standalone installer で入れます。既存の Homebrew
 `codex` cask がある場合は外し、`~/.local/bin/codex` の launcher を使います。
-Claude Code は公式推奨 of Native Install で入れます。既存の Homebrew
+Claude Code は公式推奨の Native Install で入れます。既存の Homebrew
 `claude-code` / `claude-code@latest` cask がある場合は外し、`~/.local/bin/claude`
 の launcher を使います。
 
@@ -173,7 +174,7 @@ AI_AGENT_CONFLICT_MODE=fail sh scripts/setup.sh
 sh scripts/validate-repo.sh
 ```
 
-この validation は、必要なファイルの存在、repository surface、任意の `skills/` 構造、entrypoint 参照、health-check と setup dry-run を確認します。
+この validation は、shell / Python の構文、macOS plist の lint、必要なファイルの存在、repository surface（廃止済み path が無いこと、tracked file が `.gitignore` に掛からないこと）、任意の `skills/` 構造、entrypoint 参照、health-check と setup dry-run を確認します。
 
 ## Skill Links
 
@@ -190,22 +191,24 @@ sh scripts/validate-repo.sh
 ## Skill runtime dependencies
 
 一部の skill はスクリプト実行用に外部ランタイムを使います。`setup.sh` は
-これらの存在を確認します。macOS bootstrap が有効な場合、`openpyxl` は
-`python3 -m pip install --user --break-system-packages` でユーザー site-packages へ
-自動インストールし、LibreOffice は cask として自動インストール対象です。状態は
+これらの存在を確認します。不足している Python package は、各 skill の
+`scripts/requirements.txt` から `python3 -m pip install --user --break-system-packages`
+でユーザー site-packages へ自動インストールします。Graphviz / poppler / LibreOffice は
+macOS bootstrap の formula / cask として自動インストール対象です。状態は
 `sh scripts/health-check.sh` の
 `skill dependencies:` 行でも確認できます。
 
 | 依存 | 区分 | 用途 | 不足時の対応 |
 |---|---|---|---|
 | `python3` / `pip` / `pip3` | 必須 | skill スクリプト（財務モデリング、スライド packaging）の実行と Python package 導入 | macOS は `brew install python` |
-| `openpyxl` | 必須 | `startup-financial-modeling` の xlsx 生成 | `setup.sh` がユーザー site-packages へ導入 |
-| `python-pptx` / `Pillow` / `lxml` / `fonttools` / `graphviz`(py) / `vl-convert-python` / `svgelements` / `resvg_py` | 必須 | `act-structured-slide-generation` の pptx 生成・図表・検証 | `setup.sh` が `requirements.txt` からユーザー site-packages へ導入 |
+| `openpyxl` / `PyYAML` | 必須 | `startup-financial-modeling` の xlsx 生成 | `openpyxl` か `PyYAML` が import できない場合、`setup.sh` が `requirements.txt` からユーザー site-packages へ導入 |
+| `python-pptx` / `Pillow` / `lxml` / `fonttools` / `graphviz`(py) / `vl-convert-python` / `svgelements` | 必須 | `act-structured-slide-generation` の pptx 生成、Vega-Lite チャート（`vl-convert-python`）、Graphviz 図解、Lucide アイコン（`svgelements`） | `setup.sh` が `requirements.txt` からユーザー site-packages へ導入 |
 | Geist / Noto Sans JP フォント（400/600/700） | 必須 | スライドの文字採寸（無いと折返しが近似化し描画が崩れる） | `setup.sh` が同梱の `setup_fonts.py` で `~/Library/Fonts` へ導入 |
 | Graphviz CLI (`dot`) | 必須 | 図解（org_tree / node_graph）のビルド | `setup.sh` が `brew install graphviz` |
 | poppler (`pdftoppm`) | 必須 | スライドのレンダリング検証（PDF→PNG） | `setup.sh` が `brew install poppler` |
 | LibreOffice (`soffice`) | 必須 | xlsx の再計算検証、スライドの PDF レンダリング | `setup.sh` が `brew install --cask libreoffice` |
-| ImageMagick (`convert`)・画像生成 API | 任意 | スライド画像 skill の個別処理 | 各 skill の手順に従って個別に用意 |
+| 追加 package なし | — | `act-slide-image-generation` / `atom-slide-image-generation` の PPTX/PDF packaging（標準ライブラリのみ）。画像は Codex 組み込みの `gpt-image-2` で生成 | 不要 |
+| `hvac` | 任意 | HashiCorp Vault の Python client（skill 用ではありません） | `setup.sh` がユーザー site-packages へ導入 |
 
 LibreOffice は macOS Homebrew では `soffice` という名前で入りますが、skill は
 `libreoffice` という名前で探します。`setup.sh` は `soffice` が見つかり
@@ -216,8 +219,8 @@ LibreOffice は macOS Homebrew では `soffice` という名前で入ります�
 
 ## Optional macOS apps
 
-`setup.sh` は GUI アプリを自動インストールしません。Microsoft Office が必要な
-場合は、Homebrew Cask で次を実行します。
+Microsoft Office は `setup.sh` の cask 一覧に含まれません。必要な場合は、
+Homebrew Cask で次を実行します。
 
 ```sh
 brew install --cask microsoft-office
@@ -231,6 +234,10 @@ brew install --cask microsoft-office
 
 `setup.sh` は `shell/.zshrc` を `~/.zshrc` にリンクします。`.zshrc` の正本は
 このリポジトリにあり、編集はリポジトリ側で行います。
+
+API キーやトークンなどの秘密情報は `shell/.zshrc` に書きません。git 管理外の
+`~/.zshrc.local` に置きます。`shell/.zshrc` は末尾で、このファイルが読める場合だけ
+`source` します。`setup.sh` は `~/.zshrc.local` を作らないため、必要なら手で作ります。
 
 既存の `~/.zshrc` が通常ファイルとして残っていると、既定 (`skip`) では
 リンクが作られません。`AI_AGENT_CONFLICT_MODE=replace` は instruction や

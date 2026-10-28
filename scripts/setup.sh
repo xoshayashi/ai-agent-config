@@ -859,7 +859,8 @@ install_notification_hooks() {
 install_skill_runtime_support() {
   if ! command -v python3 >/dev/null 2>&1; then
     warn "python3 not found; skill scripts (financial modeling, slide packaging) will not run"
-  elif ! python3 -c 'import openpyxl' >/dev/null 2>&1; then
+  # startup-financial-modeling は openpyxl と PyYAML(yaml)の両方を使う(requirements.txt と一致させる)。
+  elif ! python3 -c 'import openpyxl, yaml' >/dev/null 2>&1; then
     requirements_file="$skill_source_root/startup-financial-modeling/scripts/requirements.txt"
     if [ ! -f "$requirements_file" ]; then
       warn "python package openpyxl missing; requirements file not found: $requirements_file"
@@ -870,7 +871,7 @@ install_skill_runtime_support() {
     else
       say "install: python package openpyxl"
       if python3 -m pip install --user --break-system-packages -r "$requirements_file"; then
-        if python3 -c 'import openpyxl' >/dev/null 2>&1; then
+        if python3 -c 'import openpyxl, yaml' >/dev/null 2>&1; then
           say "ok: python package openpyxl"
         else
           warn "python package openpyxl still does not import after install"

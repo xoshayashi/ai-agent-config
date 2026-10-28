@@ -219,6 +219,53 @@ grep -Fq 'install_macos_bootstrap' "$repo_root/scripts/setup.sh" \
 grep -Fq 'apply_macos_settings' "$repo_root/scripts/setup.sh" \
   || fail "setup.sh must apply captured macOS settings"
 
+# Codex 用の共有ファイルは setup / uninstall / health-check の3か所で同じ集合を扱う。
+# どれかに追加漏れがあると、張ったリンクが外れない・状態が見えない、が起きる。
+for shared_doc in AGENTS INSTRUCTIONS DESIGN WRITING; do
+  for script_name in setup.sh uninstall.sh health-check.sh; do
+    grep -Fq "\$codex_home/${shared_doc}.md" "$repo_root/scripts/$script_name" \
+      || fail "scripts/$script_name must handle codex ${shared_doc}.md"
+  done
+done
+for script_name in setup.sh uninstall.sh health-check.sh; do
+  grep -Fq "\$claude_home/CLAUDE.md" "$repo_root/scripts/$script_name" \
+    || fail "scripts/$script_name must handle claude CLAUDE.md"
+done
+
+say "validate: skill python dependencies match requirements.txt"
+# requirements.txt の各パッケージが、setup.sh と health-check.sh の import プローブに
+# 入っているかを見る。パッケージ名と import 名が違うものだけ対応表で変換する。
+# pytest は開発用なので対象外。
+for requirements_file in "$repo_root"/skills/*/scripts/requirements.txt; do
+  [ -f "$requirements_file" ] || continue
+  sed -e 's/#.*//' -e 's/[<>=!~;[ ].*//' "$requirements_file" | while IFS= read -r package; do
+    [ -n "$package" ] || continue
+    case "$package" in
+      pytest) continue ;;
+      python-pptx) module=pptx ;;
+      Pillow) module=PIL ;;
+      fonttools) module=fontTools ;;
+      vl-convert-python) module=vl_convert ;;
+      PyYAML) module=yaml ;;
+      *) module=$package ;;
+    esac
+    for script_name in setup.sh health-check.sh; do
+      grep -Eq "python3 -c 'import ([A-Za-z_]+, )*${module}(, [A-Za-z_]+)*'" "$repo_root/scripts/$script_name" \
+        || fail "scripts/$script_name must probe python module $module (from ${requirements_file#"$repo_root"/})"
+    done
+  done
+done
+! grep -Fiq "matplotlib" "$repo_root/scripts/setup.sh" "$repo_root/scripts/health-check.sh" \
+    "$repo_root"/skills/*/scripts/requirements.txt \
+  || fail "matplotlib was removed from the slide skill and must not be installed or probed"
+
+say "validate: no secrets in tracked files"
+# 典型的なキー形式だけを見る。各パターンは接尾の長さを要求するため、この行自体には一致しない。
+secret_hits=$(git -C "$repo_root" grep -nIE \
+  'pat-na2-[0-9a-f]{8}|sk-ws-[A-Za-z0-9_-]{16,}|sk-ant-[A-Za-z0-9_-]{20,}|ghp_[A-Za-z0-9]{36}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----' \
+  -- . 2>/dev/null | cut -d: -f1-2 || true)
+[ -z "$secret_hits" ] || fail "tracked files contain secret-like strings: $(printf '%s' "$secret_hits" | tr '\n' ' ')"
+
 say "validate: health-check runs"
 AI_AGENT_CONFIG_HOME="$repo_root" sh "$repo_root/scripts/health-check.sh" --json >/dev/null
 

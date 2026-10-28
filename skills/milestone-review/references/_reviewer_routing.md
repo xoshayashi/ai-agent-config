@@ -378,7 +378,7 @@ When `--strict-gate` is specified:
 
 This allows shell scripts and agent loops to conditionally halt or block a merge based on exit code:
 ```sh
-python3 route_review.py --reviewer auto --host claude-code --prompt-file review_ask.txt --include-git --strict-gate
+python3 <skill_dir>/scripts/route_review.py --reviewer auto --host claude-code --prompt-file review_ask.txt --include-git --strict-gate
 rc=$?
 
 if [ $rc -eq 3 ]; then

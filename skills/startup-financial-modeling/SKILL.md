@@ -26,7 +26,7 @@ description: Use when the user needs a startup 収支計画 / financial plan xls
    集約成長率を入力にしない）に従って原始ドライバーまで分解する。
    全入力に basis（実績/契約/記載/仮置き/ベンチマーク/逆算）と source を必須で付ける。
    逆算（目標からのback-solve）は許容されるが、必ずbasis=逆算＋照合チェック行とセット。
-2. **YAMLに構造化** — スキーマ（依存: `pip install -r scripts/requirements.txt`）:
+2. **YAMLに構造化** — スキーマ（依存: `pip install -r scripts/requirements.txt`。再計算・PDF生成に LibreOffice の `soffice` も必要）:
    - `meta系`: company / model_title / start_year / periods / source_note
    - `tree`: セクション（section/sheet∈{revenue,headcount,costs}/note）の配列。
      各ドライバー: id / label / unit（必須） / fmt∈{m,yen,pct,cnt,x,d1} /

@@ -208,7 +208,8 @@ python3_status=$(command_status python3)
 pip_status=$(command_status pip)
 pip3_status=$(command_status pip3)
 openpyxl_status=missing
-if command -v python3 >/dev/null 2>&1 && python3 -c 'import openpyxl' >/dev/null 2>&1; then
+# startup-financial-modeling は openpyxl と PyYAML(yaml)の両方を使う(requirements.txt と一致させる)。
+if command -v python3 >/dev/null 2>&1 && python3 -c 'import openpyxl, yaml' >/dev/null 2>&1; then
   openpyxl_status=ok
 fi
 pptx_deps_status=missing

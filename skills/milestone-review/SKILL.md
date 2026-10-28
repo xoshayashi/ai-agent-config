@@ -152,7 +152,7 @@ Full table + selection heuristics in `references/_reviewer_routing.md`.
       the outcome of the next step? If not, the answer is too vague and
       needs to be re-asked.
 6. **Record.** Append a short entry to the calling task's progress log
-   (e.g. `docs/sfm-overhaul/progress.md`) so a fresh session can audit
+   (e.g. the task's `progress.md`) so a fresh session can audit
    whether the review was *valid*, not just what it concluded: host,
    reviewer(s) + each route's `status` (ok / degraded / blocked), whether
    a digest substitute route was used, the one-line conclusion, the

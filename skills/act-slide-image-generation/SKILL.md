@@ -16,10 +16,11 @@ Use the smallest reference set required for the current phase:
 - `build/references/content-and-story.md` for argument, evidence, and reading order
 - `build/references/argument-closure-and-deck-logic.md` for closed slide reasoning, dependency-complete deck sequencing, counterarguments, and decision coverage
 - `build/references/generation-review-packaging.md` for production, review, and delivery
+- `build/references/text-to-slide-structure.md` for routing prose through the construction process before layout
 - `build/references/prompt-recipes.md` for a prompt scaffold
 - `build/references/openai-gpt-image-2-best-practices.md` for model semantics
 
-Generate final PNG pixels with Codex built-in `gpt-image-2`. Keep each approved master once in `slides_final/`, inspect every actual PNG, then package approved masters with the PPTX/PDF scripts.
+Generate final PNG pixels with Codex built-in `gpt-image-2`. Keep each approved master once in `slides_final/`, inspect every actual PNG, then package approved masters with `scripts/package_slide_images_to_pptx.py` or `scripts/package_slide_images_to_pdf.py`. Compile prompts with `scripts/build_act_slide_prompt.py`; `scripts/eval_act_skill.py` checks the skill contract.
 
 ## Core Master
 
