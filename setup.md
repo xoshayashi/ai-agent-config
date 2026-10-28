@@ -201,7 +201,7 @@ sh scripts/validate-repo.sh
 |---|---|---|---|
 | `python3` / `pip` / `pip3` | 必須 | skill スクリプト（財務モデリング、スライド packaging）の実行と Python package 導入 | macOS は `brew install python` |
 | `openpyxl` | 必須 | `startup-financial-modeling` の xlsx 生成 | `setup.sh` がユーザー site-packages へ導入 |
-| `python-pptx` / `Pillow` / `lxml` / `fonttools` / `matplotlib` / `matplotlib-venn` / `graphviz`(py) / `resvg_py` | 必須 | `act-structured-slide-generation` の pptx 生成・図表・検証 | `setup.sh` が `requirements.txt` からユーザー site-packages へ導入 |
+| `python-pptx` / `Pillow` / `lxml` / `fonttools` / `matplotlib` / `matplotlib-venn` / `graphviz`(py) / `vl-convert-python` / `resvg_py` | 必須 | `act-structured-slide-generation` の pptx 生成・図表・検証 | `setup.sh` が `requirements.txt` からユーザー site-packages へ導入 |
 | Geist / Noto Sans JP フォント（400/600/700） | 必須 | スライドの文字採寸（無いと折返しが近似化し描画が崩れる） | `setup.sh` が同梱の `setup_fonts.py` で `~/Library/Fonts` へ導入 |
 | Graphviz CLI (`dot`) | 必須 | 図解（org_tree / node_graph）のビルド | `setup.sh` が `brew install graphviz` |
 | poppler (`pdftoppm`) | 必須 | スライドのレンダリング検証（PDF→PNG） | `setup.sh` が `brew install poppler` |

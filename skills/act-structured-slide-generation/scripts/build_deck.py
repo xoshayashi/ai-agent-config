@@ -867,7 +867,29 @@ def add_chrome(slide, spec: dict, page_no: int, total: int, deck: dict) -> None:
     if spec.get("subtitle"):
         add_text(slide, hdr["title_x_in"], m["sub_y"], hdr["title_w_in"], m["sub_h"],
                  [[(spec["subtitle"], TS["subtitle"], 400, C["ink_subtle"])]], line_spacing=1.18)
+    add_sticker(slide, spec)
     add_footer(slide, spec, page_no, total, deck)
+
+
+STICKER_PT = 10
+CHROME_TOP_Y = 0.13        # タイトル上端(title_y_in 0.40)の上の帯。タイトルの位置は動かさない
+
+
+def add_sticker(slide, spec: dict) -> None:
+    """状態の札(sticker: 暫定 / 例示 / 議論用)をスライド右上の隅に置く。戦略ファームの資料で、数値や
+    結論の確度を読み手に先に伝える印。罫で囲むだけで塗らない — 結論より目立たせない。タイトルの上の
+    行(kicker)ではなく右上の隅の札なので、ヘッダーの寸法(本文帯の位置)は変えない。"""
+    hdr = LAY["header"]
+    line_h = drawn_line_h(STICKER_PT)
+    st = spec.get("sticker")
+    if isinstance(st, str) and st.strip():
+        tw = _label_w(st.strip(), STICKER_PT, 600)
+        bw, bh = tw + 0.24, line_h + 0.06
+        bx = hdr["title_x_in"] + hdr["title_w_in"] - bw
+        add_rect(slide, bx, CHROME_TOP_Y - 0.03, bw, bh, None, line=C["ink_subtle"], line_w_pt=0.75)
+        add_text(slide, bx, CHROME_TOP_Y - 0.03 - ink_center_offset_in(STICKER_PT), bw, bh,
+                 [[(st.strip(), STICKER_PT, 600, C["ink_subtle"])]], align=PP_ALIGN.CENTER,
+                 anchor=MSO_ANCHOR.MIDDLE, wrap=False)
 
 
 def add_footer(slide, spec: dict, page_no: int, total: int, deck: dict) -> None:
@@ -1396,7 +1418,8 @@ def add_chart_annotations(slide, cx, cy, cw, ch, cspec):
 _ASSET_ROOT = None  # set in build(): dir where generated assets + asset-manifest.json are cached
 IMAGE_ASSET_KINDS = frozenset({
     "combo", "area", "radar", "scatter", "bubble", "waterfall", "line_multi",
-    "org_tree", "node_graph", "ring", "funnel", "pyramid", "venn", "matrix"})
+    "org_tree", "node_graph", "ring", "funnel", "pyramid", "venn", "matrix",
+    "vega", "mekko", "slope", "dumbbell", "bullet"})
 
 
 def _asset_kind(obj):

@@ -44,6 +44,12 @@ name. An absent template resolves to `standard`, which is byte-for-byte the pre-
 ## Fields Common To Slides
 
 - `pattern` (required): one of the implemented primitives below.
+- `sticker` (optional): a short status label in the top-right corner, as strategy firms use them
+  (preliminary, for discussion, hypothesis, illustrative — written in the deck's language).
+  1-8 characters, outlined, never filled. An illustrative sticker (the words listed in
+  `validate_spec.ILLUSTRATIVE_STICKERS`) marks the numbers as hypothetical, so the slide must
+  carry an `assumption` saying what was assumed. It is a corner label, not a kicker line above
+  the title (kickers stay retired).
 - `title` (required on EVERY slide, cover and statement included): conclusion-oriented action
   title. Always ONE line — no `\n`, no wrapping.
 - `subtitle` (required on every slide): scope line, not a second claim. One line — except on
@@ -500,6 +506,10 @@ natively around it.
   — columns + a line on a second axis (margin/ARPU/payout); the dominant IR motif native cannot draw.
 - `{"kind": "area", "categories": [...], "series": [{"name","values"}, …]}` — stacked-area over time.
 - `{"kind": "line_multi" | "radar" | "scatter" | "bubble" | "waterfall", …}` — see act_assets for fields.
+- `{"kind": "vega", "data": [rows], "mark", "encoding", "focal"?, "labels"?, "unit"}` — any Vega-Lite
+  chart (histogram, heat map, facets, layered bands, ...) in the Act look.
+- `{"kind": "mekko" | "slope" | "dumbbell" | "bullet", …}` — consulting recipes compiled to Vega-Lite.
+  See `charts-vega.md` for fields, the chart-choice table and the checks.
 
 Use an image chart only when the native seven cannot express the claim; native charts stay editable.
 

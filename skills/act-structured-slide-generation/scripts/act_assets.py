@@ -40,16 +40,32 @@ def _renderer_versions() -> str:
 CHART_KINDS = {"combo", "area", "radar", "scatter", "bubble", "waterfall", "line_multi"}
 DIAGRAM_GRAPHVIZ = {"org_tree", "node_graph"}
 DIAGRAM_MPL = {"ring", "funnel", "pyramid", "venn", "matrix"}
-ASSET_KINDS = CHART_KINDS | DIAGRAM_GRAPHVIZ | DIAGRAM_MPL
+# Vega-Lite で描くグラフ(act_vega): 任意の宣言(vega)と、戦略ファーム定番のレシピ
+VEGA_KINDS = {"vega", "mekko", "slope", "dumbbell", "bullet"}
+ASSET_KINDS = CHART_KINDS | DIAGRAM_GRAPHVIZ | DIAGRAM_MPL | VEGA_KINDS
 
 
 # ---------------------------------------------------------------- cache / manifest / audit
 
+def _vega_fingerprint() -> str:
+    """Vega のグラフは、vl-convert の版と act_vega.py(テーマとレシピ)の中身で描き方が決まる。
+    どちらかが変われば作り直す — 手で BACKEND_VERSION を上げ忘れても古い画像を使わない。"""
+    from importlib import metadata
+    try:
+        ver = metadata.version("vl-convert-python")
+    except Exception:
+        ver = "?"
+    src = (Path(__file__).resolve().parent / "act_vega.py").read_bytes()
+    return ver + ":" + hashlib.sha1(src).hexdigest()[:12]
+
+
 def asset_id(spec: dict, size_in: tuple[float, float]) -> str:
-    payload = json.dumps({"spec": spec, "size": [round(size_in[0], 3), round(size_in[1], 3)],
-                          "backend": BACKEND_VERSION, "renderers": _renderer_versions(),
-                          "tokens": theme.tokens_hash()},
-                         sort_keys=True, ensure_ascii=False)
+    key = {"spec": spec, "size": [round(size_in[0], 3), round(size_in[1], 3)],
+           "backend": BACKEND_VERSION, "renderers": _renderer_versions(),
+           "tokens": theme.tokens_hash()}
+    if spec.get("kind") in VEGA_KINDS:
+        key["vega"] = _vega_fingerprint()
+    payload = json.dumps(key, sort_keys=True, ensure_ascii=False)
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]
 
 
@@ -81,6 +97,9 @@ def render_asset(spec: dict, out_root: Path, size_in: tuple[float, float] = (8.6
     if not png.exists():
         if kind in DIAGRAM_GRAPHVIZ:
             _render_graphviz(kind, spec, png)
+        elif kind in VEGA_KINDS:
+            import act_vega
+            act_vega.render(spec, png, size_in)
         else:
             _render_matplotlib(kind, spec, png, size_in)
         # audit sidecar: pixels are opaque, the numbers stay auditable + regenerable

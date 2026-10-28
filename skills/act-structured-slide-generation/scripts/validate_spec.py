@@ -80,6 +80,10 @@ QUALITATIVE_EVIDENCE = {"competitive_landscape", "diagram", "logic_tree", "risk_
                         "matrix_2x2", "harvey_table"}
 
 
+# 数値が仮のものであることを示す札。付けたら assumption で何を仮に置いたかを言う
+ILLUSTRATIVE_STICKERS = {"例示", "イメージ", "仮置き", "ダミー", "試算例", "Illustrative", "Example"}
+
+
 def composite_blocks(s: dict) -> list[dict]:
     """composite のブロックを平らに並べる。grid を書いた形はセルの中身、grid を省いた形は blocks。"""
     if not s.get("grid") and s.get("blocks"):
@@ -194,11 +198,17 @@ IMAGE_KIND_REQUIRED = {
     "matrix": ("rows", "cols"),
     "org_tree": ("nodes", "edges"),
     "node_graph": ("nodes", "edges"),
+    "vega": ("data",),
+    "mekko": ("columns",),
+    "slope": ("periods", "series"),
+    "dumbbell": ("categories", "from", "to"),
+    "bullet": ("items",),
 }
+VEGA_KINDS = {"vega", "mekko", "slope", "dumbbell", "bullet"}
 IMAGE_ASSET_KINDS = {
     "combo", "area", "radar", "scatter", "bubble", "waterfall", "line_multi",
     "org_tree", "node_graph", "ring", "funnel", "pyramid", "venn", "matrix",
-}
+} | VEGA_KINDS
 
 # 日本語プレゼンの標準話速(NHKアナウンス基準の目安)。トークスクリプト総量の照合に使う
 TALK_CHARS_PER_MIN = 300
@@ -644,6 +654,25 @@ def main() -> int:
                         return isinstance(vals, list) and vals and all(
                             isinstance(v, (int, float)) and not isinstance(v, bool) for v in vals)
                     cats_n = len(chart.get("categories") or [])
+                    if k in VEGA_KINDS:
+                        # Vega-Lite の宣言は描く前にコンパイルして誤りを出す(書式の誤りを build まで持ち越さない)
+                        if not chart.get("unit") and k != "vega":
+                            warns.append(f"{cloc}: {k} に unit が無い — 量の軸と値ラベルの単位を書く")
+                        if k == "vega" and not (chart.get("mark") or chart.get("layer") or chart.get("facet")
+                                                or chart.get("hconcat") or chart.get("vconcat") or chart.get("repeat")):
+                            errors.append(f"{cloc}: vega に mark(または layer / facet / concat)が無い")
+                        else:
+                            import act_vega
+                            err = act_vega.compile_check(chart)
+                            if err:
+                                errors.append(f"{cloc}: Vega-Lite の宣言がコンパイルできない — {err}")
+                        if k == "mekko":
+                            focal_ = chart.get("focal")
+                            segs = {sg.get("label") for c in chart.get("columns", []) for sg in c.get("segments", [])}
+                            if focal_ and focal_ not in segs:
+                                errors.append(f"{cloc}: mekko の focal '{focal_}' がどの列のセグメントにも無い")
+                            if not 2 <= len(chart.get("columns", [])) <= 8:
+                                errors.append(f"{cloc}: mekko の columns は 2-8 列(多いと細い列のラベルが入らない)")
                     if k == "combo":
                         for part in ("bar", "line"):
                             pv = (chart.get(part) or {}).get("values")
@@ -825,6 +854,13 @@ def main() -> int:
             long_date = [str(m.get("date")) for m in ms_ if ja_len(str(m.get("date", ""))) > 10]
             if long_date:
                 warns.append(f"{loc}: date が長い({', '.join(d[:12] for d in long_date)}) — 10字以内(2026年4月 / Q3 FY26)")
+        st_ = s.get("sticker")
+        if st_ is not None:
+            if not (isinstance(st_, str) and 1 <= ja_len(st_.strip()) <= 8):
+                errors.append(f"{loc}: sticker は 1-8 字の短い札(暫定 / 例示 / 議論用 / 仮説)— いまは {st_!r}")
+            elif st_.strip() in ILLUSTRATIVE_STICKERS and not s.get("assumption"):
+                errors.append(f"{loc}: sticker「{st_.strip()}」は数値が仮のものだという印 — assumption に"
+                              "何を仮に置いたかを書く(例示の数字を実績と読ませない)")
         if pat == "matrix_2x2":
             qs = s.get("quadrants", [])
             pos_ = [q.get("position") for q in qs]

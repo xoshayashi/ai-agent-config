@@ -3619,6 +3619,98 @@ def test_validate_checks_the_blocks_form(tmp_path):
     assert "Traceback" not in r2.stdout + r2.stderr
 
 
+_VEGA_RECIPES = {
+    "mekko": {"kind": "mekko", "unit": "億円", "focal": "自社", "columns": [
+        {"label": "大企業", "segments": [{"label": "自社", "value": 380}, {"label": "A社", "value": 520}]},
+        {"label": "中堅", "segments": [{"label": "自社", "value": 160}, {"label": "C社", "value": 260}]}]},
+    "slope": {"kind": "slope", "unit": "%", "periods": ["FY23", "FY26"], "focal": "自社",
+              "series": [{"name": "自社", "values": [9, 18]}, {"name": "A社", "values": [31, 27]}]},
+    "dumbbell": {"kind": "dumbbell", "unit": "分", "categories": ["経理", "営業"],
+                 "from": {"name": "導入前", "values": [12, 9]}, "to": {"name": "導入後", "values": [4, 5]}},
+    "bullet": {"kind": "bullet", "unit": "%", "items": [{"label": "NRR", "actual": 114, "target": 110, "ranges": [100, 110, 125]}]},
+    "vega": {"kind": "vega", "unit": "件", "data": [{"m": "1", "n": 8}, {"m": "3", "n": 42}], "mark": "bar",
+             "encoding": {"x": {"field": "m", "type": "ordinal"}, "y": {"field": "n", "type": "quantitative"}},
+             "focal": {"field": "m", "equals": "3"}, "labels": True},
+}
+
+
+def test_vega_charts_compile_and_carry_the_act_look():
+    """Vega-Lite のグラフ: 任意の宣言とレシピ4種がコンパイルでき、Act の見た目(フォント・背景・配色)と
+    主役の強調・直接ラベル・単位の軸題が入る。"""
+    pytest.importorskip("vl_convert")
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import act_vega as V
+    for name, spec in _VEGA_RECIPES.items():
+        assert V.compile_check(spec) is None, (name, V.compile_check(spec))
+        vl = V.to_vegalite(spec, (8.0, 4.0))
+        assert vl["config"]["font"] == "Noto Sans JP" and vl["config"]["background"] == V.theme.COLORS["canvas"]
+        assert vl["width"] == 576 and vl["height"] == 288                   # 1pt = 1px(型の大きさがスライドと一致)
+    bar = V.to_vegalite(_VEGA_RECIPES["vega"], (8.0, 4.0))
+    marks = [l["mark"] if isinstance(l["mark"], str) else l["mark"]["type"] for l in bar["layer"]]
+    assert marks == ["bar", "text"]                                         # labels: true → 値の直接ラベル
+    assert bar["layer"][0]["encoding"]["color"]["condition"]["value"] == V.theme.COLORS["primary"]
+    assert bar["layer"][0]["encoding"]["y"]["title"] == "(件)"
+    # マリメッコ: 列の幅は列の合計の比、セグメントの高さはシェア
+    rows = V.build_mekko(_VEGA_RECIPES["mekko"])["data"]
+    big = [r for r in rows if r["col"] == "大企業" and r["seg"] == "自社"][0]
+    assert abs((big["x2"] - big["x"]) - 900 / 1320) < 1e-9 and abs(big["share"] - 380 / 900) < 1e-9
+    assert V.compile_check({"kind": "vega", "data": [{"a": 1}], "mark": "nonsense"}) is not None
+
+
+def test_vega_charts_build_through_every_chart_slot(tmp_path):
+    """Vega のグラフは chart_insight / composite / chart_grid のどこに置いても画像で描かれ、verify を通る。
+    宣言の誤りは validate がビルド前に名指しする。"""
+    pytest.importorskip("vl_convert")
+    from pptx import Presentation
+    src = {"source": "Act市場調査(2026年9月)"}
+    spec = {"meta": {"title": "t"}, "slides": [
+        {"pattern": "chart_insight", "title": "中堅市場の自社シェアは18%、大企業の27%を下回る", "subtitle": "市場規模とシェア",
+         "chart": _VEGA_RECIPES["mekko"], "layout": "chart_full", **src},
+        {"pattern": "composite", "title": "自社は3年でシェアを9pt伸ばし18%に", "subtitle": "中堅市場のシェア",
+         "blocks": [{"role": "focal", "type": "chart", "chart": _VEGA_RECIPES["slope"]},
+                    {"type": "text", "points": [{"heading": "最大の伸び", "body": "3年で+9pt、上位2社に迫る"}]}], **src},
+        {"pattern": "chart_grid", "title": "5部門で処理時間が短縮、NRRは114%", "subtitle": "改善の幅",
+         "charts": [{"title": "処理時間", "chart": _VEGA_RECIPES["dumbbell"]}, {"title": "KPI", "chart": _VEGA_RECIPES["bullet"]}], **src},
+    ]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(spec, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 0, r.stdout
+    out = tmp_path / "deck.pptx"
+    b = run("build_deck.py", p, "-o", out)
+    assert b.returncode == 0, b.stdout + b.stderr
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0, v.stdout
+    for slide in Presentation(out).slides:
+        assert any(sh.shape_type == 13 for sh in slide.shapes)              # picture
+    bad = {"meta": {"title": "t"}, "slides": [
+        {**spec["slides"][0], "chart": {"kind": "vega", "unit": "件", "data": [{"a": 1}], "mark": "nonsense",
+                                        "encoding": {"x": {"field": "a", "type": "quantitative"}}}},
+        {**spec["slides"][0], "chart": {**_VEGA_RECIPES["mekko"], "focal": "存在しない社"}},
+    ]}
+    p.write_text(json.dumps(bad, ensure_ascii=False))
+    r2 = run("validate_spec.py", p)
+    assert r2.returncode == 1
+    assert "コンパイルできない" in r2.stdout and "focal '存在しない社'" in r2.stdout, r2.stdout
+
+
+def test_sticker_marks_status_and_illustrative_needs_an_assumption(tmp_path):
+    from pptx import Presentation
+    base = {"pattern": "statement", "title": "移行支援は無償にし、初年度の契約に含める", "subtitle": "提言",
+            "statement": "移行支援を無償化する"}
+    ok = {"meta": {"title": "t"}, "slides": [{**base, "sticker": "暫定"}]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(ok, ensure_ascii=False))
+    assert run("validate_spec.py", p).returncode == 0
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    slide = list(Presentation(out).slides)[0]
+    tag = next(sh for sh in slide.shapes if sh.has_text_frame and sh.text_frame.text == "暫定")
+    assert tag.left / 914400 > 10 and tag.top / 914400 < 0.4               # 右上の隅、タイトルより上
+    bad = {"meta": {"title": "t"}, "slides": [{**base, "sticker": "例示"}, {**base, "sticker": "とても長いステッカーの文字列"}]}
+    p.write_text(json.dumps(bad, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert "assumption" in r.stdout and "1-8 字" in r.stdout, r.stdout
+
+
 def test_matrix_gantt_and_harvey_draw_native_shapes(tmp_path):
     """2x2 は象限カード4枚、ガントはバーと◆と今日の破線、ハーベイは score ごとの扇(PIE)。"""
     from pptx import Presentation

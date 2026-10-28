@@ -251,7 +251,16 @@ hollow cells, legibility, consistency, balance), and the build uses the best. In
 three with `layout_search.py deck.json --slide N --top 3`; override only for a content reason,
 by pinning a `grid`. Never override because a layout "looks better" — models judge slide
 aesthetics poorly, which is why geometry is measured, not eyeballed
-(`references/layout-search.md`). Mix shift is a
+(`references/layout-search.md`).
+
+**Charts: native first, Vega-Lite for everything else.** Plain column / bar / line / stacked /
+donut charts stay native and editable. Any other chart is a Vega-Lite spec (`kind: "vega"`: data
+rows + mark + encoding, with `focal` and `labels`), or one of the consulting recipes `mekko`,
+`slope`, `dumbbell`, `bullet`; `act_vega.py` applies the Act look and validate compiles the spec
+before the build. Pick the chart from the comparison the title makes (component, item, time
+series, frequency, correlation, bridge, two-point change, vs target) — see
+`references/charts-vega.md`. A `sticker` ("暫定", "例示") marks a slide's status in the top-right
+corner; an illustrative sticker requires an `assumption`. Mix shift is a
 native `stacked_column_100`; a chart with short comparable takeaways can use
 `chart_insight` `layout: chart_top` to vary the page rhythm.
 
@@ -446,6 +455,7 @@ Read only what the task needs, but do not skip the required workflow references.
 | `references/design-principles.md` | Act visual grammar, hierarchy, color, density judgment, and page rhythm |
 | `references/grid-and-flex-strategy.md` | Granular grid/flex contract for layout consistency |
 | `references/composition-vocabulary.md` | Composition moves, not templates |
+| `references/charts-vega.md` | Vega-Lite charts and consulting recipes (mekko / slope / dumbbell / bullet), chart choice by comparison, checks |
 | `references/layout-search.md` | Why and how `composite` blocks are arranged by search: roles, candidate grammar, verifiable scores, research sources |
 | `references/consulting-page-catalogue.md` | Strategy-firm page archetypes → dedicated pattern or `composite` recipe |
 | `references/composition-atoms.md` | IR-slide composition atoms + evidence-emphasis move→knob map |
@@ -464,6 +474,7 @@ Read only what the task needs, but do not skip the required workflow references.
 | `references/tokens.json` | Single source for Act color, type, and grid tokens |
 | `scripts/act_theme.py` | Token-core adapter: feeds tokens.json to every backend (native, matplotlib, Graphviz) |
 | `scripts/act_assets.py` | Image-asset backend: Act-styled deterministic charts/diagrams for objects native cannot draw |
+| `scripts/act_vega.py` | Vega-Lite chart rendering: Act theme, `focal` / `labels`, consulting recipes, compile check |
 | `scripts/layout_search.py` | Ranks `composite` arrangements from role-tagged `blocks`; `--top`, `--emit` to compare candidates |
 | `scripts/stress_deck.py` | Dynamic-generation regression guard: every pattern at min / documented max / past capacity |
 | `scripts/setup_fonts.py` | Installs / checks the Geist + Noto Sans JP static fonts the renderer measures with |
