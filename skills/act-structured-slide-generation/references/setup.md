@@ -5,7 +5,7 @@ machine may already have everything, in which case use the system `python3` and 
 venv (a venv only adds an activation step to every command).
 
 ```bash
-python3 -c "import pptx, PIL, lxml, fontTools, graphviz, vl_convert" && \
+python3 -c "import pptx, PIL, lxml, fontTools, graphviz, vl_convert, svgelements" && \
   command -v soffice dot >/dev/null && echo "ready — no venv needed"
 python3 scripts/setup_fonts.py --check   # the six static fonts the renderer measures with
 ```
@@ -23,7 +23,7 @@ and drift from the render. The Vega-Lite charts register the same font directori
 brew install graphviz                   # the `dot` CLI (relationship graphs)
 brew install --cask libreoffice         # `soffice`, used to render .pptx → PDF/PNG
 python3 -m pip install --user --break-system-packages python-pptx Pillow lxml fonttools \
-                                        graphviz vl-convert-python pytest
+                                        graphviz vl-convert-python svgelements pytest
 ```
 
 Homebrew's Python is PEP 668 "externally managed", so plain `pip install` is refused;

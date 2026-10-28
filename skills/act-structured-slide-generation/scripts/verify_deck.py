@@ -26,6 +26,7 @@ OK_FONTS = {TOKENS["fonts"]["latin"], TOKENS["fonts"]["latin_semibold"],
 SLIDE_W_IN = TOKENS["slide"]["width_in"]
 SLIDE_H_IN = TOKENS["slide"]["height_in"]
 A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+P = "{http://schemas.openxmlformats.org/presentationml/2006/main}"
 CELL_INSET_IN = 0.18   # 表セルの左右余白+折返しの安全余白(build_deck._cell_text_w と同じ)
 
 # 計測は deck_text の単一実装を使う — ビルダーが「どこで切るか」を決めた物差しと、検証が
@@ -374,6 +375,67 @@ def check_collisions(slide, idx, issues) -> None:
                     f"slide {idx}: テキストが図表に重なる — '{label}'")
 
 
+CONTRAST_FLOOR = 3.0   # WCAG 2.1 の大きな文字の下限(AA)。これを割る組み合わせは誰にも読めない
+
+
+def _luminance(hexrgb: str) -> float:
+    """WCAG 2.1 の相対輝度。"""
+    def ch(v):
+        c = int(v, 16) / 255.0
+        return c / 12.92 if c <= 0.03928 else ((c + 0.055) / 1.055) ** 2.4
+    r, g, b = (ch(hexrgb[i:i + 2]) for i in (0, 2, 4))
+    return 0.2126 * r + 0.7152 * g + 0.0722 * b
+
+
+def contrast_ratio(a: str, b: str) -> float:
+    la, lb = sorted((_luminance(a), _luminance(b)), reverse=True)
+    return (la + 0.05) / (lb + 0.05)
+
+
+def _bg_hex(el) -> str | None:
+    """<p:bg> の塗り(srgbClr)。無ければ None。"""
+    bg = el.find(f".//{P}bg")
+    if bg is None:
+        return None
+    clr = bg.find(f".//{A}srgbClr")
+    return clr.get("val").upper() if clr is not None else None
+
+
+def check_contrast(slide, idx, issues, master_bg: str) -> None:
+    """文字の色と、その文字の真下の地の色のコントラスト(WCAG 2.1)。地は、文字の箱の中心を含む直前の
+    塗りつぶし図形 → スライド自身の背景 → マスターの背景の順に探す。反転(濃い地)のスライドや、濃い帯・
+    淡いカードの上の文字が読めることを、色の名前ではなく実際の組み合わせで確かめる。"""
+    ground = _bg_hex(slide._element) or master_bg
+    fills: list[tuple[tuple[float, float, float, float], str]] = []
+    for sh in slide.shapes:
+        if sh.left is None or getattr(sh, "has_chart", False) or getattr(sh, "has_table", False):
+            continue
+        box = _bbox(sh)
+        own = None
+        try:
+            if sh.shape_type == 1 and sh.fill.type == 1:            # 塗りつぶしのある自動図形
+                own = str(sh.fill.fore_color.rgb).upper()
+        except Exception:
+            pass
+        if getattr(sh, "has_text_frame", False) and sh.text_frame.text.strip():
+            cx, cy = (box[0] + box[2]) / 2, (box[1] + box[3]) / 2
+            # 自分の塗り → 中心を含む直前の塗り図形(後に描いたものほど上) → スライドの地
+            under = own or next((c for b, c in reversed(fills)
+                                 if b[0] <= cx <= b[2] and b[1] <= cy <= b[3]), ground)
+            for r_el in sh._element.iter(f"{A}r"):
+                t = r_el.find(f"{A}t")
+                clr = r_el.find(f"{A}rPr/{A}solidFill/{A}srgbClr")
+                if t is None or not (t.text or "").strip() or clr is None:
+                    continue
+                ratio = contrast_ratio(clr.get("val").upper(), under)
+                if ratio < CONTRAST_FLOOR:
+                    issues.append(f"slide {idx}: 文字と地のコントラスト {ratio:.1f}:1 が下限 {CONTRAST_FLOOR}:1 未満 — "
+                                  f"'{t.text[:16]}'(#{clr.get('val').upper()} / 地 #{under})")
+                    break
+        if own:
+            fills.append((box, own))
+
+
 def audit(path: Path) -> tuple[list[str], list[str], int]:
     """Run every check on a built .pptx and return (failures, warnings, slide_count).
     The CLI prints them; stress_deck / tests call this directly."""
@@ -381,7 +443,9 @@ def audit(path: Path) -> tuple[list[str], list[str], int]:
     issues: list[str] = []
     warns: list[str] = []
 
+    master_bg = _bg_hex(prs.slide_masters[0]._element) or "FCFCFB"
     for idx, slide in enumerate(prs.slides, start=1):
+        check_contrast(slide, idx, issues, master_bg)
         xml = slide._element.xml
         # color audit: every literal srgbClr must be in the Act palette
         for m in set(re.findall(r'srgbClr val="([0-9A-Fa-f]{6})"', xml)):

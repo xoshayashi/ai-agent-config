@@ -335,6 +335,18 @@ def make_deck(variant: str = "max", template: str | None = None, images: bool = 
     meta = {"title": "Stress deck", "thesis": {"statement": "5年でARR 68億円", "value": "68", "unit": "億円"}}
     if template:
         meta["template"] = template
+    # 表現の部品(アイコン・反転)も容量の検査に含める: 並列の項目の全部にアイコン、表紙と締めは反転
+    icons = ["receipt", "users", "target", "shield-check", "chart-column", "clock", "handshake", "rocket"]
+    for sl in slides:
+        pat = sl.get("pattern")
+        if pat in ("cover", "statement"):
+            sl["tone"] = "inverse"
+        key = {"executive_summary": "points", "kpi_dashboard": "kpis", "column_framework": "columns",
+               "hub_spoke": "spokes"}.get(pat)
+        if key:
+            for i, it in enumerate(sl.get(key) or []):
+                if isinstance(it, dict):
+                    it["icon"] = icons[i % len(icons)]
     return _clean({"meta": meta, "slides": slides})
 
 

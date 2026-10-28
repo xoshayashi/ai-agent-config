@@ -215,7 +215,7 @@ fi
 pptx_deps_status=missing
 # graphviz は python パッケージだけでは動かない(CLI の dot が必要) — 実行ファイルまで
 # 揃って初めて ok にする(org_tree/node_graph がビルド時に落ちる欠落を検知する)
-if command -v python3 >/dev/null 2>&1 && python3 -c 'import pptx, PIL, lxml, fontTools, graphviz, vl_convert' >/dev/null 2>&1 && command -v dot >/dev/null 2>&1; then
+if command -v python3 >/dev/null 2>&1 && python3 -c 'import pptx, PIL, lxml, fontTools, graphviz, vl_convert, svgelements' >/dev/null 2>&1 && command -v dot >/dev/null 2>&1; then
   pptx_deps_status=ok
 fi
 libreoffice_status=$(command_status libreoffice)

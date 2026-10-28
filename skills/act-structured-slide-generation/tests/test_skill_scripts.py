@@ -3658,7 +3658,7 @@ def test_vega_charts_compile_and_carry_the_act_look():
     assert bar["title"]["text"] == "(件)"                                 # 単位はネイティブと同じく左上の注記
     assert bar["layer"][0]["encoding"]["y"]["title"] is None and bar["layer"][0]["encoding"]["x"]["title"] is None
     assert bar["layer"][0]["encoding"]["y"]["axis"] is None               # 1 系列 + 値ラベル → 値軸なし(ネイティブと同じ)
-    assert bar["layer"][1]["encoding"]["text"]["format"] == ",.1f"        # ネイティブの既定 #,##0.0
+    assert bar["layer"][1]["encoding"]["text"]["format"] == ",.0f"        # 整数のデータは整数で書く(ネイティブと同じ規則)
     # マリメッコ: 列の幅は列の合計の比、セグメントの高さはシェア
     rows = V.build_mekko(_VEGA_RECIPES["mekko"])["data"]
     big = [r for r in rows if r["col"] == "大企業" and r["seg"] == "自社"][0]
@@ -3747,6 +3747,112 @@ def test_sticker_marks_status_and_illustrative_needs_an_assumption(tmp_path):
     p.write_text(json.dumps(bad, ensure_ascii=False))
     r = run("validate_spec.py", p)
     assert "assumption" in r.stdout and "1-8 字" in r.stdout, r.stdout
+
+
+def test_icons_are_native_vectors_and_validated(tmp_path):
+    """アイコン: 同梱の Lucide を編集できるネイティブの図形(グループ)で描く。未知の名前は候補つきで止め、
+    並列の項目の一部だけに付けると警告、ラベルの無いアイコンは止める。"""
+    from pptx import Presentation
+    sys.path.insert(0, str(SCRIPTS))
+    import act_icons
+    assert "receipt" in act_icons.available() and act_icons.suggest("reciept")[0] == "receipt"
+    assert (SKILL / "assets" / "icons" / "LICENSE").exists()
+    good = {"meta": {"title": "t"}, "slides": [{"pattern": "executive_summary", "title": "段階展開なら年1.5億円を減らし、投資は2.1年で回収",
+        "subtitle": "要約", "assumption": "例示",
+        "points": [{"icon": "timer", "kicker": "効果", "heading": "処理が12分から4分に", "body": "PoCで手間が3分の1になった"},
+                   {"icon": "gavel", "kicker": "判断", "heading": "投資3.2億円の承認", "body": "1月に継続を判断する", "focal": True}]}]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(good, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert r.returncode == 0 and "視覚の錨" not in r.stdout, r.stdout
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    assert run("verify_deck.py", out).returncode == 0
+    slide = list(Presentation(out).slides)[0]
+    groups = [sh for sh in slide.shapes if sh.shape_type == 6 and sh.name.startswith("icon:")]   # 6 = group
+    assert [g.name for g in groups] == ["icon:timer", "icon:gavel"]
+    assert not [sh for sh in slide.shapes if sh.shape_type == 13]                                 # 画像ではない
+    bad = json.loads(json.dumps(good))
+    bad["slides"][0]["points"][0]["icon"] = "reciept"
+    del bad["slides"][0]["points"][1]["icon"]
+    p.write_text(json.dumps(bad, ensure_ascii=False))
+    r2 = run("validate_spec.py", p)
+    assert "アイコン 'reciept' が無い" in r2.stdout and "receipt" in r2.stdout and "一部にだけアイコン" in r2.stdout, r2.stdout
+
+
+def test_inverse_tone_sets_the_slide_background_and_passes_contrast(tmp_path):
+    """反転: 表紙・締め・章扉だけ。地はスライドの背景属性(全面の矩形は置かない)、文字は WCAG 3:1 以上。"""
+    from pptx import Presentation
+    deck = {"meta": {"title": "t"}, "slides": [
+        {"pattern": "cover", "title": "経費精算SaaS 全社展開の判断", "subtitle": "ご提案\n2026年11月", "tone": "inverse"},
+        {"pattern": "statement", "title": "本日お決めいただきたいこと", "subtitle": "承認", "tone": "inverse",
+         "lead": "段階展開と投資3.2億円をご承認ください", "statement": "経理と営業から始めます",
+         "recap": [{"label": "年間の削減額", "value": "1.5", "unit": "億円", "focal": True}], "assumption": "例示"}]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(deck, ensure_ascii=False))
+    assert run("validate_spec.py", p).returncode == 0
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0 and "コントラスト" not in v.stdout, v.stdout
+    sys.path.insert(0, str(SCRIPTS))
+    import build_deck as B
+    for slide in Presentation(out).slides:
+        bg = slide._element.find(".//{http://schemas.openxmlformats.org/presentationml/2006/main}bg")
+        assert bg is not None                                                   # スライド自身の背景
+        assert not [sh for sh in slide.shapes if sh.shape_type == 1 and sh.width >= B.SLIDE_W * 0.99]   # 全面の矩形は無い
+    bad = {"meta": {"title": "t"}, "slides": [{**deck["slides"][1], "pattern": "two_column", "left": {"heading": "a", "items": ["x"]},
+                                               "right": {"heading": "b", "items": ["y"]}}]}
+    p.write_text(json.dumps(bad, ensure_ascii=False))
+    assert "tone 'inverse' は" in run("validate_spec.py", p).stdout
+
+
+def test_contrast_check_catches_dark_text_on_a_dark_fill(tmp_path):
+    from pptx import Presentation
+    from pptx.util import Inches, Pt
+    from pptx.dml.color import RGBColor
+    sys.path.insert(0, str(SCRIPTS))
+    import verify_deck as Vd
+    assert round(Vd.contrast_ratio("FFFFFF", "000000"), 1) == 21.0
+    prs = Presentation(); s = prs.slides.add_slide(prs.slide_layouts[6])
+    r = s.shapes.add_shape(1, Inches(1), Inches(1), Inches(4), Inches(1)); r.fill.solid(); r.fill.fore_color.rgb = RGBColor(0x1F, 0x3A, 0x66)
+    tb = s.shapes.add_textbox(Inches(1.2), Inches(1.2), Inches(3), Inches(0.5))
+    run_ = tb.text_frame.paragraphs[0].add_run(); run_.text = "読めない文字"; run_.font.size = Pt(16)
+    run_.font.color.rgb = RGBColor(0x2D, 0x33, 0x2E)
+    issues = []
+    Vd.check_contrast(s, 1, issues, "FCFCFB")
+    assert issues and "コントラスト" in issues[0]
+
+
+def test_text_only_pages_need_a_visual_anchor_and_formats_follow_the_data(tmp_path):
+    sys.path.insert(0, str(SCRIPTS))
+    import build_deck as B
+    assert B.auto_number_format([24, 32, 41]) == "#,##0" and B.auto_number_format([12.8, 9.85]) == "#,##0.00"
+    plain = {"meta": {"title": "t"}, "slides": [{"pattern": "executive_summary", "title": "段階展開なら年1.5億円を減らし、投資は2.1年で回収",
+        "subtitle": "要約", "assumption": "例示",
+        "points": [{"heading": "処理が12分から4分に", "body": "PoCで手間が3分の1になった"},
+                   {"heading": "投資3.2億円の承認", "body": "1月に継続を判断する"}]}]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(plain, ensure_ascii=False))
+    assert "視覚の錨が無い" in run("validate_spec.py", p).stdout
+
+
+def test_cost_bridge_colours_decreases_as_good_and_shares_precision(tmp_path):
+    """費用のブリッジ(lower_is_better): 減少が主色・増加が危険色。値ラベルの桁はブリッジ全体で揃う(△1.0)。"""
+    from pptx import Presentation
+    sys.path.insert(0, str(SCRIPTS))
+    import build_deck as B
+    items = [{"label": "現状", "value": 2.8, "kind": "start"}, {"label": "自動化", "value": -1},
+             {"label": "運用費", "value": 0.2}, {"label": "導入後", "value": 2.0, "kind": "end"}]
+    spec = {"meta": {"title": "t"}, "slides": [{"pattern": "waterfall", "title": "処理コストは年2.8億円から2.0億円に下がる",
+                                                "subtitle": "s", "unit": "億円", "items": items, "lower_is_better": True,
+                                                "source": "x"}]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(spec, ensure_ascii=False))
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    ch = next(sh for sh in list(Presentation(out).slides)[0].shapes if sh.has_chart).chart
+    bars = ch.plots[0].series[1]
+    assert str(bars.points[1].format.fill.fore_color.rgb) == str(B.C["primary"])     # 減少 = 良い知らせ
+    assert str(bars.points[2].format.fill.fore_color.rgb) == str(B.C["danger"])      # 増加 = 不利
+    labels = [pt.data_label.text_frame.text for pt in ch.plots[1].series[0].points]
+    assert labels == ["2.8", "△1.0", "+0.2", "2.0"]
 
 
 def test_matrix_gantt_and_harvey_draw_native_shapes(tmp_path):

@@ -8,4 +8,5 @@ fonttools>=4.50
 #   macOS:  brew install graphviz
 graphviz>=0.21      # Python wrapper that shells out to the `dot` CLI
 vl-convert-python>=1.7   # Vega-Lite charts (act_vega.py): grammar-of-graphics specs → PNG, no browser
+svgelements>=1.9   # Lucide icons (act_icons.py): SVG paths → native freeform vectors
 pytest>=8.0  # dev: tests

@@ -44,6 +44,13 @@ name. An absent template resolves to `standard`, which is byte-for-byte the pre-
 ## Fields Common To Slides
 
 - `pattern` (required): one of the implemented primitives below.
+- `tone` (optional): `"inverse"` paints the slide with the template's brand dark and swaps the
+  text and fill roles in pairs. Only on `cover`, `statement` and `section_divider`. See
+  `design-richness.md`.
+- `icon` (optional, on items): a Lucide icon name from `assets/icons/` on `executive_summary`
+  points, `kpi_dashboard` / composite `kpi` items, `column_framework` columns, `hub_spoke` spokes,
+  and composite blocks with a `heading`. Every item of a set or none; always with a label.
+  `executive_summary` points also take `focal` (pale card, thicker strip).
 - `sticker` (optional): a short status label in the top-right corner, as strategy firms use them
   (preliminary, for discussion, hypothesis, illustrative — written in the deck's language).
   1-8 characters, outlined, never filled. An illustrative sticker (the words listed in
@@ -145,7 +152,10 @@ cross-check one conclusion rather than duplicate decoration.
 ### 11. `waterfall`
 
 Bridge chart. Items require start, positive/negative drivers, and end (≤12 items); `forecast`
-draws an outlined bar, `display` overrides a label. Cause labels should explain the movement,
+draws an outlined bar, `display` overrides a label. Set `lower_is_better: true` for cost, time or
+headcount bridges, where a decrease is the good news: decreases then take the primary colour and
+increases the danger colour (the default treats increases as favourable). Labels share one
+precision across the bridge ("△1.0" beside "+0.2", never "△1"). Cause labels should explain the movement,
 not merely repeat numbers. It is a native PowerPoint chart object (see `pptx-pitfalls.md` §15):
 the bars follow when the numbers are edited in PowerPoint; the "+3.2 / △1.5" labels are written
 from the spec, so rebuild after changing numbers. The same native chart is used for a

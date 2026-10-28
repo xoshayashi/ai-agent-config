@@ -10,6 +10,7 @@ and available data rather than forcing one fixed layout.
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import math
 import re
@@ -968,6 +969,27 @@ HORIZONTAL_BARS = {"bar", "stacked_bar"}        # カテゴリが縦軸: annotat
 C_NS = "{http://schemas.openxmlformats.org/drawingml/2006/chart}"
 
 
+def data_decimals(values) -> int:
+    """データ自身の小数の桁(最大 2)。整数のデータに「.0」を付けない — 4 分を「4.0」と書くと、測っていない
+    精度を装うことになる。"""
+    d = 0
+    for v in values:
+        try:
+            f = float(v)
+        except (TypeError, ValueError):
+            continue
+        txt = f"{f:.6f}".rstrip("0").rstrip(".")
+        if "." in txt:
+            d = max(d, len(txt.split(".")[1]))
+    return min(2, d)
+
+
+def auto_number_format(values) -> str:
+    """値ラベルの既定の書式。データの桁に合わせる("#,##0" / "#,##0.0" / "#,##0.00")。"""
+    d = data_decimals(values)
+    return "#,##0" + ("." + "0" * d if d else "")
+
+
 def _chart_ea_fonts(chart) -> None:
     """Ensure every defRPr in the chart XML carries latin+ea Act fonts."""
     root = chart._chartSpace
@@ -1104,7 +1126,8 @@ def add_act_chart(slide, x, y, w, h, cspec: dict):
             dl.font.size = Pt(TS["chart_label"])
             dl.font.bold = True  # 主要値を太字にして視認性を上げる(Qwen)
             dl.font.color.rgb = C["ink"]
-            dl.number_format = cspec.get("number_format", "#,##0.0")
+            dl.number_format = cspec.get("number_format") or auto_number_format(
+                [v for s_ in cspec["series"] for v in s_["values"]])
             dl.number_format_is_linked = False
             if seg_labels:
                 dl.position = XL_LABEL_POSITION.CENTER   # 帯の中央にセグメント値
@@ -1234,6 +1257,22 @@ def p_section_divider(slide, spec, deck):
             ny += row_h
 
 
+ICON_ROW = 0.40       # 行の頭に置くアイコン(要約の点・KPI・カード見出し)。1 枚の中では大きさを揃える
+
+
+def draw_icon(slide, name, x, y, size=ICON_ROW, color=None):
+    """Lucide アイコンをネイティブのベクター図形で描く(act_icons)。名前が無ければ何も描かず None —
+    未知の名前は validate_spec がビルド前に候補つきで止める。"""
+    if not name:
+        return None
+    import act_icons
+    try:
+        return act_icons.add_icon(slide, str(name), x, y, size, color or C["primary_deep"])
+    except KeyError:
+        print(f"WARN: アイコン '{name}' が assets/icons に無い — 描かずに続ける")
+        return None
+
+
 def p_executive_summary(slide, spec, deck):
     points = spec.get("points", [])
     y0, h = body_region(spec)
@@ -1248,7 +1287,8 @@ def p_executive_summary(slide, spec, deck):
     PAIR_GAP_PT = 3      # 見出し↔本文のペア内ギャップ(pt)
     LS = 1.14            # カード内はコンパクトな行送り(2行サブメッセージ+呼吸を両立)
     has_kicker = any(p.get("kicker") for p in points)
-    kx_off = 2.7 if has_kicker else 0.34
+    has_icon = any(p.get("icon") for p in points)
+    kx_off = (2.7 if has_kicker else 0.34) + (ICON_ROW + 0.22 if has_icon else 0.0)   # 本文の始まり(描画と同じ)
     tw = w - kx_off - 0.34
     line_head = TS["section_heading"] / 72.0 * LS * 1.22
     line_body = TS["body"] / 72.0 * LS * 1.22
@@ -1268,13 +1308,20 @@ def p_executive_summary(slide, spec, deck):
     total = card_h * n + GAP * (n - 1)
     y = y0 + max(0.0, (h - total) * 0.5)
     for pt_ in points:
-        add_rect(slide, x, y, w, card_h, C["surface_tint"], radius_pt=LAY["card"]["radius_pt"])
-        add_rect(slide, x, y, 0.055, card_h, C["primary"])
+        # focal の点(会議で決めること・最大の効果)は淡い主色の面と太い帯で立てる — 色を戻すのは1点だけ
+        focal = bool(pt_.get("focal"))
+        add_rect(slide, x, y, w, card_h, C["primary_pale"] if focal else C["surface_tint"],
+                 radius_pt=LAY["card"]["radius_pt"])
+        add_rect(slide, x, y, 0.10 if focal else 0.055, card_h, C["primary_deep"] if focal else C["primary"])
         kx = x + 0.34
+        if has_icon:
+            # アイコンは見出し列の頭。全点に付けるか付けないか(validate_spec が検査)
+            draw_icon(slide, pt_.get("icon"), kx, y + (card_h - ICON_ROW) / 2)
+            kx += ICON_ROW + 0.22
         if pt_.get("kicker"):
-            add_text(slide, kx, y, 2.2, card_h,
+            add_text(slide, kx, y, x + 2.7 + (ICON_ROW + 0.22 if has_icon else 0.0) - kx - 0.1, card_h,
                      [[(pt_["kicker"], TS["body"], 700, C["primary_deep"])]], anchor=MSO_ANCHOR.MIDDLE)
-            kx = x + 2.7
+            kx = x + 2.7 + (ICON_ROW + 0.22 if has_icon else 0.0)
         add_text(slide, kx, y + 0.06, x + w - kx - 0.34, card_h - 0.12,
                  [[(pt_.get("heading", ""), TS["section_heading"], 600, C["ink"])],
                   [(pt_.get("body", ""), TS["body"], 400, C["ink_subtle"])]],
@@ -1370,6 +1417,10 @@ def p_kpi_dashboard(slide, spec, deck):
                  radius_pt=LAY["card"]["radius_pt"])
         # インクの隙間で組む: 値の上下(ラベル・注記)が同じ余白で座り、上下インセットも対称
         stack_block(slide, x + pad, y + stack_top, text_w, inner_hs[i], stacks[i])
+        if k.get("icon"):
+            # アイコンはラベルの行の右端。値の行には掛けない(横に並ぶ数値の高さを揃えたまま)
+            draw_icon(slide, k["icon"], x + cw - pad - ICON_ROW, y + stack_top - 0.04,
+                      color=C["primary_deep"] if (k.get("focal") or not any_focal_kpi) else C["primary"])
 
 
 def _focal_bar_anchor(cx, cw, cspec):
@@ -2010,14 +2061,14 @@ def waterfall_levels(items: list) -> list[tuple[float, float]]:
     return levels
 
 
-def _waterfall_label(it: dict) -> str:
+def _waterfall_label(it: dict, decimals: int = 1) -> str:
+    """ブリッジの値ラベル。桁はブリッジ全体で揃える(「△1」と「+0.2」を並べない — 同じ表の数字は同じ精度)。"""
     if it.get("display") is not None:
         return str(it["display"])
     v = float(it["value"])
     if it.get("kind", "delta") == "delta":
-        mag = f"{abs(v):,.1f}".rstrip("0").rstrip(".")
-        return ("△" if v < 0 else "+") + mag          # IR 慣行: 負値は - でなく △
-    return f"{v:,.1f}".rstrip("0").rstrip(".")
+        return ("△" if v < 0 else "+") + f"{abs(v):,.{decimals}f}"   # IR 慣行: 負値は - でなく △
+    return f"{v:,.{decimals}f}"
 
 
 def add_waterfall_chart(slide, x, y, w, h, wspec: dict):
@@ -2034,6 +2085,9 @@ def add_waterfall_chart(slide, x, y, w, h, wspec: dict):
     スペックから書き込むので、数値を直したらビルドし直す。"""
     items = wspec.get("items", [])
     levels = waterfall_levels(items)
+    decimals = data_decimals([it.get("value") for it in items])
+    # 費用・時間のブリッジでは減ることが良い知らせ: lower_is_better なら、減少を主色・増加を危険色で描く
+    good_down = bool(wspec.get("lower_is_better"))
     lo_min = min(min(a, b) for a, b in levels)
     hi_max = max(max(a, b) for a, b in levels)
     shift = -min(lo_min, 0.0)                         # ゼロを下回るぶんだけ全体を持ち上げる
@@ -2086,8 +2140,9 @@ def add_waterfall_chart(slide, x, y, w, h, wspec: dict):
             pt_.format.line.width = Pt(1.5)
             continue
         pt_.format.fill.solid()
+        favourable = (float(it["value"]) < 0) if good_down else (float(it["value"]) >= 0)
         pt_.format.fill.fore_color.rgb = (C["primary_deep"] if it.get("kind") in ("start", "end")
-                                          else C["primary"] if float(it["value"]) >= 0 else C["danger"])
+                                          else C["primary"] if favourable else C["danger"])
         pt_.format.line.fill.background()
     from pptx.enum.chart import XL_LABEL_POSITION, XL_MARKER_STYLE, XL_TICK_LABEL_POSITION
     s_lab = line_plot.series[0]
@@ -2097,7 +2152,7 @@ def add_waterfall_chart(slide, x, y, w, h, wspec: dict):
     for i, (it, (lo, hi)) in enumerate(zip(items, levels)):
         dl = s_lab.points[i].data_label
         tf = dl.text_frame
-        tf.text = _waterfall_label(it)
+        tf.text = _waterfall_label(it, decimals)
         run = tf.paragraphs[0].runs[0]
         run.font.size = Pt(TS["chart_label"])
         run.font.bold = True
@@ -3149,17 +3204,22 @@ def _column_framework_layout(cols: list, h: float) -> dict:
     HEAD_PT = TS["body_small"]
     # 見出し帯の行数は、描くものと同じ文字列(実際のラベル + 見出し)で数える。「00  」の仮置きでは
     # 「Pillar 1」のような長いラベルの折返しを取りこぼし、帯が低く出る(Claude レビュー指摘、PR #158)
+    icon_w = (ICON_ROW * 0.8 + 0.12) if any(c.get("icon") for c in cols) else 0.0
     head_rows = max(_text_lines((f"{c['label']}  " if c.get("label") else "") + c.get("heading", ""),
-                                cw - 0.32, HEAD_PT, 600, "label") for c in cols)
+                                cw - 0.32 - icon_w, HEAD_PT, 600, "label") for c in cols)
     head_h = max(0.56, head_rows * drawn_line_h(HEAD_PT) + 0.22)
     # 見出し帯は3行まで、かつカードに最低 1.4in を残す。長い見出しが帯を育て続けると、fit_band が
     # 帯を本文帯に収めたあとの引き算で card_h が 0 以下になり、カードが 0.1in の筋になる
     # (Codex レビュー指摘、PR #158)。超えるぶんは溢れとして verify が名指しする
     head_h = min(head_h, max(0.56, 3 * drawn_line_h(HEAD_PT) + 0.22), max(0.56, h - 0.10 - 0.12 - 1.4))
     has_outcome = any(c.get("outcome") for c in cols)
+    # 柱のアイコンは見出し帯の中(見出しの左)。本文の高さを使わないので、柱の容量(項目数・結論帯)は変わらない。
+    # 帯の行数は、アイコンの幅を引いた幅で数える(描画と同じ)
+    icon_h = 0.0
     outcome_pt = TS["section_heading"]
     # 入らないときは余白から詰める(reclaim ladder): 項目間 → 器の内側余白。型は縮めない
-    for pad, gap_item in ((0.24, OPT["gap_in"]["item"]), (0.16, 0.20), (0.12, 0.14)):
+    # 最後の段(0.10 / 0.10)は bold テンプレートの大きな型で、4 本柱 × 2 項目 + 結論帯(文書化した上限)を入れるため
+    for pad, gap_item in ((0.24, OPT["gap_in"]["item"]), (0.16, 0.20), (0.12, 0.14), (0.10, 0.10)):
         text_w = cw - 2 * pad
         # 行揃え: 全列の項目数が同じときだけ、項目 i の高さを列間の最大に合わせる
         item_h = [[_stack_drawn_h(_rail_blocks([it]), text_w) for it in c.get("items", [])] for c in cols]
@@ -3180,14 +3240,16 @@ def _column_framework_layout(cols: list, h: float) -> dict:
         out_text_h = (max(_text_lines(c.get("outcome", ""), text_w, outcome_pt, 700, "label") for c in cols)
                       * drawn_line_h(outcome_pt) + 0.06) if has_outcome else 0.0
         outcome_zone = (0.46 + out_text_h) if has_outcome else 0.0
-        card_min = max(1.4, pad + body_h + outcome_zone + pad)
+        card_min = max(1.4, pad + icon_h + body_h + outcome_zone + pad)
         if head_h + 0.12 + card_min <= h - 0.10:
             break
     band_h, off = fit_band(h - 0.10, head_h + 0.12 + card_min, top_anchored=not has_outcome)
     card_h = max(1.4, band_h - head_h - 0.12)
     col_h = [(_stack_drawn_h(b, text_w) if b else 0.0) for b in col_blocks]
     return dict(n=n, cw=cw, gut=gut, head_h=head_h, HEAD_PT=HEAD_PT, has_outcome=has_outcome,
-                outcome_pt=outcome_pt, pad=pad, text_w=text_w, col_blocks=col_blocks, col_h=col_h,
+                outcome_pt=outcome_pt, pad=pad, text_w=text_w, col_blocks=col_blocks, col_h=col_h, icon_h=icon_h,
+                icon_w=icon_w, need_h=head_h + 0.12 + card_min,
+                overflow=head_h + 0.12 + card_min > h - 0.10 + 1e-6,
                 out_text_h=out_text_h, outcome_zone=outcome_zone, card_min=card_min,
                 card_h=card_h, off=off, line_h=drawn_line_h(TS["body"]))
 
@@ -3225,7 +3287,7 @@ def p_column_framework(slide, spec, deck):
             # ラベルの走りと残りの走りに戻す — レンダラ任せの折返しでは英語名や見積もりとずれる
             # (Codex レビュー指摘、PR #158)
             lab = str(c["label"])
-            joined = display_wrap_text(f"{lab}  {c.get('heading', '')}", cw - 0.32, HEAD_PT, 600, "label")
+            joined = display_wrap_text(f"{lab}  {c.get('heading', '')}", cw - 0.32 - L["icon_w"], HEAD_PT, 600, "label")
             if joined.startswith(lab):
                 parts.append((lab, HEAD_PT, 700, head_ink))
                 parts.append((joined[len(lab):], HEAD_PT, 600, head_ink))
@@ -3237,13 +3299,17 @@ def p_column_framework(slide, spec, deck):
         # 一続きで中央に置く。上下は行ボックスではなくインクで中央にする — 和文の行ボックスは
         # 下側に余白を持つので、箱を MIDDLE に置くと字面が帯の中心より下に座る。その差
         # (ink_center_offset_in)だけ箱を持ち上げる(300dpi 実測で約 0.16em)
-        add_text(slide, cx_ + 0.16, y_top - ink_center_offset_in(HEAD_PT), cw - 0.32, head_h, [parts],
+        iw = L["icon_w"]
+        if c.get("icon"):
+            d = ICON_ROW * 0.8
+            draw_icon(slide, c["icon"], cx_ + 0.16, y_top + (head_h - d) / 2, size=d, color=head_ink)
+        add_text(slide, cx_ + 0.16 + iw, y_top - ink_center_offset_in(HEAD_PT), cw - 0.32 - iw, head_h, [parts],
                  anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.CENTER, wrap_role="label",
                  display_wrap=not c.get("label"))
         cy = y_top + head_h + 0.12
         add_rect(slide, cx_, cy, cw, card_h, C["surface_tint"], radius_pt=pillar_r, name="card")
         if col_blocks[ci]:
-            stack_block(slide, cx_ + pad, cy + pad, text_w,
+            stack_block(slide, cx_ + pad, cy + pad + L["icon_h"], text_w,
                         stack_optical_height(col_blocks[ci], text_w), col_blocks[ci])
         if c.get("outcome"):
             ty = cy + card_h - pad - out_text_h
@@ -3566,6 +3632,9 @@ def p_hub_spoke(slide, spec, deck):
                      radius_pt=LAY["card"]["radius_pt"], name="card")
             if L["blocks"][i]:
                 stack_block(slide, sx + pad, yy + pad, L["text_w"], card_h - 2 * pad, L["blocks"][i])
+            if sp.get("icon"):
+                draw_icon(slide, sp["icon"], sx + sw - pad - ICON_ROW, yy + pad,
+                          color=C["primary_deep"] if focal else C["primary"])
             mid = yy + card_h / 2
             mids.append(mid)
             add_line(slide, bus_x, mid, edge_sp, mid, C["primary"] if focal else C["ink_faint"],
@@ -3760,10 +3829,14 @@ CHART_MIN_H = 1.8           # これより低いグラフは軸と目盛りで�
 CALLOUT_PAD = 0.20
 
 
-def _blk_heading(slide, x, y, w, heading) -> float:
-    """ブロック見出し(主色 16pt + 罫)。描いた高さを返す。見出しが無ければ 0。"""
+def _blk_heading(slide, x, y, w, heading, icon=None) -> float:
+    """ブロック見出し(主色 16pt + 罫)。描いた高さを返す。見出しが無ければ 0。icon は見出しの頭に置く。"""
     if not heading:
         return 0.0
+    if icon:
+        d = 0.30
+        draw_icon(slide, icon, x, y + 0.01, size=d)
+        x, w = x + d + 0.12, w - d - 0.12
     add_text(slide, x, y, w, 0.3, [[(heading, 16, 600, C["primary_deep"])]])
     add_line(slide, x, y + 0.34, x + w, y + 0.34, C["rule"], 0.75)
     return BLOCK_HEAD_H
@@ -3972,7 +4045,7 @@ def _draw_block(slide, x, y, w, h, b: dict) -> None:
     if card:
         add_rect(slide, x, y, w, h, C["surface_tint"], radius_pt=LAY["card"]["radius_pt"], name="card")
         x, y, w, h = x + CARD_INSET, y + CARD_INSET, w - 2 * CARD_INSET, h - 2 * CARD_INSET
-    y_head = _blk_heading(slide, x, y, w, b.get("heading"))
+    y_head = _blk_heading(slide, x, y, w, b.get("heading"), b.get("icon"))
     y, h = y + y_head, h - y_head
     if t == "text":
         blocks = _rail_blocks(b.get("points", []))
@@ -3991,6 +4064,9 @@ def _draw_block(slide, x, y, w, h, b: dict) -> None:
                     add_line(slide, kx - gut / 2, y + 0.04, kx - gut / 2, y + h - 0.04, C["rule"], 0.5)
                 blocks = _kpi_blocks(k)
                 stack_block(slide, kx, y, kw, h, blocks)
+                if k.get("icon"):
+                    ih = stack_optical_height(blocks, kw)
+                    draw_icon(slide, k["icon"], kx + kw - ICON_ROW, y + max(0.0, (h - ih) / 2) - 0.04)
         else:
             hs = [_stack_drawn_h(_kpi_blocks(k), w) for k in ks]
             slack = max(0.0, h - sum(hs)) / len(ks)
@@ -4000,6 +4076,9 @@ def _draw_block(slide, x, y, w, h, b: dict) -> None:
                 if i:
                     add_line(slide, x, yy, x + w, yy, C["rule"], 0.5)
                 stack_block(slide, x, yy, w, slot, _kpi_blocks(k))
+                if k.get("icon"):
+                    ih = stack_optical_height(_kpi_blocks(k), w)
+                    draw_icon(slide, k["icon"], x + w - ICON_ROW, yy + max(0.0, (slot - ih) / 2) - 0.04)
                 yy += slot
     elif t == "chart":
         ch = b.get("chart") or {}
@@ -4546,7 +4625,7 @@ def card_copy_estimate(spec: dict) -> list[dict]:
     card(名前), content_h, card_h, ratio, line_h(1行の高さ), hint_chars(警告文に添える1行あたりの和文字数の目安。行数の計算には使わない — 行数は _text_lines の実測だけ)。"""
     pat = spec.get("pattern")
     if pat not in ("process_flow", "column_framework", "two_column", "milestone_timeline", "hub_spoke",
-                   "case_strip"):
+                   "case_strip", "matrix_2x2"):
         return []
     _, h = body_region(spec)
     em = TS["body"] / 72.0
@@ -4566,7 +4645,7 @@ def card_copy_estimate(spec: dict) -> list[dict]:
             return []
         L = _column_framework_layout(cols, h)
         for c, ch in zip(cols, L["col_h"]):
-            content = ch + (L["outcome_zone"] if c.get("outcome") else 0.0)
+            content = ch + L["icon_h"] + (L["outcome_zone"] if c.get("outcome") else 0.0)
             out.append(dict(card=c.get("heading", ""), content_h=content, card_h=L["card_h"],
                             line_h=L["line_h"], hint_chars=max(1, int(L["text_w"] // em))))
     elif pat == "milestone_timeline":
@@ -4577,6 +4656,13 @@ def card_copy_estimate(spec: dict) -> list[dict]:
         for m, ch in zip(ms, L["col_h"]):
             out.append(dict(card=m.get("label", "") or m.get("date", ""), content_h=ch, card_h=L["card_h"],
                             line_h=L["line_h"], hint_chars=max(1, int(L["text_w"] // em))))
+    elif pat == "matrix_2x2":
+        # 象限は「card」と名付けた面: verify が描画後に測るのと同じ物差しで、validate がビルド前に測る
+        L = _matrix_2x2_layout(spec, h)
+        for pos, need in L["needs"].items():
+            q = L["quads"].get(pos) or {}
+            out.append(dict(card=q.get("title", pos), content_h=need - 2 * L["pad"], card_h=L["qh"],
+                            line_h=drawn_line_h(TS["body"]), hint_chars=max(1, int((L["qw"] - 2 * L["pad"]) // em))))
     elif pat == "case_strip":
         L = _case_strip_layout(spec, h)
         for cs, bh in zip(L["cases"], L["body_h"]):
@@ -4637,6 +4723,30 @@ PATTERNS = {
 }
 
 NO_CHROME = {"cover", "section_divider"}
+
+# 反転(tone: "inverse"): 地をテンプレートのブランドの濃色(primary_deep)にし、色の役割を入れ替えて描く。
+# 文字の役割と面の役割を「対」で入れ替える — 片方だけ替えると、淡い地で読めていた組(濃い帯の上の白字など)が
+# 濃い地で潰れる。地はスライドの背景属性で塗る(全面の矩形は置かない: 編集で毎回つかんでしまう)。
+INVERSE_OK = {"cover", "statement", "section_divider"}
+INVERSE_SWAP = {
+    "ink": "canvas", "ink_strong": "canvas", "ink_subtle": "surface", "ink_faint": "chart_gray_light",
+    "primary_deep": "primary_pale", "primary": "primary_pale", "rule": "chart_gray",
+    "surface_tint": "ink_strong", "primary_pale": "ink_strong", "canvas": "primary_deep",
+}
+
+
+class inverse_palette:
+    """with 文の間だけ C の色の役割を反転する(INVERSE_SWAP)。抜けるときに元へ戻す。"""
+    def __enter__(self):
+        self.saved = dict(C)
+        for role, src in INVERSE_SWAP.items():
+            C[role] = self.saved[src]
+        return self.saved["primary_deep"]
+
+    def __exit__(self, *exc):
+        C.clear()
+        C.update(self.saved)
+        return False
 
 
 def _strip_visible_periods(obj):
@@ -4708,14 +4818,20 @@ def build(spec_path: Path, out_path: Path) -> Path:
         if pattern not in PATTERNS:
             raise SystemExit(f"slide {idx}: unknown pattern '{pattern}'. valid: {sorted(PATTERNS)}")
         slide = prs.slides.add_slide(blank)
-        if pattern in NO_CHROME:
-            PATTERNS[pattern](slide, spec, deck)
-            if pattern == "section_divider":
-                add_footer(slide, spec, idx, total, deck)
-        else:
-            add_chrome(slide, spec, idx, total, deck)
-            PATTERNS[pattern](slide, spec, deck)
-            add_insight_bar(slide, spec)
+        inverse = spec.get("tone") == "inverse" and pattern in INVERSE_OK
+        ctx = inverse_palette() if inverse else contextlib.nullcontext()
+        with ctx as dark:
+            if inverse:
+                slide.background.fill.solid()
+                slide.background.fill.fore_color.rgb = dark
+            if pattern in NO_CHROME:
+                PATTERNS[pattern](slide, spec, deck)
+                if pattern == "section_divider":
+                    add_footer(slide, spec, idx, total, deck)
+            else:
+                add_chrome(slide, spec, idx, total, deck)
+                PATTERNS[pattern](slide, spec, deck)
+                add_insight_bar(slide, spec)
         if spec.get("speaker_notes"):
             slide.notes_slide.notes_text_frame.text = spec["speaker_notes"]
     prs.save(out_path)

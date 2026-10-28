@@ -98,14 +98,39 @@ def act_config() -> dict:
     }
 
 
-def d3_format(spec: dict, default: str = ",.1f") -> str:
+def _spec_numbers(spec: dict) -> list:
+    """スペックに書かれた数値(データの桁を測るため)。"""
+    out = []
+
+    def walk(o):
+        if isinstance(o, bool):
+            return
+        if isinstance(o, (int, float)):
+            out.append(o)
+        elif isinstance(o, dict):
+            for k, v in o.items():
+                if k not in ("dy", "dx", "size", "target", "x", "y") or not isinstance(v, (int, float)):
+                    walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+    walk({k: v for k, v in spec.items() if k in ("data", "values", "series", "bar", "line", "from", "to",
+                                                 "items", "columns", "points", "stages")})
+    return out
+
+
+def d3_format(spec: dict, default: str | None = None) -> str:
     """値ラベルの書式。label_format(d3)が無ければ、ネイティブと同じ number_format(Excel 形式)を d3 に直す。
-    既定はネイティブの既定 "#,##0.0" と同じ ",.1f" — 同じ数字が画像とネイティブで違う桁で出ないように。"""
+    どちらも無ければ、ネイティブと同じくデータ自身の桁に合わせる(4 分は「4」、12.8 億円は「12.8」)。"""
     if spec.get("label_format"):
         return spec["label_format"]
     nf = spec.get("number_format")
     if not nf:
-        return default
+        if default:
+            return default
+        import build_deck
+        d = build_deck.data_decimals(_spec_numbers(spec))
+        return f",.{d}f"
     pct = "%" in nf
     dec = len(nf.split(".", 1)[1].rstrip("%")) if "." in nf else 0
     return f"{',' if ',' in nf else ''}.{dec}{'%' if pct else 'f'}"

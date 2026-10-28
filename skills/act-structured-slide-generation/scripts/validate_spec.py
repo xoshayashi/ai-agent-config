@@ -144,6 +144,8 @@ FIT_CHECKS = {
     "before_after": (lambda bd, s, h: bd._before_after_layout(s, h), "注記を短くするか、行を減らす"),
     "case_strip": (lambda bd, s, h: bd._case_strip_layout(s, h), "本文か声を短くする"),
     "matrix_2x2": (lambda bd, s, h: bd._matrix_2x2_layout(s, h), "象限の項目を減らす(各象限2-3項目)"),
+    "column_framework": (lambda bd, s, h: bd._column_framework_layout(s.get("columns", [])[:4], h),
+                         "柱の項目か本文を減らす(4本柱+結論帯なら各柱2項目まで)"),
     "gantt": (lambda bd, s, h: bd._gantt_layout(s, h), "タスクを束ねる(group 行を含めて8行まで、名前は1行)"),
     "harvey_table": (lambda bd, s, h: bd._harvey_layout(s, h), "選択肢を減らすか、評価軸の名前を短くする"),
     "composite": (lambda bd, s, h: bd._composite_layout(s, h),
@@ -317,6 +319,77 @@ def print_outline(slides: list) -> None:
         title = s.get("title") or s.get("statement") or ""
         marker = "  " if pat in STRUCTURAL else "● "
         print(f"{i:2d} {marker}[{pat}] {title}")
+
+
+# ---------------------------------------------------------------- design richness and rhythm
+
+# アイコンを持てる並列の項目: (パターン, 一覧のキー, ラベルのキー)。composite は別に見る
+ICON_SETS = [("executive_summary", "points", ("heading", "kicker")), ("kpi_dashboard", "kpis", ("label",)),
+             ("column_framework", "columns", ("heading",)), ("hub_spoke", "spokes", ("label",))]
+INVERSE_PATTERNS = {"cover", "statement", "section_divider"}
+# それ自体が視覚の錨(大きな数字・濃い面・強調された系列・図)を持つパターン
+ANCHORED = {"cover", "section_divider", "agenda", "kpi_dashboard", "chart_insight", "chart_grid", "market_sizing",
+            "waterfall", "financial_summary", "financial_highlights", "metrics_rows", "driver_decomposition",
+            "guidance_progress", "diagram", "metric_proof", "logic_tree", "milestone_timeline", "risk_matrix",
+            "hub_spoke", "before_after", "case_strip", "matrix_2x2", "gantt", "harvey_table",
+            "competitive_landscape", "roadmap", "process_flow"}
+
+
+def check_icons(errors, warns, loc, s) -> None:
+    """アイコンは意味の印: 名前が同梱の Lucide にあること、並列の項目の全部に付けるか付けないか、ラベルと一緒。"""
+    import act_icons
+    known = set(act_icons.available())
+    sets = []
+    for pat, key, label_keys in ICON_SETS:
+        if s.get("pattern") == pat:
+            sets.append((key, s.get(key) or [], label_keys))
+    if s.get("pattern") == "composite":
+        for b in composite_blocks(s):
+            if b.get("type") == "kpi":
+                sets.append(("kpis", b.get("kpis") or [], ("label",)))
+            if b.get("icon"):
+                sets.append(("block", [b], ("heading",)))
+    for key, items, label_keys in sets:
+        icons = [it.get("icon") for it in items if isinstance(it, dict)]
+        named = [ic for ic in icons if ic]
+        for ic in named:
+            if ic not in known:
+                errors.append(f"{loc}: アイコン '{ic}' が無い — 近いもの: {', '.join(act_icons.suggest(ic)) or '(なし)'}"
+                              "(一覧は assets/icons/)")
+        if named and len(named) != len(icons) and key != "block":
+            warns.append(f"{loc}: {key} の一部にだけアイコンがある({len(named)}/{len(icons)}) — 並列の項目は全部に付けるか、どれにも付けない")
+        for it in items:
+            if isinstance(it, dict) and it.get("icon") and not any(str(it.get(k, "")).strip() for k in label_keys):
+                errors.append(f"{loc}: アイコン '{it['icon']}' にラベルが無い — アイコンだけでは意味が決まらない(ラベルと一緒に置く)")
+
+
+def has_anchor(s) -> bool:
+    """視覚の錨があるか: パターン自体が持つか、主役(focal)・強調・アイコン・so-what の帯が指定されているか。"""
+    pat = s.get("pattern")
+    if pat in ANCHORED:
+        return True
+    blob = json.dumps({k: v for k, v in s.items() if k not in ("speaker_notes",)}, ensure_ascii=False)
+    if any(k in blob for k in ('"focal": true', '"icon":', '"emphasis_col"', '"emphasis_row"', '"focal_category"')):
+        return True
+    if pat == "composite":
+        return any(b.get("type") in ("chart", "kpi", "callout", "table", "diagram") for b in composite_blocks(s))
+    if pat == "statement":
+        return bool(s.get("recap") or s.get("lead") or s.get("tone") == "inverse")
+    return False
+
+
+def layout_diversity(slides) -> float:
+    """内容スライドの「実質的な型の数」(Vendi score を、同型 = 1・別型 = 0 の類似度で計算したもの =
+    型の分布のエントロピーの exp)。同じ型の繰り返しが多いほど 1 に近づき、全部違えば枚数に等しい。"""
+    import math
+    sigs = [shape_signature(s) for s in slides if s.get("pattern") not in STRUCTURAL]
+    if not sigs:
+        return 0.0
+    counts = {}
+    for g in sigs:
+        counts[g] = counts.get(g, 0) + 1
+    n = len(sigs)
+    return math.exp(-sum((c / n) * math.log(c / n) for c in counts.values()))
 
 
 def main() -> int:
@@ -838,6 +911,8 @@ def main() -> int:
             if long_head:
                 warns.append(f"{loc}: 柱の見出しが長い({', '.join(h[:12] for h in long_head)}) — ラベル込みで36字以内。"
                              "帯は3行で頭打ちにし、超える分は溢れて描かれる")
+            if 2 <= ncol <= 4:
+                _check_fit(errors, warns, loc, s, tokens)
             fat = [c.get("heading", f"col{j+1}") for j, c in enumerate(s.get("columns", []))
                    if len(c.get("items", [])) > 4]
             if fat:
@@ -879,6 +954,15 @@ def main() -> int:
             elif st_.strip() in ILLUSTRATIVE_STICKERS and not s.get("assumption"):
                 errors.append(f"{loc}: sticker「{st_.strip()}」は数値が仮のものだという印 — assumption に"
                               "何を仮に置いたかを書く(例示の数字を実績と読ませない)")
+        check_icons(errors, warns, loc, s)
+        if s.get("tone") is not None:
+            if s["tone"] != "inverse":
+                errors.append(f"{loc}: tone '{s['tone']}' は未対応 — 'inverse'(濃い地)だけ")
+            elif pat not in INVERSE_PATTERNS:
+                errors.append(f"{loc}: tone 'inverse' は {', '.join(sorted(INVERSE_PATTERNS))} だけ(図表のページは淡い地で読ませる)")
+        if pat not in STRUCTURAL and not has_anchor(s):
+            warns.append(f"{loc}: 視覚の錨が無い({pat}) — 主役の項目に focal、並列の項目に icon、強調の列・系列、"
+                         "so-what の帯のどれかで、目が最初に止まる場所を作る(文字の箱が並ぶだけのページは「様式の欠如」)")
         if pat == "matrix_2x2":
             qs = s.get("quadrants", [])
             pos_ = [q.get("position") for q in qs]
@@ -1107,7 +1191,7 @@ def main() -> int:
         # カード高の card_text_floor に届くかをビルド前に見る。届かないカードは、下半分が空いて
         # 見出し帯・隣のカードと釣り合わない。足すべき行数と1行の字数を具体的に示す
         if pat in ("process_flow", "column_framework", "two_column", "milestone_timeline", "hub_spoke",
-                   "case_strip"):
+                   "case_strip", "matrix_2x2"):
             try:
                 card_copy_estimate = _builder(tokens).card_copy_estimate     # ビルドと同じ物差し
                 floor_ = BUDGET_FILL.get("card_text_floor", 0.6)
@@ -1193,6 +1277,23 @@ def main() -> int:
                     warns.append(f"slide {i}: executive_summary の kicker が章タイトルと不一致 — 各点の kicker を章扉と同じ語順・同じ語に揃える: points={klabels} / 章={dividers}")
             elif npt < nd or npt % nd != 0:
                 warns.append(f"slide {i}: executive_summary {npt}点 ↔ 章扉{nd}章がズレている — 1:1(kicker=章タイトル)か、各章が同数の点をまとめる均等グルーピング(例 {nd}章なら {nd} か {nd*2} 点)に揃える")
+
+    # 濃い地の配分とリズム: 反転は1割強まで(多いと「濃い地」が特別でなくなる)。長いデッキには最低1枚の
+    # 山場(反転・ヒーロー数値)を置き、型の多様性(実質的な型の数)が低すぎないことを見る
+    inv = [i for i, s in enumerate(slides, start=1) if s.get("tone") == "inverse"]
+    if slides and len(inv) > max(2, round(len(slides) * 0.25)):
+        warns.append(f"反転(tone: inverse)が {len(inv)}/{len(slides)} 枚 — 表紙・章扉・締めに絞る(目安は全体の 25% まで)")
+    content_slides = [s for s in slides if s.get("pattern") not in STRUCTURAL]
+    if len(slides) >= 8:
+        heroes = [s for s in slides if s.get("tone") == "inverse" or s.get("pattern") in ("metric_proof", "kpi_dashboard", "case_strip")
+                  or (s.get("pattern") == "statement" and s.get("recap"))]
+        if not heroes:
+            warns.append("山場のページが無い — 8 枚以上のデッキには、反転の表紙か締め、またはヒーロー数値のページを1枚以上置く")
+        div = layout_diversity(slides)
+        floor_div = min(len(content_slides), 8) * 0.5
+        if content_slides and div < floor_div:
+            warns.append(f"型の多様性が低い(実質 {div:.1f} 型 / 内容 {len(content_slides)} 枚、目安 {floor_div:.1f} 以上) — "
+                         "同じ型の繰り返しを composite の組み立てや別の型に置き換える")
 
     # adjacent-slide monotony: same content pattern back to back reads as a template loop
     prev_pat = None

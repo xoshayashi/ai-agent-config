@@ -1,7 +1,7 @@
 ---
 name: act-structured-slide-generation
 description: "Generates and repairs native, editable 16:9 .pptx decks from a prompt: banker-grade structured slides in the Act design language, composed by judgment over audience, claim, evidence, narrative role, grid/flex layout, design richness, and production constraints rather than slide-type templates. Use whenever the user asks for a deck, slides, presentation, or page-based business material, including Japanese terms such as 資料, 決算説明資料, IR資料, 提案書, 営業資料, 会社説明資料, 経営会議資料, 登壇資料, ピッチ資料, 事業計画資料, board deck, investor deck, or editable .pptx. Also critiques or redesigns an existing deck at design, structure, and claim level. Not for AI-image slides, ATOM-brand slides, narrative-only equity stories, proofreading-only edits, Google Slides-only work, or xlsx financial models."
-compatibility: "Needs Python 3 with python-pptx, Pillow, lxml, fonttools, vl-convert-python and graphviz; the Graphviz dot CLI and LibreOffice (soffice) plus pdftoppm for diagrams and render QA; the Geist and Noto Sans JP fonts (scripts/setup_fonts.py). Built for Claude Code and Codex; see references/setup.md."
+compatibility: "Needs Python 3 with python-pptx, Pillow, lxml, fonttools, vl-convert-python, svgelements and graphviz; the Graphviz dot CLI and LibreOffice (soffice) plus pdftoppm for diagrams and render QA; the Geist and Noto Sans JP fonts (scripts/setup_fonts.py). Built for Claude Code and Codex; see references/setup.md."
 ---
 
 # Act Structured Slide Generation
@@ -72,7 +72,7 @@ Run from this skill directory. Check the toolchain before anything else, and ins
 this reports missing (`references/setup.md` has the commands and the font notes):
 
 ```bash
-python3 -c "import pptx, PIL, lxml, fontTools, graphviz, vl_convert" && \
+python3 -c "import pptx, PIL, lxml, fontTools, graphviz, vl_convert, svgelements" && \
   command -v soffice dot >/dev/null && echo "ready"
 python3 scripts/setup_fonts.py --check
 ```
@@ -199,6 +199,14 @@ aesthetics poorly and the geometry is measured instead. Pick a chart from the co
 title makes (component, item, time series, frequency, correlation, bridge, two-point change, vs
 target). A `sticker` ("暫定", "例示") marks a slide's status in the top-right corner; an
 illustrative sticker requires an `assumption`.
+
+**Richness inside one system.** Every content page needs a visual anchor: a hero number, a
+`focal` item or series, a callout panel, or an `icon` set on parallel items (summary points, KPIs,
+pillars, spokes; all or none, always beside a label). Give the deck peaks with `tone: "inverse"`
+(the brand-dark surface) on the cover, the close or chapter dividers, at most about a quarter of
+the deck. Vary layouts; validate scores the deck's layout diversity. Keep the grid, type scale and
+palette fixed: richness is contrast, not new colours. Rules, sources and checks:
+`references/design-richness.md`.
 
 **Text frames.** A group that reads as one thing is one text box, built from paragraphs
 (label -> value -> note; heading -> body; a whole interpretation rail). Leading follows the
@@ -337,7 +345,8 @@ and any known residual risk.
 - Do not use a single standalone bar as a chart. Use a hero number, gauge, range, table, or
   comparative bars instead.
 - Do not let decorative freshness override auditability. Freshness comes from composition,
-  not gradients, shadows, icons, or color noise.
+  scale, emphasis and surface contrast, not gradients, shadows, or color noise. Icons are allowed
+  only as semantic markers on parallel items with labels, never as decoration.
 
 ## File Map
 
@@ -352,6 +361,7 @@ Read only what the task needs, but do not skip the required workflow references.
 | `references/templates/*.json` | The template patches themselves (`standard`, `navy`, `monochrome`, `bold`) |
 | `references/design-principles.md` | Act visual grammar, hierarchy, color, density judgment, and page rhythm |
 | `references/grid-and-flex-strategy.md` | Granular grid/flex contract for layout consistency |
+| `references/design-richness.md` | Visual anchors, icons, inverse surfaces, rhythm, layout diversity, contrast: rules, checks, sources |
 | `references/composition-vocabulary.md` | Composition moves, not templates |
 | `references/charts-vega.md` | Vega-Lite charts and consulting recipes (mekko / slope / dumbbell / bullet), chart choice by comparison, checks |
 | `references/layout-search.md` | Why and how `composite` blocks are arranged by search: roles, candidate grammar, verifiable scores, research sources |
@@ -373,6 +383,7 @@ Read only what the task needs, but do not skip the required workflow references.
 | `references/tokens.json` | Single source for Act color, type, and grid tokens |
 | `scripts/act_theme.py` | Token-core adapter: feeds tokens.json to every backend (native, Vega-Lite, Graphviz) |
 | `scripts/act_assets.py` | Image-asset backend: Act-styled deterministic charts/diagrams for objects native cannot draw |
+| `scripts/act_icons.py`, `assets/icons/` | Lucide icons (ISC) drawn as native vector shapes; curated subset |
 | `scripts/act_vega.py` | Vega-Lite chart rendering: Act theme, `focal` / `labels`, consulting recipes, compile check |
 | `scripts/layout_search.py` | Ranks `composite` arrangements from role-tagged `blocks`; `--top`, `--emit` to compare candidates |
 | `scripts/stress_deck.py` | Dynamic-generation regression guard: every pattern at min / documented max / past capacity |
