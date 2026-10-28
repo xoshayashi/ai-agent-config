@@ -102,6 +102,7 @@ require_file "instructions/INSTRUCTIONS.md"
 require_file "instructions/DESIGN.md"
 require_file "instructions/WRITING.md"
 require_file "shell/.zshrc"
+require_file "shell/secrets.zsh.example"
 require_file ".github/workflows/validate.yml"
 require_file ".github/workflows/claude-code-review.yml"
 

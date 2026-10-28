@@ -21,8 +21,8 @@ Claude Code / Codex に共通の Instructions を配布するためのリポジ�
 
 加えて、シェル設定 `shell/.zshrc` を `~/.zshrc` へリンクします。`.zshrc` の正本は
 このリポジトリ側にあり、`~/.zshrc` はそのシンボリックリンクになります。
-API キーやトークンなどの秘密情報はリポジトリに置かず、git 管理外の `~/.zshrc.local` に書きます。
-`shell/.zshrc` は末尾でこのファイルが読める場合だけ `source` します。
+API キーやトークンなどの秘密情報はリポジトリに置かず、git 管理外の `~/.secrets.zsh` に `export` で書きます。
+`setup.sh` が `~/.zshenv` に読み込み行を足すので、対話シェルだけでなくスクリプトやエージェントの zsh からも環境変数として使えます。雛形は `shell/secrets.zsh.example` です。
 
 このリポジトリでは、CLI や `/init` 系コマンドがローカルに生成しうる root-level `AGENTS.md`、`CLAUDE.md`、`GEMINI.md` は canonical ではありません。正本は `instructions/` 配下です。
 

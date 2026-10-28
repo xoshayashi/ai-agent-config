@@ -236,8 +236,10 @@ brew install --cask microsoft-office
 このリポジトリにあり、編集はリポジトリ側で行います。
 
 API キーやトークンなどの秘密情報は `shell/.zshrc` に書きません。git 管理外の
-`~/.zshrc.local` に置きます。`shell/.zshrc` は末尾で、このファイルが読める場合だけ
-`source` します。`setup.sh` は `~/.zshrc.local` を作らないため、必要なら手で作ります。
+`~/.secrets.zsh` に `export` で書きます。`setup.sh` は `~/.zshenv` に読み込み行を
+1行だけ足します。`.zshenv` は対話・非対話を問わず全 zsh が読むため、スクリプトや
+エージェントのシェルからも同じ環境変数を使えます。`~/.secrets.zsh` は自動では
+作らないので、`shell/secrets.zsh.example` をコピーして `chmod 600` で作ります。
 
 既存の `~/.zshrc` が通常ファイルとして残っていると、既定 (`skip`) では
 リンクが作られません。`AI_AGENT_CONFLICT_MODE=replace` は instruction や

@@ -760,6 +760,26 @@ install_instruction_links() {
 
 install_shell_links() {
   install_link "$config_home/shell/.zshrc" "$home_dir/.zshrc"
+  install_secrets_loader
+}
+
+# 秘密情報は git 管理外の ~/.secrets.zsh に置き、~/.zshenv から読む。.zshenv は
+# 対話・非対話を問わず全 zsh が読むので、スクリプトやエージェントからも使える。
+# ~/.zshenv はマシン固有の行を持つ通常ファイルなので、リンクせず1行だけ足す。
+secrets_loader_line='[ -r "$HOME/.secrets.zsh" ] && . "$HOME/.secrets.zsh"'
+install_secrets_loader() {
+  zshenv="$home_dir/.zshenv"
+  if [ -f "$zshenv" ] && grep -Fqx "$secrets_loader_line" "$zshenv"; then
+    say "ok: secrets loader in $zshenv"
+  elif [ "$dry_run" = "1" ]; then
+    say "would append secrets loader to $zshenv"
+  else
+    printf '\n# 秘密情報(API キー・トークン)。ai-agent-config の setup.sh が追記\n%s\n' \
+      "$secrets_loader_line" >> "$zshenv"
+    say "append: secrets loader to $zshenv"
+  fi
+  [ -f "$home_dir/.secrets.zsh" ] \
+    || say "note: ~/.secrets.zsh がありません。必要なら shell/secrets.zsh.example から作ります"
 }
 
 install_skill_links() {

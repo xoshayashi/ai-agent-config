@@ -29,7 +29,7 @@ export LANG=ja_JP.UTF-8
 # Pythonキャッシュファイル（.pyc）の生成を抑制
 export PYTHONDONTWRITEBYTECODE=1
 
-# Google GenAI / GCP Settings (GOOGLE_CLOUD_PROJECT は ~/.zshrc.local)
+# Google GenAI / GCP Settings (GOOGLE_CLOUD_PROJECT は ~/.secrets.zsh)
 export GOOGLE_CLOUD_LOCATION="global"
 export GOOGLE_GENAI_USE_ENTERPRISE="True"
 
@@ -147,5 +147,5 @@ export PATH='/Users/sh/.local/bin':$PATH
 
 test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
 
-# 秘密情報(API キー・トークン)は git 管理外の ~/.zshrc.local に置く
-[[ -r "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"
+# 秘密情報(API キー・トークン)はここに書かない。git 管理外の ~/.secrets.zsh に置き、
+# ~/.zshenv が読み込む(雛形: shell/secrets.zsh.example)。
