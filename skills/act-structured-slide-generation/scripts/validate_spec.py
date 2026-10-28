@@ -93,9 +93,10 @@ def is_evidence(s: dict) -> bool:
 
 
 def is_qualitative(s: dict) -> bool:
-    """タイトルに数字が無くてよい証拠ページか。composite は KPI もグラフも持たないなら定性。"""
+    """タイトルに数字が無くてよい証拠ページか。composite は数値の図表(グラフ・表・KPI)を持たなければ定性
+    (図だけなら diagram パターンと同じく定性で、出所だけを求める)。"""
     if s.get("pattern") == "composite":
-        return not any(b.get("type") in ("chart", "kpi") for b in composite_blocks(s))
+        return not any(b.get("type") in ("chart", "table", "kpi") for b in composite_blocks(s))
     return s.get("pattern") in QUALITATIVE_EVIDENCE
 
 
@@ -103,9 +104,11 @@ def shape_signature(s: dict) -> str:
     """同じパターンの連続を判定する名前。composite は行ごとの (列の取り分, ブロック種) が同じときだけ同型。"""
     if s.get("pattern") != "composite":
         return str(s.get("pattern"))
+    from build_deck import composite_spans   # span 省略時の等分は描画と同じ規則で数える
     rows = (s.get("grid") or [])[:3]
-    return "composite:" + "|".join(",".join(f"{c.get('span')}{(c.get('block') or {}).get('type')}"
-                                            for c in (r.get("cells") or [])[:4]) for r in rows)
+    return "composite:" + "|".join(",".join(f"{sp}{(c.get('block') or {}).get('type')}"
+                                            for c, sp in zip((r.get("cells") or [])[:4], composite_spans(r)))
+                                   for r in rows)
 
 
 def _builder(tokens):
@@ -859,9 +862,12 @@ def main() -> int:
                 cells_ = r.get("cells") or []
                 if not 1 <= len(cells_) <= 4:
                     errors.append(f"{loc} row {ri}: cells は 1-4 個({len(cells_)} 個)")
-                spans = [c.get("span") for c in cells_]
-                if any(not (isinstance(sp, int) and not isinstance(sp, bool) and 2 <= sp <= 12) for sp in spans):
-                    errors.append(f"{loc} row {ri}: span は 2-12 の整数 — いまは {spans}")
+                given = [c.get("span") for c in cells_]
+                from build_deck import composite_spans
+                spans = composite_spans(r)        # span を省いたセルは残りの列を等分(描画と同じ)
+                if any(sp is not None and not (isinstance(sp, int) and not isinstance(sp, bool) and 2 <= sp <= 12)
+                       for sp in given) or any(sp < 2 for sp in spans):
+                    errors.append(f"{loc} row {ri}: span は 2-12 の整数(省くと残りを等分)— いまは {given}")
                 elif sum(spans) > 12:
                     errors.append(f"{loc} row {ri}: span の合計が {sum(spans)} — 12 列を超える")
                 elif sum(spans) < 12:

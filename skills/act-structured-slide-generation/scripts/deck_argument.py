@@ -132,17 +132,53 @@ def material_tokens(values: list) -> set[str]:
     return tokens
 
 
+# composite のブロック種 → 監査で見せるキー。セル(cells)は roadmap の表セルと同じ名前で EXHIBIT に
+# 入っているため、そのまま歩くと text / callout の主張まで「図表が示した数値」になり、裏づけの無い
+# 数字が監査を素通りする(Claude レビュー指摘、2026-10-28)。ブロックごとに主張と証拠へ振り分ける
+_COMPOSITE_KEYS = {"chart": ("chart",), "table": ("table",), "kpi": ("kpis",), "diagram": ("diagram",),
+                   "text": ("heading", "points"), "callout": ("heading", "statement")}
+
+
+def audit_view(slide: dict) -> dict:
+    """監査が歩く形のスライド。composite は grid を外し、ブロックの中身を種別どおりのキーで並べ直す
+    (text の見出し・要点と callout は主張、chart / table / kpi / diagram は証拠)。他のパターンはそのまま。"""
+    if slide.get("pattern") != "composite":
+        return slide
+    view = {k: v for k, v in slide.items() if k != "grid"}
+    claims: list = []
+    exhibits: list = []
+    charts = []
+    for r in (slide.get("grid") or []):
+        for c in (r.get("cells") or []):
+            b = c.get("block") or {}
+            keys = _COMPOSITE_KEYS.get(b.get("type"), ())
+            part = {k: b[k] for k in keys if k in b}
+            if b.get("type") in ("text", "callout"):
+                claims.append(part)
+            else:
+                if b.get("heading"):
+                    claims.append({"heading": b["heading"]})
+                exhibits.append(part)
+                if b.get("type") == "chart" and isinstance(b.get("chart"), dict):
+                    charts.append(b["chart"])
+    view["points"] = claims                      # CLAIM_KEYS の 1 つ: 主張として歩かれる
+    view["facts"] = exhibits                     # EXHIBIT_KEYS の 1 つ: 証拠として歩かれる
+    if len(charts) == 1 and "chart" not in view:
+        view["chart"] = charts[0]                # 図表の単位(chart.unit)を裸の数に付けるため
+    return view
+
+
 def exhibit_values(slide: dict) -> list:
     """図表が持つ値(文字列・数値)を平らに集める。"""
     out: list = []
-    _walk(slide, EXHIBIT_KEYS, lambda v: _strings_and_numbers(v, out))
+    _walk(audit_view(slide), EXHIBIT_KEYS, lambda v: _strings_and_numbers(v, out))
     return out
 
 
 def claim_values(slide: dict) -> list:
     """主張(散文)の文字列を集める。"""
     out: list = []
-    _walk(slide, CLAIM_KEYS, lambda v: _strings_and_numbers(v, out))
+    _walk(audit_view(slide), CLAIM_KEYS, lambda v: _strings_and_numbers(v, out))
     return [v for v in out if isinstance(v, str)]
 
 
@@ -154,7 +190,7 @@ UNIT_SCOPED_KEYS = {"chart", "charts", "series", "values", "items", "bars", "cur
 def _unit_scoped_values(slide: dict) -> list:
     """図表そのものの数値(chart の series 値、waterfall の items 等)だけを平らに集める。"""
     out: list = []
-    _walk(slide, UNIT_SCOPED_KEYS, lambda v: _strings_and_numbers(v, out))
+    _walk(audit_view(slide), UNIT_SCOPED_KEYS, lambda v: _strings_and_numbers(v, out))
     return out
 
 
@@ -164,7 +200,8 @@ def exhibit_tokens(slide: dict) -> set[str]:
     tokens = material_tokens(values)
     # 図表の裸の数値(chart の values 等)も、単位を付けたトークンとして数える — ただし対象は
     # 図表データそのものだけで、facts / hero / table の数には付けない
-    unit = slide.get("unit") or (slide.get("chart") or {}).get("unit")
+    view = audit_view(slide)
+    unit = view.get("unit") or (view.get("chart") or {}).get("unit")
     if unit:
         for v in _unit_scoped_values(slide):
             # 図表全体の単位を付けるのは「裸の数」だけ。「114%」のように単位を持つ文字列や、

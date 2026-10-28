@@ -371,9 +371,14 @@ native and editable.
 - Row heights follow `height` weights, but a row that needs more gets its need first, and a
   row with no chart / table / diagram never grows past 1.3x its content (spare height goes to
   stretchable rows, or the grid is centred). Validate errors when the blocks cannot fit.
-- Evidence rules follow the content: with a chart, table, KPI or diagram block the page needs
-  `source` / `assumption` and a number in the title; text-and-callout composites are
-  qualitative. Charts inside blocks go through the same chart checks as `chart_insight`.
+- Evidence rules follow the content: a chart, table, KPI or diagram block makes the page need
+  `source` / `assumption`; a chart, table or KPI block also asks for a number in the title
+  (a diagram alone stays qualitative, as in `diagram`). Text and callout blocks are claims and
+  chart / table / KPI / diagram blocks are exhibits for `audit_argument`, so a number stated
+  only in a callout is not "shown". Charts inside blocks get the same checks as `chart_insight`.
+- `span` may be omitted: cells without one share the remaining columns equally.
+- `style: "card"` works on every block except `callout`; the 0.24in inset is part of the
+  measured height, and table blocks are measured with the table's own wrapped-line heights.
 - Consecutive composites count as the same pattern only when their grids match.
 - See `consulting-page-catalogue.md` for the archetype → recipe map.
 

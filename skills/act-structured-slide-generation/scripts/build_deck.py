@@ -1671,9 +1671,10 @@ def _cell_text_w(col_w_in: float) -> float:
     return max(0.4, col_w_in - 0.18)
 
 
-def add_act_table(slide, x, y, w, h, tspec: dict):
-    """tspec: {headers:[], rows:[[...]], col_widths:[fractions], align:[l|r|c per col],
-    emphasis_col: int|None, emphasis_row: int|None}"""
+def _table_min_heights(w: float, tspec: dict):
+    """表の列幅と、各行・ヘッダーの最小高(折返し行数の実測から)。add_act_table が描く高さと、
+    composite が行の高さを決める見積もりが同じ数字を見る(片方だけ1行で数えると溢れを見逃す)。
+    返り値: (headers, rows, ncols, col_w_in, line_h, v_pad, row_min, hdr_min)"""
     headers = tspec.get("headers", [])
     rows = tspec.get("rows", [])
     nrows, ncols = len(rows) + 1, len(headers)
@@ -1711,6 +1712,24 @@ def add_act_table(slide, x, y, w, h, tspec: dict):
     hdr_rows = max((_text_lines(str(h_), _cell_text_w(col_w_in[ci]), hdr_pt, 700)
                     for ci, h_ in enumerate(headers)), default=1)
     hdr_min = hdr_rows * (hdr_pt / 72.0 * 1.34) + v_pad * 0.7
+    return headers, rows, ncols, col_w_in, line_h, v_pad, row_min, hdr_min
+
+
+def add_act_table(slide, x, y, w, h, tspec: dict):
+    """tspec: {headers:[], rows:[[...]], col_widths:[fractions], align:[l|r|c per col],
+    emphasis_col: int|None, emphasis_row: int|None}"""
+    headers, rows, ncols, col_w_in, line_h, v_pad, row_min, hdr_min = _table_min_heights(w, tspec)
+    nrows = len(rows) + 1
+    cell_pt, hdr_pt = TS["table_cell"], TS["table_header"]
+    emph_col, emph_row = tspec.get("emphasis_col"), tspec.get("emphasis_row")
+
+    def _cell_weight(ri: int, ci: int) -> int:
+        """そのセルを実際に描く重み。行数見積りは描画と同じ重みで測る(強調列は太い)。"""
+        if ci == 0:
+            return 700
+        focal = (emph_col is not None and ci == emph_col) or (emph_row is not None and ri == emph_row)
+        return 600 if focal else 400
+
     n = len(row_min)
     sum_min = sum(row_min)
     # 余白を詰めて本文領域を埋める(全体の高さを出す)。追加高は主にデータ行へ配分し、
@@ -3676,11 +3695,16 @@ def _kpi_blocks(k: dict) -> list[dict]:
     return blocks
 
 
-def _kpi_horizontal(b: dict, w: float, h: float) -> bool:
-    """KPI を横に並べるか。横長のセル(帯)なら横、縦長(サイドレール)なら縦に積む。"""
+KPI_MIN_W = 1.9            # 横に並べた KPI 1つが値と単位を1行で持てる幅
+
+
+def _kpi_horizontal(b: dict, w: float) -> bool:
+    """KPI を横に並べるか。幅だけで決める(1つあたり KPI_MIN_W 以上なら横)。行の高さで決めると、
+    見積もり時と描画時で行の高さが変わったとき向きが変わり、測った高さと描く高さがずれる。"""
     if b.get("direction") in ("row", "column"):
         return b["direction"] == "row"
-    return w >= h * 1.6
+    n = max(1, len(b.get("kpis", [])))
+    return (w - LAY["gutter_in"] * (n - 1)) / n >= KPI_MIN_W
 
 
 def _callout_fill(style: str):
@@ -3698,32 +3722,52 @@ def _callout_blocks(b: dict, ink) -> list[dict]:
     return blocks
 
 
-def block_need_h(b: dict, w: float, h: float | None = None) -> float:
+CARD_INSET = 0.24
+CHART_UNIT_H = 0.22         # グラフの上に置く単位注記の帯(_draw_block と同じ)
+
+
+def block_need_h(b: dict, w: float) -> float:
     """ブロックが最低限必要とする高さ(in)。行の高さ配分と validate の溢れ判定が共有する。
-    グラフ・図は下限(CHART_MIN_H)、表は1行ずつの最小行高から見積もる。"""
+    描画(_draw_block)と同じ順で引く: card の内側余白 → 見出し → 中身。グラフ・図は下限
+    (CHART_MIN_H、グラフは単位注記の帯を足す)、表は add_act_table と同じ実測(_table_min_heights)。"""
     t = b.get("type")
-    head = BLOCK_HEAD_H if b.get("heading") and t not in ("callout",) else 0.0
-    pad = 0.24 if b.get("style") == "card" else 0.0
-    if t == "text":
-        return head + _stack_drawn_h(_rail_blocks(b.get("points", [])), w - 2 * pad) + 2 * pad
-    if t == "kpi":
-        ks = b.get("kpis", [])
-        if not ks:
-            return head
-        if _kpi_horizontal(b, w, h if h is not None else w):
-            kw = (w - LAY["gutter_in"] * (len(ks) - 1)) / len(ks)
-            return head + max(_stack_drawn_h(_kpi_blocks(k), kw) for k in ks)
-        return head + sum(_stack_drawn_h(_kpi_blocks(k), w) for k in ks) + 0.36 * (len(ks) - 1)
     if t == "callout":
         _f, ink, bar = _callout_fill(b.get("style", "primary"))
         return _stack_drawn_h(_callout_blocks(b, ink), w - 2 * CALLOUT_PAD - (0.10 if bar else 0)) + 2 * CALLOUT_PAD
-    if t in ("chart", "diagram"):
-        return head + CHART_MIN_H
-    if t == "table":
-        tb = b.get("table") or {}
-        row_h = TS["table_cell"] / 72.0 * 1.34 * 1.13 + 0.30      # add_act_table の1行の最小高
-        return head + row_h * (len(tb.get("rows", [])) + 1)
-    return head
+    pad = CARD_INSET if b.get("style") == "card" else 0.0
+    w -= 2 * pad
+    head = BLOCK_HEAD_H if b.get("heading") else 0.0
+    if t == "text":
+        body = _stack_drawn_h(_rail_blocks(b.get("points", [])), w)
+    elif t == "kpi":
+        ks = b.get("kpis", [])
+        if not ks:
+            body = 0.0
+        elif _kpi_horizontal(b, w):
+            kw = (w - LAY["gutter_in"] * (len(ks) - 1)) / len(ks)
+            body = max(_stack_drawn_h(_kpi_blocks(k), kw) for k in ks)
+        else:
+            body = sum(_stack_drawn_h(_kpi_blocks(k), w) for k in ks)
+    elif t == "chart":
+        body = CHART_UNIT_H + CHART_MIN_H
+    elif t == "diagram":
+        body = CHART_MIN_H
+    elif t == "table":
+        *_rest, row_min, hdr_min = _table_min_heights(w, b.get("table") or {})
+        body = hdr_min + sum(row_min)
+    else:
+        body = 0.0
+    return 2 * pad + head + body
+
+
+def composite_spans(row: dict) -> list[int]:
+    """行のセルの列数。span を省いたセルは、残りの列を省いたセルで等分する(validate も同じ規則)。"""
+    cells = (row.get("cells") or [])[:4]
+    given = [c.get("span") for c in cells]
+    fixed = sum(sp for sp in given if isinstance(sp, int) and not isinstance(sp, bool))
+    n_free = sum(1 for sp in given if not (isinstance(sp, int) and not isinstance(sp, bool)))
+    each = max(1, (12 - fixed) // n_free) if n_free else 0
+    return [sp if isinstance(sp, int) and not isinstance(sp, bool) else each for sp in given]
 
 
 def _composite_layout(spec: dict, h: float) -> dict:
@@ -3732,22 +3776,17 @@ def _composite_layout(spec: dict, h: float) -> dict:
     rows = spec.get("grid", [])[:3]
     GAP = 0.26
     avail = h - 0.10 - GAP * max(0, len(rows) - 1)
-    cells_xywh = []          # 行ごとの [(x, w, block)]
-    needs = []
+    row_cells = []           # 行ごとの [(x, w, block)]
     for r in rows:
         col = 0
         cells = []
-        for c in r.get("cells", [])[:4]:
-            span = int(c.get("span", 12 // max(1, len(r.get("cells", [])))))
+        for c, span in zip(r.get("cells", [])[:4], composite_spans(r)):
             cx_, cw_ = grid(col, span)
             cells.append((cx_, cw_, c.get("block") or {}))
             col += span
-        cells_xywh.append(cells)
+        row_cells.append(cells)
     weights = [float(r.get("height", 1)) for r in rows]
-    # 必要高の判定はセルの高さに依る(KPI の縦横)ので、重みで割った仮の高さで一度測る
-    share = [avail * wt / (sum(weights) or 1) for wt in weights]
-    needs = [max((block_need_h(b, cw_, share[i]) for _x, cw_, b in cells), default=0.0)
-             for i, cells in enumerate(cells_xywh)]
+    needs = [max((block_need_h(b, cw_) for _x, cw_, b in cells), default=0.0) for cells in row_cells]
     fixed: dict[int, float] = {}
     for _ in range(len(rows)):
         free = [i for i in range(len(rows)) if i not in fixed]
@@ -3767,7 +3806,7 @@ def _composite_layout(spec: dict, h: float) -> dict:
     # 伸びて困る行の上限: グラフ・表・図を持たない行(テキスト・KPI・callout だけ)は、中身の
     # stretch_top 倍までしか育てない — 重みどおりに伸ばすと上寄せの本文の下が空洞になる。
     # 余った高さは伸ばせる行へ重みで配り、伸ばせる行が無ければ全体を上下中央に置く(fit_band と同じ占有契約)
-    stretchy = [any(b.get("type") in ("chart", "table", "diagram") for _x, _w, b in cells) for cells in cells_xywh]
+    stretchy = [any(b.get("type") in ("chart", "table", "diagram") for _x, _w, b in cells) for cells in row_cells]
     caps = [float("inf") if stretchy[i] else max(needs[i], needs[i] * LAY["fill"]["stretch_top"])
             for i in range(len(rows))]
     spare = sum(max(0.0, rh - cap) for rh, cap in zip(row_h, caps))
@@ -3784,7 +3823,7 @@ def _composite_layout(spec: dict, h: float) -> dict:
         k = avail / max(1e-6, sum(row_h))
         row_h = [rh * k for rh in row_h]
         off = 0.0
-    return dict(rows=rows, cells=cells_xywh, row_h=row_h, needs=needs, GAP=GAP, avail=avail, off=off,
+    return dict(rows=rows, cells=row_cells, row_h=row_h, needs=needs, GAP=GAP, avail=avail, off=off,
                 overflow=overflow, need_h=sum(needs) + GAP * max(0, len(rows) - 1))
 
 
@@ -3803,7 +3842,7 @@ def _draw_block(slide, x, y, w, h, b: dict) -> None:
     card = b.get("style") == "card"
     if card:
         add_rect(slide, x, y, w, h, C["surface_tint"], radius_pt=LAY["card"]["radius_pt"], name="card")
-        x, y, w, h = x + 0.24, y + 0.24, w - 0.48, h - 0.48
+        x, y, w, h = x + CARD_INSET, y + CARD_INSET, w - 2 * CARD_INSET, h - 2 * CARD_INSET
     y_head = _blk_heading(slide, x, y, w, b.get("heading"))
     y, h = y + y_head, h - y_head
     if t == "text":
@@ -3814,7 +3853,7 @@ def _draw_block(slide, x, y, w, h, b: dict) -> None:
         ks = b.get("kpis", [])
         if not ks:
             return
-        if _kpi_horizontal(b, w, h):
+        if _kpi_horizontal(b, w):
             gut = LAY["gutter_in"]
             kw = (w - gut * (len(ks) - 1)) / len(ks)
             for i, k in enumerate(ks):
@@ -3839,8 +3878,8 @@ def _draw_block(slide, x, y, w, h, b: dict) -> None:
             place_asset(slide, ch, x, y, w, h)
         else:
             add_unit_note(slide, x, y, ch.get("unit"))
-            add_act_chart(slide, x, y + 0.22, w, h - 0.22, ch)
-            add_chart_annotations(slide, x, y + 0.22, w, h - 0.22, ch)
+            add_act_chart(slide, x, y + CHART_UNIT_H, w, h - CHART_UNIT_H, ch)
+            add_chart_annotations(slide, x, y + CHART_UNIT_H, w, h - CHART_UNIT_H, ch)
     elif t == "table":
         add_act_table(slide, x, y, w, h, b.get("table") or {})
     elif t == "diagram":
@@ -4083,8 +4122,8 @@ def _harvey_layout(spec: dict, h: float) -> dict:
     lab_need = [(_text_lines(str(o.get("label", "")), lw - 0.24, RAIL_HEAD_PT, 600)) * drawn_line_h(RAIL_HEAD_PT)
                 + (drawn_line_h(TS["kpi_sub"]) if o.get("note") else 0.0) + 0.16 for o in opts]
     row_h = max(lab_need + [0.62])
-    need_h = HEAD_H + row_h * len(opts) + 0.40
-    avail = h - 0.10 - HEAD_H - 0.40
+    need_h = HEAD_H + 0.06 + row_h * len(opts) + 0.40      # 0.06 = 見出しの罫(描画と同じ)
+    avail = h - 0.10 - HEAD_H - 0.46
     if opts and row_h * len(opts) < avail:
         row_h = min(avail / len(opts), max(row_h, 0.78))
     if opts and need_h > h - 0.10:

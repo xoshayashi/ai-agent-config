@@ -3484,6 +3484,49 @@ def test_validate_checks_the_composite(tmp_path):
     assert not any(l.startswith("ERROR: slide 7") for l in lines), r.stdout                  # テキストだけなら定性
 
 
+def test_composite_review_findings(tmp_path):
+    """レビュー指摘(2026-10-28): composite の主張が証拠扱いになる、card の内側余白・表の折返し・
+    グラフの単位帯を見積もりが落とす、KPI の向きが行の高さで変わる、span 省略と validate の不一致。"""
+    sys.path.insert(0, str(SKILL / "scripts"))
+    import build_deck as B
+    import deck_argument as A
+    claim_only = _composite_slide(grid=[{"cells": [
+        {"span": 12, "block": {"type": "callout", "statement": "売上は3年で2.1倍になった"}}]}])
+    assert "2.1倍" in A.claim_tokens(claim_only) and "2.1倍" not in A.exhibit_tokens(claim_only)
+    assert "41億円" in A.exhibit_tokens(_composite_slide())          # グラフの裸の値には chart.unit が付く
+    kpis = [{"label": "ARR", "value": "12.8", "unit": "億円"}] * 3
+    plain = B.block_need_h({"type": "kpi", "kpis": kpis}, 11.0)
+    card = B.block_need_h({"type": "kpi", "kpis": kpis, "style": "card"}, 11.0)
+    assert card >= plain + 2 * B.CARD_INSET - 1e-6
+    assert B._kpi_horizontal({"kpis": kpis}, 11.0) and not B._kpi_horizontal({"kpis": kpis}, 3.0)
+    assert B.block_need_h({"type": "chart", "chart": {}}, 6.0) >= B.CHART_UNIT_H + B.CHART_MIN_H
+    wrap = {"headers": ["指標", "説明"], "rows": [["ARR", "電子帳簿保存法とインボイス制度への対応を単一の基盤で完結させる"]] * 3}
+    *_r, row_min, hdr_min = B._table_min_heights(4.0, wrap)
+    assert abs(B.block_need_h({"type": "table", "table": wrap}, 4.0) - (hdr_min + sum(row_min))) < 1e-6
+    assert max(row_min) > min(B._table_min_heights(12.0, wrap)[6])  # 狭い列では折り返して行が高くなる
+    # span を省いたセルは残りを等分し、build も validate も通る
+    no_span = _composite_slide(grid=[{"cells": [{"block": {"type": "chart", "chart": _composite_slide()["grid"][0]["cells"][0]["block"]["chart"]}},
+                                                {"block": {"type": "text", "points": ["増分の7割が既存顧客"]}}]}])
+    assert B.composite_spans(no_span["grid"][0]) == [6, 6]
+    table_only = _composite_slide(title="M&Aが最も有利な選択肢になる", grid=[{"cells": [{"span": 12, "block": {"type": "table", "table": {
+        "headers": ["案", "投資額"], "rows": [["M&A", "40億円"], ["自社開発", "25億円"]]}}}]}])
+    spec = {"meta": {"title": "t"}, "slides": [no_span, table_only]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(spec, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert "span は" not in r.stdout, r.stdout
+    assert any(l.startswith("WARN: slide 2") and ("数字" in l or "数値" in l) for l in r.stdout.splitlines()), r.stdout
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    # ハーベイ表の溢れ判定は見出しの罫(0.06in)も数える
+    hv = {"pattern": "harvey_table", "title": "t1", "subtitle": "s", "criteria": ["a", "b"],
+          "options": [{"label": "x", "scores": [1, 2]}]}
+    Lh = B._harvey_layout(hv, 5.0)
+    row_need = Lh["need_h"] - Lh["HEAD_H"] - 0.06 - 0.40          # 1 行ぶんの必要高(最小 0.62in)
+    assert row_need >= 0.62 - 1e-9
+    tight = Lh["need_h"] + 0.10 - 0.03                             # 罫を数えなければ収まると誤判定する高さ
+    assert B._harvey_layout(hv, tight)["overflow"]
+
+
 def test_matrix_gantt_and_harvey_draw_native_shapes(tmp_path):
     """2x2 は象限カード4枚、ガントはバーと◆と今日の破線、ハーベイは score ごとの扇(PIE)。"""
     from pptx import Presentation

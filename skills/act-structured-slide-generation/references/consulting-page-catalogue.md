@@ -109,7 +109,8 @@ Chart, reading notes, and one decision line:
   fewer: say so if the empty columns are intended), KPI blocks hold at most 4, charts get at
   least 4 columns (warning). Each block must carry its key (`points`, `kpis`, `statement`,
   `chart`, `table`, `diagram`). An `accent` callout uses the slide's one accent.
-- A composite counts as an evidence page (`source` / `assumption`, a number in the title) when
-  it holds a chart, table, KPI or diagram block; a text-and-callout composite is qualitative.
+- A composite needs `source` / `assumption` when it holds a chart, table, KPI or diagram block,
+  and a number in the title when it holds a chart, table or KPI. Numbers written only in text or
+  callout blocks are claims, not evidence: the argument audit looks for them in the exhibits.
 - Two composites in a row are "the same pattern" only when their grids match (same spans and
   block types per row), so varied composites do not trip the monotony warning.
