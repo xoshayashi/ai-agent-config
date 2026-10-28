@@ -134,13 +134,12 @@ shape, and anchor the text to the bottom (`MSO_ANCHOR.BOTTOM`). `verify_deck.che
 now fails any text frame whose ink covers 12-88% of a solid autoshape — fully inside (card
 text) and fully outside (a floated label) are the only two correct states.
 
-### 14d. matplotlib must be handed the Act font files
+### 14d. Image charts must be handed the Act font files
 
-matplotlib's font cache is built once and does not pick up fonts installed later, so image
-assets rendered Japanese labels as tofu (□) while the native slides were fine.
-`act_theme.apply_matplotlib` registers the same TTFs `deck_text` measures with
-(`font_manager.fontManager.addfont`), and `act_assets.BACKEND_VERSION` was bumped so cached
-tofu assets are regenerated.
+The image renderer does not see fonts on its own, so image assets once rendered Japanese labels
+as tofu (□) while the native slides were fine. `act_vega._register_fonts` registers the same
+font directories `deck_text` measures with (`vl_convert.register_font_directory`), and the chart
+font is the native pair `Geist, Noto Sans JP` (Latin from Geist, Japanese from Noto Sans JP).
 
 ### 15. Vertically centered text: the box center is not the ink center
 
@@ -178,10 +177,14 @@ character estimate, so keep `NotoSansJP-{400,600,700}.ttf` present when it matte
 
 ## Charts
 
-15. chartEx types (native waterfall etc.) cannot be generated. waterfall / roadmap /
-    2x2 map / market funnel are drawn by shape composition (data not editable, but shapes
-    are editable individually). Standard charts (column/bar/line/donut) are generated
-    natively, keeping data editability.
+15. chartEx types (the Office 2016 native waterfall etc.) cannot be generated, and LibreOffice
+    cannot render them. The waterfall is therefore a native *stacked column* chart: an invisible
+    base series under the visible bar series, with value labels on a third series moved into a
+    line chart in the same plot area (stacked bars have no outside label position). The data stays
+    editable in PowerPoint. LibreOffice mis-draws negative stacked values, so a bridge that dips
+    below zero is shifted up by its deepest point and the category axis crosses at the true zero.
+    Roadmap / 2x2 map / market funnel are still drawn by shape composition. Standard charts
+    (column/bar/line/donut) are generated natively, keeping data editability.
 16. Fine-grained formatting APIs are thin. Series color, gap_width, and data labels are
     API-level; anything past that (secondary axes, …) means XML surgery on
     `chart._chartSpace` — avoid on principle. Per-point fill/outline is available via

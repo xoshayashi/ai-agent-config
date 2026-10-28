@@ -151,6 +151,22 @@ FIT_CHECKS = {
 }
 
 
+def _check_waterfall_items(errors, loc: str, items: list) -> None:
+    """ブリッジの items: 起点(start)で始まり終点(end)で終わる、value は数値、12 本まで(バーとラベルが潰れない幅)。"""
+    kinds = [it.get("kind", "delta") for it in items]
+    if not items:
+        errors.append(f"{loc}: waterfall に items がない")
+        return
+    if kinds[0] != "start" or kinds[-1] != "end":
+        errors.append(f"{loc}: waterfall items must begin with kind='start' and finish with kind='end'")
+    bad = [str(it.get("label")) for it in items
+           if not isinstance(it.get("value"), (int, float)) or isinstance(it.get("value"), bool)]
+    if bad:
+        errors.append(f"{loc}: waterfall items の value が数値でない: {', '.join(bad[:3])}")
+    if len(items) > 12:
+        errors.append(f"{loc}: waterfall の items が {len(items)} 本 — 12 本まで(増減を束ねる)")
+
+
 def _check_composite_block(errors, warns, bl: str, b: dict, span) -> None:
     """composite の1ブロック: 種別、必須キー、上限。grid 形(span あり)と blocks 形(span は探索が決める)で共用。"""
     t = b.get("type")
@@ -189,7 +205,6 @@ IMAGE_KIND_REQUIRED = {
     "line_multi": ("categories", "series"),
     "scatter": ("points",),
     "bubble": ("points",),
-    "waterfall": ("items",),
     "radar": ("axes", "series"),
     "ring": ("segments",),
     "funnel": ("stages",),
@@ -204,9 +219,12 @@ IMAGE_KIND_REQUIRED = {
     "dumbbell": ("categories", "from", "to"),
     "bullet": ("items",),
 }
-VEGA_KINDS = {"vega", "mekko", "slope", "dumbbell", "bullet"}
+# 画像のグラフ・模式図は org_tree / node_graph(Graphviz)以外すべて Vega-Lite(act_vega.VEGA_KINDS と同じ)
+VEGA_KINDS = {"vega", "mekko", "slope", "dumbbell", "bullet", "combo", "area", "line_multi", "scatter",
+              "bubble", "radar", "ring", "funnel", "pyramid", "venn", "matrix"}
+UNIT_KINDS = {"mekko", "slope", "dumbbell", "bullet", "area", "line_multi"}   # 量の軸を持つので unit を求める
 IMAGE_ASSET_KINDS = {
-    "combo", "area", "radar", "scatter", "bubble", "waterfall", "line_multi",
+    "combo", "area", "radar", "scatter", "bubble", "line_multi",
     "org_tree", "node_graph", "ring", "funnel", "pyramid", "venn", "matrix",
 } | VEGA_KINDS
 
@@ -636,6 +654,13 @@ def main() -> int:
             else:
                 _charts.append((_dg, f"{loc} diagram"))
         for chart, cloc in _charts:
+            if chart and (chart.get("kind") == "waterfall" or chart.get("type") == "waterfall"):
+                # ブリッジはどの枠でもネイティブのグラフ(build_deck.add_waterfall_chart)。items だけを検査する
+                _check_waterfall_items(errors, cloc, chart.get("items") or [])
+                if chart.get("annotations") or chart.get("annotation"):
+                    warns.append(f"{cloc}: waterfall は注記(annotation / annotations)を描かない — 増減の理由は"
+                                 "項目名(label)か要点レールに書く")
+                continue
             if chart and chart.get("render") == "image" and chart.get("kind") not in IMAGE_ASSET_KINDS:
                 # 強制 image 指定でも未知 kind は画像バックエンドが受けない(build が落ちる)
                 errors.append(f"{cloc}: render:'image' だが kind '{chart.get('kind')}' は image バックエンド非対応 — "
@@ -649,14 +674,14 @@ def main() -> int:
                     errors.append(f"{cloc}: image chart '{k}' に必須フィールドがない: {', '.join(missing)}")
                 else:
                     # データ形状の検査。ネイティブ検査(長さ/数値)をスキップする分、image kind も
-                    # ここで同等の検査を通す — 素通しすると matplotlib が build 時に落ちる
+                    # ここで同等の検査を通す — 素通しすると描画が build 時に落ちる
                     def _nums_ok(vals):
                         return isinstance(vals, list) and vals and all(
                             isinstance(v, (int, float)) and not isinstance(v, bool) for v in vals)
                     cats_n = len(chart.get("categories") or [])
                     if k in VEGA_KINDS:
                         # Vega-Lite の宣言は描く前にコンパイルして誤りを出す(書式の誤りを build まで持ち越さない)
-                        if not chart.get("unit") and k != "vega":
+                        if not chart.get("unit") and k in UNIT_KINDS:
                             warns.append(f"{cloc}: {k} に unit が無い — 量の軸と値ラベルの単位を書く")
                         if k == "vega" and not (chart.get("mark") or chart.get("layer") or chart.get("facet")
                                                 or chart.get("hconcat") or chart.get("vconcat") or chart.get("repeat")):
@@ -695,11 +720,6 @@ def main() -> int:
                                 errors.append(f"{cloc}: radar series '{ser.get('name')}' の values は数値リスト必須")
                             elif len(pv) != axes_n:
                                 errors.append(f"{cloc}: radar series '{ser.get('name')}' が {len(pv)} 件で axes {axes_n} 件と不一致")
-                    elif k == "waterfall":
-                        bad = [it_.get("label") for it_ in chart.get("items", [])
-                               if not isinstance(it_.get("value"), (int, float)) or isinstance(it_.get("value"), bool)]
-                        if bad:
-                            errors.append(f"{cloc}: waterfall items の value が数値でない: {', '.join(str(b) for b in bad[:3])}")
                     elif k in ("scatter", "bubble"):
                         for pt_ in chart.get("points", []):
                             if not all(isinstance(pt_.get(ax_), (int, float)) and not isinstance(pt_.get(ax_), bool)
@@ -726,10 +746,10 @@ def main() -> int:
                     warns.append(f"{cloc}: image chart '{k}' ignores native `annotation` — use `annotations:[{{target,text}}]`")
                 if chart.get("annotations") and k in ("org_tree", "node_graph"):
                     warns.append(f"{cloc}: `annotations` are not rendered on Graphviz '{k}' — use edge labels")
-                elif chart.get("annotations") and k not in ("combo", "waterfall") and any(
+                elif chart.get("annotations") and k != "combo" and any(
                         isinstance(a, dict) and isinstance(a.get("target"), int) for a in chart["annotations"]):
                     warns.append(f"{cloc}: image chart '{k}' は int target のアンカーを持たず黙って落ちる — "
-                                 "combo/waterfall 以外は target を {'x','y'} のデータ座標で指定する")
+                                 "combo 以外は target を {'x','y'} のデータ座標で指定する")
                 chart = None  # skip native-chart checks below
             if chart:
                 # track trap: image `annotations` on a native chart is silently ignored
@@ -789,9 +809,7 @@ def main() -> int:
                     warns.append(f"{cloc}: negative values in a {chart.get('type', 'column')} chart — LibreOffice render-QA draws them wrong (PowerPoint is fine); prefer 'line', the waterfall pattern, or keep negatives in a table")
 
         if pat == "waterfall":
-            kinds = [it.get("kind", "delta") for it in s.get("items", [])]
-            if kinds and (kinds[0] != "start" or kinds[-1] != "end"):
-                errors.append(f"{loc}: waterfall items must begin with kind='start' and finish with kind='end'")
+            _check_waterfall_items(errors, loc, s.get("items", []))
 
         for k in s.get("kpis", []):
             if ja_len(k.get("label", "")) > BUDGET["kpi_label_max_chars_ja"]:

@@ -144,8 +144,12 @@ cross-check one conclusion rather than duplicate decoration.
 
 ### 11. `waterfall`
 
-Bridge chart. Items require start, positive/negative drivers, and end. Cause labels should
-explain the movement, not merely repeat numbers.
+Bridge chart. Items require start, positive/negative drivers, and end (≤12 items); `forecast`
+draws an outlined bar, `display` overrides a label. Cause labels should explain the movement,
+not merely repeat numbers. It is a native PowerPoint chart object (see `pptx-pitfalls.md` §15):
+the bars follow when the numbers are edited in PowerPoint; the "+3.2 / △1.5" labels are written
+from the spec, so rebuild after changing numbers. The same native chart is used for a
+`{"kind": "waterfall", "items": [...]}` chart in any chart slot (`chart_insight`, `composite`, ...).
 
 ### 12. `roadmap`
 
@@ -513,14 +517,14 @@ natively around it.
 
 Use an image chart only when the native seven cannot express the claim; native charts stay editable.
 
-**Annotation layer (matplotlib-rendered charts/diagrams).** Add `annotations` to attach
-leader-line callout boxes anchored to a specific mark — the recurring IR "point to the driver
-behind this step/bar" move that native connectors cannot anchor to chart internals:
-`"annotations": [{"target": <int category/step index | {"x":, "y":}>, "text": "cause…", "dy": 40, "dx": 0}]`.
-An int `target` resolves to a bar top on `combo` / step top on `waterfall`; on the other
-matplotlib kinds give an explicit `{"x":,"y":}` in data coordinates. `dy`/`dx` nudge the box
-(positive `dy` above, negative below). Keep to 1-3 per exhibit. Not supported on the Graphviz
-relationship graphs (`org_tree`, `node_graph`) — label those with edge labels instead.
+**Annotation layer (Vega image charts).** Add `annotations` to float a short bold cause line
+above a specific mark — the recurring IR "point to the driver behind this bar" move that native
+connectors cannot anchor to chart internals:
+`"annotations": [{"target": <int index | {"x":, "y":}>, "text": "cause…", "dy": 40}]`.
+An int `target` is a category index on `combo` (bar top), `area` (stack top) and `line_multi`
+(highest line), or a point index on `scatter` / `bubble`; `{"x":,"y":}` uses data coordinates.
+`dy` is the lift above the mark in points. Keep to 1-3 per exhibit. Not drawn on the Graphviz
+graphs (use edge labels) or on the native waterfall (name the cause in the item label).
 
 Rules:
 
@@ -589,11 +593,12 @@ multi-character `unit` can wrap and collide with the delta, so move long qualifi
 Objects the native engine cannot draw (image chart kinds, the `diagram` pattern) are rendered by
 `scripts/act_assets.py` into Act-styled PNGs and embedded with `add_picture`. All colour and
 type come from the one token core via `act_theme.py`, so an embedded chart and a native table look
-like one deck. The renderers are deterministic and browser-free (matplotlib Agg, Graphviz `dot`).
+like one deck. The renderers are deterministic and browser-free (Vega-Lite through vl-convert,
+Graphviz `dot`); matplotlib is not used.
 
 - Assets are **content-addressed** on spec + box + theme + renderer versions → same cached file,
-  no re-render; a renderer upgrade (matplotlib/Graphviz) busts the cache so output never goes
-  stale. They live in an `assets/` dir beside the built `.pptx`, with an `asset-manifest.json`.
+  no re-render; a renderer upgrade (vl-convert/Graphviz) or a change to `act_vega.py` busts the
+  cache so output never goes stale. They live in an `assets/` dir beside the built `.pptx`, with an `asset-manifest.json`.
 - Each asset keeps a **`.json` sidecar** of its spec and numbers. The picture is not editable in
   PowerPoint, but the data stays auditable and regenerable — so embed the smallest object that
   needs it and keep the surrounding title, rail, tables, and body native.

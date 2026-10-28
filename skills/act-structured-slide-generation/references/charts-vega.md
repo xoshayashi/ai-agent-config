@@ -10,8 +10,12 @@ Vega-Lite: `mekko`, `slope`, `dumbbell`, `bullet`.
 ## Native Or Vega
 
 Native python-pptx charts stay the default for plain column, bar, line, stacked and donut
-charts: they are editable in PowerPoint and the emphasis knobs (`focal_category`,
-`annotation.badge`) work on them. Use Vega when the chart needs something native cannot do:
+charts, and the waterfall is always a native chart (stacked columns with an invisible base): they
+are editable in PowerPoint and the emphasis knobs (`focal_category`, `annotation.badge`) work on
+them. Every other chart and schematic is Vega-Lite — there is no matplotlib path. The former
+image kinds keep their fields and are now Vega recipes: `combo`, `area`, `line_multi`, `scatter`,
+`bubble`, `radar`, `ring`, `funnel`, `pyramid`, `venn`, `matrix`. Use Vega when the chart needs
+something native cannot do:
 
 - a consulting shape: Mekko (size x mix), slope (two-point change), dumbbell (gap per item),
   bullet (actual vs target vs bands);
@@ -22,6 +26,23 @@ charts: they are editable in PowerPoint and the emphasis knobs (`focal_category`
 A Vega chart is an image: the numbers stay auditable in the asset sidecar JSON and in
 `deck.json`, but the chart cannot be edited in PowerPoint. Say so when the reader will
 need to edit it.
+
+## Same Tone As Native Charts
+
+`act_config()` takes every visual setting from the tokens the native chart code uses, so a Vega
+chart beside a native chart reads as the same family:
+
+| Element | Native and Vega |
+|---|---|
+| Fonts | Geist (Latin) + Noto Sans JP (Japanese) |
+| Value axis | no line, no ticks; gridlines `chart_gray_light` at `gridline_width_pt`; labels `ink_faint`; hidden when a single series carries value labels |
+| Category axis | line `ink_faint` 1.25pt; labels `ink`; no ticks; no axis titles |
+| Unit | "(unit)" at the top-left of the chart, not an axis title |
+| Value labels | `chart_label`, bold, `ink`; default format `#,##0.0` (`number_format` is shared) |
+| Legend | top, centred, `chart_axis`, `ink_subtle`; squares for bars and areas, line segments for lines |
+| Bars | gap = `gap_width_pct` (100% = one bar width), square corners |
+| Lines | first series 2.25pt, others 1.5pt, no markers |
+| Colours | `comparison_series_colors`; focal primary, the rest `chart_gray` |
 
 ## Choosing The Chart (Zelazny, *Say It With Charts*)
 

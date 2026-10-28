@@ -958,6 +958,8 @@ def test_waterfall_auto_label_uses_triangle(tmp_path):
         for sh in slide.shapes:
             if sh.has_text_frame:
                 texts.append(sh.text_frame.text)
+            if sh.has_chart:            # ブリッジはネイティブのグラフ: 値ラベルはグラフのデータラベルにある
+                texts += [t.text for t in sh.chart._chartSpace.iter("{http://schemas.openxmlformats.org/drawingml/2006/main}t")]
     joined = " ".join(texts)
     assert "△2.8" in joined and "-2.8" not in joined
 
@@ -1555,7 +1557,7 @@ def test_native_table_col0_spans_merges_and_builds(tmp_path):
 
 def test_image_asset_track_combo_and_diagram(tmp_path):
     import shutil
-    pytest.importorskip("matplotlib")
+    pytest.importorskip("vl_convert")
     if shutil.which("dot") is None:
         pytest.skip("Graphviz CLI (dot) not installed")
     deck = {"slides": [
@@ -1620,7 +1622,7 @@ def test_native_chart_grid_small_multiples(tmp_path):
 
 def test_image_annotations_layer_renders(tmp_path):
     import shutil
-    pytest.importorskip("matplotlib")
+    pytest.importorskip("vl_convert")
     if shutil.which("dot") is None:
         pytest.skip("dot not installed")
     deck = {"slides": [{
@@ -1734,7 +1736,7 @@ def test_oversized_table_frame_stays_inside_slide(tmp_path):
 
 def test_chart_grid_image_cell_routes_to_asset(tmp_path):
     # chart_grid のセル単位 image-kind エスカレーションが picture として埋め込まれる
-    pytest.importorskip("matplotlib")
+    pytest.importorskip("vl_convert")
     deck = {"slides": [{"pattern": "chart_grid",
                         "title": "2系列の小型チャート群で売上と利益率の両立を確認",
                         "charts": [
@@ -1807,7 +1809,7 @@ def test_validate_rejects_incomplete_or_unknown_image_kinds(tmp_path):
 
 
 def test_financial_summary_image_chart_routes_to_asset(tmp_path):
-    pytest.importorskip("matplotlib")
+    pytest.importorskip("vl_convert")
     deck = {"slides": [{"pattern": "financial_summary",
                         "title": "売上60億円と利益率12%の同時達成をテーブルとcomboで確認",
                         "table": {"headers": ["項目", "FY24", "FY25"],
@@ -1962,7 +1964,7 @@ def test_fidelity_corpus_has_delimiters_and_filters_control_keys(tmp_path):
 
 
 def test_pyramid_accepts_scalar_tiers(tmp_path):
-    pytest.importorskip("matplotlib")
+    pytest.importorskip("vl_convert")
     deck = {"slides": [{"pattern": "diagram", "title": "3層の実行体制で意思決定から現場までを接続する",
                         "diagram": {"kind": "pyramid", "tiers": ["経営", "推進", "現場"]}}]}
     f = tmp_path / "deck.json"
@@ -2001,24 +2003,20 @@ def test_sign_flip_not_warned_when_positive_form_also_on_slide(tmp_path):
     assert not any("負値" in ln for ln in r.stdout.splitlines()), r.stdout
 
 
-def test_venn_subsets_derive_from_sizes_and_overlaps():
-    pytest.importorskip("matplotlib")
+def test_venn_overlap_areas_follow_sizes_and_overlaps():
+    """ベン図(Vega): 円の面積は size に、重なりの面積は overlaps に比例して配置される。重なりを変えると
+    円の距離が変わる(固定の配置で潰れない)。"""
     sys.path.insert(0, str(SCRIPTS))
-    import importlib
-    import act_assets
-    act_assets = importlib.reload(act_assets)
-    # 2集合: サイズと重なりから排他リージョンを導出
-    sub2 = act_assets._venn_subsets([{"label": "A", "size": 20}, {"label": "B", "size": 10}], {"AB": 4})
-    assert sub2 == (16.0, 6.0, 4.0)
-    # 3集合: 包除原理で導出され、負にならない
-    sub3 = act_assets._venn_subsets(
-        [{"label": "A", "size": 20}, {"label": "B", "size": 15}, {"label": "C", "size": 10}],
-        {"AB": 5, "AC": 4, "BC": 3, "ABC": 2})
-    assert sub3 == (13.0, 9.0, 3.0, 5.0, 2.0, 1.0, 2.0)
-    assert all(v >= 0 for v in sub3)
-    # サイズ違いは異なるリージョン値になる(固定既定値で潰れない)
-    other = act_assets._venn_subsets([{"label": "A", "size": 40}, {"label": "B", "size": 10}], {"AB": 4})
-    assert other != sub2
+    import math
+    import act_vega as V
+    ra, rb = math.sqrt(20 / math.pi), math.sqrt(10 / math.pi)
+    d = V._distance_for_overlap(ra, rb, 4.0)
+    assert abs(V._lens_area(ra, rb, d) - 4.0) < 1e-6
+    assert V._distance_for_overlap(ra, rb, 1.0) > d          # 重なりが小さいほど離れる
+    spec = {"kind": "venn", "sets": [{"label": "A", "size": 20}, {"label": "B", "size": 10}], "overlaps": {"AB": 4}}
+    rows = V.build_venn(spec, (600, 340))["data"]
+    assert rows[0]["size"] > rows[1]["size"]                  # 大きい集合ほど大きい円
+    assert V.compile_check(spec) is None
 
 
 # ---------------------------------------------------------------------------
@@ -3643,13 +3641,16 @@ def test_vega_charts_compile_and_carry_the_act_look():
     for name, spec in _VEGA_RECIPES.items():
         assert V.compile_check(spec) is None, (name, V.compile_check(spec))
         vl = V.to_vegalite(spec, (8.0, 4.0))
-        assert vl["config"]["font"] == "Noto Sans JP" and vl["config"]["background"] == V.theme.COLORS["canvas"]
+        assert vl["config"]["font"] == V.font_stack() and vl["config"]["background"] == V.theme.COLORS["canvas"]
         assert vl["width"] == 576 and vl["height"] == 288                   # 1pt = 1px(型の大きさがスライドと一致)
     bar = V.to_vegalite(_VEGA_RECIPES["vega"], (8.0, 4.0))
     marks = [l["mark"] if isinstance(l["mark"], str) else l["mark"]["type"] for l in bar["layer"]]
     assert marks == ["bar", "text"]                                         # labels: true → 値の直接ラベル
     assert bar["layer"][0]["encoding"]["color"]["condition"]["value"] == V.theme.COLORS["primary"]
-    assert bar["layer"][0]["encoding"]["y"]["title"] == "(件)"
+    assert bar["title"]["text"] == "(件)"                                 # 単位はネイティブと同じく左上の注記
+    assert bar["layer"][0]["encoding"]["y"]["title"] is None and bar["layer"][0]["encoding"]["x"]["title"] is None
+    assert bar["layer"][0]["encoding"]["y"]["axis"] is None               # 1 系列 + 値ラベル → 値軸なし(ネイティブと同じ)
+    assert bar["layer"][1]["encoding"]["text"]["format"] == ",.1f"        # ネイティブの既定 #,##0.0
     # マリメッコ: 列の幅は列の合計の比、セグメントの高さはシェア
     rows = V.build_mekko(_VEGA_RECIPES["mekko"])["data"]
     big = [r for r in rows if r["col"] == "大企業" and r["seg"] == "自社"][0]
@@ -3691,6 +3692,35 @@ def test_vega_charts_build_through_every_chart_slot(tmp_path):
     r2 = run("validate_spec.py", p)
     assert r2.returncode == 1
     assert "コンパイルできない" in r2.stdout and "focal '存在しない社'" in r2.stdout, r2.stdout
+
+
+def test_waterfall_is_a_native_chart_with_editable_data(tmp_path):
+    """ブリッジはネイティブのグラフとして入る(図形の組み合わせでも画像でもない)。土台は透明、バーは種類で色分け、
+    ワークシートには土台とバーの値が入る。ゼロを下回るブリッジは全体を持ち上げ、横軸の線を本当のゼロに引く。"""
+    from pptx import Presentation
+    items = [{"label": "期首", "value": 1.2, "kind": "start"}, {"label": "値下げ", "value": -2.6},
+             {"label": "削減", "value": 1.8}, {"label": "期末", "value": 0.4, "kind": "end"}]
+    spec = {"meta": {"title": "t"}, "slides": [
+        {"pattern": "waterfall", "title": "営業利益は値下げで赤字に転じ、削減で0.4億円に戻した", "subtitle": "s",
+         "unit": "億円", "items": items, "source": "x"},
+        {"pattern": "chart_insight", "title": "営業利益は値下げで赤字に転じ、削減で0.4億円に戻した", "subtitle": "s",
+         "chart": {"kind": "waterfall", "unit": "億円", "items": items}, "source": "x"}]}
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(spec, ensure_ascii=False))
+    assert run("validate_spec.py", p).returncode == 0
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0, v.stdout
+    for slide in Presentation(out).slides:
+        charts = [sh for sh in slide.shapes if sh.has_chart]
+        assert len(charts) == 1 and not [sh for sh in slide.shapes if sh.shape_type == 13]
+        ch = charts[0].chart
+        bar_plot = ch.plots[0]
+        base, bars = bar_plot.series
+        assert all(v_ >= 0 for v_ in base.values) and all(v_ >= 0 for v_ in bars.values)   # 負の積み上げを持たない
+        assert abs(bars.values[1] - 2.6) < 1e-9                                            # 値下げのバーの高さ
+        assert abs(ch.value_axis.crosses_at - 1.4) < 1e-9                                   # 本当のゼロ(最深点 -1.4)
+        assert ch.plots[1].series[0].points[1].data_label.text_frame.text == "△2.6"
 
 
 def test_sticker_marks_status_and_illustrative_needs_an_assumption(tmp_path):
@@ -3804,16 +3834,19 @@ def test_lint_render_flags_an_under_occupied_body(tmp_path):
     assert r.returncode == 1 and "占有率" in r.stdout or "小さい" in r.stdout, r.stdout
 
 
-def test_image_assets_register_the_act_fonts_for_matplotlib():
-    """画像アセットの和文ラベルが豆腐にならない: apply_matplotlib がフォントファイルを登録する。"""
-    pytest.importorskip("matplotlib")
+def test_vega_charts_use_the_native_font_pair():
+    """画像のグラフもネイティブと同じ書体の組(欧文 Geist、和文 Noto Sans JP)で描く。フォントは
+    deck_text が採寸に使う同じファイルを vl-convert に登録する(和文が豆腐にならない)。"""
+    pytest.importorskip("vl_convert")
     sys.path.insert(0, str(SCRIPTS))
-    import act_theme
+    import act_vega as V
     from deck_text import MEASURE_OK
+    assert V.font_stack().split(", ") == [V.theme.FONTS["latin"], V.theme.FONTS["ea"]]
+    assert V.act_config()["font"] == V.font_stack()
     if not MEASURE_OK:
         pytest.skip("Act fonts not installed")
-    act_theme.apply_matplotlib()
-    assert act_theme.fonts_present() == []
+    V._register_fonts()
+    assert V._FONTS_REGISTERED
 
 
 def test_thesis_literal_match_is_a_whole_number(tmp_path):

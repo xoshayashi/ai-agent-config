@@ -32,9 +32,12 @@ page, change the spec, choose a different pattern, or extend the primitive.
 it can faithfully take (`render_route`). The native python-pptx track (text, tables, native
 charts, autoshapes) is the default and stays editable in PowerPoint. When an object genuinely
 exceeds native — a combo/dual-axis chart, an area/radar chart, an org tree, a ring/funnel/
-pyramid/Venn/matrix — it escalates to the image-asset track (matplotlib / Graphviz via
-`act_assets.py`, one shared token core via `act_theme.py`), embedded as an Act-styled picture
-with an audit sidecar. Escalate only the single hard object; keep the rest of the slide native.
+pyramid/Venn/matrix — it escalates to the image-asset track (Vega-Lite via `act_vega.py` for
+every chart and schematic, Graphviz for relationship graphs, both through `act_assets.py` and one
+shared token core in `act_theme.py`), embedded as an Act-styled picture with an audit sidecar.
+Vega charts take their axes, gridlines, label sizes, legend, bar gaps, line weights and fonts from
+the same tokens as native charts, so the two read as one deck. The waterfall is always a native
+chart object. Escalate only the single hard object; keep the rest of the slide native.
 
 **Design template ≠ layout template.** The rule above forbids picking a *per-slide layout* from
 a type label. It does not forbid a *deck-level design template* — the calm-teal, formal-navy,
@@ -54,7 +57,7 @@ may already have everything, in which case use the system `python3` and do NOT c
 (a venv only adds an activation step to every command):
 
 ```bash
-python3 -c "import pptx, PIL, lxml, fontTools, matplotlib, matplotlib_venn, graphviz" && \
+python3 -c "import pptx, PIL, lxml, fontTools, graphviz, vl_convert" && \
   command -v soffice dot >/dev/null && echo "ready — no venv needed"
 python3 scripts/setup_fonts.py --check   # the six static fonts the renderer measures with
 ```
@@ -67,11 +70,10 @@ font and drift from the render.
 If something is missing, install it into the system Python (macOS / Homebrew):
 
 ```bash
-brew install python-matplotlib          # matplotlib + numpy for the image-asset track
 brew install graphviz                   # the `dot` CLI (relationship graphs)
 brew install --cask libreoffice         # `soffice`, used to render .pptx → PDF/PNG
-python3 -m pip install --break-system-packages python-pptx Pillow lxml fonttools \
-                                        matplotlib-venn graphviz pytest
+python3 -m pip install --user --break-system-packages python-pptx Pillow lxml fonttools \
+                                        graphviz vl-convert-python pytest
 ```
 
 Homebrew's Python is PEP 668 "externally managed", so plain `pip install` is refused —
@@ -83,9 +85,9 @@ python3 -m venv .venv && . .venv/bin/activate
 python3 -m pip install -r scripts/requirements.txt
 ```
 
-The image-asset deps (matplotlib, matplotlib-venn, Graphviz) are imported lazily — a
-native-only deck runs without them, and they are only needed when a deck uses an image chart
-`kind` or the `diagram` pattern.
+The image-asset deps (vl-convert-python, Graphviz) are imported lazily — a native-only deck runs
+without them, and they are only needed when a deck uses an image chart `kind` or the `diagram`
+pattern. matplotlib is not used.
 
 ### 1. Requirements And Outline
 
@@ -472,7 +474,7 @@ Read only what the task needs, but do not skip the required workflow references.
 | `references/visual-qa-and-repair-rubric.md` | Render-based review loop: seven lenses, P0/P1/P2 severity, repair menu R1-R14, approve / repair / redesign verdict |
 | `references/pptx-pitfalls.md` | python-pptx implementation pitfalls |
 | `references/tokens.json` | Single source for Act color, type, and grid tokens |
-| `scripts/act_theme.py` | Token-core adapter: feeds tokens.json to every backend (native, matplotlib, Graphviz) |
+| `scripts/act_theme.py` | Token-core adapter: feeds tokens.json to every backend (native, Vega-Lite, Graphviz) |
 | `scripts/act_assets.py` | Image-asset backend: Act-styled deterministic charts/diagrams for objects native cannot draw |
 | `scripts/act_vega.py` | Vega-Lite chart rendering: Act theme, `focal` / `labels`, consulting recipes, compile check |
 | `scripts/layout_search.py` | Ranks `composite` arrangements from role-tagged `blocks`; `--top`, `--emit` to compare candidates |

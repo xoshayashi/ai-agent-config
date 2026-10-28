@@ -13,8 +13,8 @@ Every object routes to the most editable representation it can faithfully take (
   `color_negatives`, `focal`, table `col0_spans` for grouped row labels) rather than a bespoke
   layout. Assume a data/argument slide is native unless an object genuinely exceeds it.
 - **Image-asset track (escalation).** For objects the native engine cannot draw, an Act-styled
-  deterministic image is generated (matplotlib for charts + schematic diagrams, Graphviz for
-  relationship graphs) and embedded as a picture. Use it only for the single hard object on a
+  deterministic image is generated (Vega-Lite for charts + schematic diagrams, Graphviz for
+  relationship graphs) and embedded as a picture, in the same tone as native charts. Use it only for the single hard object on a
   slide; keep the title, rail, tables, and body native. The image is a cache of a spec — a
   sidecar keeps its numbers, so the pixels are non-editable but the data stays auditable and
   regenerable. Now covers, as an image `kind`:
@@ -39,9 +39,10 @@ Every object routes to the most editable representation it can faithfully take (
   whole grid by default.
 - **Leader-line cause callouts** anchored to a specific bar / waterfall step / point (the "explain
   the driver behind this movement" move): add `annotations: [{target, text, dy}]` to a
-  matplotlib-rendered image chart (int `target` on `combo`/`waterfall`, else `{x,y}`). Native pptx
-  connectors cannot anchor to chart internals, so this is the one case where the annotation itself
-  is the reason to use the image track. Not on Graphviz `org_tree`/`node_graph` (use edge labels).
+  Vega image chart (int `target` = category index on `combo` / `area` / `line_multi` or point
+  index on `scatter` / `bubble`, else `{x,y}` in data coordinates). Native pptx connectors cannot
+  anchor to chart internals, so this is the one case where the annotation itself is the reason to
+  use the image track. The native waterfall takes no annotations: name the cause in the item label. Not on Graphviz `org_tree`/`node_graph` (use edge labels).
   Keep to 1-3 per exhibit.
 
 ### Still out of scope (re-express or flag)

@@ -2,9 +2,9 @@
 
 Single source of truth for every rendering backend. Reads `references/tokens.json` (the same
 file the native python-pptx builder consumes as C/TS/LAY/CH) and exposes the Act palette, fonts,
-and per-backend style config for matplotlib and Graphviz. No backend re-declares a colour.
+and per-backend style config for Vega-Lite (act_vega) and Graphviz. No backend re-declares a colour.
 
-Keeping colour/type in one file is what makes a native table, a matplotlib chart image, and a
+Keeping colour/type in one file is what makes a native chart, a Vega-Lite chart image, and a
 Graphviz diagram look like one deck.
 """
 from __future__ import annotations
@@ -14,18 +14,18 @@ from pathlib import Path
 
 _TOKENS_PATH = Path(__file__).resolve().parent.parent / "references" / "tokens.json"
 
-# The active template. build_deck calls use_template() so image assets (matplotlib charts,
+# The active template. build_deck calls use_template() so image assets (Vega-Lite charts,
 # Graphviz diagrams) carry the SAME palette as the native slides, and the content-addressed
 # asset cache is keyed by template — two templates that differ only in colour must not collide.
 _TEMPLATE = "standard"
 TOKENS = json.loads(_TOKENS_PATH.read_text())
 
-# hex strings WITH leading '#', ready for matplotlib / Graphviz (native builder uses RGBColor)
+# hex strings WITH leading '#', ready for Vega-Lite / Graphviz (native builder uses RGBColor)
 COLORS = {k: "#" + v for k, v in TOKENS["colors"].items()}
 FONTS = TOKENS["fonts"]
 CHART = TOKENS["chart_style"]
 
-# Latin from Geist, Japanese falls back to Noto Sans JP (matplotlib font fallback list).
+# Latin from Geist, Japanese falls back to Noto Sans JP (the font-family list act_vega passes to Vega).
 FONT_STACK = [FONTS["latin"], FONTS["ea"]]
 
 # Ordered categorical palette (primary → navy → accent → …), reused across backends.
@@ -57,64 +57,6 @@ def tokens_hash() -> str:
     import hashlib
 
     return hashlib.sha1(_TOKENS_PATH.read_bytes() + _TEMPLATE.encode()).hexdigest()[:12]
-
-
-def fonts_present() -> list[str]:
-    """Return the Act font families matplotlib cannot resolve (empty = all present)."""
-    from matplotlib import font_manager as fm
-
-    missing = []
-    for fam in (FONTS["latin"], FONTS["ea"]):
-        try:
-            fm.findfont(fam, fallback_to_default=False)
-        except Exception:
-            missing.append(fam)
-    return missing
-
-
-def apply_matplotlib():
-    """Apply the Act look to matplotlib rcParams and return the series palette.
-
-    Calm surface, ink text, no top/right spines, no grid noise, direct labels preferred.
-    """
-    import matplotlib
-
-    matplotlib.use("Agg")
-    from matplotlib import font_manager as fm
-    from matplotlib import pyplot as plt
-
-    # フォントはファイルで登録する。matplotlib のフォントキャッシュはインストール前の状態で
-    # 固まりがちで、そのまま描くと和文ラベルが豆腐(□)になる(ストレス試験で再現)。
-    # 物差し(deck_text)が見ている同じ TTF を matplotlib にも渡す — 一度登録すれば findfont が解決する
-    try:
-        from deck_text import _FONT_FILES
-        for path in _FONT_FILES.values():
-            if path:
-                fm.fontManager.addfont(path)
-    except Exception:
-        pass
-
-    plt.rcParams.update({
-        "figure.facecolor": COLORS["canvas"],
-        "axes.facecolor": COLORS["canvas"],
-        "savefig.facecolor": COLORS["canvas"],
-        "text.color": COLORS["ink"],
-        "axes.labelcolor": COLORS["ink_subtle"],
-        "axes.edgecolor": COLORS["ink_faint"],
-        "xtick.color": COLORS["ink"],
-        "ytick.color": COLORS["ink_faint"],
-        "font.family": FONT_STACK,
-        "font.size": 15,
-        "axes.grid": False,
-        "axes.spines.top": False,
-        "axes.spines.right": False,
-        "axes.linewidth": 1.0,
-        "xtick.major.size": 0,
-        "ytick.major.size": 0,
-        "svg.fonttype": "none",
-        "figure.dpi": 200,
-    })
-    return list(SERIES_PALETTE)
 
 
 def graphviz_graph_attr() -> dict:

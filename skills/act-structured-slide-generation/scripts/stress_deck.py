@@ -13,7 +13,7 @@ The copy is synthetic by design (it is a layout fixture, not an argument), so th
 meant to pass audit_argument; validate_spec must still report 0 errors (header contract,
 cardinality caps, data shape) — that is asserted here too.
 
---images adds the image-asset patterns (diagram, combo chart); they need matplotlib/Graphviz.
+--images adds the image-asset patterns (diagram, combo chart); they need vl-convert/Graphviz.
 --lint renders the max variant (LibreOffice) and runs lint_render on it; its findings gate the exit code.
 """
 from __future__ import annotations

@@ -965,6 +965,9 @@ STACKED = {"stacked_column", "stacked_column_100", "stacked_bar"}
 HORIZONTAL_BARS = {"bar", "stacked_bar"}        # カテゴリが縦軸: annotation(バッジ・矢印)のアンカーは縦棒専用
 
 
+C_NS = "{http://schemas.openxmlformats.org/drawingml/2006/chart}"
+
+
 def _chart_ea_fonts(chart) -> None:
     """Ensure every defRPr in the chart XML carries latin+ea Act fonts."""
     root = chart._chartSpace
@@ -983,6 +986,8 @@ def add_act_chart(slide, x, y, w, h, cspec: dict):
     {type, categories, series:[{name, values, focal|color}], unit, value_labels,
      focal_category (index highlighted for single-series), number_format}
     """
+    if cspec.get("kind") == "waterfall" or cspec.get("type") == "waterfall":
+        return add_waterfall_chart(slide, x, y, w, h, cspec)     # ブリッジはどの枠に置いてもネイティブ
     ctype = cspec.get("type", "column")
     data = CategoryChartData()
     data.categories = [hw(str(c)) for c in cspec["categories"]]
@@ -1413,18 +1418,18 @@ def add_chart_annotations(slide, cx, cy, cw, ch, cspec):
 
 
 # Image-asset track: objects the native pptx engine cannot faithfully draw are rendered as
-# Act-styled deterministic images (matplotlib/Graphviz via act_assets) and embedded. The router
+# Act-styled deterministic images (Vega-Lite/Graphviz via act_assets) and embedded. The router
 # below only ESCALATES to an image; native stays the default. See data-and-diagram-rules.md.
 _ASSET_ROOT = None  # set in build(): dir where generated assets + asset-manifest.json are cached
 IMAGE_ASSET_KINDS = frozenset({
-    "combo", "area", "radar", "scatter", "bubble", "waterfall", "line_multi",
+    "combo", "area", "radar", "scatter", "bubble", "line_multi",
     "org_tree", "node_graph", "ring", "funnel", "pyramid", "venn", "matrix",
     "vega", "mekko", "slope", "dumbbell", "bullet"})
 
 
 def _asset_kind(obj):
     """Return the image-asset kind if `obj` must route to the image backend, else None.
-    Pure membership test — does NOT import matplotlib, so native-only decks stay light."""
+    Pure membership test — does NOT import the image renderers, so native-only decks stay light."""
     if isinstance(obj, dict):
         k = obj.get("kind")
         # membership のみで判定する。render:"image" だけでは未知 kind を画像経路へ
@@ -1991,76 +1996,141 @@ def p_financial_summary(slide, spec, deck):
         p_chart_insight(slide, spec, deck)
 
 
-def p_waterfall(slide, spec, deck):
-    """Shape-composed waterfall. items: [{label, value, kind: start|delta|end}]"""
-    items = spec.get("items", [])
-    if not items:
-        return
-    y0, h = body_region(spec)
-    x, w = grid(0, 12)
-    chart_h = h - 1.0
-    base_y = y0 + 0.42
+def waterfall_levels(items: list) -> list[tuple[float, float]]:
+    """各バーの (下端, 上端) の累計値。start / end は 0 から、増減は直前の累計から積む。"""
     running, levels = 0.0, []
     for it in items:
         v = float(it["value"])
-        if it.get("kind") == "start":
-            running = v
-            levels.append((0.0, v))
-        elif it.get("kind") == "end":
+        if it.get("kind") in ("start", "end"):
             levels.append((0.0, v))
             running = v
         else:
             levels.append((running, running + v))
             running += v
-    # 負の累計(赤字転落ブリッジ)も帯内に収める: 0 の基準線を span 内に置いてスケールする
-    hi_max = max(max(a, b) for a, b in levels)
+    return levels
+
+
+def _waterfall_label(it: dict) -> str:
+    if it.get("display") is not None:
+        return str(it["display"])
+    v = float(it["value"])
+    if it.get("kind", "delta") == "delta":
+        mag = f"{abs(v):,.1f}".rstrip("0").rstrip(".")
+        return ("△" if v < 0 else "+") + mag          # IR 慣行: 負値は - でなく △
+    return f"{v:,.1f}".rstrip("0").rstrip(".")
+
+
+def add_waterfall_chart(slide, x, y, w, h, wspec: dict):
+    """ウォーターフォール(ブリッジ)を PowerPoint のネイティブのグラフとして描く。
+
+    PowerPoint 2016 の標準ウォーターフォール(chartEx)は python-pptx で作れず LibreOffice でも描けないので、
+    積み上げ縦棒の定番の作り方を使う: 透明な土台(base)の上に、見えるバー(bar)を積む。系列は埋め込みの
+    ワークシートに入るので、PowerPoint の「データの編集」で数値を直すとバーが追従する。
+    負の積み上げは LibreOffice が正しく描けない(描画確認が壊れる)ため、累計がゼロを下回るブリッジは
+    全体を最深点ぶん持ち上げて、ワークシートの値をすべて 0 以上にする。そのときは横軸の線を本当のゼロ
+    (crossesAt)に引き、項目名は下端に置く。ゼロを下回らないブリッジは、ワークシートの値がそのまま実額。
+    値ラベルは 3 本目の系列(各バーの上端)を同じプロットの折れ線(線も点も無し)に
+    移して付ける — 積み上げ棒は「外側」のラベル位置を持たないため。ラベルの文字(+3.2 / △1.5)は
+    スペックから書き込むので、数値を直したらビルドし直す。"""
+    items = wspec.get("items", [])
+    levels = waterfall_levels(items)
     lo_min = min(min(a, b) for a, b in levels)
-    top = max(hi_max, 0.0) * 1.15 or 1.0
-    bot = min(lo_min, 0.0) * 1.15
-    span = (top - bot) or 1.0
-    zero_y = base_y + chart_h * top / span
-    n = len(items)
-    slot = w / n
-    bar_w = slot * 0.62
-    # 値ラベルはバーの上に「浮かせる」。箱の高さは実描画の行高(drawn_line_h)から取り、
-    # 下端をバー上端の LABEL_GAP 上に揃える — 公称の 0.22in 箱に 15.5pt を上寄せで入れると
-    # 字面がバーの縁をまたいで描かれる(実際に起きた欠陥。verify の straddle 検査が拾う)
-    lab_pt = TS["chart_label"]
-    lab_h = drawn_line_h(lab_pt) + 0.02
-    LABEL_GAP = 0.05
-    add_line(slide, x, zero_y, x + w, zero_y, C["chart_gray"], 0.75)
-    for i, (it, (lo, hi)) in enumerate(zip(items, levels)):
-        v = float(it["value"])
-        kind = it.get("kind", "delta")
-        y_top = base_y + chart_h * (top - max(lo, hi)) / span
-        bh = max(0.03, chart_h * abs(hi - lo) / span)
-        bx = x + i * slot + (slot - bar_w) / 2
-        if kind in ("start", "end"):
-            fill = C["primary_deep"]
-        else:
-            fill = C["primary"] if v >= 0 else C["danger"]
+    hi_max = max(max(a, b) for a, b in levels)
+    shift = -min(lo_min, 0.0)                         # ゼロを下回るぶんだけ全体を持ち上げる
+    base, bar_v, lab = [], [], []
+    for (lo, hi) in levels:
+        a, b = min(lo, hi) + shift, max(lo, hi) + shift
+        base.append(a)
+        bar_v.append(b - a)
+        lab.append(b)          # ラベルは常にバーの上端の上 — ゼロより下のバーも、下端だと項目名の行と重なる
+    data = CategoryChartData()
+    data.categories = [hw(str(it.get("label", ""))) for it in items]
+    for name, vals in (("base", base), ("bar", bar_v), ("label", lab)):
+        data.add_series(name, tuple(float(v) for v in vals))
+    gf = slide.shapes.add_chart(XL_CHART_TYPE.COLUMN_STACKED, Inches(x), Inches(y), Inches(w), Inches(h), data)
+    chart = gf.chart
+    chart.has_title = False
+    chart.has_legend = False
+    chart.font.size = Pt(TS["chart_axis"])
+    chart.font.color.rgb = C["ink_subtle"]
+    chart.font.name = FONTS["latin"]
+    # 3 本目(label)を棒グラフから外し、同じ軸の折れ線グラフに移す。python-pptx の XML パーサで作る —
+    # 素の etree 要素だと plots / series の部品として扱われない
+    from pptx.oxml import parse_xml
+    from pptx.oxml.ns import nsdecls
+    plot_area = chart._chartSpace.find(f".//{C_NS}plotArea")
+    bar = plot_area.find(f"{C_NS}barChart")
+    lab_ser = bar.findall(f"{C_NS}ser")[-1]
+    bar.remove(lab_ser)
+    inv = lab_ser.find(f"{C_NS}invertIfNegative")
+    if inv is not None:
+        lab_ser.remove(inv)
+    ax_ids = "".join(f'<c:axId val="{ax.get("val")}"/>' for ax in bar.findall(f"{C_NS}axId"))
+    line = parse_xml(f'<c:lineChart {nsdecls("c")}><c:grouping val="standard"/><c:varyColors val="0"/>'
+                     f'<c:marker val="1"/>{ax_ids}</c:lineChart>')
+    line.find(f"{C_NS}varyColors").addnext(lab_ser)
+    bar.addnext(line)
+    bar_plot, line_plot = chart.plots[0], chart.plots[1]
+    bar_plot.gap_width = 60
+    bar_plot.overlap = 100
+    s_base, s_bar = bar_plot.series
+    s_base.format.fill.background()                    # 土台は見せない
+    s_base.format.line.fill.background()
+    for i, it in enumerate(items):
+        pt_ = s_bar.points[i]
         if it.get("forecast"):
             # 計画・予想のバーは実績と同じソリッド塗りにしない(IBCS)
-            add_rect(slide, bx, y_top, bar_w, bh, C["primary_pale"],
-                     line=C["primary_deep"], line_w_pt=1.5)
-        else:
-            add_rect(slide, bx, y_top, bar_w, bh, fill)
-        if i > 0:
-            edge = base_y + chart_h * (top - lo) / span if kind == "delta" else y_top
-            add_line(slide, bx - (slot - bar_w), edge, bx, edge, C["chart_gray"], 0.5, dash="dash")
-        if it.get("display") is not None:
-            label_v = it["display"]
-        elif kind == "delta":
-            mag = f"{abs(v):,.1f}".rstrip("0").rstrip(".")
-            label_v = ("△" if v < 0 else "+") + mag  # IR 慣行: 負値は - でなく △
-        else:
-            label_v = f"{v:,.1f}".rstrip("0").rstrip(".")
-        add_text(slide, bx - slot * 0.19, y_top - LABEL_GAP - lab_h, slot, lab_h,
-                 [[(label_v, lab_pt, 600, C["ink"])]], align=PP_ALIGN.CENTER,
-                 anchor=MSO_ANCHOR.BOTTOM)
-        add_text(slide, x + i * slot + 0.02, base_y + chart_h + 0.08, slot - 0.04, 0.55,
-                 [[(it.get("label", ""), TS["chart_axis"], 600, C["ink_subtle"])]], align=PP_ALIGN.CENTER, line_spacing=1.05)
-    add_unit_note(slide, x, y0 + 0.0, spec.get("unit"))
+            pt_.format.fill.solid()
+            pt_.format.fill.fore_color.rgb = C["primary_pale"]
+            pt_.format.line.color.rgb = C["primary_deep"]
+            pt_.format.line.width = Pt(1.5)
+            continue
+        pt_.format.fill.solid()
+        pt_.format.fill.fore_color.rgb = (C["primary_deep"] if it.get("kind") in ("start", "end")
+                                          else C["primary"] if float(it["value"]) >= 0 else C["danger"])
+        pt_.format.line.fill.background()
+    from pptx.enum.chart import XL_LABEL_POSITION, XL_MARKER_STYLE, XL_TICK_LABEL_POSITION
+    s_lab = line_plot.series[0]
+    s_lab.format.line.fill.background()
+    s_lab.marker.style = XL_MARKER_STYLE.NONE
+    s_lab.smooth = False
+    for i, (it, (lo, hi)) in enumerate(zip(items, levels)):
+        dl = s_lab.points[i].data_label
+        tf = dl.text_frame
+        tf.text = _waterfall_label(it)
+        run = tf.paragraphs[0].runs[0]
+        run.font.size = Pt(TS["chart_label"])
+        run.font.bold = True
+        run.font.color.rgb = C["ink"]
+        dl.position = XL_LABEL_POSITION.ABOVE
+    cat_ax, val_ax = chart.category_axis, chart.value_axis
+    cat_ax.format.line.color.rgb = C["ink_faint"]
+    cat_ax.format.line.width = Pt(1.25)
+    cat_ax.major_tick_mark = XL_TICK_MARK.NONE
+    cat_ax.tick_labels.font.size = Pt(TS["chart_axis"])
+    cat_ax.tick_labels.font.color.rgb = C["ink"]
+    # 値はラベルで読むので値軸は隠す。上端はラベルぶんの余白、下端は 0(持ち上げたあとの最深点)
+    val_ax.visible = False
+    val_ax.has_major_gridlines = False
+    val_ax.minimum_scale = 0.0
+    val_ax.maximum_scale = (hi_max + shift) * 1.15 or 1.0
+    if shift > 0:
+        # 横軸の線は本当のゼロ(持ち上げた値で shift)に引き、項目名は下端へ(バーと重ねない)
+        val_ax.crosses_at = shift
+        cat_ax.tick_label_position = XL_TICK_LABEL_POSITION.LOW
+    _chart_ea_fonts(chart)
+    return gf
+
+
+def p_waterfall(slide, spec, deck):
+    """ブリッジ(ウォーターフォール)。items: [{label, value, kind: start|delta|end, forecast?, display?}]。
+    PowerPoint のネイティブのグラフとして入る(add_waterfall_chart)。"""
+    if not spec.get("items"):
+        return
+    y0, h = body_region(spec)
+    x, w = grid(0, 12)
+    add_unit_note(slide, x, y0, spec.get("unit"))
+    add_waterfall_chart(slide, x, y0 + 0.22, w, h - 0.22, spec)
 
 
 def p_roadmap(slide, spec, deck):
@@ -4621,7 +4691,7 @@ def build(spec_path: Path, out_path: Path) -> Path:
         _apply_tokens(resolve_tokens(template))
     except ValueError as e:
         raise SystemExit(f"ERROR: {e}")
-    act_theme.use_template(template)          # matplotlib / Graphviz のアセットも同じ配色で描く
+    act_theme.use_template(template)          # Vega-Lite / Graphviz のアセットも同じ配色で描く
     prs = Presentation()
     prs.slide_width, prs.slide_height = SLIDE_W, SLIDE_H
     if template != "standard":
