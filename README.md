@@ -12,10 +12,10 @@ Claude Code / Codex / Gemini CLI に共通の Instructions を配布するため
 | Claude Code | `~/.claude/CLAUDE.md` |
 | Gemini CLI | `~/.gemini/GEMINI.md` |
 
-加えて、各 CLI の設定フォルダーに次の共有ファイルをリンクします。
+共有ファイル `INSTRUCTIONS.md` / `DESIGN.md` / `WRITING.md` の読み込み方は CLI ごとに違います。
 
-- `INSTRUCTIONS.md`
-- `DESIGN.md`
+- Codex は `AGENTS.md` からパスで参照するため、`~/.codex/` に3ファイルをリンクします。
+- Claude Code が自動で読むのは `CLAUDE.md` だけです。3ファイルは `CLAUDE.md` 内の絶対パス import で読み込むので、`~/.claude/` にはリンクしません。
 
 さらに、`skills/` 配下の共有 skill も各 CLI のグローバル `skills/`
 フォルダーへリンクします。

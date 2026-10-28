@@ -730,17 +730,32 @@ remove_retired_instruction_links() {
       warn "skip unmanaged instruction path: $dst -> $current"
     fi
   done
+
+  # Claude Code が自動で読むのは CLAUDE.md だけ。共有ファイルは CLAUDE.md の絶対パス
+  # import で解決するので、~/.claude 側のリンクは実働に効かない。過去に張った分を外す。
+  for doc_name in INSTRUCTIONS DESIGN WRITING; do
+    dst="$claude_home/$doc_name.md"
+    [ -L "$dst" ] || continue
+    current=$(readlink "$dst" 2>/dev/null || true)
+    if [ "$current" = "$config_home/instructions/$doc_name.md" ]; then
+      trash_managed_path "$dst" "retired instruction link"
+    else
+      warn "skip unmanaged instruction path: $dst -> $current"
+    fi
+  done
 }
 
 install_instruction_links() {
   src_root="$config_home/instructions"
+  # Codex は AGENTS.md から共有ファイルをパスで読むため、実体のリンクが要る。
   install_link "$src_root/AGENTS.md" "$codex_home/AGENTS.md"
   install_link "$src_root/INSTRUCTIONS.md" "$codex_home/INSTRUCTIONS.md"
   install_link "$src_root/DESIGN.md" "$codex_home/DESIGN.md"
+  install_link "$src_root/WRITING.md" "$codex_home/WRITING.md"
 
+  # Claude Code が自動で読むのは CLAUDE.md だけ。共有ファイルは CLAUDE.md の
+  # 絶対パス import で読み込むので、~/.claude 側にリンクは張らない。
   install_link "$src_root/CLAUDE.md" "$claude_home/CLAUDE.md"
-  install_link "$src_root/INSTRUCTIONS.md" "$claude_home/INSTRUCTIONS.md"
-  install_link "$src_root/DESIGN.md" "$claude_home/DESIGN.md"
 }
 
 install_shell_links() {

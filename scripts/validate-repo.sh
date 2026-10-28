@@ -100,6 +100,7 @@ require_file "instructions/AGENTS.md"
 require_file "instructions/CLAUDE.md"
 require_file "instructions/INSTRUCTIONS.md"
 require_file "instructions/DESIGN.md"
+require_file "instructions/WRITING.md"
 require_file "shell/.zshrc"
 require_file ".github/workflows/validate.yml"
 require_file ".github/workflows/claude-code-review.yml"
@@ -155,8 +156,15 @@ grep -Fq "~/.codex/INSTRUCTIONS.md" "$repo_root/instructions/AGENTS.md" \
   || fail "Codex AGENTS entrypoint must point to ~/.codex/INSTRUCTIONS.md"
 grep -Fq "~/.codex/DESIGN.md" "$repo_root/instructions/AGENTS.md" \
   || fail "Codex AGENTS entrypoint must point to ~/.codex/DESIGN.md"
-grep -Fq "@./INSTRUCTIONS.md" "$repo_root/instructions/CLAUDE.md" \
-  || fail "Claude entrypoint must import @./INSTRUCTIONS.md"
+grep -Fq "~/.codex/WRITING.md" "$repo_root/instructions/AGENTS.md" \
+  || fail "Codex AGENTS entrypoint must point to ~/.codex/WRITING.md"
+# CLAUDE.md は絶対パスで import する(~ や ./ は使わない)。
+for shared_doc in INSTRUCTIONS DESIGN WRITING; do
+  grep -Eq "^@/.*/instructions/${shared_doc}\.md$" "$repo_root/instructions/CLAUDE.md" \
+    || fail "Claude entrypoint must import ${shared_doc}.md by absolute path"
+done
+! grep -Eq '^@(\./|~)' "$repo_root/instructions/CLAUDE.md" \
+  || fail "Claude entrypoint imports must be absolute paths"
 ! grep -Fq "HOOKS.md" "$repo_root/instructions/AGENTS.md" "$repo_root/instructions/CLAUDE.md" \
   || fail "instruction entrypoints must reference only current instruction files"
 # The instructions file was renamed AI_AGENT_INSTRUCTIONS.md -> INSTRUCTIONS.md. The old name

@@ -1,3 +1,9 @@
+
+# Kiro CLI pre block. Keep at the top of this file.
+[[ -f "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.pre.zsh" ]] && builtin source "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.pre.zsh"
+
+
+
 # ==============================================================================
 #  _   _   _   _   _   _   _  
 # | \_/ | / \ / \_/ | / \_/ | 
@@ -22,6 +28,11 @@ export LANG=ja_JP.UTF-8
 
 # Pythonキャッシュファイル（.pyc）の生成を抑制
 export PYTHONDONTWRITEBYTECODE=1
+
+# Google GenAI / GCP Settings (GOOGLE_CLOUD_PROJECT は ~/.zshrc.local)
+export GOOGLE_CLOUD_LOCATION="global"
+export GOOGLE_GENAI_USE_ENTERPRISE="True"
+
 
 
 # ------------------------------------------------------------------------------
@@ -119,3 +130,22 @@ if [[ -o interactive && "${TERM:-}" != "dumb" ]] && command -v brew >/dev/null 2
   [ -r "$_brew_prefix/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh" ] && source "$_brew_prefix/share/zsh-syntax-highlighting/zsh-syntax-highlighting.zsh"
   unset _brew_prefix
 fi
+
+
+
+
+
+[[ "$TERM_PROGRAM" == "kiro" ]] && . "$(kiro --locate-shell-integration-path zsh)"
+
+# Qwen Code PATH block begin
+export PATH='/Users/sh/.local/bin':$PATH
+# Qwen Code PATH block end
+
+
+# Kiro CLI post block. Keep at the bottom of this file.
+[[ -f "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.post.zsh" ]] && builtin source "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.post.zsh"
+
+test -e "${HOME}/.iterm2_shell_integration.zsh" && source "${HOME}/.iterm2_shell_integration.zsh"
+
+# 秘密情報(API キー・トークン)は git 管理外の ~/.zshrc.local に置く
+[[ -r "$HOME/.zshrc.local" ]] && source "$HOME/.zshrc.local"

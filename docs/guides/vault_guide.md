@@ -93,7 +93,7 @@ vault status
 
 ```bash
 vault kv put secret/qwen \
-  apiKey="***REMOVED-QWEN-KEY***" \
+  apiKey="<QWEN_API_KEY>" \
   apiHost="<workspace-id>.ap-southeast-1.maas.aliyuncs.com" \
   workspaceId="<workspace-id>" \
   workspaceName="默认业务空间" \

@@ -9,10 +9,9 @@
 | `~/.codex/AGENTS.md` | `instructions/AGENTS.md` |
 | `~/.codex/INSTRUCTIONS.md` | `instructions/INSTRUCTIONS.md` |
 | `~/.codex/DESIGN.md` | `instructions/DESIGN.md` |
+| `~/.codex/WRITING.md` | `instructions/WRITING.md` |
 | `~/.codex/skills/<name>` | `skills/<name>` |
 | `~/.claude/CLAUDE.md` | `instructions/CLAUDE.md` |
-| `~/.claude/INSTRUCTIONS.md` | `instructions/INSTRUCTIONS.md` |
-| `~/.claude/DESIGN.md` | `instructions/DESIGN.md` |
 | `~/.claude/skills/<name>` | `skills/<name>` |
 | `~/.zshrc` | `shell/.zshrc` |
 

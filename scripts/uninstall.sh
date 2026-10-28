@@ -169,10 +169,15 @@ src_root="$config_home/instructions"
 remove_managed_link "$codex_home/AGENTS.md" "$src_root/AGENTS.md" "instruction link"
 remove_managed_link "$codex_home/INSTRUCTIONS.md" "$src_root/INSTRUCTIONS.md" "instruction link"
 remove_managed_link "$codex_home/DESIGN.md" "$src_root/DESIGN.md" "instruction link"
+remove_managed_link "$codex_home/WRITING.md" "$src_root/WRITING.md" "instruction link"
 
 remove_managed_link "$claude_home/CLAUDE.md" "$src_root/CLAUDE.md" "instruction link"
-remove_managed_link "$claude_home/INSTRUCTIONS.md" "$src_root/INSTRUCTIONS.md" "instruction link"
-remove_managed_link "$claude_home/DESIGN.md" "$src_root/DESIGN.md" "instruction link"
+
+# Claude Code は CLAUDE.md しか自動で読まない。共有ファイルは CLAUDE.md の絶対パス
+# import で解決するため、~/.claude 側のリンクは廃止した(残っていれば外す)。
+remove_managed_link "$claude_home/INSTRUCTIONS.md" "$src_root/INSTRUCTIONS.md" "retired instruction link"
+remove_managed_link "$claude_home/DESIGN.md" "$src_root/DESIGN.md" "retired instruction link"
+remove_managed_link "$claude_home/WRITING.md" "$src_root/WRITING.md" "retired instruction link"
 
 # 旧名 AI_AGENT_INSTRUCTIONS.md へのリンクが残っていれば併せて外す(INSTRUCTIONS.md へ改名済み)。
 remove_managed_link "$codex_home/AI_AGENT_INSTRUCTIONS.md" "$src_root/AI_AGENT_INSTRUCTIONS.md" "retired instruction link"
