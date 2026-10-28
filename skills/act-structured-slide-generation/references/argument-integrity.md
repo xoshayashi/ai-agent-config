@@ -10,6 +10,23 @@ recompute, a comparison with nothing to compare against, a bridge that does not 
 source no one could request, a closing line that proves itself, and a promise where a range
 belongs.
 
+## Contents
+
+- 1. The deck states one thesis, and the thesis is a number
+- 2. Evidence, claim and provenance are three different substances
+- 3. Every number a slide speaks, its exhibit shows — or its derivation computes
+- 4. A rate is recomputed, not typed
+- 5. A comparison shows both sides
+- 6. Exhibits reconcile with themselves
+- 7. A source names a document someone could request
+- 8. A projection names its drivers
+- 9. The closing slide proves nothing new
+- 10. Say what is, not what may be
+- 11. A superlative names its universe and its date
+- 12. A change verb carries its magnitude
+- 13. What the gate does not check
+- 14. Repairing a finding
+
 ## 1. The deck states one thesis, and the thesis is a number
 
 Write `meta.thesis` before the first slide: the sentence the deck exists to prove, plus the

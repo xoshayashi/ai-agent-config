@@ -5,6 +5,19 @@ is investment-bank / strategy-consulting: action title, one claim, tight proof h
 auditable sources, and disciplined comparison. Freshness comes second and must be earned
 through composition, object scale, asymmetry, and density control.
 
+## Contents
+
+- Typography And Whitespace
+- Canvas And Header
+- Color
+- Charts And Evidence
+- Structural Slides
+- Accessibility
+- Density And Composition
+- Evidence And Source Discipline
+- Common Proof Arcs
+- Defects To Hunt
+
 ## Typography And Whitespace
 
 - Use the type scale from `tokens.json`; do not shrink body evidence to fit a weak layout.

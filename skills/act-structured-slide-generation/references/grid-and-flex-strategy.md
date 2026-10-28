@@ -4,6 +4,20 @@ Grid/flex is the structure contract for the slide. It creates consistency, densi
 editorial precision without forcing a fixed template. Use it whenever a page feels loose,
 overly empty, cramped, or visually inconsistent with the deck.
 
+## Contents
+
+- Grid Contract
+- Content Area Contract (vertical centering)
+- Body Fill Contract (`tokens.layout.fill`)
+- Container Breathing Contract
+- One Box, One Group (the stack contract)
+- Message Slides (form and footprint)
+- Flexbox Mental Model
+- Fine-grained adjustment loop
+- Banker Order + Modern Freshness
+- Strategy Examples, Not Presets
+- Review Prompts
+
 ## Grid Contract
 
 Think in relationships, not coordinates. A slide must declare:

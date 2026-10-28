@@ -23,6 +23,19 @@ Final verdict:
 - **repair**: local fixes can pass.
 - **redesign**: claim/evidence/composition must be rebuilt.
 
+## Contents
+
+- 1. Investor Lens
+- 2. IR Owner Lens
+- 3. Designer Lens
+- 4. Data Visualization Lens
+- 5. Legal / Disclaimer Lens
+- 6. Implementer Lens
+- 7. Narrative And Strategy Lens
+- Severity Guide
+- Repair Menu
+- Repair-Or-Redesign Decision
+
 ## 1. Investor Lens
 
 Ask:

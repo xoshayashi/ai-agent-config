@@ -3,6 +3,15 @@
 Sources: the official anthropics/skills pptx skill, community CJK skills, and this skill's
 own field testing.
 
+## Contents
+
+- Japanese fonts (most critical)
+- Dimensions and XML
+- Text and overflow
+- Charts
+- Known LibreOffice render-QA quirks
+- Design discipline
+
 ## Japanese fonts (most critical)
 
 1. `run.font.name` rewrites only `<a:latin>`. Japanese runs need an explicit

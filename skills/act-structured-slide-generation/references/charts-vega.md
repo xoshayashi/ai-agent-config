@@ -7,6 +7,16 @@ renders through vl-convert (headless, no browser, same input → same PNG). Cons
 staples that would take many layers to write by hand are provided as recipes compiled to
 Vega-Lite: `mekko`, `slope`, `dumbbell`, `bullet`.
 
+## Contents
+
+- Native Or Vega
+- Same Tone As Native Charts
+- Choosing The Chart (Zelazny, *Say It With Charts*)
+- The Chart Object
+- Recipes
+- Checks
+- Sources
+
 ## Native Or Vega
 
 Native python-pptx charts stay the default for plain column, bar, line, stacked and donut

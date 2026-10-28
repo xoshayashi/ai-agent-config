@@ -4,6 +4,14 @@ Use this file before composing any content slide. It defines the required decisi
 for a slide. It is not a template catalog and must not be used to pick a fixed layout from
 a topic label.
 
+## Contents
+
+- Anti-Template Audit
+- Deck-Level Judgment
+- Per-Slide Judgment
+- Fact / Estimate / Assumption / Open Discipline
+- 2-3 Direction Exploration
+
 ## Anti-Template Audit
 
 Run this audit while designing and again after rendering. If any answer is yes, repair the

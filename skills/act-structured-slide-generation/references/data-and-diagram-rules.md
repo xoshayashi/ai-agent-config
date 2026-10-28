@@ -2,6 +2,14 @@
 
 Use this file when selecting charts, tables, diagrams, images, and other evidence carriers.
 
+## Contents
+
+- Two Rendering Tracks: Native First, Image When Native Cannot
+- Chart Choice By Claim
+- Read Without Help
+- Diagram Rules
+- Image And Asset Rules
+
 ## Two Rendering Tracks: Native First, Image When Native Cannot
 
 Every object routes to the most editable representation it can faithfully take (see

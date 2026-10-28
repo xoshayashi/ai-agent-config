@@ -33,9 +33,17 @@ def run(script, *args):
 
 
 def test_skill_metadata_and_resource_map_are_discoverable():
+    import re
     skill_md = (SKILL / "SKILL.md").read_text()
-    desc = skill_md.split("description:", 1)[1].split("---", 1)[0].strip().strip('"')
-    assert len(desc) <= 1024
+    # フロントマターは1行1項目で読む(compatibility などが続いても description だけを測る)
+    fm = skill_md.split("---", 2)[1]
+    fields = dict(re.findall(r'^([a-z-]+): "?(.*?)"?$', fm, re.M))
+    assert set(fields) <= {"name", "description", "license", "compatibility", "metadata", "allowed-tools"}
+    assert fields["name"] == SKILL.name                              # 仕様: name はディレクトリ名と一致
+    assert 1 <= len(fields["description"]) <= 1024                  # 仕様の上限
+    assert len(fields.get("compatibility", "")) <= 500
+    assert fields["description"].startswith("Generates")             # 三人称(システムプロンプトに入るため)
+    assert skill_md.split("---", 2)[2].count("\n") < 500              # 本文は 500 行未満
     assert "grid-and-flex-strategy.md" in skill_md
     assert "slide-decision-engine.md" in skill_md
     assert "composition-atoms.md" in skill_md

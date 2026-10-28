@@ -7,6 +7,52 @@ the same character is right on the slide, which is read with the eyes.
 The readings themselves live in `references/tts_readings.json` (symbols, patterns, and the
 `policy.script_choice` map). This file is the reasoning behind that table.
 
+## Contents
+
+- Writing the script: fidelity, scene, narrative, depth
+- The rule (readings)
+- Choosing the form
+- What the tooling does
+
+## Writing the script
+
+**Only the spoken script.** Design metadata (judgment fields, `reader_question`, `composition`,
+`focal`, rhythm labels) never appears in `speaker_notes`: a presenter reads these notes verbatim.
+
+**Content fidelity: the script and the slide are the same argument.** Write the scripts against
+the final slide bodies (after visual QA) and re-check them whenever a slide's copy changes; notes
+that describe an older body are a defect ("script drift").
+
+- Every number, date and proper noun you speak exists on that slide (or in its note or
+  assumption). A number that appears only in the script is a hallucination risk, and
+  `validate_spec.py` flags unit-bearing numbers absent from the slide.
+- Touch every load-bearing element: the title claim (paraphrased), the focal object, the key
+  rows, steps or columns, the insight band, and any caveat, spoken in natural language.
+- Do not open by reading the title string verbatim; restate the claim in spoken form.
+
+**Open on the scene, then the claim.** The first sentence puts the audience somewhere: a person,
+a place, an action. Then the claim, then the evidence in the slide's reading order. A script that
+could be read over any slide in the deck is not yet doing its job; `validate_spec.py` warns when
+a slide's notes carry no scene.
+
+**Narrative: the deck reads as one story, not per-slide captions.** Each script
+
+1. picks up from the previous slide's bridge (no reset openings such as "on this slide", and no
+   three slides in a row opening with the same connective),
+2. opens with the claim in spoken language, then walks the evidence in the slide's visual reading
+   order, naming the actual labels and numbers the audience should look at,
+3. states the implication (the so-what) before leaving the slide,
+4. ends with a bridge that hands off to the next slide's question.
+
+Use a natural spoken polite register throughout: full sentences, no noun-ending fragments, no
+bullet dumps. Read the finished set aloud once from start to finish; if a transition jars, or a
+slide's script could be moved elsewhere without anyone noticing, the narrative is not done.
+
+**Depth.** About 150-300 Japanese characters per content slide (30-60 seconds of speech);
+calibrate the deck total against `meta.talk_minutes` (about 300 characters per minute). A one-line
+note is a defect on every slide except the cover. `validate_spec.py` warns on metadata leakage,
+thin scripts, a non-spoken register, title-verbatim openings and slide-absent numbers.
+
 ## The rule
 
 **Open only what a voice would stumble over, and open it into the words a person would

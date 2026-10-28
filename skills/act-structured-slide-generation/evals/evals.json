@@ -33,6 +33,22 @@
         "render/contact-sheet.png is generated",
         "eval_deck.py with rubric.json scores >=95"
       ]
+    },
+    {
+      "id": 3,
+      "name": "consulting-composite-and-charts-ja",
+      "prompt": "来月の経営会議で、経費精算システムの全社展開を判断する資料を12枚前後で作って。失注インタビュー24件の結果、PoCの処理時間(12分→4分)、3案(自社開発・M&A・提携)の比較、6カ月のワークプラン、営業利益の増減(値下げで一時赤字)を入れて。あとで自分たちで直したいので編集できるpptxで。",
+      "expected_output": "A 11-13 slide Japanese decision deck that uses composite blocks for combination pages, the consulting staples for their geometry, Vega-Lite for non-native charts, and a native waterfall; all checks green.",
+      "files": [],
+      "assertions": [
+        "validate_spec.py / audit_argument.py / verify_deck.py / lint_render.py all exit 0",
+        "slide count is 11-13",
+        "at least two composite slides are written with role-tagged blocks (no hand-written grid), and layout_search.py --top 3 runs on them",
+        "harvey_table, gantt and before_after (or matrix_2x2) patterns are included",
+        "the operating-profit bridge is a native PowerPoint chart object (graphic frame with a chart), not a picture, and its stored series values are all >= 0",
+        "every image chart uses a Vega kind; no build log or asset sidecar references matplotlib",
+        "eval_deck.py with rubric.json scores >=95"
+      ]
     }
   ],
   "structural_evals": [

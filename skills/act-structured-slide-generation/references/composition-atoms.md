@@ -7,6 +7,13 @@ density, and rhythm role.
 Use this with `slide-decision-engine.md` and `composition-vocabulary.md`. If an atom starts to
 behave like a fixed template, return to the reader question and evidence.
 
+## Contents
+
+- Selection Gate
+- Atoms
+- Atom Mixing Rules
+- Evidence-emphasis move → renderer knob map
+
 ## Selection Gate
 
 Before choosing an atom, answer:

@@ -4,6 +4,16 @@ This file names reusable composition moves. These are not slide types. Use them 
 2-3 distinct directions for a slide, then map the chosen direction to an implemented
 `deck.json` primitive.
 
+## Contents
+
+- Selection Rule
+- Evidence And Number Moves
+- Data-Shape Moves
+- Diagram And Structure Moves
+- Editorial Structure Moves
+- Whole-Page Framing Moves
+- Mapping To Implemented Primitives
+
 ## Selection Rule
 
 Choose a move from the reader question and focal evidence:

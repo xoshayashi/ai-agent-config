@@ -7,6 +7,14 @@ recipe (when it is a combination). It is a lookup, not a template list: start fr
 question and the evidence (`slide-decision-engine.md`), then use this page to find the
 primitive that draws the chosen composition.
 
+## Contents
+
+- How To Use
+- Blocks (`composite`)
+- Archetypes
+- A Full Recipe
+- Caps And Checks
+
 ## How To Use
 
 1. Name the archetype the composition needs (the reader question decides, not the topic).

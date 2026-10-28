@@ -8,6 +8,18 @@ Core flow:
 
 `source understanding -> reader_question -> single_takeaway -> focal_object -> evidence_strategy -> composition_move -> render_route -> density_control -> visual QA -> repair`
 
+## Contents
+
+- 1. Source Understanding
+- 2. Deck-Level Decisions
+- 3. Per-Slide Minimum Vocabulary
+- 4. Evidence-To-Composition Decision Tree
+- 5. Blueprint Output
+- 6. Pre-Render QA Gates
+- 7. Post-Render Repair Logic
+- 8. Mapping To Existing References
+- 9. Incorporating New Observations
+
 ## 1. Source Understanding
 
 Before slide planning, classify every input item:

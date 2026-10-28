@@ -1,6 +1,7 @@
 ---
 name: act-structured-slide-generation
-description: "Generate and repair native, editable 16:9 .pptx decks from a prompt: banker-grade structured slides in the Act design language, composed by judgment over audience, claim, evidence, narrative role, grid/flex layout, design richness, and production constraints rather than slide-type templates. Use whenever the user asks for a deck, slides, presentation, or page-based business material, including Japanese terms such as 資料, 決算説明資料, IR資料, 提案書, 営業資料, 会社説明資料, 経営会議資料, 登壇資料, ピッチ資料, 事業計画資料, board deck, investor deck, or editable .pptx. Also use to critique or redesign an existing deck at design, structure, and claim level. Not for AI-image slides, ATOM-brand slides, narrative-only equity stories, proofreading-only edits, Google Slides-only work, or xlsx financial models."
+description: "Generates and repairs native, editable 16:9 .pptx decks from a prompt: banker-grade structured slides in the Act design language, composed by judgment over audience, claim, evidence, narrative role, grid/flex layout, design richness, and production constraints rather than slide-type templates. Use whenever the user asks for a deck, slides, presentation, or page-based business material, including Japanese terms such as 資料, 決算説明資料, IR資料, 提案書, 営業資料, 会社説明資料, 経営会議資料, 登壇資料, ピッチ資料, 事業計画資料, board deck, investor deck, or editable .pptx. Also critiques or redesigns an existing deck at design, structure, and claim level. Not for AI-image slides, ATOM-brand slides, narrative-only equity stories, proofreading-only edits, Google Slides-only work, or xlsx financial models."
+compatibility: "Needs Python 3 with python-pptx, Pillow, lxml, fonttools, vl-convert-python and graphviz; the Graphviz dot CLI and LibreOffice (soffice) plus pdftoppm for diagrams and render QA; the Geist and Noto Sans JP fonts (scripts/setup_fonts.py). Built for Claude Code and Codex; see references/setup.md."
 ---
 
 # Act Structured Slide Generation
@@ -50,44 +51,31 @@ inside it. See `references/templates.md`.
 
 ## Required Workflow
 
+Copy this checklist into your reply and tick it off as you go. Every gate is a command that
+exits non-zero on a defect: when one fails, fix `deck.json` and rerun from that gate, never
+patch the rendered file.
+
+```
+Deck progress:
+- [ ] 0. Toolchain check passes (python3 -c ... && setup_fonts.py --check)
+- [ ] 1. outline.md written; template chosen; high-risk inputs asked
+- [ ] 2. deck.json authored (thesis, derivations, header contract, speaker_notes)
+- [ ] 3. validate_spec → audit_argument → build_deck → verify_deck → render_deck → lint_render all exit 0
+- [ ] 4. Contact sheet and every slide read; defects repaired in deck.json, then step 3 rerun
+- [ ] 5. eval_deck.py ≥ 95 with an independent judge
+- [ ] 6. Final report: files, checks run, remaining risks
+```
+
 ### 0. Environment
 
-Run from this skill directory unless an output path is explicit. **Check first — the machine
-may already have everything, in which case use the system `python3` and do NOT create a venv**
-(a venv only adds an activation step to every command):
+Run from this skill directory. Check the toolchain before anything else, and install only what
+this reports missing (`references/setup.md` has the commands and the font notes):
 
 ```bash
 python3 -c "import pptx, PIL, lxml, fontTools, graphviz, vl_convert" && \
-  command -v soffice dot >/dev/null && echo "ready — no venv needed"
-python3 scripts/setup_fonts.py --check   # the six static fonts the renderer measures with
+  command -v soffice dot >/dev/null && echo "ready"
+python3 scripts/setup_fonts.py --check
 ```
-
-`deck_text` measures every line with the same font files it draws with (Geist and Noto Sans
-JP, 400 / 600 / 700). Run `setup_fonts.py` without `--check` once to install them into
-`~/Library/Fonts`; without them the line breaks and header limits are computed on a fallback
-font and drift from the render.
-
-If something is missing, install it into the system Python (macOS / Homebrew):
-
-```bash
-brew install graphviz                   # the `dot` CLI (relationship graphs)
-brew install --cask libreoffice         # `soffice`, used to render .pptx → PDF/PNG
-python3 -m pip install --user --break-system-packages python-pptx Pillow lxml fonttools \
-                                        graphviz vl-convert-python pytest
-```
-
-Homebrew's Python is PEP 668 "externally managed", so plain `pip install` is refused —
-`--break-system-packages` is what lets these (pure-Python) packages land in it. Only reach
-for a venv if you cannot install into the system Python:
-
-```bash
-python3 -m venv .venv && . .venv/bin/activate
-python3 -m pip install -r scripts/requirements.txt
-```
-
-The image-asset deps (vl-convert-python, Graphviz) are imported lazily — a native-only deck runs
-without them, and they are only needed when a deck uses an image chart `kind` or the `diagram`
-pattern. matplotlib is not used.
 
 ### 1. Requirements And Outline
 
@@ -182,89 +170,35 @@ Per-line character limits are never written down: they are derived from the rend
 renderer read. Changing a type scale or a layout width moves the limit automatically — do not
 reintroduce hard-coded character budgets for headers.
 
-**Line breaks.** Write copy; the builder writes the breaks, and it writes them differently for
-the two kinds of text. Short display text (labels, headings, chevron labels, outcome lines,
-cell text) breaks at phrase boundaries so the phrasing shows in the shape — break these
-properly. Body copy (sentences, item bodies) gets no authored breaks: it is handed to the
-renderer as written and wraps naturally — kanji and kana wrap anywhere, as Japanese text does.
-The builder inserts a break only where the natural wrap would land inside a katakana word, a
-Latin word or name, or a number and its unit, or where the last line would hold a single
-character, and it inserts it only at that spot; every other line end is the renderer's
-(`deck_text.wrap_natural`). Never break body copy at clause boundaries for shape. A `\n` you
-type is honoured as a forced break, which is what makes it right for a slot with an exact line
-count (the cover subtitle's two lines). A symbolic closing message is composed as a form
-(`shape_message`). When a word is wider than its column, `verify_deck` names it: shorten the
-word or widen the column. See `references/copy-and-title-rules.md`.
+**Copy and layout contracts (details in the references).**
 
-**Emphasis without dashes.** On a slide, a clause break is a comma and an emphasis break is a
-line. A point that deserves to stand alone gets its own line — on a statement slide it becomes
-the `lead`, with the sentence that supports it set below in smaller type. `validate_spec`
-flags dashes in slide-visible text.
+- **Line breaks:** write copy; the builder writes the breaks. Display text breaks at phrase
+  boundaries, body copy wraps naturally, and a `\n` you type is a forced break (use it only for
+  slots with an exact line count, like the cover subtitle) — `references/copy-and-title-rules.md`.
+- **Emphasis without dashes:** a clause break is a comma, an emphasis break is its own line (the
+  `lead` on a statement slide); `validate_spec` flags dashes in slide-visible text.
+- **Body fill and card copy:** blocks grow toward 74% of the body band; past a pattern's cap the
+  renderer reclaims spacing and then *reports* overflow instead of shrinking type. Write cards to
+  their size (a bold one-line lead plus about three two-line items); validate and verify name a
+  card that is under 60% full. Fix copy, never type size — `references/grid-and-flex-strategy.md`.
 
-**Body fill contract.** Occupancy is one rule, not a per-slide feeling: `tokens.json` →
-`layout.fill` and `build_deck.fit_band` grow every content-sized block toward 74% of the body
-band (never past 1.75× its own content, 1.3× for top-anchored bullet cards) and centre the
-remainder. When copy exceeds a pattern's cap, the renderer climbs a reclaim ladder (line
-spacing → item gap → inner padding) and then *reports* the overflow — it never shrinks type and
-never pushes a frame off the slide. `verify_deck` fails text that straddles a bar/card edge;
-`lint_render` fails an evidence slide whose rendered body occupancy is under 50%. Treat either
-as a copy or pattern-choice defect, not something to nudge. See
-`references/grid-and-flex-strategy.md` (Body Fill Contract).
+**Choosing the primitive.** Pick by the reader question, then look up the shape:
 
-**Card copy volume (one-shot balance).** A card pattern (`process_flow`, `column_framework`,
-`two_column`) sizes its cards from the fullest card and grows them toward the body band, so a
-card carrying three short phrases ends up half empty and out of balance with its header band and
-its neighbours. Write to the card, not to the minimum: a bold one-line lead (`desc` / `heading`)
-plus three items, each about two lines at that column width — for a 4-step flow that is roughly
-10 characters of lead and 12-17 characters per item; for 3 pillars, 15-25 characters per item
-body. `validate_spec.py` estimates every card with the renderer's own geometry
-(`build_deck.card_copy_estimate`) and names the shortfall in lines and characters when a card's
-copy is under `tokens.layout.fill.card_text_floor` (60% of the card); `verify_deck.py` re-measures
-the built file. Fix by adding copy, never by enlarging type or shrinking the card.
+| The page needs | Use | Reference |
+|---|---|---|
+| A known consulting archetype | the pattern or `composite` recipe it maps to | `consulting-page-catalogue.md` |
+| A combination (chart + notes + so-what, KPI strip + table, three issue cards + bar) | `composite` with role-tagged `blocks`; the layout search picks the arrangement | `layout-search.md` |
+| A specific geometry (pillars, tree, decision timeline, risk grid, hub, before/after, cases, 2x2, workplan, Harvey balls) | the dedicated pattern | `deck-spec.md` |
+| A chart beyond plain column / bar / line / stacked / donut | Vega-Lite (`kind: "vega"` or `mekko` / `slope` / `dumbbell` / `bullet`); waterfalls are always native | `charts-vega.md` |
 
-**Consulting page shapes.** Three structures are native primitives (see `deck-spec.md`
-22-24) and should be chosen by judgment like any other: `column_framework` (2-4 pillars with
-aligned rows and a locked outcome strip — parallel structure, never a sequence),
-`metric_proof` (hero number cluster + the chart that proves it + facts rail), `logic_tree`
-(issue / driver / KPI tree, root → branches → leaves, all editable shapes). When the question is
-*when is what decided*, use `milestone_timeline` (3-6 dated milestones, diamonds for decision
-points, solid axis for actuals and dashed for plan via `current`) rather than a `roadmap`. For a risk
-review, `risk_matrix` places numbered risks on a 3x3 likelihood × impact grid beside their
-mitigations. When one platform coordinates several parts, `hub_spoke` draws the hub,
-3-6 spoke cards, and a relation line in each card, all as editable shapes. When change is
-the argument and it can be measured, `before_after` reads each dimension across one row
-(before → after + delta) instead of two free columns. Customer proof is a `case_strip`:
-2-4 cases in one card grammar, each with a measured result.
-
-**Combinations and the consulting catalogue.** Most strategy-firm pages are combinations, not
-new shapes. `composite` writes them directly: a `grid` of 1-3 rows, each row a set of cells
-spanning the 12 columns, each cell one block (`text`, `kpi`, `callout`, `chart`, `table`,
-`diagram`). Reach for it before inventing a pattern, and add a dedicated pattern only for a
-new geometry. Three consulting staples with specific geometry are native too: `matrix_2x2`
-(quadrant content), `gantt` (workplan), `harvey_table` (options scored on criteria).
-`references/consulting-page-catalogue.md` maps each common archetype to its primitive or
-composite recipe.
-
-**Reason about content, let code measure the layout.** For a `composite`, prefer `blocks` over
-a hand-written `grid`: list the blocks and give each a `role` (`focal` answers the reader
-question; `support`, `context`, `conclusion`). `scripts/layout_search.py` enumerates the
-arrangements, measures them with the builder's geometry (fit, hierarchy, reading order,
-hollow cells, legibility, consistency, balance), and the build uses the best. Inspect the top
-three with `layout_search.py deck.json --slide N --top 3`; override only for a content reason,
-by pinning a `grid`. Never override because a layout "looks better" — models judge slide
-aesthetics poorly, which is why geometry is measured, not eyeballed
-(`references/layout-search.md`).
-
-**Charts: native first, Vega-Lite for everything else.** Plain column / bar / line / stacked /
-donut charts stay native and editable. Any other chart is a Vega-Lite spec (`kind: "vega"`: data
-rows + mark + encoding, with `focal` and `labels`), or one of the consulting recipes `mekko`,
-`slope`, `dumbbell`, `bullet`; `act_vega.py` applies the Act look and validate compiles the spec
-before the build. Pick the chart from the comparison the title makes (component, item, time
-series, frequency, correlation, bridge, two-point change, vs target) — see
-`references/charts-vega.md`. A `sticker` ("暫定", "例示") marks a slide's status in the top-right
-corner; an illustrative sticker requires an `assumption`. Mix shift is a
-native `stacked_column_100`; a chart with short comparable takeaways can use
-`chart_insight` `layout: chart_top` to vary the page rhythm.
+For `composite` blocks, give each block a `role` (`focal` answers the reader question;
+`support`, `context`, `conclusion`) and let `scripts/layout_search.py` measure the arrangements.
+Inspect the top three with `layout_search.py deck.json --slide N --top 3`, and pin a `grid` only
+for a content reason — never because a layout "looks better", since models judge slide
+aesthetics poorly and the geometry is measured instead. Pick a chart from the comparison the
+title makes (component, item, time series, frequency, correlation, bridge, two-point change, vs
+target). A `sticker` ("暫定", "例示") marks a slide's status in the top-right corner; an
+illustrative sticker requires an `assumption`.
 
 **Text frames.** A group that reads as one thing is one text box, built from paragraphs
 (label -> value -> note; heading -> body; a whole interpretation rail). Leading follows the
@@ -279,61 +213,23 @@ never as commentary or a navigation hint, and never on a slide that shows no num
 
 ### 2b. Talk Script (speaker_notes)
 
-`speaker_notes` is the presenter's spoken script and NOTHING else. Design metadata
-(judgment fields, "reader_question", "composition", "focal", rhythm labels) must never
-appear there — a presenter reads these notes verbatim while delivering.
+`speaker_notes` is the presenter's spoken script and nothing else: no design metadata
+(judgment fields, "reader_question", "composition", "focal"), because a presenter reads it aloud.
+Write it against the final slide bodies and re-check it whenever a slide's copy changes.
 
-**Content fidelity — the script and the slide must be the same argument.** Write scripts
-against the FINAL slide bodies (after visual QA), and re-check them whenever a slide's
-copy changes — stale notes that describe an older body are a defect ("script drift").
-Concretely:
+- **Same argument as the slide:** every number, date and proper noun you speak is on the slide;
+  touch the title claim (paraphrased, not read verbatim), the focal object, and any caveat.
+- **Scene, then claim:** open on a person, a place or an action (「朝、倉庫の点呼です。ドライバーの声が少し低い。」),
+  then the claim, then the evidence in the slide's reading order.
+- **One story:** pick up the previous slide's bridge (no 「このスライドでは」 openings), state the
+  so-what, and hand off to the next slide's question. Spoken です/ます, no bullet dumps.
+- **Speakable:** open fragments a voice cannot say (arrows, tildes, `vs`, `YoY`, the accounting
+  triangle) into words; never apply these readings to slide-visible text.
+- **Depth:** about 150-300 Japanese characters per content slide, calibrated to
+  `meta.talk_minutes` (about 300 characters per minute).
 
-- Every number, date, and proper noun you speak must exist on that slide (or in its
-  note/assumption). A number that appears only in the script is a hallucination risk —
-  `validate_spec.py` flags unit-bearing numbers absent from the slide.
-- Every load-bearing element must be touched: the title claim (paraphrased), the focal
-  object, the key rows/steps/columns, the insight band, and any caveat note — speak the
-  caveat in natural language ("この期間は会議時点の見込みです" 等).
-- Do not read the title string verbatim as the opening; restate the claim in spoken form.
-
-**Open on the scene, then the claim.** The presenter's first sentence puts the audience
-somewhere: a person, a place, an action. 「朝、倉庫の点呼です。ドライバーの声が少し低い。」— then
-the claim, then the evidence in the slide's reading order. A script that could be read over any
-slide in the deck is not yet doing its job; `validate_spec.py` warns when a slide's notes carry
-no scene.
-
-**Narrative — the deck reads as ONE story, not per-slide captions.** Each script:
-
-1. picks up from the previous slide's bridge (no reset openings like 「このスライドでは」;
-   vary the openers — three slides in a row starting with 「次に」 is a template smell),
-2. opens with the claim in spoken language, then walks the evidence in the slide's visual
-   reading order, naming the actual labels and numbers the audience should look at,
-3. states the implication (so-what) before leaving the slide,
-4. ends with a bridge that hands off to the next slide's question.
-
-Spoken register throughout: natural です/ます sentences, no noun-ending fragments, no
-bullet dumps. Read the finished set aloud start-to-finish once — if any transition
-jars or a slide's script could be shuffled elsewhere without anyone noticing, the
-narrative is not yet doing its job.
-
-**Readable by a voice, and by the presenter.** The script is read aloud — by a person or by
-a speech engine — so a fragment a voice cannot say is a defect there, even though the same
-character is right on the slide (which is read with the eyes). Open the fragments that a TTS
-engine skips, spells out, or reads in English: arrows, range tildes, math and relation signs,
-the accounting triangle, `&`, inline fractions, `2.4x`, `vs`, `CAGR`, `YoY`, `SaaS`, an
-em-dash used as a pause. Open them into the words a presenter would actually say — the form
-follows the kind of fragment (operators and relations into kana/kanji, units into
-katakana/kanji, fractions reordered denominator-first, letter-wise acronyms like KPI/ARR left
-as Latin, word-like ones like SaaS into katakana). Stop there: rewriting every Latin string
-into katakana makes the notes unreadable for the human holding them.
-`validate_spec.py` warns on each un-speakable fragment and names the reading; the table is
-`references/tts_readings.json`, the reasoning `references/talk-script-and-tts.md`. Never
-apply these conversions to slide-visible text.
-
-Depth target: ~150-300 Japanese characters per content slide (≈30-60 seconds of speech);
-calibrate the deck total against `meta.talk_minutes` (~300字/分). A one-line note is a
-defect on any slide except the cover. `validate_spec.py` warns on metadata leakage,
-thin scripts, non-spoken register, title-verbatim openings, and slide-absent numbers.
+`validate_spec.py` warns on each of these. The full rules and the reading table are in
+`references/talk-script-and-tts.md` and `references/tts_readings.json`.
 
 ### 3. Validate, Audit The Argument, Build, Verify, Render
 
@@ -468,6 +364,7 @@ Read only what the task needs, but do not skip the required workflow references.
 | `references/argument-integrity.md` | The argument contract enforced by `audit_argument.py` |
 | `references/concreteness.md` | Scenes, named mechanisms, felt scale (lexicon: `concreteness-lexicon.json`) |
 | `references/commitment-lexicon.json` | Terms that decide promise / rank / hedge / motion |
+| `references/setup.md` | Toolchain check, fonts, and install commands |
 | `references/talk-script-and-tts.md` | Speaker-notes readings a voice can say (table: `tts_readings.json`) |
 | `references/humanize.md` | Remove AI-like generic output |
 | `references/anti-patterns.md` | Failure modes to hunt before delivery |
@@ -495,6 +392,7 @@ Use:
 PYTHONDONTWRITEBYTECODE=1 python3 -m pytest tests -p no:cacheprovider
 python3 scripts/stress_deck.py -o /tmp/stress --images     # every pattern at min / max / overload, all templates via --template
 python3 ~/.claude/plugins/marketplaces/claude-plugins-official/plugins/skill-creator/skills/skill-creator/scripts/quick_validate.py .
+agentskills validate "$PWD"   # Agent Skills spec validator (pip install --user skills-ref); pass the path, not "."
 ```
 
 After touching a renderer, rebuild and render the three example decks and read the contact

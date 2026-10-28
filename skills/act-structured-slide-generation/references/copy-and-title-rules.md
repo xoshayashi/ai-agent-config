@@ -3,6 +3,14 @@
 Use this file when writing slide-visible text. The manual is English; generated slide copy is
 usually Japanese.
 
+## Contents
+
+- Titles And Subtitles (the header contract)
+- Body Copy
+- Japanese Slide Copy Discipline
+- Line Breaks
+- Words To Replace
+
 ## Titles And Subtitles (the header contract)
 
 Every slide carries a main title and a subtitle, and each occupies exactly the number of

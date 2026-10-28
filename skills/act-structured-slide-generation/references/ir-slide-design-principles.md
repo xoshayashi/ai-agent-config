@@ -7,6 +7,33 @@ evidence-rich but readable pages.
 
 Each principle has: **Use when / Why it works / Parameters / Failure / Repair**.
 
+## Contents
+
+- 1. Start From The Reader Question
+- 2. Make One Takeaway Carry The Page
+- 3. Give The Strongest Evidence The Strongest Visual Weight
+- 4. Pair Numbers With Their Interpretation
+- 5. Use Tables For Accountability, Not Decoration
+- 6. Treat Actual, Plan, Forecast, And Opportunity As Different States
+- 7. Make Progress Pages Show A Denominator
+- 8. Show Change With Time Grouping And Events
+- 9. Decompose Before Explaining
+- 10. Put Bad News In The Same Grammar As Good News
+- 11. Separate External Evidence From Internal Interpretation
+- 12. Use Images Only As Evidence
+- 13. Name The Relationship In Every Diagram
+- 14. Use Coverage Matrices For Expansion Potential
+- 15. Current-Location Slides Must Preserve The Whole Map
+- 16. Use Quiet Pages As Rhythm, Not Fillers
+- 17. Let Dense Pages Earn Their Density
+- 18. Define Specialized Metrics At First Use
+- 19. Keep Color Meaning Stable
+- 20. Pair Absolute Amounts With Rates When Both Matter
+- 21. Use External Context To Explain, Not Excuse
+- 22. Preserve The Audit Trail For Future-Looking Claims
+- 23. Keep Appendix Logic Out Of Mainline Proof Pages
+- 24. Repair Locally Before Redesigning Globally
+
 ## 1. Start From The Reader Question
 - **Use when**: composing any slide, especially dense IR pages.
 - **Why it works**: IR pages are strongest when each page answers a specific doubt:
