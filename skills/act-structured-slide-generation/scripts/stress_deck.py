@@ -368,6 +368,7 @@ def make_deck(variant: str = "max", template: str | None = None, images: bool = 
          "source": "Source: 経理部 試算(2026年10月)"},
     ]
     slides[-1:-1] = rich
+    slides[-1:-1] = more_patterns(v)
 
     # drop None outcome keys so validate sees the real spec shape
     def _clean(o):
@@ -467,6 +468,99 @@ def main() -> int:
         bad += len(res["lint_findings"] or [])
     return 1 if bad else 0
 
+
+
+def more_patterns(v: str) -> list:
+    """act_patterns の24型を、文書化した件数の下限(min)・上限(max)・上限+長い文(overload)で並べる。"""
+    import act_patterns as AP
+    overload = v == "overload"
+    T = lambda long_, short: _txt(v, long_, short)  # noqa: E731
+
+    def n(p):
+        _k, lo, hi, *_r = AP.SPEC[p]
+        return lo if v == "min" else hi
+
+    W = T(LONG if overload else "承認ルートを2段にそろえる", "そろえる")
+    L_ = T("会計システム連携" if not overload else "会計システムとの仕訳連携の検証", "連携")
+    src = "Source: 社内試算(2026年10月)"
+    hd = lambda t, s_: {"title": T(t, s_), "subtitle": "確認"}  # noqa: E731
+    out = [
+        {"pattern": "big_number", **hd("経費処理は全社で年18万件、1件12分かかっている", "18万件"), "value": "18", "unit": "万件",
+         "label": T("年間の経費申請", "申請"), "sublabel": T("1,200名、1人あたり月12.5件", "月12.5件") if v != "min" else None,
+         "context": [W] * (0 if v == "min" else 3), "source": src},
+        {"pattern": "number_strip", **hd("PoCで処理時間・差戻し・締めの3つが同時に縮んだ", "3つが縮んだ"),
+         "numbers": [{"label": L_, "value": T("10,590" if overload else "1.5", "4"), "unit": T("億円", "分"), "note": W if v != "min" else None, "focal": i == 0}
+                     for i in range(n("number_strip"))], "source": src},
+        {"pattern": "progress_bars", **hd("利用率は5部門のうち4部門で9割を超えた", "9割超"),
+         "bars": [{"label": L_, "value": [0.98, 0.5, 1.2, 0.0, 0.9, 0.3, 0.7, 1.0][i], "note": W if i == 0 else None, "focal": i == 0}
+                  for i in range(n("progress_bars"))], "source": src},
+        {"pattern": "ranking", **hd("経費の件数は営業と経理で全体の6割を占める", "6割"), "unit": "千件",
+         "items": [{"label": L_, "value": 62 - 5 * i, "focal": i == 0} for i in range(n("ranking"))], "source": src},
+        {"pattern": "funnel", **hd("申請の8割が差戻しなしで、2日以内に承認まで届く", "8割"),
+         "stages": [{"label": T("一次承認", "承認"), "value": 2400 - 300 * i, "note": W if v != "min" else None} for i in range(n("funnel"))],
+         "source": src},
+        {"pattern": "pyramid", **hd("全社展開は、仕組みの上に運用と文化を積んで定着させる", "3層"),
+         "tiers": [{"label": T("運用", "層"), "desc": W if v != "min" else None} for _ in range(n("pyramid"))]},
+        {"pattern": "composition_bar", **hd("処理時間12分のうち8分が手入力で、自動化の余地が大きい", "8分が手入力"),
+         "total_label": T("1件12分の内訳", "内訳") if v != "min" else None,
+         "segments": [{"label": L_, "value": 8 - i, "note": W if v != "min" else None, "focal": i == 0} for i in range(n("composition_bar"))],
+         "source": src},
+        {"pattern": "heatmap_table", **hd("差戻しは月末の経理と営業に集中している", "月末に集中"), "unit": "件",
+         "rows": [T("情報システム部" if overload else "経理", "経理")] * n("heatmap_table"),
+         "columns": [T("第1週", "週")] * (2 if v == "min" else 7),
+         "values": [[(i * 7 + j * 3) % 40 for j in range(2 if v == "min" else 7)] for i in range(n("heatmap_table"))], "source": src},
+        {"pattern": "swot", **hd("強みは承認の速さ、最大の脅威は会計システムの更新時期", "SWOT"),
+         **{q: [W] * (1 if v == "min" else 4 if overload else 3) for q in ("strengths", "weaknesses", "opportunities", "threats")}},
+        {"pattern": "pros_cons", **hd("一括展開は速いが、移行の負担とリスクが重い", "負担が重い"),
+         "pros": [W] * (1 if v == "min" else 5), "cons": [W] * (1 if v == "min" else 5),
+         "verdict": T("一括ではなく、効果の大きい経理と営業から段階的に広げる", "段階的に") if v != "min" else None},
+        {"pattern": "versus", **hd("段階展開は一括展開よりリスクが低く、効果の遅れは2カ月", "段階が低リスク"),
+         "left": {"name": T("一括展開", "一括"), "note": W if v != "min" else None}, "right": {"name": T("段階展開", "段階"), "focal": True},
+         "rows": [{"label": L_, "left": W, "right": W, "winner": "right" if i % 2 else None} for i in range(n("versus"))], "source": src},
+        {"pattern": "cycle", **hd("申請データを規程の見直しに戻し、差戻しを毎月減らす", "循環"),
+         "center": T("差戻しを毎月減らす", "改善") if v != "min" else None,
+         "steps": [{"label": L_, "desc": W if v != "min" else None} for _ in range(n("cycle"))]},
+        {"pattern": "value_chain", **hd("経費処理の5工程のうち、入力と確認で効果の8割が出る", "8割"),
+         "stages": [{"label": T("申請", "工程"), "items": [W] * (1 if v == "min" else 3 if overload else 2), "focal": i == 0}
+                    for i in range(n("value_chain"))],
+         "outcome": T("入力と確認の自動化で、1件12分が4分になる", "4分") if v != "min" else None},
+        {"pattern": "layer_stack", **hd("新しい仕組みは3層で、既存の会計システムには手を入れない", "3層"),
+         "layers": [{"label": L_, "items": [T("スマートフォン", "端末")] * (1 if v == "min" else 6 if overload else 4), "focal": i == 1}
+                    for i in range(n("layer_stack"))]},
+        {"pattern": "org_chart", **hd("推進は経理部長が責任者となり、3チームで進める", "3チーム"),
+         "root": {"name": T("経理部長", "部長"), "role": T("全社展開の責任者", "責任者") if v != "min" else None},
+         "children": [{"name": T("連携チーム", "チーム"), "role": T("情報システム部 2名", "2名") if v != "min" else None,
+                       "items": [W] * (0 if v == "min" else 3 if overload else 1)} for _ in range(n("org_chart"))]},
+        {"pattern": "checklist", **hd("展開前の6項目のうち4つは完了し、連携の検証が残る", "4つ完了"),
+         "items": [{"label": L_, "status": ("done", "todo", "risk")[i % 3], "note": W if i % 2 and v != "min" else None}
+                   for i in range(n("checklist"))]},
+        {"pattern": "numbered_steps", **hd("部門の切り替えは4つの手順で、1部門2週間で終える", "4つの手順"),
+         "steps": [{"label": L_, "desc": W if v != "min" else None} for _ in range(n("numbered_steps"))]},
+        {"pattern": "vertical_timeline", **hd("11月に経理と営業から始め、3月に全社展開を決める", "3月に決める"),
+         "events": [{"date": f"2027年{i + 1}月", "label": L_, "desc": W if (overload or (v != "min" and i % 2 == 0)) else None,
+                     "focal": i == 1}   # 7件のときの説明は1つおき(全件に説明なら5件が上限)
+                    for i in range(n("vertical_timeline"))]},
+        {"pattern": "faq", **hd("想定される4つの質問には、PoCの実績で答えられる", "4つの質問"),
+         "pairs": [{"q": T("会計システムに影響は出ないか", "影響は"), "a": W} for _ in range(n("faq"))]},
+        {"pattern": "team", **hd("推進の中心は、経理・情シス・人事の3名が担う", "3名"),
+         "people": [{"name": T("鈴木 課長", "鈴木"), "role": T("情報システム部", "情シス"), "desc": W if v != "min" else None,
+                     "focal": i == 0} for i in range(n("team"))]},
+        {"pattern": "pricing_tiers", **hd("全社では中位のプランで足り、年3,600万円に収まる", "3,600万円"),
+         "tiers": [{"name": T("標準", "案"), "price": "3,600", "unit": T("万円/年", "万円"), "note": W if overload else None,
+                    "features": [T("会計連携", "連携")] * (0 if v == "min" else 6), "focal": i == 1} for i in range(n("pricing_tiers"))],
+         "source": src},
+        {"pattern": "quote_grid", **hd("3部門とも、締め日の負担が減ったと話している", "負担が減った"),
+         "quotes": [{"quote": T(LONG if overload else "締め日に残る夜がなくなった", "早く帰れる"), "attribution": T("営業部 課長", "課長"),
+                     "role": T("PoC 2期", "2期") if v != "min" else None} for _ in range(n("quote_grid"))]},
+        {"pattern": "nine_box", **hd("最初に広げるのは、効果が大きく準備の整った2部門", "2部門"),
+         "x_label": T("準備の度合い", "準備"), "y_label": T("効果", "効果"), "reading": W if v != "min" else None,
+         "items": [{"label": T("情報システム部" if overload else "経理", "経理"), "x": i % 3, "y": (i // 3) % 3}
+                   for i in range(n("nine_box"))]},
+        {"pattern": "target_bars", **hd("4指標のうち3つが目標に届き、差戻し率だけが残る", "3つが達成"),
+         "rows": [{"label": L_, "actual": 50 + 20 * i, "target": 100, "note": W if i == 0 and v != "min" else None}
+                  for i in range(n("target_bars"))], "source": src},
+    ]
+    return out
 
 if __name__ == "__main__":
     sys.exit(main())

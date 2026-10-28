@@ -5154,6 +5154,9 @@ PATTERNS = {
     "icon_grid": p_icon_grid,
 }
 
+import act_patterns                                    # noqa: E402  追加の24型(同じ部品で組む)
+act_patterns.install(sys.modules[__name__])
+
 NO_CHROME = {"cover", "section_divider"}
 
 # 反転(tone: "inverse"): 地をテンプレートのブランドの濃色(primary_deep)にし、色の役割を入れ替えて描く。

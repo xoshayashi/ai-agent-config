@@ -4761,3 +4761,49 @@ def test_eval_colour_criterion_follows_the_design_template():
         assert "[color-1] The deck wears" in E.rubric_body()
     finally:
         E.TEMPLATE = "standard"
+
+
+def test_the_registry_holds_sixty_patterns_with_one_spec_table():
+    """60 型: build_deck の PATTERNS と validate_spec の必須表が同じ集合を持ち、追加の24型は act_patterns.SPEC
+    の1つの表から検査・寸法・図表のページかを引く(描画と検査が別々の表を持たない)。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import act_patterns as AP
+    import build_deck as B
+    import validate_spec as V
+    assert len(B.PATTERNS) >= 60
+    assert set(B.PATTERNS) == set(V.PATTERNS)
+    assert set(AP.SPEC) == set(AP.RENDERERS) == set(AP.LAYOUTS)
+    assert set(AP.SPEC) <= set(V.FIT_CHECKS)
+
+
+def test_the_24_added_patterns_build_and_pass_every_gate(tmp_path):
+    """追加の24型のショーケース(実際の文の長さ)が validate 0 / verify 0 で組める。"""
+    src = SKILL / "tests" / "fixtures-patterns24.json"
+    p = tmp_path / "deck.json"; p.write_text(src.read_text())
+    r = run("validate_spec.py", p)
+    assert " 0 errors" in r.stdout, r.stdout
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0 and "0 failures" in v.stdout, v.stdout
+
+
+def test_added_patterns_reject_bad_shapes_and_numbers_that_cannot_fit(tmp_path):
+    base = {"meta": {"title": "t"}, "slides": []}
+    bad = [
+        {"pattern": "ranking", "title": "上位の比較", "subtitle": "s", "items": ["営業", "経理", "購買"], "source": "x"},
+        {"pattern": "checklist", "title": "確認の状況", "subtitle": "s", "items": [{"label": "a", "status": "ok"}] * 3},
+        {"pattern": "nine_box", "title": "優先度の整理", "subtitle": "s", "items": [{"label": "a", "x": 3, "y": 0}]},
+        {"pattern": "number_strip", "title": "数字は1行で", "subtitle": "s", "source": "x",
+         "numbers": [{"label": "a", "value": "1,234,567", "unit": "営業日"}] * 4},
+        {"pattern": "heatmap_table", "title": "表の形", "subtitle": "s", "rows": ["a", "b"], "columns": ["x", "y"],
+         "values": [[1, 2]], "source": "x"},
+    ]
+    base["slides"] = bad
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(base, ensure_ascii=False))
+    out = run("validate_spec.py", p).stdout
+    assert "items[0] は" in out and "文字列だけは書けない" in out
+    assert "status は done / todo / risk" in out
+    assert "x / y は 0-2 の整数" in out and "x_label と y_label" in out
+    assert "が列に1行で入らない" in out
+    assert "rows × columns の数値の表" in out

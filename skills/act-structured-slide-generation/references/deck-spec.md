@@ -7,7 +7,7 @@ primitives, not design templates. Choose and combine them after the judgment pro
 
 - Top Level
 - Fields Common To Slides
-- The 36 Patterns
+- The 60 Patterns
 - Layout contract shared by every pattern
 - Argument fields
 - Chart Spec (native types, emphasis/annotation knobs, image chart kinds, annotation layer)
@@ -100,7 +100,7 @@ the divider's `title`; validate errors on a longer one. Dividers keep their own 
   for a kind the native engine could attempt. Default (unset) keeps native unless the `kind` is
   image-only (combo/area/org_tree/…). Escalate to image only for objects native cannot draw.
 
-## The 36 Patterns
+## The 60 Patterns
 
 ### 1. `cover`
 
@@ -474,6 +474,44 @@ interview's method and n in `source`. The type never shrinks; cut the quote.
 label → one sentence. Every item needs an `icon` and a `label` (validate errors otherwise); one
 `focal` tile at most turns brand dark. Columns follow the count (≤4 in one row, 5-6 and 9 in
 threes, 7-8 in fours). Validate measures the tiles.
+
+### 37-60. Added patterns (`scripts/act_patterns.py`)
+
+Twenty-four more geometries, drawn with the same primitives. One table, `act_patterns.SPEC`, holds
+each pattern's list key, item count, required item keys and whether it is an evidence page;
+`validate_spec` reads it, and every pattern has a measured layout in `act_patterns.LAYOUTS` that
+the fit check shares with the renderer. Numbers that must stay on one line (big numbers, strip
+numbers, prices) are measured too, and validate names the number that does not fit.
+
+| # | Pattern | Fields | Use when |
+|---|---|---|---|
+| 37 | `big_number` | `value`, `unit?`, `label`, `sublabel?`, `context` (0-3 lines) | one 120pt number changes the belief |
+| 38 | `number_strip` | `numbers` 2-4 `{label, value, unit?, note?, focal?}` | a few headline numbers with no cards |
+| 39 | `progress_bars` | `bars` 2-8 `{label, value 0-1, display?, note?, focal?}` | attainment by unit, more than five rows |
+| 40 | `ranking` | `items` 3-10 `{label, value, display?, focal?}`, `unit?` | top-N comparison with readable names |
+| 41 | `funnel` | `stages` 3-6 `{label, value, display?, note?, focal?}` | conversion; rates are computed |
+| 42 | `pyramid` | `tiers` 3-5 `{label, desc?}` (top first) | a hierarchy of meaning, not of quantity |
+| 43 | `composition_bar` | `segments` 2-6 `{label, value, note?, focal?}`, `total_label?` | one whole split into parts |
+| 44 | `heatmap_table` | `rows`, `columns` (2-7), `values` (rows x columns), `unit?`, `lower_is_better?` | concentration across two dimensions |
+| 45 | `swot` | `strengths`, `weaknesses`, `opportunities`, `threats` (1-4 each), `labels?` | situation summary |
+| 46 | `pros_cons` | `pros`, `cons` (1-5 each), `verdict?` | one option weighed, one verdict |
+| 47 | `versus` | `left` / `right` `{name, note?, focal?}`, `rows` 2-6 `{label, left, right, winner?}` | exactly two options |
+| 48 | `cycle` | `steps` 3-6 `{label, desc?, focal?}`, `center?` | a loop that compounds |
+| 49 | `value_chain` | `stages` 3-6 `{label, items, focal?}`, `outcome?` | a sequence of stages with activities |
+| 50 | `layer_stack` | `layers` 2-5 `{label, items or desc, focal?}` | architecture or operating layers |
+| 51 | `org_chart` | `root {name, role?}`, `children` 2-5 `{name, role?, items?, focal?}` | a two-level team |
+| 52 | `checklist` | `items` 3-8 `{label, status: done / todo / risk, note?, status_label?}` | readiness and open items |
+| 53 | `numbered_steps` | `steps` 3-6 `{label, desc?, focal?}` | steps with longer explanations |
+| 54 | `vertical_timeline` | `events` 3-7 `{date, label, desc?, focal?}` (about 5 when every event has a desc) | dated events with text |
+| 55 | `faq` | `pairs` 2-6 `{q, a}` | anticipated questions |
+| 56 | `team` | `people` 2-6 `{name, role, desc?, initials?, focal?}` | who owns what |
+| 57 | `pricing_tiers` | `tiers` 2-4 `{name, price, unit?, note?, features (≤6), focal?}`, `focal_label?` | plans or option tiers with a recommendation |
+| 58 | `quote_grid` | `quotes` 2-4 `{quote, attribution, role?, focal?}` | several short voices |
+| 59 | `nine_box` | `items` ≤12 `{label, x 0-2, y 0-2, focal?}`, `x_label`, `y_label`, `reading?` | a 3x3 portfolio or prioritisation |
+| 60 | `target_bars` | `rows` 2-8 `{label, actual, target, display?, note?}`, `legend?` | actual against target; each row has its own scale |
+
+`note` stays the footer field on every pattern; text that belongs on the slide uses the
+pattern's own key (`sublabel`, `reading`, item `note`).
 
 ## Layout contract shared by every pattern
 

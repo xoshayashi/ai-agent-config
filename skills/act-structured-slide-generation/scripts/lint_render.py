@@ -206,7 +206,8 @@ def main() -> int:
         for i, s in enumerate(spec.get("slides", []), start=1):
             if s.get("pattern") in ("cover", "section_divider"):
                 fullbleed.add(i)
-            if s.get("pattern") in ("cover", "section_divider", "statement", "agenda", "pull_quote"):
+            if s.get("pattern") in ("cover", "section_divider", "statement", "agenda", "pull_quote",
+                                    "big_number", "number_strip"):   # 数字そのものが主役の、空気で見せるページ
                 no_balance.add(i)
             if designed_side_bleed(s):
                 side_bleed.add(i)

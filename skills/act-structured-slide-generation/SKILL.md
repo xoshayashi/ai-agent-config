@@ -188,7 +188,7 @@ reintroduce hard-coded character budgets for headers.
 |---|---|---|
 | A known consulting archetype | the pattern or `composite` recipe it maps to | `consulting-page-catalogue.md` |
 | A combination (chart + notes + so-what, KPI strip + table, three issue cards + bar) | `composite` with role-tagged `blocks`; the layout search picks the arrangement | `layout-search.md` |
-| A specific geometry (pillars, tree, decision timeline, risk grid, hub, before/after, cases, 2x2, workplan, Harvey balls, scorecard, pull quote, icon tiles) | the dedicated pattern | `deck-spec.md` |
+| A specific geometry: 60 patterns (pillars, tree, timelines, risk grid, hub, before/after, cases, 2x2, 3x3, workplan, Harvey balls, scorecard, funnel, pyramid, ranking, heatmap, SWOT, versus, cycle, value chain, layers, org chart, checklist, FAQ, team, pricing, quotes, big numbers) | the dedicated pattern | `deck-spec.md`, `consulting-page-catalogue.md` |
 | A chart beyond plain column / bar / line / stacked / donut | Vega-Lite (`kind: "vega"` or `mekko` / `slope` / `dumbbell` / `bullet`); waterfalls are always native | `charts-vega.md` |
 
 For `composite` blocks, give each block a `role` (`focal` answers the reader question;
@@ -389,6 +389,7 @@ Read only what the task needs, but do not skip the required workflow references.
 | `scripts/act_theme.py` | Token-core adapter: feeds tokens.json to every backend (native, Vega-Lite, Graphviz) |
 | `scripts/act_assets.py` | Image-asset backend: Act-styled deterministic charts/diagrams for objects native cannot draw |
 | `scripts/act_icons.py`, `assets/icons/` | Lucide icons (ISC) drawn as native vector shapes; curated subset |
+| `scripts/act_patterns.py` | The 24 added patterns (37-60): renderers, measured layouts and the one `SPEC` table validate reads |
 | `scripts/act_vega.py` | Vega-Lite chart rendering: Act theme, `focal` / `labels`, consulting recipes, compile check |
 | `scripts/layout_search.py` | Ranks `composite` arrangements from role-tagged `blocks`; `--top`, `--emit` to compare candidates |
 | `scripts/stress_deck.py` | Dynamic-generation regression guard: every pattern at min / documented max / past capacity |

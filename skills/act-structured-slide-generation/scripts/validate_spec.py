@@ -71,7 +71,10 @@ PATTERNS = {
     "pull_quote": ["quote", "attribution"],
     "icon_grid": ["items"],
 }
-EVIDENCE_PATTERNS = {
+import act_patterns  # noqa: E402  追加の24型: 必須キー・件数・図表のページかは act_patterns.SPEC が単一の表
+PATTERNS.update(act_patterns.REQUIRED)
+
+EVIDENCE_PATTERNS = {*act_patterns.EVIDENCE,
     "chart_insight", "market_sizing", "comparison_table", "competitive_landscape",
     "financial_summary", "waterfall", "kpi_dashboard",
     "financial_highlights", "metrics_rows", "driver_decomposition", "guidance_progress",
@@ -154,6 +157,7 @@ FIT_CHECKS = {
     "scorecard": (lambda bd, s, h: bd._scorecard_layout(s, h), "行を減らすか、指標の注記を短くする(8行まで)"),
     "pull_quote": (lambda bd, s, h: bd._pull_quote_layout(s, h), "声を切る(30pt で4行、1行あたり約24字まで)"),
     "icon_grid": (lambda bd, s, h: bd._icon_grid_layout(s, h), "一文を短くするか、項目を減らす"),
+    **{p: ((lambda bd, s, h, p=p: bd.act_patterns.LAYOUTS[p](s, h)), act_patterns.FIT_HINT) for p in act_patterns.SPEC},
     "agenda": (lambda bd, s, h: bd._agenda_tiles_layout(s, h) if s.get("layout") == "tiles"
                else {"overflow": False, "need_h": 0.0}, "タイルの説明を短くする(各2行まで)"),
     "composite": (lambda bd, s, h: bd._composite_layout(s, h),
@@ -224,7 +228,9 @@ def _check_fit(errors, warns, loc, s, tokens) -> None:
         bd = _builder(tokens)
         _, body_h = bd.body_region(s)
         L = fn(bd, s, body_h)
-        if L["overflow"]:
+        if L["overflow"] and L.get("hint"):
+            errors.append(f"{loc}: {L['hint']}")
+        elif L["overflow"]:
             errors.append(f"{loc}: 本文帯に入らない(必要 {L['need_h']:.2f}in > {body_h - 0.10:.2f}in) — {fix}")
     except Exception as exc:  # 見積もりが壊れていれば黙らず告げる(検査を無効化しない)
         warns.append(f"{loc}: {s.get('pattern')} の寸法見積もりに失敗 ({exc})")
@@ -363,7 +369,8 @@ ANCHORED = {"cover", "section_divider", "agenda", "kpi_dashboard", "chart_insigh
             "waterfall", "financial_summary", "financial_highlights", "metrics_rows", "driver_decomposition",
             "guidance_progress", "diagram", "metric_proof", "logic_tree", "milestone_timeline", "risk_matrix",
             "hub_spoke", "before_after", "case_strip", "matrix_2x2", "gantt", "harvey_table",
-            "competitive_landscape", "roadmap", "process_flow", "scorecard", "pull_quote", "icon_grid"}
+            "competitive_landscape", "roadmap", "process_flow", "scorecard", "pull_quote", "icon_grid",
+            *act_patterns.SPEC}
 
 
 def check_icons(errors, warns, loc, s) -> None:
@@ -1028,6 +1035,11 @@ def main() -> int:
             if sum(1 for t in tks if t.get("focal")) > 2:
                 warns.append(f"{loc}: focal のタスクが3つ以上 — 強調は判断に関わる1-2本に絞る")
             if 3 <= len(per) <= 12 and 2 <= len(tks) <= 8:
+                _check_fit(errors, warns, loc, s, tokens)
+        if pat in act_patterns.SPEC:
+            shape_errs = act_patterns.check(s)
+            errors.extend(f"{loc}: {e}" for e in shape_errs)
+            if not shape_errs:
                 _check_fit(errors, warns, loc, s, tokens)
         if pat == "scorecard":
             rows_ = s.get("rows", [])
