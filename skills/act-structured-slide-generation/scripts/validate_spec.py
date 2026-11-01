@@ -155,7 +155,7 @@ FIT_CHECKS = {
     "gantt": (lambda bd, s, h: bd._gantt_layout(s, h), "タスクを束ねる(group 行を含めて8行まで、名前は1行)"),
     "harvey_table": (lambda bd, s, h: bd._harvey_layout(s, h), "選択肢を減らすか、評価軸の名前を短くする"),
     "scorecard": (lambda bd, s, h: bd._scorecard_layout(s, h), "行を減らすか、指標の注記を短くする(8行まで)"),
-    "pull_quote": (lambda bd, s, h: bd._pull_quote_layout(s, h), "声を切る(30pt で4行、1行あたり約24字まで)"),
+    "pull_quote": (lambda bd, s, h: bd._pull_quote_layout(s, h), "声を最大4行に短くする(本文30pt、折返し後の行数を検証)"),
     "icon_grid": (lambda bd, s, h: bd._icon_grid_layout(s, h), "一文を短くするか、項目を減らす"),
     **{p: ((lambda bd, s, h, p=p: bd.act_patterns.LAYOUTS[p](s, h)), act_patterns.FIT_HINT) for p in act_patterns.SPEC},
     "agenda": (lambda bd, s, h: bd._agenda_tiles_layout(s, h) if s.get("layout") == "tiles"
@@ -1054,7 +1054,7 @@ def main() -> int:
                     errors.append(f"{loc}: scorecard の行 {j} に label がない")
                 pg = r.get("progress")
                 if pg is not None and (isinstance(pg, bool) or not isinstance(pg, (int, float)) or not 0 <= pg <= 1.5):
-                    errors.append(f"{loc}: scorecard の行 {j} の progress={pg!r} — 達成率は 0-1(1.0 = 100%)")
+                    errors.append(f"{loc}: scorecard の行 {j} の progress={pg!r} — 達成率は 0-1.5(1.0 = 100%)")
                 tr = r.get("trend")
                 if tr is not None and (not isinstance(tr, list) or len(tr) < 3
                                        or any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in tr)):
@@ -1069,11 +1069,12 @@ def main() -> int:
                 _check_fit(errors, warns, loc, s, tokens)
         if pat == "pull_quote":
             q = str(s.get("quote", ""))
-            if len(q) > 110:
-                errors.append(f"{loc}: pull_quote の声が {len(q)} 字 — 110 字までに切る(30pt で4行。型は縮めない)")
+            if len(q) > 96:
+                errors.append(f"{loc}: pull_quote の声が {len(q)} 字 — 96 字までに切る(30pt、最大4行。型は縮めない)")
             if not str(s.get("attribution", "")).strip():
                 errors.append(f"{loc}: pull_quote に attribution(だれの声か)がない")
-            _check_fit(errors, warns, loc, s, tokens)
+            if q:
+                _check_fit(errors, warns, loc, s, tokens)
         if pat == "icon_grid":
             its = s.get("items", [])
             if not 3 <= len(its) <= 9:

@@ -4799,6 +4799,16 @@ def test_lint_tells_a_designed_bleed_from_a_clipped_element():
     assert L.solid_bleed(solid, list(range(500, 600)))                         # 一続きの一色の面
     assert not L.solid_bleed(solid, list(range(0, 1000, 10)))                  # 字画のように途切れる
     assert not L.solid_bleed([(40, 40, 40), (120, 120, 120), (200, 200, 200)] * 30, list(range(90)))
+    clipped = Image.new("RGB", (1466, 825), CANVAS_RGB)
+    clipped_draw = ImageDraw.Draw(clipped)
+    clipped_draw.rectangle([0, 300, 1465, 360], fill=(0, 79, 73))             # 正常な濃色の全面帯
+    clipped_draw.rectangle([1461, 332, 1465, 340], fill=(225, 95, 55))        # 右端で切れた図形
+    assert any("right edge" in h for h in L.edge_scan(clipped, side_bleed=True))
+    split_bleed = Image.new("RGB", (1466, 825), CANVAS_RGB)
+    split_draw = ImageDraw.Draw(split_bleed)
+    split_draw.rectangle([1300, 300, 1465, 600], fill=(0, 79, 73))            # 右端のパネル
+    split_draw.rectangle([0, 677, 1465, 741], fill=(31, 58, 102))             # 下端近くの濃色帯
+    assert not any("right edge" in h for h in L.edge_scan(split_bleed, side_bleed=True))
 
 
 def test_eval_colour_criterion_follows_the_design_template():
@@ -4859,3 +4869,21 @@ def test_added_patterns_reject_bad_shapes_and_numbers_that_cannot_fit(tmp_path):
     assert "x / y は 0-2 の整数" in out and "x_label と y_label" in out
     assert "が列に1行で入らない" in out
     assert "rows × columns の数値の表" in out
+
+
+def test_big_number_and_number_strip_support_thesis_and_recap_audits():
+    sys.path.insert(0, str(SCRIPTS))
+    import audit_argument as audit
+    for opening in (
+        {"pattern": "big_number", "value": "18", "unit": "億円", "label": "年間効果"},
+        {"pattern": "number_strip", "numbers": [
+            {"label": "年間効果", "value": "18", "unit": "億円"},
+            {"label": "対象部門", "value": "3", "unit": "部門"},
+        ]},
+    ):
+        deck = {"meta": {"thesis": {"statement": "年間効果は18億円に達する", "value": "18", "unit": "億円"}},
+                "slides": [opening, {"pattern": "statement", "statement": "年間効果18億円を次の段階へ広げる"}]}
+        errors = []
+        audit.check_thesis(deck, errors)
+        audit.check_recap(deck, errors)
+        assert not errors, errors

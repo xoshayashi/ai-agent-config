@@ -19,7 +19,7 @@ EXHIBIT_KEYS = {
     "chart", "charts", "table", "kpis", "stages", "items", "phases", "rows", "cells",
     "steps", "groups", "columns", "factors", "players", "diagram", "bars", "current",
     "side", "segments", "metrics", "recap_metrics", "series", "values", "headers",
-    "hero", "facts", "root", "branches", "leaves", "hub",
+    "hero", "facts", "root", "branches", "leaves", "hub", "numbers",
 }
 # 主張(CLAIM): 散文。読み手に向かって言い切る場所
 CLAIM_KEYS = {
@@ -142,6 +142,11 @@ _COMPOSITE_KEYS = {"chart": ("chart",), "table": ("table",), "kpi": ("kpis",), "
 def audit_view(slide: dict) -> dict:
     """監査が歩く形のスライド。composite は grid を外し、ブロックの中身を種別どおりのキーで並べ直す
     (text の見出し・要点と callout は主張、chart / table / kpi / diagram は証拠)。他のパターンはそのまま。"""
+    if slide.get("pattern") == "big_number":
+        view = dict(slide)
+        if slide.get("value") not in (None, ""):
+            view["facts"] = [{"value": slide["value"], "unit": slide.get("unit", "")}]
+        return view
     if slide.get("pattern") != "composite":
         return slide
     view = {k: v for k, v in slide.items() if k not in ("grid", "blocks")}
