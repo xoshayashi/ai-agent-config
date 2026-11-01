@@ -99,7 +99,9 @@ pool):
 - transcript-aware + Codex — structural soundness and diff-level
   correctness for the same milestone.
 - Codex + Antigravity — implementation review with a model-diversity check.
-  (Antigravity default models are Gemini-family, so pairing it with codex or claude provides a real cross-family check.)
+  (Select Antigravity explicitly with `--reviewer antigravity`; `auto`
+  excludes it. Its default models are Gemini-family, so it adds a real
+  cross-family check alongside Codex or Claude.)
 
 Three-way (transcript-aware + two external CLIs from different model
 families) for milestone gates at the end of a phase or before a

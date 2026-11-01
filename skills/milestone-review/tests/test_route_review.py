@@ -247,6 +247,7 @@ def test_automatic_pool_for_host_excludes_antigravity() -> None:
         "claude": ["codex"],
         "codex": ["claude"],
         "antigravity": ["codex", "claude"],
+        None: ["codex", "claude"],
     }
     for host, want in expected.items():
         got = route_review.automatic_pool_for_host(host)
@@ -691,6 +692,13 @@ def test_main_auto_reviewer_resolves_and_dispatches() -> None:
         rc, err = _run_main(["--reviewer", "auto", "--host", "claude-code", "--prompt", "p"])
         assert rc == 0, f"expected rc 0, got {rc!r}"
         assert captured["cmd"][0] == "codex", f"auto must exclude agy, got {captured['cmd']!r}"
+
+        # The host-less path must apply the same restriction.
+        rc, err = _run_main(["--reviewer", "auto", "--no-host-guard", "--prompt", "p"])
+        assert rc == 0, f"host-less automatic dispatch should succeed, got {rc!r}"
+        assert captured["cmd"][0] == "codex", (
+            f"host-less auto must exclude agy, got {captured['cmd']!r}"
+        )
 
         # An explicit reviewer choice still dispatches to Antigravity.
         rc, err = _run_main(["--reviewer", "antigravity", "--host", "claude-code", "--prompt", "p"])

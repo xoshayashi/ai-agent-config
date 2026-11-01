@@ -130,11 +130,16 @@ def external_pool_for_host(host: str) -> list[str]:
     return [reviewer for reviewer in SUPPORTED_REVIEWERS if reviewer != blocked]
 
 
-def automatic_pool_for_host(host: str) -> list[str]:
+def automatic_pool_for_host(host: str | None) -> list[str]:
     """Routes eligible for implicit selection, excluding auth-UI-capable agy."""
+    candidates = (
+        list(SUPPORTED_REVIEWERS)
+        if host is None
+        else external_pool_for_host(host)
+    )
     return [
         reviewer
-        for reviewer in external_pool_for_host(host)
+        for reviewer in candidates
         if reviewer != "antigravity"
     ]
 
@@ -465,7 +470,7 @@ def _run_doctor(candidates: "list[str]", timeout: float, as_json: bool) -> int:
                     "duration_seconds": 0.0,
                     "stderr_tail": (
                         "not probed to avoid opening Google Sign-In; "
-                        "use --reviewer antigravity for an intentional check"
+                        "run a review with --reviewer antigravity to invoke intentionally"
                     ),
                 }
             )
@@ -499,7 +504,7 @@ def _run_doctor(candidates: "list[str]", timeout: float, as_json: bool) -> int:
     else:
         for probe in probes:
             sys.stdout.write(
-                f"{probe['reviewer']:<12} {probe['status']:<6} "
+                f"{probe['reviewer']:<12} {probe['status']:<7} "
                 f"{probe['duration_seconds']:>6.1f}s  "
                 f"{probe['stderr_tail'] if probe['status'] != 'ok' else ''}\n".rstrip()
                 + "\n"
@@ -638,16 +643,15 @@ def _main(argv: "Sequence[str] | None" = None) -> int:
 
     # Determine pool of candidates
     if args.reviewer == "auto":
-        if args.host is None:
-            # We are running with --no-host-guard, so any supported reviewer is valid
+        if args.doctor and args.host is None:
+            # Keep every reviewer in the diagnostic report; _run_doctor skips agy.
             candidates = list(SUPPORTED_REVIEWERS)
+        elif args.doctor:
+            # Keep Antigravity visible in the doctor's report as skipped.
+            candidates = external_pool_for_host(args.host)
         else:
-            candidates = external_pool_for_host(args.host) if args.doctor else automatic_pool_for_host(args.host)
-        # Keep Antigravity in the doctor's report so it can be labeled skipped,
-        # but never launch its authentication UI as an implicit review route.
-        # Users can deliberately choose it with --reviewer antigravity.
-        if args.host is None and not args.doctor:
-            candidates = [candidate for candidate in candidates if candidate != "antigravity"]
+            # Do not launch agy's authentication UI as an implicit route.
+            candidates = automatic_pool_for_host(args.host)
     else:
         candidates = [args.reviewer]
 
