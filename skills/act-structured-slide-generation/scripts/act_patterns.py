@@ -473,7 +473,21 @@ def _funnel_layout(spec, h):
     avail = h - 0.10
     step_h = min(max(step_min, (avail - gap * (n - 1)) / n * 0.92), max(step_min, 0.95), (avail - gap * (n - 1)) / n)
     need = n * step_min + gap * (n - 1)
-    return _fit(need, h, st=st, fx=fx, fw=fw, rx=rx, rw=rw, gap=gap, notes=notes, step_h=step_h)
+    mx = max((float(s.get("value") or 0) for s in st), default=1.0) or 1.0
+    too_wide = []
+    for s in st:
+        v = float(s.get("value") or 0)
+        bar_w = fw * max(0.28, v / mx)
+        disp = s.get("display") or f"{v:,.0f}"
+        label_w = B.text_width_in(str(s.get("label", "")) + "  ", B.TS["kpi_label"], 600)
+        value_w = B.text_width_in(str(disp), B.TS["kpi_label"] + 2, 700)
+        if label_w + value_w > bar_w:
+            too_wide.append(str(s.get("label", "")))
+    hint = (f"funnel の段階ラベルと値が帯に1行で入らない: {', '.join(too_wide[:3])} — "
+            "段階名を短くするか表示値を丸める") if too_wide else None
+    if too_wide:
+        need = max(need, h + 1.0)
+    return _fit(need, h, hint=hint, st=st, fx=fx, fw=fw, rx=rx, rw=rw, gap=gap, notes=notes, step_h=step_h)
 
 
 def p_funnel(slide, spec, deck):
@@ -521,7 +535,18 @@ def _pyramid_layout(spec, h):
     tier_min = max([0.58] + [_h(d, dw - 0.3) + 0.14 for d in descs])
     avail = h - 0.10
     tier_h = min(max(tier_min, (avail - gap * (n - 1)) / n * 0.9), max(tier_min, 1.0), (avail - gap * (n - 1)) / n)
-    return _fit(n * tier_min + gap * (n - 1), h, tiers=tiers, px=px, pw=pw, dx=dx, dw=dw, gap=gap, descs=descs, tier_h=tier_h)
+    too_tall = []
+    for i, t in enumerate(tiers):
+        frac = 0.40 + 0.60 * (i / max(1, n - 1))
+        tier_w = pw * frac
+        lines = B._text_lines(str(t.get("label", "")), max(0.05, tier_w - 0.24), B.TS["kpi_label"], 700)
+        if lines * B.drawn_line_h(B.TS["kpi_label"]) > tier_h:
+            too_tall.append(str(t.get("label", "")))
+    need = n * tier_min + gap * (n - 1)
+    hint = (f"pyramid の段階名が段に収まらない: {', '.join(too_tall[:3])} — 名前を短くする") if too_tall else None
+    if too_tall:
+        need = max(need, h + 1.0)
+    return _fit(need, h, hint=hint, tiers=tiers, px=px, pw=pw, dx=dx, dw=dw, gap=gap, descs=descs, tier_h=tier_h)
 
 
 def p_pyramid(slide, spec, deck):
@@ -887,9 +912,17 @@ def _value_chain_layout(spec, h):
     cols, gut = _cols(max(1, len(st)), gut=0.06)
     chev_h = 0.72
     body = max((_h(_vc_items(s), c[1] - 0.46) for s, c in zip(st, cols)), default=0.3)
+    too_tall = []
+    for stage, (_x, w) in zip(st, cols):
+        lines = B._text_lines(str(stage.get("label", "")), max(0.05, w - 0.3), B.TS["kpi_label"], 700)
+        if lines * B.drawn_line_h(B.TS["kpi_label"]) > chev_h:
+            too_tall.append(str(stage.get("label", "")))
     out = _h([_b(spec["outcome"], B.TS["insight"], 600)], B.grid(0, 12)[1] - 0.6) + 0.5 if spec.get("outcome") else 0.0
     need = chev_h + 0.2 + body + 0.36 + out
-    return _fit(need, h, st=st, cols=cols, chev_h=chev_h, body=body, out=out)
+    hint = (f"value_chain の矢羽ラベルが収まらない: {', '.join(too_tall[:3])} — 名前を短くする") if too_tall else None
+    if too_tall:
+        need = max(need, h + 1.0)
+    return _fit(need, h, hint=hint, st=st, cols=cols, chev_h=chev_h, body=body, out=out)
 
 
 def p_value_chain(slide, spec, deck):

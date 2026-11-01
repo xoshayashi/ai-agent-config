@@ -4022,6 +4022,21 @@ def _composite_layout(spec: dict, h: float) -> dict:
             cells.append((cx_, cw_, c.get("block") or {}))
             col += span
         row_cells.append(cells)
+    wide_heroes = []
+    for cells in row_cells:
+        for _x, cell_w, block in cells:
+            hero = block.get("hero") if block.get("type") == "callout" else None
+            if not isinstance(hero, dict) or hero.get("value") in (None, ""):
+                continue
+            style = block.get("style", "primary")
+            _fill, _ink, bar = _callout_fill(style)
+            text_w = cell_w - 2 * CALLOUT_PAD - (0.10 if bar else 0)
+            value_w = text_width_in(str(hero["value"]), TS["kpi_value_hero"], 700)
+            if hero.get("unit"):
+                unit_text, unit_size, unit_weight, _color = _unit_part(hero["unit"], 20)
+                value_w += text_width_in(unit_text, unit_size, unit_weight)
+            if value_w > text_w:
+                wide_heroes.append(str(hero["value"]))
     weights = [float(r.get("height", 1)) for r in rows]
     needs = [max((block_need_h(b, cw_) for _x, cw_, b in cells), default=0.0) for cells in row_cells]
     fixed: dict[int, float] = {}
@@ -4055,13 +4070,18 @@ def _composite_layout(spec: dict, h: float) -> dict:
             row_h[i] += spare * weights[i] / gw
         spare = 0.0
     off = spare / 2
-    overflow = sum(needs) > avail + 1e-6
+    overflow = sum(needs) > avail + 1e-6 or bool(wide_heroes)
     if overflow:
         k = avail / max(1e-6, sum(row_h))
         row_h = [rh * k for rh in row_h]
         off = 0.0
+    hint = (f"composite callout の hero 数字が1行で入らない: {', '.join(wide_heroes[:3])} — "
+            "数字を丸めるか、セルの幅を広げる") if wide_heroes else None
+    need_h = sum(needs) + GAP * max(0, len(rows) - 1)
+    if wide_heroes:
+        need_h = max(need_h, h + 1.0)
     return dict(rows=rows, cells=row_cells, row_h=row_h, needs=needs, GAP=GAP, avail=avail, off=off,
-                overflow=overflow, need_h=sum(needs) + GAP * max(0, len(rows) - 1))
+                overflow=overflow, hint=hint, need_h=need_h)
 
 
 def _draw_block(slide, x, y, w, h, b: dict) -> None:
@@ -4948,7 +4968,9 @@ def _icon_grid_layout(spec: dict, h: float) -> dict:
     tile_min = 2 * pad + ICON_DISC + 0.20 + body
     avail = h - 0.10 - gut * (nrows - 1)
     # 入りきらないとき(overflow)もタイルの枠は本文帯の中に置く: 枠は帯の高さで止め、溢れは中身の側で報告する
-    tile_h = min(max(tile_min, avail / nrows * 0.92), 2.9, avail / nrows)
+    # 2.9in is a preferred cap, not a hard cap: when text needs more room,
+    # keep the tile tall enough for its measured contents if the body band allows it.
+    tile_h = min(max(tile_min, avail / nrows * 0.92), max(tile_min, 2.9), avail / nrows)
     need = nrows * tile_min + gut * (nrows - 1)
     grid_h = nrows * tile_h + gut * (nrows - 1)
     return dict(items=items, cols=cols, nrows=nrows, x=x, tw=tw, gut=gut, pad=pad, text_w=text_w,

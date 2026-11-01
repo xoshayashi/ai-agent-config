@@ -4709,6 +4709,58 @@ def test_richness_primitives_build_natively_and_stay_inside_the_slide(tmp_path):
                for s in slides for sh in s.shapes)
 
 
+def test_icon_grid_allows_measured_tile_height_above_preferred_cap(tmp_path):
+    """4-item tiles can grow past the preferred 2.9in cap when long copy needs it."""
+    deck = {"meta": {"title": "t"}, "slides": [{
+        "pattern": "icon_grid", "title": "各部門は4つの準備をそろえてから導入を始める", "subtitle": "開始条件", "items": [
+            {"icon": "users", "label": "推進役", "desc": "部門ごとに責任者を1名置き、判断と進捗を週次で確認するための運用を決める。関係する担当者や責任範囲を明らかにし、課題が起きたときの相談先と対応期限も決め、導入後に改善を続ける体制を整える"},
+            {"icon": "workflow", "label": "承認ルート", "desc": "申請から決裁までの手順を定める"},
+            {"icon": "plug", "label": "連携", "desc": "既存システムとの接続を確かめる"},
+            {"icon": "user-check", "label": "測定", "desc": "導入前後の効果を比べる"},
+        ],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    checked = run("validate_spec.py", spec)
+    assert "0 errors" in checked.stdout, checked.stdout
+    sys.path.insert(0, str(SCRIPTS))
+    import build_deck
+    build_deck._apply_tokens(TOKENS)
+    _y, body_h = build_deck.body_region(deck["slides"][0])
+    layout = build_deck._icon_grid_layout(deck["slides"][0], body_h)
+    assert layout["tile_h"] > 2.9, layout
+    out = tmp_path / "deck.pptx"
+    built = run("build_deck.py", spec, "-o", out)
+    assert built.returncode == 0, built.stdout + built.stderr
+    verified = run("verify_deck.py", out)
+    assert verified.returncode == 0 and "0 failures" in verified.stdout, verified.stdout
+
+
+def test_new_pattern_fit_checks_reject_labels_that_cannot_fit(tmp_path):
+    deck = {"meta": {"title": "t"}, "slides": [
+        {"pattern": "funnel", "title": "契約までの転換を高める", "subtitle": "段階",
+         "stages": [{"label": label, "value": value} for label, value in
+                    [("問い合わせ", 10000), ("商談", 3000), ("本契約に至った件数", 300)] ]},
+        {"pattern": "pyramid", "title": "基盤から運用まで整える", "subtitle": "階層",
+         "tiers": [{"label": "経営と現場をつなぐための全社横断の長い戦略名称を示す重要な方針"},
+                   {"label": "運用"}, {"label": "現場"}]},
+        {"pattern": "value_chain", "title": "入力から支払まで一連の流れを変える", "subtitle": "工程",
+         "stages": [{"label": label, "items": ["実行"]} for label in
+                    ["請求書の受領と内容を確認してシステムに登録し承認担当へ回す", "入力", "照合", "承認", "支払", "記録"]]},
+        {"pattern": "composite", "title": "投資回収を早める", "subtitle": "回収",
+         "grid": [{"cells": [{"span": 3, "block": {"type": "callout", "style": "deep",
+                                  "hero": {"value": "10,590", "unit": "万円"}}},
+                              {"span": 9, "block": {"type": "text", "points": ["投資効果"]}}]}]},
+    ]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = run("validate_spec.py", spec).stdout
+    assert "funnel の段階ラベルと値が帯に1行で入らない" in out, out
+    assert "pyramid の段階名が段に収まらない" in out, out
+    assert "value_chain の矢羽ラベルが収まらない" in out, out
+    assert "composite callout の hero 数字が1行で入らない" in out, out
+
+
 def test_validate_names_richness_defects(tmp_path):
     import copy
     d = copy.deepcopy(RICH_DECK)
