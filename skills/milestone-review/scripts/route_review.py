@@ -130,6 +130,15 @@ def external_pool_for_host(host: str) -> list[str]:
     return [reviewer for reviewer in SUPPORTED_REVIEWERS if reviewer != blocked]
 
 
+def automatic_pool_for_host(host: str) -> list[str]:
+    """Routes eligible for implicit selection, excluding auth-UI-capable agy."""
+    return [
+        reviewer
+        for reviewer in external_pool_for_host(host)
+        if reviewer != "antigravity"
+    ]
+
+
 @dataclass
 class ReviewResult:
     reviewer: str
@@ -436,7 +445,7 @@ def _attempt_summary(result: ReviewResult) -> dict:
 
 
 def _run_doctor(candidates: "list[str]", timeout: float, as_json: bool) -> int:
-    """Probe every candidate with a trivial prompt and report measured health.
+    """Probe safe candidates with a trivial prompt and report measured health.
 
     Exit 0 when at least one route answered (a review can run), 1 when the
     whole pool is dead. Probes run sequentially so per-route seconds are not
@@ -444,6 +453,23 @@ def _run_doctor(candidates: "list[str]", timeout: float, as_json: bool) -> int:
     """
     probes = []
     for candidate in candidates:
+        if candidate == "antigravity":
+            # agy starts Google Sign-In in a local browser when it cannot read
+            # an existing session. A diagnostic must not unexpectedly open UI.
+            # Antigravity can still be checked through an explicit review call.
+            probes.append(
+                {
+                    "reviewer": candidate,
+                    "status": "skipped",
+                    "returncode": -1,
+                    "duration_seconds": 0.0,
+                    "stderr_tail": (
+                        "not probed to avoid opening Google Sign-In; "
+                        "use --reviewer antigravity for an intentional check"
+                    ),
+                }
+            )
+            continue
         if not is_reviewer_available(candidate):
             probes.append(
                 {
@@ -491,8 +517,8 @@ def _main(argv: "Sequence[str] | None" = None) -> int:
         choices=SUPPORTED_REVIEWERS + ("auto",),
         help=(
             "The external CLI reviewer to dispatch to. Default is 'auto', "
-            "which resolves and dispatches to the first available peer CLI on PATH "
-            "that is compatible with your host (not self-review)."
+            "which resolves to the first available non-host CLI except "
+            "Antigravity. Select 'antigravity' explicitly to use that route."
         ),
     )
     prompt_src = parser.add_mutually_exclusive_group(required=False)
@@ -579,8 +605,9 @@ def _main(argv: "Sequence[str] | None" = None) -> int:
         "--doctor",
         action="store_true",
         help=(
-            "Preflight: probe every reviewer in the host's pool with a "
-            "trivial prompt and report measured status + seconds per route "
+            "Preflight: probe non-interactive reviewers in the host's pool "
+            "with a trivial prompt and report measured status + seconds per route "
+            "(Antigravity is skipped to avoid opening Google Sign-In) "
             f"(probe timeout {DOCTOR_TIMEOUT_SECONDS}s unless --timeout is "
             "lowered below it). Exit 0 if at least one route answers, 1 if "
             "the pool is dead. Run it before the first milestone of a "
@@ -615,7 +642,12 @@ def _main(argv: "Sequence[str] | None" = None) -> int:
             # We are running with --no-host-guard, so any supported reviewer is valid
             candidates = list(SUPPORTED_REVIEWERS)
         else:
-            candidates = external_pool_for_host(args.host)
+            candidates = external_pool_for_host(args.host) if args.doctor else automatic_pool_for_host(args.host)
+        # Keep Antigravity in the doctor's report so it can be labeled skipped,
+        # but never launch its authentication UI as an implicit review route.
+        # Users can deliberately choose it with --reviewer antigravity.
+        if args.host is None and not args.doctor:
+            candidates = [candidate for candidate in candidates if candidate != "antigravity"]
     else:
         candidates = [args.reviewer]
 
