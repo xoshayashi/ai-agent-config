@@ -130,6 +130,25 @@ def external_pool_for_host(host: str) -> list[str]:
     return [reviewer for reviewer in SUPPORTED_REVIEWERS if reviewer != blocked]
 
 
+def reviewer_pool_for_host(
+    host: str | None, *, include_antigravity: bool = False
+) -> list[str]:
+    """Build a host-safe pool, optionally retaining Antigravity for diagnostics."""
+    candidates = (
+        list(SUPPORTED_REVIEWERS)
+        if host is None
+        else external_pool_for_host(host)
+    )
+    if include_antigravity:
+        return candidates
+    return [reviewer for reviewer in candidates if reviewer != "antigravity"]
+
+
+def automatic_pool_for_host(host: str | None) -> list[str]:
+    """Routes eligible for implicit selection, excluding auth-UI-capable agy."""
+    return reviewer_pool_for_host(host)
+
+
 @dataclass
 class ReviewResult:
     reviewer: str
@@ -436,7 +455,7 @@ def _attempt_summary(result: ReviewResult) -> dict:
 
 
 def _run_doctor(candidates: "list[str]", timeout: float, as_json: bool) -> int:
-    """Probe every candidate with a trivial prompt and report measured health.
+    """Probe safe candidates with a trivial prompt and report measured health.
 
     Exit 0 when at least one route answered (a review can run), 1 when the
     whole pool is dead. Probes run sequentially so per-route seconds are not
@@ -444,6 +463,23 @@ def _run_doctor(candidates: "list[str]", timeout: float, as_json: bool) -> int:
     """
     probes = []
     for candidate in candidates:
+        if candidate == "antigravity":
+            # agy starts Google Sign-In in a local browser when it cannot read
+            # an existing session. A diagnostic must not unexpectedly open UI.
+            # Antigravity can still be checked through an explicit review call.
+            probes.append(
+                {
+                    "reviewer": candidate,
+                    "status": "skipped",
+                    "returncode": None,
+                    "duration_seconds": 0.0,
+                    "stderr_tail": (
+                        "not probed to avoid opening Google Sign-In; "
+                        "run a review with --reviewer antigravity to invoke intentionally"
+                    ),
+                }
+            )
+            continue
         if not is_reviewer_available(candidate):
             probes.append(
                 {
@@ -473,7 +509,7 @@ def _run_doctor(candidates: "list[str]", timeout: float, as_json: bool) -> int:
     else:
         for probe in probes:
             sys.stdout.write(
-                f"{probe['reviewer']:<12} {probe['status']:<6} "
+                f"{probe['reviewer']:<12} {probe['status']:<7} "
                 f"{probe['duration_seconds']:>6.1f}s  "
                 f"{probe['stderr_tail'] if probe['status'] != 'ok' else ''}\n".rstrip()
                 + "\n"
@@ -491,8 +527,8 @@ def _main(argv: "Sequence[str] | None" = None) -> int:
         choices=SUPPORTED_REVIEWERS + ("auto",),
         help=(
             "The external CLI reviewer to dispatch to. Default is 'auto', "
-            "which resolves and dispatches to the first available peer CLI on PATH "
-            "that is compatible with your host (not self-review)."
+            "which resolves to the first available non-host CLI except "
+            "Antigravity. Select 'antigravity' explicitly to use that route."
         ),
     )
     prompt_src = parser.add_mutually_exclusive_group(required=False)
@@ -579,11 +615,12 @@ def _main(argv: "Sequence[str] | None" = None) -> int:
         "--doctor",
         action="store_true",
         help=(
-            "Preflight: probe every reviewer in the host's pool with a "
-            "trivial prompt and report measured status + seconds per route "
+            "Preflight: probe non-interactive reviewers in the host's pool "
+            "with a trivial prompt and report measured status + seconds per route "
+            "(Antigravity is skipped to avoid opening Google Sign-In) "
             f"(probe timeout {DOCTOR_TIMEOUT_SECONDS}s unless --timeout is "
-            "lowered below it). Exit 0 if at least one route answers, 1 if "
-            "the pool is dead. Run it before the first milestone of a "
+            "lowered below it). Exit 0 if a non-interactive route answers, "
+            "1 if none does. Run it before the first milestone of a "
             "session, or after any route degraded."
         ),
     )
@@ -611,17 +648,21 @@ def _main(argv: "Sequence[str] | None" = None) -> int:
 
     # Determine pool of candidates
     if args.reviewer == "auto":
-        if args.host is None:
-            # We are running with --no-host-guard, so any supported reviewer is valid
-            candidates = list(SUPPORTED_REVIEWERS)
-        else:
-            candidates = external_pool_for_host(args.host)
+        # Diagnostics retain Antigravity so it can be reported as skipped;
+        # automatic review routes exclude it to avoid launching sign-in UI.
+        candidates = reviewer_pool_for_host(
+            args.host, include_antigravity=args.doctor
+        )
     else:
         candidates = [args.reviewer]
 
+    no_available_automatic_reviewer = False
     # Reorder candidates: prioritize available binaries
     if args.reviewer == "auto":
         available_candidates = [c for c in candidates if is_reviewer_available(c)]
+        no_available_automatic_reviewer = (
+            not args.doctor and not available_candidates
+        )
         unavailable_candidates = [c for c in candidates if not is_reviewer_available(c)]
         candidates = available_candidates + unavailable_candidates
         if not candidates:
@@ -680,6 +721,20 @@ def _main(argv: "Sequence[str] | None" = None) -> int:
             return 2
     else:
         prompt = args.prompt
+
+    if no_available_automatic_reviewer:
+        if (
+            args.host != "antigravity"
+            and is_reviewer_available("antigravity")
+        ):
+            sys.stderr.write(
+                "route_review: no available non-interactive reviewer; "
+                "select Antigravity explicitly with --reviewer antigravity.\n"
+            )
+        else:
+            sys.stderr.write(
+                "route_review: no available reviewer in the automatic pool.\n"
+            )
 
     # Append git context if requested
     if args.include_git:

@@ -10,12 +10,14 @@ and re-read when the question shape changes.
 | **advisor** (Claude Code host tool only) | Reads the full live session transcript: every tool call, every result. Deep reasoning. Single instance per call. Does not exist on other hosts — see "Host awareness" below for the substitute. | Structural soundness, "what did I miss", strategy reviews, end-of-task self-audit, deciding between two designs grounded in the conversation. | Anything the transcript does not cover. Parallel fan-out. Re-running with different prompts cheaply. | Host tool `advisor()` from inside a Claude Code agent. |
 | **Codex CLI** | External one-shot process. Sees only the prompt you pass. Strong on concrete code / diff / logic. | Reviewing a specific diff, a function for correctness bugs, a test for what it actually proves, a regex / SQL / config snippet. Parallelizable. | Questions that need the live conversation context the prompt cannot reconstruct. Reviews dispatched from a Codex host (self-review). | `codex exec` (prompt via stdin) via `scripts/route_review.py --reviewer codex`. |
 | **Claude CLI** | External one-shot process (`claude -p`). Anthropic model family. | Structural judgement and design-taste review when the host is not Claude Code; the transcript-aware substitute via a context digest. | Reviews dispatched from a Claude Code host (self-review — use `advisor()` there instead, which also sees more). | `claude -p` (isolated, prompt via stdin) via `scripts/route_review.py --reviewer claude`. |
-| **Antigravity CLI** | External one-shot process (`agy -p`, print mode). Google model family by default. | An additional independent route when the other CLIs are the host or unavailable; second opinion. | Reviews dispatched from an Antigravity host. | `agy -p <prompt> --print-timeout <t>s` via `scripts/route_review.py --reviewer antigravity`. |
+| **Antigravity CLI** | External one-shot process (`agy -p`, print mode). Google model family by default. | An additional independent route when explicitly selected; an unauthenticated run can open browser sign-in. | Reviews dispatched from an Antigravity host. | `agy -p <prompt> --print-timeout <t>s` via `scripts/route_review.py --reviewer antigravity`. |
 | **self** | The calling agent immediately rechecks. | Mechanical, rule-based checks: linter exit code, schema match, regex pass, test runner green. | Anything requiring judgement or design taste. Self-review of one's own claim of correctness. | Driven directly by the calling agent's own recheck. |
 
 `route_review.py` dispatches the external CLIs (**codex**,
 **claude**, **antigravity**) — advisor and self are driven from
-`SKILL.md` flow steps directly.
+`SKILL.md` flow steps directly. Antigravity is explicit-only because an
+unauthenticated CLI invocation can open a browser sign-in flow; `--doctor`
+skips that route for the same reason.
 
 ## Host awareness & Auto-Routing
 
@@ -30,22 +32,27 @@ Antigravity. Two consequences:
    an alias for "claude-code"). 
    
    To simplify this, use **`--reviewer auto`** (the default). It reads
-   your `--host`, derives the valid non-host pool, checks which CLIs are
-   actually installed (`shutil.which`), tries available binaries first,
-   and fails over to the next peer CLI when one fails (timeout, missing
-   binary, rate limit, non-zero exit; disable with `--no-failover`). A
+   your `--host`, derives the valid non-host pool, excludes Antigravity to
+   avoid launching Google Sign-In as a side effect, checks which remaining
+   CLIs are actually installed (`shutil.which`), tries available binaries
+   first, and fails over to the next peer CLI when one fails (timeout,
+   missing binary, rate limit, non-zero exit; disable with `--no-failover`). A
    failover is still a route change — the record must show which
    reviewer actually answered. The helper makes this impossible to
    miss: a failover success exits **4** (never 0), a
    `route_review: attempts: ...` one-liner goes to stderr, and `--json`
    carries the full `attempts` trace.
+   If no non-interactive reviewer is installed but Antigravity is, `auto`
+   exits with an error that points to the explicit `--reviewer antigravity`
+   option.
 
-   Effective external pool per host:
+   Effective automatic external pool per host (Antigravity can be selected
+   explicitly with `--reviewer antigravity`):
 
-   | Host | Transcript-aware route | External pool |
+   | Host | Transcript-aware route | Automatic external pool |
    |---|---|---|
-   | Claude Code | `advisor()` host tool | codex, antigravity |
-   | Codex | context digest → claude (or antigravity) | claude, antigravity |
+   | Claude Code | `advisor()` host tool | codex |
+   | Codex | context digest → claude | claude |
    | Antigravity | context digest → claude (or codex) | codex, claude |
 
 2. **Transcript-aware substitute.** Outside Claude Code there is no
@@ -82,8 +89,8 @@ Antigravity. Two consequences:
   is the host).
 - Question phrased as "give me an independent take that does not assume
   what I just decided", "challenge the consensus", "what would another
-  reviewer notice" → **Antigravity** (or **claude** when
-  Antigravity is the host).
+  reviewer notice" → **Antigravity** via an explicit `--reviewer
+  antigravity` selection (or **claude** when Antigravity is the host).
 - Question is "did this command pass", "does this file parse", "does
   this regex match these examples" → **self**, with the command output
   attached.
@@ -95,7 +102,9 @@ pool):
 - transcript-aware + Codex — structural soundness and diff-level
   correctness for the same milestone.
 - Codex + Antigravity — implementation review with a model-diversity check.
-  (Antigravity default models are Gemini-family, so pairing it with codex or claude provides a real cross-family check.)
+  (Select Antigravity explicitly with `--reviewer antigravity`; `auto`
+  excludes it. Its default models are Gemini-family, so it adds a real
+  cross-family check alongside Codex or Claude.)
 
 Three-way (transcript-aware + two external CLIs from different model
 families) for milestone gates at the end of a phase or before a
@@ -228,10 +237,13 @@ Consequences, all built into `route_review.py`:
   substantial partial output means "healthy route, question too big
   for the timeout" → re-dispatch with a higher `--timeout`, don't
   switch reviewer.
-- `--doctor --host <host>` re-measures the pool on demand (trivial
-  probe per route, status + seconds). Run it before the first review
-  of a session or after any degraded route, and trust its output over
-  this table — the table is a snapshot, the probe is live.
+- `--doctor --host <host>` re-measures non-interactive routes on demand
+  (trivial probe per route, status + seconds). Antigravity is reported as
+  skipped so a diagnostic cannot launch Google Sign-In. Run it before the
+  first review of a session or after any degraded route. It exits 1 when
+  no non-interactive route answers, including when only Antigravity is present.
+  In JSON output, a skipped route has status `skipped` and `returncode: null`
+  because the command was never run.
 
 ## Known limitations (read before Phase 2)
 
@@ -322,8 +334,8 @@ Consequences, all built into `route_review.py`:
 
 ## Worked example
 
-Host: Claude Code (so `advisor()` is available and codex /
-antigravity form the external pool). Milestone: finished implementing
+Host: Claude Code (so `advisor()` is available and codex is the automatic
+external route; Antigravity remains an explicit option). Milestone: finished implementing
 `apply_semantic_border_span` and replaced the `_write_values` bold path
 in the workbook builder module.
 

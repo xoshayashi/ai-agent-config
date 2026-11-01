@@ -60,7 +60,8 @@ verification is already obvious from `git diff` and a passing test.
   - **claude** (`claude -p`) — structural judgement and design-taste
     review when the host is not Claude Code.
   - **antigravity** (`agy -p`) — an additional independent route when
-    the other CLIs are the host or unavailable.
+    deliberately selected. It is excluded from automatic fallback and
+    preflight because a missing session can open Google Sign-In.
   Never pick the CLI you are running inside (see Host awareness).
 - **self** — immediate, in-process. Use only for mechanical checks
   (style, schema, regex, test-runner exit code) where rules are explicit
@@ -89,11 +90,14 @@ Full table + selection heuristics in `references/_reviewer_routing.md`.
      file):
       ```sh
       # Before the first review of a session (or after any route degraded):
-      # probe every pool route with a trivial prompt, report status + seconds.
+      # probe non-interactive routes; Antigravity is skipped to avoid opening
+      # Google Sign-In during a diagnostic.
       python3 <skill_dir>/scripts/route_review.py --doctor --host claude-code
 
-      # Dispatch one review. auto = first available non-host CLI, with
-      # automatic failover to the next peer if the primary fails.
+      # Dispatch one review. auto = first available non-host CLI other than
+      # Antigravity, with automatic failover among those routes.
+      # If none is available and agy is installed, the error points to the
+      # explicit --reviewer antigravity option.
       python3 <skill_dir>/scripts/route_review.py \
           --reviewer auto \
           --host claude-code|codex|antigravity \

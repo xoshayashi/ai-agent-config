@@ -37,6 +37,7 @@ def _install_fake_run(
 
     def fake_run(cmd, **kwargs):
         captured["cmd"] = list(cmd)
+        captured.setdefault("commands", []).append(list(cmd))
         captured["kwargs"] = kwargs
         if raise_timeout:
             raise _sp.TimeoutExpired(cmd=cmd, timeout=kwargs.get("timeout"))
@@ -241,6 +242,32 @@ def test_external_pool_for_host_rejects_unknown_host() -> None:
     print("ok    test_external_pool_for_host_rejects_unknown_host")
 
 
+def test_automatic_pool_for_host_excludes_antigravity() -> None:
+    expected = {
+        "claude-code": ["codex"],
+        "claude": ["codex"],
+        "codex": ["claude"],
+        "antigravity": ["codex", "claude"],
+        None: ["codex", "claude"],
+    }
+    for host, want in expected.items():
+        got = route_review.automatic_pool_for_host(host)
+        assert got == want, f"automatic pool for host {host!r}: expected {want}, got {got}"
+        diagnostic_pool = route_review.reviewer_pool_for_host(
+            host, include_antigravity=True
+        )
+        expected_diagnostic_pool = (
+            list(route_review.SUPPORTED_REVIEWERS)
+            if host is None
+            else route_review.external_pool_for_host(host)
+        )
+        assert diagnostic_pool == expected_diagnostic_pool
+    assert route_review.reviewer_pool_for_host(
+        None, include_antigravity=True
+    ) == list(route_review.SUPPORTED_REVIEWERS)
+    print("ok    test_automatic_pool_for_host_excludes_antigravity")
+
+
 def test_host_exclusion_allows_cross_family_dispatch() -> None:
     captured: dict = {}
     _install_fake_run(captured, completed=_FakeCompleted(stdout="hi", returncode=0))
@@ -417,9 +444,10 @@ def test_main_requires_exactly_one_prompt_source() -> None:
     print("ok    test_main_requires_exactly_one_prompt_source")
 
 
-def test_docs_pool_table_matches_external_pool_helper() -> None:
-    """G7/doc-drift: the 'Effective external pool per host' table in
-    references/_reviewer_routing.md must match external_pool_for_host() for
+def test_docs_pool_table_matches_automatic_pool_helper() -> None:
+    """The documented automatic pool must match automatic_pool_for_host().
+
+    references/_reviewer_routing.md must match automatic_pool_for_host() for
     every host, so the doc can never advertise a pool the guard would reject."""
     from pathlib import Path
 
@@ -432,7 +460,7 @@ def test_docs_pool_table_matches_external_pool_helper() -> None:
         "Antigravity": "antigravity",
     }
     for label, host in rows.items():
-        pool = route_review.external_pool_for_host(host)
+        pool = route_review.automatic_pool_for_host(host)
         blocked = route_review.HOST_BLOCKED_REVIEWER[host]
         # find the table row for this host
         line = next(
@@ -449,7 +477,7 @@ def test_docs_pool_table_matches_external_pool_helper() -> None:
         assert blocked not in pool_cell, (
             f"{label} external-pool cell must not list its own CLI {blocked!r}: {pool_cell!r}"
         )
-    print("ok    test_docs_pool_table_matches_external_pool_helper")
+    print("ok    test_docs_pool_table_matches_automatic_pool_helper")
 
 
 def test_supported_reviewers_cover_all_three_external_clis() -> None:
@@ -613,6 +641,7 @@ def main() -> None:
     test_host_exclusion_blocks_every_host_reviewer_pair()
     test_external_pool_for_host_excludes_only_the_host_cli()
     test_external_pool_for_host_rejects_unknown_host()
+    test_automatic_pool_for_host_excludes_antigravity()
     test_host_exclusion_allows_cross_family_dispatch()
     test_host_exclusion_rejects_unknown_host()
     test_main_exits_nonzero_on_host_self_review()
@@ -621,7 +650,7 @@ def main() -> None:
     test_main_reads_prompt_from_file_and_stdin()
     test_main_unreadable_prompt_file_exits_2_without_dispatch()
     test_main_requires_exactly_one_prompt_source()
-    test_docs_pool_table_matches_external_pool_helper()
+    test_docs_pool_table_matches_automatic_pool_helper()
     test_supported_reviewers_cover_all_three_external_clis()
     test_run_reviewer_returns_error_status_on_timeout()
     test_run_reviewer_returns_error_status_on_nonzero_exit()
@@ -637,7 +666,7 @@ def main() -> None:
     # New Upgraded Features (v2) Tests
     test_reviewer_availability_check()
     test_main_auto_reviewer_resolves_and_dispatches()
-    test_main_auto_reviewer_failover()
+    test_main_auto_reviewer_does_not_fail_over_to_antigravity()
     test_main_no_failover_disables_retry()
     test_git_context_capture()
     test_strict_gate_violations()
@@ -665,28 +694,78 @@ def test_reviewer_availability_check() -> None:
 
 
 def test_main_auto_reviewer_resolves_and_dispatches() -> None:
+    import contextlib
+    import io
+    import json
     captured: dict = {}
-    _install_fake_run(captured, completed=_FakeCompleted(stdout="review ok", returncode=0))
-    original_which = route_review.shutil.which
-    try:
-        # Pretend only "antigravity" (agy) is installed
-        route_review.shutil.which = lambda name: "/fake/agy" if name == "agy" else None
-        
-        # Host is claude-code, external pool is codex and antigravity.
-        # Since only agy is installed, it should auto-select antigravity.
-        rc, err = _run_main(["--reviewer", "auto", "--host", "claude-code", "--prompt", "p"])
-        assert rc == 0, f"expected rc 0, got {rc!r}"
-        assert captured["cmd"][0] in ("agy", "antigravity"), f"expected agy/antigravity command, got {captured['cmd']!r}"
-    finally:
-        route_review.shutil.which = original_which
-    print("ok    test_main_auto_reviewer_resolves_and_dispatches")
-
-
-def test_main_auto_reviewer_failover() -> None:
     original_which = route_review.shutil.which
     original_run = route_review.subprocess.run
     try:
-        # Pretend both are available
+        # Pretend only "antigravity" (agy) is installed.
+        route_review.shutil.which = lambda name: "/fake/agy" if name == "agy" else None
+
+        def fake_run(cmd, **kwargs):
+            captured.setdefault("commands", []).append(list(cmd))
+            captured["cmd"] = list(cmd)
+            captured["kwargs"] = kwargs
+            if cmd[0] in ("agy", "antigravity"):
+                return _FakeCompleted(stdout="review ok", returncode=0)
+            raise FileNotFoundError("not found")
+
+        route_review.subprocess.run = fake_run
+        
+        # Auto must not select agy, even when it is the only installed peer.
+        rc, err = _run_main(["--reviewer", "auto", "--host", "claude-code", "--prompt", "p"])
+        assert rc == 1, f"no safe reviewer available should exit 1, got {rc!r}"
+        assert "--reviewer antigravity" in err, (
+            f"failure should explain the explicit Antigravity option, got {err!r}"
+        )
+        assert [cmd[0] for cmd in captured["commands"]] == ["codex"], (
+            f"auto must not invoke agy, got {captured['commands']!r}"
+        )
+
+        # The host-less path must apply the same restriction.
+        captured["commands"] = []
+        rc, err = _run_main(["--reviewer", "auto", "--no-host-guard", "--prompt", "p"])
+        assert rc == 1, f"host-less auto must not invoke agy, got {rc!r}"
+        assert "--reviewer antigravity" in err, (
+            f"host-less failure should explain the explicit option, got {err!r}"
+        )
+        assert [cmd[0] for cmd in captured["commands"]] == ["codex", "claude"]
+
+        # Antigravity cannot be offered as a remedy when it is the host.
+        captured["commands"] = []
+        rc, err = _run_main(["--reviewer", "auto", "--host", "antigravity", "--prompt", "p"])
+        assert rc == 1
+        assert "--reviewer antigravity" not in err
+
+        # JSON consumers still receive the failed route and attempt trace.
+        out = io.StringIO()
+        with contextlib.redirect_stdout(out), contextlib.redirect_stderr(io.StringIO()):
+            rc = route_review._main(
+                ["--reviewer", "auto", "--host", "claude-code", "--prompt", "p", "--json"]
+            )
+        payload = json.loads(out.getvalue())
+        assert rc == 1 and payload["status"] == "error"
+        assert payload["attempts"][0]["reviewer"] == "codex"
+
+        # An explicit reviewer choice still dispatches to Antigravity.
+        rc, err = _run_main(["--reviewer", "antigravity", "--host", "claude-code", "--prompt", "p"])
+        assert rc == 0, f"explicit Antigravity dispatch should succeed, got {rc!r}"
+        assert captured["cmd"][0] in ("agy", "antigravity"), (
+            f"explicit selection should dispatch to agy, got {captured['cmd']!r}"
+        )
+    finally:
+        route_review.shutil.which = original_which
+        route_review.subprocess.run = original_run
+    print("ok    test_main_auto_reviewer_resolves_and_dispatches")
+
+
+def test_main_auto_reviewer_does_not_fail_over_to_antigravity() -> None:
+    original_which = route_review.shutil.which
+    original_run = route_review.subprocess.run
+    try:
+        # Pretend codex and agy are available.
         route_review.shutil.which = lambda name: f"/fake/{name}"
         
         runs = []
@@ -695,25 +774,19 @@ def test_main_auto_reviewer_failover() -> None:
             if cmd[0] == "codex":
                 # First candidate fails with non-zero
                 return _FakeCompleted(stdout="", stderr="rate limit", returncode=1)
-            # Second candidate succeeds
-            return _FakeCompleted(stdout="Review looks great", returncode=0)
+            # A second invocation would mean an Antigravity fallback occurred.
+            return _FakeCompleted(stdout="unexpected fallback", returncode=0)
             
         route_review.subprocess.run = fake_run
         
-        # Host is claude-code, external pool is [codex, antigravity]
         rc, err = _run_main(["--reviewer", "auto", "--host", "claude-code", "--prompt", "p"])
-        # External review 2026-07-12: a failover success must NOT exit 0 —
-        # reduced reviewer independence has to be visible to a shell loop
-        # that never parses --json. 4 = reviewed via failover.
-        assert rc == 4, f"failover success must exit 4 (degraded route ran), got {rc!r}"
-        assert "attempts:" in err, f"stderr must carry the attempts one-liner, got {err!r}"
-        assert len(runs) == 2, f"should have run 2 candidates, got {runs!r}"
+        assert rc == 1, f"failed primary with no safe fallback should exit 1, got {rc!r}"
+        assert len(runs) == 1, f"auto must not invoke Antigravity as fallback, got {runs!r}"
         assert runs[0][0] == "codex", f"first should be codex, got {runs[0]!r}"
-        assert runs[1][0] in ("agy", "antigravity"), f"second should be antigravity, got {runs[1]!r}"
     finally:
         route_review.shutil.which = original_which
         route_review.subprocess.run = original_run
-    print("ok    test_main_auto_reviewer_failover")
+    print("ok    test_main_auto_reviewer_does_not_fail_over_to_antigravity")
 
 
 def test_main_no_failover_disables_retry() -> None:
@@ -841,9 +914,7 @@ def test_timeout_keeps_partial_stdout() -> None:
 
 
 def test_main_doctor_probes_pool_and_reports() -> None:
-    """--doctor probes every pool reviewer with a trivial prompt: exit 0 when
-    at least one route answers, 1 when the whole pool is dead, 2 when
-    combined with a prompt (invocation error)."""
+    """--doctor probes safe routes and reports Antigravity as skipped."""
     import contextlib
     import io
 
@@ -856,14 +927,52 @@ def test_main_doctor_probes_pool_and_reports() -> None:
         return rc, out.getvalue(), err.getvalue()
 
     try:
-        # Healthy pool: host codex → pool [claude, antigravity], both answer.
+        # Healthy pool: probe Claude; report Antigravity without invoking agy.
         route_review.shutil.which = lambda name: f"/fake/{name}"
         captured: dict = {}
         _install_fake_run(captured, completed=_FakeCompleted(stdout="OK", returncode=0))
         rc, out, _ = run_doctor(["--doctor", "--host", "codex"])
         assert rc == 0, f"healthy pool must exit 0, got {rc!r}"
-        assert "claude" in out and "antigravity" in out, (
-            f"doctor report must name every probed route, got {out!r}"
+        assert "claude" in out and "antigravity" in out and "skipped" in out, (
+            f"doctor must report Claude and skipped Antigravity, got {out!r}"
+        )
+        assert captured["cmd"][0] == "claude", (
+            f"doctor must not execute agy, got {captured['cmd']!r}"
+        )
+
+        import json
+        rc, out, _ = run_doctor(["--doctor", "--host", "codex", "--json"])
+        result = json.loads(out)
+        antigravity = next(
+            probe for probe in result["doctor"] if probe["reviewer"] == "antigravity"
+        )
+        assert rc == 0 and antigravity["status"] == "skipped"
+        assert antigravity["returncode"] is None, (
+            f"skipped route must not invent a process return code, got {antigravity!r}"
+        )
+
+        # Without --host, a doctor run still skips agy. If it is the only
+        # installed CLI, the doctor exits 1 without invoking any CLI.
+        route_review.shutil.which = lambda name: "/fake/agy" if name == "agy" else None
+        captured["commands"] = []
+        rc, out, _ = run_doctor(["--doctor", "--no-host-guard"])
+        assert rc == 1, f"only skipped Antigravity must not count as healthy, got {rc!r}"
+        assert "antigravity" in out and "skipped" in out, (
+            f"host-less doctor must report skipped Antigravity, got {out!r}"
+        )
+        assert captured["commands"] == [], (
+            f"host-less doctor must not invoke agy, got {captured['commands']!r}"
+        )
+
+        # When safe routes are available, the host-less doctor probes them
+        # and continues to skip Antigravity.
+        route_review.shutil.which = lambda name: f"/fake/{name}"
+        captured["commands"] = []
+        rc, out, _ = run_doctor(["--doctor", "--no-host-guard"])
+        assert rc == 0, f"healthy host-less doctor must exit 0, got {rc!r}"
+        assert "antigravity" in out and "skipped" in out
+        assert {cmd[0] for cmd in captured["commands"]} == {"codex", "claude"}, (
+            f"host-less doctor must probe safe routes only, got {captured['commands']!r}"
         )
 
         # Dead pool: no binaries anywhere.
