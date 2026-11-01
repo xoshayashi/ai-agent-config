@@ -7,7 +7,7 @@ primitives, not design templates. Choose and combine them after the judgment pro
 
 - Top Level
 - Fields Common To Slides
-- The 33 Patterns
+- The 60 Patterns
 - Layout contract shared by every pattern
 - Argument fields
 - Chart Spec (native types, emphasis/annotation knobs, image chart kinds, annotation layer)
@@ -24,6 +24,7 @@ primitives, not design templates. Choose and combine them after the judgment pro
   "meta": {
     "title": "Deck title",
     "template": "standard | navy | monochrome | bold",
+    "tracker": true,
     "date": "Optional display date",
     "company": "Optional company name"
   },
@@ -41,12 +42,20 @@ look every slide wears. The valid set is the files in `references/templates/`; l
 `build_deck.py --templates` and see `templates.md`. `validate_spec.py` errors on an unknown
 name. An absent template resolves to `standard`, which is byte-for-byte the pre-template output.
 
+`meta.tracker` (optional) draws a chapter tracker above every content title: one numbered dot
+per `section_divider`, the current chapter filled in primary, plus its short name. It needs two or
+more dividers. The name is the divider's `tracker_label` (16 characters at most), falling back to
+the divider's `title`; validate errors on a longer one. Dividers keep their own chapter list.
+
 ## Fields Common To Slides
 
 - `pattern` (required): one of the implemented primitives below.
 - `tone` (optional): `"inverse"` paints the slide with the template's brand dark and swaps the
   text and fill roles in pairs. Only on `cover`, `statement` and `section_divider`. See
-  `design-richness.md`.
+  `design-richness.md`. `pull_quote` also takes it.
+- `insight_style` (optional): `accent` (pale yellow, default), `primary` (pale primary, centred)
+  or `deep` (a brand-dark band painted edge to edge, white text after an `insight_label`, default
+  "implication" written in the deck's language). Use `deep` for the one so-what the page exists for; it takes the same reserved strip.
 - `icon` (optional, on items): a Lucide icon name from `assets/icons/` on `executive_summary`
   points, `kpi_dashboard` / composite `kpi` items, `column_framework` columns, `hub_spoke` spokes,
   and composite blocks with a `heading`. Every item of a set or none; always with a label.
@@ -91,7 +100,7 @@ name. An absent template resolves to `standard`, which is byte-for-byte the pre-
   for a kind the native engine could attempt. Default (unset) keeps native unless the `kind` is
   image-only (combo/area/org_tree/…). Escalate to image only for objects native cannot draw.
 
-## The 33 Patterns
+## The 60 Patterns
 
 ### 1. `cover`
 
@@ -103,6 +112,10 @@ To Slides); the cover title stays one line.
 
 Table of contents or current-location page. Keep `items` to six or fewer. Use a highlighted
 current item only when the reader benefits from navigation.
+
+`layout: "tiles"` draws 2-5 items as tall numbered tiles in a row (a 54pt numeral, the label,
+an optional two-line `desc`). Add `current` (0-based index) to reprise the agenda mid-deck: the
+current tile turns brand dark and the others go quiet. Validate measures the tiles.
 
 ### 3. `section_divider`
 
@@ -383,7 +396,8 @@ The grid of blocks: most consulting pages are combinations, not new shapes (char
 a KPI strip over a table, three issue cards over a so-what bar). `grid` is 1-3 rows; a row is
 `{height?, rules?, cells: [{span, block}]}` with spans as column shares of 12; a block is one of
 `text` (`heading?`, `points`, `style?: "card"`), `kpi` (`kpis` ≤4, `direction?: row | column`),
-`callout` (`statement`, `heading?`, `style: primary | accent | navy`), `chart` (`chart`, any
+`callout` (`statement`, `heading?`, `hero?: {value, unit?, label?}`, `style: primary | accent |
+navy | deep`, `bleed?`), `chart` (`chart`, any
 native spec or image `kind`), `table` (`table`), `diagram` (`diagram`, image-track asset).
 Blocks call the same rectangle primitives the dedicated patterns use, so every combination is
 native and editable.
@@ -404,6 +418,10 @@ native and editable.
 - `style: "card"` works on every block except `callout`; the 0.24in inset is part of the
   measured height, and table blocks are measured with the table's own wrapped-line heights.
 - Consecutive composites count as the same pattern only when their grids match.
+- **Split-tone panel.** A `callout` with `style: "deep"`, a `hero` number and `bleed: true` in
+  the first or last cell paints that side to the slide edge: the dark panel holds the answer
+  (hero + one line), the rest of the row holds the evidence. Text stays on the grid; only the
+  fill bleeds. Validate warns on `bleed` with a pale style.
 - See `consulting-page-catalogue.md` for the archetype → recipe map.
 
 ### 31. `matrix_2x2`
@@ -433,6 +451,67 @@ scores, verdict?, focal?}]` (2-6; `scores` one 0-4 integer per criterion), optio
 carry a `note`, 6 without (validate errors when the rows cannot fit). The legend is drawn with the same balls (fonts
 lack the quarter-circle glyphs). Name criteria so that a full ball is good ("low integration
 risk", not "integration risk"). One `focal` option at most (the recommendation).
+
+### 34. `scorecard`
+
+A metric review in rows: label (+ optional `note`) → value + unit → a word-sized trend line
+(`trend`, 3+ numbers, drawn as a native freeform inside its cell) → achievement bar (`progress`,
+0-1, capped at 100% drawn, the label shows the real %) → status (`good | watch | bad`, a coloured
+dot plus a word, `status_label` overrides the word). `rows` 2-8; `columns` overrides the five
+header labels; `focal` (1-2 rows) gets a pale primary band. Labels must fit one line (notes carry
+the rest). Validate measures the rows against the body band, including an `insight` strip.
+
+### 35. `pull_quote`
+
+One voice as evidence: a large primary quotation mark, the quote at 30pt (four lines at most,
+about 110 characters), a short rule, then `attribution` (required: who said it) and an optional
+`role` (context: when, where, how many were asked). Allows `tone: "inverse"`. Put the
+interview's method and n in `source`. The type never shrinks; cut the quote.
+
+### 36. `icon_grid`
+
+3-9 parallel items (capabilities, principles, preparations) as tiles: an icon in a pale disc →
+label → one sentence. Every item needs an `icon` and a `label` (validate errors otherwise); one
+`focal` tile at most turns brand dark. Columns follow the count (≤4 in one row, 5-6 and 9 in
+threes, 7-8 in fours). Validate measures the tiles.
+
+### 37-60. Added patterns (`scripts/act_patterns.py`)
+
+Twenty-four more geometries, drawn with the same primitives. One table, `act_patterns.SPEC`, holds
+each pattern's list key, item count, required item keys and whether it is an evidence page;
+`validate_spec` reads it, and every pattern has a measured layout in `act_patterns.LAYOUTS` that
+the fit check shares with the renderer. Numbers that must stay on one line (big numbers, strip
+numbers, prices) are measured too, and validate names the number that does not fit.
+
+| # | Pattern | Fields | Use when |
+|---|---|---|---|
+| 37 | `big_number` | `value`, `unit?`, `label`, `sublabel?`, `context` (0-3 lines) | one 120pt number changes the belief |
+| 38 | `number_strip` | `numbers` 2-4 `{label, value, unit?, note?, focal?}` | a few headline numbers with no cards |
+| 39 | `progress_bars` | `bars` 2-8 `{label, value 0-1, display?, note?, focal?}` | attainment by unit, more than five rows |
+| 40 | `ranking` | `items` 3-10 `{label, value, display?, focal?}`, `unit?` | top-N comparison with readable names |
+| 41 | `funnel` | `stages` 3-6 `{label, value, display?, note?, focal?}` | conversion; rates are computed |
+| 42 | `pyramid` | `tiers` 3-5 `{label, desc?}` (top first) | a hierarchy of meaning, not of quantity |
+| 43 | `composition_bar` | `segments` 2-6 `{label, value, note?, focal?}`, `total_label?` | one whole split into parts |
+| 44 | `heatmap_table` | `rows`, `columns` (2-7), `values` (rows x columns), `unit?`, `lower_is_better?` | concentration across two dimensions |
+| 45 | `swot` | `strengths`, `weaknesses`, `opportunities`, `threats` (1-4 each), `labels?` | situation summary |
+| 46 | `pros_cons` | `pros`, `cons` (1-5 each), `verdict?` | one option weighed, one verdict |
+| 47 | `versus` | `left` / `right` `{name, note?, focal?}`, `rows` 2-6 `{label, left, right, winner?}` | exactly two options |
+| 48 | `cycle` | `steps` 3-6 `{label, desc?, focal?}`, `center?` | a loop that compounds |
+| 49 | `value_chain` | `stages` 3-6 `{label, items, focal?}`, `outcome?` | a sequence of stages with activities |
+| 50 | `layer_stack` | `layers` 2-5 `{label, items or desc, focal?}` | architecture or operating layers |
+| 51 | `org_chart` | `root {name, role?}`, `children` 2-5 `{name, role?, items?, focal?}` | a two-level team |
+| 52 | `checklist` | `items` 3-8 `{label, status: done / todo / risk, note?, status_label?}` | readiness and open items |
+| 53 | `numbered_steps` | `steps` 3-6 `{label, desc?, focal?}` | steps with longer explanations |
+| 54 | `vertical_timeline` | `events` 3-7 `{date, label, desc?, focal?}` (about 5 when every event has a desc) | dated events with text |
+| 55 | `faq` | `pairs` 2-6 `{q, a}` | anticipated questions |
+| 56 | `team` | `people` 2-6 `{name, role, desc?, initials?, focal?}` | who owns what |
+| 57 | `pricing_tiers` | `tiers` 2-4 `{name, price, unit?, note?, features (≤6), focal?}`, `focal_label?` | plans or option tiers with a recommendation |
+| 58 | `quote_grid` | `quotes` 2-4 `{quote, attribution, role?, focal?}` | several short voices |
+| 59 | `nine_box` | `items` ≤12 `{label, x 0-2, y 0-2, focal?}`, `x_label`, `y_label`, `reading?` | a 3x3 portfolio or prioritisation |
+| 60 | `target_bars` | `rows` 2-8 `{label, actual, target, display?, note?}`, `legend?` | actual against target; each row has its own scale |
+
+`note` stays the footer field on every pattern; text that belongs on the slide uses the
+pattern's own key (`sublabel`, `reading`, item `note`).
 
 ## Layout contract shared by every pattern
 

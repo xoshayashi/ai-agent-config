@@ -26,10 +26,32 @@ Richness comes from contrast inside one system, never from new colours, gradient
 | Emphasis | one item regains colour, the rest stay grey | `focal` on points, cards, rows, series; `focal_category`; `emphasis_col` |
 | Scale | one number or line is much larger than the rest | hero numbers (`metric_proof`, `kpi_dashboard`, `case_strip`, `recap`) |
 | Surface | a page or panel takes the dark brand surface | `tone: "inverse"` on cover / statement / section_divider; `callout` panels |
-| Marker | parallel items carry a semantic icon | `icon` on points, KPIs, pillars, spokes, composite blocks |
+| Marker | parallel items carry a semantic icon | `icon` on points, KPIs, pillars, spokes, composite blocks, `icon_grid` |
+| Colour block | a brand-dark band or panel reaches the slide edge | `insight_style: "deep"`; composite `callout` with `style: "deep"`, `hero`, `bleed` |
+| Navigation | the reader sees which chapter they are in without reading | `meta.tracker`; `agenda` `layout: "tiles"` with `current` |
+| Word-sized data | trends and progress sit inside a row, next to the number | `scorecard` (sparkline, progress bar, status) |
 
 Use one emphasis attribute per message (colour, size, position or weight); stacking several adds
 clutter.
+
+## Pages that carry the richness
+
+- **Split-tone panel.** Columns 1-4 hold the answer on the brand dark (hero number + one line),
+  columns 5-12 hold the evidence on the light surface. Swiss-style asymmetry on the 12-column
+  grid; the fill bleeds to the edge, the text stays on the grid.
+- **Deep so-what band.** The page's one implication on a brand-dark strip from edge to edge. One
+  per page; it replaces the pale band, it is not added to it.
+- **Scorecard.** Six to eight metrics with a sparkline (Tufte's word-sized graphic), an
+  achievement bar and a status word per row: a monthly review reads in one pass instead of
+  six KPI cards.
+- **Pull quote.** One voice with attribution and method, as evidence, often inverse. Use it
+  after the numbers to show what they mean for a person.
+- **Icon tiles.** Parallel capabilities or preparations as tiles; one focal tile goes dark.
+- **Agenda reprise and tracker.** Tiles with large numerals; mid-deck, the current chapter goes
+  dark. The tracker repeats the position above every content title.
+
+Mix them: in a 12-page deck, aim for two or three dark surfaces between the cover and the close
+(a deep band, a panel, an inverse quote or statement), never two dark pages in a row.
 
 ## Visual anchors (one per content page)
 
@@ -37,7 +59,7 @@ Every content page needs one object the eye lands on first: a hero number, a hig
 row, a `focal` card, an icon row, a dark or tinted panel, or a diagram. A page that is only text
 boxes in a row fails the glance test (the point must come across in about three seconds).
 Patterns that draw an anchor by themselves (charts, waterfall, risk grid, timelines, cases, hub,
-Harvey balls, ...) pass automatically; text patterns (`executive_summary`, `two_column`,
+Harvey balls, scorecard, pull quote, icon tiles, ...) pass automatically; text patterns (`executive_summary`, `two_column`,
 `column_framework`, text-only `composite`) need a `focal`, an `icon` set, or a callout.
 
 ## Icons
@@ -91,6 +113,9 @@ filled shape under its centre, the slide background, then the master background)
 | Content page with no visual anchor | validate | warning |
 | No peak page in a deck of 8+, inverse over 25%, low layout diversity | validate | warning |
 | Text-to-ground contrast below 3:1 | verify | failure |
+| scorecard / pull_quote / icon_grid / agenda tiles do not fit the body band | validate | error |
+| Tracker label over 16 characters, tracker with fewer than two dividers | validate | error / warning |
+| Edge contact that is not one solid side bleed | lint_render | finding |
 | Every pattern at min / max / overload with icons and inverse on, all templates | stress_deck | regression |
 
 ## Sources
@@ -103,3 +128,8 @@ filled shape under its centre, the slide background, then the master background)
 - Datawrapper on emphasis with colour (grey first, then restore colour to one item)
 - Duarte, the glance test and the sparkline story structure
 - WCAG 2.1 contrast ratio
+- Tufte, sparklines as word-sized graphics — edwardtufte.com/notebook/sparkline-theory-and-practice-edward-tufte
+- FT Visual Vocabulary (small multiples, reference lines) — github.com/Financial-Times/chart-doctor
+- International Typographic Style (asymmetric grid layouts) — en.wikipedia.org/wiki/International_Typographic_Style
+- Agenda reprise as divider in consulting decks — deckary.com/blog/agenda-slide-powerpoint
+- PPTAgent (reference-based editing) arXiv 2501.03936; SlideCoder (layout-aware retrieval, overlap and canvas overflow) arXiv 2506.07964

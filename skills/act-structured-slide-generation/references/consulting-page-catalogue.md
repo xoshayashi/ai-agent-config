@@ -60,6 +60,15 @@ cannot fit the body, and `rules: true` on a row draws thin vertical rules betwee
 | Benchmark table | accountability across rows and columns | `comparison_table` |
 | Before / after | measured change across aligned dimensions | `before_after` |
 | Customer proof | 2-4 cases, each with a result | `case_strip` |
+| Answer panel + proof | the answer as one dark number, the evidence beside it | composite `[callout(deep, hero, bleed) 4, chart 8]` |
+| Metric review | 6-8 metrics with trend, attainment and status | `scorecard` |
+| Voice of the customer | one quote with who, where and n | `pull_quote` |
+| One number | a single figure reframes the problem | `big_number` / `number_strip` |
+| Attainment and ranking | units compared on one measure | `progress_bars` / `ranking` / `target_bars` |
+| Conversion | stage-to-stage drop-off | `funnel` |
+| Mix | one whole split into parts | `composition_bar` |
+| Concentration | where a value clusters across two dimensions | `heatmap_table` |
+| Several voices | 2-4 short quotes | `quote_grid` |
 
 ### Structure and logic
 
@@ -75,6 +84,16 @@ cannot fit the body, and `rules: true` on a row draws thin vertical rules betwee
 | Hub and spoke | one platform coordinates several parts | `hub_spoke` |
 | Risk assessment | likelihood x impact with responses | `risk_matrix` |
 | Option evaluation | options scored on criteria, one recommended | `harvey_table` |
+| Capability / preparation set | 3-9 parallel items, each a label and one line | `icon_grid` |
+| Agenda reprise | where the talk is now, chapter by chapter | `agenda` `layout: "tiles"` + `current` |
+| Situation summary | strengths, weaknesses, opportunities, threats | `swot` |
+| One option weighed | benefits against concerns, one verdict | `pros_cons` |
+| Two options | head-to-head on the same criteria | `versus` |
+| Flywheel | steps that feed each other | `cycle` |
+| Value chain | stages with activities and an outcome | `value_chain` |
+| Architecture | layers from user to infrastructure | `layer_stack` |
+| Hierarchy of meaning | purpose above operations above foundations | `pyramid` |
+| Portfolio / prioritisation 3x3 | items placed on two three-level axes | `nine_box` |
 
 ### Time and execution
 
@@ -85,6 +104,12 @@ cannot fit the body, and `rules: true` on a row draws thin vertical rules betwee
 | Phased roadmap | stages and what each delivers | `roadmap` |
 | Process with outcomes | sequence where each step yields something | `process_flow` |
 | Guidance progress | where the year stands against the range | `guidance_progress` |
+| Steps with explanation | each step needs a sentence | `numbered_steps` |
+| Dated events with text | a history or plan read top to bottom | `vertical_timeline` |
+| Readiness | what is done, open or at risk | `checklist` |
+| Team | who owns which part | `org_chart` / `team` |
+| Plans or tiers | priced options with one recommended | `pricing_tiers` |
+| Anticipated questions | the questions the room will ask | `faq` |
 
 ### Framing and close
 

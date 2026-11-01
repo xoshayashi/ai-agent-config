@@ -8,7 +8,7 @@ Pairing (independent perspective — a different model/tool reviews than the one
   (legacy: --judge gemini)
 
 Usage:
-  eval_deck.py <render_dir> --judge codex|claude [--anchor "<slide-1 title phrase>"]
+  eval_deck.py <render_dir> --judge codex|claude [--anchor "<slide-1 title phrase>"] [--spec deck.json]
   eval_deck.py <render_dir> --judge codex|claude --resume        # continue the same
                                                                  # judge session with the
                                                                  # revised images
@@ -18,6 +18,9 @@ Iterate-to-95 loop (driven by SKILL.md, no round cap):
   2. if total < pass_threshold: fix deck.json, re-render, run again with --resume so the
      SAME judge session scores the revised images (it remembers its prior findings).
   3. repeat until total >= pass_threshold (exit 0).
+
+--spec: the deck.json, so the colour criterion names the deck's design template (meta.template)
+instead of judging a navy / monochrome / bold deck against the standard teal.
 
 --anchor: a phrase from slide 1's *title*. The judge reads it back; a verdict whose readback
 omits it is discarded as a hallucination (it judged the wrong images). Only meaningful on the
@@ -46,10 +49,35 @@ REVIEWER_ROLE = (
 )
 
 
+TEMPLATE = "standard"
+
+
+def palette_criterion(template: str) -> str | None:
+    """color-1 をデッキの基本デザイン(meta.template)の配色で言い直す。ルーブリックの既定文は standard
+    (深緑・ティール)の言葉で書かれているので、navy などを選んだデッキを「基調色から外れた」と誤って
+    減点させない(2026-10 の採点で、正規のテンプレート navy を13枚とも減点した)。"""
+    if template == "standard":
+        return None
+    tpath = HERE.parent / "references" / "templates" / f"{template}.json"
+    try:
+        t = json.loads(tpath.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    meta, col = t.get("$template") or {}, t.get("colors") or {}
+    lead = " / ".join(f"#{col[k]}" for k in ("primary", "primary_deep") if col.get(k))
+    return (f"The deck wears the '{meta.get('label', template)}' design template ({meta.get('use', '')}): "
+            f"its lead colour {lead} is the sanctioned base in place of teal, with controlled tints, gray "
+            "support, and no uncontrolled color spread. Judge discipline within this template, not distance from teal.")
+
+
 def rubric_body() -> str:
     cats = []
+    alt = palette_criterion(TEMPLATE)
     for c in RUBRIC["categories"]:
-        crit = "\n".join(f"  [{c['id']}-{k + 1}] {x}" for k, x in enumerate(c["criteria"]))
+        items = list(c["criteria"])
+        if c["id"] == "color" and alt:
+            items[0] = alt
+        crit = "\n".join(f"  [{c['id']}-{k + 1}] {x}" for k, x in enumerate(items))
         cats.append(f"■ {c['name']}(id: {c['id']}、満点 {c['max_points']}点)\n{crit}")
     return "\n".join(cats)
 
@@ -177,6 +205,11 @@ def main() -> int:
         i = args.index("--anchor"); anchor = args[i + 1]; del args[i:i + 2]
     if "--resume" in args:
         resume = True; args.remove("--resume")
+    if "--spec" in args:
+        global TEMPLATE
+        i = args.index("--spec")
+        TEMPLATE = (json.loads(Path(args[i + 1]).read_text()).get("meta") or {}).get("template") or "standard"
+        del args[i:i + 2]
     if len(args) != 1 or judge not in JUDGES:
         print(__doc__)
         return 1

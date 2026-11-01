@@ -4658,3 +4658,441 @@ def test_column_framework_keeps_a_card_under_a_long_header(tmp_path):
     slide = pptx.Presentation(out).slides[0]
     cards = [Emu(sh.height).inches for sh in slide.shapes if getattr(sh, "name", "") == "card"]
     assert cards and min(cards) >= 1.4 - 1e-6, cards
+
+
+RICH_DECK = {"meta": {"title": "t", "tracker": True}, "slides": [
+    {"pattern": "section_divider", "number": 1, "title": "効果の確認", "tracker_label": "効果", "desc": "PoC 2期"},
+    {"pattern": "scorecard", "title": "4指標のうち3つが目標を超えた", "subtitle": "主要指標",
+     "rows": [{"label": "処理時間", "value": "4", "unit": "分", "trend": [12, 8, 4], "progress": 1.0, "status": "good", "focal": True},
+              {"label": "差戻し率", "value": "9", "unit": "%", "trend": [18, 12, 9], "progress": 0.6, "status": "bad"}],
+     "insight": "差戻しは候補表示で減らせる", "insight_style": "deep", "source": "Source: 申請ログ"},
+    {"pattern": "section_divider", "number": 2, "title": "展開と投資", "desc": "段階展開"},
+    {"pattern": "pull_quote", "title": "現場は残業がなくなったと受け止めた", "subtitle": "営業部の声", "tone": "inverse",
+     "quote": "締め日の前に残る夜がなくなりました", "attribution": "営業部 課長", "source": "Source: インタビュー"},
+    {"pattern": "icon_grid", "title": "展開の前に3つの準備をそろえる", "subtitle": "準備",
+     "items": [{"icon": "users", "label": "推進役", "desc": "部門ごとに1名"},
+               {"icon": "workflow", "label": "承認ルート", "desc": "2段にそろえる", "focal": True},
+               {"icon": "plug", "label": "連携", "desc": "12月に検証"}]},
+    {"pattern": "agenda", "title": "次は投資の判断に移る", "subtitle": "論点(再掲)", "layout": "tiles", "current": 1,
+     "items": [{"label": "効果", "desc": "実績"}, {"label": "投資", "desc": "回収"}]},
+    {"pattern": "composite", "title": "投資は2.1年で回収できる", "subtitle": "回収の見通し",
+     "grid": [{"cells": [{"span": 4, "block": {"type": "callout", "style": "deep", "bleed": True,
+                                               "hero": {"value": "2.1", "unit": "年", "label": "回収期間"}}},
+                         {"span": 8, "block": {"type": "chart", "chart": {"type": "column", "unit": "億円",
+                          "categories": ["1年目", "2年目"], "series": [{"name": "累計", "values": [1.5, 3.0]}]}}}]}],
+     "source": "Source: 試算"}]}
+
+
+def test_richness_primitives_build_natively_and_stay_inside_the_slide(tmp_path):
+    """章トラッカー・評価表(sparkline と達成率の棒)・引用・アイコンのタイル・目次のタイル・濃い示唆帯・
+    端まで塗るパネルが、編集できるネイティブ図形で描かれ、verify の検査(コントラスト含む)を通る。"""
+    from pptx import Presentation
+    from pptx.util import Emu
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(RICH_DECK, ensure_ascii=False))
+    r = run("validate_spec.py", p)
+    assert "0 errors" in r.stdout, r.stdout
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0 and "0 failures" in v.stdout, v.stdout
+    slides = list(Presentation(out).slides)
+    names = lambda i: [sh.name for sh in slides[i].shapes]   # noqa: E731
+    assert names(1).count("tracker") == 2 and names(3).count("tracker") == 2     # 章の数の丸(扉以外のページ)
+    assert "tracker" not in names(0)                                           # 章扉には描かない
+    assert names(1).count("sparkline") == 2                                    # 行ごとの推移線
+    band = next(sh for sh in slides[1].shapes if sh.name == "insight")
+    assert band.left == 0 and band.left + band.width == Presentation(out).slide_width   # 濃い帯は端から端まで
+    panel = next(sh for sh in slides[6].shapes if sh.name == "panel")
+    assert panel.left == 0                                                     # パネルは左端まで塗る
+    assert sum(1 for sh in slides[4].shapes if sh.name.startswith("icon:")) == 3
+    assert all(Emu(sh.left) >= 0 and sh.top + sh.height <= Presentation(out).slide_height
+               for s in slides for sh in s.shapes)
+
+
+def test_icon_grid_allows_measured_tile_height_above_preferred_cap(tmp_path):
+    """4-item tiles can grow past the preferred 2.9in cap when long copy needs it."""
+    deck = {"meta": {"title": "t"}, "slides": [{
+        "pattern": "icon_grid", "title": "各部門は4つの準備をそろえてから導入を始める", "subtitle": "開始条件", "items": [
+            {"icon": "users", "label": "推進役", "desc": "部門ごとに責任者を1名置き、判断と進捗を週次で確認するための運用を決める。関係する担当者や責任範囲を明らかにし、課題が起きたときの相談先と対応期限も決め、導入後に改善を続ける体制を整える"},
+            {"icon": "workflow", "label": "承認ルート", "desc": "申請から決裁までの手順を定める"},
+            {"icon": "plug", "label": "連携", "desc": "既存システムとの接続を確かめる"},
+            {"icon": "user-check", "label": "測定", "desc": "導入前後の効果を比べる"},
+        ],
+    }]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    checked = run("validate_spec.py", spec)
+    assert "0 errors" in checked.stdout, checked.stdout
+    sys.path.insert(0, str(SCRIPTS))
+    import build_deck
+    build_deck._apply_tokens(TOKENS)
+    _y, body_h = build_deck.body_region(deck["slides"][0])
+    layout = build_deck._icon_grid_layout(deck["slides"][0], body_h)
+    assert layout["tile_h"] > 2.9, layout
+    out = tmp_path / "deck.pptx"
+    built = run("build_deck.py", spec, "-o", out)
+    assert built.returncode == 0, built.stdout + built.stderr
+    verified = run("verify_deck.py", out)
+    assert verified.returncode == 0 and "0 failures" in verified.stdout, verified.stdout
+
+
+def test_new_pattern_fit_checks_reject_labels_that_cannot_fit(tmp_path):
+    deck = {"meta": {"title": "t"}, "slides": [
+        {"pattern": "funnel", "title": "契約までの転換を高める", "subtitle": "段階",
+         "stages": [{"label": label, "value": value} for label, value in
+                    [("問い合わせ", 10000), ("商談", 3000), ("本契約に至った件数", 300)] ]},
+        {"pattern": "pyramid", "title": "基盤から運用まで整える", "subtitle": "階層",
+         "tiers": [{"label": "経営と現場をつなぐための全社横断の長い戦略名称を示す重要な方針"},
+                   {"label": "運用"}, {"label": "現場"}]},
+        {"pattern": "value_chain", "title": "入力から支払まで一連の流れを変える", "subtitle": "工程",
+         "stages": [{"label": label, "items": ["実行"]} for label in
+                    ["請求書の受領と内容を確認してシステムに登録し承認担当へ回す", "入力", "照合", "承認", "支払", "記録"]]},
+        {"pattern": "composite", "title": "投資回収を早める", "subtitle": "回収",
+         "grid": [{"cells": [{"span": 3, "block": {"type": "callout", "style": "deep",
+                                  "hero": {"value": "10,590", "unit": "万円"}}},
+                              {"span": 9, "block": {"type": "text", "points": ["投資効果"]}}]}]},
+    ]}
+    spec = tmp_path / "deck.json"
+    spec.write_text(json.dumps(deck, ensure_ascii=False))
+    out = run("validate_spec.py", spec).stdout
+    assert "funnel の段階ラベルと値が帯に1行で入らない" in out, out
+    assert "pyramid の段階名が段に収まらない" in out, out
+    assert "value_chain の矢羽ラベルが収まらない" in out, out
+    assert "composite callout の hero 数字が1行で入らない" in out, out
+
+
+def test_validate_names_richness_defects(tmp_path):
+    import copy
+    d = copy.deepcopy(RICH_DECK)
+    d["slides"][1]["rows"][0]["progress"] = 3
+    d["slides"][3].pop("attribution")
+    d["slides"][4]["items"][0].pop("icon")
+    d["slides"][2]["tracker_label"] = "全社展開の進め方と投資の判断と、そのための体制とスケジュールの全体像"
+    d["slides"][5]["current"] = True
+    d["slides"][6]["grid"][0]["cells"][0]["block"]["hero"] = "2.1"
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(d, ensure_ascii=False))
+    out = run("validate_spec.py", p).stdout
+    assert "progress=3" in out
+    assert "attribution" in out
+    assert "全項目に icon が要る" in out
+    assert "章トラッカー" in out
+    assert "current=True" in out
+    assert "hero は" in out
+    d2 = copy.deepcopy(RICH_DECK)
+    d2["slides"][4]["items"] = ["推進役", "承認", "連携"]
+    p.write_text(json.dumps(d2, ensure_ascii=False))
+    assert "文字列だけの項目は書けない" in run("validate_spec.py", p).stdout
+
+
+def test_lint_tells_a_designed_bleed_from_a_clipped_element():
+    sys.path.insert(0, str(SCRIPTS))
+    import lint_render as L
+    assert L.designed_side_bleed({"insight": "x", "insight_style": "deep"})
+    assert not L.designed_side_bleed({"insight": "x", "insight_style": "primary"})
+    assert L.designed_side_bleed({"pattern": "composite", "grid": [{"cells": [{"block": {"type": "callout", "bleed": True}}]}]})
+    from PIL import Image, ImageDraw
+    im = Image.new("RGB", (1466, 825), CANVAS_RGB)
+    ImageDraw.Draw(im).rectangle([1300, 300, 1465, 360], fill=(0, 79, 73))     # 右端に一色の図形
+    assert any("right edge" in h for h in L.edge_scan(im))                     # 宣言が無ければ見切れとして鳴る
+    assert not any("right edge" in h for h in L.edge_scan(im, side_bleed=True))
+    solid = [(0, 79, 73)] * 95 + [(90, 140, 135)] * 5
+    assert L.solid_bleed(solid, list(range(500, 600)))                         # 一続きの一色の面
+    assert not L.solid_bleed(solid, list(range(0, 1000, 10)))                  # 字画のように途切れる
+    assert not L.solid_bleed([(40, 40, 40), (120, 120, 120), (200, 200, 200)] * 30, list(range(90)))
+    clipped = Image.new("RGB", (1466, 825), CANVAS_RGB)
+    clipped_draw = ImageDraw.Draw(clipped)
+    clipped_draw.rectangle([0, 300, 1465, 360], fill=(0, 79, 73))             # 正常な濃色の全面帯
+    clipped_draw.rectangle([1461, 332, 1465, 340], fill=(225, 95, 55))        # 右端で切れた図形
+    assert any("right edge" in h for h in L.edge_scan(clipped, side_bleed=True))
+    split_bleed = Image.new("RGB", (1466, 825), CANVAS_RGB)
+    split_draw = ImageDraw.Draw(split_bleed)
+    split_draw.rectangle([1300, 300, 1465, 600], fill=(0, 79, 73))            # 右端のパネル
+    split_draw.rectangle([0, 677, 1465, 741], fill=(31, 58, 102))             # 下端近くの濃色帯
+    assert not any("right edge" in h for h in L.edge_scan(split_bleed, side_bleed=True))
+
+
+def test_eval_colour_criterion_follows_the_design_template():
+    """採点の color-1 はデッキの基本デザインで言い直す: navy のデッキをティールとの距離で減点させない。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import eval_deck as E
+    assert E.palette_criterion("standard") is None
+    navy = E.palette_criterion("navy")
+    assert "#1F3A66" in navy and "not distance from teal" in navy
+    E.TEMPLATE = "navy"
+    try:
+        assert "[color-1] The deck wears" in E.rubric_body()
+    finally:
+        E.TEMPLATE = "standard"
+
+
+def test_the_registry_holds_sixty_patterns_with_one_spec_table():
+    """60 型: build_deck の PATTERNS と validate_spec の必須表が同じ集合を持ち、追加の24型は act_patterns.SPEC
+    の1つの表から検査・寸法・図表のページかを引く(描画と検査が別々の表を持たない)。"""
+    sys.path.insert(0, str(SCRIPTS))
+    import act_patterns as AP
+    import build_deck as B
+    import validate_spec as V
+    assert len(B.PATTERNS) >= 60
+    assert set(B.PATTERNS) == set(V.PATTERNS)
+    assert set(AP.SPEC) == set(AP.RENDERERS) == set(AP.LAYOUTS)
+    assert set(AP.SPEC) <= set(V.FIT_CHECKS)
+
+
+def test_the_24_added_patterns_build_and_pass_every_gate(tmp_path):
+    """追加の24型のショーケース(実際の文の長さ)が validate 0 / verify 0 で組める。"""
+    src = SKILL / "tests" / "fixtures-patterns24.json"
+    p = tmp_path / "deck.json"; p.write_text(src.read_text())
+    r = run("validate_spec.py", p)
+    assert " 0 errors" in r.stdout, r.stdout
+    out = tmp_path / "deck.pptx"
+    assert run("build_deck.py", p, "-o", out).returncode == 0
+    v = run("verify_deck.py", out)
+    assert v.returncode == 0 and "0 failures" in v.stdout, v.stdout
+
+
+def test_added_patterns_reject_bad_shapes_and_numbers_that_cannot_fit(tmp_path):
+    base = {"meta": {"title": "t"}, "slides": []}
+    bad = [
+        {"pattern": "ranking", "title": "上位の比較", "subtitle": "s", "items": ["営業", "経理", "購買"], "source": "x"},
+        {"pattern": "checklist", "title": "確認の状況", "subtitle": "s", "items": [{"label": "a", "status": "ok"}] * 3},
+        {"pattern": "nine_box", "title": "優先度の整理", "subtitle": "s", "items": [{"label": "a", "x": 3, "y": 0}]},
+        {"pattern": "number_strip", "title": "数字は1行で", "subtitle": "s", "source": "x",
+         "numbers": [{"label": "a", "value": "1,234,567", "unit": "営業日"}] * 4},
+        {"pattern": "heatmap_table", "title": "表の形", "subtitle": "s", "rows": ["a", "b"], "columns": ["x", "y"],
+         "values": [[1, 2]], "source": "x"},
+    ]
+    base["slides"] = bad
+    p = tmp_path / "deck.json"; p.write_text(json.dumps(base, ensure_ascii=False))
+    out = run("validate_spec.py", p).stdout
+    assert "items[0] は" in out and "文字列だけは書けない" in out
+    assert "status は done / todo / risk" in out
+    assert "x / y は 0-2 の整数" in out and "x_label と y_label" in out
+    assert "が列に1行で入らない" in out
+    assert "rows × columns の数値の表" in out
+
+
+def test_big_number_and_number_strip_support_thesis_and_recap_audits():
+    sys.path.insert(0, str(SCRIPTS))
+    import audit_argument as audit
+    for opening in (
+        {"pattern": "big_number", "value": "18", "unit": "億円", "label": "年間効果"},
+        {"pattern": "number_strip", "numbers": [
+            {"label": "年間効果", "value": "18", "unit": "億円"},
+            {"label": "対象部門", "value": "3", "unit": "部門"},
+        ]},
+    ):
+        deck = {"meta": {"thesis": {"statement": "年間効果は18億円に達する", "value": "18", "unit": "億円"}},
+                "slides": [opening, {"pattern": "statement", "statement": "年間効果18億円を次の段階へ広げる"}]}
+        errors = []
+        audit.check_thesis(deck, errors)
+        audit.check_recap(deck, errors)
+        assert not errors, errors
+
+
+def test_generated_pattern_percentages_and_tier_prices_support_thesis_and_recap_audits(monkeypatch):
+    sys.path.insert(0, str(SCRIPTS))
+    import audit_argument as audit
+    examples = [
+        ({"pattern": "progress_bars", "bars": [{"label": "達成", "value": 0.7}]}, "70", "%"),
+        ({"pattern": "target_bars", "rows": [{"label": "達成", "actual": 7, "target": 10}]}, "70", "%"),
+        ({"pattern": "composition_bar", "segments": [{"label": "A", "value": 7}, {"label": "B", "value": 3}]}, "70", "%"),
+        ({"pattern": "funnel", "stages": [{"label": "流入", "value": 10},
+                                               {"label": "商談", "value": 7},
+                                               {"label": "成約", "value": 4}]}, "70", "%"),
+        ({"pattern": "pricing_tiers", "tiers": [{"name": "標準", "price": "18", "unit": "億円"}]}, "18", "億円"),
+    ]
+    for opening, value, unit in examples:
+        deck = {"meta": {"thesis": {"statement": f"結果は{value}{unit}", "value": value, "unit": unit}},
+                "slides": [opening, {"pattern": "statement", "statement": f"結果は{value}{unit}を維持する"}]}
+        errors = []
+        audit.check_thesis(deck, errors)
+        audit.check_recap(deck, errors)
+        assert not errors, (opening["pattern"], errors)
+
+    hidden = {"meta": {"thesis": {"statement": "小区分は5%", "value": "5", "unit": "%"}},
+              "slides": [{"pattern": "composition_bar", "segments": [
+                  {"label": "大", "value": 95}, {"label": "小", "value": 5}]},
+                  {"pattern": "statement", "statement": "小区分は5%を維持する"}]}
+    errors = []
+    audit.check_thesis(hidden, errors)
+    audit.check_recap(hidden, errors)
+    assert len(errors) == 2, errors
+    assert all("5%" in error for error in errors), errors
+    from deck_argument import exhibit_tokens
+    assert "95%" in exhibit_tokens(hidden["slides"][0])
+
+    hidden_with_unit = {"pattern": "composition_bar", "segments": [
+        {"label": "大", "value": 95}, {"label": "小", "value": 5, "unit": "%"}]}
+    assert "5%" not in exhibit_tokens(hidden_with_unit)
+
+    capped = {"pattern": "composition_bar", "segments": [
+        {"label": "a", "value": 30}, {"label": "b", "value": 20},
+        {"label": "c", "value": 15}, {"label": "d", "value": 10},
+        {"label": "e", "value": 10}, {"label": "f", "value": 5},
+        {"label": "not drawn", "value": 10, "note": "12億円"},
+    ]}
+    capped_tokens = exhibit_tokens(capped)
+    assert "33%" in capped_tokens and "30%" not in capped_tokens and "12億円" not in capped_tokens, capped_tokens
+
+    capped_patterns = [
+        {"pattern": "progress_bars", "bars": [{"label": str(i), "value": 0.5} for i in range(8)]
+                          + [{"label": "not drawn", "value": 0.5, "note": "12億円"}]},
+        {"pattern": "target_bars", "rows": [{"label": str(i), "actual": 1, "target": 2} for i in range(8)]
+                         + [{"label": "not drawn", "actual": 1, "target": 2, "note": "12億円"}]},
+        {"pattern": "funnel", "stages": [{"label": str(i), "value": 100 - i * 10} for i in range(6)]
+                       + [{"label": "not drawn", "value": 10, "note": "12億円"}]},
+        {"pattern": "pricing_tiers", "tiers": [{"name": str(i), "price": str(i + 1), "unit": "億円"} for i in range(4)]
+                              + [{"name": "not drawn", "price": "12", "unit": "億円"}]},
+    ]
+    for capped_pattern in capped_patterns:
+        tokens = exhibit_tokens(capped_pattern)
+        assert "12億円" not in tokens, capped_pattern
+        if capped_pattern["pattern"] == "funnel":
+            assert "20%" not in tokens, tokens
+
+    funnel_override = {"pattern": "funnel", "unit": "社", "stages": [
+        {"label": "流入", "value": 1000, "display": "約千"},
+        {"label": "商談", "value": 200, "display": "二百"}]}
+    funnel_tokens = exhibit_tokens(funnel_override)
+    assert "20%" in funnel_tokens and "1000社" not in funnel_tokens and "200社" not in funnel_tokens
+
+    ranking_override = {"pattern": "ranking", "unit": "%", "items": [
+        {"label": "A", "value": 0.1, "display": "約1割"},
+        {"label": "B", "value": 0.2, "display": "18億円"}]}
+    ranking_tokens = exhibit_tokens(ranking_override)
+    assert "18億円" in ranking_tokens and "10%" not in ranking_tokens
+    assert "12億円" not in exhibit_tokens({"pattern": "pricing_tiers", "tiers": [
+        {"name": "標準", "price": "1", "unit": "円", "features": "12億円"}]})
+
+    capped_ranking = {"pattern": "ranking", "unit": "社", "items":
+                      [{"label": str(i), "value": i} for i in range(10)]
+                      + [{"label": "not drawn", "value": 12, "display": "12億円"}],
+                      "facts": [{"value": "12", "unit": "億円"}],
+                      "kpis": [{"value": "12", "unit": "億円"}],
+                      "hero": {"value": "12", "unit": "億円"},
+                      "chart": {"values": [12], "unit": "億円"}}
+    assert "12億円" not in exhibit_tokens(capped_ranking)
+    assert "12社" not in exhibit_tokens({"pattern": "progress_bars", "unit": "社",
+                                           "bars": [{"label": "12", "value": 0.5}]})
+    stray_annotations = {"pattern": "progress_bars", "bars": [],
+                         "legend": "目標90%", "total_label": "100%", "focal_label": "30%",
+                         "facts": [{"value": "12", "unit": "億円"}],
+                         "left": {"kpis": [{"value": "12", "unit": "億円"}]}}
+    stray_tokens = exhibit_tokens(stray_annotations)
+    assert not {"90%", "100%", "30%", "12億円"} & stray_tokens, stray_tokens
+    assert "90%" in exhibit_tokens({"pattern": "target_bars", "legend": "目標90%", "rows": []})
+    assert "100%" in exhibit_tokens({"pattern": "composition_bar", "total_label": "全体100%",
+                                      "segments": [{"label": "全体", "value": 1}]})
+    assert "30%" not in exhibit_tokens({"pattern": "pricing_tiers", "focal_label": "30%オフ",
+                                         "tiers": [{"name": "標準", "price": "1", "unit": "円"}]})
+    assert "30%" in exhibit_tokens({"pattern": "pricing_tiers", "focal_label": "30%オフ",
+                                     "tiers": [{"name": "標準", "price": "1", "unit": "円", "focal": True}]})
+
+    import deck_text
+    base_resolve = deck_text.resolve_tokens
+    narrow = json.loads(json.dumps(base_resolve("standard")))
+    narrow["layout"]["margin_x_in"] = 0.9
+    float_grid = json.loads(json.dumps(base_resolve("standard")))
+    float_grid["layout"]["grid_columns"] = 12.0
+    monkeypatch.setattr(deck_text, "resolve_tokens", lambda template:
+                        narrow if template == "test_narrow" else
+                        float_grid if template == "test_float_grid" else base_resolve(template))
+    narrow_slide = {"pattern": "composition_bar", "segments": [
+        {"label": "large", "value": 94}, {"label": "small", "value": 6}]}
+    assert "6%" in exhibit_tokens(narrow_slide, "standard")
+    assert "6%" in exhibit_tokens(narrow_slide, "test_float_grid")
+    assert "6%" not in exhibit_tokens(narrow_slide, "test_narrow")
+    narrow_deck = {"meta": {"template": "test_narrow",
+                             "thesis": {"statement": "小区分は6%", "value": "6", "unit": "%"}},
+                   "slides": [narrow_slide, {"pattern": "statement", "statement": "小区分は6%を維持する"}]}
+    errors = []
+    audit.check_thesis(narrow_deck, errors)
+    audit.check_recap(narrow_deck, errors)
+    assert len(errors) == 2 and all("6%" in error for error in errors), errors
+
+    overridden = {"meta": {"thesis": {"statement": "達成率は70%", "value": "70", "unit": "%"}},
+                  "slides": [{"pattern": "progress_bars", "bars": [
+                      {"label": "達成", "value": 0.7, "display": "7割"}]},
+                      {"pattern": "statement", "statement": "達成率は70%を保つ"}]}
+    errors = []
+    audit.check_thesis(overridden, errors)
+    audit.check_recap(overridden, errors)
+    assert len(errors) == 2, errors
+    assert all("70%" in error for error in errors), errors
+
+
+def test_audit_argument_reports_unknown_or_broken_template_without_traceback(tmp_path, monkeypatch, capsys):
+    deck = {"meta": {"template": "not-a-template",
+                     "thesis": {"statement": "シェアは95%", "value": "95", "unit": "%"}},
+            "slides": [{"pattern": "composition_bar", "segments": [
+                {"label": "A", "value": 95}, {"label": "B", "value": 5}]}]}
+    path = tmp_path / "unknown-template.json"
+    path.write_text(json.dumps(deck, ensure_ascii=False))
+    result = run("audit_argument.py", path)
+    assert result.returncode == 1
+    assert "meta.template が不明" in result.stdout
+    assert "Traceback" not in result.stdout + result.stderr
+
+    import audit_argument as audit
+    import deck_text
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    monkeypatch.setattr(deck_text, "TEMPLATES_DIR", templates)
+    monkeypatch.setattr(sys, "argv", ["audit_argument.py", str(path)])
+    for name, content in (("broken", "{"), ("wrong_shape", "[]"),
+                          ("wrong_width", '{"layout": {"margin_x_in": "wide"}}'),
+                          ("zero_columns", '{"layout": {"grid_columns": 0}}'),
+                          ("nan_margin", '{"layout": {"margin_x_in": NaN}}')):
+        (templates / f"{name}.json").write_text(content)
+        deck["meta"]["template"] = name
+        path.write_text(json.dumps(deck, ensure_ascii=False))
+        assert audit.main() == 1
+        output = capsys.readouterr().out
+        assert "meta.template を読み込めない" in output, output
+        assert "Traceback" not in output
+
+    import validate_spec as validate
+    for name in ("zero_columns", "nan_margin"):
+        deck["meta"]["template"] = name
+        deck["slides"] = [{"pattern": "composition_bar"}]
+        path.write_text(json.dumps(deck, ensure_ascii=False))
+        monkeypatch.setattr(sys, "argv", ["validate_spec.py", str(path)])
+        assert validate.main() == 1
+        output = capsys.readouterr().out
+        assert "ERROR:" in output and "Traceback" not in output
+
+
+@pytest.mark.parametrize("features", ["12億円", {"12億円": True}, 5, [12]])
+def test_pricing_tier_features_must_be_string_list(features):
+    sys.path.insert(0, str(SCRIPTS))
+    import act_patterns
+    slide = {"pattern": "pricing_tiers", "tiers": [
+        {"name": "標準", "price": "1", "features": features},
+        {"name": "上位", "price": "2"}]}
+    assert any("features は文字列の配列" in error for error in act_patterns.check(slide))
+    from deck_argument import exhibit_tokens
+    assert "12億円" not in exhibit_tokens(slide)
+
+
+@pytest.mark.parametrize("slide", [
+    {"pattern": "progress_bars", "bars": None},
+    {"pattern": "progress_bars", "bars": ["not an item"]},
+    {"pattern": "progress_bars", "bars": [{"label": "達成", "value": "70%"}]},
+])
+def test_audit_view_handles_malformed_pattern_items(slide):
+    sys.path.insert(0, str(SCRIPTS))
+    from deck_argument import exhibit_tokens
+    assert isinstance(exhibit_tokens(slide), set)
+
+
+def test_hidden_chart_cannot_ground_relation_claim_on_native_pattern():
+    sys.path.insert(0, str(SCRIPTS))
+    import audit_argument as audit
+    slide = {"pattern": "progress_bars", "title": "売上は前年比+12%成長",
+             "bars": [{"label": "達成", "value": 0.7}],
+             "chart": {"series": [{"values": [100, 112]}]}}
+    errors, warns = [], []
+    audit.check_claim_grounded(1, slide, errors, warns)
+    audit.check_comparison_base(1, slide, errors)
+    assert not errors, errors
+    assert any("+12%" in warn and "示す図表がない" in warn for warn in warns), warns

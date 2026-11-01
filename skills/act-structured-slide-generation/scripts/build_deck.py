@@ -869,6 +869,8 @@ def add_chrome(slide, spec: dict, page_no: int, total: int, deck: dict) -> None:
         add_text(slide, hdr["title_x_in"], m["sub_y"], hdr["title_w_in"], m["sub_h"],
                  [[(spec["subtitle"], TS["subtitle"], 400, C["ink_subtle"])]], line_spacing=1.18)
     add_sticker(slide, spec)
+    if (deck.get("meta") or {}).get("tracker"):
+        add_tracker(slide, deck, deck.get("_cur_chapter"))
     add_footer(slide, spec, page_no, total, deck)
 
 
@@ -938,7 +940,20 @@ def add_insight_bar(slide, spec: dict) -> None:
         return
     y = FOOT_Y - 0.74
     h = 0.58
-    if spec.get("insight_style", "accent") == "primary":
+    style = spec.get("insight_style", "accent")
+    if style == "deep":
+        # 濃い帯: 左右の端まで塗る(色面のブロッキング)。文字は本文の左端にそろえ、ラベルを先に置く
+        W = TOKENS["slide"]["width_in"]
+        add_rect(slide, 0, y, W, h, C["primary_deep"], name="insight")
+        lab = spec.get("insight_label", "示唆")
+        lw = _label_w(lab, TS["kpi_sub"], 700) + 0.30
+        add_text(slide, MX, y, lw, h, [[(lab, TS["kpi_sub"], 700, C["primary_pale"])]],
+                 anchor=MSO_ANCHOR.MIDDLE, wrap=False)
+        add_line(slide, MX + lw - 0.15, y + 0.14, MX + lw - 0.15, y + h - 0.14, C["primary"], 1.0)
+        add_text(slide, MX + lw, y, CONTENT_W - lw, h,
+                 [[(spec["insight"], TS["insight"], 600, C["canvas"])]], anchor=MSO_ANCHOR.MIDDLE)
+        return
+    if style == "primary":
         add_rect(slide, MX, y, CONTENT_W, h, C["primary_pale"], radius_pt=4)
         add_text(slide, MX + 0.18, y, CONTENT_W - 0.36, h,
                  [[(spec["insight"], TS["insight"], 600, C["primary_deep"])]],
@@ -1190,6 +1205,9 @@ def p_cover(slide, spec, deck):
 def p_agenda(slide, spec, deck):
     items = spec.get("items", [])
     y0, h = body_region(spec)
+    if spec.get("layout") == "tiles":
+        p_agenda_tiles(slide, spec, deck, y0, h)
+        return
     x, w = grid(1, 10)
     row_h = min(0.95, h / max(1, len(items)))
     y0 += max(0.0, (h - len(items) * row_h) * 0.42)
@@ -3877,15 +3895,32 @@ def _kpi_horizontal(b: dict, w: float) -> bool:
 def _callout_fill(style: str):
     return {"primary": (C["primary_pale"], C["primary_deep"], C["primary"]),
             "accent": (C["accent_pale"], C["ink"], C["accent_line"]),
-            "navy": (C["navy"], C["canvas"], None)}.get(style, (C["primary_pale"], C["primary_deep"], C["primary"]))
+            "navy": (C["navy"], C["canvas"], None),
+            "deep": (C["primary_deep"], C["canvas"], None)}.get(style, (C["primary_pale"], C["primary_deep"], C["primary"]))
 
 
 def _callout_blocks(b: dict, ink) -> list[dict]:
     blocks = []
+    hero = b.get("hero") if isinstance(b.get("hero"), dict) else {}
+    if hero.get("value") not in (None, ""):
+        # パネルの主役の数字(kpi_value_hero)。濃い面では地の色、淡い面では主色の濃い側で
+        dark = b.get("style") in ("deep", "navy")
+        vpt = TS["kpi_value_hero"]
+        vparts = [(str(hero["value"]), vpt, 700, ink if dark else C["primary_deep"])]
+        if hero.get("unit"):
+            u = _unit_part(hero["unit"], 20)
+            vparts.append((u[0], u[1], u[2], ink if dark else C["primary_deep"]))
+        blocks.append({"parts": vparts, "size": vpt, "kind": "numeral"})
+        if hero.get("label"):
+            blocks.append({"parts": [(hero["label"], TS["kpi_sub"], 600, C["primary_pale"] if dark else C["ink_subtle"])],
+                           "size": TS["kpi_sub"], "kind": "text", "gap_before": OPT["gap_in"]["metric_subline"],
+                           "gap_name": "callout_hero"})
     if b.get("heading"):
         blocks.append({"parts": [(b["heading"], TS["kpi_sub"], 700, ink)], "size": TS["kpi_sub"], "kind": "text"})
-    blocks.append({"parts": [(b.get("statement", ""), TS["insight"], 600, ink)], "size": TS["insight"], "kind": "text",
-                   "gap_before": OPT["gap_in"]["heading_body"] if blocks else 0.0, "gap_name": "callout"})
+    if b.get("statement"):
+        blocks.append({"parts": [(b["statement"], TS["insight"], 600, ink)], "size": TS["insight"], "kind": "text",
+                       "gap_before": (OPT["gap_in"]["item"] if hero.get("value") not in (None, "") else OPT["gap_in"]["heading_body"]) if blocks else 0.0,
+                       "gap_name": "callout"})
     return blocks
 
 
@@ -3987,6 +4022,21 @@ def _composite_layout(spec: dict, h: float) -> dict:
             cells.append((cx_, cw_, c.get("block") or {}))
             col += span
         row_cells.append(cells)
+    wide_heroes = []
+    for cells in row_cells:
+        for _x, cell_w, block in cells:
+            hero = block.get("hero") if block.get("type") == "callout" else None
+            if not isinstance(hero, dict) or hero.get("value") in (None, ""):
+                continue
+            style = block.get("style", "primary")
+            _fill, _ink, bar = _callout_fill(style)
+            text_w = cell_w - 2 * CALLOUT_PAD - (0.10 if bar else 0)
+            value_w = text_width_in(str(hero["value"]), TS["kpi_value_hero"], 700)
+            if hero.get("unit"):
+                unit_text, unit_size, unit_weight, _color = _unit_part(hero["unit"], 20)
+                value_w += text_width_in(unit_text, unit_size, unit_weight)
+            if value_w > text_w:
+                wide_heroes.append(str(hero["value"]))
     weights = [float(r.get("height", 1)) for r in rows]
     needs = [max((block_need_h(b, cw_) for _x, cw_, b in cells), default=0.0) for cells in row_cells]
     fixed: dict[int, float] = {}
@@ -4020,20 +4070,33 @@ def _composite_layout(spec: dict, h: float) -> dict:
             row_h[i] += spare * weights[i] / gw
         spare = 0.0
     off = spare / 2
-    overflow = sum(needs) > avail + 1e-6
+    overflow = sum(needs) > avail + 1e-6 or bool(wide_heroes)
     if overflow:
         k = avail / max(1e-6, sum(row_h))
         row_h = [rh * k for rh in row_h]
         off = 0.0
+    hint = (f"composite callout の hero 数字が1行で入らない: {', '.join(wide_heroes[:3])} — "
+            "数字を丸めるか、セルの幅を広げる") if wide_heroes else None
+    need_h = sum(needs) + GAP * max(0, len(rows) - 1)
+    if wide_heroes:
+        need_h = max(need_h, h + 1.0)
     return dict(rows=rows, cells=row_cells, row_h=row_h, needs=needs, GAP=GAP, avail=avail, off=off,
-                overflow=overflow, need_h=sum(needs) + GAP * max(0, len(rows) - 1))
+                overflow=overflow, hint=hint, need_h=need_h)
 
 
 def _draw_block(slide, x, y, w, h, b: dict) -> None:
     t = b.get("type")
     if t == "callout":
         fill, ink, bar = _callout_fill(b.get("style", "primary"))
-        add_rect(slide, x, y, w, h, fill, radius_pt=4)
+        if b.get("bleed"):
+            # 端まで塗るパネル(左右分割の色面): 本文の端に接したセルだけ、その側をスライドの端まで延ばす。
+            # 文字の位置はセルのまま(グリッドの左端・右端にそろう)。上下は行の高さのまま
+            W = TOKENS["slide"]["width_in"]
+            bx0 = 0.0 if x <= MX + 0.01 else x
+            bx1 = W if x + w >= W - MX - 0.01 else x + w
+            add_rect(slide, bx0, y, bx1 - bx0, h, fill, name="panel")
+        else:
+            add_rect(slide, x, y, w, h, fill, radius_pt=4)
         inset = CALLOUT_PAD
         if bar:
             add_rect(slide, x, y, 0.08, h, bar)
@@ -4618,6 +4681,394 @@ def p_milestone_timeline(slide, spec, deck):
                  [[("   ".join(legend), TS["kpi_sub"], 400, C["ink_subtle"])]], align=PP_ALIGN.RIGHT)
 
 
+# ---------------------------------------------------------------- richness primitives (2026-10)
+#
+# 豊かさを「飾り」ではなく、寸法を固定した構造で足す。どれも中身の量から高さを測り(*_layout)、
+# 入らないときは型を縮めずに overflow を返す — validate_spec の FIT_CHECKS が同じ関数で先に止める。
+
+TRACKER_D = 0.22           # 章トラッカーの丸(本文の上の帯 CHROME_TOP_Y に置く)
+TRACKER_PT = 10
+TRACKER_GAP = 0.08
+
+
+def tracker_width(chapters: list, label: str) -> float:
+    """章トラッカーの描画幅: 章の数ぶんの丸 + 現在の章の名前。validate が帯の幅と比べる。"""
+    n = len(chapters)
+    return n * TRACKER_D + (n - 1) * TRACKER_GAP + (0.14 + _label_w(label, TRACKER_PT, 600) if label else 0.0)
+
+
+def add_tracker(slide, deck: dict, chapter: int | None) -> None:
+    """章トラッカー: タイトルの上の帯の左に、章の数だけ番号の丸を並べ、いまの章だけ主色で塗って名前を添える。
+    MBB 資料の「目次の再掲」を本文ページでも小さく続ける — 読み手が、いまどの論点の中にいるかを
+    読まずに分かる。ページ番号ではない(番号は章であって頁ではない)。章扉が2つ以上あるデッキだけ。"""
+    chapters = deck.get("_chapters") or []
+    if len(chapters) < 2 or chapter is None:
+        return
+    x = MX
+    y = CHROME_TOP_Y
+    for i, (num, _title) in enumerate(chapters):
+        cur = i == chapter
+        sh = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(x), Inches(y), Inches(TRACKER_D), Inches(TRACKER_D))
+        if cur:
+            sh.fill.solid()
+            sh.fill.fore_color.rgb = C["primary"]
+            sh.line.fill.background()
+        else:
+            sh.fill.background()
+            sh.line.color.rgb = C["rule"]
+            sh.line.width = Pt(0.75)
+        sh.shadow.inherit = False
+        _strip_style(sh)
+        sh.name = "tracker"
+        add_text(slide, x, y - ink_center_offset_in(TRACKER_PT, "numeral"), TRACKER_D, TRACKER_D,
+                 [[(str(num), TRACKER_PT - 1, 600, C["canvas"] if cur else C["ink_faint"])]],
+                 align=PP_ALIGN.CENTER, anchor=MSO_ANCHOR.MIDDLE, wrap=False)
+        x += TRACKER_D + TRACKER_GAP
+    label = tracker_label(chapters, chapter, deck)
+    if label:
+        add_text(slide, x + 0.06, y - ink_center_offset_in(TRACKER_PT), 6.0, TRACKER_D,
+                 [[(label, TRACKER_PT, 600, C["primary_deep"])]], anchor=MSO_ANCHOR.MIDDLE, wrap=False)
+
+
+def tracker_label(chapters: list, chapter: int, deck: dict) -> str:
+    """いまの章の短い名前: 章扉の tracker_label、無ければ章扉のタイトル。"""
+    divs = [s for s in deck.get("slides", []) if s.get("pattern") == "section_divider"]
+    if 0 <= chapter < len(divs):
+        return str(divs[chapter].get("tracker_label") or divs[chapter].get("title", ""))
+    return ""
+
+
+def slide_chapters(slides: list) -> list:
+    """各スライドが属する章の添字(最初の章扉より前は None)。"""
+    out, cur = [], None
+    for s in slides:
+        if s.get("pattern") == "section_divider":
+            cur = 0 if cur is None else cur + 1
+        out.append(cur)
+    return out
+
+
+# ---- scorecard: 指標ごとの行に、値・推移の小さな線(sparkline)・達成率の棒・状態を並べる
+
+SCORE_STATUS = {"good": ("success", "順調"), "watch": ("warning", "注意"), "bad": ("danger", "遅れ")}
+SCORE_COLS = ("指標", "実績", "推移", "達成率", "状態")
+SCORE_VALUE_PT = 22
+
+
+def _score_label_blocks(r: dict) -> list[dict]:
+    b = [{"parts": [(r.get("label", ""), RAIL_HEAD_PT, 600, C["ink"])], "size": RAIL_HEAD_PT, "kind": "text"}]
+    if r.get("note"):
+        b.append({"parts": [(r["note"], TS["kpi_sub"], 400, C["ink_subtle"])], "size": TS["kpi_sub"],
+                  "kind": "text", "gap_before": OPT["gap_in"]["metric_subline"] * 0.5, "gap_name": "score_note"})
+    return b
+
+
+def _scorecard_layout(spec: dict, h: float) -> dict:
+    """列幅は12列グリッドから固定(指標4・実績2・推移2・達成率3・状態1)。行の高さは最も高い指標名から。"""
+    rows = spec.get("rows", [])[:8]
+    x, w = grid(0, 12)
+    # 列は12列グリッドの取り分(指標4・実績2・推移2・達成率3・状態1)。他のパターンと同じ grid() で切る
+    spans, col, widths = (4, 2, 2, 3, 1), 0, []
+    for sp in spans:
+        widths.append(grid(col, sp)[1])
+        col += sp
+    gut = LAY["gutter_in"]
+    head_h = drawn_line_h(TS["kpi_sub"]) + 0.16
+    value_h = drawn_line_h(SCORE_VALUE_PT)
+    # 行ごとの高さ: 指標名(+注記)か値の高い方 + 上下の余白。余りは全行に等しく配る(上限 0.95in)
+    mins = [max(_stack_drawn_h(_score_label_blocks(r), widths[0]), value_h) + 0.12 for r in rows]
+    avail = h - 0.10 - head_h
+    slack = max(0.0, avail - sum(mins)) / max(1, len(rows))
+    row_hs = [min(m + slack, max(m, 0.95)) for m in mins]
+    if sum(row_hs) > avail > 0:          # 入りきらない: 枠は帯の中に縮め、溢れは overflow で報告する
+        k = avail / sum(row_hs)
+        row_hs = [r * k for r in row_hs]
+    need = head_h + sum(mins)
+    off = max(0.0, (avail - sum(row_hs)) * 0.4)
+    return dict(rows=rows, x=x, widths=widths, gut=gut, head_h=head_h, row_hs=row_hs, off=off,
+                need_h=need, overflow=need > h - 0.10)
+
+
+def add_sparkline(slide, x, y, w, h, values, color, *, focal_last=True):
+    """語の大きさの折れ線(Tufte)。セルの箱の中へ値を正規化して描く — 箱の外へは出ない。末尾に点。"""
+    vals = [float(v) for v in values if isinstance(v, (int, float)) and not isinstance(v, bool)]
+    if len(vals) < 2:
+        return
+    lo, hi = min(vals), max(vals)
+    span = (hi - lo) or 1.0
+    pad = 0.05
+    pts = [(x + pad + (w - 2 * pad) * i / (len(vals) - 1), y + pad + (h - 2 * pad) * (1 - (v - lo) / span))
+           for i, v in enumerate(vals)]
+    emu = [(int(Inches(px)), int(Inches(py))) for px, py in pts]
+    fb = slide.shapes.build_freeform(emu[0][0], emu[0][1], scale=1.0)
+    fb.add_line_segments(emu[1:], close=False)
+    sh = fb.convert_to_shape()
+    sh.fill.background()
+    sh.line.color.rgb = color
+    sh.line.width = Pt(1.75)
+    sh.shadow.inherit = False
+    _strip_style(sh)
+    sh.name = "sparkline"
+    if focal_last:
+        d = 0.09
+        lx, ly = pts[-1]
+        dot = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(lx - d / 2), Inches(ly - d / 2), Inches(d), Inches(d))
+        dot.fill.solid()
+        dot.fill.fore_color.rgb = color
+        dot.line.fill.background()
+        dot.shadow.inherit = False
+        _strip_style(dot)
+
+
+def p_scorecard(slide, spec, deck):
+    """スコアカード: 指標の行ごとに 実績(値+単位) → 推移(sparkline) → 達成率(棒と %) → 状態(色の点+語)。
+    KPI のカードを並べるより、6-8 指標を一目で見比べられる(経営会議の月次レビューの定番)。状態は
+    色だけでなく語(順調・注意・遅れ)も書く。focal の行は淡い主色の帯で立てる。"""
+    y0, h = body_region(spec)
+    L = _scorecard_layout(spec, h)
+    rows = L["rows"]
+    if not rows:
+        return
+    if L["overflow"]:
+        print(f"WARN: scorecard の行が本文帯に収まらない({L['need_h']:.2f}in > {h - 0.10:.2f}in) — 行か注記を減らす")
+    xs, cx = [], L["x"]
+    for wd in L["widths"]:
+        xs.append(cx)
+        cx += wd + L["gut"]
+    w_all = xs[-1] + L["widths"][-1] - L["x"]
+    top = y0 + 0.05 + L["off"]
+    heads = spec.get("columns") or SCORE_COLS
+    for i, (hx, wd) in enumerate(zip(xs, L["widths"])):
+        add_text(slide, hx, top, wd, L["head_h"], [[(str(heads[i]) if i < len(heads) else "", TS["kpi_sub"], 600,
+                                                      C["ink_subtle"])]],
+                 align=PP_ALIGN.LEFT if i in (0, 2, 3) else PP_ALIGN.RIGHT if i == 1 else PP_ALIGN.CENTER,
+                 wrap=False)
+    y = top + L["head_h"]
+    add_line(slide, L["x"], y, L["x"] + w_all, y, C["ink_subtle"], 1.0)
+    for r, rh in zip(rows, L["row_hs"]):
+        focal = bool(r.get("focal"))
+        if focal:
+            add_rect(slide, L["x"] - 0.08, y + 0.02, w_all + 0.16, rh - 0.04, C["primary_pale"], radius_pt=4)
+        blocks = _score_label_blocks(r)
+        lh = _stack_drawn_h(blocks, L["widths"][0])
+        stack_block(slide, xs[0], y + (rh - lh) / 2, L["widths"][0], lh, blocks)
+        vpt = SCORE_VALUE_PT
+        vparts = [(str(r.get("value", "")), vpt, 700, C["primary_deep"])]
+        if r.get("unit"):
+            vparts.append(_unit_part(r["unit"], TS["kpi_sub"]))
+        add_text(slide, xs[1], y, L["widths"][1], rh, [vparts], align=PP_ALIGN.RIGHT, anchor=MSO_ANCHOR.MIDDLE,
+                 wrap=False)
+        sw, shh = L["widths"][2] - 0.16, max(0.0, min(0.42, rh - 0.20))
+        if shh >= 0.12:                  # 行が潰れたとき(overflow)は線を描かない — 隣の行へはみ出させない
+            add_sparkline(slide, xs[2] + 0.08, y + (rh - shh) / 2, sw, shh, r.get("trend") or [],
+                          C["primary"] if focal else C["primary_deep"])
+        prog = r.get("progress")
+        if isinstance(prog, (int, float)) and not isinstance(prog, bool):
+            frac = max(0.0, min(1.0, float(prog)))
+            bw = L["widths"][3] - 0.72
+            bh = 0.14
+            by = y + (rh - bh) / 2
+            add_rect(slide, xs[3], by, bw, bh, C["surface_tint"], radius_pt=3)
+            if frac > 0:
+                add_rect(slide, xs[3], by, max(bh, bw * frac), bh, C["primary"], radius_pt=3)
+            add_text(slide, xs[3] + bw + 0.06, y, 0.66, rh,
+                     [[(f"{round(float(prog) * 100)}%", TS["kpi_sub"], 600, C["ink"])]],
+                     anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.RIGHT, wrap=False)
+        st = SCORE_STATUS.get(r.get("status"))
+        if st:
+            d = 0.14
+            sx = xs[4] + 0.04
+            dot = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(sx), Inches(y + (rh - d) / 2), Inches(d), Inches(d))
+            dot.fill.solid()
+            dot.fill.fore_color.rgb = C[st[0]]
+            dot.line.fill.background()
+            dot.shadow.inherit = False
+            _strip_style(dot)
+            add_text(slide, sx + d + 0.06, y, L["widths"][4] - d - 0.06, rh,
+                     [[(r.get("status_label") or st[1], TS["kpi_sub"], 600, C["ink"])]],
+                     anchor=MSO_ANCHOR.MIDDLE, wrap=False)
+        y += rh
+        add_line(slide, L["x"], y, L["x"] + w_all, y, C["rule"], 0.5)
+
+
+# ---- pull_quote: 顧客・現場の声を証拠として1枚で見せる
+
+QUOTE_PT = 30
+QUOTE_MAX_LINES = 4
+
+
+def _quote_blocks(q: str) -> list[dict]:
+    return [{"parts": [(q, QUOTE_PT, 600, C["ink"])], "size": QUOTE_PT, "kind": "text"}]
+
+
+def _attr_blocks(spec: dict) -> list[dict]:
+    b = [{"parts": [(spec.get("attribution", ""), TS["kpi_label"], 600, C["ink"])], "size": TS["kpi_label"], "kind": "text"}]
+    if spec.get("role"):
+        b.append({"parts": [(spec["role"], TS["kpi_sub"], 400, C["ink_subtle"])], "size": TS["kpi_sub"], "kind": "text",
+                  "gap_before": OPT["gap_in"]["metric_subline"] * 0.6, "gap_name": "quote_role"})
+    return b
+
+
+def _pull_quote_layout(spec: dict, h: float) -> dict:
+    x, w = grid(1, 10)
+    text_x = x + 1.05
+    text_w = w - 1.05
+    q = str(spec.get("quote", "")).strip("「」\"“”")
+    lines = wrap_natural(q, text_w, QUOTE_PT, 600).split("\n") if q else []
+    q_h = _stack_drawn_h(_quote_blocks(q), text_w) if q else 0.0
+    attr_h = _stack_drawn_h(_attr_blocks(spec), text_w)
+    need = q_h + 0.46 + attr_h
+    return dict(x=x, text_x=text_x, text_w=text_w, quote=q, lines=lines, q_h=q_h, attr_h=attr_h,
+                need_h=need, overflow=need > h - 0.10 or len(lines) > QUOTE_MAX_LINES)
+
+
+def p_pull_quote(slide, spec, deck):
+    """引用: 主色の大きな引用符 → 30pt の声 → 細い罫 → 名前と立場。声は証拠であって飾りではない —
+    だれが・どこで言ったかを必ず添える(attribution 必須)。文字を縮めて収めず、長ければ声を切る。"""
+    y0, h = body_region(spec)
+    L = _pull_quote_layout(spec, h)
+    if L["overflow"]:
+        print(f"WARN: 引用が本文帯に収まらない({len(L['lines'])} 行) — 声を {QUOTE_MAX_LINES} 行までに切る")
+    top = y0 + max(0.05, (h - L["need_h"]) * 0.42)
+    mark_pt = 110
+    add_text(slide, L["x"], top - 0.28, 1.0, drawn_line_h(mark_pt) + 0.1, [[("“", mark_pt, 700, C["primary"])]],
+             wrap=False)
+    qb = _quote_blocks(L["quote"])
+    stack_block(slide, L["text_x"], top, L["text_w"], stack_optical_height(qb, L["text_w"]), qb)
+    ry = top + L["q_h"] + 0.22
+    add_line(slide, L["text_x"], ry, L["text_x"] + 0.9, ry, C["primary"], 1.5)
+    ab = _attr_blocks(spec)
+    stack_block(slide, L["text_x"], ry + 0.24, L["text_w"], stack_optical_height(ab, L["text_w"]), ab)
+
+
+# ---- icon_grid: 能力・特徴・原則を、アイコン付きのタイルで並べる
+
+def _tile_blocks(it: dict, ink, sub) -> list[dict]:
+    b = [{"parts": [(it.get("label", ""), RAIL_HEAD_PT + 1, 700, ink)], "size": RAIL_HEAD_PT + 1, "kind": "text"}]
+    if it.get("desc"):
+        b.append({"parts": [(it["desc"], TS["body_small"], 400, sub)], "size": TS["body_small"], "kind": "text",
+                  "gap_before": OPT["gap_in"]["heading_body"], "gap_name": "tile_desc"})
+    return b
+
+
+ICON_DISC = 0.58
+
+
+def _icon_grid_layout(spec: dict, h: float) -> dict:
+    items = spec.get("items", [])[:9]
+    n = max(1, len(items))
+    cols = n if n <= 4 else (3 if n in (5, 6, 9) else 4)
+    nrows = -(-n // cols)
+    x, w = grid(0, 12)
+    gut = LAY["gutter_in"] * 1.5
+    tw = (w - gut * (cols - 1)) / cols
+    pad = 0.24
+    text_w = tw - 2 * pad
+    body = max((_stack_drawn_h(_tile_blocks(it, C["ink"], C["ink_subtle"]), text_w) for it in items), default=0.3)
+    tile_min = 2 * pad + ICON_DISC + 0.20 + body
+    avail = h - 0.10 - gut * (nrows - 1)
+    # 入りきらないとき(overflow)もタイルの枠は本文帯の中に置く: 枠は帯の高さで止め、溢れは中身の側で報告する
+    # 2.9in is a preferred cap, not a hard cap: when text needs more room,
+    # keep the tile tall enough for its measured contents if the body band allows it.
+    tile_h = min(max(tile_min, avail / nrows * 0.92), max(tile_min, 2.9), avail / nrows)
+    need = nrows * tile_min + gut * (nrows - 1)
+    grid_h = nrows * tile_h + gut * (nrows - 1)
+    return dict(items=items, cols=cols, nrows=nrows, x=x, tw=tw, gut=gut, pad=pad, text_w=text_w,
+                tile_h=tile_h, off=max(0.0, (h - 0.10 - grid_h) * 0.42), need_h=need, overflow=need > h - 0.10)
+
+
+def p_icon_grid(slide, spec, deck):
+    """アイコンのタイル: 3-9 項目を、淡い円の中のアイコン → 名前 → 一文で並べる。並列の項目(能力・
+    原則・提供価値)に向く。アイコンは全項目に付け、必ず名前と一緒に使う。focal の1枚だけ濃い主色の
+    面で立て、文字を反転する(1画面に濃い面は1つ)。"""
+    y0, h = body_region(spec)
+    L = _icon_grid_layout(spec, h)
+    if not L["items"]:
+        return
+    if L["overflow"]:
+        print(f"WARN: icon_grid のタイルが本文帯に収まらない({L['need_h']:.2f}in > {h - 0.10:.2f}in) — 一文を短くする")
+    top = y0 + 0.05 + L["off"]
+    for i, it in enumerate(L["items"]):
+        r, c = divmod(i, L["cols"])
+        tx = L["x"] + c * (L["tw"] + L["gut"])
+        ty = top + r * (L["tile_h"] + L["gut"])
+        focal = bool(it.get("focal"))
+        fill = C["primary_deep"] if focal else C["surface_tint"]
+        ink, sub = (C["canvas"], C["primary_pale"]) if focal else (C["ink"], C["ink_subtle"])
+        add_rect(slide, tx, ty, L["tw"], L["tile_h"], fill, radius_pt=LAY["card"]["radius_pt"])
+        dx, dy = tx + L["pad"], ty + L["pad"]
+        disc = slide.shapes.add_shape(MSO_SHAPE.OVAL, Inches(dx), Inches(dy), Inches(ICON_DISC), Inches(ICON_DISC))
+        disc.fill.solid()
+        disc.fill.fore_color.rgb = C["primary"] if focal else C["primary_pale"]
+        disc.line.fill.background()
+        disc.shadow.inherit = False
+        _strip_style(disc)
+        if it.get("icon"):
+            isz = ICON_DISC * 0.56
+            draw_icon(slide, it["icon"], dx + (ICON_DISC - isz) / 2, dy + (ICON_DISC - isz) / 2, size=isz,
+                      color=C["canvas"] if focal else C["primary_deep"])
+        blocks = _tile_blocks(it, ink, sub)
+        stack_block(slide, dx, dy + ICON_DISC + 0.20, L["text_w"], stack_optical_height(blocks, L["text_w"]), blocks)
+
+
+# ---- agenda tiles: 目次を番号の大きなタイルで横に並べる(章の再掲では current を立てる)
+
+AGENDA_NUM_PT = 54
+
+
+def _agenda_tile_blocks(it, cur: bool) -> list[dict]:
+    label = it if isinstance(it, str) else it.get("label", "")
+    desc = None if isinstance(it, str) else it.get("desc")
+    b = [{"parts": [(label, 20, 700, C["ink"] if cur or cur is None else C["ink_subtle"])], "size": 20, "kind": "text"}]
+    if desc:
+        b.append({"parts": [(desc, TS["body_small"], 400, C["ink_subtle"])], "size": TS["body_small"], "kind": "text",
+                  "gap_before": OPT["gap_in"]["heading_body"], "gap_name": "agenda_desc"})
+    return b
+
+
+def _agenda_tiles_layout(spec: dict, h: float) -> dict:
+    items = spec.get("items", [])[:5]
+    n = max(1, len(items))
+    x, w = grid(0, 12)
+    gut = LAY["gutter_in"] * 1.5
+    tw = (w - gut * (n - 1)) / n
+    num_h = drawn_line_h(AGENDA_NUM_PT) + 0.06
+    pad = 0.28
+    body = max((_stack_drawn_h(_agenda_tile_blocks(it, True), tw - 2 * pad) for it in items), default=0.3)
+    need = pad + 0.20 + num_h + 0.16 + body + pad        # 0.20 は帯(0.06)と数字までの間を含む
+    # タイルは本文帯の 7 割まで伸ばす(目次は1枚で章の地図になる。上に寄った細い帯にしない)
+    tile_h = min(h - 0.10, max(need, (h - 0.10) * 0.70))
+    return dict(items=items, x=x, tw=tw, gut=gut, pad=pad, num_h=num_h, body=body, need_h=need, tile_h=tile_h,
+                overflow=need > h - 0.10)
+
+
+def p_agenda_tiles(slide, spec, deck, y0, h):
+    L = _agenda_tiles_layout(spec, h)
+    if L["overflow"]:
+        print(f"WARN: agenda のタイルが本文帯に収まらない({L['need_h']:.2f}in > {h - 0.10:.2f}in) — 説明を短くする")
+    cur_i = spec.get("current")
+    top = y0 + 0.05 + max(0.0, (h - 0.10 - L["tile_h"]) * 0.42)
+    pad = L["pad"]
+    for i, it in enumerate(L["items"]):
+        tx = L["x"] + i * (L["tw"] + L["gut"])
+        cur = None if cur_i is None else (i == cur_i)
+        lit = cur or cur is None
+        # 再掲(current あり)では、いまの章だけ濃い面で立てる。初出(current なし)は全タイルを同じ淡い面に
+        dark = cur is True
+        add_rect(slide, tx, top, L["tw"], L["tile_h"], C["primary_deep"] if dark else C["surface_tint"],
+                 radius_pt=LAY["card"]["radius_pt"])
+        add_rect(slide, tx + pad, top + pad, 0.56, 0.06, C["primary_pale"] if dark else (C["primary"] if lit else C["rule"]))
+        add_text(slide, tx + pad, top + pad + 0.20, L["tw"] - 2 * pad, L["num_h"],
+                 [[(f"{i + 1:02d}", AGENDA_NUM_PT, 700,
+                    C["canvas"] if dark else (C["primary"] if lit else C["ink_faint"]))]], wrap=False)
+        blocks = _agenda_tile_blocks(it, cur)
+        if dark:
+            for b in blocks:
+                b["parts"] = [(t, sz, wt, C["canvas"] if wt == 700 else C["primary_pale"]) for t, sz, wt, _c in b["parts"]]
+        bw = L["tw"] - 2 * pad
+        stack_block(slide, tx + pad, top + pad + 0.20 + L["num_h"] + 0.16, bw, stack_optical_height(blocks, bw), blocks)
+
+
 def card_copy_estimate(spec: dict) -> list[dict]:
     """カード型(process_flow / column_framework / two_column)の各カードについて、本文が占める高さと
     カードの高さの見込みを返す。描画と同じ寸法計算(_*_layout)を使うので、validate_spec がビルド前に
@@ -4720,14 +5171,20 @@ PATTERNS = {
     "guidance_progress": p_guidance_progress,
     "diagram": p_diagram,
     "chart_grid": p_chart_grid,
+    "scorecard": p_scorecard,
+    "pull_quote": p_pull_quote,
+    "icon_grid": p_icon_grid,
 }
+
+import act_patterns                                    # noqa: E402  追加の24型(同じ部品で組む)
+act_patterns.install(sys.modules[__name__])
 
 NO_CHROME = {"cover", "section_divider"}
 
 # 反転(tone: "inverse"): 地をテンプレートのブランドの濃色(primary_deep)にし、色の役割を入れ替えて描く。
 # 文字の役割と面の役割を「対」で入れ替える — 片方だけ替えると、淡い地で読めていた組(濃い帯の上の白字など)が
 # 濃い地で潰れる。地はスライドの背景属性で塗る(全面の矩形は置かない: 編集で毎回つかんでしまう)。
-INVERSE_OK = {"cover", "statement", "section_divider"}
+INVERSE_OK = {"cover", "statement", "section_divider", "pull_quote"}
 INVERSE_SWAP = {
     "ink": "canvas", "ink_strong": "canvas", "ink_subtle": "surface", "ink_faint": "chart_gray_light",
     "primary_deep": "primary_pale", "primary": "primary_pale", "rule": "chart_gray",
@@ -4813,7 +5270,9 @@ def build(spec_path: Path, out_path: Path) -> Path:
     total = len(slides)
     deck["_chapters"] = [(s.get("number") or i + 1, s.get("title", ""))
                          for i, s in enumerate([sp for sp in slides if sp.get("pattern") == "section_divider"])]
+    chapter_of = slide_chapters(slides)
     for idx, spec in enumerate(slides, start=1):
+        deck["_cur_chapter"] = chapter_of[idx - 1]
         pattern = spec.get("pattern")
         if pattern not in PATTERNS:
             raise SystemExit(f"slide {idx}: unknown pattern '{pattern}'. valid: {sorted(PATTERNS)}")
