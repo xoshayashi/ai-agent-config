@@ -130,18 +130,23 @@ def external_pool_for_host(host: str) -> list[str]:
     return [reviewer for reviewer in SUPPORTED_REVIEWERS if reviewer != blocked]
 
 
-def automatic_pool_for_host(host: str | None) -> list[str]:
-    """Routes eligible for implicit selection, excluding auth-UI-capable agy."""
+def reviewer_pool_for_host(
+    host: str | None, *, include_antigravity: bool = False
+) -> list[str]:
+    """Build a host-safe pool, optionally retaining Antigravity for diagnostics."""
     candidates = (
         list(SUPPORTED_REVIEWERS)
         if host is None
         else external_pool_for_host(host)
     )
-    return [
-        reviewer
-        for reviewer in candidates
-        if reviewer != "antigravity"
-    ]
+    if include_antigravity:
+        return candidates
+    return [reviewer for reviewer in candidates if reviewer != "antigravity"]
+
+
+def automatic_pool_for_host(host: str | None) -> list[str]:
+    """Routes eligible for implicit selection, excluding auth-UI-capable agy."""
+    return reviewer_pool_for_host(host)
 
 
 @dataclass
@@ -466,7 +471,7 @@ def _run_doctor(candidates: "list[str]", timeout: float, as_json: bool) -> int:
                 {
                     "reviewer": candidate,
                     "status": "skipped",
-                    "returncode": -1,
+                    "returncode": None,
                     "duration_seconds": 0.0,
                     "stderr_tail": (
                         "not probed to avoid opening Google Sign-In; "
@@ -643,21 +648,21 @@ def _main(argv: "Sequence[str] | None" = None) -> int:
 
     # Determine pool of candidates
     if args.reviewer == "auto":
-        if args.doctor and args.host is None:
-            # Keep every reviewer in the diagnostic report; _run_doctor skips agy.
-            candidates = list(SUPPORTED_REVIEWERS)
-        elif args.doctor:
-            # Keep Antigravity visible in the doctor's report as skipped.
-            candidates = external_pool_for_host(args.host)
-        else:
-            # Do not launch agy's authentication UI as an implicit route.
-            candidates = automatic_pool_for_host(args.host)
+        # Diagnostics retain Antigravity so it can be reported as skipped;
+        # automatic review routes exclude it to avoid launching sign-in UI.
+        candidates = reviewer_pool_for_host(
+            args.host, include_antigravity=args.doctor
+        )
     else:
         candidates = [args.reviewer]
 
+    no_available_automatic_reviewer = False
     # Reorder candidates: prioritize available binaries
     if args.reviewer == "auto":
         available_candidates = [c for c in candidates if is_reviewer_available(c)]
+        no_available_automatic_reviewer = (
+            not args.doctor and not available_candidates
+        )
         unavailable_candidates = [c for c in candidates if not is_reviewer_available(c)]
         candidates = available_candidates + unavailable_candidates
         if not candidates:
@@ -716,6 +721,20 @@ def _main(argv: "Sequence[str] | None" = None) -> int:
             return 2
     else:
         prompt = args.prompt
+
+    if no_available_automatic_reviewer:
+        if (
+            args.host != "antigravity"
+            and is_reviewer_available("antigravity")
+        ):
+            sys.stderr.write(
+                "route_review: no available non-interactive reviewer; "
+                "select Antigravity explicitly with --reviewer antigravity.\n"
+            )
+        else:
+            sys.stderr.write(
+                "route_review: no available reviewer in the automatic pool.\n"
+            )
 
     # Append git context if requested
     if args.include_git:

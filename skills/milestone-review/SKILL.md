@@ -96,6 +96,8 @@ Full table + selection heuristics in `references/_reviewer_routing.md`.
 
       # Dispatch one review. auto = first available non-host CLI other than
       # Antigravity, with automatic failover among those routes.
+      # If none is available and agy is installed, the error points to the
+      # explicit --reviewer antigravity option.
       python3 <skill_dir>/scripts/route_review.py \
           --reviewer auto \
           --host claude-code|codex|antigravity \

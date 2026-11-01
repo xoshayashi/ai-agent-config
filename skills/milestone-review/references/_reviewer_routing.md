@@ -42,6 +42,9 @@ Antigravity. Two consequences:
    miss: a failover success exits **4** (never 0), a
    `route_review: attempts: ...` one-liner goes to stderr, and `--json`
    carries the full `attempts` trace.
+   If no non-interactive reviewer is installed but Antigravity is, `auto`
+   exits with an error that points to the explicit `--reviewer antigravity`
+   option.
 
    Effective automatic external pool per host (Antigravity can be selected
    explicitly with `--reviewer antigravity`):
@@ -239,6 +242,8 @@ Consequences, all built into `route_review.py`:
   skipped so a diagnostic cannot launch Google Sign-In. Run it before the
   first review of a session or after any degraded route. It exits 1 when
   no non-interactive route answers, including when only Antigravity is present.
+  In JSON output, a skipped route has status `skipped` and `returncode: null`
+  because the command was never run.
 
 ## Known limitations (read before Phase 2)
 
