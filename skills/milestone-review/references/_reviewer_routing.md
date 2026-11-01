@@ -237,7 +237,8 @@ Consequences, all built into `route_review.py`:
 - `--doctor --host <host>` re-measures non-interactive routes on demand
   (trivial probe per route, status + seconds). Antigravity is reported as
   skipped so a diagnostic cannot launch Google Sign-In. Run it before the
-  first review of a session or after any degraded route.
+  first review of a session or after any degraded route. It exits 1 when
+  no non-interactive route answers, including when only Antigravity is present.
 
 ## Known limitations (read before Phase 2)
 

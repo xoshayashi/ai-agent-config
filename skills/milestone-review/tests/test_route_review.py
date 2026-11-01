@@ -37,6 +37,7 @@ def _install_fake_run(
 
     def fake_run(cmd, **kwargs):
         captured["cmd"] = list(cmd)
+        captured.setdefault("commands", []).append(list(cmd))
         captured["kwargs"] = kwargs
         if raise_timeout:
             raise _sp.TimeoutExpired(cmd=cmd, timeout=kwargs.get("timeout"))
@@ -888,6 +889,30 @@ def test_main_doctor_probes_pool_and_reports() -> None:
         )
         assert captured["cmd"][0] == "claude", (
             f"doctor must not execute agy, got {captured['cmd']!r}"
+        )
+
+        # Without --host, a doctor run still skips agy. If it is the only
+        # installed CLI, the doctor exits 1 without invoking any CLI.
+        route_review.shutil.which = lambda name: "/fake/agy" if name == "agy" else None
+        captured["commands"] = []
+        rc, out, _ = run_doctor(["--doctor", "--no-host-guard"])
+        assert rc == 1, f"only skipped Antigravity must not count as healthy, got {rc!r}"
+        assert "antigravity" in out and "skipped" in out, (
+            f"host-less doctor must report skipped Antigravity, got {out!r}"
+        )
+        assert captured["commands"] == [], (
+            f"host-less doctor must not invoke agy, got {captured['commands']!r}"
+        )
+
+        # When safe routes are available, the host-less doctor probes them
+        # and continues to skip Antigravity.
+        route_review.shutil.which = lambda name: f"/fake/{name}"
+        captured["commands"] = []
+        rc, out, _ = run_doctor(["--doctor", "--no-host-guard"])
+        assert rc == 0, f"healthy host-less doctor must exit 0, got {rc!r}"
+        assert "antigravity" in out and "skipped" in out
+        assert {cmd[0] for cmd in captured["commands"]} == {"codex", "claude"}, (
+            f"host-less doctor must probe safe routes only, got {captured['commands']!r}"
         )
 
         # Dead pool: no binaries anywhere.

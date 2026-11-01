@@ -614,8 +614,8 @@ def _main(argv: "Sequence[str] | None" = None) -> int:
             "with a trivial prompt and report measured status + seconds per route "
             "(Antigravity is skipped to avoid opening Google Sign-In) "
             f"(probe timeout {DOCTOR_TIMEOUT_SECONDS}s unless --timeout is "
-            "lowered below it). Exit 0 if at least one route answers, 1 if "
-            "the pool is dead. Run it before the first milestone of a "
+            "lowered below it). Exit 0 if a non-interactive route answers, "
+            "1 if none does. Run it before the first milestone of a "
             "session, or after any route degraded."
         ),
     )
