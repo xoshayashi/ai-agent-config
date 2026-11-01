@@ -17,6 +17,7 @@ from pathlib import Path
 
 from deck_text import (footer_text, header_slots, ja_len, list_templates, resolve_tokens,
                        template_of, tts_risks)
+from deck_argument import composition_bar_width_in
 
 REF = Path(__file__).resolve().parent.parent / "references"
 
@@ -460,7 +461,8 @@ def main() -> int:
         return 1
     try:
         tokens = resolve_tokens(template)
-    except ValueError as e:
+        composition_bar_width_in(template)
+    except (ValueError, TypeError, KeyError, AttributeError) as e:
         print(f"ERROR: {e}")
         return 1
 
@@ -1335,7 +1337,7 @@ def main() -> int:
                         if isinstance(v, str) and re.search(r"\d", _period.sub("", _ordinal.sub("", v.strip(), count=1))):
                             return True
                     return False
-                if not (exhibit_tokens(s) | claim_tokens(s)) and not _has_bare_number(exhibit_values(s)):
+                if not (exhibit_tokens(s, template) | claim_tokens(s)) and not _has_bare_number(exhibit_values(s, template)):
                     warns.append(f"{loc}: note「{str(s['note'])[:20]}」— 数値の無いページに Note を置かない。"
                                  "解説は本文か speaker_notes へ移し、note は削除する")
             except Exception as exc:

@@ -13,6 +13,14 @@ from functools import lru_cache
 from pathlib import Path
 
 LEXICON_PATH = Path(__file__).resolve().parent.parent / "references" / "commitment-lexicon.json"
+TOKENS_PATH = Path(__file__).resolve().parent.parent / "references" / "tokens.json"
+COMPOSITION_LABEL_MIN_WIDTH_IN = 0.7
+COMPOSITION_MAX_SEGMENTS = 6
+PROGRESS_MAX_ROWS = 8
+TARGET_BARS_MAX_ROWS = 8
+FUNNEL_MAX_STAGES = 6
+PRICING_MAX_TIERS = 4
+RANKING_MAX_ITEMS = 10
 
 # 証拠(EXHIBIT): 構造化された図表の中身。ここに出る数値だけが「示された数値」
 EXHIBIT_KEYS = {
@@ -114,6 +122,72 @@ def _strings_and_numbers(obj, out: list):
         out.append(obj)
 
 
+def composition_bar_width_in(template: str | None = None) -> float:
+    """12-column body width used by composition_bar under the deck's selected template."""
+    from deck_text import resolve_tokens
+    tokens = resolve_tokens(template)
+    layout, slide = tokens["layout"], tokens["slide"]
+    columns, gutter = layout["grid_columns"], layout["gutter_in"]
+    margin, slide_w = layout["margin_x_in"], slide["width_in"]
+    try:
+        numeric_columns = float(columns)
+    except (TypeError, ValueError, OverflowError):
+        numeric_columns = float("nan")
+    if (not isinstance(columns, (int, float)) or isinstance(columns, bool)
+            or not math.isfinite(numeric_columns) or not numeric_columns.is_integer() or numeric_columns < 12):
+        raise ValueError("layout.grid_columns は12以上の整数")
+    columns = int(numeric_columns)
+    if any(not _finite_nonnegative(value) for value in (margin, gutter, slide_w)):
+        raise ValueError("テンプレートのスライド幅・余白・列間隔は有限の非負数")
+    margin, gutter, slide_w = float(margin), float(gutter), float(slide_w)
+    try:
+        content_w = slide_w - 2 * margin
+        if content_w <= 0 or content_w - gutter * (columns - 1) <= 0:
+            raise ValueError("テンプレートのグリッド幅は正の数")
+        col_w = (content_w - gutter * (columns - 1)) / columns
+        width = 12 * col_w + 11 * gutter
+    except ArithmeticError as exc:
+        raise ValueError("テンプレートのグリッド幅を計算できない") from exc
+    if not math.isfinite(width) or width <= 0:
+        raise ValueError("構成バーの幅は有限の正の数")
+    return width
+
+
+def _finite_nonnegative(value) -> bool:
+    if not isinstance(value, (int, float)) or isinstance(value, bool):
+        return False
+    try:
+        number = float(value)
+    except OverflowError:
+        return False
+    return math.isfinite(number) and number >= 0
+
+
+def composition_bar_label(value: float, total: float, segment_width_in: float) -> str | None:
+    """Label text shared by the renderer and the audit; narrow segments have no visible percentage."""
+    if not math.isfinite(segment_width_in) or segment_width_in < COMPOSITION_LABEL_MIN_WIDTH_IN:
+        return None
+    return f"{value / total * 100:.0f}%" if total else "0%"
+
+
+def _audit_number(value, default: float = 0.0) -> float:
+    try:
+        result = float(value) if value not in (None, "") else default
+        return result if math.isfinite(result) else default
+    except (TypeError, ValueError, OverflowError):
+        return default
+
+
+def _audit_items(value, limit: int) -> list[dict]:
+    if not isinstance(value, list):
+        return []
+    return [item for item in value[:limit] if isinstance(item, dict)]
+
+
+def _visible_fields(items: list[dict], *fields: str) -> list[dict]:
+    return [{key: item[key] for key in fields if key in item} for item in items]
+
+
 def material_tokens(values: list) -> set[str]:
     """「数値+単位」のトークン集合。年や四半期は数えない(データではなく期間)。"""
     tokens: set[str] = set()
@@ -139,13 +213,72 @@ _COMPOSITE_KEYS = {"chart": ("chart",), "table": ("table",), "kpi": ("kpis",), "
                    "text": ("heading", "points"), "callout": ("heading", "statement")}
 
 
-def audit_view(slide: dict) -> dict:
+def audit_view(slide: dict, template: str | None = None) -> dict:
     """監査が歩く形のスライド。composite は grid を外し、ブロックの中身を種別どおりのキーで並べ直す
     (text の見出し・要点と callout は主張、chart / table / kpi / diagram は証拠)。他のパターンはそのまま。"""
     if slide.get("pattern") == "big_number":
         view = dict(slide)
         if slide.get("value") not in (None, ""):
             view["facts"] = [{"value": slide["value"], "unit": slide.get("unit", "")}]
+        return view
+    pattern = slide.get("pattern")
+    if pattern in {"progress_bars", "target_bars", "composition_bar", "funnel", "pricing_tiers", "ranking"}:
+        # Start from visible text only; arbitrary evidence-shaped or pattern-inapplicable
+        # fields must not become facts just because they are present in the input.
+        visible_keys = {"pattern"}
+        visible_keys.update(key for key in ("title", "subtitle", "insight", "sticker")
+                            if isinstance(slide.get(key), str))
+        view = {key: slide[key] for key in visible_keys if key in slide}
+        facts: list = []
+        if pattern == "progress_bars":
+            bars = _audit_items(slide.get("bars"), PROGRESS_MAX_ROWS)
+            view["bars"] = _visible_fields(bars, "label", "note")
+            facts.extend(r.get("display") or f"{_audit_number(r.get('value')) * 100:.0f}%" for r in bars)
+        elif pattern == "target_bars":
+            if isinstance(slide.get("legend"), str):
+                facts.append(slide["legend"])
+            rows = _audit_items(slide.get("rows"), TARGET_BARS_MAX_ROWS)
+            view["rows"] = _visible_fields(rows, "label", "note")
+            facts.extend(r.get("display") or f"{_audit_number(r.get('actual')) / (_audit_number(r.get('target'), 1.0) or 1.0) * 100:.0f}%"
+                         for r in rows)
+        elif pattern == "composition_bar":
+            segments = _audit_items(slide.get("segments"), COMPOSITION_MAX_SEGMENTS)
+            view["segments"] = _visible_fields(segments, "label", "note")
+            total = sum(_audit_number(s.get("value")) for s in segments) or 1.0
+            bar_width = composition_bar_width_in(template)
+            if isinstance(slide.get("total_label"), str) and slide["total_label"]:
+                facts.append(slide["total_label"])
+            facts.extend(label for s in segments
+                         if (label := composition_bar_label(_audit_number(s.get("value")), total,
+                                                            bar_width * _audit_number(s.get("value")) / total)) is not None)
+        elif pattern == "funnel":
+            stages = _audit_items(slide.get("stages"), FUNNEL_MAX_STAGES)
+            view["stages"] = _visible_fields(stages, "label", "note")
+            facts.extend(s.get("display") or f"{_audit_number(s.get('value')):,.0f}" for s in stages)
+            for i in range(1, len(stages)):
+                previous = _audit_number(stages[i - 1].get("value"))
+                if previous:
+                    facts.append(f"{_audit_number(stages[i].get('value')) / previous * 100:.0f}%")
+        elif pattern == "pricing_tiers":
+            tiers = _audit_items(slide.get("tiers"), PRICING_MAX_TIERS)
+            visible_tiers = _visible_fields(tiers, "name", "note")
+            for visible, tier in zip(visible_tiers, tiers):
+                if isinstance(tier.get("features"), list):
+                    visible["features"] = [feature for feature in tier["features"] if isinstance(feature, str)]
+            view["tiers"] = visible_tiers
+            if isinstance(slide.get("focal_label"), str) and slide["focal_label"] and any(t.get("focal") for t in tiers):
+                facts.append(slide["focal_label"])
+            facts.extend({"value": t.get("price", ""), "unit": t.get("unit", ""),
+                          "label": t.get("name", ""), "note": t.get("note", ""),
+                          "features": ([feature for feature in t["features"] if isinstance(feature, str)]
+                                       if isinstance(t.get("features"), list) else [])}
+                         for t in tiers)
+        elif pattern == "ranking":
+            items = _audit_items(slide.get("items"), RANKING_MAX_ITEMS)
+            unit = slide.get("unit", "")
+            view["items"] = _visible_fields(items, "label")
+            facts.extend(item.get("display") or f"{_audit_number(item.get('value')):g}{unit}" for item in items)
+        view["facts"] = facts
         return view
     if slide.get("pattern") != "composite":
         return slide
@@ -181,10 +314,10 @@ def audit_view(slide: dict) -> dict:
     return view
 
 
-def exhibit_values(slide: dict) -> list:
+def exhibit_values(slide: dict, template: str | None = None) -> list:
     """図表が持つ値(文字列・数値)を平らに集める。"""
     out: list = []
-    _walk(audit_view(slide), EXHIBIT_KEYS, lambda v: _strings_and_numbers(v, out))
+    _walk(audit_view(slide, template), EXHIBIT_KEYS, lambda v: _strings_and_numbers(v, out))
     return out
 
 
@@ -200,23 +333,23 @@ def claim_values(slide: dict) -> list:
 UNIT_SCOPED_KEYS = {"chart", "charts", "series", "values", "items", "bars", "current", "stages", "phases"}
 
 
-def _unit_scoped_values(slide: dict) -> list:
+def _unit_scoped_values(slide: dict, template: str | None = None) -> list:
     """図表そのものの数値(chart の series 値、waterfall の items 等)だけを平らに集める。"""
     out: list = []
-    _walk(audit_view(slide), UNIT_SCOPED_KEYS, lambda v: _strings_and_numbers(v, out))
+    _walk(audit_view(slide, template), UNIT_SCOPED_KEYS, lambda v: _strings_and_numbers(v, out))
     return out
 
 
-def exhibit_tokens(slide: dict) -> set[str]:
+def exhibit_tokens(slide: dict, template: str | None = None) -> set[str]:
     """その図表が「示している」数値。"""
-    values = exhibit_values(slide)
+    values = exhibit_values(slide, template)
     tokens = material_tokens(values)
     # 図表の裸の数値(chart の values 等)も、単位を付けたトークンとして数える — ただし対象は
     # 図表データそのものだけで、facts / hero / table の数には付けない
-    view = audit_view(slide)
+    view = audit_view(slide, template)
     unit = view.get("unit") or (view.get("chart") or {}).get("unit")
     if unit:
-        for v in _unit_scoped_values(slide):
+        for v in _unit_scoped_values(slide, template):
             # 図表全体の単位を付けるのは「裸の数」だけ。「114%」のように単位を持つ文字列や、
             # 単位と組になった値には付けない(そうしないと 114% が 114億円 に化ける)
             if isinstance(v, bool):

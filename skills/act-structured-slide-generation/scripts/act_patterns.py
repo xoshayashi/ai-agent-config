@@ -13,6 +13,15 @@ build_deck からは install(module) で登録する。この模块は build_dec
 """
 from __future__ import annotations
 
+from deck_argument import (
+    COMPOSITION_MAX_SEGMENTS,
+    FUNNEL_MAX_STAGES,
+    PRICING_MAX_TIERS,
+    PROGRESS_MAX_ROWS,
+    RANKING_MAX_ITEMS,
+    TARGET_BARS_MAX_ROWS,
+)
+
 B = None        # install() が build_deck のモジュールを入れる
 
 
@@ -28,11 +37,11 @@ def install(mod) -> None:
 SPEC = {
     "big_number": (None, 0, 0, (), True),
     "number_strip": ("numbers", 2, 4, ("value", "label"), True),
-    "progress_bars": ("bars", 2, 8, ("label", "value"), True),
-    "ranking": ("items", 3, 10, ("label", "value"), True),
-    "funnel": ("stages", 3, 6, ("label", "value"), True),
+    "progress_bars": ("bars", 2, PROGRESS_MAX_ROWS, ("label", "value"), True),
+    "ranking": ("items", 3, RANKING_MAX_ITEMS, ("label", "value"), True),
+    "funnel": ("stages", 3, FUNNEL_MAX_STAGES, ("label", "value"), True),
     "pyramid": ("tiers", 3, 5, ("label",), False),
-    "composition_bar": ("segments", 2, 6, ("label", "value"), True),
+    "composition_bar": ("segments", 2, COMPOSITION_MAX_SEGMENTS, ("label", "value"), True),
     "heatmap_table": ("rows", 2, 8, (), True),
     "swot": (None, 0, 0, (), False),
     "pros_cons": (None, 0, 0, (), False),
@@ -46,10 +55,10 @@ SPEC = {
     "vertical_timeline": ("events", 3, 7, ("date", "label"), False),
     "faq": ("pairs", 2, 6, ("q", "a"), False),
     "team": ("people", 2, 6, ("name", "role"), False),
-    "pricing_tiers": ("tiers", 2, 4, ("name", "price"), True),
+    "pricing_tiers": ("tiers", 2, PRICING_MAX_TIERS, ("name", "price"), True),
     "quote_grid": ("quotes", 2, 4, ("quote", "attribution"), False),
     "nine_box": ("items", 1, 12, ("label", "x", "y"), False),
-    "target_bars": ("rows", 2, 8, ("label", "actual", "target"), True),
+    "target_bars": ("rows", 2, TARGET_BARS_MAX_ROWS, ("label", "actual", "target"), True),
 }
 REQUIRED = {p: ([k] if k else []) for p, (k, *_r) in SPEC.items()}
 REQUIRED["big_number"] = ["value", "label"]
@@ -139,8 +148,13 @@ def check(s: dict) -> list[str]:
             errs.append("nine_box に x_label と y_label が要る(軸の意味)")
     if pat == "pricing_tiers":
         for j, t in enumerate(s.get("tiers") or []):
-            if isinstance(t, dict) and len(t.get("features") or []) > 6:
-                errs.append(f"pricing_tiers の tiers[{j}].features は6つまで")
+            if isinstance(t, dict):
+                features = t.get("features")
+                if features is not None and (not isinstance(features, list)
+                                             or any(not isinstance(f, str) for f in features)):
+                    errs.append(f"pricing_tiers の tiers[{j}].features は文字列の配列")
+                elif len(features or []) > 6:
+                    errs.append(f"pricing_tiers の tiers[{j}].features は6つまで")
     return errs
 
 
@@ -342,7 +356,8 @@ TL_HEAD = 0.08
 
 
 def _bar_rows_layout(spec, h, key):
-    rows = (spec.get(key) or [])[:8]
+    limit = PROGRESS_MAX_ROWS if key == "bars" else TARGET_BARS_MAX_ROWS
+    rows = (spec.get(key) or [])[:limit]
     lx, lw = B.grid(0, 4)
     bx, bw = B.grid(4, 7)
     vx, vw = B.grid(11, 1)
@@ -422,7 +437,7 @@ def p_target_bars(slide, spec, deck):
 # ---------------------------------------------------------------- 4. ranking
 
 def _ranking_layout(spec, h):
-    items = (spec.get("items") or [])[:10]
+    items = (spec.get("items") or [])[:RANKING_MAX_ITEMS]
     nx, nw = B.grid(0, 1)
     lx, lw = B.grid(1, 4)
     bx, bw = B.grid(5, 6)
@@ -463,7 +478,7 @@ def p_ranking(slide, spec, deck):
 # ---------------------------------------------------------------- 5. funnel
 
 def _funnel_layout(spec, h):
-    st = (spec.get("stages") or [])[:6]
+    st = (spec.get("stages") or [])[:FUNNEL_MAX_STAGES]
     fx, fw = B.grid(0, 8)
     rx, rw = B.grid(8, 4)
     n = max(1, len(st))
@@ -581,7 +596,7 @@ COMP_BAR_H = 0.9
 
 
 def _composition_layout(spec, h):
-    segs = (spec.get("segments") or [])[:6]
+    segs = (spec.get("segments") or [])[:COMPOSITION_MAX_SEGMENTS]
     x, w = B.grid(0, 12)
     legend_cols, _g = _cols(min(3, max(1, len(segs))), gut=0.4)
     rows = -(-len(segs) // 3) if segs else 1
@@ -618,13 +633,15 @@ def p_composition_bar(slide, spec, deck):
     by = top + 0.40
     x = L["x"]
     fills = []
+    from deck_argument import composition_bar_label
     for i, s in enumerate(segs):
         sw = L["w"] * float(s.get("value") or 0) / tot
         f, ink = _seg_fill(i, s.get("focal"))
         fills.append(f)
         B.add_rect(slide, x, by, sw, L["bar_h"], f)
-        if sw >= 0.7:
-            B.add_text(slide, x, by, sw, L["bar_h"], [[(_ratio_text(float(s.get("value") or 0) / tot), 18, 700, ink)]],
+        label = composition_bar_label(float(s.get("value") or 0), tot, sw)
+        if label is not None:
+            B.add_text(slide, x, by, sw, L["bar_h"], [[(label, 18, 700, ink)]],
                        anchor=MSO_ANCHOR.MIDDLE, align=PP_ALIGN.CENTER, wrap=False)
         x += sw
     ly = by + L["bar_h"] + 0.40
@@ -1266,17 +1283,22 @@ def _tier_blocks(t, dark):
     return b
 
 
+def _tier_features(t):
+    features = t.get("features")
+    return [feature for feature in features if isinstance(feature, str)] if isinstance(features, list) else []
+
+
 TAG_H = 0.36
 FEAT_GAP = 0.05
 
 
 def _pricing_layout(spec, h):
-    tiers = (spec.get("tiers") or [])[:4]
+    tiers = (spec.get("tiers") or [])[:PRICING_MAX_TIERS]
     cols, gut = _cols(max(1, len(tiers)))
     pad = 0.22
     tw = cols[0][1] - 2 * pad
     head = max((_h(_tier_blocks(t, False), tw) for t in tiers), default=0.5)
-    feats = max((sum(_h([_b(f, B.TS["body_small"])], tw - 0.34) + FEAT_GAP for f in (t.get("features") or [])) for t in tiers), default=0)
+    feats = max((sum(_h([_b(f, B.TS["body_small"])], tw - 0.34) + FEAT_GAP for f in _tier_features(t)) for t in tiers), default=0)
     need = TAG_H + 2 * pad + head + 0.40 + feats
     hint = None
     if any(_value_w({"value": t.get("price"), "unit": t.get("unit")}, 36, B.TS["kpi_sub"]) > tw for t in tiers):
@@ -1307,7 +1329,7 @@ def p_pricing_tiers(slide, spec, deck):
         fy = top + TAG_H + L["pad"] + L["head"] + 0.18
         B.add_line(slide, x + L["pad"], fy, x + w - L["pad"], fy, B.C["primary"] if dark else B.C["rule"], 0.75)
         fy += 0.22
-        for f in t.get("features") or []:
+        for f in _tier_features(t):
             B.add_text(slide, x + L["pad"], fy - 0.02, 0.3, 0.3, [[("✓", B.TS["body_small"], 700,
                                                                     B.C["primary_pale"] if dark else B.C["primary"])]], wrap=False)
             fb = [_b(f, B.TS["body_small"], 400, B.C["canvas"] if dark else B.C["ink"])]

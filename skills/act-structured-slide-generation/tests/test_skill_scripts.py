@@ -4887,3 +4887,212 @@ def test_big_number_and_number_strip_support_thesis_and_recap_audits():
         audit.check_thesis(deck, errors)
         audit.check_recap(deck, errors)
         assert not errors, errors
+
+
+def test_generated_pattern_percentages_and_tier_prices_support_thesis_and_recap_audits(monkeypatch):
+    sys.path.insert(0, str(SCRIPTS))
+    import audit_argument as audit
+    examples = [
+        ({"pattern": "progress_bars", "bars": [{"label": "達成", "value": 0.7}]}, "70", "%"),
+        ({"pattern": "target_bars", "rows": [{"label": "達成", "actual": 7, "target": 10}]}, "70", "%"),
+        ({"pattern": "composition_bar", "segments": [{"label": "A", "value": 7}, {"label": "B", "value": 3}]}, "70", "%"),
+        ({"pattern": "funnel", "stages": [{"label": "流入", "value": 10},
+                                               {"label": "商談", "value": 7},
+                                               {"label": "成約", "value": 4}]}, "70", "%"),
+        ({"pattern": "pricing_tiers", "tiers": [{"name": "標準", "price": "18", "unit": "億円"}]}, "18", "億円"),
+    ]
+    for opening, value, unit in examples:
+        deck = {"meta": {"thesis": {"statement": f"結果は{value}{unit}", "value": value, "unit": unit}},
+                "slides": [opening, {"pattern": "statement", "statement": f"結果は{value}{unit}を維持する"}]}
+        errors = []
+        audit.check_thesis(deck, errors)
+        audit.check_recap(deck, errors)
+        assert not errors, (opening["pattern"], errors)
+
+    hidden = {"meta": {"thesis": {"statement": "小区分は5%", "value": "5", "unit": "%"}},
+              "slides": [{"pattern": "composition_bar", "segments": [
+                  {"label": "大", "value": 95}, {"label": "小", "value": 5}]},
+                  {"pattern": "statement", "statement": "小区分は5%を維持する"}]}
+    errors = []
+    audit.check_thesis(hidden, errors)
+    audit.check_recap(hidden, errors)
+    assert len(errors) == 2, errors
+    assert all("5%" in error for error in errors), errors
+    from deck_argument import exhibit_tokens
+    assert "95%" in exhibit_tokens(hidden["slides"][0])
+
+    hidden_with_unit = {"pattern": "composition_bar", "segments": [
+        {"label": "大", "value": 95}, {"label": "小", "value": 5, "unit": "%"}]}
+    assert "5%" not in exhibit_tokens(hidden_with_unit)
+
+    capped = {"pattern": "composition_bar", "segments": [
+        {"label": "a", "value": 30}, {"label": "b", "value": 20},
+        {"label": "c", "value": 15}, {"label": "d", "value": 10},
+        {"label": "e", "value": 10}, {"label": "f", "value": 5},
+        {"label": "not drawn", "value": 10, "note": "12億円"},
+    ]}
+    capped_tokens = exhibit_tokens(capped)
+    assert "33%" in capped_tokens and "30%" not in capped_tokens and "12億円" not in capped_tokens, capped_tokens
+
+    capped_patterns = [
+        {"pattern": "progress_bars", "bars": [{"label": str(i), "value": 0.5} for i in range(8)]
+                          + [{"label": "not drawn", "value": 0.5, "note": "12億円"}]},
+        {"pattern": "target_bars", "rows": [{"label": str(i), "actual": 1, "target": 2} for i in range(8)]
+                         + [{"label": "not drawn", "actual": 1, "target": 2, "note": "12億円"}]},
+        {"pattern": "funnel", "stages": [{"label": str(i), "value": 100 - i * 10} for i in range(6)]
+                       + [{"label": "not drawn", "value": 10, "note": "12億円"}]},
+        {"pattern": "pricing_tiers", "tiers": [{"name": str(i), "price": str(i + 1), "unit": "億円"} for i in range(4)]
+                              + [{"name": "not drawn", "price": "12", "unit": "億円"}]},
+    ]
+    for capped_pattern in capped_patterns:
+        tokens = exhibit_tokens(capped_pattern)
+        assert "12億円" not in tokens, capped_pattern
+        if capped_pattern["pattern"] == "funnel":
+            assert "20%" not in tokens, tokens
+
+    funnel_override = {"pattern": "funnel", "unit": "社", "stages": [
+        {"label": "流入", "value": 1000, "display": "約千"},
+        {"label": "商談", "value": 200, "display": "二百"}]}
+    funnel_tokens = exhibit_tokens(funnel_override)
+    assert "20%" in funnel_tokens and "1000社" not in funnel_tokens and "200社" not in funnel_tokens
+
+    ranking_override = {"pattern": "ranking", "unit": "%", "items": [
+        {"label": "A", "value": 0.1, "display": "約1割"},
+        {"label": "B", "value": 0.2, "display": "18億円"}]}
+    ranking_tokens = exhibit_tokens(ranking_override)
+    assert "18億円" in ranking_tokens and "10%" not in ranking_tokens
+    assert "12億円" not in exhibit_tokens({"pattern": "pricing_tiers", "tiers": [
+        {"name": "標準", "price": "1", "unit": "円", "features": "12億円"}]})
+
+    capped_ranking = {"pattern": "ranking", "unit": "社", "items":
+                      [{"label": str(i), "value": i} for i in range(10)]
+                      + [{"label": "not drawn", "value": 12, "display": "12億円"}],
+                      "facts": [{"value": "12", "unit": "億円"}],
+                      "kpis": [{"value": "12", "unit": "億円"}],
+                      "hero": {"value": "12", "unit": "億円"},
+                      "chart": {"values": [12], "unit": "億円"}}
+    assert "12億円" not in exhibit_tokens(capped_ranking)
+    assert "12社" not in exhibit_tokens({"pattern": "progress_bars", "unit": "社",
+                                           "bars": [{"label": "12", "value": 0.5}]})
+    stray_annotations = {"pattern": "progress_bars", "bars": [],
+                         "legend": "目標90%", "total_label": "100%", "focal_label": "30%",
+                         "facts": [{"value": "12", "unit": "億円"}],
+                         "left": {"kpis": [{"value": "12", "unit": "億円"}]}}
+    stray_tokens = exhibit_tokens(stray_annotations)
+    assert not {"90%", "100%", "30%", "12億円"} & stray_tokens, stray_tokens
+    assert "90%" in exhibit_tokens({"pattern": "target_bars", "legend": "目標90%", "rows": []})
+    assert "100%" in exhibit_tokens({"pattern": "composition_bar", "total_label": "全体100%",
+                                      "segments": [{"label": "全体", "value": 1}]})
+    assert "30%" not in exhibit_tokens({"pattern": "pricing_tiers", "focal_label": "30%オフ",
+                                         "tiers": [{"name": "標準", "price": "1", "unit": "円"}]})
+    assert "30%" in exhibit_tokens({"pattern": "pricing_tiers", "focal_label": "30%オフ",
+                                     "tiers": [{"name": "標準", "price": "1", "unit": "円", "focal": True}]})
+
+    import deck_text
+    base_resolve = deck_text.resolve_tokens
+    narrow = json.loads(json.dumps(base_resolve("standard")))
+    narrow["layout"]["margin_x_in"] = 0.9
+    float_grid = json.loads(json.dumps(base_resolve("standard")))
+    float_grid["layout"]["grid_columns"] = 12.0
+    monkeypatch.setattr(deck_text, "resolve_tokens", lambda template:
+                        narrow if template == "test_narrow" else
+                        float_grid if template == "test_float_grid" else base_resolve(template))
+    narrow_slide = {"pattern": "composition_bar", "segments": [
+        {"label": "large", "value": 94}, {"label": "small", "value": 6}]}
+    assert "6%" in exhibit_tokens(narrow_slide, "standard")
+    assert "6%" in exhibit_tokens(narrow_slide, "test_float_grid")
+    assert "6%" not in exhibit_tokens(narrow_slide, "test_narrow")
+    narrow_deck = {"meta": {"template": "test_narrow",
+                             "thesis": {"statement": "小区分は6%", "value": "6", "unit": "%"}},
+                   "slides": [narrow_slide, {"pattern": "statement", "statement": "小区分は6%を維持する"}]}
+    errors = []
+    audit.check_thesis(narrow_deck, errors)
+    audit.check_recap(narrow_deck, errors)
+    assert len(errors) == 2 and all("6%" in error for error in errors), errors
+
+    overridden = {"meta": {"thesis": {"statement": "達成率は70%", "value": "70", "unit": "%"}},
+                  "slides": [{"pattern": "progress_bars", "bars": [
+                      {"label": "達成", "value": 0.7, "display": "7割"}]},
+                      {"pattern": "statement", "statement": "達成率は70%を保つ"}]}
+    errors = []
+    audit.check_thesis(overridden, errors)
+    audit.check_recap(overridden, errors)
+    assert len(errors) == 2, errors
+    assert all("70%" in error for error in errors), errors
+
+
+def test_audit_argument_reports_unknown_or_broken_template_without_traceback(tmp_path, monkeypatch, capsys):
+    deck = {"meta": {"template": "not-a-template",
+                     "thesis": {"statement": "シェアは95%", "value": "95", "unit": "%"}},
+            "slides": [{"pattern": "composition_bar", "segments": [
+                {"label": "A", "value": 95}, {"label": "B", "value": 5}]}]}
+    path = tmp_path / "unknown-template.json"
+    path.write_text(json.dumps(deck, ensure_ascii=False))
+    result = run("audit_argument.py", path)
+    assert result.returncode == 1
+    assert "meta.template が不明" in result.stdout
+    assert "Traceback" not in result.stdout + result.stderr
+
+    import audit_argument as audit
+    import deck_text
+    templates = tmp_path / "templates"
+    templates.mkdir()
+    monkeypatch.setattr(deck_text, "TEMPLATES_DIR", templates)
+    monkeypatch.setattr(sys, "argv", ["audit_argument.py", str(path)])
+    for name, content in (("broken", "{"), ("wrong_shape", "[]"),
+                          ("wrong_width", '{"layout": {"margin_x_in": "wide"}}'),
+                          ("zero_columns", '{"layout": {"grid_columns": 0}}'),
+                          ("nan_margin", '{"layout": {"margin_x_in": NaN}}')):
+        (templates / f"{name}.json").write_text(content)
+        deck["meta"]["template"] = name
+        path.write_text(json.dumps(deck, ensure_ascii=False))
+        assert audit.main() == 1
+        output = capsys.readouterr().out
+        assert "meta.template を読み込めない" in output, output
+        assert "Traceback" not in output
+
+    import validate_spec as validate
+    for name in ("zero_columns", "nan_margin"):
+        deck["meta"]["template"] = name
+        deck["slides"] = [{"pattern": "composition_bar"}]
+        path.write_text(json.dumps(deck, ensure_ascii=False))
+        monkeypatch.setattr(sys, "argv", ["validate_spec.py", str(path)])
+        assert validate.main() == 1
+        output = capsys.readouterr().out
+        assert "ERROR:" in output and "Traceback" not in output
+
+
+@pytest.mark.parametrize("features", ["12億円", {"12億円": True}, 5, [12]])
+def test_pricing_tier_features_must_be_string_list(features):
+    sys.path.insert(0, str(SCRIPTS))
+    import act_patterns
+    slide = {"pattern": "pricing_tiers", "tiers": [
+        {"name": "標準", "price": "1", "features": features},
+        {"name": "上位", "price": "2"}]}
+    assert any("features は文字列の配列" in error for error in act_patterns.check(slide))
+    from deck_argument import exhibit_tokens
+    assert "12億円" not in exhibit_tokens(slide)
+
+
+@pytest.mark.parametrize("slide", [
+    {"pattern": "progress_bars", "bars": None},
+    {"pattern": "progress_bars", "bars": ["not an item"]},
+    {"pattern": "progress_bars", "bars": [{"label": "達成", "value": "70%"}]},
+])
+def test_audit_view_handles_malformed_pattern_items(slide):
+    sys.path.insert(0, str(SCRIPTS))
+    from deck_argument import exhibit_tokens
+    assert isinstance(exhibit_tokens(slide), set)
+
+
+def test_hidden_chart_cannot_ground_relation_claim_on_native_pattern():
+    sys.path.insert(0, str(SCRIPTS))
+    import audit_argument as audit
+    slide = {"pattern": "progress_bars", "title": "売上は前年比+12%成長",
+             "bars": [{"label": "達成", "value": 0.7}],
+             "chart": {"series": [{"values": [100, 112]}]}}
+    errors, warns = [], []
+    audit.check_claim_grounded(1, slide, errors, warns)
+    audit.check_comparison_base(1, slide, errors)
+    assert not errors, errors
+    assert any("+12%" in warn and "示す図表がない" in warn for warn in warns), warns

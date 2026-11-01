@@ -26,9 +26,10 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from deck_argument import (  # noqa: E402
-    MATERIAL, claim_tokens, claim_values, compute, exhibit_tokens, exhibit_values,
+    MATERIAL, audit_view, claim_tokens, claim_values, compute, exhibit_tokens, exhibit_values,
     lexicon, matches, resolve_path, to_number, visible_strings,
 )
+from deck_text import DEFAULT_TEMPLATE, list_templates, resolve_tokens, template_of  # noqa: E402
 
 SYNTHESIS = {"executive_summary", "statement", "two_column", "column_framework",
              "cover", "section_divider", "agenda"}
@@ -50,7 +51,7 @@ def _lex_hits(text: str, cls: dict) -> list[str]:
     return hits
 
 
-def check_language(i, s, errors, warns) -> None:
+def check_language(i, s, errors, warns, template=None) -> None:
     """言い切りの強さ。約束・順位・ぼかし・変化語を語彙表で見る(語を足すのは語彙表)。"""
     lex = lexicon()["classes"]
     visible = " ".join(visible_strings(s))
@@ -71,7 +72,7 @@ def check_language(i, s, errors, warns) -> None:
                 f"{loc}: 順位・唯一性の主張「{hit}」— {lex['rank']['fix']}"
                 "(qualifier.universe / qualifier.as_of / source を添える)")
     for hit in _lex_hits(visible, lex["motion"]):
-        if not claim_tokens(s) and not exhibit_tokens(s):
+        if not claim_tokens(s) and not exhibit_tokens(s, template):
             warns.append(f"{loc}: 量のない変化語「{hit}」— {lex['motion']['fix']}")
     for hit in _lex_hits(visible, lex["euphemism"]):
         warns.append(f"{loc}: 和らげた言葉「{hit}」— {lex['euphemism']['fix']}")
@@ -96,7 +97,7 @@ def check_provenance(i, s, deck, errors, proved_before) -> None:
     """数値を語るスライドは、出所か前提を名乗る。要約スライドは、他のスライドの図表で足りる。"""
     if s.get("pattern") in STRUCTURAL:
         return
-    tokens = exhibit_tokens(s) | claim_tokens(s)
+    tokens = exhibit_tokens(s, template_of(deck)) | claim_tokens(s)
     if not tokens:
         return
     if s.get("source") or s.get("assumption"):
@@ -110,10 +111,10 @@ def check_provenance(i, s, deck, errors, proved_before) -> None:
                   "source(外部の文書) か assumption(自分の推計) を書く")
 
 
-def check_claim_grounded(i, s, errors, warns) -> None:
+def check_claim_grounded(i, s, errors, warns, template=None) -> None:
     """図表が示していない数値は、導出として宣言するか、前のページで証明されていること。"""
     lex = lexicon()["relation_markers"]
-    ex, cl = exhibit_tokens(s), claim_tokens(s)
+    ex, cl = exhibit_tokens(s, template), claim_tokens(s)
     loc = _slide_id(i, s)
     deriv = s.get("derivation")
 
@@ -128,7 +129,7 @@ def check_claim_grounded(i, s, errors, warns) -> None:
             # 関係の主張(成長率・倍率・シェア)は、図表から計算し直せなければならない
             if deriv and str(deriv.get("value")) and _declared_matches(s, deriv, token):
                 continue
-            series = _single_series(s)
+            series = _single_series(audit_view(s, template))
             if series is None:
                 if token in ex:
                     continue
@@ -222,11 +223,12 @@ def check_derivation(i, s, errors) -> None:
         errors.append(f"{loc}: derivation が合わない(宣言 {declared} / 計算 {got:.2f})")
 
 
-def check_comparison_base(i, s, errors) -> None:
+def check_comparison_base(i, s, errors, template=None) -> None:
     """比較の主張には、比べる相手が同じページにあること。"""
     lex = lexicon()["relation_markers"]
-    chart = s.get("chart") or {}
-    table = s.get("table") or {}
+    visible = audit_view(s, template)
+    chart = visible.get("chart") or {}
+    table = visible.get("table") or {}
     if not chart and not table:
         return
     text = " ".join(claim_values(s))
@@ -495,9 +497,10 @@ def check_recap(deck, errors) -> None:
     if last.get("pattern") not in ("statement", "closing", "kpi_dashboard"):
         return
     proved: set[str] = set()
+    template = template_of(deck)
     for s in slides[:-1]:
-        proved |= exhibit_tokens(s)
-    new = sorted(claim_tokens(last) | exhibit_tokens(last))
+        proved |= exhibit_tokens(s, template)
+    new = sorted(claim_tokens(last) | exhibit_tokens(last, template))
     unproved = [t for t in new if t not in proved]
     if unproved:
         errors.append(f"slide {last_i} (締め): 前のページで示していない数値で締めている"
@@ -523,11 +526,12 @@ def check_thesis(deck, errors) -> None:
     # (Codex レビュー指摘、PR #158)
     # 符号も一致させる — 「7段階」を「-7段階」「△7段階」で満たさない(Codex レビュー指摘、PR #158)
     whole = re.compile(r"(?<![\d.,\-−△▲+±])" + re.escape(token) + r"(?!\d)")
+    template = template_of(deck)
 
     def _shown(s: dict) -> bool:
-        if token in exhibit_tokens(s):
+        if token in exhibit_tokens(s, template):
             return True
-        return any(whole.search(str(v).replace(",", "")) for v in exhibit_values(s) if isinstance(v, str))
+        return any(whole.search(str(v).replace(",", "")) for v in exhibit_values(s, template) if isinstance(v, str))
     if not any(_shown(s) for s in deck.get("slides", [])):
         errors.append(f"meta.thesis の数値「{token}」を示す図表がどのページにも無い")
 
@@ -552,22 +556,37 @@ def main() -> int:
     slides = deck.get("slides", [])
     errors: list[str] = []
     warns: list[str] = []
+    template = template_of(deck)
+    if template not in list_templates():
+        errors.append(f"meta.template が不明: {template} — 有効なテンプレート: {', '.join(list_templates())}")
+        deck = dict(deck)
+        deck["meta"] = {**(deck.get("meta") or {}), "template": DEFAULT_TEMPLATE}
+    else:
+        try:
+            resolve_tokens(template)
+            from deck_argument import composition_bar_width_in
+            composition_bar_width_in(template)
+        except (ValueError, TypeError, KeyError, AttributeError) as exc:
+            errors.append(f"meta.template を読み込めない: {exc}")
+            deck = dict(deck)
+            deck["meta"] = {**(deck.get("meta") or {}), "template": DEFAULT_TEMPLATE}
 
     lexicon()                                     # 語彙表が壊れていたら、ここで止まる
     check_thesis(deck, errors)
     check_recap(deck, errors)
 
     proved: set[str] = set()
+    template = template_of(deck)
     for i, s in enumerate(slides, start=1):
-        check_language(i, s, errors, warns)
+        check_language(i, s, errors, warns, template)
         check_source(i, s, errors)
         check_provenance(i, s, deck, errors, proved)
         check_derivation(i, s, errors)
-        check_claim_grounded(i, s, errors, warns)
-        check_comparison_base(i, s, errors)
+        check_claim_grounded(i, s, errors, warns, template)
+        check_comparison_base(i, s, errors, template)
         check_identity(i, s, errors)
         check_forward_drivers(i, s, warns)
-        proved |= exhibit_tokens(s)
+        proved |= exhibit_tokens(s, template)
 
     for w in warns:
         print(f"WARN: {w}")
